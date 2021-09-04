@@ -1,0 +1,12 @@
+{
+  "type": "code",
+  "modid": "thaumstory",
+  "name": "thaumstory",
+  "author": "Unknown",
+  "description": "To be added",
+  "version": "0.4.63",
+  "dependency": {
+    "game": ""
+  },
+  "requiredOnClient": true
+}

@@ -1,0 +1,8 @@
+{
+  "code": "dummy-wand-ammo",
+  "texture": {
+    "base": "game:block/transparent"
+  },
+  "creativeinventory": {},
+  "maxstacksize": 2147483647
+}

@@ -1,0 +1,71 @@
+{
+	"editor": {
+		"allAngles": false,
+		"entityTextureMode": false
+	},
+	"textureWidth": 16,
+	"textureHeight": 16,
+	"textureSizes": {
+	},
+	"textures": {
+	},
+	"elements": [
+		{
+			"name": "Cube1",
+			"from": [ 39.0, -0.6, 6.9 ], 
+			"to": [ 43.0, 3.5, 11.1 ], 
+			"rotationOrigin": [ 39.0, -0.6, 6.9 ],
+			"faces": {
+				"north": { "texture": "#null", "uv": [ 0.0, 0.0, 4.0, 4.0 ], "glow": 220 },
+				"east": { "texture": "#null", "uv": [ 0.0, 0.0, 4.0, 4.0 ] },
+				"south": { "texture": "#null", "uv": [ 0.0, 0.0, 4.0, 4.0 ] },
+				"west": { "texture": "#null", "uv": [ 0.0, 0.0, 4.0, 4.0 ] },
+				"up": { "texture": "#null", "uv": [ 0.0, 0.0, 4.0, 4.0 ] },
+				"down": { "texture": "#null", "uv": [ 0.0, 0.0, 4.0, 4.0 ] }
+			},
+			"children": [
+				{
+					"name": "Cube2",
+					"from": [ 0.6, -0.3, 0.5 ], 
+					"to": [ 3.5, 4.5, 3.8 ], 
+					"rotationOrigin": [ 0.6, -0.3, 0.5 ],
+					"faces": {
+						"north": { "texture": "#null", "uv": [ 0.0, 0.0, 2.5, 4.5 ], "glow": 220 },
+						"east": { "texture": "#null", "uv": [ 0.0, 0.0, 3.0, 4.5 ] },
+						"south": { "texture": "#null", "uv": [ 0.0, 0.0, 2.5, 4.5 ] },
+						"west": { "texture": "#null", "uv": [ 0.0, 0.0, 3.0, 4.5 ] },
+						"up": { "texture": "#null", "uv": [ 0.0, 0.0, 2.5, 3.0 ] },
+						"down": { "texture": "#null", "uv": [ 0.0, 0.0, 2.5, 3.0 ] }
+					}
+				},
+				{
+					"name": "Cube3",
+					"from": [ -0.4, 0.6, 0.4 ], 
+					"to": [ 4.4, 3.7, 3.8 ], 
+					"rotationOrigin": [ -0.4, 0.6, 0.4 ],
+					"faces": {
+						"north": { "texture": "#null", "uv": [ 0.0, 0.0, 4.5, 3.0 ], "glow": 220 },
+						"east": { "texture": "#null", "uv": [ 0.0, 0.0, 3.0, 3.0 ] },
+						"south": { "texture": "#null", "uv": [ 0.0, 0.0, 4.5, 3.0 ] },
+						"west": { "texture": "#null", "uv": [ 0.0, 0.0, 3.0, 3.0 ] },
+						"up": { "texture": "#null", "uv": [ 0.0, 0.0, 4.5, 3.0 ] },
+						"down": { "texture": "#null", "uv": [ 0.0, 0.0, 4.5, 3.0 ] }
+					}
+				},
+				{
+					"name": "Cube4",
+					"from": [ 0.3, 0.6, -0.4 ], 
+					"to": [ 3.6, 3.7, 4.6 ], 
+					"rotationOrigin": [ 0.3, 0.6, -0.4 ],
+					"faces": {
+						"north": { "texture": "#null", "uv": [ 0.0, 0.0, 3.0, 3.0 ], "glow": 220 },
+						"east": { "texture": "#null", "uv": [ 0.0, 0.0, 5.0, 3.0 ] },
+						"south": { "texture": "#null", "uv": [ 0.0, 0.0, 3.0, 3.0 ] },
+						"west": { "texture": "#null", "uv": [ 0.0, 0.0, 5.0, 3.0 ] },
+						"up": { "texture": "#null", "uv": [ 0.0, 0.0, 3.0, 5.0 ] },
+						"down": { "texture": "#null", "uv": [ 0.0, 0.0, 3.0, 5.0 ] }
+					}
+				}
+			]
+		}
+	]}

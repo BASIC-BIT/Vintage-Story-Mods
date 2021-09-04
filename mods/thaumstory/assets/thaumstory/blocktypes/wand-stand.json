@@ -1,0 +1,56 @@
+{
+  "code": "wand-stand",
+  "sideopaque": {
+    "all": false
+  },
+  "sidesolid": {
+    "all": false
+  },
+  "blockmaterial": "Wood",
+  shapebytype: {
+    "*-north": {
+      base: "wand-holder",
+      rotateY: 180
+    },
+    "*-east": {
+      base: "wand-holder",
+      rotateY: 90
+    },
+    "*-south": {
+      base: "wand-holder",
+      rotateY: 0
+    },
+    "*-west": {
+      base: "wand-holder",
+      rotateY: 270
+    }
+  },
+  shapeInventory: { base: "block/wood/chest/normal", rotateY: 270 },
+  replaceable: 900,
+  sideAo: {
+    all: false
+  },
+  variantgroups: [
+    {
+      code: "side",
+      loadFromProperties: "abstract/horizontalorientation"
+    }
+  ],
+  creativeinventoryStacksByType: {
+    "*-east": [
+      {
+        tabs: [
+          "general",
+          "decorative",
+          "thaumstory"
+        ],
+        stacks: [
+          {
+            type: "block",
+            code: "wand-stand-east",
+          }
+        ]
+      }
+    ]
+  }
+}

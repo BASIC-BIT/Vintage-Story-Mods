@@ -1,0 +1,210 @@
+{
+	"editor": {
+		"allAngles": false,
+		"entityTextureMode": false
+	},
+	"textureWidth": 16,
+	"textureHeight": 16,
+	"textureSizes": {
+	},
+	"textures": {
+	},
+	"elements": [
+		{
+			"name": "WandBase",
+			"from": [ 7.0, 0.3, 2.1 ], 
+			"to": [ 8.0, 1.3, 13.9 ], 
+			"rotationOrigin": [ 7.0, 0.3, 2.1 ],
+			"faces": {
+				"north": { "texture": "#core", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+				"east": { "texture": "#core", "uv": [ 0.0, 0.0, 11.5, 1.0 ] },
+				"south": { "texture": "#core", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+				"west": { "texture": "#core", "uv": [ 0.0, 0.0, 11.5, 1.0 ] },
+				"up": { "texture": "#core", "uv": [ 0.0, 0.0, 2.0, 10.0 ], "autoUv": false },
+				"down": { "texture": "#core", "uv": [ 0.0, 0.0, 1.0, 11.5 ] }
+			},
+			"children": [
+				{
+					"name": "WandCapTip",
+					"from": [ 0.0, 0.0, 11.6 ], 
+					"to": [ 1.0, 1.0, 12.3 ], 
+					"rotationOrigin": [ 0.0, 0.0, 11.6 ],
+					"faces": {
+						"north": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.0, 0.0 ], "autoUv": false },
+						"east": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+						"south": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+						"west": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+						"up": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 0.5 ] },
+						"down": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 0.5 ] }
+					},
+					"children": [
+						{
+							"name": "WandCapTipBase",
+							"from": [ -0.1, -0.1, -0.5 ], 
+							"to": [ 1.1, 1.1, 0.6 ], 
+							"rotationOrigin": [ -0.1, -0.1, -0.5 ],
+							"faces": {
+								"north": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.0, 0.0 ], "autoUv": false },
+								"east": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"south": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"west": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"up": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"down": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] }
+							}
+						},
+						{
+							"name": "WandCapTipVerticalInner",
+							"from": [ 0.1, -0.2, -0.5 ], 
+							"to": [ 0.9, 1.2, 0.5 ], 
+							"rotationOrigin": [ 0.1, -0.2, -0.5 ],
+							"faces": {
+								"north": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.0, 0.0 ], "autoUv": false },
+								"east": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"south": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+								"west": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"up": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+								"down": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 1.0 ] }
+							}
+						},
+						{
+							"name": "WandCapTipHorizontalInner",
+							"from": [ -0.2, 0.1, -0.5 ], 
+							"to": [ 1.2, 0.9, 0.5 ], 
+							"rotationOrigin": [ -0.2, 0.1, -0.5 ],
+							"faces": {
+								"north": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.0, 0.0 ], "autoUv": false },
+								"east": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 0.5 ] },
+								"south": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 0.5 ] },
+								"west": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 0.5 ] },
+								"up": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"down": { "texture": "#cap", "uv": [ 0.0, 0.0, 1.0, 1.0 ] }
+							}
+						},
+						{
+							"name": "WandCapTippyTip",
+							"from": [ 0.2, 0.2, 0.6 ], 
+							"to": [ 0.8, 0.8, 0.8 ], 
+							"rotationOrigin": [ 0.2, 0.2, 0.6 ],
+							"faces": {
+								"north": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.0, 0.0 ], "autoUv": false },
+								"east": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+								"south": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+								"west": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+								"up": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+								"down": { "texture": "#cap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] }
+							}
+						}
+					]
+				},
+				{
+					"name": "WandHiltMiddle",
+					"from": [ -0.1, -0.1, 0.0 ], 
+					"to": [ 1.1, 1.1, 2.8 ], 
+					"rotationOrigin": [ -0.1, -0.1, 0.0 ],
+					"faces": {
+						"north": { "texture": "#hilt", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+						"east": { "texture": "#hilt", "uv": [ 0.0, 0.0, 2.5, 1.0 ] },
+						"south": { "texture": "#hilt", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+						"west": { "texture": "#hilt", "uv": [ 0.0, 0.0, 2.5, 1.0 ] },
+						"up": { "texture": "#hilt", "uv": [ 0.0, 0.0, 1.0, 2.5 ] },
+						"down": { "texture": "#hilt", "uv": [ 0.0, 0.0, 1.0, 2.5 ] }
+					},
+					"children": [
+						{
+							"name": "WandHiltTop",
+							"from": [ -0.1, -0.1, 2.8 ], 
+							"to": [ 1.3, 1.3, 3.4 ], 
+							"rotationOrigin": [ -0.1, -0.1, 2.8 ],
+							"faces": {
+								"north": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"east": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+								"south": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"west": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+								"up": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 0.5 ] },
+								"down": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 0.5 ] }
+							}
+						},
+						{
+							"name": "WandHiltBottom",
+							"from": [ -0.1, -0.1, -0.3 ], 
+							"to": [ 1.3, 1.3, 0.1 ], 
+							"rotationOrigin": [ -0.1, -0.1, -0.3 ],
+							"faces": {
+								"north": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"east": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+								"south": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"west": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+								"up": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 0.5 ] },
+								"down": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 0.5 ] }
+							}
+						},
+						{
+							"name": "WandHiltTopTaper",
+							"from": [ 0.0, 0.0, 3.4 ], 
+							"to": [ 1.2, 1.2, 4.0 ], 
+							"rotationOrigin": [ 0.0, 0.0, 3.4 ],
+							"faces": {
+								"north": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 1.0 ], "autoUv": false },
+								"east": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+								"south": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"west": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.5, 1.0 ], "autoUv": false },
+								"up": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 0.5 ] },
+								"down": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 0.5 ] }
+							}
+						},
+						{
+							"name": "WandHiltBottomTaper",
+							"from": [ 0.0, 0.0, -0.4 ], 
+							"to": [ 1.2, 1.2, -0.3 ], 
+							"rotationOrigin": [ 0.0, 0.0, -0.4 ],
+							"faces": {
+								"north": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"east": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+								"south": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 1.0 ] },
+								"west": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 0.5, 1.0 ] },
+								"up": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 0.5 ] },
+								"down": { "texture": "#hiltguard", "uv": [ 0.0, 0.0, 1.0, 0.5 ] }
+							}
+						}
+					]
+				},
+				{
+					"name": "WandCapGem",
+					"from": [ 0.1, 0.1, -0.5 ], 
+					"to": [ 0.9, 0.9, -0.2 ], 
+					"rotationOrigin": [ 0.1, 0.1, -0.5 ],
+					"faces": {
+						"north": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+						"east": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+						"south": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+						"west": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+						"up": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+						"down": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] }
+					},
+					"children": [
+						{
+							"name": "WandCapGemTip",
+							"from": [ 0.1, 0.1, -0.1 ], 
+							"to": [ 0.7, 0.7, 0.3 ], 
+							"rotationOrigin": [ 0.1, 0.1, -0.1 ],
+							"faces": {
+								"north": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+								"east": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+								"south": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+								"west": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+								"up": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+								"down": { "texture": "#endcap", "uv": [ 0.0, 0.0, 0.5, 0.5 ] }
+							}
+						}
+					]
+				}
+			],
+			"attachmentpoints": [
+				{
+					"code": "Point2",
+					"posX": "0.5","posY": "0.5","posZ": "1.0",
+					"rotationX": "0.0","rotationY": "0.0","rotationZ": "0.0"
+				}
+			]
+		}
+	]}

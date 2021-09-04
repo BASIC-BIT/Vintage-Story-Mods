@@ -1,0 +1,12 @@
+{
+  "type": "code",
+  "modid": "thebasics",
+  "name": "The BASICs",
+  "author": "BASIC",
+  "description": "Adds some stuff",
+  "version": "2.5.3",
+  "dependency": {
+    "game": ""
+  },
+  "requiredOnClient": false
+}

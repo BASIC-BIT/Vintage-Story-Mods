@@ -1,0 +1,61 @@
+{
+  "code": "wand-metal",
+  "class": "ItemWand",
+  "variantgroups": [
+    {
+      "code": "corematerial",
+      "states": ["copper", "tinbronze", "blackbronze", "bismuthbronze", "iron", "meteoriciron", "steel"]
+    },
+    {
+      "code": "capmaterial",
+      "states": ["copper", "tinbronze", "blackbronze", "bismuthbronze", "iron", "meteoriciron", "steel", "gold", "silver"]
+    },
+    {
+      "code": "endcapmaterial",
+      "states": ["none", "lapislazuli", "amethyst", "clearquartz", "olivine", "quartz"]
+    }
+  ],
+  "shape": { "base": "wand" },
+  "texturesByType": {
+    "*-none": {
+      "endcap": { "base":  "game:block/transparent" },
+      "hiltguard": { "base":  "game:block/wood/oak-dark" },
+      "core": { "base":  "game:block/metal/ingot/{corematerial}" },
+      "cap": { "base":  "game:block/metal/ingot/{capmaterial}" },
+      "hilt": { "base":  "game:block/linen" }
+    },
+    "*": {
+      "endcap": { "base":  "game:item/resource/ungraded/{endcapmaterial}" },
+      "hiltguard": { "base":  "game:block/wood/oak-dark" },
+      "core": { "base":  "game:block/metal/ingot/{corematerial}" },
+      "cap": { "base":  "game:block/metal/ingot/{capmaterial}" },
+      "hilt": { "base":  "game:block/linen" }
+    }
+  },
+  "creativeinventory": { "general": ["*"], "tools": ["*"], "thaumstory": ["*"] },
+  "maxstacksize": 1,
+
+  "groundTransform": {
+    "translation": { x: 0, y: 0, z: 0 },
+    "rotation": { x: 0, y: 0, z: 0 },
+    "origin": { x: 0.5, y: 0, z: 0.5 },
+    "scale": 3.6
+  },
+  tpHandTransform: {
+    translation: { x: -0.29, y: 0.5, z: 0.1 },
+    rotation: { x: 90, y: 146, z: -16 },
+    origin: { x: 0, y: 0, z: 0 },
+    scale: 0.95
+  },
+  fpHandTransform: {
+    translation: { x: -0.6532, y: 0, z: 0 },
+    rotation: { x: -132, y: -16, z: 69 },
+    scale: 2.59
+  },
+  guiTransform: {
+    translation: { x: 0, y: 0, z: 0 },
+    rotation: { x: -78, y: -135, z: -70 },
+    origin: { x: 0.61, y: 0, z: 0.47 },
+    scale: 2.22
+  }
+}

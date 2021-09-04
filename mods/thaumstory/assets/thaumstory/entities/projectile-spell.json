@@ -1,0 +1,36 @@
+{
+  code: "projectile-spell",
+  class: "EntityProjectileSpell",
+  hitboxSize: { x: 0.125, y: 0.125 },
+  client: {
+    size: 0.4,
+    renderer: "Shape",
+    "shape": { "base": "spell-projectile" },
+    "texture": {
+      "base":"white"
+    },
+    behaviors: [
+      { code: "passivephysics",
+        groundDragFactor: 0,
+        airDragFactor: 0,
+        gravityFactor: 0
+      },
+      { code: "interpolateposition" }
+    ],
+  },
+  server: {
+    behaviors: [
+      {
+        code: "passivephysics",
+        groundDragFactor: 0,
+        airDragFactor: 0,
+        gravityFactor: 0
+      },
+      { code: "despawn", minSeconds: 600 }
+    ],
+  },
+  lightHsv: [4, 2, 14],
+  sounds: {
+  },
+  "glowlevel": 255
+}

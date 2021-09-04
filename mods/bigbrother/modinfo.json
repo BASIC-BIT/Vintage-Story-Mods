@@ -1,0 +1,11 @@
+{
+  "type": "code",
+  "modid": "roz",
+  "name": "Roz",
+  "author": "BASIC",
+  "description": "I'm watching you, Wazowski. Always watching. Always.",
+  "version": "0.0.1",
+  "dependency": {
+    "game": ""
+  }
+}

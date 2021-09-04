@@ -1,0 +1,11 @@
+{
+  "type": "code",
+  "modid": "makersmark",
+  "name": "makersmark",
+  "author": "Unknown",
+  "description": "To be added",
+  "version": "1.0.0",
+  "dependency": {
+    "game": ""
+  }
+}
