@@ -6,7 +6,9 @@ namespace autorun
 {
     public class Main : ModSystem
     {
-        public const string HotkeyCode = "egocarib_MapMarkerGUI";
+        public const string HotkeyCode = "autorun_autorun";
+
+        private ICoreClientAPI _api;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -16,15 +18,28 @@ namespace autorun
         public override void StartClientSide(ICoreClientAPI api)
         {
             base.StartClientSide(api);
+            _api = api;
             api.Input.RegisterHotKey(
                 hotkeyCode: HotkeyCode,
-                name: Lang.Get("autorun:config-keybind-name"),
-                key: GlKeys.W,
+                name: "Autorun",
+                key: GlKeys.BracketRight,
                 type: HotkeyType.CharacterControls,
-                altPressed: false, ctrlPressed: true, shiftPressed: false);
-            api.Input.
+                altPressed: false, ctrlPressed: false, shiftPressed: false);
 
-            api.Input.SetHotKeyHandler(hotkeyCode: HotkeyCode, handler: ToggleGUI);
+            api.Input.SetHotKeyHandler(hotkeyCode: HotkeyCode, handler: OnAutorunHotkey);
+
+            api.Input.InWorldAction += Input_InWorldAction;
+        }
+
+        private void Input_InWorldAction(EnumEntityAction action, bool on, ref EnumHandling handled)
+        {
+        }
+
+        private bool OnAutorunHotkey(KeyCombination key)
+        {
+            // _api.World.Player.Entity.WalkYaw = _api.World.Player.CameraYaw;
+            _api.World.Player.WorldData.EntityControls.Forward = true;
+            return false;
         }
     }
 }

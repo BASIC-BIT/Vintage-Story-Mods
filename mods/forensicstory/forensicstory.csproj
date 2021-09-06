@@ -11,6 +11,7 @@
     <AssemblyName>forensicstory</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <LangVersion>6</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -32,9 +33,15 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="0Harmony, Version=2.0.4.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\..\..\..\Users\steve\AppData\Roaming\Vintagestory\Lib\0Harmony.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
 
     <Reference Include="System.Core" />
+
+    <Reference Include="System.Web" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
 
@@ -71,16 +78,18 @@
       <HintPath>$(AppData)\Vintagestory\Lib\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="assets" />
     <Folder Include="assets\" />
     <Folder Include="src\" />
     <Content Include="modinfo.json" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="src\log.cs" />
-    <Compile Include="src\logging.cs" />
+    <Compile Include="src\Extensions.cs" />
+    <Compile Include="src\Log.cs" />
+    <Compile Include="src\Logger.cs" />
+    <Compile Include="src\LoggingModSystem.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
