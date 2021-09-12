@@ -11,13 +11,12 @@
     <AssemblyName>forensicstory</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <LangVersion>6</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\bin\Debug\forensicstory\</OutputPath>
+    <OutputPath>$(ProjectDir)\bin</OutputPath>
     <IntermediateOutputPath>..\..\obj\Debug\forensicstory\</IntermediateOutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -26,22 +25,23 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>..\..\bin\Release\forensicstory\</OutputPath>
+    <OutputPath>$(ProjectDir)\bin</OutputPath>
     <IntermediateOutputPath>..\..\obj\Release\forensicstory\</IntermediateOutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.0.4.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>..\..\..\..\Users\steve\AppData\Roaming\Vintagestory\Lib\0Harmony.dll</HintPath>
+    <Reference Include="NLog, Version=5.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c">
+      <HintPath>..\..\packages\NLog.5.0.0-preview.1\lib\net45\NLog.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
 
     <Reference Include="System.Core" />
 
-    <Reference Include="System.Web" />
+    <Reference Include="System.IO.Compression" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
 
@@ -55,46 +55,45 @@
     <Reference Include="System.Xml" />
 
     <Reference Include="VintagestoryAPI">
-      <HintPath>$(AppData)\Vintagestory\VintagestoryAPI.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>$(VINTAGE_STORY)/VintagestoryAPI.dll</HintPath>
     </Reference>
 
     <Reference Include="VSSurvivalMod">
-      <HintPath>$(AppData)\Vintagestory\Mods\VSSurvivalMod.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>$(VINTAGE_STORY)/Mods/VSSurvivalMod.dll</HintPath>
     </Reference>
 
     <Reference Include="VSEssentials">
-      <HintPath>$(AppData)\Vintagestory\Mods\VSEssentials.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>$(VINTAGE_STORY)/Mods/VSEssentials.dll</HintPath>
     </Reference>
 
     <Reference Include="VSCreativeMod">
-      <HintPath>$(AppData)\Vintagestory\Mods\VSCreativeMod.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>$(VINTAGE_STORY)/Mods/VSCreativeMod.dll</HintPath>
     </Reference>
 
     <Reference Include="Newtonsoft.Json">
-      <HintPath>$(AppData)\Vintagestory\Lib\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(VINTAGE_STORY)/Lib/Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="assets" />
     <Folder Include="assets\" />
     <Folder Include="src\" />
-    <Content Include="modinfo.json" />
+    <Content Include="modinfo.json" /><Compile Include="src\ChunkLoggingData.cs" />
+<Compile Include="src\ChunkTarget.cs" />
+<Compile Include="src\Extensions.cs" />
+<Compile Include="src\Log.cs" />
+<Compile Include="src\LoggingModSystem.cs" />
+
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="src\Extensions.cs" />
-    <Compile Include="src\Log.cs" />
-    <Compile Include="src\Logger.cs" />
-    <Compile Include="src\LoggingModSystem.cs" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>
-
+copy "$(TargetPath)" "$(ProjectDir)" 
+copy "$(TargetDir)\$(TargetName).pdb" "$(ProjectDir)" 
     </PostBuildEvent>
   </PropertyGroup>
 </Project>

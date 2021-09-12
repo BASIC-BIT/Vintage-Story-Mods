@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
 namespace forensicstory.src
@@ -20,12 +21,21 @@ namespace forensicstory.src
 
             return stringBuilder;
         }
-
+        
         public static string GetPrettyString(this BlockPos blockPos)
         {
             int blockX = (blockPos.X - 512000);
             int blockY = blockPos.Y;
             int blockZ = (blockPos.Z - 512000);
+
+            return blockX + "," + blockY + "," + blockZ;
+        }
+        
+        public static string GetPrettyString(this SyncedEntityPos pos)
+        {
+            double blockX = (pos.X - 512000);
+            double blockY = pos.Y;
+            double blockZ = (pos.Z - 512000);
 
             return blockX + "," + blockY + "," + blockZ;
         }
