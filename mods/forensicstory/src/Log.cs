@@ -10,6 +10,7 @@ namespace forensicstory.src
 {
     public abstract class Log
     {
+        protected readonly DateTime LogTime = DateTime.Now;
         public abstract string FormatLog(ICoreAPI api);
 
         public abstract string FileName { get; }
@@ -186,6 +187,39 @@ namespace forensicstory.src
 
             String ingameDate = api.World.Calendar.PrettyDate();
             log.AddLogSection("Position", _pos.GetPrettyString());
+            log.AddLogSection("Ingame date", ingameDate);
+            log.AddLogSection("Time", DateTime.Now.ToString(CultureInfo.InvariantCulture));
+
+            return log.ToString();
+        }
+    }
+    public class PlaceBombLog : PositionLog
+    {
+        private readonly IServerPlayer _byPlayer;
+        private readonly BlockSelection _blockSel;
+
+        public override string FileName => "IgniteBomb";
+        
+        public PlaceBombLog(IServerPlayer byPlayer, BlockSelection blockSel)
+        {
+            _byPlayer = byPlayer;
+            _blockSel = blockSel;
+            Pos = _blockSel.Position.ToVec3d();
+        }
+
+        public override string FormatLog(ICoreAPI api)
+        {
+
+            StringBuilder log = new StringBuilder();
+
+            log.Append(_byPlayer.PlayerName);
+            log.AddSeparator();
+            log.Append(_byPlayer.PlayerUID);
+            
+            log.AddSeparator();
+
+            String ingameDate = api.World.Calendar.PrettyDate();
+            log.AddLogSection("Position", _blockSel.Position.GetPrettyString());
             log.AddLogSection("Ingame date", ingameDate);
             log.AddLogSection("Time", DateTime.Now.ToString(CultureInfo.InvariantCulture));
 
