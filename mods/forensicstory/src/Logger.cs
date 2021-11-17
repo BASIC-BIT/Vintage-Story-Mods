@@ -6,13 +6,13 @@ using System.Timers;
 using forensicstory.util;
 using Vintagestory.API.Common;
 
-namespace forensicstory.src
+namespace forensicstory
 {
     public class Logger<T> where T : Log
     {
         private readonly ICoreAPI _api;
 
-        public static string FolderPrefix = Path.GetFullPath(Path.Combine("data", "Logs", "bigbrother-"));
+        public static string FolderPrefix;
         public static string Extension = ".txt";
 
         public int BatchSize = 50;
@@ -26,6 +26,7 @@ namespace forensicstory.src
         public Logger(ICoreAPI api = null)
         {
             _api = api;
+            FolderPrefix = Path.GetFullPath(Path.Combine(_api.DataBasePath, "Logs", "bigbrother-"));
         }
 
         public void Log(T log)

@@ -3,7 +3,7 @@ using System.Text;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
-namespace forensicstory.src
+namespace forensicstory
 {
     public static class Extensions
     {

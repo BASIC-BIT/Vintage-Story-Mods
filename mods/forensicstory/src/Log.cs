@@ -6,7 +6,7 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
-namespace forensicstory.src
+namespace forensicstory
 {
     public abstract class Log
     {

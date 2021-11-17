@@ -74,6 +74,7 @@
     
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="src\ModConfig.cs" />
     <Compile Include="src\util\DateUtility.cs" />
     <Folder Include="assets\" />
     <Folder Include="src\" />

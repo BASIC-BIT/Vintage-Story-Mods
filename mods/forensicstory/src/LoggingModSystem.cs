@@ -1,9 +1,10 @@
-﻿using Vintagestory.API.Common;
+﻿using System;
+using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
-namespace forensicstory.src
+namespace forensicstory
 {
     public class LoggingSystem : ModSystem
     {
@@ -13,6 +14,11 @@ namespace forensicstory.src
         private static Logger<BlockUseLog> _blockAccessLogger;
         private static Logger<EntityInteractLog> _entityInteractLogger;
         private static Logger<PlaceBombLog> _placeBombLogger;
+
+        private ModConfig config;
+
+        private const string CONFIGNAME = "forensicstory.json";
+        
         
         public override void StartServerSide(ICoreServerAPI api)
         {
@@ -23,6 +29,24 @@ namespace forensicstory.src
             _blockBreakLogger = new Logger<BlockBreakLog>(_api);
             _entityInteractLogger = new Logger<EntityInteractLog>(_api);
             _placeBombLogger = new Logger<PlaceBombLog>(_api);
+            
+            try
+            {
+                this.config = api.LoadModConfig<ModConfig>(CONFIGNAME);
+            }
+            catch (Exception e)
+            {
+                api.Server.LogError("Forensic Story: Failed to load mod config!");
+                return;
+            }
+
+            if (this.config == null)
+            {
+                api.Server.LogNotification($"Forensic Story: Non-existant modconfig at 'ModConfig/{CONFIGNAME}', creating default and disabling mod...");
+                api.StoreModConfig(new ModConfig(), CONFIGNAME);
+
+                return;
+            }
 
             api.Event.DidUseBlock += E_DidUseBlock;
             api.Event.DidBreakBlock += E_DidBreakBlock;

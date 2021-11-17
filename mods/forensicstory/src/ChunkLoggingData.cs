@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Vintagestory.API.MathTools;
 
-namespace forensicstory.src
+namespace forensicstory
 {
     public class ChunkLoggingData
     {
