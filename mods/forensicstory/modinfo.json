@@ -2,13 +2,12 @@
   "type": "code",
   "modid": "forensicstory",
   "name": "Forensic Story",
-  "author": "Hadrin (Edits by BASIC)",
+  "author": "Hadrin & BASIC",
   "description": "Adds logging and investigative tools.",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "side": "Server",
   "requiredOnClient": false,
   "dependency": {
     "game": ""
-  },
-  
+  }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using System.Timers;
+using forensicstory.util;
 using Vintagestory.API.Common;
 
 namespace forensicstory.src
@@ -11,7 +12,7 @@ namespace forensicstory.src
     {
         private readonly ICoreAPI _api;
 
-        public static string FolderPrefix = "./data/Logs/bigbrother-";
+        public static string FolderPrefix = Path.GetFullPath(Path.Combine("data", "Logs", "bigbrother-"));
         public static string Extension = ".txt";
 
         public int BatchSize = 50;
@@ -65,11 +66,9 @@ namespace forensicstory.src
             {
                 Task.Run(() =>
                 {
-                    var fileName = FileName;
-                    var date = DateTime.Now.ToString("yyyy-MM-dd");
                     try
                     {
-                        using (StreamWriter w = File.AppendText($"{FolderPrefix}{fileName}-{date}{Extension}"))
+                        using (StreamWriter w = File.AppendText(GetLogLocation()))
                         {
                             foreach (var log in BatchContents)
                             {
@@ -86,6 +85,11 @@ namespace forensicstory.src
                     }
                 });
             }
+        }
+
+        protected string GetLogLocation()
+        {
+            return $"{FolderPrefix}{FileName}-{DateUtility.GetDateString()}{Extension}";
         }
 
         protected void RunLogTask(object sender, ElapsedEventArgs eventArgs)
