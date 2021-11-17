@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using thebasics.Extensions;
 using thebasics.Models;
@@ -24,15 +25,33 @@ namespace thebasics
             new Dictionary<ProximityChatMode, string[]>
             {
                 { ProximityChatMode.YELL, new[] { "yells", "shouts", "exclaims" } },
-                { ProximityChatMode.NORMAL, new[] { "says" } },
-                { ProximityChatMode.WHISPER, new[] { "whispers" } }
+                { ProximityChatMode.NORMAL, new[] { "says", "states", "mentions" } },
+                { ProximityChatMode.WHISPER, new[] { "whispers", "mumbles", "mutters" } },
+                { ProximityChatMode.SIGN, new[] { "signs", "gestures", "motions" } }
             };
         private IDictionary<ProximityChatMode, string> proximityChatModePunctuation = 
             new Dictionary<ProximityChatMode, string>
             {
                 { ProximityChatMode.YELL, "!" },
                 { ProximityChatMode.NORMAL, "." },
-                { ProximityChatMode.WHISPER, "." }
+                { ProximityChatMode.WHISPER, "." },
+                { ProximityChatMode.SIGN, "." }
+            };
+        private IDictionary<ProximityChatMode, string> proximityChatModeQuotationStart = 
+            new Dictionary<ProximityChatMode, string>
+            {
+                { ProximityChatMode.YELL, "\"" },
+                { ProximityChatMode.NORMAL, "\"" },
+                { ProximityChatMode.WHISPER, "\"" },
+                { ProximityChatMode.SIGN, "<i>\'" }
+            };
+        private IDictionary<ProximityChatMode, string> proximityChatModeQuotationEnd = 
+            new Dictionary<ProximityChatMode, string>
+            {
+                { ProximityChatMode.YELL, "\"" },
+                { ProximityChatMode.NORMAL, "\"" },
+                { ProximityChatMode.WHISPER, "\"" },
+                { ProximityChatMode.SIGN, "\'</i>" }
             };
 
         private PlayerGroup proximityGroup = null;
@@ -86,6 +105,8 @@ namespace thebasics
             api.RegisterCommand("say", "Set your chat mode back to normal, or say a single message", "", Say);
             api.RegisterCommand("normal", "Set your chat mode back to normal, or say a single message", "", Say);
             api.RegisterCommand("s", "Set your chat mode back to normal, or say a single message", "", Say);
+            api.RegisterCommand("hands", "Set your chat mode to Sign Language, or sign a single message", "", Sign);
+            api.RegisterCommand("h", "Set your chat mode to Sign Language, or sign a single message", "", Sign);
             api.RegisterCommand("emotemode", "Turn Emote-only mode on or off", "/emotemode [on|off]", EmoteMode);
             api.RegisterCommand("rptext", "Turn the whole RP system on or off for your messages", "/rptext [on|off]", RpTextEnabled);
             
@@ -105,7 +126,8 @@ namespace thebasics
             {
                 { ProximityChatMode.YELL, config.ProximityChatYellBlockRange },
                 { ProximityChatMode.NORMAL, config.ProximityChatNormalBlockRange },
-                { ProximityChatMode.WHISPER, config.ProximityChatWhisperBlockRange }
+                { ProximityChatMode.WHISPER, config.ProximityChatWhisperBlockRange },
+                { ProximityChatMode.SIGN, config.ProximityChatSignBlockRange }
             };
         }
 
@@ -217,7 +239,17 @@ namespace thebasics
             {
                 return GetFullEmoteMessage(player, content, tempMode);
             }
-            return $"{player.GetNickname()}{GetProximityChatVerb(player, tempMode)} \"{GetRPMessage(player, content, tempMode)}\"";
+
+            var message = new StringBuilder();
+            message.Append(player.GetNickname());
+            message.Append(" ");
+            message.Append(GetProximityChatVerb(player, tempMode));
+            message.Append(" ");
+            message.Append(proximityChatModeQuotationStart[player.GetChatMode(tempMode)]);
+            message.Append(GetRPMessage(player, content, tempMode));
+            message.Append(proximityChatModeQuotationEnd[player.GetChatMode(tempMode)]);
+
+            return message.ToString();
         }
 
         private string GetFullEmoteMessage(IServerPlayer player, string content, ProximityChatMode? tempMode = null)
@@ -340,6 +372,18 @@ namespace thebasics
             {
                 player.SetChatMode(ProximityChatMode.YELL);
                 player.SendMessage(groupId, "You are now yelling.", EnumChatType.Notification);
+            }
+        }
+        private void Sign(IServerPlayer player, int groupId, CmdArgs args)
+        {
+            if (args.Length > 0)
+            {
+                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.SIGN), ProximityChatMode.SIGN);
+            }
+            else
+            {
+                player.SetChatMode(ProximityChatMode.SIGN);
+                player.SendMessage(groupId, "You are now signing.", EnumChatType.Notification);
             }
         }
         private void Whisper(IServerPlayer player, int groupId, CmdArgs args)

@@ -5,5 +5,6 @@
         NORMAL,
         WHISPER,
         YELL,
+        SIGN,
     }
 }
