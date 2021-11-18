@@ -5,7 +5,7 @@ namespace forensicstory
 {
     public class ChunkLoggingData
     {
-        private IDictionary<BlockPos, List<Log>> blockData { get; }
+        private IDictionary<BlockPos, List<Log>> blockData;
 
         public ChunkLoggingData()
         {

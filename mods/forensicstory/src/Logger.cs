@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
 using forensicstory.util;
@@ -65,7 +66,7 @@ namespace forensicstory
             ClearTimer();
             if (BatchContents.Count > 0)
             {
-                Task.Run(() =>
+                var task = new Task(() =>
                 {
                     try
                     {
@@ -85,12 +86,20 @@ namespace forensicstory
                         Console.WriteLine(e.ToString());
                     }
                 });
+                task.Start();
             }
         }
 
         protected string GetLogLocation()
         {
-            return $"{FolderPrefix}{FileName}-{DateUtility.GetDateString()}{Extension}";
+            var output = new StringBuilder();
+            output.Append(FolderPrefix);
+            output.Append(FileName);
+            output.Append("-");
+            output.Append(DateUtility.GetDateString());
+            output.Append(Extension);
+
+            return output.ToString();
         }
 
         protected void RunLogTask(object sender, ElapsedEventArgs eventArgs)

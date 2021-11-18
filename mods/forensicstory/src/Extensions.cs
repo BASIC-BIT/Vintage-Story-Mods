@@ -16,7 +16,7 @@ namespace forensicstory
 
         public static StringBuilder AddLogSection(this StringBuilder stringBuilder, String section, String data)
         {
-            stringBuilder.Append($"{section}: {data}");
+            stringBuilder.Append(section + ": " + data);
             stringBuilder.AddSeparator();
 
             return stringBuilder;

@@ -26,7 +26,10 @@ namespace forensicstory
         private readonly IServerPlayer _byPlayer;
         private readonly BlockSelection _blockSel;
 
-        public override string FileName => "BlockAccess";
+        public override string FileName
+        {
+            get { return "BlockAccess"; }
+        }
 
         public BlockUseLog(IServerPlayer byPlayer, BlockSelection blockSel)
         {
@@ -55,7 +58,10 @@ namespace forensicstory
         private readonly ItemSlot _slot;
         private readonly Vec3d _hitPosition;
 
-        public override string FileName => "EntityInteract";
+        public override string FileName
+        {
+            get { return "EntityInteract"; }
+        }
 
         public EntityInteractLog(
             Entity entity,
@@ -86,7 +92,10 @@ namespace forensicstory
     {
         private readonly Exception _e;
 
-        public override string FileName => "BigBrotherError";
+        public override string FileName
+        {
+            get { return "BigBrotherError"; }
+        }
 
         public SystemErrorLog(Exception e)
         {
@@ -105,8 +114,11 @@ namespace forensicstory
         private readonly BlockSelection _blockSel;
         private readonly int _oldblockId;
 
-        public override string FileName => "BlockBreak";
-        
+        public override string FileName
+        {
+            get { return "BlockBreak"; }
+        }
+
         public BlockBreakLog(IServerPlayer byPlayer,
             int oldblockId,
             BlockSelection blockSel)
@@ -134,8 +146,11 @@ namespace forensicstory
         private readonly EntityAgent _byEntity;
         private readonly BlockPos _pos;
 
-        public override string FileName => "IgniteBomb";
-        
+        public override string FileName
+        {
+            get { return "IgniteBomb"; }
+        }
+
         public IgniteBombLog(EntityAgent byEntity, BlockPos pos)
         {
             _byEntity = byEntity;
@@ -172,8 +187,11 @@ namespace forensicstory
     {
         private readonly BlockPos _pos;
 
-        public override string FileName => "Explosion";
-        
+        public override string FileName
+        {
+            get { return "Explosion"; }
+        }
+
         public ExplosionLog(BlockPos pos)
         {
             _pos = pos;
@@ -198,8 +216,11 @@ namespace forensicstory
         private readonly IServerPlayer _byPlayer;
         private readonly BlockSelection _blockSel;
 
-        public override string FileName => "IgniteBomb";
-        
+        public override string FileName
+        {
+            get { return "IgniteBomb"; }
+        }
+
         public PlaceBombLog(IServerPlayer byPlayer, BlockSelection blockSel)
         {
             _byPlayer = byPlayer;

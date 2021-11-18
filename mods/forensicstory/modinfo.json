@@ -4,7 +4,7 @@
   "name": "Forensic Story",
   "author": "Hadrin & BASIC",
   "description": "Adds logging and investigative tools.",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "side": "Server",
   "requiredOnClient": false,
   "dependency": {

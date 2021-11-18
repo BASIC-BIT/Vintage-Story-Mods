@@ -42,7 +42,7 @@ namespace forensicstory
 
             if (this.config == null)
             {
-                api.Server.LogNotification($"Forensic Story: Non-existant modconfig at 'ModConfig/{CONFIGNAME}', creating default and disabling mod...");
+                api.Server.LogNotification("Forensic Story: Non-existant modconfig at 'ModConfig/" + CONFIGNAME + "', creating default and disabling mod...");
                 api.StoreModConfig(new ModConfig(), CONFIGNAME);
 
                 return;
