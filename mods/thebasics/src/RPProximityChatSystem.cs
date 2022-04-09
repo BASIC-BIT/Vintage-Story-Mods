@@ -1,60 +1,59 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using thebasics.Extensions;
 using thebasics.Models;
+using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
-using Vintagestory.API.Util;
 
 namespace thebasics
 {
     public class ProximityChatSystem : ModSystem
     {
-        private ICoreServerAPI sapi;
-        private ModConfig config;
-        private const string PROXIMITYGROUPNAME = "Proximity";
-        private const string CONFIGNAME = "the_basics.json";
-        private IDictionary<ProximityChatMode, int> proximityChatModeDistances;
+        private ICoreServerAPI _sapi;
+        private ModConfig _config;
+        private const string ProximityGroupName = "Proximity";
+        private const string ConfigName = "the_basics.json";
+        private IDictionary<ProximityChatMode, int> _proximityChatModeDistances;
 
-        private IDictionary<ProximityChatMode, string[]> proximityChatModeVerbs =
+        private readonly IDictionary<ProximityChatMode, string[]> _proximityChatModeVerbs =
             new Dictionary<ProximityChatMode, string[]>
             {
-                { ProximityChatMode.YELL, new[] { "yells", "shouts", "exclaims" } },
-                { ProximityChatMode.NORMAL, new[] { "says", "states", "mentions" } },
-                { ProximityChatMode.WHISPER, new[] { "whispers", "mumbles", "mutters" } },
-                { ProximityChatMode.SIGN, new[] { "signs", "gestures", "motions" } }
+                { ProximityChatMode.Yell, new[] { "yells", "shouts", "exclaims" } },
+                { ProximityChatMode.Normal, new[] { "says", "states", "mentions" } },
+                { ProximityChatMode.Whisper, new[] { "whispers", "mumbles", "mutters" } },
+                { ProximityChatMode.Sign, new[] { "signs", "gestures", "motions" } }
             };
-        private IDictionary<ProximityChatMode, string> proximityChatModePunctuation = 
+        private readonly IDictionary<ProximityChatMode, string> _proximityChatModePunctuation = 
             new Dictionary<ProximityChatMode, string>
             {
-                { ProximityChatMode.YELL, "!" },
-                { ProximityChatMode.NORMAL, "." },
-                { ProximityChatMode.WHISPER, "." },
-                { ProximityChatMode.SIGN, "." }
+                { ProximityChatMode.Yell, "!" },
+                { ProximityChatMode.Normal, "." },
+                { ProximityChatMode.Whisper, "." },
+                { ProximityChatMode.Sign, "." }
             };
-        private IDictionary<ProximityChatMode, string> proximityChatModeQuotationStart = 
+        private readonly IDictionary<ProximityChatMode, string> _proximityChatModeQuotationStart = 
             new Dictionary<ProximityChatMode, string>
             {
-                { ProximityChatMode.YELL, "\"" },
-                { ProximityChatMode.NORMAL, "\"" },
-                { ProximityChatMode.WHISPER, "\"" },
-                { ProximityChatMode.SIGN, "<i>\'" }
+                { ProximityChatMode.Yell, "\"" },
+                { ProximityChatMode.Normal, "\"" },
+                { ProximityChatMode.Whisper, "\"" },
+                { ProximityChatMode.Sign, "<i>\'" }
             };
-        private IDictionary<ProximityChatMode, string> proximityChatModeQuotationEnd = 
+        private readonly IDictionary<ProximityChatMode, string> _proximityChatModeQuotationEnd = 
             new Dictionary<ProximityChatMode, string>
             {
-                { ProximityChatMode.YELL, "\"" },
-                { ProximityChatMode.NORMAL, "\"" },
-                { ProximityChatMode.WHISPER, "\"" },
-                { ProximityChatMode.SIGN, "\'</i>" }
+                { ProximityChatMode.Yell, "\"" },
+                { ProximityChatMode.Normal, "\"" },
+                { ProximityChatMode.Whisper, "\"" },
+                { ProximityChatMode.Sign, "\'</i>" }
             };
 
-        private PlayerGroup proximityGroup = null;
+        private PlayerGroup _proximityGroup;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -63,34 +62,34 @@ namespace thebasics
 
         public override void StartServerSide(ICoreServerAPI api)
         {
-            this.sapi = api;
+            this._sapi = api;
 
             try
             {
-                this.config = api.LoadModConfig<ModConfig>(CONFIGNAME);
+                this._config = api.LoadModConfig<ModConfig>(ConfigName);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 api.Server.LogError("proximitychat: Failed to load mod config!");
                 return;
             }
 
-            if (this.config == null)
+            if (_config == null)
             {
-                api.Server.LogNotification($"proximitychat: non-existant modconfig at 'ModConfig/{CONFIGNAME}', creating default...");
-                this.config = new ModConfig();
-                api.StoreModConfig(this.config, CONFIGNAME);
+                api.Server.LogNotification("proximitychat: non-existant modconfig at 'ModConfig/" + ConfigName + "', creating default...");
+                _config = new ModConfig();
+                api.StoreModConfig(this._config, ConfigName);
             }
-            else if (this.config.ProximityChatNormalBlockRange <= 0 || this.config.ProximityChatWhisperBlockRange <= 0 || this.config.ProximityChatYellBlockRange <= 0)
+            else if (_config.ProximityChatNormalBlockRange <= 0 || _config.ProximityChatWhisperBlockRange <= 0 || _config.ProximityChatYellBlockRange <= 0)
             {
-                api.Server.LogError($"proximitychat: invalid modconfig at 'ModConfig/{CONFIGNAME}'!");
+                api.Server.LogError("proximitychat: invalid modconfig at 'ModConfig/" + ConfigName + "'!");
                 return;
             }
 
-            sapi.Event.PlayerChat += Event_PlayerChat;
-            sapi.Event.PlayerJoin += Event_PlayerJoin;
+            _sapi.Event.PlayerChat += Event_PlayerChat;
+            _sapi.Event.PlayerJoin += Event_PlayerJoin;
 
-            sapi.RegisterCommand("pmessage", "Sends a message to all players in a specific area", null, OnPMessageHandler, Privilege.announce);
+            _sapi.RegisterCommand("pmessage", "Sends a message to all players in a specific area", null, OnPMessageHandler, Privilege.announce);
             api.RegisterCommand("nick", "Get or set your nickname", "", SetNickname);
             api.RegisterCommand("setnick", "Get or set your nickname", "", SetNickname);
             api.RegisterCommand("nickname", "Get or set your nickname", "", SetNickname);
@@ -110,30 +109,30 @@ namespace thebasics
             api.RegisterCommand("emotemode", "Turn Emote-only mode on or off", "/emotemode [on|off]", EmoteMode);
             api.RegisterCommand("rptext", "Turn the whole RP system on or off for your messages", "/rptext [on|off]", RpTextEnabled);
             
-            this.proximityGroup = sapi.Groups.GetPlayerGroupByName(PROXIMITYGROUPNAME);
-            if (this.proximityGroup == null)
+            _proximityGroup = _sapi.Groups.GetPlayerGroupByName(ProximityGroupName);
+            if (_proximityGroup == null)
             {
-                this.proximityGroup = new PlayerGroup()
+                _proximityGroup = new PlayerGroup()
                 {
-                    Name = PROXIMITYGROUPNAME,
+                    Name = ProximityGroupName,
                     OwnerUID = null
                 };
-                sapi.Groups.AddPlayerGroup(this.proximityGroup);
-                this.proximityGroup.Md5Identifier = GameMath.Md5Hash(this.proximityGroup.Uid.ToString() + "null");
+                _sapi.Groups.AddPlayerGroup(_proximityGroup);
+                _proximityGroup.Md5Identifier = GameMath.Md5Hash(_proximityGroup.Uid + "null");
             }
 
-            this.proximityChatModeDistances = new Dictionary<ProximityChatMode, int>
+            _proximityChatModeDistances = new Dictionary<ProximityChatMode, int>
             {
-                { ProximityChatMode.YELL, config.ProximityChatYellBlockRange },
-                { ProximityChatMode.NORMAL, config.ProximityChatNormalBlockRange },
-                { ProximityChatMode.WHISPER, config.ProximityChatWhisperBlockRange },
-                { ProximityChatMode.SIGN, config.ProximityChatSignBlockRange }
+                { ProximityChatMode.Yell, _config.ProximityChatYellBlockRange },
+                { ProximityChatMode.Normal, _config.ProximityChatNormalBlockRange },
+                { ProximityChatMode.Whisper, _config.ProximityChatWhisperBlockRange },
+                { ProximityChatMode.Sign, _config.ProximityChatSignBlockRange }
             };
         }
 
         private void OnPMessageHandler(IServerPlayer player, int groupId, CmdArgs args)
         {
-            Vec3d spawnpos = sapi.World.DefaultSpawnPosition.XYZ;
+            Vec3d spawnpos = _sapi.World.DefaultSpawnPosition.XYZ;
             spawnpos.Y = 0;
             Vec3d targetpos = null;
             if( player.Entity == null )
@@ -169,15 +168,15 @@ namespace thebasics
                 return;
             }
 
-            foreach (var nearbyPlayerData in this.sapi.World.AllOnlinePlayers.Select(x => new { Position = x.Entity.ServerPos, Player = (IServerPlayer) x }).Where(x => Math.Abs( x.Position.DistanceTo(targetpos) ) < blockRadius))
+            foreach (var nearbyPlayerData in this._sapi.World.AllOnlinePlayers.Select(x => new { Position = x.Entity.ServerPos, Player = (IServerPlayer) x }).Where(x => Math.Abs( x.Position.DistanceTo(targetpos) ) < blockRadius))
             {
-                nearbyPlayerData.Player.SendMessage(this.proximityGroup.Uid, message, EnumChatType.CommandSuccess);
+                nearbyPlayerData.Player.SendMessage(this._proximityGroup.Uid, message, EnumChatType.CommandSuccess);
             }
         }
 
         private void Event_PlayerJoin(IServerPlayer byPlayer)
         {
-            var proximityGroup = sapi.Groups.GetPlayerGroupByName(PROXIMITYGROUPNAME);
+            var proximityGroup = _sapi.Groups.GetPlayerGroupByName(ProximityGroupName);
             var playerProximityGroup = byPlayer.GetGroup(proximityGroup.Uid);
             if (playerProximityGroup == null)
             {
@@ -194,7 +193,7 @@ namespace thebasics
 
         private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data, Vintagestory.API.Datastructures.BoolRef consumed)
         {
-            var proximityGroup = sapi.Groups.GetPlayerGroupByName(PROXIMITYGROUPNAME);
+            var proximityGroup = _sapi.Groups.GetPlayerGroupByName(ProximityGroupName);
             if (proximityGroup.Uid == channelId)
             {
                 if (byPlayer.GetRpTextEnabled())
@@ -221,7 +220,7 @@ namespace thebasics
                     }
                     else
                     {
-                        byPlayer.SendMessage(channelId, $"You need a nickname to use proximity chat!  You can set it with `/nick MyName`", EnumChatType.CommandError);
+                        byPlayer.SendMessage(channelId, "You need a nickname to use proximity chat!  You can set it with `/nick MyName`", EnumChatType.CommandError);
                     }
                 }
                 else
@@ -245,21 +244,21 @@ namespace thebasics
             message.Append(" ");
             message.Append(GetProximityChatVerb(player, tempMode));
             message.Append(" ");
-            message.Append(proximityChatModeQuotationStart[player.GetChatMode(tempMode)]);
+            message.Append(_proximityChatModeQuotationStart[player.GetChatMode(tempMode)]);
             message.Append(GetRPMessage(player, content, tempMode));
-            message.Append(proximityChatModeQuotationEnd[player.GetChatMode(tempMode)]);
+            message.Append(_proximityChatModeQuotationEnd[player.GetChatMode(tempMode)]);
 
             return message.ToString();
         }
 
         private string GetFullEmoteMessage(IServerPlayer player, string content, ProximityChatMode? tempMode = null)
         {
-            return $"{player.GetNickname()}{GetEmoteMessage(content)}";
+            return player.GetNickname() + GetEmoteMessage(content);
         }
         private void SendLocalChat(IServerPlayer byPlayer, string message, ProximityChatMode? tempMode = null, EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
         {
-            var proximityGroup = sapi.Groups.GetPlayerGroupByName(PROXIMITYGROUPNAME);
-            foreach (var player in this.sapi.World.AllOnlinePlayers.Where(x => x.Entity.Pos.AsBlockPos.ManhattenDistance(byPlayer.Entity.Pos.AsBlockPos) < GetProximityChatRange(byPlayer, tempMode)))
+            var proximityGroup = _sapi.Groups.GetPlayerGroupByName(ProximityGroupName);
+            foreach (var player in this._sapi.World.AllOnlinePlayers.Where(x => x.Entity.Pos.AsBlockPos.ManhattenDistance(byPlayer.Entity.Pos.AsBlockPos) < GetProximityChatRange(byPlayer, tempMode)))
             {
                 var serverPlayer = player as IServerPlayer;
                 
@@ -269,16 +268,16 @@ namespace thebasics
 
         private int GetProximityChatRange(IServerPlayer player, ProximityChatMode? tempMode = null)
         {
-            return proximityChatModeDistances[player.GetChatMode(tempMode)];
+            return _proximityChatModeDistances[player.GetChatMode(tempMode)];
         }
 
         private string GetProximityChatVerb(IServerPlayer player, ProximityChatMode? tempMode = null)
         {
-            return proximityChatModeVerbs[player.GetChatMode(tempMode)].GetRandomElement();
+            return _proximityChatModeVerbs[player.GetChatMode(tempMode)].GetRandomElement();
         }
         private string GetProximityChatPunctuation(IServerPlayer player, ProximityChatMode? tempMode = null)
         {
-            return proximityChatModePunctuation[player.GetChatMode(tempMode)];
+            return _proximityChatModePunctuation[player.GetChatMode(tempMode)];
         }
 
         private string GetRPMessage(IServerPlayer player, string message, ProximityChatMode? tempMode = null)
@@ -325,18 +324,18 @@ namespace thebasics
             {
                 if (player.HasNickname())
                 {
-                    player.SendMessage(groupId, $"Your nickname is: {player.GetNickname()}", EnumChatType.Notification);
+                    player.SendMessage(groupId, ChatHelper.Build("Your nickname is: ", player.GetNickname()), EnumChatType.Notification);
                 }
                 else
                 {
-                    player.SendMessage(groupId, $"You don't have a nickname!  You can set it with `/nick MyName`", EnumChatType.Notification);
+                    player.SendMessage(groupId, "You don't have a nickname!  You can set it with `/nick MyName`", EnumChatType.Notification);
                 }
             }
             else
             {
                 var nickname = args.PopAll();
                 player.SetNickname(nickname);
-                player.SendMessage(groupId, $"Okay, your nickname is set to \"{nickname}\".", EnumChatType.Notification);
+                player.SendMessage(groupId, ChatHelper.Build("Okay, your nickname is set to ", ChatHelper.Quote(nickname)), EnumChatType.Notification);
             }
         }
 
@@ -348,13 +347,13 @@ namespace thebasics
             }
             else
             {
-                byPlayer.SendMessage(groupId, $"You need a nickname to use emotes!  You can set it with `/nick MyName`", EnumChatType.CommandError);
+                byPlayer.SendMessage(groupId, "You need a nickname to use emotes!  You can set it with `/nick MyName`", EnumChatType.CommandError);
             }
         }
 
         private void EnvironmentMessage(IServerPlayer byPlayer, int groupId, CmdArgs args)
         {
-            SendLocalChat(byPlayer, $"*{GetRPMessage(byPlayer, args.PopAll(), ProximityChatMode.NORMAL)}*", chatType: EnumChatType.Notification);
+            SendLocalChat(byPlayer, ChatHelper.Wrap(GetRPMessage(byPlayer, args.PopAll(), ProximityChatMode.Normal), "*"), chatType: EnumChatType.Notification);
         }
         
         private void ClearNickname(IServerPlayer player, int groupId, CmdArgs args)
@@ -366,11 +365,11 @@ namespace thebasics
         {
             if (args.Length > 0)
             {
-                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.YELL), ProximityChatMode.YELL);
+                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.Yell), ProximityChatMode.Yell);
             }
             else
             {
-                player.SetChatMode(ProximityChatMode.YELL);
+                player.SetChatMode(ProximityChatMode.Yell);
                 player.SendMessage(groupId, "You are now yelling.", EnumChatType.Notification);
             }
         }
@@ -378,11 +377,11 @@ namespace thebasics
         {
             if (args.Length > 0)
             {
-                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.SIGN), ProximityChatMode.SIGN);
+                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.Sign), ProximityChatMode.Sign);
             }
             else
             {
-                player.SetChatMode(ProximityChatMode.SIGN);
+                player.SetChatMode(ProximityChatMode.Sign);
                 player.SendMessage(groupId, "You are now signing.", EnumChatType.Notification);
             }
         }
@@ -390,11 +389,11 @@ namespace thebasics
         {
             if (args.Length > 0)
             {
-                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.WHISPER), ProximityChatMode.WHISPER);
+                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.Whisper), ProximityChatMode.Whisper);
             }
             else
             {
-                player.SetChatMode(ProximityChatMode.WHISPER);
+                player.SetChatMode(ProximityChatMode.Whisper);
                 player.SendMessage(groupId, "You are now whispering.", EnumChatType.Notification);
             }
         }
@@ -402,11 +401,11 @@ namespace thebasics
         {
             if (args.Length > 0)
             {
-                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.NORMAL), ProximityChatMode.NORMAL);
+                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.Normal), ProximityChatMode.Normal);
             }
             else
             {
-                player.SetChatMode(ProximityChatMode.NORMAL);
+                player.SetChatMode(ProximityChatMode.Normal);
                 player.SendMessage(groupId, "You are now talking normally.", EnumChatType.Notification);
             }
         }
@@ -429,7 +428,7 @@ namespace thebasics
             var emoteMode = value == "on";
             
             player.SetEmoteMode(emoteMode);
-            player.SendMessage(groupId, $"Emote mode is now {value}.", EnumChatType.Notification);
+            player.SendMessage(groupId, ChatHelper.Build("Emote mode is now ", value), EnumChatType.Notification);
         }
 
         private void RpTextEnabled(IServerPlayer player, int groupId, CmdArgs args)
@@ -451,7 +450,7 @@ namespace thebasics
             var rpTextEnabled = value == "on";
             
             player.SetRpTextEnabled(rpTextEnabled);
-            player.SendMessage(groupId, $"RP Text is now {value} for your messages.", EnumChatType.Notification);
+            player.SendMessage(groupId, ChatHelper.Build("RP Text is now ", value, " for your messages."), EnumChatType.Notification);
         }
     }
 }

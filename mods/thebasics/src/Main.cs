@@ -16,11 +16,11 @@ namespace thebasics
 
         private ICoreServerAPI api
         {
-            get => Api;
-            set => Api = value;
+            get { return Api; }
+            set { Api = value; }
         }
 
-        private ModConfig config;
+        private ModConfig _config;
 
         private const string CONFIGNAME = "the_basics.json";
 
@@ -33,17 +33,18 @@ namespace thebasics
         {
             try
             {
-                this.config = api.LoadModConfig<ModConfig>(CONFIGNAME);
+                _config = api.LoadModConfig<ModConfig>(CONFIGNAME);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 api.Server.LogError("The Basics: Failed to load mod config!");
                 return;
             }
 
-            if (this.config == null)
+            if (_config == null)
             {
-                api.Server.LogNotification($"The Basics: Non-existant modconfig at 'ModConfig/{CONFIGNAME}', creating default and disabling mod...");
+                api.Server.LogNotification(
+                    "The Basics: Non-existant modconfig at 'ModConfig/" + CONFIGNAME + "', creating default and disabling mod...");
                 api.StoreModConfig(new ModConfig(), CONFIGNAME);
 
                 return;
@@ -51,10 +52,7 @@ namespace thebasics
 
             this.api = api;
 
-            Task.Run(async () =>
-            {
-                await this.MainAsync(api);
-            });
+            Task.Run(async () => { await this.MainAsync(api); });
         }
 
         private async Task MainAsync(ICoreServerAPI api)
@@ -67,17 +65,19 @@ namespace thebasics
 
         private void Event_GameWorldSave()
         {
-            if (config.SendServerSaveAnnouncement)
+            if (_config.SendServerSaveAnnouncement)
             {
-                api.SendMessageToGroup(GlobalConstants.GeneralChatGroup, this.config.TEXT_ServerSaveAnnouncement, EnumChatType.Notification);
+                api.SendMessageToGroup(GlobalConstants.GeneralChatGroup, this._config.TEXT_ServerSaveAnnouncement,
+                    EnumChatType.Notification);
             }
         }
 
         private void Event_SaveFinished()
         {
-            if (config.SendServerSaveFinishedAnnouncement)
+            if (_config.SendServerSaveFinishedAnnouncement)
             {
-                api.SendMessageToGroup(GlobalConstants.GeneralChatGroup, this.config.TEXT_ServerSaveFinished, EnumChatType.Notification);
+                api.SendMessageToGroup(GlobalConstants.GeneralChatGroup, this._config.TEXT_ServerSaveFinished,
+                    EnumChatType.Notification);
             }
         }
     }

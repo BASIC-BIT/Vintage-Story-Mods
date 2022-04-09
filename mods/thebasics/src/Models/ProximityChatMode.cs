@@ -2,9 +2,9 @@
 {
     public enum ProximityChatMode
     {
-        NORMAL,
-        WHISPER,
-        YELL,
-        SIGN,
+        Normal,
+        Whisper,
+        Yell,
+        Sign,
     }
 }

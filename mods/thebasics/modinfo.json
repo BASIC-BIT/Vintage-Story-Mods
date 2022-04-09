@@ -3,8 +3,8 @@
   "modid": "thebasics",
   "name": "The BASICs",
   "author": "BASIC",
-  "description": "Adds some stuff",
-  "version": "2.6.1",
+  "description": "Adds an RP proximity chat system, with configurable talking ranges, nicknames, automatic message formatting, and more!",
+  "version": "2.7.0",
   "dependency": {
     "game": ""
   },
