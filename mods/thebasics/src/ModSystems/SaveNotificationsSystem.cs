@@ -1,16 +1,13 @@
 ﻿using System;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using thebasics.Configs;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
-using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
-using Vintagestory.API.Util;
-using Vintagestory.GameContent;
 
-namespace thebasics
+namespace thebasics.ModSystems
 {
-    public class Main : ModSystem
+    public class SaveNotificationsSystem : ModSystem
     {
         public static ICoreServerAPI Api;
 
@@ -44,7 +41,8 @@ namespace thebasics
             if (_config == null)
             {
                 api.Server.LogNotification(
-                    "The Basics: Non-existant modconfig at 'ModConfig/" + CONFIGNAME + "', creating default and disabling mod...");
+                    "The Basics: Non-existant modconfig at 'ModConfig/" + CONFIGNAME +
+                    "', creating default and disabling mod...");
                 api.StoreModConfig(new ModConfig(), CONFIGNAME);
 
                 return;
@@ -52,7 +50,7 @@ namespace thebasics
 
             this.api = api;
 
-            Task.Run(async () => { await this.MainAsync(api); });
+            Task.Run(async () => { await MainAsync(api); });
         }
 
         private async Task MainAsync(ICoreServerAPI api)

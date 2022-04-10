@@ -1,14 +1,52 @@
-﻿using System.Text;
+﻿using System.Linq;
+using System.Text;
 
 namespace thebasics.Utilities
 {
     public static class ChatHelper
     {
+        private static readonly char[] Punctuation =
+        {
+            '.',
+            '!',
+            '?',
+            '~',
+            '-',
+            ';',
+            ':',
+            '/',
+            ',',
+            '"',
+            '\'',
+        };
+
+        public static bool IsPunctuation(char character)
+        {
+            return Punctuation.Any(punctuation => character == punctuation);
+        }
+
+        public static bool DoesMessageNeedPunctuation(string input)
+        {
+            if (input.Length == 0)
+            {
+                return false;
+            }
+
+            var lastCharacter = input[input.Length - 1];
+
+            return !IsPunctuation(lastCharacter);
+        }
+
+        public static string Trim(string input)
+        {
+            return input.Trim();
+        }
+
         public static string Strong(string input)
         {
             return WrapWithTag(input, "strong");
         }
-        
+
         public static string Quote(string input)
         {
             var builder = new StringBuilder();
@@ -19,7 +57,7 @@ namespace thebasics.Utilities
 
             return builder.ToString();
         }
-        
+
         public static string Wrap(string input, string wrap)
         {
             var builder = new StringBuilder();
@@ -50,6 +88,7 @@ namespace thebasics.Utilities
             {
                 builder.Append("/");
             }
+
             builder.Append(tag);
             builder.Append(">");
 
