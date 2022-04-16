@@ -51,6 +51,7 @@ namespace thebasics.ModSystems
             if (!targetPlayer.GetTpAllowed())
             {
                 player.SendMessage(groupId, "Player has teleport requests from other players disabled.", EnumChatType.CommandError);
+                return;
             }
 
             var requestMessage = new StringBuilder();
@@ -58,10 +59,11 @@ namespace thebasics.ModSystems
             requestMessage.Append(player.PlayerName);
             requestMessage.Append(
                 " has requested to teleport to you.  Type `/tpaccept` to accept, or `/tpdeny` to deny.");
-            API.SendMessage(targetPlayer, GlobalConstants.GeneralChatGroup, requestMessage.ToString(), EnumChatType.Notification);
+            targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup, requestMessage.ToString(), EnumChatType.Notification);
             
             targetPlayer.SetLastTpa(player);
             player.SetTpaTime(API.World.Calendar);
+            player.SendMessage(groupId, "Teleport request to " + targetPlayer.PlayerName + " has been sent.", EnumChatType.CommandSuccess);
         }
 
 
@@ -75,7 +77,7 @@ namespace thebasics.ModSystems
                 return;
             }
             
-            API.SendMessage(targetPlayer, GlobalConstants.GeneralChatGroup, "Your teleport request has been accepted!", EnumChatType.CommandSuccess);
+            targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup, "Your teleport request has been accepted!", EnumChatType.CommandSuccess);
             var pos = player.Entity.Pos;
             
             targetPlayer.Entity.TeleportToDouble(pos.X, pos.Y, pos.Z);
@@ -92,7 +94,7 @@ namespace thebasics.ModSystems
                 return;
             }
             
-            API.SendMessage(targetPlayer, GlobalConstants.GeneralChatGroup, "Your teleport request has been denied!", EnumChatType.CommandError);
+            targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup, "Your teleport request has been denied!", EnumChatType.CommandError);
             player.ClearLastTpa();
         }
 

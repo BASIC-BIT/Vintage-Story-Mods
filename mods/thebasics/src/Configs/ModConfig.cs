@@ -64,8 +64,8 @@ namespace thebasics.Configs
         // public bool TrackPlayerBlocksBroken = true;
 
         public bool AllowPlayerTpa = true;
-        public decimal TpaCooldownInGameHours = 1;
-        // public decimal TpaExpirationInGameHours = 1;
+        public double TpaCooldownInGameHours = 1;
+        // public double TpaExpirationInGameHours = 1;
         // public bool LogTpaToAdminChat = true;
     }
 }

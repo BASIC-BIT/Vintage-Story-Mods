@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using System.Collections.Generic;
+using System.Text;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
@@ -9,6 +11,35 @@ namespace thebasics.ModSystems
 {
     public class PlayerStatSystem : BaseBasicModSystem
     {
+        private class StatDefinition
+        {
+            public Func<ModConfig, bool> Enabled;
+            public string Title;
+            public Func<IServerPlayer, string> Stat;
+        }
+
+        private List<StatDefinition> _stats = new List<StatDefinition>
+        {
+            new StatDefinition
+            {
+                Enabled = config => config.TrackPlayerDeaths,
+                Stat = player => player.GetDeathCount().ToString(),
+                Title = "Deaths",
+            },
+            new StatDefinition
+            {
+                Enabled = config => config.TrackPlayerOnPlayerKills,
+                Stat = player => player.GetPlayerKillCount().ToString(),
+                Title = "Player Kills",
+            },
+            new StatDefinition
+            {
+                Enabled = config => config.TrackPlayerOnNpcKills,
+                Stat = player => player.GetNpcKillCount().ToString(),
+                Title = "NPC Kills",
+            },
+        };
+        
         protected override void BasicStartServerSide()
         {
             if (Config.PlayerStatSystem)
@@ -36,32 +67,28 @@ namespace thebasics.ModSystems
 
             var otherPlayer = args.Length > 0;
             var targetPlayer = otherPlayer ? API.GetPlayerByName(args[0]) : player;
-                
+
+            if (targetPlayer == null)
+            {
+                player.SendMessage(groupId, "Could not find target player", EnumChatType.CommandError);
+                return;
+            }
+
             var message = new StringBuilder();
             var messageName = otherPlayer ? ChatHelper.Build(targetPlayer.PlayerName, "'s") : "Your";
             message.Append(messageName);
             message.Append(" Stats:\n");
-            if (Config.TrackPlayerDeaths)
-            {
-                message.Append("Deaths: ");
-                message.Append(targetPlayer.GetDeathCount());
-                message.Append("\n");
-            }
-
-            if (Config.TrackPlayerOnPlayerKills)
-            {
-                message.Append("Player Kills: ");
-                message.Append(targetPlayer.GetPlayerKillCount());
-                message.Append("\n");
-            }
-
-            if (Config.TrackPlayerOnNpcKills)
-            {
-                message.Append("NPC Kills: ");
-                message.Append(targetPlayer.GetNpcKillCount());
-                message.Append("\n");
-            }
             
+            foreach (var stat in _stats)
+            {
+                if (stat.Enabled(Config))
+                {
+                    message.Append(stat.Title + ": ");
+                    message.Append(stat.Stat(targetPlayer));
+                    message.Append("\n");
+                }
+            }
+
             player.SendMessage(groupId, message.ToString(), EnumChatType.CommandSuccess);
         }
 

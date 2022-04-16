@@ -152,7 +152,7 @@ namespace thebasics.Extensions
             var prevHours = GetModData(player, ModDataTpaTime, Double.MinValue);
             var curHours = cal.TotalHours;
 
-            var diff = (decimal) (curHours - prevHours);
+            var diff = curHours - prevHours;
 
             return diff > config.TpaCooldownInGameHours;
         }
