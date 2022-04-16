@@ -1,4 +1,7 @@
-﻿using thebasics.Models;
+﻿using System;
+using thebasics.Configs;
+using thebasics.Models;
+using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
@@ -16,6 +19,8 @@ namespace thebasics.Extensions
         private const string ModDataNpcKillCount = "BASIC_COUNT_KILLS_NPC";
         
         private const string ModDataLastTpa = "BASIC_LAST_TPA_PLAYER_ID";
+        private const string ModDataTpaTime = "BASIC_TPA_TIME";
+        private const string ModDataTpAllowed = "BASIC_TPA_ALLOWED";
 
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
         {
@@ -140,6 +145,31 @@ namespace thebasics.Extensions
         public static void ClearLastTpa(this IServerPlayer player)
         {
             SetModData<string>(player, ModDataLastTpa, null);
+        }
+
+        public static bool CanTpa(this IServerPlayer player, IGameCalendar cal, ModConfig config)
+        {
+            var prevHours = GetModData(player, ModDataTpaTime, Double.MinValue);
+            var curHours = cal.TotalHours;
+
+            var diff = (decimal) (curHours - prevHours);
+
+            return diff > config.TpaCooldownInGameHours;
+        }
+
+        public static void SetTpaTime(this IServerPlayer player, IGameCalendar cal)
+        {
+            SetModData(player, ModDataTpaTime, cal.TotalHours);
+        }
+
+        public static void SetTpAllowed(this IServerPlayer player, bool allowed)
+        {
+            SetModData(player, ModDataTpAllowed, allowed);
+        }
+
+        public static bool GetTpAllowed(this IServerPlayer player)
+        {
+            return GetModData(player, ModDataTpAllowed, true);
         }
     }
 }

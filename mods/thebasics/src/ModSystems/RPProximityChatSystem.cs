@@ -40,9 +40,8 @@ namespace thebasics.ModSystems
                 "Set your chat mode back to normal, or say a single message", "", Say);
             API.RegisterCommand(new[] {"hands", "h"}, "Set your chat mode to Sign Language, or sign a single message",
                 "", Sign);
-            API.RegisterCommand("emotemode", "Turn Emote-only mode on or off", "/emotemode [on|off]", EmoteMode);
-            API.RegisterCommand("rptext", "Turn the whole RP system on or off for your messages", "/rptext [on|off]",
-                RpTextEnabled);
+            API.RegisterOnOffCommand("emotemode", "Turn Emote-only mode on or off", EmoteMode);
+            API.RegisterOnOffCommand("rptext", "Turn the whole RP system on or off for your messages", RpTextEnabled);
         }
 
         private void HookEvents()
@@ -378,48 +377,18 @@ namespace thebasics.ModSystems
             }
         }
 
-        private void EmoteMode(IServerPlayer player, int groupId, CmdArgs args)
+        private void EmoteMode(IServerPlayer player, int groupId, bool emoteMode)
         {
-            if (args.Length != 1)
-            {
-                player.SendMessage(groupId, "Usage: /emotemode [on|off]", EnumChatType.CommandError);
-                return;
-            }
-
-            var value = args[0].ToLower();
-
-            if (value != "on" && value != "off")
-            {
-                player.SendMessage(groupId, "Usage: /emotemode [on|off]", EnumChatType.CommandError);
-                return;
-            }
-
-            var emoteMode = value == "on";
-
             player.SetEmoteMode(emoteMode);
-            player.SendMessage(groupId, ChatHelper.Build("Emote mode is now ", value), EnumChatType.Notification);
+            player.SendMessage(groupId, ChatHelper.Build("Emote mode is now ", ChatHelper.OnOff(emoteMode)),
+                EnumChatType.Notification);
         }
 
-        private void RpTextEnabled(IServerPlayer player, int groupId, CmdArgs args)
+        private void RpTextEnabled(IServerPlayer player, int groupId, bool rpTextEnabled)
         {
-            if (args.Length != 1)
-            {
-                player.SendMessage(groupId, "Usage: /rptext [on|off]", EnumChatType.CommandError);
-                return;
-            }
-
-            var value = args[0].ToLower();
-
-            if (value != "on" && value != "off")
-            {
-                player.SendMessage(groupId, "Usage: /rptext [on|off]", EnumChatType.CommandError);
-                return;
-            }
-
-            var rpTextEnabled = value == "on";
-
             player.SetRpTextEnabled(rpTextEnabled);
-            player.SendMessage(groupId, ChatHelper.Build("RP Text is now ", value, " for your messages."),
+            player.SendMessage(groupId,
+                ChatHelper.Build("RP Text is now ", ChatHelper.OnOff(rpTextEnabled), " for your messages."),
                 EnumChatType.Notification);
         }
     }

@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using thebasics.Extensions;
+using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Server;
@@ -22,32 +23,42 @@ namespace thebasics.ModSystems
                     API.Event.OnEntityDeath += OnEntityDeath;
                 }
 
-                API.RegisterCommand("playerstats", "Get your player stats", "/stats", GetStats);
+                API.RegisterCommand("playerstats", "Get your player stats, or another players", "/playerstats (name)", GetStats);
             }
         }
 
         private void GetStats(IServerPlayer player, int groupId, CmdArgs args)
         {
+            if (args.Length > 2)
+            {
+                player.SendMessage(groupId, "Usage: /playerstats (name)", EnumChatType.CommandError);
+            }
+
+            var otherPlayer = args.Length > 0;
+            var targetPlayer = otherPlayer ? API.GetPlayerByName(args[0]) : player;
+                
             var message = new StringBuilder();
-            message.Append("Player Stats:\n");
+            var messageName = otherPlayer ? ChatHelper.Build(targetPlayer.PlayerName, "'s") : "Your";
+            message.Append(messageName);
+            message.Append(" Stats:\n");
             if (Config.TrackPlayerDeaths)
             {
                 message.Append("Deaths: ");
-                message.Append(player.GetDeathCount());
+                message.Append(targetPlayer.GetDeathCount());
                 message.Append("\n");
             }
 
             if (Config.TrackPlayerOnPlayerKills)
             {
                 message.Append("Player Kills: ");
-                message.Append(player.GetPlayerKillCount());
+                message.Append(targetPlayer.GetPlayerKillCount());
                 message.Append("\n");
             }
 
             if (Config.TrackPlayerOnNpcKills)
             {
                 message.Append("NPC Kills: ");
-                message.Append(player.GetNpcKillCount());
+                message.Append(targetPlayer.GetNpcKillCount());
                 message.Append("\n");
             }
             

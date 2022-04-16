@@ -1,5 +1,8 @@
 ﻿using System.Linq;
 using System.Text;
+using thebasics.Extensions;
+using Vintagestory.API.Common;
+using Vintagestory.API.Server;
 
 namespace thebasics.Utilities
 {
@@ -100,6 +103,11 @@ namespace thebasics.Utilities
             Start,
             End,
         }
+        
+        public static string OnOff(bool value)
+        {
+            return value ? "on" : "off";
+        }
 
         public static string Build(params string[] values)
         {
@@ -111,5 +119,7 @@ namespace thebasics.Utilities
 
             return builder.ToString();
         }
+
+        public delegate void OnOffChatCommandDelegate(IServerPlayer player, int groupId, bool value);
     }
 }
