@@ -9,7 +9,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
-namespace thebasics.ModSystems
+namespace thebasics.ModSystems.ProximityChat
 {
     public class RPProximityChatSystem : BaseBasicModSystem
     {

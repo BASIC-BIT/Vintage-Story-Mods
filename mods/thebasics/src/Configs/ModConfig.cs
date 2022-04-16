@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using thebasics.Models;
+using thebasics.ModSystems.PlayerStats.Models;
 
 namespace thebasics.Configs
 {
@@ -58,10 +59,12 @@ namespace thebasics.Configs
         public string TEXT_ServerSaveFinished = "Server save has finished.";
 
         public bool PlayerStatSystem = true;
-        public bool TrackPlayerDeaths = true;
-        public bool TrackPlayerOnPlayerKills = true;
-        public bool TrackPlayerOnNpcKills = true;
-        // public bool TrackPlayerBlocksBroken = true;
+        public IDictionary<PlayerStatType, bool> PlayerStatToggles = new Dictionary<PlayerStatType, bool>
+        {
+            {PlayerStatType.Deaths, true},
+            {PlayerStatType.NpcKills, true},
+            {PlayerStatType.PlayerKills, true},
+        };
 
         public bool AllowPlayerTpa = true;
         public double TpaCooldownInGameHours = 1;

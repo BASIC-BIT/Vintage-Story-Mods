@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Linq;
 using thebasics.Configs;
 using thebasics.Models;
+using thebasics.ModSystems.PlayerStats.Definitions;
+using thebasics.ModSystems.PlayerStats.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -13,10 +16,8 @@ namespace thebasics.Extensions
         private const string ModDataChatMode = "BASIC_CHATMODE";
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
         private const string ModDataRpTextEnabled = "BASIC_RPTEXTENABLED";
-        
-        private const string ModDataDeathCount = "BASIC_COUNT_DEATHS";
-        private const string ModDataPlayerKillCount = "BASIC_COUNT_KILLS_PLAYER";
-        private const string ModDataNpcKillCount = "BASIC_COUNT_KILLS_NPC";
+
+        private const string ModDataPlayerStatsPrefix = "BASIC_COUNT_";
         
         private const string ModDataLastTpa = "BASIC_LAST_TPA_PLAYER_ID";
         private const string ModDataTpaTime = "BASIC_TPA_TIME";
@@ -81,42 +82,26 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataRpTextEnabled, true);
         }
-
-        public static int GetDeathCount(this IServerPlayer player)
-        {
-            return GetModData(player, ModDataDeathCount, 0);
-        }
         
-        public static void AddDeathCount(this IServerPlayer player)
+        private static string GetPlayerStatID(PlayerStatType type)
         {
-            AddCount(player, ModDataDeathCount);
+            return ModDataPlayerStatsPrefix + StatTypes.Types[type].ID;
         }
 
-        public static int GetNpcKillCount(this IServerPlayer player)
+        public static int GetPlayerStat(this IServerPlayer player, PlayerStatType type, int defaultValue = 0)
         {
-            return GetModData(player, ModDataNpcKillCount, 0);
+            return GetModData(player, GetPlayerStatID(type), defaultValue);
         }
         
-        public static void AddNpcKillCount(this IServerPlayer player)
+        public static void AddPlayerStat(this IServerPlayer player, PlayerStatType type)
         {
-            AddCount(player, ModDataNpcKillCount);
+            AddCount(player, GetPlayerStatID(type));
         }
 
-        public static int GetPlayerKillCount(this IServerPlayer player)
+        public static void ClearPlayerStats(this IServerPlayer player)
         {
-            return GetModData(player, ModDataPlayerKillCount, 0);
-        }
-        
-        public static void AddPlayerKillCount(this IServerPlayer player)
-        {
-            AddCount(player, ModDataPlayerKillCount);
-        }
-        
-        public static void ClearCounts(this IServerPlayer player)
-        {
-            SetModData(player, ModDataDeathCount, 0);
-            SetModData(player, ModDataNpcKillCount, 0);
-            SetModData(player, ModDataPlayerKillCount, 0);
+            StatTypes.Types.Keys.ToList().ForEach(type =>
+                SetModData(player, GetPlayerStatID(type), 0));
         }
 
         private static void AddCount(IServerPlayer player, string key)

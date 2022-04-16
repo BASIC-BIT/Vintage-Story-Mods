@@ -1,7 +1,7 @@
 ﻿using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 
-namespace thebasics.ModSystems
+namespace thebasics.ModSystems.SaveNotifications
 {
     public class SaveNotificationsSystem : BaseBasicModSystem
     {

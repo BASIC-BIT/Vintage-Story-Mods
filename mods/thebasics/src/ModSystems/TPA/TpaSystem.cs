@@ -4,7 +4,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
-namespace thebasics.ModSystems
+namespace thebasics.ModSystems.TPA
 {
     public class TpaSystem : BaseBasicModSystem
     {
