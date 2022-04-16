@@ -86,11 +86,15 @@
   <ItemGroup>
     <Compile Include="src\Configs\ModConfig.cs" />
     <Compile Include="src\Extensions\ArrayExtensions.cs" />
+    <Compile Include="src\Extensions\EntityExtensions.cs" />
     <Compile Include="src\Extensions\ICoreServerAPIExtensions.cs" />
     <Compile Include="src\Extensions\IServerPlayerExtensions.cs" />
     <Compile Include="src\Models\ProximityChatMode.cs" />
+    <Compile Include="src\ModSystems\BaseBasicModSystem.cs" />
+    <Compile Include="src\ModSystems\PlayerStatSystem.cs" />
     <Compile Include="src\ModSystems\SaveNotificationsSystem.cs" />
     <Compile Include="src\ModSystems\RPProximityChatSystem.cs" />
+    <Compile Include="src\ModSystems\TpaSystem.cs" />
     <Compile Include="src\Utilities\ChatHelper.cs" />
   </ItemGroup>
   <ItemGroup>

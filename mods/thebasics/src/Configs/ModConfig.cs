@@ -56,5 +56,15 @@ namespace thebasics.Configs
 
         public string TEXT_ServerSaveAnnouncement = "Server save has started - expect lag for a few seconds.";
         public string TEXT_ServerSaveFinished = "Server save has finished.";
+
+        public bool PlayerStatSystem = true;
+        public bool TrackPlayerDeaths = true;
+        public bool TrackPlayerOnPlayerKills = true;
+        public bool TrackPlayerOnNpcKills = true;
+        // public bool TrackPlayerBlocksBroken = true;
+
+        public bool AllowPlayerTpa = true;
+        // public int TpaCooldownSeconds = 120;
+        // public bool LogTpaToAdminChat = true;
     }
 }

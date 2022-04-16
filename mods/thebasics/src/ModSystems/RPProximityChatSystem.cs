@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.Utilities;
@@ -12,81 +11,49 @@ using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems
 {
-    public class RPProximityChatSystem : ModSystem
+    public class RPProximityChatSystem : BaseBasicModSystem
     {
-        private ICoreServerAPI _sapi;
-        private ModConfig _config;
         private const string ProximityGroupName = "Proximity";
-        private const string ConfigName = "the_basics.json";
         private PlayerGroup _proximityGroup;
 
-        public override bool ShouldLoad(EnumAppSide forSide)
+        protected override void BasicStartServerSide()
         {
-            return forSide == EnumAppSide.Server;
-        }
-
-        public override void StartServerSide(ICoreServerAPI api)
-        {
-            _sapi = api;
-
-            LoadConfig();
             HookEvents();
             RegisterCommands();
             SetupProximityGroup();
         }
 
-        private void LoadConfig()
-        {
-            try
-            {
-                _config = _sapi.LoadModConfig<ModConfig>(ConfigName);
-            }
-            catch (Exception)
-            {
-                _sapi.Server.LogError("proximitychat: Failed to load mod config!");
-                return;
-            }
-
-            if (_config == null)
-            {
-                _sapi.Server.LogNotification("proximitychat: non-existant modconfig at 'ModConfig/" + ConfigName +
-                                             "', creating default...");
-                _config = new ModConfig();
-                _sapi.StoreModConfig(this._config, ConfigName);
-            }
-        }
-
         private void RegisterCommands()
         {
-            _sapi.RegisterCommand("pmessage", "Sends a message to all players in a specific area", null,
+            API.RegisterCommand("pmessage", "Sends a message to all players in a specific area", null,
                 OnPMessageHandler, Privilege.announce);
-            _sapi.RegisterCommand(new[] {"nick", "setnick", "nickname"}, "Get or set your nickname", "", SetNickname);
-            _sapi.RegisterCommand("clearnick", "Clear your nickname", "", ClearNickname);
-            _sapi.RegisterCommand(new[] {"me", "m"}, "Send a proximity emote message", "", Emote);
-            _sapi.RegisterCommand("it", "Send a proximity environment message", "", EnvironmentMessage);
-            _sapi.RegisterCommand(new[] {"yell", "y"}, "Set your chat mode to Yelling, or yell a single message", "",
+            API.RegisterCommand(new[] {"nick", "setnick", "nickname"}, "Get or set your nickname", "", SetNickname);
+            API.RegisterCommand("clearnick", "Clear your nickname", "", ClearNickname);
+            API.RegisterCommand(new[] {"me", "m"}, "Send a proximity emote message", "", Emote);
+            API.RegisterCommand("it", "Send a proximity environment message", "", EnvironmentMessage);
+            API.RegisterCommand(new[] {"yell", "y"}, "Set your chat mode to Yelling, or yell a single message", "",
                 Yell);
-            _sapi.RegisterCommand(new[] {"whisper", "w"},
+            API.RegisterCommand(new[] {"whisper", "w"},
                 "Set your chat mode to Whispering, or whisper a single message", "",
                 Whisper);
-            _sapi.RegisterCommand(new[] {"say", "normal", "s"},
+            API.RegisterCommand(new[] {"say", "normal", "s"},
                 "Set your chat mode back to normal, or say a single message", "", Say);
-            _sapi.RegisterCommand(new[] {"hands", "h"}, "Set your chat mode to Sign Language, or sign a single message",
+            API.RegisterCommand(new[] {"hands", "h"}, "Set your chat mode to Sign Language, or sign a single message",
                 "", Sign);
-            _sapi.RegisterCommand("emotemode", "Turn Emote-only mode on or off", "/emotemode [on|off]", EmoteMode);
-            _sapi.RegisterCommand("rptext", "Turn the whole RP system on or off for your messages", "/rptext [on|off]",
+            API.RegisterCommand("emotemode", "Turn Emote-only mode on or off", "/emotemode [on|off]", EmoteMode);
+            API.RegisterCommand("rptext", "Turn the whole RP system on or off for your messages", "/rptext [on|off]",
                 RpTextEnabled);
         }
 
         private void HookEvents()
         {
-            _sapi.Event.PlayerChat += Event_PlayerChat;
-            _sapi.Event.PlayerJoin += Event_PlayerJoin;
+            API.Event.PlayerChat += Event_PlayerChat;
+            API.Event.PlayerJoin += Event_PlayerJoin;
         }
 
         private void SetupProximityGroup()
         {
-            _proximityGroup = _sapi.Groups.GetPlayerGroupByName(ProximityGroupName);
+            _proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
             if (_proximityGroup == null)
             {
                 _proximityGroup = new PlayerGroup()
@@ -94,14 +61,14 @@ namespace thebasics.ModSystems
                     Name = ProximityGroupName,
                     OwnerUID = null
                 };
-                _sapi.Groups.AddPlayerGroup(_proximityGroup);
+                API.Groups.AddPlayerGroup(_proximityGroup);
                 _proximityGroup.Md5Identifier = GameMath.Md5Hash(_proximityGroup.Uid + "null");
             }
         }
 
         private void OnPMessageHandler(IServerPlayer player, int groupId, CmdArgs args)
         {
-            Vec3d spawnpos = _sapi.World.DefaultSpawnPosition.XYZ;
+            Vec3d spawnpos = API.World.DefaultSpawnPosition.XYZ;
             spawnpos.Y = 0;
             Vec3d targetpos = null;
             if (player.Entity == null)
@@ -142,7 +109,7 @@ namespace thebasics.ModSystems
                 return;
             }
 
-            foreach (var nearbyPlayerData in this._sapi.World.AllOnlinePlayers
+            foreach (var nearbyPlayerData in API.World.AllOnlinePlayers
                          .Select(x => new {Position = x.Entity.ServerPos, Player = (IServerPlayer) x})
                          .Where(x => Math.Abs(x.Position.DistanceTo(targetpos)) < blockRadius))
             {
@@ -152,7 +119,7 @@ namespace thebasics.ModSystems
 
         private void Event_PlayerJoin(IServerPlayer byPlayer)
         {
-            var proximityGroup = _sapi.Groups.GetPlayerGroupByName(ProximityGroupName);
+            var proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
             var playerProximityGroup = byPlayer.GetGroup(proximityGroup.Uid);
             if (playerProximityGroup == null)
             {
@@ -170,7 +137,7 @@ namespace thebasics.ModSystems
         private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
             Vintagestory.API.Datastructures.BoolRef consumed)
         {
-            var proximityGroup = _sapi.Groups.GetPlayerGroupByName(ProximityGroupName);
+            var proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
             if (proximityGroup.Uid == channelId)
             {
                 if (byPlayer.GetRpTextEnabled())
@@ -223,9 +190,9 @@ namespace thebasics.ModSystems
             message.Append(" ");
             message.Append(GetProximityChatVerb(player, tempMode));
             message.Append(" ");
-            message.Append(_config.ProximityChatModeQuotationStart[player.GetChatMode(tempMode)]);
+            message.Append(Config.ProximityChatModeQuotationStart[player.GetChatMode(tempMode)]);
             message.Append(GetRPMessage(player, content, tempMode));
-            message.Append(_config.ProximityChatModeQuotationEnd[player.GetChatMode(tempMode)]);
+            message.Append(Config.ProximityChatModeQuotationEnd[player.GetChatMode(tempMode)]);
 
             return message.ToString();
         }
@@ -233,7 +200,7 @@ namespace thebasics.ModSystems
         private string GetFormattedNickname(IServerPlayer player)
         {
             var nick = player.GetNickname();
-            return _config.BoldNicknames ? ChatHelper.Strong(nick) : nick;
+            return Config.BoldNicknames ? ChatHelper.Strong(nick) : nick;
         }
 
         private string GetFullEmoteMessage(IServerPlayer player, string content)
@@ -244,8 +211,8 @@ namespace thebasics.ModSystems
         private void SendLocalChat(IServerPlayer byPlayer, string message, ProximityChatMode? tempMode = null,
             EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
         {
-            var proximityGroup = _sapi.Groups.GetPlayerGroupByName(ProximityGroupName);
-            foreach (var player in _sapi.World.AllOnlinePlayers.Where(x =>
+            var proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
+            foreach (var player in API.World.AllOnlinePlayers.Where(x =>
                          x.Entity.Pos.AsBlockPos.ManhattenDistance(byPlayer.Entity.Pos.AsBlockPos) <
                          GetProximityChatRange(byPlayer, tempMode)))
             {
@@ -257,17 +224,17 @@ namespace thebasics.ModSystems
 
         private int GetProximityChatRange(IServerPlayer player, ProximityChatMode? tempMode = null)
         {
-            return _config.ProximityChatModeDistances[player.GetChatMode(tempMode)];
+            return Config.ProximityChatModeDistances[player.GetChatMode(tempMode)];
         }
 
         private string GetProximityChatVerb(IServerPlayer player, ProximityChatMode? tempMode = null)
         {
-            return _config.ProximityChatModeVerbs[player.GetChatMode(tempMode)].GetRandomElement();
+            return Config.ProximityChatModeVerbs[player.GetChatMode(tempMode)].GetRandomElement();
         }
 
         private string GetProximityChatPunctuation(IServerPlayer player, ProximityChatMode? tempMode = null)
         {
-            return _config.ProximityChatModePunctuation[player.GetChatMode(tempMode)];
+            return Config.ProximityChatModePunctuation[player.GetChatMode(tempMode)];
         }
 
         private string GetRPMessage(IServerPlayer player, string message, ProximityChatMode? tempMode = null)
