@@ -67,8 +67,10 @@ namespace thebasics.Configs
         };
 
         public bool AllowPlayerTpa = true;
-        public double TpaCooldownInGameHours = 1;
-        // public double TpaExpirationInGameHours = 1;
+        public bool TpaUseCooldown = true;
+        public double TpaCooldownInGameHours = 0.5;
+        // public bool TpaUseExpiration = true;
+        // public double TpaExpirationInGameHours = 0.5;
         // public bool LogTpaToAdminChat = true;
     }
 }

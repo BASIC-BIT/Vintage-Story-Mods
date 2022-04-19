@@ -82,7 +82,6 @@
     <Folder Include="assets\" />
     <Folder Include="src\" />
     <Content Include="modinfo.json" />
-    <Folder Include="src\Commands" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="src\Configs\ModConfig.cs" />
@@ -90,7 +89,9 @@
     <Compile Include="src\Extensions\EntityExtensions.cs" />
     <Compile Include="src\Extensions\ICoreServerAPIExtensions.cs" />
     <Compile Include="src\Extensions\IServerPlayerExtensions.cs" />
+    <Compile Include="src\Models\CommandArgument.cs" />
     <Compile Include="src\Models\ProximityChatMode.cs" />
+    <Compile Include="src\Models\TpaRequest.cs" />
     <Compile Include="src\ModSystems\BaseBasicModSystem.cs" />
     <Compile Include="src\ModSystems\PlayerStats\Definitions\StatTypes.cs" />
     <Compile Include="src\ModSystems\PlayerStats\Extensions\ModConfigExtensions.cs" />

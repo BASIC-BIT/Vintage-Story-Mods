@@ -6,6 +6,7 @@ using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -130,6 +131,10 @@ namespace thebasics.ModSystems.ProximityChat
                 };
                 byPlayer.ServerData.PlayerGroupMemberShips.Add(proximityGroup.Uid, newMembership);
                 proximityGroup.OnlinePlayers.Add(byPlayer);
+                foreach (var serverDataPlayerGroupMembership in byPlayer.ServerData.PlayerGroupMemberships)
+                {
+                    byPlayer.SendMessage(GlobalConstants.GeneralChatGroup, serverDataPlayerGroupMembership.Value.GroupName, EnumChatType.Notification);
+                }
             }
         }
 

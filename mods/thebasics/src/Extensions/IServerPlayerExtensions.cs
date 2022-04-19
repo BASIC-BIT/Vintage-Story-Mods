@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using thebasics.Configs;
 using thebasics.Models;
@@ -18,10 +19,10 @@ namespace thebasics.Extensions
         private const string ModDataRpTextEnabled = "BASIC_RPTEXTENABLED";
 
         private const string ModDataPlayerStatsPrefix = "BASIC_COUNT_";
-        
-        private const string ModDataLastTpa = "BASIC_LAST_TPA_PLAYER_ID";
+
         private const string ModDataTpaTime = "BASIC_TPA_TIME";
-        private const string ModDataTpAllowed = "BASIC_TPA_ALLOWED";
+        private const string ModDataTpAllowed = "BASIC_TPA_ALLOWED"; 
+        private const string ModDataTpaRequests = "BASIC_TPA_REQUESTS";
 
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
         {
@@ -110,30 +111,37 @@ namespace thebasics.Extensions
             SetModData(player, key, previousCount + 1);
         }
 
-        public static IServerPlayer GetLastTpa(this IServerPlayer player)
+        public static List<TpaRequest> GetTpaRequests(this IServerPlayer player)
         {
-            var uid = GetModData<string>(player, ModDataLastTpa, null);
-
-            if (uid == null)
-            {
-                return null;
-            }
-
-            return player.Entity.Api.World.PlayerByUid(uid) as IServerPlayer;
+            return GetModData(player, ModDataTpaRequests, new List<TpaRequest>());
         }
 
-        public static void SetLastTpa(this IServerPlayer player, IServerPlayer requestPlayer)
+        public static void ClearTpaRequests(this IServerPlayer player)
         {
-            SetModData(player, ModDataLastTpa, requestPlayer.PlayerUID);
+            SetModData(player, ModDataTpaRequests, new List<TpaRequest>());
         }
 
-        public static void ClearLastTpa(this IServerPlayer player)
+        public static void AddTpaRequest(this IServerPlayer player, TpaRequest request)
         {
-            SetModData<string>(player, ModDataLastTpa, null);
+            var currentRequests = player.GetTpaRequests();
+            currentRequests.Add(request);
+            SetModData(player, ModDataTpaRequests, currentRequests);
+        }
+        
+        public static void RemoveTpaRequest(this IServerPlayer player, TpaRequest request)
+        {
+            var currentRequests = player.GetTpaRequests();
+            currentRequests.Remove(request);
+            SetModData(player, ModDataTpaRequests, currentRequests);
         }
 
         public static bool CanTpa(this IServerPlayer player, IGameCalendar cal, ModConfig config)
         {
+            if (!config.TpaUseCooldown)
+            {
+                return true;
+            }
+
             var prevHours = GetModData(player, ModDataTpaTime, Double.MinValue);
             var curHours = cal.TotalHours;
 

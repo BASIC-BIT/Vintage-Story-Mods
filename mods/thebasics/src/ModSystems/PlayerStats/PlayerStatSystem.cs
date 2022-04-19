@@ -25,30 +25,17 @@ namespace thebasics.ModSystems.PlayerStats
                 {
                     API.Event.OnEntityDeath += OnEntityDeath;
                 }
-
-                API.RegisterCommand("playerstats", "Get your player stats, or another players", "/playerstats (name)",
-                    GetStats);
+                API.RegisterPlayerTargetCommand("playerstats", "Get your player stats, or another players", GetStats, optional: true);
             }
         }
 
-        private void GetStats(IServerPlayer player, int groupId, CmdArgs args)
+        private void GetStats(IServerPlayer player, int groupId, IServerPlayer otherPlayer)
         {
-            if (args.Length > 2)
-            {
-                player.SendMessage(groupId, "Usage: /playerstats (name)", EnumChatType.CommandError);
-            }
-
-            var otherPlayer = args.Length > 0;
-            var targetPlayer = otherPlayer ? API.GetPlayerByName(args[0]) : player;
-
-            if (targetPlayer == null)
-            {
-                player.SendMessage(groupId, "Could not find target player", EnumChatType.CommandError);
-                return;
-            }
-
+            var isOtherPlayer = otherPlayer != null;
+            var targetPlayer = otherPlayer ?? player;
+            
             var message = new StringBuilder();
-            var messageName = otherPlayer ? ChatHelper.Build(targetPlayer.PlayerName, "'s") : "Your";
+            var messageName = isOtherPlayer ? ChatHelper.Build(targetPlayer.PlayerName, "'s") : "Your";
             message.Append(messageName);
             message.Append(" Stats:\n");
 

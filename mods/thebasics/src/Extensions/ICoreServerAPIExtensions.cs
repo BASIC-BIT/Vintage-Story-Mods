@@ -26,27 +26,20 @@ namespace thebasics.Extensions
             ChatHelper.OnOffChatCommandDelegate handler,
             string requiredPrivilege = null)
         {
-            ServerChatCommandDelegate del = (player, groupId, args) =>
-            {
-                if (args.Length != 1)
-                {
-                    player.SendMessage(groupId, "Usage: /" + command + " [on|off]", EnumChatType.CommandError);
-                    return;
-                }
+            var del = ChatHelper.GetChatCommandFromOnOff(command, handler);
+            var syntaxMsg = "/" + command + " [on|off]";
+            
+            return api.RegisterCommand(command, descriptionMsg, syntaxMsg, del, requiredPrivilege);
+        }
 
-                var value = args[0].ToLower();
-
-                if (value != "on" && value != "off")
-                {
-                    player.SendMessage(groupId, "Usage: /" + command + " [on|off]", EnumChatType.CommandError);
-                    return;
-                }
-
-                var boolValue = value == "on";
-
-                handler(player, groupId, boolValue);
-            };
-
+        public static bool RegisterPlayerTargetCommand(this ICoreServerAPI api,
+            string command,
+            string descriptionMsg,
+            ChatHelper.PlayerTargetChatCommandDelegate handler,
+            string requiredPrivilege = null,
+            bool optional = false)
+        {
+            var del = ChatHelper.GetChatCommandFromPlayerTarget(command, api, handler, optional);
             var syntaxMsg = "/" + command + " [on|off]";
             
             return api.RegisterCommand(command, descriptionMsg, syntaxMsg, del, requiredPrivilege);
@@ -56,6 +49,12 @@ namespace thebasics.Extensions
         {
             return api.Server.Players.ToList()
                 .Find(findPlayer => String.Equals(findPlayer.PlayerName, name, StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        public static IServerPlayer GetPlayerByUID(this ICoreServerAPI api, string name)
+        {
+            return api.Server.Players.ToList()
+                .Find(findPlayer => String.Equals(findPlayer.PlayerUID, name, StringComparison.InvariantCultureIgnoreCase));
         }
     }
 }

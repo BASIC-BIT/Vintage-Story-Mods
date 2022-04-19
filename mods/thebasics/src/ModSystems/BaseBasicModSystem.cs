@@ -10,7 +10,7 @@ namespace thebasics.ModSystems
         protected ICoreServerAPI API;
         protected ModConfig Config;
         private const string ConfigName = "the_basics.json";
-        
+
         public override bool ShouldLoad(EnumAppSide forSide)
         {
             return forSide == EnumAppSide.Server;
@@ -42,7 +42,7 @@ namespace thebasics.ModSystems
             if (Config == null)
             {
                 API.Server.LogNotification("The BASICs: non-existant modconfig at 'ModConfig/" + ConfigName +
-                                             "', creating default...");
+                                           "', creating default...");
                 Config = new ModConfig();
                 API.StoreModConfig(this.Config, ConfigName);
             }
