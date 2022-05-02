@@ -153,9 +153,13 @@ namespace thebasics.Utilities
             };
         }
 
-        public static string GetUsageNotationForOptional(bool optional)
+        public static string GetStartUsageNotationForOptional(bool optional)
         {
             return optional ? "(" : "[";
+        }
+        public static string GetEndUsageNotationForOptional(bool optional)
+        {
+            return optional ? ")" : "]";
         }
         
         public static ServerChatCommandDelegate GetChatCommandFromPlayerTarget(
@@ -168,8 +172,8 @@ namespace thebasics.Utilities
             {
                 if (args.Length > 2 || (!optional && args.Length == 0))
                 {
-                    var usageString = "Usage: /" + command + " " + GetUsageNotationForOptional(optional) + "name" +
-                                      GetUsageNotationForOptional(optional);
+                    var usageString = "Usage: /" + command + " " + GetStartUsageNotationForOptional(optional) + "name" +
+                                      GetEndUsageNotationForOptional(optional);
                     player.SendMessage(groupId, usageString, EnumChatType.CommandError);
                     return;
                 }
@@ -177,6 +181,7 @@ namespace thebasics.Utilities
                 if (args.Length == 0)
                 {
                     handler(player, groupId, null);
+                    return;
                 }
 
                 var targetPlayer = api.GetPlayerByName(args[0]);

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace thebasics.Models
+namespace thebasics.ModSystems.TPA.Models
 {
     public class TpaRequest : IEquatable<TpaRequest>
     {

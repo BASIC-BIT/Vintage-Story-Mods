@@ -78,11 +78,13 @@
     <Compile Include="src\Client.cs" />
     <Compile Include="src\Entities\EntityProjectileSpell.cs" />
     <Compile Include="src\ItemWand.cs" />
+    <Compile Include="src\ParticleEffects\MagicalExplosion.cs" />
     <Compile Include="src\Server.cs" />
     <Compile Include="src\ModConfig.cs" />
     <Compile Include="src\Universal.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="README.md" />
     <Folder Include="assets\" />
     <Folder Include="src\" />
     <Content Include="assets\thaumstory\blocktypes\wand-stand.json" />

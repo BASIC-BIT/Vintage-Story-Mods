@@ -7,18 +7,18 @@ namespace thebasics.ModSystems.PlayerStats.Extensions
 {
     public static class ModConfigExtensions
     {
-        public static bool AllPlayerStatsEnabled(this ModConfig config, List<PlayerStatType> types)
+        public static bool AllPlayerStatsEnabled(this ModConfig config, params PlayerStatType[] types)
         {
             return types.All(config.PlayerStatEnabled);
         }
-        public static bool AnyPlayerStatEnabled(this ModConfig config, List<PlayerStatType> types)
+        public static bool AnyPlayerStatEnabled(this ModConfig config, params PlayerStatType[] types)
         {
             return types.Any(config.PlayerStatEnabled);
         }
         
         public static bool PlayerStatEnabled(this ModConfig config, PlayerStatType type)
         {
-            return Definitions.StatTypes.Types[type].Enabled(config);
+            return config.PlayerStatToggles[type];
         }
     }
 }

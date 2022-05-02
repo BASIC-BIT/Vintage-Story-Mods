@@ -90,16 +90,17 @@
     <Compile Include="src\Extensions\ICoreServerAPIExtensions.cs" />
     <Compile Include="src\Extensions\IServerPlayerExtensions.cs" />
     <Compile Include="src\Models\CommandArgument.cs" />
-    <Compile Include="src\Models\ProximityChatMode.cs" />
-    <Compile Include="src\Models\TpaRequest.cs" />
     <Compile Include="src\ModSystems\BaseBasicModSystem.cs" />
     <Compile Include="src\ModSystems\PlayerStats\Definitions\StatTypes.cs" />
     <Compile Include="src\ModSystems\PlayerStats\Extensions\ModConfigExtensions.cs" />
     <Compile Include="src\ModSystems\PlayerStats\Models\PlayerStatDefinition.cs" />
     <Compile Include="src\ModSystems\PlayerStats\Models\PlayerStatType.cs" />
     <Compile Include="src\ModSystems\PlayerStats\PlayerStatSystem.cs" />
+    <Compile Include="src\ModSystems\ProximityChat\Models\ProximityChatMode.cs" />
     <Compile Include="src\ModSystems\ProximityChat\RPProximityChatSystem.cs" />
     <Compile Include="src\ModSystems\SaveNotifications\SaveNotificationsSystem.cs" />
+    <Compile Include="src\ModSystems\SleepNotifier\SleepNotifierSystem.cs" />
+    <Compile Include="src\ModSystems\TPA\Models\TpaRequest.cs" />
     <Compile Include="src\ModSystems\TPA\TpaSystem.cs" />
     <Compile Include="src\Utilities\ChatHelper.cs" />
   </ItemGroup>

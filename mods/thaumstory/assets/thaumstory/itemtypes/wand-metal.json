@@ -15,6 +15,14 @@
       "states": ["none", "lapislazuli", "amethyst", "clearquartz", "olivine", "quartz"]
     }
   ],
+  "attributes": {
+    wandStandTransform: {
+      translation: { x: -0.3, y: 0.6, z: -0.1 },
+      rotation: { x: 97, y: 180, z: 3 },
+      origin: { x: 0.5, y: 0, z: 0.5 },
+      scale: 1.25
+    }
+  },
   "shape": { "base": "wand" },
   "texturesByType": {
     "*-none": {

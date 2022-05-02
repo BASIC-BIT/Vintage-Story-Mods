@@ -67,10 +67,15 @@ namespace thebasics.Configs
         };
 
         public bool AllowPlayerTpa = true;
-        public bool TpaUseCooldown = true;
+        public bool AllowTpaPrivilegeByDefault = false;
+        public bool TpaUseCooldown = false;
         public double TpaCooldownInGameHours = 0.5;
         // public bool TpaUseExpiration = true;
         // public double TpaExpirationInGameHours = 0.5;
         // public bool LogTpaToAdminChat = true;
+
+        public bool EnableSleepNotifications = true;
+        public double SleepNotificationThreshold = 0.5;
+        public string TEXT_SleepNotification = "You start to feel tired...";
     }
 }

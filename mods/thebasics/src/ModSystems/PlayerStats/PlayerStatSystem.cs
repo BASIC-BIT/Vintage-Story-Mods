@@ -16,7 +16,7 @@ namespace thebasics.ModSystems.PlayerStats
         {
             if (Config.PlayerStatSystem)
             {
-                if (Config.PlayerStatToggles[PlayerStatType.Deaths] || Config.PlayerStatToggles[PlayerStatType.PlayerKills])
+                if (Config.AnyPlayerStatEnabled(PlayerStatType.Deaths,PlayerStatType.PlayerKills))
                 {
                     API.Event.PlayerDeath += OnPlayerDeath;
                 }
@@ -37,13 +37,13 @@ namespace thebasics.ModSystems.PlayerStats
             var message = new StringBuilder();
             var messageName = isOtherPlayer ? ChatHelper.Build(targetPlayer.PlayerName, "'s") : "Your";
             message.Append(messageName);
-            message.Append(" Stats:\n");
+            message.Append(" Stats:");
 
             foreach (var stat in StatTypes.Types)
             {
-                if (stat.Value.Enabled(Config))
+                if (Config.PlayerStatEnabled(stat.Key))
                 {
-                    message.Append(ChatHelper.Build(stat.Value.Title, ": ", targetPlayer.GetPlayerStat(stat.Key).ToString(), "\n"));
+                    message.Append(ChatHelper.Build("\n", stat.Value.Title, ": ", targetPlayer.GetPlayerStat(stat.Key).ToString()));
                 }
             }
 
@@ -52,12 +52,12 @@ namespace thebasics.ModSystems.PlayerStats
 
         private void OnPlayerDeath(IServerPlayer byPlayer, DamageSource damageSource)
         {
-            if (Config.PlayerStatToggles[PlayerStatType.Deaths])
+            if (Config.PlayerStatEnabled(PlayerStatType.Deaths))
             {
                 byPlayer.AddPlayerStat(PlayerStatType.Deaths);
             }
 
-            if (Config.PlayerStatToggles[PlayerStatType.PlayerKills] && damageSource.Source == EnumDamageSource.Player)
+            if (Config.PlayerStatEnabled(PlayerStatType.PlayerKills) && damageSource.Source == EnumDamageSource.Player)
             {
                 var player = damageSource.SourceEntity.GetPlayer();
                 player.AddPlayerStat(PlayerStatType.PlayerKills);
@@ -68,6 +68,7 @@ namespace thebasics.ModSystems.PlayerStats
         {
             if (Config.PlayerStatEnabled(PlayerStatType.NpcKills) &&
                 entity.GetPlayer() == null &&
+                damageSource != null && 
                 damageSource.Source == EnumDamageSource.Player)
             {
                 var player = damageSource.SourceEntity.GetPlayer();

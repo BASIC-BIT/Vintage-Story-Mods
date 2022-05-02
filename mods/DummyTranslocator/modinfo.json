@@ -1,0 +1,11 @@
+{
+  "type": "code",
+  "modid": "dummytranslocator",
+  "name": "Dummy Translocator",
+  "author": "BASIC",
+  "description": "Adds a dummy static translocator block to the game.",
+  "version": "0.0.1",
+  "dependency": {
+    "game": ""
+  }
+}

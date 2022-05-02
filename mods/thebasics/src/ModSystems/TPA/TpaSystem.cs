@@ -1,6 +1,8 @@
-﻿using System.Text;
+﻿using System.Linq;
+using System.Text;
 using thebasics.Extensions;
 using thebasics.Models;
+using thebasics.ModSystems.TPA.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -18,6 +20,7 @@ namespace thebasics.ModSystems.TPA
                 API.RegisterCommand("tpaccept", "Accept last teleport request", "/tpaccept", HandleTpAccept);
                 API.RegisterCommand("tpdeny", "Deny last teleport request", "/tpdeny", HandleTpDeny);
                 API.RegisterOnOffCommand("tpallow", "Allow or deny all teleport requests from other players", HandleTpAllow);
+                API.RegisterOnOffCommand("cleartpa", "Clear all outstanding TPA requests", HandleTpaClear);
             }
         }
 
@@ -33,7 +36,7 @@ namespace thebasics.ModSystems.TPA
 
         private void HandleTpaRequest(IServerPlayer player, int groupId, IServerPlayer targetPlayer, TpaRequestType type)
         {
-            if (!player.CanTpa(API.World.Calendar, Config))
+            if (!player.CanTpa(API.World.Calendar, Config)) // TODO: Dynamic error message
             {
                 var hoursString = Config.TpaCooldownInGameHours.ToString("0.##");
                 player.SendMessage(groupId, "Please wait " + hoursString + " hours between teleport requests.", EnumChatType.CommandError);
@@ -80,7 +83,7 @@ namespace thebasics.ModSystems.TPA
 
         private void HandleTpAccept(IServerPlayer player, int groupId, CmdArgs args)
         {
-            var requests = player.GetTpaRequests();
+            var requests = player.GetTpaRequests().ToList();
 
             if (requests.Count == 0)
             {
@@ -108,7 +111,7 @@ namespace thebasics.ModSystems.TPA
 
         private void HandleTpDeny(IServerPlayer player, int groupId, CmdArgs args)
         {
-            var requests = player.GetTpaRequests();
+            var requests = player.GetTpaRequests().ToList();
 
             if (requests.Count == 0)
             {
@@ -129,6 +132,12 @@ namespace thebasics.ModSystems.TPA
 
             player.SendMessage(groupId, "Teleport requests are now " + (value ? "allowed" : "disallowed") + ".",
                 EnumChatType.CommandSuccess);
+        }
+
+        private void HandleTpaClear(IServerPlayer player, int groupId, bool value)
+        {
+            player.ClearTpaRequests();
+            player.SendMessage(groupId, "Teleport requests have been cleared.", EnumChatType.CommandSuccess);
         }
     }
 }

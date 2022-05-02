@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 using thebasics.Configs;
 using thebasics.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
+using thebasics.ModSystems.TPA.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -23,6 +25,8 @@ namespace thebasics.Extensions
         private const string ModDataTpaTime = "BASIC_TPA_TIME";
         private const string ModDataTpAllowed = "BASIC_TPA_ALLOWED"; 
         private const string ModDataTpaRequests = "BASIC_TPA_REQUESTS";
+        
+        private const string TpaPrivilege = "tpa";
 
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
         {
@@ -111,28 +115,43 @@ namespace thebasics.Extensions
             SetModData(player, key, previousCount + 1);
         }
 
+        private static string SerializeTpaRequests(List<TpaRequest> requests)
+        {
+            return JsonConvert.SerializeObject(requests);
+        }
+        
+        private static List<TpaRequest> DeserializeTpaRequests(string data)
+        {
+            return JsonConvert.DeserializeObject<List<TpaRequest>>(data);
+        }
+        
+        private static string GetDefaultSerializedTpaRequests()
+        {
+            return SerializeTpaRequests(new List<TpaRequest>());
+        }
+        
         public static List<TpaRequest> GetTpaRequests(this IServerPlayer player)
         {
-            return GetModData(player, ModDataTpaRequests, new List<TpaRequest>());
+            return DeserializeTpaRequests(GetModData<string>(player, ModDataTpaRequests, GetDefaultSerializedTpaRequests()));
         }
 
         public static void ClearTpaRequests(this IServerPlayer player)
         {
-            SetModData(player, ModDataTpaRequests, new List<TpaRequest>());
+            SetModData<string>(player, ModDataTpaRequests, null);
         }
 
         public static void AddTpaRequest(this IServerPlayer player, TpaRequest request)
         {
-            var currentRequests = player.GetTpaRequests();
+            var currentRequests = player.GetTpaRequests().ToList();
             currentRequests.Add(request);
-            SetModData(player, ModDataTpaRequests, currentRequests);
+            SetModData<string>(player, ModDataTpaRequests, SerializeTpaRequests(currentRequests));
         }
         
         public static void RemoveTpaRequest(this IServerPlayer player, TpaRequest request)
         {
-            var currentRequests = player.GetTpaRequests();
+            var currentRequests = player.GetTpaRequests().ToList();
             currentRequests.Remove(request);
-            SetModData(player, ModDataTpaRequests, currentRequests);
+            SetModData<string>(player, ModDataTpaRequests, SerializeTpaRequests(currentRequests));
         }
 
         public static bool CanTpa(this IServerPlayer player, IGameCalendar cal, ModConfig config)
@@ -140,6 +159,11 @@ namespace thebasics.Extensions
             if (!config.TpaUseCooldown)
             {
                 return true;
+            }
+
+            if (!config.AllowTpaPrivilegeByDefault && !player.Privileges.Contains(TpaPrivilege))
+            {
+                return false;
             }
 
             var prevHours = GetModData(player, ModDataTpaTime, Double.MinValue);
