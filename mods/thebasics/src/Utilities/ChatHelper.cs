@@ -1,7 +1,6 @@
 ﻿using System.Linq;
 using System.Text;
 using thebasics.Extensions;
-using thebasics.ModSystems.PlayerStats.Definitions;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 

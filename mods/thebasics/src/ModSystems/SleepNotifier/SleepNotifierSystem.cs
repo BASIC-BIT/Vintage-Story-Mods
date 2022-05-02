@@ -7,7 +7,7 @@ namespace thebasics.ModSystems.SleepNotifier
 {
     public class SleepNotifierSystem : BaseBasicModSystem
     {
-        public double LastSleepingCount;
+        public int LastSleepingCount;
 
         protected override void BasicStartServerSide()
         {
@@ -30,8 +30,11 @@ namespace thebasics.ModSystems.SleepNotifier
 
             if (curSleepingCount >= 1 &&
                 totalPlayers >= 2 &&
+                curSleepingCount < totalPlayers &&
                 curSleepingCount > LastSleepingCount &&
-                IsAboveSleepingThreshold(curSleepingCount, totalPlayers))
+                IsAboveSleepingThreshold(curSleepingCount, totalPlayers) &&
+                !IsAboveSleepingThreshold(LastSleepingCount, totalPlayers)
+               )
             {
                 API.BroadcastMessageToAllGroups(Config.TEXT_SleepNotification, EnumChatType.AllGroups);
             }
@@ -41,7 +44,7 @@ namespace thebasics.ModSystems.SleepNotifier
 
         public bool IsAboveSleepingThreshold(int curSleepingCount, int totalPlayers)
         {
-            return ((double) curSleepingCount / (double) totalPlayers) > Config.SleepNotificationThreshold;
+            return ((double) curSleepingCount / (double) totalPlayers) >= Config.SleepNotificationThreshold;
         }
 
         private int GetSleepingCount()
