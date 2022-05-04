@@ -161,11 +161,6 @@ namespace thebasics.Extensions
                 return true;
             }
 
-            if (!config.AllowTpaPrivilegeByDefault && !player.Privileges.Contains(TpaPrivilege))
-            {
-                return false;
-            }
-
             var prevHours = GetModData(player, ModDataTpaTime, Double.MinValue);
             var curHours = cal.TotalHours;
 

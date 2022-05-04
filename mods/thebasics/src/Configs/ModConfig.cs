@@ -68,6 +68,7 @@ namespace thebasics.Configs
 
         public bool AllowPlayerTpa = true;
         public bool AllowTpaPrivilegeByDefault = false;
+        public bool TpaRequireTemporalGear = true;
         public bool TpaUseCooldown = false;
         public double TpaCooldownInGameHours = 0.5;
         // public bool TpaUseExpiration = true;
