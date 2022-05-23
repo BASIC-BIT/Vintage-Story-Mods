@@ -151,6 +151,35 @@ namespace thebasics.Utilities
                 handler(player, groupId, boolValue);
             };
         }
+        
+        public delegate void SingleNumberChatCommandDelegate(IServerPlayer player, int groupId, int value);
+        
+        public static ServerChatCommandDelegate GetChatCommandFromSingleNumber(
+            string command,
+            SingleNumberChatCommandDelegate handler)
+        {
+            return (player, groupId, args) =>
+            {
+                if (args.Length != 1)
+                {
+                    player.SendMessage(groupId, "Usage: /" + command + " [num]", EnumChatType.CommandError);
+                    return;
+                }
+
+                var value = args[0];
+
+                int result;
+                var parseSuccess = int.TryParse(value, out result);
+
+                if (!parseSuccess)
+                {
+                    player.SendMessage(groupId, "Usage: /" + command + " [num]", EnumChatType.CommandError);
+                    return;
+                }
+
+                handler(player, groupId, result);
+            };
+        }
 
         public static string GetStartUsageNotationForOptional(bool optional)
         {

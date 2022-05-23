@@ -31,6 +31,18 @@ namespace thebasics.Extensions
             
             return api.RegisterCommand(command, descriptionMsg, syntaxMsg, del, requiredPrivilege);
         }
+        
+        public static bool RegisterSingleNumberCommand(this ICoreServerAPI api,
+            string command,
+            string descriptionMsg,
+            ChatHelper.SingleNumberChatCommandDelegate handler,
+            string requiredPrivilege = null)
+        {
+            var del = ChatHelper.GetChatCommandFromSingleNumber(command, handler);
+            var syntaxMsg = "/" + command + " [num]";
+            
+            return api.RegisterCommand(command, descriptionMsg, syntaxMsg, del, requiredPrivilege);
+        }
 
         public static bool RegisterPlayerTargetCommand(this ICoreServerAPI api,
             string command,

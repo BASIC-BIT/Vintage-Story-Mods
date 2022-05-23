@@ -98,6 +98,7 @@
     <Compile Include="src\ModSystems\PlayerStats\PlayerStatSystem.cs" />
     <Compile Include="src\ModSystems\ProximityChat\Models\ProximityChatMode.cs" />
     <Compile Include="src\ModSystems\ProximityChat\RPProximityChatSystem.cs" />
+    <Compile Include="src\ModSystems\Repair\RepairModSystem.cs" />
     <Compile Include="src\ModSystems\SaveNotifications\SaveNotificationsSystem.cs" />
     <Compile Include="src\ModSystems\SleepNotifier\SleepNotifierSystem.cs" />
     <Compile Include="src\ModSystems\TPA\Models\TpaRequest.cs" />
