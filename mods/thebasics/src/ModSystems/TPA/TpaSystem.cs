@@ -22,7 +22,7 @@ namespace thebasics.ModSystems.TPA
             {
                 LifeLength = 0.8f,
                 Color = ColorUtil.ToRgba(180, 200, 220, 250),
-                Bouncy = true,
+                Bounciness = 1,
                 GravityEffect = 0,
                 ParticleModel = EnumParticleModel.Cube,
                 MinPos = pos,
