@@ -1,6 +1,6 @@
 ﻿# The Basics
 
-*As seen on Saltpoint RP and various other servers, finally released on ModDB!*
+*As seen on Saltpoint RP, Fair Travels, and various other servers, finally released on ModDB!*
 
 **ModDB: https://mods.vintagestory.at/thebasics**
 

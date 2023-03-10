@@ -75,6 +75,7 @@
     
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="src\ChunkLogger.cs" />
     <Compile Include="src\ModConfig.cs" />
     <Compile Include="src\util\DateUtility.cs" />
     <Folder Include="assets\" />
