@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using thebasics.Configs;
-using thebasics.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
+using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.TPA.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -25,6 +25,9 @@ namespace thebasics.Extensions
         private const string ModDataTpaTime = "BASIC_TPA_TIME";
         private const string ModDataTpAllowed = "BASIC_TPA_ALLOWED"; 
         private const string ModDataTpaRequests = "BASIC_TPA_REQUESTS";
+        
+        
+        private const string ModDataLanguages = "BASIC_LANGUAGES";
         
         private const string TpaPrivilege = "tpa";
 
@@ -129,10 +132,49 @@ namespace thebasics.Extensions
         {
             return SerializeTpaRequests(new List<TpaRequest>());
         }
+
+        private static string SerializeLanguages(List<Language> languages)
+        {
+            return JsonConvert.SerializeObject(languages);
+        }
+
+        private static List<Language> DeserializeLanguages(string data)
+        {
+            return JsonConvert.DeserializeObject<List<Language>>(data);
+        }
         
+        private static string GetDefaultSerializedLanguages()
+        {
+            return SerializeLanguages(new List<Language>());
+        }
+        
+        public static List<Language> GetLanguages(this IServerPlayer player)
+        {
+            return DeserializeLanguages(GetModData(player, ModDataLanguages, GetDefaultSerializedLanguages()));
+        }
+
+        public static void ClearLanguages(this IServerPlayer player)
+        {
+            SetModData<string>(player, ModDataLanguages, null);
+        }
+
+        public static void AddLanguage(this IServerPlayer player, Language request)
+        {
+            var currentRequests = player.GetLanguages().ToList();
+            currentRequests.Add(request);
+            SetModData(player, ModDataLanguages, SerializeLanguages(currentRequests));
+        }
+        
+        public static void RemoveLanguage(this IServerPlayer player, Language request)
+        {
+            var currentRequests = player.GetLanguages().ToList();
+            currentRequests.Remove(request);
+            SetModData(player, ModDataLanguages, SerializeLanguages(currentRequests));
+        }
+
         public static List<TpaRequest> GetTpaRequests(this IServerPlayer player)
         {
-            return DeserializeTpaRequests(GetModData<string>(player, ModDataTpaRequests, GetDefaultSerializedTpaRequests()));
+            return DeserializeTpaRequests(GetModData(player, ModDataTpaRequests, GetDefaultSerializedTpaRequests()));
         }
 
         public static void ClearTpaRequests(this IServerPlayer player)
@@ -144,14 +186,14 @@ namespace thebasics.Extensions
         {
             var currentRequests = player.GetTpaRequests().ToList();
             currentRequests.Add(request);
-            SetModData<string>(player, ModDataTpaRequests, SerializeTpaRequests(currentRequests));
+            SetModData(player, ModDataTpaRequests, SerializeTpaRequests(currentRequests));
         }
         
         public static void RemoveTpaRequest(this IServerPlayer player, TpaRequest request)
         {
             var currentRequests = player.GetTpaRequests().ToList();
             currentRequests.Remove(request);
-            SetModData<string>(player, ModDataTpaRequests, SerializeTpaRequests(currentRequests));
+            SetModData(player, ModDataTpaRequests, SerializeTpaRequests(currentRequests));
         }
 
         public static bool CanTpa(this IServerPlayer player, IGameCalendar cal, ModConfig config)

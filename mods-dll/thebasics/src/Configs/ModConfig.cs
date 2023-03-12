@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
-using thebasics.Models;
 using thebasics.ModSystems.PlayerStats.Models;
+using thebasics.ModSystems.ProximityChat.Models;
 
 namespace thebasics.Configs
 {
@@ -8,10 +8,10 @@ namespace thebasics.Configs
     {
         public IDictionary<ProximityChatMode, int> ProximityChatModeDistances = new Dictionary<ProximityChatMode, int>
         {
-            {ProximityChatMode.Yell, 90},
-            {ProximityChatMode.Normal, 35},
-            {ProximityChatMode.Whisper, 5},
-            {ProximityChatMode.Sign, 15}
+            { ProximityChatMode.Yell, 90 },
+            { ProximityChatMode.Normal, 35 },
+            { ProximityChatMode.Whisper, 5 },
+            { ProximityChatMode.Sign, 15 }
         };
 
         public bool BoldNicknames = false;
@@ -19,37 +19,37 @@ namespace thebasics.Configs
         public IDictionary<ProximityChatMode, string[]> ProximityChatModeVerbs =
             new Dictionary<ProximityChatMode, string[]>
             {
-                {ProximityChatMode.Yell, new[] {"yells", "shouts", "exclaims"}},
-                {ProximityChatMode.Normal, new[] {"says", "states", "mentions"}},
-                {ProximityChatMode.Whisper, new[] {"whispers", "mumbles", "mutters"}},
-                {ProximityChatMode.Sign, new[] {"signs", "gestures", "motions"}}
+                { ProximityChatMode.Yell, new[] { "yells", "shouts", "exclaims" } },
+                { ProximityChatMode.Normal, new[] { "says", "states", "mentions" } },
+                { ProximityChatMode.Whisper, new[] { "whispers", "mumbles", "mutters" } },
+                { ProximityChatMode.Sign, new[] { "signs", "gestures", "motions" } }
             };
 
         public IDictionary<ProximityChatMode, string> ProximityChatModePunctuation =
             new Dictionary<ProximityChatMode, string>
             {
-                {ProximityChatMode.Yell, "!"},
-                {ProximityChatMode.Normal, "."},
-                {ProximityChatMode.Whisper, "."},
-                {ProximityChatMode.Sign, "."}
+                { ProximityChatMode.Yell, "!" },
+                { ProximityChatMode.Normal, "." },
+                { ProximityChatMode.Whisper, "." },
+                { ProximityChatMode.Sign, "." }
             };
 
         public IDictionary<ProximityChatMode, string> ProximityChatModeQuotationStart =
             new Dictionary<ProximityChatMode, string>
             {
-                {ProximityChatMode.Yell, "\""},
-                {ProximityChatMode.Normal, "\""},
-                {ProximityChatMode.Whisper, "\""},
-                {ProximityChatMode.Sign, "<i>\'"}
+                { ProximityChatMode.Yell, "\"" },
+                { ProximityChatMode.Normal, "\"" },
+                { ProximityChatMode.Whisper, "\"" },
+                { ProximityChatMode.Sign, "<i>\'" }
             };
 
         public IDictionary<ProximityChatMode, string> ProximityChatModeQuotationEnd =
             new Dictionary<ProximityChatMode, string>
             {
-                {ProximityChatMode.Yell, "\""},
-                {ProximityChatMode.Normal, "\""},
-                {ProximityChatMode.Whisper, "\""},
-                {ProximityChatMode.Sign, "\'</i>"}
+                { ProximityChatMode.Yell, "\"" },
+                { ProximityChatMode.Normal, "\"" },
+                { ProximityChatMode.Whisper, "\"" },
+                { ProximityChatMode.Sign, "\'</i>" }
             };
 
         public bool SendServerSaveAnnouncement = true;
@@ -59,17 +59,19 @@ namespace thebasics.Configs
         public string TEXT_ServerSaveFinished = "Server save has finished.";
 
         public bool PlayerStatSystem = true;
+
         public IDictionary<PlayerStatType, bool> PlayerStatToggles = new Dictionary<PlayerStatType, bool>
         {
-            {PlayerStatType.Deaths, true},
-            {PlayerStatType.NpcKills, true},
-            {PlayerStatType.PlayerKills, true},
+            { PlayerStatType.Deaths, true },
+            { PlayerStatType.NpcKills, true },
+            { PlayerStatType.PlayerKills, true },
         };
 
         public bool AllowPlayerTpa = true;
         public bool AllowTpaPrivilegeByDefault = false;
         public bool TpaRequireTemporalGear = true;
         public bool TpaUseCooldown = false;
+
         public double TpaCooldownInGameHours = 0.5;
         // public bool TpaUseExpiration = true;
         // public double TpaExpirationInGameHours = 0.5;
@@ -78,5 +80,16 @@ namespace thebasics.Configs
         public bool EnableSleepNotifications = true;
         public double SleepNotificationThreshold = 0.5;
         public string TEXT_SleepNotification = "You start to feel tired...";
+
+        public bool EnableLanguageSystem = true;
+        public bool AllowDefaultLanguage = true;
+
+        public IList<Language> Languages = new Language[]
+        {
+            new("Common", "The universal language", "c",
+                new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }),
+            new("Tradeband", "A common language for ease of trade across regions", "tr",
+            new[] { "feng", "tar", "kin", "ga", "shin", "ji" }),
+        };
     }
 }

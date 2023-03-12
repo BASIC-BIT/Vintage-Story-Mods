@@ -2,8 +2,10 @@
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
+using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -16,30 +18,33 @@ namespace thebasics.ModSystems.ProximityChat
     {
         private const string ProximityGroupName = "Proximity";
         private PlayerGroup _proximityGroup;
+        private LanguageSystem _languageSystem;
 
         protected override void BasicStartServerSide()
         {
             HookEvents();
             RegisterCommands();
             SetupProximityGroup();
+
+            _languageSystem = new LanguageSystem(this, API, Config);
         }
 
         private void RegisterCommands()
         {
             API.RegisterCommand("pmessage", "Sends a message to all players in a specific area", null,
                 OnPMessageHandler, Privilege.announce);
-            API.RegisterCommand(new[] {"nick", "setnick", "nickname"}, "Get or set your nickname", "", SetNickname);
+            API.RegisterCommand(new[] { "nick", "setnick", "nickname" }, "Get or set your nickname", "", SetNickname);
             API.RegisterCommand("clearnick", "Clear your nickname", "", ClearNickname);
-            API.RegisterCommand(new[] {"me", "m"}, "Send a proximity emote message", "", Emote);
+            API.RegisterCommand(new[] { "me", "m" }, "Send a proximity emote message", "", Emote);
             API.RegisterCommand("it", "Send a proximity environment message", "", EnvironmentMessage);
-            API.RegisterCommand(new[] {"yell", "y"}, "Set your chat mode to Yelling, or yell a single message", "",
+            API.RegisterCommand(new[] { "yell", "y" }, "Set your chat mode to Yelling, or yell a single message", "",
                 Yell);
-            API.RegisterCommand(new[] {"whisper", "w"},
+            API.RegisterCommand(new[] { "whisper", "w" },
                 "Set your chat mode to Whispering, or whisper a single message", "",
                 Whisper);
-            API.RegisterCommand(new[] {"say", "normal", "s"},
+            API.RegisterCommand(new[] { "say", "normal", "s" },
                 "Set your chat mode back to normal, or say a single message", "", Say);
-            API.RegisterCommand(new[] {"hands", "h"}, "Set your chat mode to Sign Language, or sign a single message",
+            API.RegisterCommand(new[] { "hands", "h" }, "Set your chat mode to Sign Language, or sign a single message",
                 "", Sign);
             API.RegisterOnOffCommand("emotemode", "Turn Emote-only mode on or off", EmoteMode);
             API.RegisterOnOffCommand("rptext", "Turn the whole RP system on or off for your messages", RpTextEnabled);
@@ -110,7 +115,7 @@ namespace thebasics.ModSystems.ProximityChat
             }
 
             foreach (var nearbyPlayerData in API.World.AllOnlinePlayers
-                         .Select(x => new {Position = x.Entity.ServerPos, Player = (IServerPlayer) x})
+                         .Select(x => new { Position = x.Entity.ServerPos, Player = (IServerPlayer)x })
                          .Where(x => Math.Abs(x.Position.DistanceTo(targetpos)) < blockRadius))
             {
                 nearbyPlayerData.Player.SendMessage(this._proximityGroup.Uid, message, EnumChatType.CommandSuccess);
@@ -133,7 +138,8 @@ namespace thebasics.ModSystems.ProximityChat
                 proximityGroup.OnlinePlayers.Add(byPlayer);
                 foreach (var serverDataPlayerGroupMembership in byPlayer.ServerData.PlayerGroupMemberships)
                 {
-                    byPlayer.SendMessage(GlobalConstants.GeneralChatGroup, serverDataPlayerGroupMembership.Value.GroupName, EnumChatType.Notification);
+                    byPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                        serverDataPlayerGroupMembership.Value.GroupName, EnumChatType.Notification);
                 }
             }
         }
@@ -215,6 +221,24 @@ namespace thebasics.ModSystems.ProximityChat
         private void SendLocalChat(IServerPlayer byPlayer, string message, ProximityChatMode? tempMode = null,
             EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
         {
+            if (Config.EnableLanguageSystem)
+            {
+                SendLocalChatByPlayer(byPlayer,
+                    player => _languageSystem.ProcessMessage(byPlayer, player, Config.Languages[0], message), tempMode,
+                    chatType, data);
+            }
+            else
+            {
+                SendLocalChatByPlayer(byPlayer,
+                    _ => message, tempMode,
+                    chatType, data);
+            }
+        }
+
+        private void SendLocalChatByPlayer(IServerPlayer byPlayer, System.Func<IServerPlayer, string> messageGenerator,
+            ProximityChatMode? tempMode = null,
+            EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
+        {
             var proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
             foreach (var player in API.World.AllOnlinePlayers.Where(x =>
                          x.Entity.Pos.AsBlockPos.ManhattenDistance(byPlayer.Entity.Pos.AsBlockPos) <
@@ -222,7 +246,7 @@ namespace thebasics.ModSystems.ProximityChat
             {
                 var serverPlayer = player as IServerPlayer;
 
-                serverPlayer.SendMessage(proximityGroup.Uid, message, chatType, data);
+                serverPlayer.SendMessage(proximityGroup.Uid, messageGenerator(serverPlayer), chatType, data);
             }
         }
 

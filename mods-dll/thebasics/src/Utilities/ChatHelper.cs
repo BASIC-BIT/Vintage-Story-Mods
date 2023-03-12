@@ -28,6 +28,19 @@ namespace thebasics.Utilities
             return Punctuation.Any(punctuation => character == punctuation);
         }
 
+        private static readonly char[] Delimiter = //TODO: Come up with a better name for this
+        {
+            ' ',
+            '\t',
+            '\n',
+            '\r',
+        };
+
+        public static bool IsDelimiter(char character)
+        {
+            return Delimiter.Any(punctuation => character == punctuation);
+        }
+
         public static bool DoesMessageNeedPunctuation(string input)
         {
             if (input.Length == 0)
@@ -178,6 +191,26 @@ namespace thebasics.Utilities
                 }
 
                 handler(player, groupId, result);
+            };
+        }
+        
+        public delegate void SingleStringChatCommandDelegate(IServerPlayer player, int groupId, string value);
+        
+        public static ServerChatCommandDelegate GetChatCommandFromSingleString(
+            string command,
+            SingleStringChatCommandDelegate handler)
+        {
+            return (player, groupId, args) =>
+            {
+                if (args.Length != 1)
+                {
+                    player.SendMessage(groupId, "Usage: /" + command + " [value]", EnumChatType.CommandError);
+                    return;
+                }
+                
+                var value = args.ToString().Trim();
+                
+                handler(player, groupId, value);
             };
         }
 

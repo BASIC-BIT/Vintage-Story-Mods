@@ -1,6 +1,5 @@
 ﻿using System;
 using thebasics.Configs;
-using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
