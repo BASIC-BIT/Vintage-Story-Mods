@@ -23,12 +23,13 @@ namespace thebasics.Extensions
         private const string ModDataPlayerStatsPrefix = "BASIC_COUNT_";
 
         private const string ModDataTpaTime = "BASIC_TPA_TIME";
-        private const string ModDataTpAllowed = "BASIC_TPA_ALLOWED"; 
+        private const string ModDataTpAllowed = "BASIC_TPA_ALLOWED";
         private const string ModDataTpaRequests = "BASIC_TPA_REQUESTS";
-        
-        
+
+
         private const string ModDataLanguages = "BASIC_LANGUAGES";
-        
+        private const string ModDataDefaultLanguage = "BASIC_DEFAULT_LANGUAGE";
+
         private const string TpaPrivilege = "tpa";
 
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
@@ -90,7 +91,7 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataRpTextEnabled, true);
         }
-        
+
         private static string GetPlayerStatID(PlayerStatType type)
         {
             return ModDataPlayerStatsPrefix + StatTypes.Types[type].ID;
@@ -100,7 +101,7 @@ namespace thebasics.Extensions
         {
             return GetModData(player, GetPlayerStatID(type), defaultValue);
         }
-        
+
         public static void AddPlayerStat(this IServerPlayer player, PlayerStatType type)
         {
             AddCount(player, GetPlayerStatID(type));
@@ -122,12 +123,12 @@ namespace thebasics.Extensions
         {
             return JsonConvert.SerializeObject(requests);
         }
-        
+
         private static List<TpaRequest> DeserializeTpaRequests(string data)
         {
             return JsonConvert.DeserializeObject<List<TpaRequest>>(data);
         }
-        
+
         private static string GetDefaultSerializedTpaRequests()
         {
             return SerializeTpaRequests(new List<TpaRequest>());
@@ -138,16 +139,26 @@ namespace thebasics.Extensions
             return JsonConvert.SerializeObject(languages);
         }
 
+        private static string SerializeLanguage(Language language)
+        {
+            return JsonConvert.SerializeObject(language);
+        }
+
         private static List<Language> DeserializeLanguages(string data)
         {
             return JsonConvert.DeserializeObject<List<Language>>(data);
         }
-        
+
+        private static Language DeserializeLanguage(string data)
+        {
+            return JsonConvert.DeserializeObject<Language>(data);
+        }
+
         private static string GetDefaultSerializedLanguages()
         {
             return SerializeLanguages(new List<Language>());
         }
-        
+
         public static List<Language> GetLanguages(this IServerPlayer player)
         {
             return DeserializeLanguages(GetModData(player, ModDataLanguages, GetDefaultSerializedLanguages()));
@@ -158,18 +169,32 @@ namespace thebasics.Extensions
             SetModData<string>(player, ModDataLanguages, null);
         }
 
-        public static void AddLanguage(this IServerPlayer player, Language request)
+        public static void AddLanguage(this IServerPlayer player, Language lang)
         {
-            var currentRequests = player.GetLanguages().ToList();
-            currentRequests.Add(request);
-            SetModData(player, ModDataLanguages, SerializeLanguages(currentRequests));
+            var currentLanguages = player.GetLanguages().ToList();
+            if (player.GetLanguages().All(curLang => curLang.Name != lang.Name))
+            {
+                currentLanguages.Add(lang);
+            }
+            SetModData(player, ModDataLanguages, SerializeLanguages(currentLanguages));
         }
-        
-        public static void RemoveLanguage(this IServerPlayer player, Language request)
+
+        public static void RemoveLanguage(this IServerPlayer player, Language lang)
         {
-            var currentRequests = player.GetLanguages().ToList();
-            currentRequests.Remove(request);
-            SetModData(player, ModDataLanguages, SerializeLanguages(currentRequests));
+            var currentLanguages = player.GetLanguages().ToList();
+            var newLanguages = currentLanguages.Where(curLang => lang.Name != curLang.Name).ToList();
+            SetModData(player, ModDataLanguages, SerializeLanguages(newLanguages));
+        }
+
+        public static Language GetDefaultLanguage(this IServerPlayer player, ModConfig config)
+        {
+            return DeserializeLanguage(GetModData(player, ModDataDefaultLanguage,
+                SerializeLanguage(config.Languages.First())));
+        }
+
+        public static void SetDefaultLanguage(this IServerPlayer player, Language lang)
+        {
+            SetModData(player, ModDataDefaultLanguage, SerializeLanguage(lang));
         }
 
         public static List<TpaRequest> GetTpaRequests(this IServerPlayer player)
@@ -188,7 +213,7 @@ namespace thebasics.Extensions
             currentRequests.Add(request);
             SetModData(player, ModDataTpaRequests, SerializeTpaRequests(currentRequests));
         }
-        
+
         public static void RemoveTpaRequest(this IServerPlayer player, TpaRequest request)
         {
             var currentRequests = player.GetTpaRequests().ToList();

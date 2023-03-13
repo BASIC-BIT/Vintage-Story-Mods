@@ -1,48 +1,46 @@
 ﻿using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 
 namespace thebasics.ModSystems.ProximityChat
 {
-    public class TheStringSlingingScrambler
+    public static class TheStringSlingingScrambler
     {
-        private Random _random;
-
-        public TheStringSlingingScrambler()
+        public static string ScrambleMessage(string message, Language language)
         {
-            _random = new Random();
+            var wordRegex = new Regex(@"\w+");
+            return wordRegex.Replace(message, match =>
+            {
+                var word = match.Groups[0].Value;
+                var random = new Random(GetWordHash(word));
+
+                var syllableCount = GetSyllableCount(word, random);
+
+                var garbledText = string.Join("",
+                    syllableCount.DoTimes(_ => language.Syllables.GetRandomElement(random)));
+
+                return garbledText;
+            });
         }
 
-        public string ScrambleMessage(string message, Language language)
+        private static int GetSyllableCount(string word, Random random)
         {
-            var random = new Random(GetWordHash(message));
-            return string.Join(" ", message
-                .Split(' ')
-                .Select(word => word.Trim())
-                .Select(GetSyllableCount)
-                .Select(syllables =>
-                    string.Join("",
-                        syllables.DoTimes(
-                            _ => language.Syllables.GetRandomElement(random)))));
-        }
-
-        private int GetSyllableCount(string word)
-        {
-            return (int)((word.Length / 2.0) +
-                         (_random.Next(
+            return (int)Math.Max((word.Length / 2.0) +
+                         (random.Next(
                              (int)Math.Round(word.Length / 2.0))
                                           - 
-                                          Math.Round(word.Length / 4.0)));
+                                          Math.Round(word.Length / 4.0)), 1);
         }
 
-        private int GetWordHash(string word)
+        private static int GetWordHash(string word)
         {
             return word.Select(character => (int)character).Aggregate((acc, cur) => acc + cur);
         }
 
-        private char RandomChar(char original)
+        private static char RandomChar(char original, Random random)
         {
             if (ChatHelper.IsPunctuation(original))
             {
@@ -50,13 +48,13 @@ namespace thebasics.ModSystems.ProximityChat
             }
 
             // ascii ranges of usable characters is 33 to 126, so random mod 94 plus 33
-            var asciiValue = _random.Next(94) + 33;
+            var asciiValue = random.Next(94) + 33;
             char value = (char)asciiValue;
             return value;
         }
 
         //Unimplemented
-        private string AddRandomCharactersToWords(string message)
+        private static string AddRandomCharactersToWords(string message)
         {
             return message;
         }

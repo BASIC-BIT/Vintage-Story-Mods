@@ -14,6 +14,15 @@ namespace thebasics.Configs
             { ProximityChatMode.Sign, 15 }
         };
 
+        public bool EnableDistanceObfuscationSystem = true;
+        public IDictionary<ProximityChatMode, int> ProximityChatModeObfuscationRanges = new Dictionary<ProximityChatMode, int>
+        {
+            { ProximityChatMode.Yell, 45 },
+            { ProximityChatMode.Normal, 15 },
+            { ProximityChatMode.Whisper, 2 },
+            { ProximityChatMode.Sign, 15 }
+        };
+
         public bool BoldNicknames = false;
 
         public IDictionary<ProximityChatMode, string[]> ProximityChatModeVerbs =
@@ -87,9 +96,9 @@ namespace thebasics.Configs
         public IList<Language> Languages = new Language[]
         {
             new("Common", "The universal language", "c",
-                new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }),
+                new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#92C4E1"),
             new("Tradeband", "A common language for ease of trade across regions", "tr",
-            new[] { "feng", "tar", "kin", "ga", "shin", "ji" }),
+            new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A"),
         };
     }
 }

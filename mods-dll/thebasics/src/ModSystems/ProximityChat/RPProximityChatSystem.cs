@@ -2,9 +2,7 @@
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using thebasics.Configs;
 using thebasics.Extensions;
-using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
@@ -19,6 +17,7 @@ namespace thebasics.ModSystems.ProximityChat
         private const string ProximityGroupName = "Proximity";
         private PlayerGroup _proximityGroup;
         private LanguageSystem _languageSystem;
+        private DistanceObfuscationSystem _distanceObfuscationSystem;
 
         protected override void BasicStartServerSide()
         {
@@ -27,6 +26,7 @@ namespace thebasics.ModSystems.ProximityChat
             SetupProximityGroup();
 
             _languageSystem = new LanguageSystem(this, API, Config);
+            _distanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
         }
 
         private void RegisterCommands()
@@ -152,11 +152,17 @@ namespace thebasics.ModSystems.ProximityChat
             {
                 if (byPlayer.GetRpTextEnabled())
                 {
+                    if (_languageSystem.HandleSwapLanguage(byPlayer, channelId, message))
+                    {
+                        consumed.value = true;
+                        return;
+                    }
                     if (byPlayer.HasNickname())
                     {
-                        var content = GetMessage(message);
+                        var content = ChatHelper.GetMessage(message);
                         var isEmote = content[0] == '*';
                         var isOOC = content[0] == '(';
+
                         if (isEmote)
                         {
                             content = content.Remove(0, 1);
@@ -167,10 +173,10 @@ namespace thebasics.ModSystems.ProximityChat
                         }
                         else
                         {
-                            message = GetFullRPMessage(byPlayer, content);
+                            message = GetFullRPMessage(byPlayer, byPlayer, content, channelId);
                         }
 
-                        SendLocalChat(byPlayer, message, data: data);
+                        SendLocalChatByPlayer(byPlayer, targetPlayer => GetFullRPMessage(byPlayer, targetPlayer, content, channelId), data: data);
                     }
                     else
                     {
@@ -188,22 +194,39 @@ namespace thebasics.ModSystems.ProximityChat
             }
         }
 
-        private string GetFullRPMessage(IServerPlayer player, string content, ProximityChatMode? tempMode = null)
+        private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content, int groupId, ProximityChatMode? tempMode = null)
         {
-            if (player.GetEmoteMode())
+            Console.WriteLine(sendingPlayer);
+            Console.WriteLine(receivingPlayer);
+            if (sendingPlayer.GetEmoteMode())
             {
-                return GetFullEmoteMessage(player, content);
+                return GetFullEmoteMessage(sendingPlayer, content);
             }
+            
+            var lang = _languageSystem.GetSpeakingLanguage(sendingPlayer, groupId, ref content);
 
             var message = new StringBuilder();
-            message.Append(GetFormattedNickname(player));
+            message.Append(GetFormattedNickname(sendingPlayer));
             message.Append(" ");
-            message.Append(GetProximityChatVerb(player, tempMode));
+            message.Append(GetProximityChatVerb(sendingPlayer, tempMode));
             message.Append(" ");
-            message.Append(Config.ProximityChatModeQuotationStart[player.GetChatMode(tempMode)]);
-            message.Append(GetRPMessage(player, content, tempMode));
-            message.Append(Config.ProximityChatModeQuotationEnd[player.GetChatMode(tempMode)]);
+            message.Append($"<font color=\"{lang.Color}\">");
+            message.Append(Config.ProximityChatModeQuotationStart[sendingPlayer.GetChatMode(tempMode)]);
 
+
+            var chatContent = GetRPMessage(sendingPlayer, content, tempMode);
+
+            var languagedChatContent = _languageSystem.ProcessMessage(sendingPlayer, receivingPlayer, groupId, chatContent, lang);
+
+            var obfuscatedChatContent =
+                _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, languagedChatContent,
+                    tempMode);
+            
+            message.Append(obfuscatedChatContent);
+            message.Append(Config.ProximityChatModeQuotationEnd[sendingPlayer.GetChatMode(tempMode)]);
+
+            message.Append("</font>");
+            
             return message.ToString();
         }
 
@@ -221,18 +244,9 @@ namespace thebasics.ModSystems.ProximityChat
         private void SendLocalChat(IServerPlayer byPlayer, string message, ProximityChatMode? tempMode = null,
             EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
         {
-            if (Config.EnableLanguageSystem)
-            {
-                SendLocalChatByPlayer(byPlayer,
-                    player => _languageSystem.ProcessMessage(byPlayer, player, Config.Languages[0], message), tempMode,
-                    chatType, data);
-            }
-            else
-            {
-                SendLocalChatByPlayer(byPlayer,
+            SendLocalChatByPlayer(byPlayer,
                     _ => message, tempMode,
                     chatType, data);
-            }
         }
 
         private void SendLocalChatByPlayer(IServerPlayer byPlayer, System.Func<IServerPlayer, string> messageGenerator,
@@ -292,13 +306,6 @@ namespace thebasics.ModSystems.ProximityChat
             return builder.ToString();
         }
 
-        private string GetMessage(string message)
-        {
-            var foundText = new Regex(@".*?> (.+)$").Match(message);
-
-            return foundText.Groups[1].Value.Trim();
-        }
-
         private void SetNickname(IServerPlayer player, int groupId, CmdArgs args)
         {
             if (args.Length == 0)
@@ -354,7 +361,7 @@ namespace thebasics.ModSystems.ProximityChat
         {
             if (args.Length > 0)
             {
-                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.Yell),
+                SendLocalChatByPlayer(player, targetPlayer => GetFullRPMessage(player, targetPlayer, args.PopAll(), groupId, ProximityChatMode.Yell),
                     ProximityChatMode.Yell);
             }
             else
@@ -368,7 +375,7 @@ namespace thebasics.ModSystems.ProximityChat
         {
             if (args.Length > 0)
             {
-                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.Sign),
+                SendLocalChatByPlayer(player, targetPlayer => GetFullRPMessage(player, targetPlayer, args.PopAll(), groupId, ProximityChatMode.Sign),
                     ProximityChatMode.Sign);
             }
             else
@@ -382,7 +389,7 @@ namespace thebasics.ModSystems.ProximityChat
         {
             if (args.Length > 0)
             {
-                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.Whisper),
+                SendLocalChatByPlayer(player, targetPlayer => GetFullRPMessage(player, targetPlayer, args.PopAll(), groupId, ProximityChatMode.Whisper),
                     ProximityChatMode.Whisper);
             }
             else
@@ -396,7 +403,7 @@ namespace thebasics.ModSystems.ProximityChat
         {
             if (args.Length > 0)
             {
-                SendLocalChat(player, GetFullRPMessage(player, args.PopAll(), ProximityChatMode.Normal),
+                SendLocalChatByPlayer(player, targetPlayer => GetFullRPMessage(player, targetPlayer, args.PopAll(), groupId, ProximityChatMode.Normal),
                     ProximityChatMode.Normal);
             }
             else

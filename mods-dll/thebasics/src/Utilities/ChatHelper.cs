@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using thebasics.Extensions;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -208,10 +209,17 @@ namespace thebasics.Utilities
                     return;
                 }
                 
-                var value = args.ToString().Trim();
+                var value = args.PopAll().Trim();
                 
                 handler(player, groupId, value);
             };
+        }
+
+        public static string GetMessage(string message)
+        {
+            var foundText = new Regex(@".*?> (.+)$").Match(message);
+
+            return foundText.Groups[1].Value.Trim();
         }
 
         public static string GetStartUsageNotationForOptional(bool optional)
