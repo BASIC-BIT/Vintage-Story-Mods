@@ -16,54 +16,98 @@ namespace thebasics.ModSystems.ProximityChat
         public LanguageSystem(BaseBasicModSystem system, ICoreServerAPI api, ModConfig config) : base(system, api,
             config)
         {
-            API.RegisterSingleStringCommand("addlang", "Add a new language to the system", AddLanguage);
-            API.RegisterSingleStringCommand("removelang", "Add a new language to the system", RemoveLanguage);
-            API.RegisterCommand("listlang", "Add a new language to the system", null, ListLanguages);
+            API.ChatCommands.GetOrCreate("addlang")
+                .WithAlias("addlanguage")
+                .WithDescription("Add one of your known languages")
+                .RequiresPrivilege(Privilege.chat)
+                .WithArgs(new StringArgParser("language", true))
+                .HandleWith(AddLanguage);
+
+            API.ChatCommands.GetOrCreate("removelang")
+                .WithAlias("removelanguage", "remlang", "remlanguage")
+                .WithDescription("Remove one of your known languages")
+                .RequiresPrivilege(Privilege.chat)
+                .WithArgs(new StringArgParser("language", true))
+                .HandleWith(RemoveLanguage);
+
+            API.ChatCommands.GetOrCreate("listlang")
+                .WithAlias("listlanguage", "listlanguages")
+                .WithDescription("List your known languages, and all available languages.")
+                .RequiresPrivilege(Privilege.chat)
+                .HandleWith(ListLanguages);
         }
 
-        private void AddLanguage(IServerPlayer player, int groupId, string language)
+        private TextCommandResult AddLanguage(TextCommandCallingArgs args)
         {
-            var foundLang = Config.Languages.Any(lang => lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
+            var player = (IServerPlayer)args.Caller.Player;
+            var language = (string)args.Parsers[0].GetValue();
+            var foundLang = Config.Languages.Any(lang =>
+                lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
 
             if (!foundLang)
             {
-                API.SendMessage(player, groupId, "Invalid language specified", EnumChatType.CommandError);
-                return;
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Invalid language specified",
+                };
             }
 
-            var lang = Config.Languages.Single(lang => lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
+            var lang = Config.Languages.Single(lang =>
+                lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
 
             player.AddLanguage(lang);
-            
-            API.SendMessage(player, groupId, "Language added!", EnumChatType.CommandSuccess);
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "Language added!",
+            };
         }
 
-        private void RemoveLanguage(IServerPlayer player, int groupId, string language)
+        private TextCommandResult RemoveLanguage(TextCommandCallingArgs args)
         {
-            var foundLang = player.GetLanguages().Any(lang => lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
+            var player = (IServerPlayer)args.Caller.Player;
+            var language = (string)args.Parsers[0].GetValue();
+            var foundLang = player.GetLanguages().Any(lang =>
+                lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
 
             if (!foundLang)
             {
-                API.SendMessage(player, groupId, "You don't know that language!", EnumChatType.CommandError);
-                return;
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "You don't know that language!",
+                };
             }
 
-            var lang = player.GetLanguages().Single(lang => lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
+            var lang = player.GetLanguages().Single(lang =>
+                lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
 
             player.RemoveLanguage(lang);
-            
-            API.SendMessage(player, groupId, "Language removed!", EnumChatType.CommandSuccess);
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "Language removed!",
+            };
         }
 
-        private void ListLanguages(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult ListLanguages(TextCommandCallingArgs args)
         {
-            var output = "You know: " + string.Join(", ", player.GetLanguages().Select(lang => lang.Name)) + "\n" +
-                         "All languages: " + string.Join(", ", Config.Languages.Select(lang => lang.Name));
-            API.SendMessage(player, groupId, output, EnumChatType.CommandSuccess);
+            var player = (IServerPlayer)args.Caller.Player;
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "You know: " + string.Join(", ", player.GetLanguages().Select(lang => ChatHelper.LangColor(lang.Name, lang))) +
+                                "\n" +
+                                "All languages: " + string.Join(", ", Config.Languages.Select(lang => ChatHelper.LangColor(lang.Name, lang))),
+            };
         }
 
         private static Regex _languageSwapRegex = new(@"^\s*:(\w+)\s*$");
         private static Regex _languageTalkRegex = new(@"^\s*:(\w+)\s+(.*)$");
+
         public bool HandleSwapLanguage(IServerPlayer sendingPlayer, int groupId, string message)
         {
             if (_languageSwapRegex.IsMatch(ChatHelper.GetMessage(message)))
@@ -71,13 +115,20 @@ namespace thebasics.ModSystems.ProximityChat
                 var match = _languageSwapRegex.Match(ChatHelper.GetMessage(message));
                 var languageIdentifier = match.Groups[1].Value;
 
-                if (Config.Languages.All(lang => lang.Prefix.ToLower() != languageIdentifier.ToLower() && lang.Name.ToLower() != languageIdentifier.ToLower()))
+                if (Config.Languages.All(lang =>
+                        lang.Prefix.ToLower() != languageIdentifier.ToLower() &&
+                        lang.Name.ToLower() != languageIdentifier.ToLower()))
                 {
-                    API.SendMessage(sendingPlayer, groupId, "Invalid language specifier.  Valid prefixes include: " + string.Join(", ", Config.Languages.Select(lang => ":" + lang.Prefix + " (" + lang.Name + ")")), EnumChatType.CommandError);
+                    API.SendMessage(sendingPlayer, groupId,
+                        "Invalid language specifier.  Valid prefixes include: " + string.Join(", ",
+                            Config.Languages.Select(lang => ChatHelper.LangColor($":{lang.Prefix} ({lang.Name})", lang))),
+                        EnumChatType.CommandError);
                     return true;
                 }
 
-                var lang = Config.Languages.Single(lang => lang.Prefix.ToLower() == languageIdentifier.ToLower() || lang.Name.ToLower() == languageIdentifier.ToLower());
+                var lang = Config.Languages.Single(lang =>
+                    lang.Prefix.ToLower() == languageIdentifier.ToLower() ||
+                    lang.Name.ToLower() == languageIdentifier.ToLower());
 
                 if (sendingPlayer.GetLanguages().All(playerLang => playerLang.Name != lang.Name))
                 {
@@ -86,14 +137,15 @@ namespace thebasics.ModSystems.ProximityChat
                 }
 
                 sendingPlayer.SetDefaultLanguage(lang);
-                API.SendMessage(sendingPlayer, groupId, "You are now speaking " + lang.Name + ".", EnumChatType.CommandSuccess);
+                API.SendMessage(sendingPlayer, groupId, "You are now speaking " + lang.Name + ".",
+                    EnumChatType.CommandSuccess);
 
                 return true;
             }
 
             return false;
         }
-        
+
         public Language GetSpeakingLanguage(IServerPlayer sendingPlayer, int groupId, ref string message)
         {
             if (_languageTalkRegex.IsMatch(message))
@@ -103,7 +155,10 @@ namespace thebasics.ModSystems.ProximityChat
 
                 if (Config.Languages.All(lang => lang.Prefix.ToLower() != languageIdentifier.ToLower()))
                 {
-                    API.SendMessage(sendingPlayer, groupId, "Invalid language specifier.  Valid prefixes include: " + string.Join(", ", Config.Languages.Select(lang => ":" + lang.Prefix + " (" + lang.Name + ")")), EnumChatType.CommandError);
+                    API.SendMessage(sendingPlayer, groupId,
+                        "Invalid language specifier.  Valid prefixes include: " + string.Join(", ",
+                            Config.Languages.Select(lang => ":" + lang.Prefix + " (" + lang.Name + ")")),
+                        EnumChatType.CommandError);
                     throw new Exception("Invalid language specifier");
                 }
 
@@ -129,13 +184,13 @@ namespace thebasics.ModSystems.ProximityChat
             {
                 return message;
             }
-            
+
             if (receivingPlayer.GetLanguages().Any(curLang => curLang.Name == lang.Name))
             {
                 return message;
             }
 
-            return TheStringSlingingScrambler.ScrambleMessage(message, lang);
+            return LanguageScrambler.ScrambleMessage(message, lang);
         }
     }
 }

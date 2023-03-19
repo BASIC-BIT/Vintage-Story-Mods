@@ -7,7 +7,7 @@ using thebasics.Utilities;
 
 namespace thebasics.ModSystems.ProximityChat
 {
-    public static class TheStringSlingingScrambler
+    public static class LanguageScrambler
     {
         public static string ScrambleMessage(string message, Language language)
         {
@@ -29,15 +29,17 @@ namespace thebasics.ModSystems.ProximityChat
         private static int GetSyllableCount(string word, Random random)
         {
             return (int)Math.Max((word.Length / 2.0) +
-                         (random.Next(
-                             (int)Math.Round(word.Length / 2.0))
-                                          - 
-                                          Math.Round(word.Length / 4.0)), 1);
+                                 (random.Next(
+                                      (int)Math.Round(word.Length / 2.0))
+                                  -
+                                  Math.Round(word.Length / 4.0)), 1);
         }
 
         private static int GetWordHash(string word)
         {
-            return word.Select(character => (int)character).Aggregate((acc, cur) => acc + cur);
+            return word.Select(character => (int)character)
+                .Aggregate((acc, cur) =>
+                    acc + cur);
         }
 
         private static char RandomChar(char original, Random random)

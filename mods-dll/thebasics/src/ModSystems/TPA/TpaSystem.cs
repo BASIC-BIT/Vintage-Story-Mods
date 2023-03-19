@@ -27,8 +27,8 @@ namespace thebasics.ModSystems.TPA
                 ParticleModel = EnumParticleModel.Cube,
                 MinPos = pos,
                 SelfPropelled = true,
-                MinVelocity = new Vec3f((float) (rand.NextDouble() - 0.5), (float) (rand.NextDouble() - 0.5),
-                    (float) (rand.NextDouble() - 0.5)),
+                MinVelocity = new Vec3f((float)(rand.NextDouble() - 0.5), (float)(rand.NextDouble() - 0.5),
+                    (float)(rand.NextDouble() - 0.5)),
                 ShouldDieInAir = false,
                 ShouldSwimOnLiquid = false,
                 ShouldDieInLiquid = false,
@@ -75,74 +75,120 @@ namespace thebasics.ModSystems.TPA
         {
             if (Config.AllowPlayerTpa)
             {
-                if (Config.AllowTpaPrivilegeByDefault)
-                {
-                    API.RegisterPlayerTargetCommand("tpa", "Request a teleport to another player", HandleTpa,
-                        optional: false);
-                    API.RegisterPlayerTargetCommand("tpahere", "Request to teleport another player to you", HandleTpaHere,
-                        optional: false);
-                }
-                else
-                {
-                    API.RegisterPlayerTargetCommand("tpa", "Request a teleport to another player", HandleTpa,
-                        optional: false, requiredPrivilege: "tpa");
-                    API.RegisterPlayerTargetCommand("tpahere", "Request to teleport another player to you", HandleTpaHere,
-                        optional: false, requiredPrivilege: "tpa");
-                }
-                API.RegisterCommand("tpaccept", "Accept last teleport request", "/tpaccept", HandleTpAccept);
-                API.RegisterCommand("tpdeny", "Deny last teleport request", "/tpdeny", HandleTpDeny);
-                API.RegisterOnOffCommand("tpallow", "Allow or deny all teleport requests from other players",
-                    HandleTpAllow);
-                API.RegisterOnOffCommand("cleartpa", "Clear all outstanding TPA requests", HandleTpaClear);
-                
                 API.Permissions.RegisterPrivilege("tpa", "Ability to use the /tpa and /tpahere commands");
+
+                API.ChatCommands.GetOrCreate("tpa")
+                    .WithDescription("Request a teleport to another player")
+                    .RequiresPrivilege(Config.AllowTpaPrivilegeByDefault ? Privilege.chat : "tpa")
+                    .WithArgs(new PlayersArgParser("player", API, true))
+                    .HandleWith(HandleTpa);
+
+                API.ChatCommands.GetOrCreate("tpahere")
+                    .WithDescription("Request to teleport another player to you")
+                    .RequiresPrivilege(Config.AllowTpaPrivilegeByDefault ? Privilege.chat : "tpa")
+                    .WithArgs(new PlayersArgParser("player", API, true))
+                    .HandleWith(HandleTpaHere);
+
+                API.ChatCommands.GetOrCreate("tpaccept")
+                    .WithDescription("Accept last teleport request")
+                    .RequiresPrivilege(Privilege.chat)
+                    .HandleWith(HandleTpAccept);
+
+                API.ChatCommands.GetOrCreate("tpdeny")
+                    .WithDescription("Deny last teleport request")
+                    .RequiresPrivilege(Privilege.chat)
+                    .HandleWith(HandleTpDeny);
+
+                API.ChatCommands.GetOrCreate("tpallow")
+                    .WithDescription("Allow or deny all teleport requests from other players")
+                    .WithArgs(new BoolArgParser("allow", "on", true))
+                    .RequiresPrivilege(Privilege.chat)
+                    .HandleWith(HandleTpAllow);
+
+                API.ChatCommands.GetOrCreate("cleartpa")
+                    .WithDescription("Clear all outstanding TPA requests")
+                    .RequiresPrivilege(Privilege.chat)
+                    .HandleWith(HandleTpaClear);
             }
         }
 
-        private void HandleTpa(IServerPlayer player, int groupId, IServerPlayer targetPlayer)
+        private TextCommandResult HandleTpa(TextCommandCallingArgs args)
         {
-            HandleTpaRequest(player, groupId, targetPlayer, TpaRequestType.Goto);
+            var player = (IServerPlayer)args.Caller.Player;
+            var attemptTarget = args.Parsers[0].GetValue();
+            if (attemptTarget == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Cannot find player.",
+                };
+            }
+            var targetPlayer = (IServerPlayer)attemptTarget;
+            return HandleTpaRequest(player, targetPlayer, TpaRequestType.Goto);
         }
 
-        private void HandleTpaHere(IServerPlayer player, int groupId, IServerPlayer targetPlayer)
+        private TextCommandResult HandleTpaHere(TextCommandCallingArgs args)
         {
-            HandleTpaRequest(player, groupId, targetPlayer, TpaRequestType.Bring);
+            var player = (IServerPlayer)args.Caller.Player;
+            var attemptTarget = args.Parsers[0].GetValue();
+            if (attemptTarget == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Cannot find player.",
+                };
+            }
+            var targetPlayer = (IServerPlayer)attemptTarget;
+            return HandleTpaRequest(player, targetPlayer, TpaRequestType.Bring);
         }
 
-        private void HandleTpaRequest(IServerPlayer player, int groupId, IServerPlayer targetPlayer,
+        private TextCommandResult HandleTpaRequest(IServerPlayer player, IServerPlayer targetPlayer,
             TpaRequestType type)
         {
             if (Config.TpaRequireTemporalGear && !IsPlayerHoldingTemporalGear(player))
             {
-                player.SendMessage(groupId, "You must hold a temporal gear to initiate a teleport request. (This will consume it)",
-                    EnumChatType.CommandError);
-                return;
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage =
+                        "You must hold a temporal gear to initiate a teleport request. (This will consume it)",
+                };
             }
 
             if (!player.CanTpa(API.World.Calendar, Config)) // TODO: Dynamic error message
             {
                 var hoursString = Config.TpaCooldownInGameHours.ToString("0.##");
-                player.SendMessage(groupId, "Please wait " + hoursString + " hours between teleport requests.",
-                    EnumChatType.CommandError);
-                return;
+
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"Please wait {hoursString} hours between teleport requests.",
+                };
             }
 
             if (targetPlayer.PlayerUID == player.PlayerUID)
             {
-                player.SendMessage(groupId, "You cannot /tpa to yourself!", EnumChatType.CommandError);
-                return;
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "You cannot /tpa to yourself!",
+                };
             }
 
             if (!targetPlayer.GetTpAllowed())
             {
-                player.SendMessage(groupId, "Player has teleport requests from other players disabled.",
-                    EnumChatType.CommandError);
-                return;
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Player has teleport requests from other players disabled.",
+                };
             }
 
             API.World.SpawnParticles(GetTpaRequestParticles(player));
 
-            
+
             var requestMessage = new StringBuilder();
 
             requestMessage.Append(player.PlayerName);
@@ -168,18 +214,26 @@ namespace thebasics.ModSystems.TPA
                 TargetPlayerUID = targetPlayer.PlayerUID,
             });
             player.SetTpaTime(API.World.Calendar);
-            player.SendMessage(groupId, "Teleport request has been sent to " + targetPlayer.PlayerName + ".",
-                EnumChatType.CommandSuccess);
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Teleport request has been sent to {targetPlayer.PlayerName}.",
+            };
         }
 
-        private void HandleTpAccept(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult HandleTpAccept(TextCommandCallingArgs args)
         {
+            var player = (IServerPlayer)args.Caller.Player;
             var requests = player.GetTpaRequests().ToList();
 
             if (requests.Count == 0)
             {
-                player.SendMessage(groupId, "No recent teleport request to accept!", EnumChatType.CommandError);
-                return;
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "No recent teleport request to accept!",
+                };
             }
 
             var request = requests[0];
@@ -206,16 +260,26 @@ namespace thebasics.ModSystems.TPA
             }
 
             player.RemoveTpaRequest(request);
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "Teleport successful!",
+            };
         }
 
-        private void HandleTpDeny(IServerPlayer player, int groupId, CmdArgs args)
+        private TextCommandResult HandleTpDeny(TextCommandCallingArgs args)
         {
+            var player = (IServerPlayer)args.Caller.Player;
             var requests = player.GetTpaRequests().ToList();
 
             if (requests.Count == 0)
             {
-                player.SendMessage(groupId, "No recent teleport request to deny!", EnumChatType.CommandError);
-                return;
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "No recent teleport request to deny!",
+                };
             }
 
             var request = requests[0];
@@ -224,21 +288,35 @@ namespace thebasics.ModSystems.TPA
             targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup, "Your teleport request has been denied!",
                 EnumChatType.CommandError);
             player.RemoveTpaRequest(request);
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = $"You have denied the teleport request from {targetPlayer.PlayerName}.",
+            };
         }
 
-
-        private void HandleTpAllow(IServerPlayer player, int groupId, bool value)
+        private TextCommandResult HandleTpAllow(TextCommandCallingArgs args)
         {
+            var value = (bool)args.Parsers[0].GetValue();
+            var player = (IServerPlayer)args.Caller.Player;
+
             player.SetTpAllowed(value);
-
-            player.SendMessage(groupId, "Teleport requests are now " + (value ? "allowed" : "disallowed") + ".",
-                EnumChatType.CommandSuccess);
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Teleport requests are now {(value ? "allowed" : "disallowed")}).",
+            };
         }
 
-        private void HandleTpaClear(IServerPlayer player, int groupId, bool value)
+        private TextCommandResult HandleTpaClear(TextCommandCallingArgs args)
         {
+            var player = (IServerPlayer)args.Caller.Player;
             player.ClearTpaRequests();
-            player.SendMessage(groupId, "Teleport requests have been cleared.", EnumChatType.CommandSuccess);
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "Teleport requests have been cleared.",
+            };
         }
     }
 }

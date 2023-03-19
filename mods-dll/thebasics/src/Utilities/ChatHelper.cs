@@ -2,6 +2,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using thebasics.Extensions;
+using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -132,6 +133,11 @@ namespace thebasics.Utilities
             }
 
             return builder.ToString();
+        }
+
+        public static string LangColor(string message, Language lang)
+        {
+            return $"<font color=\"{lang.Color}\">{message}</font>";
         }
 
         public delegate void OnOffChatCommandDelegate(IServerPlayer player, int groupId, bool value);

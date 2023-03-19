@@ -8,67 +8,6 @@ namespace thebasics.Extensions
 {
     public static class ICoreServerAPIExtensions
     {
-        public static bool RegisterCommand(this ICoreServerAPI api,
-            string[] commands,
-            string descriptionMsg,
-            string syntaxMsg,
-            ServerChatCommandDelegate handler,
-            string requiredPrivilege = null)
-        {
-            var results = commands.Select(command =>
-                api.RegisterCommand(command, descriptionMsg, syntaxMsg, handler, requiredPrivilege));
-
-            return results.All(result => result);
-        }
-        public static bool RegisterOnOffCommand(this ICoreServerAPI api,
-            string command,
-            string descriptionMsg,
-            ChatHelper.OnOffChatCommandDelegate handler,
-            string requiredPrivilege = null)
-        {
-            var del = ChatHelper.GetChatCommandFromOnOff(command, handler);
-            var syntaxMsg = "/" + command + " [on|off]";
-            
-            return api.RegisterCommand(command, descriptionMsg, syntaxMsg, del, requiredPrivilege);
-        }
-        
-        public static bool RegisterSingleStringCommand(this ICoreServerAPI api,
-            string command,
-            string descriptionMsg,
-            ChatHelper.SingleStringChatCommandDelegate handler,
-            string requiredPrivilege = null)
-        {
-            var del = ChatHelper.GetChatCommandFromSingleString(command, handler);
-            var syntaxMsg = "/" + command + " [value]";
-            
-            return api.RegisterCommand(command, descriptionMsg, syntaxMsg, del, requiredPrivilege);
-        }
-        
-        public static bool RegisterSingleNumberCommand(this ICoreServerAPI api,
-            string command,
-            string descriptionMsg,
-            ChatHelper.SingleNumberChatCommandDelegate handler,
-            string requiredPrivilege = null)
-        {
-            var del = ChatHelper.GetChatCommandFromSingleNumber(command, handler);
-            var syntaxMsg = "/" + command + " [num]";
-            
-            return api.RegisterCommand(command, descriptionMsg, syntaxMsg, del, requiredPrivilege);
-        }
-
-        public static bool RegisterPlayerTargetCommand(this ICoreServerAPI api,
-            string command,
-            string descriptionMsg,
-            ChatHelper.PlayerTargetChatCommandDelegate handler,
-            string requiredPrivilege = null,
-            bool optional = false)
-        {
-            var del = ChatHelper.GetChatCommandFromPlayerTarget(command, api, handler, optional);
-            var syntaxMsg = "/" + command + " [on|off]";
-            
-            return api.RegisterCommand(command, descriptionMsg, syntaxMsg, del, requiredPrivilege);
-        }
-
         public static IServerPlayer GetPlayerByName(this ICoreServerAPI api, string name)
         {
             return api.Server.Players.ToList()

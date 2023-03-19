@@ -25,18 +25,33 @@ namespace thebasics.ModSystems.PlayerStats
                 {
                     API.Event.OnEntityDeath += OnEntityDeath;
                 }
-                API.RegisterPlayerTargetCommand("playerstats", "Get your player stats, or another players", GetStats, optional: true);
+
+                API.ChatCommands.GetOrCreate("playerstats")
+                    .WithAlias("pstats")
+                    .WithDescription("Get your player stats, or another players")
+                    .WithArgs(new PlayersArgParser("player", API, false))
+                    .HandleWith(GetStats);
             }
         }
 
-        private void GetStats(IServerPlayer player, int groupId, IServerPlayer otherPlayer)
+        private TextCommandResult GetStats(TextCommandCallingArgs args)
         {
-            var isOtherPlayer = otherPlayer != null;
-            var targetPlayer = otherPlayer ?? player;
+            var player = (IServerPlayer)args.Caller.Player;
+            var isOtherPlayer = !args.Parsers[0].IsMissing;
+            var otherPlayer = args.Parsers[0].GetValue();
+
+            if (isOtherPlayer && otherPlayer == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Cannot find player.",
+                };
+            }
+            var targetPlayer = isOtherPlayer ? (IServerPlayer) otherPlayer : player;
             
             var message = new StringBuilder();
-            var messageName = isOtherPlayer ? ChatHelper.Build(targetPlayer.PlayerName, "'s") : "Your";
-            message.Append(messageName);
+            message.Append(isOtherPlayer ? ChatHelper.Build(targetPlayer.PlayerName, "'s") : "Your");
             message.Append(" Stats:");
 
             foreach (var stat in StatTypes.Types)
@@ -47,7 +62,11 @@ namespace thebasics.ModSystems.PlayerStats
                 }
             }
 
-            player.SendMessage(groupId, message.ToString(), EnumChatType.CommandSuccess);
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = message.ToString(),
+            };
         }
 
         private void OnPlayerDeath(IServerPlayer byPlayer, DamageSource damageSource)

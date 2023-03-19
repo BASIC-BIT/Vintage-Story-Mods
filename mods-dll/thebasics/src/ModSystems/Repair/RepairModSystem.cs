@@ -8,18 +8,34 @@ namespace thebasics.ModSystems.Repair
     {
         protected override void BasicStartServerSide()
         {
-            API.RegisterSingleNumberCommand(
-                "setdurability",
-                "Sets the durability of the item held in your hand",
-                SetDurabilityCommand, 
-                "root");
+            API.ChatCommands.GetOrCreate("setdurability")
+                .WithDescription("Sets the durability of the item held in your hand")
+                .RequiresPrivilege(Privilege.root)
+                .HandleWith(SetDurabilityCommand);
         }
 
-        private void SetDurabilityCommand(IServerPlayer player, int groupId, int durability)
+        private TextCommandResult SetDurabilityCommand(TextCommandCallingArgs args)
         {
+            var player = (IServerPlayer) args.Caller.Player;
+            var durability = (int) args.Parsers[0].GetValue();
             var item = GetHeldItem(player);
 
+            if (item == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Cannot set the durability of your currently held item.",
+                };
+            }
+
             SetItemDurability(item, durability);
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Item durability set to {durability}.",
+            };
         }
 
         private Item GetHeldItem(IServerPlayer player)
