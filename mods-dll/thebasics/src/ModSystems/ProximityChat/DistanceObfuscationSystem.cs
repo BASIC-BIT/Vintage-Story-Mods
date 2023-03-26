@@ -18,12 +18,12 @@ public class DistanceObfuscationSystem : BaseSubSystem
         _random = new Random();
     }
 
-    public string ObfuscateMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message,
+    public void ObfuscateMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, ref string message,
         ProximityChatMode? tempMode = null)
     {
         if (!Config.EnableDistanceObfuscationSystem)
         {
-            return message;
+            return;
         }
         
         var distance = sendingPlayer.Entity.ServerPos.DistanceTo(receivingPlayer.Entity.ServerPos);
@@ -34,18 +34,18 @@ public class DistanceObfuscationSystem : BaseSubSystem
 
         if (distance < obfuscationRange)
         {
-            return message;
+            return;
         }
 
         var percentage = (distance - obfuscationRange) / (maxRange - obfuscationRange);
 
-        return message.Select(character =>
+        message = string.Join("", message.Select(character =>
         {
             if (ChatHelper.IsPunctuation(character) || ChatHelper.IsDelimiter(character))
             {
                 return character;
             }
             return _random.NextDouble() < percentage ? '*' : character;
-        }).ToString();
+        }));
     }
 }

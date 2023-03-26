@@ -29,6 +29,7 @@ namespace thebasics.ModSystems.PlayerStats
                 API.ChatCommands.GetOrCreate("playerstats")
                     .WithAlias("pstats")
                     .WithDescription("Get your player stats, or another players")
+                    .RequiresPrivilege(Privilege.chat)
                     .WithArgs(new PlayersArgParser("player", API, false))
                     .HandleWith(GetStats);
             }
@@ -36,7 +37,7 @@ namespace thebasics.ModSystems.PlayerStats
 
         private TextCommandResult GetStats(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var isOtherPlayer = !args.Parsers[0].IsMissing;
             var otherPlayer = args.Parsers[0].GetValue();
 
@@ -48,7 +49,16 @@ namespace thebasics.ModSystems.PlayerStats
                     StatusMessage = "Cannot find player.",
                 };
             }
-            var targetPlayer = isOtherPlayer ? (IServerPlayer) otherPlayer : player;
+            var targetPlayer = isOtherPlayer ? API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid) : player;
+            
+            if (targetPlayer == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Cannot find player.",
+                };
+            }
             
             var message = new StringBuilder();
             message.Append(isOtherPlayer ? ChatHelper.Build(targetPlayer.PlayerName, "'s") : "Your");

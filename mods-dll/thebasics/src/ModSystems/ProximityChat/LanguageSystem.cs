@@ -39,7 +39,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult AddLanguage(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var language = (string)args.Parsers[0].GetValue();
             var foundLang = Config.Languages.Any(lang =>
                 lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
@@ -67,7 +67,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult RemoveLanguage(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var language = (string)args.Parsers[0].GetValue();
             var foundLang = player.GetLanguages().Any(lang =>
                 lang.Name.ToLower() == language.ToLower() || lang.Prefix.ToLower() == language.ToLower());
@@ -95,7 +95,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult ListLanguages(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -177,20 +177,20 @@ namespace thebasics.ModSystems.ProximityChat
             return sendingPlayer.GetDefaultLanguage(Config);
         }
 
-        public string ProcessMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, int groupId,
-            string message, Language lang)
+        public void ProcessMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, int groupId,
+            ref string message, Language lang)
         {
             if (!Config.EnableLanguageSystem)
             {
-                return message;
+                return;
             }
 
             if (receivingPlayer.GetLanguages().Any(curLang => curLang.Name == lang.Name))
             {
-                return message;
+                return;
             }
 
-            return LanguageScrambler.ScrambleMessage(message, lang);
+            message = LanguageScrambler.ScrambleMessage(message, lang);
         }
     }
 }

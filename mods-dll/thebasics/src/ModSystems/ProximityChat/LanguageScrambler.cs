@@ -42,6 +42,7 @@ namespace thebasics.ModSystems.ProximityChat
                     acc + cur);
         }
 
+        //Unused
         private static char RandomChar(char original, Random random)
         {
             if (ChatHelper.IsPunctuation(original))

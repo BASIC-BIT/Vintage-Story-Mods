@@ -144,6 +144,16 @@ namespace thebasics.ModSystems.ProximityChat
             }
         }
 
+        public delegate string TransformMessage(IServerPlayer byPlayer, ref string message, Vintagestory.API.Datastructures.BoolRef consumed);
+
+        public TransformMessage GetLanguage()
+        {
+            return (IServerPlayer byPlayer, ref string message, Vintagestory.API.Datastructures.BoolRef consumed) =>
+            {
+                return message;
+            };
+        }
+        
         private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
             Vintagestory.API.Datastructures.BoolRef consumed)
         {
@@ -157,6 +167,13 @@ namespace thebasics.ModSystems.ProximityChat
                         consumed.value = true;
                         return;
                     }
+
+
+                    if (_languageSystem.HandleSwapLanguage(byPlayer, channelId, message))
+                    {
+                        
+                    }
+
                     if (byPlayer.HasNickname())
                     {
                         var content = ChatHelper.GetMessage(message);
@@ -176,7 +193,8 @@ namespace thebasics.ModSystems.ProximityChat
                             message = GetFullRPMessage(byPlayer, byPlayer, content, channelId);
                         }
 
-                        SendLocalChatByPlayer(byPlayer, targetPlayer => GetFullRPMessage(byPlayer, targetPlayer, content, channelId), data: data);
+                        SendLocalChatByPlayer(byPlayer,
+                            targetPlayer => GetFullRPMessage(byPlayer, targetPlayer, content, channelId), data: data);
                     }
                     else
                     {
@@ -194,13 +212,14 @@ namespace thebasics.ModSystems.ProximityChat
             }
         }
 
-        private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content, int groupId, ProximityChatMode? tempMode = null)
+        private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content,
+            int groupId, ProximityChatMode? tempMode = null)
         {
             if (sendingPlayer.GetEmoteMode())
             {
                 return GetFullEmoteMessage(sendingPlayer, content);
             }
-            
+
             var lang = _languageSystem.GetSpeakingLanguage(sendingPlayer, groupId, ref content);
 
             var message = new StringBuilder();
@@ -211,20 +230,18 @@ namespace thebasics.ModSystems.ProximityChat
             message.Append($"<font color=\"{lang.Color}\">");
             message.Append(Config.ProximityChatModeQuotationStart[sendingPlayer.GetChatMode(tempMode)]);
 
-
             var chatContent = GetRPMessage(sendingPlayer, content, tempMode);
 
-            var languagedChatContent = _languageSystem.ProcessMessage(sendingPlayer, receivingPlayer, groupId, chatContent, lang);
+            _languageSystem.ProcessMessage(sendingPlayer, receivingPlayer, groupId, ref chatContent, lang);
 
-            var obfuscatedChatContent =
-                _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, languagedChatContent,
-                    tempMode);
-            
-            message.Append(obfuscatedChatContent);
+            _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, ref chatContent,
+                tempMode);
+
+            message.Append(chatContent);
             message.Append(Config.ProximityChatModeQuotationEnd[sendingPlayer.GetChatMode(tempMode)]);
 
             message.Append("</font>");
-            
+
             return message.ToString();
         }
 
@@ -243,8 +260,8 @@ namespace thebasics.ModSystems.ProximityChat
             EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
         {
             SendLocalChatByPlayer(byPlayer,
-                    _ => message, tempMode,
-                    chatType, data);
+                _ => message, tempMode,
+                chatType, data);
         }
 
         private void SendLocalChatByPlayer(IServerPlayer byPlayer, System.Func<IServerPlayer, string> messageGenerator,
@@ -306,7 +323,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
         {
-            var player = (IServerPlayer) fullArgs.Caller.Player;
+            var player = (IServerPlayer)fullArgs.Caller.Player;
             if (fullArgs.Parsers[0].IsMissing)
             {
                 if (player.HasNickname())
@@ -340,10 +357,10 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult Emote(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer) args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             if (player.HasNickname())
             {
-                SendLocalChat(player, GetFullEmoteMessage(player, (string) args.Parsers[0].GetValue()));
+                SendLocalChat(player, GetFullEmoteMessage(player, (string)args.Parsers[0].GetValue()));
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
@@ -361,9 +378,10 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult EnvironmentMessage(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer) args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             SendLocalChat(player,
-                ChatHelper.Wrap(GetRPMessage(player, (string) args.Parsers[0].GetValue(), ProximityChatMode.Normal), "*"),
+                ChatHelper.Wrap(GetRPMessage(player, (string)args.Parsers[0].GetValue(), ProximityChatMode.Normal),
+                    "*"),
                 chatType: EnumChatType.Notification);
 
             return new TextCommandResult
@@ -374,7 +392,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult ClearNickname(TextCommandCallingArgs args)
         {
-            ((IServerPlayer) args.Caller.Player).ClearNickname();
+            ((IServerPlayer)args.Caller.Player).ClearNickname();
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -384,12 +402,13 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult Yell(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
-            var message = (string) args.Parsers[0].GetValue();
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+            var message = (string)args.Parsers[0].GetValue();
             var groupId = args.Caller.FromChatGroupId;
             if (!args.Parsers[0].IsMissing)
             {
-                SendLocalChatByPlayer(player, targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Yell),
+                SendLocalChatByPlayer(player,
+                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Yell),
                     ProximityChatMode.Yell);
                 return new TextCommandResult
                 {
@@ -409,12 +428,13 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult Sign(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
-            var message = (string) args.Parsers[0].GetValue();
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+            var message = (string)args.Parsers[0].GetValue();
             var groupId = args.Caller.FromChatGroupId;
             if (!args.Parsers[0].IsMissing)
             {
-                SendLocalChatByPlayer(player, targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Sign),
+                SendLocalChatByPlayer(player,
+                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Sign),
                     ProximityChatMode.Sign);
                 return new TextCommandResult
                 {
@@ -434,12 +454,13 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult Whisper(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
-            var message = (string) args.Parsers[0].GetValue();
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+            var message = (string)args.Parsers[0].GetValue();
             var groupId = args.Caller.FromChatGroupId;
             if (!args.Parsers[0].IsMissing)
             {
-                SendLocalChatByPlayer(player, targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Whisper),
+                SendLocalChatByPlayer(player,
+                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Whisper),
                     ProximityChatMode.Whisper);
                 return new TextCommandResult
                 {
@@ -459,12 +480,13 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult Say(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
-            var message = (string) args.Parsers[0].GetValue();
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+            var message = (string)args.Parsers[0].GetValue();
             var groupId = args.Caller.FromChatGroupId;
             if (!args.Parsers[0].IsMissing)
             {
-                SendLocalChatByPlayer(player, targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Normal),
+                SendLocalChatByPlayer(player,
+                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Normal),
                     ProximityChatMode.Normal);
                 return new TextCommandResult
                 {
@@ -484,7 +506,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult EmoteMode(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var emoteMode = (bool)args.Parsers[0].GetValue();
             player.SetEmoteMode(emoteMode);
             return new TextCommandResult
@@ -496,7 +518,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult RpTextEnabled(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var rpTextEnabled = (bool)args.Parsers[0].GetValue();
             player.SetRpTextEnabled(rpTextEnabled);
             return new TextCommandResult
@@ -556,6 +578,5 @@ namespace thebasics.ModSystems.ProximityChat
                 nearbyPlayerData.Player.SendMessage(this._proximityGroup.Uid, message, EnumChatType.CommandSuccess);
             }
         }
-
     }
 }

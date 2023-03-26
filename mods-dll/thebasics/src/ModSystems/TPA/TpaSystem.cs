@@ -114,8 +114,8 @@ namespace thebasics.ModSystems.TPA
 
         private TextCommandResult HandleTpa(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
-            var attemptTarget = args.Parsers[0].GetValue();
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+            var attemptTarget = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
             if (attemptTarget == null)
             {
                 return new TextCommandResult
@@ -124,14 +124,14 @@ namespace thebasics.ModSystems.TPA
                     StatusMessage = "Cannot find player.",
                 };
             }
-            var targetPlayer = (IServerPlayer)attemptTarget;
-            return HandleTpaRequest(player, targetPlayer, TpaRequestType.Goto);
+            return HandleTpaRequest(player, attemptTarget, TpaRequestType.Goto);
         }
 
         private TextCommandResult HandleTpaHere(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
-            var attemptTarget = args.Parsers[0].GetValue();
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+
+            var attemptTarget = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
             if (attemptTarget == null)
             {
                 return new TextCommandResult
@@ -140,8 +140,7 @@ namespace thebasics.ModSystems.TPA
                     StatusMessage = "Cannot find player.",
                 };
             }
-            var targetPlayer = (IServerPlayer)attemptTarget;
-            return HandleTpaRequest(player, targetPlayer, TpaRequestType.Bring);
+            return HandleTpaRequest(player, attemptTarget, TpaRequestType.Bring);
         }
 
         private TextCommandResult HandleTpaRequest(IServerPlayer player, IServerPlayer targetPlayer,
@@ -224,7 +223,7 @@ namespace thebasics.ModSystems.TPA
 
         private TextCommandResult HandleTpAccept(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var requests = player.GetTpaRequests().ToList();
 
             if (requests.Count == 0)
@@ -270,7 +269,7 @@ namespace thebasics.ModSystems.TPA
 
         private TextCommandResult HandleTpDeny(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var requests = player.GetTpaRequests().ToList();
 
             if (requests.Count == 0)
@@ -298,7 +297,7 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpAllow(TextCommandCallingArgs args)
         {
             var value = (bool)args.Parsers[0].GetValue();
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
 
             player.SetTpAllowed(value);
             return new TextCommandResult
@@ -310,7 +309,7 @@ namespace thebasics.ModSystems.TPA
 
         private TextCommandResult HandleTpaClear(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer)args.Caller.Player;
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             player.ClearTpaRequests();
             return new TextCommandResult
             {
