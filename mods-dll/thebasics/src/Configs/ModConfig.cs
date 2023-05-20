@@ -14,14 +14,14 @@ namespace thebasics.Configs
             { ProximityChatMode.Sign, 15 }
         };
 
-        // public bool EnableDistanceObfuscationSystem = true;
-        // public IDictionary<ProximityChatMode, int> ProximityChatModeObfuscationRanges = new Dictionary<ProximityChatMode, int>
-        // {
-        //     { ProximityChatMode.Yell, 45 },
-        //     { ProximityChatMode.Normal, 15 },
-        //     { ProximityChatMode.Whisper, 2 },
-        //     { ProximityChatMode.Sign, 15 }
-        // };
+        public bool EnableDistanceObfuscationSystem = true;
+        public IDictionary<ProximityChatMode, int> ProximityChatModeObfuscationRanges = new Dictionary<ProximityChatMode, int>
+        {
+            { ProximityChatMode.Yell, 45 },
+            { ProximityChatMode.Normal, 15 },
+            { ProximityChatMode.Whisper, 2 },
+            { ProximityChatMode.Sign, 15 }
+        };
 
         public bool BoldNicknames = false;
 
@@ -74,6 +74,8 @@ namespace thebasics.Configs
             { PlayerStatType.Deaths, true },
             { PlayerStatType.NpcKills, true },
             { PlayerStatType.PlayerKills, true },
+            { PlayerStatType.BlockBreaks, true },
+            { PlayerStatType.DistanceTravelled, true },
         };
 
         public bool AllowPlayerTpa = true;

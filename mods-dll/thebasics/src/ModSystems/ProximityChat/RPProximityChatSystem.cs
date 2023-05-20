@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
@@ -17,7 +16,7 @@ namespace thebasics.ModSystems.ProximityChat
         private const string ProximityGroupName = "Proximity";
         private PlayerGroup _proximityGroup;
         // private LanguageSystem _languageSystem;
-        // private DistanceObfuscationSystem _distanceObfuscationSystem;
+        private DistanceObfuscationSystem _distanceObfuscationSystem;
 
         protected override void BasicStartServerSide()
         {
@@ -26,7 +25,7 @@ namespace thebasics.ModSystems.ProximityChat
             SetupProximityGroup();
 
             // _languageSystem = new LanguageSystem(this, API, Config);
-            // _distanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
+            _distanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
         }
 
         private void RegisterCommands()
@@ -144,76 +143,79 @@ namespace thebasics.ModSystems.ProximityChat
             }
         }
 
-        public delegate string TransformMessage(IServerPlayer byPlayer, ref string message, Vintagestory.API.Datastructures.BoolRef consumed);
-
-        public TransformMessage GetLanguage()
+        private string GetPlayerChat(IServerPlayer byPlayer, IServerPlayer receivingPlayer, string message)
         {
-            return (IServerPlayer byPlayer, ref string message, Vintagestory.API.Datastructures.BoolRef consumed) =>
+            var content = ChatHelper.GetMessage(message);
+            var isEmote = content[0] == '*';
+            var isOOC = content[0] == '(';
+            var isEnvironmentMessage = content[0] == '!';
+
+            var messageCopy = (string) message.Clone();
+
+            if (isEmote)
             {
-                return message;
-            };
+                content = content.Remove(0, 1);
+                messageCopy = GetFullEmoteMessage(byPlayer, content);
+            }
+            else if (isOOC)
+            {
+                if (!messageCopy.EndsWith(")")) // End the messageCopy with ) if it didn't end with it, to close out the (
+                {
+                    messageCopy += ")";
+                }
+            }
+            else if (isEnvironmentMessage)
+            {
+            }
+            else
+            {
+                messageCopy = GetFullRPMessage(byPlayer, receivingPlayer, content);
+            }
+
+            return messageCopy;
+
         }
-        
         private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
             Vintagestory.API.Datastructures.BoolRef consumed)
         {
             var proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
-            if (proximityGroup.Uid == channelId)
+            if (proximityGroup.Uid != channelId)
             {
-                if (byPlayer.GetRpTextEnabled())
-                {
-                    // if (_languageSystem.HandleSwapLanguage(byPlayer, channelId, message))
-                    // {
-                    //     consumed.value = true;
-                    //     return;
-                    // }
-                    //
-                    //
-                    // if (_languageSystem.HandleSwapLanguage(byPlayer, channelId, message))
-                    // {
-                    //     
-                    // }
-
-                    if (byPlayer.HasNickname())
-                    {
-                        var content = ChatHelper.GetMessage(message);
-                        var isEmote = content[0] == '*';
-                        var isOOC = content[0] == '(';
-
-                        if (isEmote)
-                        {
-                            content = content.Remove(0, 1);
-                            message = GetFullEmoteMessage(byPlayer, content);
-                        }
-                        else if (isOOC)
-                        {
-                        }
-                        else
-                        {
-                            message = GetFullRPMessage(byPlayer, byPlayer, content, channelId);
-                        }
-
-                        SendLocalChatByPlayer(byPlayer,
-                            targetPlayer => GetFullRPMessage(byPlayer, targetPlayer, content, channelId), data: data);
-                    }
-                    else
-                    {
-                        byPlayer.SendMessage(channelId,
-                            "You need a nickname to use proximity chat!  You can set it with `/nick MyName`",
-                            EnumChatType.CommandError);
-                    }
-                }
-                else
-                {
-                    SendLocalChat(byPlayer, message, data: data);
-                }
-
-                consumed.value = true;
+                return;
             }
+            consumed.value = true;
+            if (!byPlayer.GetRpTextEnabled())
+            {
+                SendLocalChat(byPlayer, message, data: data);
+                return;
+            }
+
+            if (!byPlayer.HasNickname())
+            {
+                byPlayer.SendMessage(channelId,
+                    "You need a nickname to use proximity chat!  You can set it with `/nick MyName`",
+                    EnumChatType.CommandError);
+                return;
+            }
+            
+            // if (_languageSystem.HandleSwapLanguage(byPlayer, channelId, message))
+            // {
+            //     consumed.value = true;
+            //     return;
+            // }
+            //
+            //
+            // if (_languageSystem.HandleSwapLanguage(byPlayer, channelId, message))
+            // {
+            //     
+            // }
+
+            var messageCopy = (string)message.Clone();
+            SendLocalChatByPlayer(byPlayer,
+                receivingPlayer => GetPlayerChat(byPlayer, receivingPlayer, messageCopy), data: data);
         }
 
-        private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content,
-            int groupId, ProximityChatMode? tempMode = null)
+        private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content, ProximityChatMode? tempMode = null)
         {
             if (sendingPlayer.GetEmoteMode())
             {
@@ -234,8 +236,8 @@ namespace thebasics.ModSystems.ProximityChat
 
             // _languageSystem.ProcessMessage(sendingPlayer, receivingPlayer, groupId, ref chatContent, lang);
             //
-            // _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, ref chatContent,
-            //     tempMode);
+            _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, ref chatContent,
+                tempMode);
 
             message.Append(chatContent);
             message.Append(Config.ProximityChatModeQuotationEnd[sendingPlayer.GetChatMode(tempMode)]);
@@ -408,7 +410,7 @@ namespace thebasics.ModSystems.ProximityChat
             if (!args.Parsers[0].IsMissing)
             {
                 SendLocalChatByPlayer(player,
-                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Yell),
+                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, ProximityChatMode.Yell),
                     ProximityChatMode.Yell);
                 return new TextCommandResult
                 {
@@ -434,7 +436,7 @@ namespace thebasics.ModSystems.ProximityChat
             if (!args.Parsers[0].IsMissing)
             {
                 SendLocalChatByPlayer(player,
-                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Sign),
+                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, ProximityChatMode.Sign),
                     ProximityChatMode.Sign);
                 return new TextCommandResult
                 {
@@ -460,7 +462,7 @@ namespace thebasics.ModSystems.ProximityChat
             if (!args.Parsers[0].IsMissing)
             {
                 SendLocalChatByPlayer(player,
-                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Whisper),
+                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, ProximityChatMode.Whisper),
                     ProximityChatMode.Whisper);
                 return new TextCommandResult
                 {
@@ -486,7 +488,7 @@ namespace thebasics.ModSystems.ProximityChat
             if (!args.Parsers[0].IsMissing)
             {
                 SendLocalChatByPlayer(player,
-                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Normal),
+                    targetPlayer => GetFullRPMessage(player, targetPlayer, message, ProximityChatMode.Normal),
                     ProximityChatMode.Normal);
                 return new TextCommandResult
                 {
@@ -528,55 +530,55 @@ namespace thebasics.ModSystems.ProximityChat
             };
         }
 
-        private void OnPMessageHandler(IServerPlayer player, int groupId, CmdArgs args)
-        {
-            Vec3d spawnpos = API.World.DefaultSpawnPosition.XYZ;
-            spawnpos.Y = 0;
-            Vec3d targetpos = null;
-            if (player.Entity == null)
-            {
-                targetpos = args.PopFlexiblePos(spawnpos, spawnpos);
-            }
-            else
-            {
-                targetpos = args.PopFlexiblePos(player.Entity.Pos.XYZ, spawnpos);
-            }
-
-            if (targetpos == null)
-            {
-                player.SendMessage(groupId, @"Invalid position supplied. Syntax: [coord] [coord] [coord] whereas
-                                             [coord] may be ~[decimal] or =[decimal] or [decimal]. 
-                                             ~ denotes a position relative to the player 
-                                             = denotes an absolute position 
-                                             no prefix denotes a position relative to the map middle",
-                    EnumChatType.CommandError);
-                return;
-            }
-
-            var blockRadius = args.PopInt();
-            if (!blockRadius.HasValue)
-            {
-                player.SendMessage(groupId,
-                    "Invalid radius supplied. Syntax: =[abscoord] =[abscoord] =[abscoord] [radius]",
-                    EnumChatType.CommandError);
-                return;
-            }
-
-            var message = args.PopAll();
-            if (string.IsNullOrEmpty(message))
-            {
-                player.SendMessage(groupId,
-                    "Invalid message supplied. Syntax: =[abscoord] =[abscoord] =[abscoord] [radius] [message]",
-                    EnumChatType.CommandError);
-                return;
-            }
-
-            foreach (var nearbyPlayerData in API.World.AllOnlinePlayers
-                         .Select(x => new { Position = x.Entity.ServerPos, Player = (IServerPlayer)x })
-                         .Where(x => Math.Abs(x.Position.DistanceTo(targetpos)) < blockRadius))
-            {
-                nearbyPlayerData.Player.SendMessage(this._proximityGroup.Uid, message, EnumChatType.CommandSuccess);
-            }
-        }
+        // private void OnPMessageHandler(IServerPlayer player, int groupId, CmdArgs args)
+        // {
+        //     Vec3d spawnpos = API.World.DefaultSpawnPosition.XYZ;
+        //     spawnpos.Y = 0;
+        //     Vec3d targetpos = null;
+        //     if (player.Entity == null)
+        //     {
+        //         targetpos = args.PopFlexiblePos(spawnpos, spawnpos);
+        //     }
+        //     else
+        //     {
+        //         targetpos = args.PopFlexiblePos(player.Entity.Pos.XYZ, spawnpos);
+        //     }
+        //
+        //     if (targetpos == null)
+        //     {
+        //         player.SendMessage(groupId, @"Invalid position supplied. Syntax: [coord] [coord] [coord] whereas
+        //                                      [coord] may be ~[decimal] or =[decimal] or [decimal]. 
+        //                                      ~ denotes a position relative to the player 
+        //                                      = denotes an absolute position 
+        //                                      no prefix denotes a position relative to the map middle",
+        //             EnumChatType.CommandError);
+        //         return;
+        //     }
+        //
+        //     var blockRadius = args.PopInt();
+        //     if (!blockRadius.HasValue)
+        //     {
+        //         player.SendMessage(groupId,
+        //             "Invalid radius supplied. Syntax: =[abscoord] =[abscoord] =[abscoord] [radius]",
+        //             EnumChatType.CommandError);
+        //         return;
+        //     }
+        //
+        //     var message = args.PopAll();
+        //     if (string.IsNullOrEmpty(message))
+        //     {
+        //         player.SendMessage(groupId,
+        //             "Invalid message supplied. Syntax: =[abscoord] =[abscoord] =[abscoord] [radius] [message]",
+        //             EnumChatType.CommandError);
+        //         return;
+        //     }
+        //
+        //     foreach (var nearbyPlayerData in API.World.AllOnlinePlayers
+        //                  .Select(x => new { Position = x.Entity.ServerPos, Player = (IServerPlayer)x })
+        //                  .Where(x => Math.Abs(x.Position.DistanceTo(targetpos)) < blockRadius))
+        //     {
+        //         nearbyPlayerData.Player.SendMessage(this._proximityGroup.Uid, message, EnumChatType.CommandSuccess);
+        //     }
+        // }
     }
 }

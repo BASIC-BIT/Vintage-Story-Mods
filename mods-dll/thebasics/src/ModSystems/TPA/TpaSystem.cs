@@ -146,14 +146,22 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpaRequest(IServerPlayer player, IServerPlayer targetPlayer,
             TpaRequestType type)
         {
-            if (Config.TpaRequireTemporalGear && !IsPlayerHoldingTemporalGear(player))
+            if (Config.TpaRequireTemporalGear)
             {
-                return new TextCommandResult
+                if(!IsPlayerHoldingTemporalGear(player))
                 {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage =
-                        "You must hold a temporal gear to initiate a teleport request. (This will consume it)",
-                };
+                    return new TextCommandResult
+                    {
+                        Status = EnumCommandStatus.Error,
+                        StatusMessage =
+                            "You must hold a temporal gear to initiate a teleport request. (This will consume it)",
+                    };
+                }
+                else
+                {
+                    // TODO: Remove temporal gear from inventory (temporarily if request times out or is declined?)
+                }
+                
             }
 
             if (!player.CanTpa(API.World.Calendar, Config)) // TODO: Dynamic error message
@@ -265,6 +273,7 @@ namespace thebasics.ModSystems.TPA
                 Status = EnumCommandStatus.Success,
                 StatusMessage = "Teleport successful!",
             };
+            
         }
 
         private TextCommandResult HandleTpDeny(TextCommandCallingArgs args)

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-    <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')"/>
+    <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
     <PropertyGroup>
         <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
         <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -33,7 +33,7 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="powershell -NoProfile -ExecutionPolicy RemoteSigned -file &quot;$(ProjectDir)\scripts\package.ps1&quot;"/>
+        <Exec Command="powershell -NoProfile -ExecutionPolicy RemoteSigned -file &quot;$(ProjectDir)\scripts\package.ps1&quot;" />
     </Target>
     <ItemGroup>
         <Reference Include="ApacheTech.Common.Extensions, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -45,20 +45,20 @@
         <Reference Include="ApacheTech.VintageMods.FluentChatCommands, Version=2.0.1.0, Culture=neutral, processorArchitecture=MSIL">
             <HintPath>..\..\packages\ApacheTech.VintageMods.FluentChatCommands.2.0.1\lib\netstandard2.0\ApacheTech.VintageMods.FluentChatCommands.dll</HintPath>
         </Reference>
-        <Reference Include="System"/>
+        <Reference Include="System" />
 
-        <Reference Include="System.Core"/>
-        <Reference Include="System.Xml.Linq"/>
-        <Reference Include="System.Data.DataSetExtensions"/>
+        <Reference Include="System.Core" />
+        <Reference Include="System.Xml.Linq" />
+        <Reference Include="System.Data.DataSetExtensions" />
 
 
-        <Reference Include="Microsoft.CSharp"/>
+        <Reference Include="Microsoft.CSharp" />
 
-        <Reference Include="System.Data"/>
+        <Reference Include="System.Data" />
 
-        <Reference Include="System.Net.Http"/>
+        <Reference Include="System.Net.Http" />
 
-        <Reference Include="System.Xml"/>
+        <Reference Include="System.Xml" />
 
         <Reference Include="VintagestoryAPI">
             <HintPath>$(AppData)\Vintagestory\VintagestoryAPI.dll</HintPath>
@@ -86,45 +86,45 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
-        <Compile Include="Properties\AssemblyInfo.cs"/>
-        <Compile Include="src\Configs\ModConfig.cs"/>
-        <Compile Include="src\Extensions\ArrayExtensions.cs"/>
-        <Compile Include="src\Extensions\EntityExtensions.cs"/>
-        <Compile Include="src\Extensions\ICoreServerAPIExtensions.cs"/>
-        <Compile Include="src\Extensions\IntExtensions.cs"/>
-        <Compile Include="src\Extensions\IServerPlayerExtensions.cs"/>
-        <Compile Include="src\Models\CommandArgument.cs"/>
-        <Compile Include="src\ModSystems\BaseSubSystem.cs"/>
-        <Compile Include="src\ModSystems\BaseBasicModSystem.cs"/>
-        <Compile Include="src\ModSystems\PlayerStats\Definitions\StatTypes.cs"/>
-        <Compile Include="src\ModSystems\PlayerStats\Extensions\ModConfigExtensions.cs"/>
-        <Compile Include="src\ModSystems\PlayerStats\Models\PlayerStatDefinition.cs"/>
-        <Compile Include="src\ModSystems\PlayerStats\Models\PlayerStatType.cs"/>
-        <Compile Include="src\ModSystems\PlayerStats\PlayerStatSystem.cs"/>
-        <Compile Include="src\ModSystems\ProximityChat\DistanceObfuscationSystem.cs"/>
-        <Compile Include="src\ModSystems\ProximityChat\LanguageSystem.cs"/>
-        <Compile Include="src\ModSystems\ProximityChat\Models\Language.cs"/>
-        <Compile Include="src\ModSystems\ProximityChat\Models\ProximityChatMode.cs"/>
-        <Compile Include="src\ModSystems\ProximityChat\RPProximityChatSystem.cs"/>
-        <Compile Include="src\ModSystems\ProximityChat\LanguageScrambler.cs"/>
-        <Compile Include="src\ModSystems\Repair\RepairModSystem.cs"/>
-        <Compile Include="src\ModSystems\SaveNotifications\SaveNotificationsSystem.cs"/>
-        <Compile Include="src\ModSystems\SleepNotifier\SleepNotifierSystem.cs"/>
-        <Compile Include="src\ModSystems\TPA\Models\TpaRequest.cs"/>
-        <Compile Include="src\ModSystems\TPA\TpaSystem.cs"/>
-        <Compile Include="src\Utilities\ChatHelper.cs"/>
+        <Compile Include="Properties\AssemblyInfo.cs" />
+        <Compile Include="src\Configs\ModConfig.cs" />
+        <Compile Include="src\Extensions\ArrayExtensions.cs" />
+        <Compile Include="src\Extensions\EntityExtensions.cs" />
+        <Compile Include="src\Extensions\ICoreServerAPIExtensions.cs" />
+        <Compile Include="src\Extensions\IntExtensions.cs" />
+        <Compile Include="src\Extensions\IServerPlayerExtensions.cs" />
+        <Compile Include="src\Models\CommandArgument.cs" />
+        <Compile Include="src\ModSystems\BaseSubSystem.cs" />
+        <Compile Include="src\ModSystems\BaseBasicModSystem.cs" />
+        <Compile Include="src\ModSystems\PlayerStats\Definitions\StatTypes.cs" />
+        <Compile Include="src\ModSystems\PlayerStats\Extensions\ModConfigExtensions.cs" />
+        <Compile Include="src\ModSystems\PlayerStats\Models\PlayerStatDefinition.cs" />
+        <Compile Include="src\ModSystems\PlayerStats\Models\PlayerStatType.cs" />
+        <Compile Include="src\ModSystems\PlayerStats\PlayerStatSystem.cs" />
+        <Compile Include="src\ModSystems\ProximityChat\DistanceObfuscationSystem.cs" />
+        <Compile Include="src\ModSystems\ProximityChat\LanguageSystem.cs" />
+        <Compile Include="src\ModSystems\ProximityChat\Models\Language.cs" />
+        <Compile Include="src\ModSystems\ProximityChat\Models\ProximityChatMode.cs" />
+        <Compile Include="src\ModSystems\ProximityChat\RPProximityChatSystem.cs" />
+        <Compile Include="src\ModSystems\ProximityChat\LanguageScrambler.cs" />
+        <Compile Include="src\ModSystems\Repair\RepairModSystem.cs" />
+        <Compile Include="src\ModSystems\SaveNotifications\SaveNotificationsSystem.cs" />
+        <Compile Include="src\ModSystems\SleepNotifier\SleepNotifierSystem.cs" />
+        <Compile Include="src\ModSystems\TPA\Models\TpaRequest.cs" />
+        <Compile Include="src\ModSystems\TPA\TpaSystem.cs" />
+        <Compile Include="src\Utilities\ChatHelper.cs" />
     </ItemGroup>
     <ItemGroup>
-        <Content Include=".ignore"/>
-        <Content Include="modinfo.json"/>
-        <Content Include="README.md"/>
-        <Content Include="scripts\package.ps1"/>
-        <Content Include="thebasics.csproj"/>
+        <Content Include=".ignore" />
+        <Content Include="modinfo.json" />
+        <Content Include="README.md" />
+        <Content Include="scripts\package.ps1" />
+        <Content Include="thebasics.csproj" />
     </ItemGroup>
     <ItemGroup>
-        <None Include="packages.config"/>
+        <None Include="packages.config" />
     </ItemGroup>
-    <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
+    <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
     <PropertyGroup>
         <PostBuildEvent>
 

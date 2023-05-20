@@ -28,6 +28,20 @@ namespace thebasics.ModSystems.PlayerStats.Definitions
                     ID = "KILLS_NPC",
                 }
             },
+            {
+                PlayerStatType.BlockBreaks, new PlayerStatDefinition
+                {
+                    Title = "Block Breaks",
+                    ID = "BLOCK_BREAKS",
+                }
+            },
+            {
+                PlayerStatType.DistanceTravelled, new PlayerStatDefinition
+                {
+                    Title = "Distance Travelled",
+                    ID = "DISTANCE_TRAVELLED",
+                }
+            },
         };
     }
 }

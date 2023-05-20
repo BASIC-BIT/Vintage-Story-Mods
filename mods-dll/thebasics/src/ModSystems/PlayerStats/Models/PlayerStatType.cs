@@ -5,5 +5,7 @@
         Deaths,
         PlayerKills,
         NpcKills,
+        BlockBreaks,
+        DistanceTravelled,
     }
 }
