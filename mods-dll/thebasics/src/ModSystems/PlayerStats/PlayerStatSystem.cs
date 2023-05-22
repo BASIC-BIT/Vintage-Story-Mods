@@ -88,7 +88,7 @@ namespace thebasics.ModSystems.PlayerStats
 
             if (Config.PlayerStatEnabled(PlayerStatType.PlayerKills) && damageSource.Source == EnumDamageSource.Player)
             {
-                var player = damageSource.SourceEntity.GetPlayer();
+                var player = (damageSource.CauseEntity ?? damageSource.SourceEntity).GetPlayer();
                 player.AddPlayerStat(PlayerStatType.PlayerKills);
             }
         }
@@ -100,7 +100,8 @@ namespace thebasics.ModSystems.PlayerStats
                 damageSource != null && 
                 damageSource.Source == EnumDamageSource.Player)
             {
-                var player = damageSource.SourceEntity.GetPlayer();
+                // var wasRangedKill = damageSource.SourceEntity != damageSource.CauseEntity;
+                var player = (damageSource.CauseEntity ?? damageSource.SourceEntity).GetPlayer();
                 player.AddPlayerStat(PlayerStatType.NpcKills);
             }
         }

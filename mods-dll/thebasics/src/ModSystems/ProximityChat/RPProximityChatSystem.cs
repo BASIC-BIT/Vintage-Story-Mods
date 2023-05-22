@@ -1,6 +1,6 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
@@ -33,13 +33,24 @@ namespace thebasics.ModSystems.ProximityChat
             // API.RegisterCommand("pmessage", "Sends a message to all players in a specific area", null,
             //     OnPMessageHandler, Privilege.announce);  
 
-            API.ChatCommands.GetOrCreate("nickname")
-                .WithAlias("nick", "setnick")
-                .WithDescription("Get or set your nickname")
-                .WithRootAlias("nick")
-                .WithArgs(new StringArgParser("new nickname", false))
-                .RequiresPrivilege(Privilege.chat)
-                .HandleWith(SetNickname);
+            if (Config.ProximityChatAllowPlayersToChangeNicknames)
+            {
+                API.ChatCommands.GetOrCreate("nickname")
+                    .WithAlias("nick", "setnick")
+                    .WithDescription("Get or set your nickname")
+                    .WithRootAlias("nick")
+                    .WithArgs(new StringArgParser("new nickname", false))
+                    .RequiresPrivilege(Privilege.chat)
+                    .HandleWith(SetNickname);
+            }
+
+            API.ChatCommands.GetOrCreate("adminsetnickname")
+                .WithAlias("adminsetnick")
+                .WithDescription("Admin: Get or set another player's nickname")
+                .WithRootAlias("adminsetnick")
+                .WithArgs(new PlayersArgParser("target player", API, true), new StringArgParser("new nickname", false))
+                .RequiresPrivilege(Privilege.commandplayer)
+                .HandleWith(SetNicknameAdmin);
 
             API.ChatCommands.GetOrCreate("me")
                 .WithAlias("m")
@@ -239,6 +250,8 @@ namespace thebasics.ModSystems.ProximityChat
             _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, ref chatContent,
                 tempMode);
 
+            chatContent = ProcessAccents(chatContent);
+
             message.Append(chatContent);
             message.Append(Config.ProximityChatModeQuotationEnd[sendingPlayer.GetChatMode(tempMode)]);
 
@@ -320,7 +333,11 @@ namespace thebasics.ModSystems.ProximityChat
                 builder.Append(".");
             }
 
-            return builder.ToString();
+            var output = builder.ToString();
+
+            output = ProcessAccents(output);
+
+            return output;
         }
 
         private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
@@ -355,6 +372,57 @@ namespace thebasics.ModSystems.ProximityChat
                     StatusMessage = $"Okay, your nickname is set to {ChatHelper.Quote(nickname)}",
                 };
             }
+        }
+
+        private string ProcessAccents(string message)
+        {
+            message = Regex.Replace(message, @"\|(.*?)\|", "<i>$1</i>");
+            message = Regex.Replace(message, @"\+(.*?)\+", "<strong>$1</strong>");
+            // message = Regex.Replace(message, @"=(.*?)=", "<font size=\"50\">$1</font>");
+
+            return message;
+        }
+        private TextCommandResult SetNicknameAdmin(TextCommandCallingArgs fullArgs)
+        {
+            var attemptTarget = API.GetPlayerByUID(((PlayerUidName[])fullArgs.Parsers[0].GetValue())[0].Uid);
+            if (attemptTarget == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Cannot find player.",
+                };
+            }
+            var oldNickname = attemptTarget.GetNickname();
+            
+            if (fullArgs.Parsers[1].IsMissing)
+            {
+                if (!attemptTarget.HasNickname())
+                {
+                    return new TextCommandResult
+                    {
+                        Status = EnumCommandStatus.Error,
+                        StatusMessage = $"Player {attemptTarget.PlayerName} does not have a nickname!  You can set it with `/adminsetnick {attemptTarget.PlayerName} NewName`",
+                    };
+                }
+
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Success,
+                    StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {attemptTarget.GetNickname()}",
+                };
+
+            }
+            
+            var newNickname = (string)fullArgs.Parsers[1].GetValue();
+            
+            attemptTarget.SetNickname(newNickname);
+            
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {newNickname}.  Old Nickname: {oldNickname}",
+            };
         }
 
         private TextCommandResult Emote(TextCommandCallingArgs args)
@@ -417,15 +485,13 @@ namespace thebasics.ModSystems.ProximityChat
                     Status = EnumCommandStatus.Success,
                 };
             }
-            else
+
+            player.SetChatMode(ProximityChatMode.Yell);
+            return new TextCommandResult
             {
-                player.SetChatMode(ProximityChatMode.Yell);
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Success,
-                    StatusMessage = "You are now yelling.",
-                };
-            }
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "You are now yelling.",
+            };
         }
 
         private TextCommandResult Sign(TextCommandCallingArgs args)
@@ -443,22 +509,19 @@ namespace thebasics.ModSystems.ProximityChat
                     Status = EnumCommandStatus.Success,
                 };
             }
-            else
+
+            player.SetChatMode(ProximityChatMode.Sign);
+            return new TextCommandResult
             {
-                player.SetChatMode(ProximityChatMode.Sign);
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Success,
-                    StatusMessage = "You are now signing.",
-                };
-            }
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "You are now signing.",
+            };
         }
 
         private TextCommandResult Whisper(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var message = (string)args.Parsers[0].GetValue();
-            var groupId = args.Caller.FromChatGroupId;
             if (!args.Parsers[0].IsMissing)
             {
                 SendLocalChatByPlayer(player,
@@ -469,22 +532,19 @@ namespace thebasics.ModSystems.ProximityChat
                     Status = EnumCommandStatus.Success,
                 };
             }
-            else
+
+            player.SetChatMode(ProximityChatMode.Whisper);
+            return new TextCommandResult
             {
-                player.SetChatMode(ProximityChatMode.Whisper);
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Success,
-                    StatusMessage = "You are now whispering.",
-                };
-            }
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "You are now whispering.",
+            };
         }
 
         private TextCommandResult Say(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var message = (string)args.Parsers[0].GetValue();
-            var groupId = args.Caller.FromChatGroupId;
             if (!args.Parsers[0].IsMissing)
             {
                 SendLocalChatByPlayer(player,
@@ -495,15 +555,13 @@ namespace thebasics.ModSystems.ProximityChat
                     Status = EnumCommandStatus.Success,
                 };
             }
-            else
+
+            player.SetChatMode(ProximityChatMode.Normal);
+            return new TextCommandResult
             {
-                player.SetChatMode(ProximityChatMode.Normal);
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Success,
-                    StatusMessage = "You are now talking normally.",
-                };
-            }
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "You are now talking normally.",
+            };
         }
 
         private TextCommandResult EmoteMode(TextCommandCallingArgs args)

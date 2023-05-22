@@ -14,6 +14,8 @@ namespace thebasics.Configs
             { ProximityChatMode.Sign, 15 }
         };
 
+        public bool ProximityChatAllowPlayersToChangeNicknames = true;
+
         public bool EnableDistanceObfuscationSystem = true;
         public IDictionary<ProximityChatMode, int> ProximityChatModeObfuscationRanges = new Dictionary<ProximityChatMode, int>
         {
