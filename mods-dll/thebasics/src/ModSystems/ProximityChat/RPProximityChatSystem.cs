@@ -243,14 +243,13 @@ namespace thebasics.ModSystems.ProximityChat
             // message.Append($"<font color=\"{lang.Color}\">");
             message.Append(Config.ProximityChatModeQuotationStart[sendingPlayer.GetChatMode(tempMode)]);
 
-            var chatContent = GetRPMessage(sendingPlayer, content, tempMode);
+            var chatContent = AddAutoCapitalizationAndPunctuation(sendingPlayer, content, tempMode);
+            chatContent = ProcessAccents(chatContent);
 
             // _languageSystem.ProcessMessage(sendingPlayer, receivingPlayer, groupId, ref chatContent, lang);
             //
             _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, ref chatContent,
                 tempMode);
-
-            chatContent = ProcessAccents(chatContent);
 
             message.Append(chatContent);
             message.Append(Config.ProximityChatModeQuotationEnd[sendingPlayer.GetChatMode(tempMode)]);
@@ -309,18 +308,26 @@ namespace thebasics.ModSystems.ProximityChat
             return Config.ProximityChatModePunctuation[player.GetChatMode(tempMode)];
         }
 
-        private string GetRPMessage(IServerPlayer player, string message, ProximityChatMode? tempMode = null)
+        private string AddAutoCapitalizationAndPunctuation(IServerPlayer player, string message, ProximityChatMode? tempMode = null)
         {
-            var builder = new StringBuilder();
+            var autoCapitalizationRegex = new Regex(@"^([\s+|]*)(.)(.*)$");
+            var autoPunctuationRegex = new Regex(@"^(.*?)(.)([\s+|]*)$");
 
-            builder.Append(message.Substring(0, 1).ToUpper() + message.Substring(1, message.Length - 1));
-
-            if (ChatHelper.DoesMessageNeedPunctuation(message))
+            message = autoPunctuationRegex.Replace(message, match =>
             {
-                builder.Append(GetProximityChatPunctuation(player, tempMode));
-            }
+                var possiblePunctuation = match.Groups[2].Value[0];
+                return
+                    $"{match.Groups[1].Value}{possiblePunctuation}{(ChatHelper.IsPunctuation(possiblePunctuation) ? "" : GetProximityChatPunctuation(player, tempMode))}{match.Groups[3].Value}";
+            });
 
-            return builder.ToString();
+            message = autoCapitalizationRegex.Replace(message, match =>
+            {
+                var firstLetter = match.Groups[2].Value;
+                return
+                    $"{match.Groups[1].Value}{firstLetter.ToUpper()}{match.Groups[3].Value}";
+            });
+
+            return message;
         }
 
         private string GetEmoteMessage(string message)
@@ -376,8 +383,11 @@ namespace thebasics.ModSystems.ProximityChat
 
         private string ProcessAccents(string message)
         {
+
             message = Regex.Replace(message, @"\|(.*?)\|", "<i>$1</i>");
+            message = Regex.Replace(message, @"\|(.*)$", "<i>$1</i>");
             message = Regex.Replace(message, @"\+(.*?)\+", "<strong>$1</strong>");
+            message = Regex.Replace(message, @"\+(.*)$", "<strong>$1</strong>");
             // message = Regex.Replace(message, @"=(.*?)=", "<font size=\"50\">$1</font>");
 
             return message;
@@ -450,7 +460,7 @@ namespace thebasics.ModSystems.ProximityChat
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             SendLocalChat(player,
-                ChatHelper.Wrap(GetRPMessage(player, (string)args.Parsers[0].GetValue(), ProximityChatMode.Normal),
+                ChatHelper.Wrap(AddAutoCapitalizationAndPunctuation(player, (string)args.Parsers[0].GetValue(), ProximityChatMode.Normal),
                     "*"),
                 chatType: EnumChatType.Notification);
 

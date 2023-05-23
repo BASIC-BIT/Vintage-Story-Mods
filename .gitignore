@@ -4,6 +4,7 @@
 !README.md
 !LICENSE
 !mods/
+!mods-dll/
 
 # Ignore user files anywhere inside the "mods" directory.
 mods/**/*.user
