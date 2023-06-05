@@ -1,0 +1,8 @@
+﻿[
+  {
+    "file": "game:blocktypes/clay/chimney",
+    "op": "add",
+    "path": "/entityBehaviors",
+    "value": [{ "name":  "litchimney" }]
+  }
+]

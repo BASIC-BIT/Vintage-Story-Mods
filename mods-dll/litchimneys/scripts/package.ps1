@@ -1,0 +1,1 @@
+﻿Compress-Archive -Force -Path $PSScriptRoot/../modinfo.json,$PSScriptRoot/../assets,$PSScriptRoot/../litchimneys.dll,$PSScriptRoot/../litchimneys.pdb -DestinationPath $PSScriptRoot/../releases/litchimneys.zip

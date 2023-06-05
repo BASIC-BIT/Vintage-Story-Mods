@@ -1,0 +1,12 @@
+{
+  "type": "code",
+  "modid": "litchimneys",
+  "name": "Lit Chimneys",
+  "author": "BASIC",
+  "description": "Automatically lights chimneys when a fireplace is lit below them.",
+  "version": "0.0.1",
+  "dependency": {
+    "game": ""
+  },
+  "side": "universal"
+}
