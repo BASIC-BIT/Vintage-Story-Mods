@@ -48,14 +48,23 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
 
         while (height > 0)
         {
-            var foundFirepit = Api.World.BlockAccessor.GetInterface<IFirePit>(new BlockPos
+            var searchPos = new BlockPos
             {
                 X = Pos.X,
                 Y = height,
                 Z = Pos.Z,
-            });
+            };
+            
+            var foundFirepit = Api.World.BlockAccessor.GetInterface<IFirePit>(searchPos);
 
             if (foundFirepit != null && foundFirepit.IsBurning)
+            {
+                return true;
+            }
+
+            var foundClayOven = Api.World.BlockAccessor.GetBlockEntity(searchPos) is BlockEntityOven { IsBurning: true };
+
+            if (foundClayOven)
             {
                 return true;
             }

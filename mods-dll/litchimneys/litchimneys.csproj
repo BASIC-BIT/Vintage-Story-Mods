@@ -87,7 +87,11 @@
     <Compile Include="src\LitChimneyBlockEntityBehavior.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="assets\litchimneys\itemtypes\firewood-sparse.json" />
+    <Content Include="assets\litchimneys\lang\en.json" />
     <Content Include="assets\litchimneys\patches\autolitchimneys.json" />
+    <Content Include="assets\litchimneys\recipes\firewood-sparse.json" />
+    <Content Include="assets\litchimneys\recipes\grid\firewood-sparse.json" />
     <Content Include="modinfo.json" />
     <Content Include="scripts\package.ps1" />
   </ItemGroup>
