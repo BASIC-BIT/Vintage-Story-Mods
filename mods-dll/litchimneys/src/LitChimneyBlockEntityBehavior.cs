@@ -13,8 +13,6 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
     {
         base.Initialize(api, properties);
         this.listenerId = api.Event.RegisterGameTickListener(Check, 3000);
-        
-        Api.Logger.Debug("LIT CHIMNEYS block initializing");
     }
     
     public override void OnBlockRemoved()
@@ -27,8 +25,7 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
     {
         var shouldBeLit = ShouldBeLit();
         var isLit = IsLit();
-
-        Api.Logger.Debug($"LIT CHIMNEYS checking block..  shouldBeLit: {shouldBeLit}, isLit: {isLit}");
+        
         if (shouldBeLit != isLit)
         {
             SetLit(shouldBeLit);
@@ -40,11 +37,14 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
         Block newBlock = Api.World.BlockAccessor.GetBlock(Block.CodeWithVariant("state", lit ? "lit" : "unlit"));
 
         Api.World.BlockAccessor.ExchangeBlock(newBlock.Id, this.Pos);
+        
+        //Fix particles because of new block
+        Blockentity.Initialize(Api);
     }
 
     private bool ShouldBeLit()
     {
-        var height = Pos.Y;
+        var height = Pos.Copy().Y;
 
         while (height > 0)
         {
@@ -54,10 +54,8 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
                 Y = height,
                 Z = Pos.Z,
             });
-            
-            Api.Logger.Debug("TEST");
 
-            if (foundFirepit != null)
+            if (foundFirepit != null && foundFirepit.IsBurning)
             {
                 return true;
             }
