@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using thebasics.Extensions;
@@ -152,6 +153,7 @@ namespace thebasics.ModSystems.ProximityChat
                         serverDataPlayerGroupMembership.Value.GroupName, EnumChatType.Notification);
                 }
             }
+            // Console.WriteLine(JsonUtil.ToString(byPlayer.ServerData.PlayerGroupMemberships));
         }
 
         private string GetPlayerChat(IServerPlayer byPlayer, IServerPlayer receivingPlayer, string message)
@@ -597,56 +599,5 @@ namespace thebasics.ModSystems.ProximityChat
                 StatusMessage = $"RP Text is now {ChatHelper.OnOff(rpTextEnabled)} for your messages.",
             };
         }
-
-        // private void OnPMessageHandler(IServerPlayer player, int groupId, CmdArgs args)
-        // {
-        //     Vec3d spawnpos = API.World.DefaultSpawnPosition.XYZ;
-        //     spawnpos.Y = 0;
-        //     Vec3d targetpos = null;
-        //     if (player.Entity == null)
-        //     {
-        //         targetpos = args.PopFlexiblePos(spawnpos, spawnpos);
-        //     }
-        //     else
-        //     {
-        //         targetpos = args.PopFlexiblePos(player.Entity.Pos.XYZ, spawnpos);
-        //     }
-        //
-        //     if (targetpos == null)
-        //     {
-        //         player.SendMessage(groupId, @"Invalid position supplied. Syntax: [coord] [coord] [coord] whereas
-        //                                      [coord] may be ~[decimal] or =[decimal] or [decimal]. 
-        //                                      ~ denotes a position relative to the player 
-        //                                      = denotes an absolute position 
-        //                                      no prefix denotes a position relative to the map middle",
-        //             EnumChatType.CommandError);
-        //         return;
-        //     }
-        //
-        //     var blockRadius = args.PopInt();
-        //     if (!blockRadius.HasValue)
-        //     {
-        //         player.SendMessage(groupId,
-        //             "Invalid radius supplied. Syntax: =[abscoord] =[abscoord] =[abscoord] [radius]",
-        //             EnumChatType.CommandError);
-        //         return;
-        //     }
-        //
-        //     var message = args.PopAll();
-        //     if (string.IsNullOrEmpty(message))
-        //     {
-        //         player.SendMessage(groupId,
-        //             "Invalid message supplied. Syntax: =[abscoord] =[abscoord] =[abscoord] [radius] [message]",
-        //             EnumChatType.CommandError);
-        //         return;
-        //     }
-        //
-        //     foreach (var nearbyPlayerData in API.World.AllOnlinePlayers
-        //                  .Select(x => new { Position = x.Entity.ServerPos, Player = (IServerPlayer)x })
-        //                  .Where(x => Math.Abs(x.Position.DistanceTo(targetpos)) < blockRadius))
-        //     {
-        //         nearbyPlayerData.Player.SendMessage(this._proximityGroup.Uid, message, EnumChatType.CommandSuccess);
-        //     }
-        // }
     }
 }

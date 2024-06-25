@@ -94,15 +94,15 @@ namespace thebasics.Configs
         public double SleepNotificationThreshold = 0.5;
         public string TEXT_SleepNotification = "You start to feel tired...";
 
-        // public bool EnableLanguageSystem = true;
-        // public bool AllowDefaultLanguage = true;
-        //
-        // public IList<Language> Languages = new Language[]
-        // {
-        //     new("Common", "The universal language", "c",
-        //         new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#92C4E1"),
-        //     new("Tradeband", "A common language for ease of trade across regions", "tr",
-        //     new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A"),
-        // };
+        public bool EnableLanguageSystem = true;
+        public bool AllowDefaultLanguage = true;
+        
+        public IList<Language> Languages = new Language[]
+        {
+            new("Common", "The universal language", "c",
+                new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#92C4E1"),
+            new("Tradeband", "A common language for ease of trade across regions", "tr",
+            new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A"),
+        };
     }
 }
