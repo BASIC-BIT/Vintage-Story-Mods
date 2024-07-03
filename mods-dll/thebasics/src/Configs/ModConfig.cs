@@ -104,5 +104,7 @@ namespace thebasics.Configs
             new("Tradeband", "A common language for ease of trade across regions", "tr",
             new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A"),
         };
+
+        public bool PreventProximityChannelSwitching = true;
     }
 }
