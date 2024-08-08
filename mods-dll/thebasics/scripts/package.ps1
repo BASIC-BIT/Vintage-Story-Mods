@@ -1,1 +1,1 @@
-﻿Compress-Archive -Force -Path $PSScriptRoot/../modinfo.json,$PSScriptRoot/../thebasics.dll,$PSScriptRoot/../thebasics.pdb -DestinationPath $PSScriptRoot/../thebasics.zip
+﻿Compress-Archive -Force -Path $PSScriptRoot/../modinfo.json,$PSScriptRoot/../../../output/net7.0/thebasics.dll,$PSScriptRoot/../../../output/net7.0/thebasics.pdb -DestinationPath $PSScriptRoot/../thebasics.zip

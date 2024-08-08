@@ -26,7 +26,7 @@ namespace thebasics.ModSystems.ProximityChat
             RegisterCommands();
             SetupProximityGroup();
 
-            // _languageSystem = new LanguageSystem(this, API, Config);
+            _languageSystem = new LanguageSystem(this, API, Config);
             _distanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
         }
 
@@ -112,6 +112,11 @@ namespace thebasics.ModSystems.ProximityChat
                 .RequiresPrivilege(Privilege.chat)
                 .HandleWith(ClearNickname);
 
+            API.ChatCommands.GetOrCreate("testmessage")
+                .WithDescription("test message")
+                .RequiresPrivilege(Privilege.chat)
+                .HandleWith(TestMessage);
+
             _serverChannel = API.Network.RegisterChannel("thebasics_config")
                 .RegisterMessageType<TheBasicsNetworkMessage>();
         }
@@ -169,6 +174,16 @@ namespace thebasics.ModSystems.ProximityChat
             // Console.WriteLine(JsonUtil.ToString(byPlayer.ServerData.PlayerGroupMemberships));
 
             SendClientConfig(byPlayer);
+
+            SwapOutNameTag(byPlayer);
+        }
+
+        // TODO: Not sure the client will get this data and sync it up.  Supposedly, behaviors should sync seamlessly with the client but I'm not sure that the UI renderer will refire (just like it does for chat), as the PlayerName never usually changes.  NPC names do though, maybe we can tie it in to that?
+        private void SwapOutNameTag(IServerPlayer player)
+        {
+            var behavior = player.Entity.GetBehavior<EntityBehaviorNameTag>();
+            
+            behavior.SetName(player.GetNickname());
         }
 
         private string GetPlayerChat(IServerPlayer byPlayer, IServerPlayer receivingPlayer, string message, int groupId)
@@ -488,6 +503,16 @@ namespace thebasics.ModSystems.ProximityChat
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = "Your nickname has been cleared.",
+            };
+        }
+
+        private TextCommandResult TestMessage(TextCommandCallingArgs args)
+        {
+            API.SendMessageToGroup(GlobalConstants.GeneralChatGroup, "TestMessage", EnumChatType.OthersMessage);
+
+            return new TextCommandResult()
+            {
+                Status = EnumCommandStatus.Success,
             };
         }
 

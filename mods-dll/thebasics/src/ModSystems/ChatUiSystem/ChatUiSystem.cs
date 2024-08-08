@@ -26,6 +26,7 @@ public class ChatUiSystem : ModSystem
         RegisterForServerSideConfig();
         
         if (!Harmony.HasAnyPatches(Mod.Info.ModID)) {
+            _api.Logger.Debug("THEBASICS - Patching!");
             _harmony = new Harmony(Mod.Info.ModID);
             _harmony.PatchAll();
         }
@@ -38,10 +39,10 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<TheBasicsNetworkMessage>(OnServerMessage);
     }
 
-    private void OnServerMessage(TheBasicsNetworkMessage networkMesage)
+    private void OnServerMessage(TheBasicsNetworkMessage networkMessage)
     {
-        _preventProximityChannelSwitching = networkMesage.PreventProximityChannelSwitching;
-        _proximityGroupId = networkMesage.ProximityGroupId;
+        _preventProximityChannelSwitching = networkMessage.PreventProximityChannelSwitching;
+        _proximityGroupId = networkMessage.ProximityGroupId;
     }
     
     // private static HudDialogChat GetChatHudElement(ICoreClientAPI api)
@@ -56,12 +57,15 @@ public class ChatUiSystem : ModSystem
     [HarmonyPatch(typeof(HudDialogChat), "HandleGotoGroupPacket")]
     public static bool HandleGotoGroupPacket()
     {
+        _api.Logger.Debug("THEBASICS - Handling GotoGroupPacket");
         var game = (ClientMain)_api.World;
         if (_preventProximityChannelSwitching && game.currentGroupid == _proximityGroupId)
         {
+            _api.Logger.Debug("THEBASICS - Denying GotoGroupPacket");
             return false;
         }
-
+        
+        _api.Logger.Debug("THEBASICS - Allowing GotoGroupPacket");
         return true;
     }
     

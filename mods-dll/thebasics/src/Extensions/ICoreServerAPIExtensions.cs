@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Linq;
-using thebasics.Utilities;
-using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
 namespace thebasics.Extensions
