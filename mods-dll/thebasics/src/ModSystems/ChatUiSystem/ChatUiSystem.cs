@@ -1,9 +1,11 @@
 ﻿using System.Collections.Generic;
+using System.Reflection.Metadata;
 using HarmonyLib;
 using thebasics.Models;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Util;
 using Vintagestory.Client.NoObf;
 
 namespace thebasics.ModSystems.ChatUiSystem;
@@ -15,7 +17,8 @@ public class ChatUiSystem : ModSystem
     private Harmony _harmony;
     private static int _proximityGroupId;
     private static bool _preventProximityChannelSwitching;
-    private static IClientNetworkChannel _clientChannel;
+    private static IClientNetworkChannel _clientConfigChannel;
+    private static IClientNetworkChannel _clientNicknameChannel;
 
     private Dictionary<string, string> PlayerNicknames = new Dictionary<string, string>();
     
@@ -25,7 +28,7 @@ public class ChatUiSystem : ModSystem
     {
         base.StartClientSide(api);
 
-        api.Event.OnEntitySpawn += ApplyNickname;
+        api.Event.OnEntityLoaded += ApplyNickname;
         _api = api;
         
         RegisterForServerSideConfig();
@@ -35,6 +38,25 @@ public class ChatUiSystem : ModSystem
             _harmony = new Harmony(Mod.Info.ModID);
             _harmony.PatchAll();
         }
+
+        api.Event.IsPlayerReady += OnPlayerReady;
+    }
+
+    private bool OnPlayerReady(ref EnumHandling handling)
+    {
+        handling = EnumHandling.PassThrough;
+
+        if (_api.World.Player != null && _api.World.Player.Entity != null)
+        {
+            _api.Logger.Debug($"THEBASICS - OnPlayerReady, Setting my player nickname!");
+            ApplyNickname(_api.World.Player.Entity);
+        }
+        else
+        {
+            _api.Logger.Debug($"THEBASICS - OnPlayerReady, Player or Entity was null!");
+        }
+
+        return true;
     }
 
     private void ApplyNickname(Entity entity)
@@ -50,9 +72,10 @@ public class ChatUiSystem : ModSystem
 
     private void RegisterForServerSideConfig()
     {
-        _clientChannel = _api.Network.RegisterChannel("thebasics_config")
+        _clientConfigChannel = _api.Network.RegisterChannel("thebasics_config")
             .RegisterMessageType<TheBasicsConfigMessage>()
-            .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
+            .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
+        _clientNicknameChannel = _api.Network.RegisterChannel("thebasics_nickname")
             .RegisterMessageType<TheBasicsPlayerNicknameMessage>()
             .SetMessageHandler<TheBasicsPlayerNicknameMessage>(OnServerPlayerNicknameMessage);
     }

@@ -19,7 +19,8 @@ namespace thebasics.ModSystems.ProximityChat
         private PlayerGroup _proximityGroup;
         private LanguageSystem _languageSystem;
         private DistanceObfuscationSystem _distanceObfuscationSystem;
-        private IServerNetworkChannel _serverChannel;
+        private IServerNetworkChannel _serverConfigChannel;
+        private IServerNetworkChannel _serverNicknameChannel;
 
         protected override void BasicStartServerSide()
         {
@@ -118,14 +119,16 @@ namespace thebasics.ModSystems.ProximityChat
                 .RequiresPrivilege(Privilege.chat)
                 .HandleWith(TestMessage);
 
-            _serverChannel = API.Network.RegisterChannel("thebasics_config")
-                .RegisterMessageType<TheBasicsConfigMessage>()
+            _serverConfigChannel = API.Network.RegisterChannel("thebasics_config")
+                .RegisterMessageType<TheBasicsConfigMessage>();
+            
+            _serverNicknameChannel = API.Network.RegisterChannel("thebasics_nickname")
                 .RegisterMessageType<TheBasicsPlayerNicknameMessage>();
         }
 
         private void SendClientConfig(IServerPlayer byPlayer)
         {
-            _serverChannel.SendPacket(new TheBasicsConfigMessage
+            _serverConfigChannel.SendPacket(new TheBasicsConfigMessage
             {
                 ProximityGroupId = _proximityGroup.Uid,
                 PreventProximityChannelSwitching = Config.PreventProximityChannelSwitching,
@@ -183,8 +186,9 @@ namespace thebasics.ModSystems.ProximityChat
         // TODO: Not sure the client will get this data and sync it up.  Supposedly, behaviors should sync seamlessly with the client but I'm not sure that the UI renderer will refire (just like it does for chat), as the PlayerName never usually changes.  NPC names do though, maybe we can tie it in to that?
         private void SwapOutNameTag(IServerPlayer player)
         {
-            if (player.HasNickname())
+            if (!player.HasNickname())
             {
+                API.Logger.Debug($"THEBASICS - Player {player.PlayerName} has no nickname set, therefore nametag updates are not being sent to the clients");
                 return;
             }
             
@@ -194,14 +198,14 @@ namespace thebasics.ModSystems.ProximityChat
             behavior.SetName(nickname);
             
             // Broadcast player's name to all clients (except player)
-            _serverChannel.BroadcastPacket(new TheBasicsPlayerNicknameMessage
+            _serverNicknameChannel.BroadcastPacket(new TheBasicsPlayerNicknameMessage
             {
                 PlayerUID = player.PlayerUID,
                 Nickname = nickname,
             }, player);
             
             // Send player's name specifically to connecting player
-            _serverChannel.SendPacket(new TheBasicsPlayerNicknameMessage
+            _serverNicknameChannel.SendPacket(new TheBasicsPlayerNicknameMessage
             {
                 PlayerUID = player.PlayerUID,
                 Nickname = nickname,
@@ -210,7 +214,7 @@ namespace thebasics.ModSystems.ProximityChat
             // Send the player all other nicknames to sync them up
             API.World.AllOnlinePlayers.Foreach((loopPlayer) =>
             {
-                _serverChannel.SendPacket(new TheBasicsPlayerNicknameMessage
+                _serverNicknameChannel.SendPacket(new TheBasicsPlayerNicknameMessage
                 {
                     PlayerUID = loopPlayer.PlayerUID,
                     Nickname = (loopPlayer as IServerPlayer).GetNickname(),
