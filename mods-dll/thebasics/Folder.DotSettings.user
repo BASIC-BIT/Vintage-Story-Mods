@@ -4,6 +4,8 @@
   &lt;Assembly Path="C:\Users\steve\AppData\Roaming\Vintagestory\VintagestoryLib.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\Users\steve\AppData\Roaming\Vintagestory\VintagestoryAPI.dll" /&gt;&#xD;
   &lt;Assembly Path="C:\Users\steve\AppData\Roaming\Vintagestory\Mods\VSEssentials.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\steve\AppData\Roaming\Vintagestory\VintagestoryServer.dll" /&gt;&#xD;
+  &lt;Assembly Path="C:\Users\steve\Downloads\expeditioner_1.0.2\Expeditioner.dll" /&gt;&#xD;
 &lt;/AssemblyExplorer&gt;</s:String>
 	
 	<s:String x:Key="/Default/Environment/Hierarchy/Build/BuildTool/CustomBuildToolPath/@EntryValue">C:\Program Files\JetBrains\JetBrains Rider 2022.2.3\tools\MSBuild\Current\Bin\MSBuild.exe</s:String>

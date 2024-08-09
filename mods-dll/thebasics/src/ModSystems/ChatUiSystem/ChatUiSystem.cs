@@ -7,6 +7,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Util;
 using Vintagestory.Client.NoObf;
+using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.ChatUiSystem;
 
@@ -28,8 +29,12 @@ public class ChatUiSystem : ModSystem
     {
         base.StartClientSide(api);
 
-        api.Event.OnEntityLoaded += ApplyNickname;
         _api = api;
+        
+        _api.Event.OnEntityLoaded += ApplyNickname;
+        _api.Event.OnEntitySpawn += ApplyRenderer;
+        
+        api.RegisterEntityRendererClass("TestPlayerShape", typeof(RpTextEntityPlayerShapeRenderer));
         
         RegisterForServerSideConfig();
         
@@ -40,6 +45,15 @@ public class ChatUiSystem : ModSystem
         }
 
         api.Event.IsPlayerReady += OnPlayerReady;
+    }
+
+    private void ApplyRenderer(Entity entity)
+    {
+        if (entity is EntityPlayer entityPlayer)
+        {
+            entity.Properties.Client.Renderer = new RpTextEntityPlayerShapeRenderer(entity,_api);
+            entity.Properties.Client.RendererName = "TestPlayerShape";
+        }
     }
 
     private bool OnPlayerReady(ref EnumHandling handling)

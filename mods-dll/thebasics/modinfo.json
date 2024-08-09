@@ -5,8 +5,10 @@
   "author": "BASIC",
   "description": "Adds an RP proximity chat system, with configurable talking ranges, nicknames, automatic message formatting, and more!",
   "version": "4.0.0-pre.5",
-  "dependency": {
-    "game": ""
+  "dependencies": {
+    "game": "",
+    "creative": "",
+    "survival": ""
   },
   "side": "universal"
 }
