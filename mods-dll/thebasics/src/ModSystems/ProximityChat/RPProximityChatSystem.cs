@@ -9,6 +9,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace thebasics.ModSystems.ProximityChat
 {
@@ -118,12 +119,13 @@ namespace thebasics.ModSystems.ProximityChat
                 .HandleWith(TestMessage);
 
             _serverChannel = API.Network.RegisterChannel("thebasics_config")
-                .RegisterMessageType<TheBasicsNetworkMessage>();
+                .RegisterMessageType<TheBasicsConfigMessage>()
+                .RegisterMessageType<TheBasicsPlayerNicknameMessage>();
         }
 
         private void SendClientConfig(IServerPlayer byPlayer)
         {
-            _serverChannel.SendPacket(new TheBasicsNetworkMessage
+            _serverChannel.SendPacket(new TheBasicsConfigMessage
             {
                 ProximityGroupId = _proximityGroup.Uid,
                 PreventProximityChannelSwitching = Config.PreventProximityChannelSwitching,
@@ -177,13 +179,43 @@ namespace thebasics.ModSystems.ProximityChat
 
             SwapOutNameTag(byPlayer);
         }
-
+        
         // TODO: Not sure the client will get this data and sync it up.  Supposedly, behaviors should sync seamlessly with the client but I'm not sure that the UI renderer will refire (just like it does for chat), as the PlayerName never usually changes.  NPC names do though, maybe we can tie it in to that?
         private void SwapOutNameTag(IServerPlayer player)
         {
-            var behavior = player.Entity.GetBehavior<EntityBehaviorNameTag>();
+            if (player.HasNickname())
+            {
+                return;
+            }
             
-            behavior.SetName(player.GetNickname());
+            var behavior = player.Entity.GetBehavior<EntityBehaviorNameTag>();
+            var nickname = player.GetNickname();
+
+            behavior.SetName(nickname);
+            
+            // Broadcast player's name to all clients (except player)
+            _serverChannel.BroadcastPacket(new TheBasicsPlayerNicknameMessage
+            {
+                PlayerUID = player.PlayerUID,
+                Nickname = nickname,
+            }, player);
+            
+            // Send player's name specifically to connecting player
+            _serverChannel.SendPacket(new TheBasicsPlayerNicknameMessage
+            {
+                PlayerUID = player.PlayerUID,
+                Nickname = nickname,
+            }, player);
+            
+            // Send the player all other nicknames to sync them up
+            API.World.AllOnlinePlayers.Foreach((loopPlayer) =>
+            {
+                _serverChannel.SendPacket(new TheBasicsPlayerNicknameMessage
+                {
+                    PlayerUID = loopPlayer.PlayerUID,
+                    Nickname = (loopPlayer as IServerPlayer).GetNickname(),
+                }, player);
+            });
         }
 
         private string GetPlayerChat(IServerPlayer byPlayer, IServerPlayer receivingPlayer, string message, int groupId)
@@ -405,6 +437,8 @@ namespace thebasics.ModSystems.ProximityChat
                     StatusMessage = $"Okay, your nickname is set to {ChatHelper.Quote(nickname)}",
                 };
             }
+            
+            // TODO: Broadcast command to set nickname on clients
         }
 
         private string ProcessAccents(string message)
@@ -459,6 +493,8 @@ namespace thebasics.ModSystems.ProximityChat
                 Status = EnumCommandStatus.Success,
                 StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {newNickname}.  Old Nickname: {oldNickname}",
             };
+            
+            // TODO: Broadcast command to set nickname on clients
         }
 
         private TextCommandResult Emote(TextCommandCallingArgs args)
@@ -504,6 +540,7 @@ namespace thebasics.ModSystems.ProximityChat
                 Status = EnumCommandStatus.Success,
                 StatusMessage = "Your nickname has been cleared.",
             };
+            // TODO: Send broadcast to clear nickname from clients
         }
 
         private TextCommandResult TestMessage(TextCommandCallingArgs args)
