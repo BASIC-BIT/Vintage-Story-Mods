@@ -6,6 +6,7 @@ using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -139,7 +140,17 @@ namespace thebasics.ModSystems.ProximityChat
         {
             API.Event.PlayerChat += Event_PlayerChat;
             API.Event.PlayerJoin += Event_PlayerJoin;
+            // API.Event.OnEntitySpawn += SetPlayerRenderer;
         }
+
+        // private void SetPlayerRenderer(Entity entity)
+        // {
+        //     if (entity is EntityPlayer entityPlayer)
+        //     {
+        //         API.Logger.Debug($"THEBASICS - Loading Player - {entity.Properties.Client.RendererName}");
+        //         entity.Properties.Client.RendererName = "TestPlayerShape";
+        //     }
+        // }
 
         private void SetupProximityGroup()
         {
@@ -175,8 +186,10 @@ namespace thebasics.ModSystems.ProximityChat
                     byPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
                         serverDataPlayerGroupMembership.Value.GroupName, EnumChatType.Notification);
                 }
+            } else if (playerProximityGroup.Level == EnumPlayerGroupMemberShip.None)
+            {
+                playerProximityGroup.Level = EnumPlayerGroupMemberShip.Member;
             }
-            // Console.WriteLine(JsonUtil.ToString(byPlayer.ServerData.PlayerGroupMemberships));
 
             SendClientConfig(byPlayer);
 

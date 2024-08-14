@@ -1,11 +1,11 @@
 ﻿using System.Collections.Generic;
-using System.Reflection.Metadata;
+using System.Reflection;
 using HarmonyLib;
 using thebasics.Models;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
-using Vintagestory.API.Util;
+using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
 using Vintagestory.GameContent;
 
@@ -32,9 +32,9 @@ public class ChatUiSystem : ModSystem
         _api = api;
         
         _api.Event.OnEntityLoaded += ApplyNickname;
-        _api.Event.OnEntitySpawn += ApplyRenderer;
-        
-        api.RegisterEntityRendererClass("TestPlayerShape", typeof(RpTextEntityPlayerShapeRenderer));
+        // _api.Event.OnEntitySpawn += ApplyRenderer;
+        //
+        // api.RegisterEntityRendererClass("TestPlayerShape", typeof(RpTextEntityPlayerShapeRenderer));
         
         RegisterForServerSideConfig();
         
@@ -47,14 +47,14 @@ public class ChatUiSystem : ModSystem
         api.Event.IsPlayerReady += OnPlayerReady;
     }
 
-    private void ApplyRenderer(Entity entity)
-    {
-        if (entity is EntityPlayer entityPlayer)
-        {
-            entity.Properties.Client.Renderer = new RpTextEntityPlayerShapeRenderer(entity,_api);
-            entity.Properties.Client.RendererName = "TestPlayerShape";
-        }
-    }
+    // private void ApplyRenderer(Entity entity)
+    // {
+    //     if (entity is EntityPlayer entityPlayer)
+    //     {
+    //         entity.Properties.Client.Renderer = new RpTextEntityPlayerShapeRenderer(entity,_api);
+    //         entity.Properties.Client.RendererName = "TestPlayerShape";
+    //     }
+    // }
 
     private bool OnPlayerReady(ref EnumHandling handling)
     {
@@ -138,10 +138,11 @@ public class ChatUiSystem : ModSystem
      */
     [HarmonyPrefix]
     [HarmonyPatch(typeof(HudDialogChat), "HandleGotoGroupPacket")]
-    public static bool HandleGotoGroupPacket()
+    public static bool HandleGotoGroupPacket(HudDialogChat __instance, Packet_Server packet)
     {
-        _api.Logger.Debug("THEBASICS - Handling GotoGroupPacket");
         var game = (ClientMain)_api.World;
+        int gotoGroupId = packet.GotoGroup.GroupId;
+        _api.Logger.Debug($"THEBASICS - Handling GotoGroupPacket ~ Current group: {game.currentGroupid} GotoGroup: {gotoGroupId}");
         if (_preventProximityChannelSwitching && game.currentGroupid == _proximityGroupId)
         {
             _api.Logger.Debug("THEBASICS - Denying GotoGroupPacket");
@@ -150,6 +151,54 @@ public class ChatUiSystem : ModSystem
         
         _api.Logger.Debug("THEBASICS - Allowing GotoGroupPacket");
         return true;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(EntityShapeRenderer), "OnChatMessage")]
+    protected static bool OnChatMessage(EntityPlayerShapeRenderer __instance, int groupId, string message, EnumChatType chattype, string data)
+    {
+        if (!(__instance.entity is EntityPlayer))
+        {
+            return true;
+        }
+        if (data == null || !data.Contains("from:") || __instance.entity.Pos.SquareDistanceTo(__instance.capi.World.Player.Entity.Pos.XYZ) >= 400.0 || message.Length <= 0)
+            return false;
+        string[] strArray1 = data.Split(new char[1]{ ',' }, 2);
+        if (strArray1.Length < 2)
+            return false;
+        string[] strArray2 = strArray1[0].Split(new char[1]
+        {
+            ':'
+        }, 2);
+        string[] strArray3 = strArray1[1].Split(new char[1]
+        {
+            ':'
+        }, 2);
+        if (strArray2[0] != "from")
+            return false;
+        int result;
+        int.TryParse(strArray2[1], out result);
+        if (__instance.entity.EntityId != (long) result)
+            return false;
+        message = strArray3[1];
+        message = message.Replace("&lt;", "<").Replace("&gt;", ">");
+        LoadedTexture loadedTexture = __instance.capi.Gui.TextTexture.GenTextTexture(message, new CairoFont(25.0, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble), 350, new TextBackground()
+        {
+            FillColor = GuiStyle.DialogLightBgColor,
+            Padding = 100,
+            Radius = GuiStyle.ElementBGRadius
+        }, EnumTextOrientation.Center);
+        var messageTexturesField = __instance.GetType()
+            .GetField("messageTextures", BindingFlags.NonPublic | BindingFlags.Instance);
+        var messageTextures = (List<MessageTexture>)messageTexturesField.GetValue(__instance);
+        messageTextures.Insert(0, new MessageTexture()
+        {
+            tex = loadedTexture,
+            message = message,
+            receivedTime = __instance.capi.World.ElapsedMilliseconds
+        });
+
+        return false;
     }
     
     public override void Dispose() {
