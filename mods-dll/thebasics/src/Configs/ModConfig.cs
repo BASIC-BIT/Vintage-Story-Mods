@@ -17,6 +17,7 @@ namespace thebasics.Configs
         public bool ProximityChatAllowPlayersToChangeNicknames = true;
 
         public bool EnableDistanceObfuscationSystem = true;
+        // TODO: Notification range past the falloff range, that says "you hear blah whispering something"
         public IDictionary<ProximityChatMode, int> ProximityChatModeObfuscationRanges = new Dictionary<ProximityChatMode, int>
         {
             { ProximityChatMode.Yell, 45 },
@@ -25,6 +26,17 @@ namespace thebasics.Configs
             { ProximityChatMode.Sign, 15 }
         };
 
+        
+        public bool EnableDistanceFontSizeSystem = true;
+        public IDictionary<ProximityChatMode, int> ProximityChatDefaultFontSize = new Dictionary<ProximityChatMode, int>
+        {
+            { ProximityChatMode.Yell, 30 },
+            { ProximityChatMode.Normal, 16 },
+            { ProximityChatMode.Whisper, 12 },
+            { ProximityChatMode.Sign, 16 }
+        };
+        public int ProximityChatMinimumFontSize = 6;
+        
         public bool BoldNicknames = false;
 
         public IDictionary<ProximityChatMode, string[]> ProximityChatModeVerbs =
@@ -35,6 +47,8 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, new[] { "whispers", "mumbles", "mutters" } },
                 { ProximityChatMode.Sign, new[] { "signs", "gestures", "motions" } }
             };
+
+        public string ProximityChatModeBabbleVerb = "babbles";
 
         public IDictionary<ProximityChatMode, string> ProximityChatModePunctuation =
             new Dictionary<ProximityChatMode, string>
@@ -100,11 +114,14 @@ namespace thebasics.Configs
         public IList<Language> Languages = new Language[]
         {
             new("Common", "The universal language", "c",
-                new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#92C4E1"),
+                new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#92C4E1", true),
             new("Tradeband", "A common language for ease of trade across regions", "tr",
             new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A"),
         };
 
         public bool PreventProximityChannelSwitching = true;
+
+        // Show RP nickname above players heads
+        public bool ShowRpNametag = true;
     }
 }

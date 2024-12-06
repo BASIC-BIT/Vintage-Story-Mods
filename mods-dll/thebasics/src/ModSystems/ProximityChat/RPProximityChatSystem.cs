@@ -6,11 +6,11 @@ using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
-using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.ProximityChat
 {
@@ -21,7 +21,7 @@ namespace thebasics.ModSystems.ProximityChat
         private LanguageSystem _languageSystem;
         private DistanceObfuscationSystem _distanceObfuscationSystem;
         private IServerNetworkChannel _serverConfigChannel;
-        private IServerNetworkChannel _serverNicknameChannel;
+        // private IServerNetworkChannel _serverNicknameChannel;
 
         protected override void BasicStartServerSide()
         {
@@ -123,8 +123,8 @@ namespace thebasics.ModSystems.ProximityChat
             _serverConfigChannel = API.Network.RegisterChannel("thebasics_config")
                 .RegisterMessageType<TheBasicsConfigMessage>();
             
-            _serverNicknameChannel = API.Network.RegisterChannel("thebasics_nickname")
-                .RegisterMessageType<TheBasicsPlayerNicknameMessage>();
+            // _serverNicknameChannel = API.Network.RegisterChannel("thebasics_nickname")
+            //     .RegisterMessageType<TheBasicsPlayerNicknameMessage>();
         }
 
         private void SendClientConfig(IServerPlayer byPlayer)
@@ -211,31 +211,31 @@ namespace thebasics.ModSystems.ProximityChat
             behavior.SetName(nickname);
             
             // Broadcast player's name to all clients (except player)
-            _serverNicknameChannel.BroadcastPacket(new TheBasicsPlayerNicknameMessage
-            {
-                PlayerUID = player.PlayerUID,
-                Nickname = nickname,
-            }, player);
+            // _serverNicknameChannel.BroadcastPacket(new TheBasicsPlayerNicknameMessage
+            // {
+            //     PlayerUID = player.PlayerUID,
+            //     Nickname = nickname,
+            // }, player);
             
             // Send player's name specifically to connecting player
-            _serverNicknameChannel.SendPacket(new TheBasicsPlayerNicknameMessage
-            {
-                PlayerUID = player.PlayerUID,
-                Nickname = nickname,
-            }, player);
+            // _serverNicknameChannel.SendPacket(new TheBasicsPlayerNicknameMessage
+            // {
+            //     PlayerUID = player.PlayerUID,
+            //     Nickname = nickname,
+            // }, player);
             
             // Send the player all other nicknames to sync them up
-            API.World.AllOnlinePlayers.Foreach((loopPlayer) =>
-            {
-                _serverNicknameChannel.SendPacket(new TheBasicsPlayerNicknameMessage
-                {
-                    PlayerUID = loopPlayer.PlayerUID,
-                    Nickname = (loopPlayer as IServerPlayer).GetNickname(),
-                }, player);
-            });
+            // API.World.AllOnlinePlayers.Foreach((loopPlayer) =>
+            // {
+            //     _serverNicknameChannel.SendPacket(new TheBasicsPlayerNicknameMessage
+            //     {
+            //         PlayerUID = loopPlayer.PlayerUID,
+            //         Nickname = (loopPlayer as IServerPlayer).GetNickname(),
+            //     }, player);
+            // });
         }
 
-        private string GetPlayerChat(IServerPlayer byPlayer, IServerPlayer receivingPlayer, string message, int groupId)
+        private string GetPlayerChat(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message, int groupId)
         {
             var content = ChatHelper.GetMessage(message);
             var isEmote = content[0] == '*';
@@ -247,7 +247,7 @@ namespace thebasics.ModSystems.ProximityChat
             if (isEmote)
             {
                 content = content.Remove(0, 1);
-                messageCopy = GetFullEmoteMessage(byPlayer, content);
+                messageCopy = GetFullEmoteMessage(sendingPlayer, receivingPlayer, content);
             }
             else if (isOOC)
             {
@@ -258,10 +258,13 @@ namespace thebasics.ModSystems.ProximityChat
             }
             else if (isEnvironmentMessage)
             {
+                messageCopy = ChatHelper.Wrap(
+                    AddAutoCapitalizationAndPunctuation(sendingPlayer, messageCopy, ProximityChatMode.Normal),
+                    "*");
             }
             else
             {
-                messageCopy = GetFullRPMessage(byPlayer, receivingPlayer, content, groupId);
+                messageCopy = GetFullRPMessage(sendingPlayer, receivingPlayer, content, groupId);
             }
 
             return messageCopy;
@@ -296,24 +299,39 @@ namespace thebasics.ModSystems.ProximityChat
                 return;
             }
 
+            
+            // TODO: Fix this hack - using a check here to check for environment messages to apply specific message type
+            var isEnvironmentMessage = message[0] == '!';
+            
+            var chatType = isEnvironmentMessage ? EnumChatType.Notification : EnumChatType.OthersMessage;
             var messageCopy = (string)message.Clone();
             SendLocalChatByPlayer(byPlayer,
-                receivingPlayer => GetPlayerChat(byPlayer, receivingPlayer, messageCopy, channelId), data: data);
+                receivingPlayer => GetPlayerChat(byPlayer, receivingPlayer, messageCopy, channelId), chatType: chatType, data: data);
+            
+            // TODO: Only send this message if the player tried to speak in babble accidentally
+            if (byPlayer.GetDefaultLanguage(Config) == LanguageSystem.BabbleLang)
+            {
+                byPlayer.SendMessage(GlobalConstants.CurrentChatGroup, "You are speaking in babble.  Add a language via /addlang or set your default lang with a language identifier, ex. \":c\"", EnumChatType.CommandError);
+            }
         }
 
         private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content, int groupId, ProximityChatMode? tempMode = null)
         {
             if (sendingPlayer.GetEmoteMode())
             {
-                return GetFullEmoteMessage(sendingPlayer, content);
+                return GetFullEmoteMessage(sendingPlayer, receivingPlayer, content);
             }
 
             var lang = _languageSystem.GetSpeakingLanguage(sendingPlayer, groupId, ref content);
-
+            
             var message = new StringBuilder();
+            if (Config.EnableDistanceFontSizeSystem)
+            {
+                message.Append($"<font size=\"{_distanceObfuscationSystem.GetFontSize(sendingPlayer, receivingPlayer, tempMode)}\">");
+            }
             message.Append(GetFormattedNickname(sendingPlayer));
             message.Append(" ");
-            message.Append(GetProximityChatVerb(sendingPlayer, tempMode));
+            message.Append(GetProximityChatVerb(sendingPlayer, lang, tempMode));
             message.Append(" ");
             message.Append($"<font color=\"{lang.Color}\">");
             message.Append(Config.ProximityChatModeQuotationStart[sendingPlayer.GetChatMode(tempMode)]);
@@ -321,7 +339,7 @@ namespace thebasics.ModSystems.ProximityChat
             var chatContent = AddAutoCapitalizationAndPunctuation(sendingPlayer, content, tempMode);
             chatContent = ProcessAccents(chatContent);
 
-            _languageSystem.ProcessMessage(sendingPlayer, receivingPlayer, groupId, ref chatContent, lang);
+            _languageSystem.ProcessMessage(receivingPlayer, ref chatContent, lang);
             
             _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, ref chatContent,
                 tempMode);
@@ -330,6 +348,10 @@ namespace thebasics.ModSystems.ProximityChat
             message.Append(Config.ProximityChatModeQuotationEnd[sendingPlayer.GetChatMode(tempMode)]);
 
             message.Append("</font>");
+            if (Config.EnableDistanceFontSizeSystem)
+            {
+                message.Append("</font>");
+            }
 
             return message.ToString();
         }
@@ -340,9 +362,9 @@ namespace thebasics.ModSystems.ProximityChat
             return Config.BoldNicknames ? ChatHelper.Strong(nick) : nick;
         }
 
-        private string GetFullEmoteMessage(IServerPlayer player, string content)
+        private string GetFullEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content)
         {
-            return ChatHelper.Build(GetFormattedNickname(player), " ", GetEmoteMessage(content));
+            return ChatHelper.Build(GetFormattedNickname(sendingPlayer), " ", GetEmoteMessage(sendingPlayer, receivingPlayer, content));
         }
 
         private void SendLocalChat(IServerPlayer byPlayer, string message, ProximityChatMode? tempMode = null,
@@ -373,8 +395,12 @@ namespace thebasics.ModSystems.ProximityChat
             return Config.ProximityChatModeDistances[player.GetChatMode(tempMode)];
         }
 
-        private string GetProximityChatVerb(IServerPlayer player, ProximityChatMode? tempMode = null)
+        private string GetProximityChatVerb(IServerPlayer player, Language lang, ProximityChatMode? tempMode = null)
         {
+            if(lang == LanguageSystem.BabbleLang)
+            {
+                return Config.ProximityChatModeBabbleVerb;
+            }
             return Config.ProximityChatModeVerbs[player.GetChatMode(tempMode)].GetRandomElement();
         }
 
@@ -405,11 +431,39 @@ namespace thebasics.ModSystems.ProximityChat
             return message;
         }
 
-        private string GetEmoteMessage(string message)
+        private string GetEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message)
         {
             var builder = new StringBuilder();
 
-            builder.Append(message.Trim());
+            var trimmedMessage = message.Trim();
+            
+            // Separate trimmed message by quotes, applying the language system to every other part
+            // TODO: Allow for multiple languages in a single message
+            var splitMessage = trimmedMessage.Split('"');
+            for (var i = 0; i < splitMessage.Length; i++)
+            {
+                if (i % 2 == 0)
+                {
+                    builder.Append(splitMessage[i]);
+                }
+                else
+                {
+                    // TODO: apply obfuscation system here too!
+                    var lang = sendingPlayer.GetDefaultLanguage(Config);
+                    _languageSystem.ProcessMessage(receivingPlayer, ref splitMessage[i], lang);
+                    _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, ref splitMessage[i]);
+                    
+                    // TODO: Should emotes accept a temporary mode? Probably not, too complicated 
+                    var fontSize = _distanceObfuscationSystem.GetFontSize(sendingPlayer, receivingPlayer);
+                    
+                    builder.Append($"<font color=\"{lang.Color}\" size=\"{fontSize}\">");
+                    builder.Append("\"");
+                    builder.Append(splitMessage[i]);
+                    builder.Append("\"");
+                    builder.Append("</font>");
+                }
+            }
+            
             if (ChatHelper.DoesMessageNeedPunctuation(message))
             {
                 builder.Append(".");
@@ -448,14 +502,13 @@ namespace thebasics.ModSystems.ProximityChat
             {
                 var nickname = (string)fullArgs.Parsers[0].GetValue();
                 player.SetNickname(nickname);
+                SwapOutNameTag(player);
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
                     StatusMessage = $"Okay, your nickname is set to {ChatHelper.Quote(nickname)}",
                 };
             }
-            
-            // TODO: Broadcast command to set nickname on clients
         }
 
         private string ProcessAccents(string message)
@@ -505,13 +558,12 @@ namespace thebasics.ModSystems.ProximityChat
             
             attemptTarget.SetNickname(newNickname);
             
+            SwapOutNameTag(attemptTarget);
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {newNickname}.  Old Nickname: {oldNickname}",
             };
-            
-            // TODO: Broadcast command to set nickname on clients
         }
 
         private TextCommandResult Emote(TextCommandCallingArgs args)
@@ -519,7 +571,10 @@ namespace thebasics.ModSystems.ProximityChat
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             if (player.HasNickname())
             {
-                SendLocalChat(player, GetFullEmoteMessage(player, (string)args.Parsers[0].GetValue()));
+                SendLocalChatByPlayer(player,
+                    targetPlayer => GetFullEmoteMessage(player, targetPlayer, 
+                        (string)args.Parsers[0].GetValue()));
+                
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
@@ -647,7 +702,7 @@ namespace thebasics.ModSystems.ProximityChat
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var message = (string)args.Parsers[0].GetValue();
             var groupId = args.Caller.FromChatGroupId;
-            if (!args.Parsers[0].IsMissing)
+            if (!args.Parsers[0].IsMissing) 
             {
                 SendLocalChatByPlayer(player,
                     targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Normal),

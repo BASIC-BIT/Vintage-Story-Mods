@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using thebasics.Configs;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
+using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.TPA.Models;
 using Vintagestory.API.Common;
@@ -42,6 +43,7 @@ namespace thebasics.Extensions
             player.SetModdata(key, SerializerUtil.Serialize<T>(value));
         }
 
+        #region Nicknames
         public static string GetNickname(this IServerPlayer player)
         {
             return GetModData(player, ModDataNickname, player.PlayerName);
@@ -61,6 +63,7 @@ namespace thebasics.Extensions
         {
             player.RemoveModdata(ModDataNickname);
         }
+        #endregion
 
         public static ProximityChatMode GetChatMode(this IServerPlayer player, ProximityChatMode? tempMode = null)
         {
@@ -92,6 +95,7 @@ namespace thebasics.Extensions
             return GetModData(player, ModDataRpTextEnabled, true);
         }
 
+        #region Player Stats
         private static string GetPlayerStatID(PlayerStatType type)
         {
             return ModDataPlayerStatsPrefix + StatTypes.Types[type].ID;
@@ -118,7 +122,85 @@ namespace thebasics.Extensions
             var previousCount = GetModData(player, key, 0);
             SetModData(player, key, previousCount + 1);
         }
+        #endregion
 
+        #region Languages
+        public static void InstantiateLanguagesIfNotExist(this IServerPlayer player, ModConfig config)
+        {
+            if(player.GetModdata(ModDataLanguages) == null)
+            {
+                SetModData(player, ModDataLanguages, config.Languages
+                    .Where(lang => lang.Default)
+                    .Select(lang => lang.Name)
+                    .ToList());
+            }
+            if(player.GetModdata(ModDataDefaultLanguage) == null)
+            {
+                var defaultLang = config.Languages
+                    .Where(lang => lang.Default)
+                    .Select(lang => lang.Name)
+                    .FirstOrDefault(LanguageSystem.BabbleLang.Name);
+                SetModData(player, ModDataDefaultLanguage, defaultLang);
+            }
+        }
+
+        public static List<string> GetLanguages(this IServerPlayer player)
+        {
+            return GetModData(player, ModDataLanguages, new List<string>());
+        }
+
+        public static bool KnowsLanguage(this IServerPlayer player, Language lang)
+        {
+            return GetLanguages(player).Any(langName => langName == lang.Name);
+        }
+
+        public static void AddLanguage(this IServerPlayer player, Language lang)
+        {
+            var currentLanguages = player.GetLanguages().ToList();
+            if (player.GetLanguages().All(curLang => curLang != lang.Name))
+            {
+                currentLanguages.Add(lang.Name);
+            }
+            SetModData(player, ModDataLanguages, currentLanguages);
+        }
+        
+        public static void RemoveLanguage(this IServerPlayer player, Language lang)
+        {
+            var currentLanguages = player.GetLanguages().ToList();
+            var newLanguages = currentLanguages.Where(curLang => lang.Name != curLang).ToList();
+            SetModData(player, ModDataLanguages, newLanguages);
+        }
+
+        public static Language GetDefaultLanguage(this IServerPlayer player, ModConfig config)
+        {
+            return GetLangFromName(GetModData<string>(player, ModDataDefaultLanguage, null), config, true);
+        }
+
+        private static Language GetLangFromName(string langName, ModConfig config, bool allowBabble)
+        {
+            return GetAllLanguages(config, allowBabble).Single((lang) => lang.Name == langName);
+        }
+
+        // TODO: Refactor this to use version in LanguageSystem
+        private static List<Language> GetAllLanguages(ModConfig config, bool allowBabble)
+        {
+            List<Language> languages = new();
+            languages.AddRange(config.Languages);
+            if (allowBabble)
+            {
+                languages.Add(LanguageSystem.BabbleLang);
+            }
+            return languages;
+        }
+        
+        public static void SetDefaultLanguage(this IServerPlayer player, Language lang)
+        {
+            SetModData(player, ModDataDefaultLanguage, lang.Name);
+        }
+        #endregion
+
+
+        #region TPA Requests
         private static string SerializeTpaRequests(List<TpaRequest> requests)
         {
             return JsonConvert.SerializeObject(requests);
@@ -133,70 +215,7 @@ namespace thebasics.Extensions
         {
             return SerializeTpaRequests(new List<TpaRequest>());
         }
-
-        private static string SerializeLanguages(List<Language> languages)
-        {
-            return JsonConvert.SerializeObject(languages);
-        }
-
-        private static string SerializeLanguage(Language language)
-        {
-            return JsonConvert.SerializeObject(language);
-        }
-
-        private static List<Language> DeserializeLanguages(string data)
-        {
-            return JsonConvert.DeserializeObject<List<Language>>(data);
-        }
-
-        private static Language DeserializeLanguage(string data)
-        {
-            return JsonConvert.DeserializeObject<Language>(data);
-        }
-
-        private static string GetDefaultSerializedLanguages()
-        {
-            return SerializeLanguages(new List<Language>());
-        }
-
-        public static List<Language> GetLanguages(this IServerPlayer player)
-        {
-            return DeserializeLanguages(GetModData(player, ModDataLanguages, GetDefaultSerializedLanguages()));
-        }
         
-        public static void ClearLanguages(this IServerPlayer player)
-        {
-            SetModData<string>(player, ModDataLanguages, null);
-        }
-
-        public static void AddLanguage(this IServerPlayer player, Language lang)
-        {
-            var currentLanguages = player.GetLanguages().ToList();
-            if (player.GetLanguages().All(curLang => curLang.Name != lang.Name))
-            {
-                currentLanguages.Add(lang);
-            }
-            SetModData(player, ModDataLanguages, SerializeLanguages(currentLanguages));
-        }
-        
-        public static void RemoveLanguage(this IServerPlayer player, Language lang)
-        {
-            var currentLanguages = player.GetLanguages().ToList();
-            var newLanguages = currentLanguages.Where(curLang => lang.Name != curLang.Name).ToList();
-            SetModData(player, ModDataLanguages, SerializeLanguages(newLanguages));
-        }
-
-        public static Language GetDefaultLanguage(this IServerPlayer player, ModConfig config)
-        {
-            return DeserializeLanguage(GetModData(player, ModDataDefaultLanguage,
-                SerializeLanguage(config.Languages.First())));
-        }
-
-        public static void SetDefaultLanguage(this IServerPlayer player, Language lang)
-        {
-            SetModData(player, ModDataDefaultLanguage, SerializeLanguage(lang));
-        }
-
         public static List<TpaRequest> GetTpaRequests(this IServerPlayer player)
         {
             return DeserializeTpaRequests(GetModData(player, ModDataTpaRequests, GetDefaultSerializedTpaRequests()));
@@ -250,5 +269,6 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataTpAllowed, true);
         }
+        #endregion
     }
 }

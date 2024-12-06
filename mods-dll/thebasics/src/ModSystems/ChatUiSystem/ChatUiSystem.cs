@@ -19,9 +19,9 @@ public class ChatUiSystem : ModSystem
     private static int _proximityGroupId;
     private static bool _preventProximityChannelSwitching;
     private static IClientNetworkChannel _clientConfigChannel;
-    private static IClientNetworkChannel _clientNicknameChannel;
+    // private static IClientNetworkChannel _clientNicknameChannel;
 
-    private Dictionary<string, string> PlayerNicknames = new Dictionary<string, string>();
+    // private Dictionary<string, string> PlayerNicknames = new Dictionary<string, string>();
     
     public override bool ShouldLoad(EnumAppSide side) => side.IsClient();
 
@@ -31,10 +31,10 @@ public class ChatUiSystem : ModSystem
 
         _api = api;
         
-        _api.Event.OnEntityLoaded += ApplyNickname;
+        // _api.Event.OnEntityLoaded += ApplyNickname;
         // _api.Event.OnEntitySpawn += ApplyRenderer;
-        //
-        // api.RegisterEntityRendererClass("TestPlayerShape", typeof(RpTextEntityPlayerShapeRenderer));
+        
+        api.RegisterEntityRendererClass("TestPlayerShape", typeof(RpTextEntityPlayerShapeRenderer));
         
         RegisterForServerSideConfig();
         
@@ -44,88 +44,93 @@ public class ChatUiSystem : ModSystem
             _harmony.PatchAll();
         }
 
-        api.Event.IsPlayerReady += OnPlayerReady;
+        // api.Event.IsPlayerReady += OnPlayerReady;
     }
 
     // private void ApplyRenderer(Entity entity)
     // {
     //     if (entity is EntityPlayer entityPlayer)
     //     {
-    //         entity.Properties.Client.Renderer = new RpTextEntityPlayerShapeRenderer(entity,_api);
+    //         var oldRenderer = entity.Properties.Client.Renderer;
+    //         var newRenderer = new RpTextEntityPlayerShapeRenderer(entity,_api);
+    //         entity.Properties.Client.Renderer = newRenderer;
     //         entity.Properties.Client.RendererName = "TestPlayerShape";
+    //
+    //         oldRenderer.Dispose();
+    //         newRenderer.OnEntityLoaded();
     //     }
     // }
 
-    private bool OnPlayerReady(ref EnumHandling handling)
-    {
-        handling = EnumHandling.PassThrough;
+    // private bool OnPlayerReady(ref EnumHandling handling)
+    // {
+    //     handling = EnumHandling.PassThrough;
+    //
+    //     if (_api.World.Player != null && _api.World.Player.Entity != null)
+    //     {
+    //         _api.Logger.Debug($"THEBASICS - OnPlayerReady, Setting my player nickname!");
+    //         ApplyNickname(_api.World.Player.Entity);
+    //     }
+    //     else
+    //     {
+    //         _api.Logger.Debug($"THEBASICS - OnPlayerReady, Player or Entity was null!");
+    //     }
+    //
+    //     return true;
+    // }
 
-        if (_api.World.Player != null && _api.World.Player.Entity != null)
-        {
-            _api.Logger.Debug($"THEBASICS - OnPlayerReady, Setting my player nickname!");
-            ApplyNickname(_api.World.Player.Entity);
-        }
-        else
-        {
-            _api.Logger.Debug($"THEBASICS - OnPlayerReady, Player or Entity was null!");
-        }
-
-        return true;
-    }
-
-    private void ApplyNickname(Entity entity)
-    {
-        if (entity is EntityPlayer entityPlayer)
-        {
-            if (PlayerNicknames.ContainsKey(entityPlayer.PlayerUID))
-            {
-                SetPlayerNickname(entityPlayer, PlayerNicknames[entityPlayer.PlayerUID]);
-            }
-        }
-    }
+    // private void ApplyNickname(Entity entity)
+    // {
+    //     if (entity is EntityPlayer entityPlayer)
+    //     {
+    //         if (PlayerNicknames.ContainsKey(entityPlayer.PlayerUID))
+    //         {
+    //             SetPlayerNickname(entityPlayer, PlayerNicknames[entityPlayer.PlayerUID]);
+    //         }
+    //     }
+    // }
 
     private void RegisterForServerSideConfig()
     {
         _clientConfigChannel = _api.Network.RegisterChannel("thebasics_config")
             .RegisterMessageType<TheBasicsConfigMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
-        _clientNicknameChannel = _api.Network.RegisterChannel("thebasics_nickname")
-            .RegisterMessageType<TheBasicsPlayerNicknameMessage>()
-            .SetMessageHandler<TheBasicsPlayerNicknameMessage>(OnServerPlayerNicknameMessage);
+        // _clientNicknameChannel = _api.Network.RegisterChannel("thebasics_nickname")
+        //     .RegisterMessageType<TheBasicsPlayerNicknameMessage>()
+        //     .SetMessageHandler<TheBasicsPlayerNicknameMessage>(OnServerPlayerNicknameMessage);
     }
 
-    private void OnServerPlayerNicknameMessage(TheBasicsPlayerNicknameMessage packet)
-    {
-        PlayerNicknames[packet.PlayerUID] = packet.Nickname;
+    // private void OnServerPlayerNicknameMessage(TheBasicsPlayerNicknameMessage packet)
+    // {
+    //     PlayerNicknames[packet.PlayerUID] = packet.Nickname;
+    //
+    //     var player = _api.World.PlayerByUid(packet.PlayerUID);
+    //
+    //     if (player == null)
+    //     {
+    //         _api.Logger.Debug($"Got nickname {packet.PlayerUID} {packet.Nickname} but couldn't find player by UUID");
+    //         return;
+    //     }
+    //
+    //     var entity = player.Entity;
+    //     
+    //     if (entity == null)
+    //     {
+    //         _api.Logger.Debug($"Got nickname {packet.PlayerUID} {packet.Nickname} but couldn't find entity for player");
+    //         return;
+    //     }
+    //     
+    //     SetPlayerNickname(entity, packet.Nickname);
+    //
+    //     // TODO: Check if player is currently being rendered to update nickname
+    // }
 
-        var player = _api.World.PlayerByUid(packet.PlayerUID);
-
-        if (player == null)
-        {
-            _api.Logger.Debug($"Got nickname {packet.PlayerUID} {packet.Nickname} but couldn't find player by UUID");
-            return;
-        }
-
-        var entity = player.Entity;
-        
-        if (entity == null)
-        {
-            _api.Logger.Debug($"Got nickname {packet.PlayerUID} {packet.Nickname} but couldn't find entity for player");
-            return;
-        }
-        
-        SetPlayerNickname(entity, packet.Nickname);
-
-        // TODO: Check if player is currently being rendered to update nickname
-    }
-
-    private void SetPlayerNickname(EntityPlayer entityPlayer, string name)
-    {
-        _api.Logger.Debug($"THEBASICS - Setting player ${entityPlayer.Player.PlayerName} nametag to nickname ${name}");
-        var nametag = entityPlayer.GetBehavior<EntityBehaviorNameTag>();
-
-        nametag.SetName(name);
-    }
+    // private void SetPlayerNickname(EntityPlayer entityPlayer, string name)
+    // {
+    //     _api.Logger.Debug($"THEBASICS - Setting player ${entityPlayer.Player.PlayerName} nametag to nickname ${name}");
+    //     var nametag = entityPlayer.GetBehavior<EntityBehaviorNameTag>();
+    //
+    //     nametag.SetName(name);
+    // }
 
     private void OnServerConfigMessage(TheBasicsConfigMessage configMessage)
     {

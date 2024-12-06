@@ -21,6 +21,12 @@ namespace thebasics.ModSystems.ProximityChat
 
                 var garbledText = string.Join("",
                     syllableCount.DoTimes(_ => language.Syllables.GetRandomElement(random)));
+                
+                //Capitalize first letter if input word is capitalized
+                if (char.IsUpper(word[0]))
+                {
+                    garbledText = char.ToUpper(garbledText[0]) + garbledText[1..];
+                }
 
                 return garbledText;
             });
