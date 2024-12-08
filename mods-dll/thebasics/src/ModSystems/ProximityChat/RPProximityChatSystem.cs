@@ -115,11 +115,6 @@ namespace thebasics.ModSystems.ProximityChat
                 .RequiresPrivilege(Privilege.chat)
                 .HandleWith(ClearNickname);
 
-            API.ChatCommands.GetOrCreate("testmessage")
-                .WithDescription("test message")
-                .RequiresPrivilege(Privilege.chat)
-                .HandleWith(TestMessage);
-
             _serverConfigChannel = API.Network.RegisterChannel("thebasics_config")
                 .RegisterMessageType<TheBasicsConfigMessage>();
             
@@ -613,16 +608,6 @@ namespace thebasics.ModSystems.ProximityChat
                 StatusMessage = "Your nickname has been cleared.",
             };
             // TODO: Send broadcast to clear nickname from clients
-        }
-
-        private TextCommandResult TestMessage(TextCommandCallingArgs args)
-        {
-            API.SendMessageToGroup(GlobalConstants.GeneralChatGroup, "TestMessage", EnumChatType.OthersMessage);
-
-            return new TextCommandResult()
-            {
-                Status = EnumCommandStatus.Success,
-            };
         }
 
         private TextCommandResult Yell(TextCommandCallingArgs args)

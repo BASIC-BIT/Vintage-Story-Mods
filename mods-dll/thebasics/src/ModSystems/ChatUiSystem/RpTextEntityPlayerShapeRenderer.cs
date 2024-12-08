@@ -12,8 +12,8 @@ public class RpTextEntityPlayerShapeRenderer : EntityPlayerShapeRenderer
     {
         capi.Logger.Debug($"THEBASICS - Player Renderer constructed");
         
-        capi.Event.ChatMessage -= OnChatMessage;
-        capi.Event.ChatMessage += NewOnChatMessage;
+        this.capi.Event.ChatMessage -= new ChatLineDelegate(this.OnChatMessage);
+        this.capi.Event.ChatMessage += new ChatLineDelegate(this.NewOnChatMessage);
     }
     
     protected void NewOnChatMessage(int groupId, string message, EnumChatType chattype, string data)
@@ -46,7 +46,7 @@ public class RpTextEntityPlayerShapeRenderer : EntityPlayerShapeRenderer
             Padding = 100,
             Radius = GuiStyle.ElementBGRadius
         }, EnumTextOrientation.Center);
-        messageTextures.Insert(0, new MessageTexture()
+        this.messageTextures.Insert(0, new MessageTexture()
         {
             tex = loadedTexture,
             message = message,
@@ -57,9 +57,9 @@ public class RpTextEntityPlayerShapeRenderer : EntityPlayerShapeRenderer
 
     public override void Dispose()
     {
-        if (DisplayChatMessages)
+        if (this.DisplayChatMessages)
         {
-            capi.Event.ChatMessage -= NewOnChatMessage;
+            this.capi.Event.ChatMessage -= new ChatLineDelegate(this.NewOnChatMessage);
         }
     }
 }

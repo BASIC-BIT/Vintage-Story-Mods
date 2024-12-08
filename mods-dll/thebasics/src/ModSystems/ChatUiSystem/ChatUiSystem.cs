@@ -4,7 +4,6 @@ using HarmonyLib;
 using thebasics.Models;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
 using Vintagestory.GameContent;
@@ -91,7 +90,7 @@ public class ChatUiSystem : ModSystem
 
     private void RegisterForServerSideConfig()
     {
-        _clientConfigChannel = _api.Network.RegisterChannel("thebasics_config")
+        _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
         // _clientNicknameChannel = _api.Network.RegisterChannel("thebasics_nickname")
@@ -208,5 +207,10 @@ public class ChatUiSystem : ModSystem
     
     public override void Dispose() {
         _harmony?.UnpatchAll(Mod.Info.ModID);
+    }
+
+    public void SetupCharacterDialog()
+    {
+        
     }
 }
