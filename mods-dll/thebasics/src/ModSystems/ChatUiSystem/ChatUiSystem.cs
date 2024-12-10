@@ -1,9 +1,13 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
+using Cairo;
 using HarmonyLib;
 using thebasics.Models;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.Client.NoObf;
 using Vintagestory.GameContent;
@@ -17,11 +21,15 @@ public class ChatUiSystem : ModSystem
     private Harmony _harmony;
     private static int _proximityGroupId;
     private static bool _preventProximityChannelSwitching;
+
     private static IClientNetworkChannel _clientConfigChannel;
+
     // private static IClientNetworkChannel _clientNicknameChannel;
+    private GuiDialogCharacterBase dlg;
+    private GuiDialog.DlgComposers Composers => this.dlg.Composers;
 
     // private Dictionary<string, string> PlayerNicknames = new Dictionary<string, string>();
-    
+
     public override bool ShouldLoad(EnumAppSide side) => side.IsClient();
 
     public override void StartClientSide(ICoreClientAPI api)
@@ -29,21 +37,61 @@ public class ChatUiSystem : ModSystem
         base.StartClientSide(api);
 
         _api = api;
-        
+
         // _api.Event.OnEntityLoaded += ApplyNickname;
         // _api.Event.OnEntitySpawn += ApplyRenderer;
-        
+
         api.RegisterEntityRendererClass("TestPlayerShape", typeof(RpTextEntityPlayerShapeRenderer));
-        
+
         RegisterForServerSideConfig();
-        
-        if (!Harmony.HasAnyPatches(Mod.Info.ModID)) {
+
+        if (!Harmony.HasAnyPatches(Mod.Info.ModID))
+        {
             _api.Logger.Debug("THEBASICS - Patching!");
             _harmony = new Harmony(Mod.Info.ModID);
             _harmony.PatchAll();
         }
 
+        this.dlg =
+            api.Gui.LoadedGuis.Find((Predicate<GuiDialog>)(dlg => dlg is GuiDialogCharacterBase)) as
+                GuiDialogCharacterBase;
+        // this.dlg.ComposeExtraGuis += Dlg_ComposeExtraGuis;
+
         // api.Event.IsPlayerReady += OnPlayerReady;
+    }
+
+    private void Dlg_ComposeExtraGuis()
+    {
+        ComposeCharacterSheetGui();
+    }
+
+    private void ComposeCharacterSheetGui()
+    {
+
+        var pcDialogPadding = 400;
+        var dialogWidth = 400;
+        var rowPadding = 20;
+        ElementBounds statsBounds = this.Composers["playercharacter"].Bounds;
+        _api.Logger.Debug($"THEBASICS - test bounds {statsBounds.absX + statsBounds.OuterWidth + pcDialogPadding}, {statsBounds.absY}");
+        ElementBounds dialogBounds = new ElementBounds()
+            .WithSizing(ElementSizing.Fixed)
+            .WithFixedPosition(statsBounds.absX + statsBounds.OuterWidth + pcDialogPadding, statsBounds.absY)
+            .WithFixedSize(dialogWidth, statsBounds.OuterHeight);
+
+        ElementBounds bgBounds = ElementBounds.Fill
+            .WithFixedPadding(GuiStyle.ElementToDialogPadding)
+            .WithSizing(ElementSizing.FitToChildren)
+            .WithChildren();
+            
+        this.Composers["charsheet"] = _api.Gui
+            .CreateCompo("charsheet", dialogBounds)
+            .AddShadedDialogBG(bgBounds)
+            .AddDialogTitleBar(Lang.Get("Character Sheet"), () => dlg.OnTitleBarClose())
+            .BeginChildElements()
+            // .AddInset()
+                .AddDynamicText("Testing!", CairoFont.WhiteSmallText(), ElementStdBounds.Rowed(0, rowPadding))
+            .EndChildElements()
+            .Compose();
     }
 
     // private void ApplyRenderer(Entity entity)
@@ -136,7 +184,7 @@ public class ChatUiSystem : ModSystem
         _preventProximityChannelSwitching = configMessage.PreventProximityChannelSwitching;
         _proximityGroupId = configMessage.ProximityGroupId;
     }
-    
+
     /*
      * Prevent chat switching by preventing original method from executing if user is currently viewing the proximity tab and server config is set to prevent switching
      */
@@ -146,28 +194,33 @@ public class ChatUiSystem : ModSystem
     {
         var game = (ClientMain)_api.World;
         int gotoGroupId = packet.GotoGroup.GroupId;
-        _api.Logger.Debug($"THEBASICS - Handling GotoGroupPacket ~ Current group: {game.currentGroupid} GotoGroup: {gotoGroupId}");
+        _api.Logger.Debug(
+            $"THEBASICS - Handling GotoGroupPacket ~ Current group: {game.currentGroupid} GotoGroup: {gotoGroupId}");
         if (_preventProximityChannelSwitching && game.currentGroupid == _proximityGroupId)
         {
             _api.Logger.Debug("THEBASICS - Denying GotoGroupPacket");
             return false;
         }
-        
+
         _api.Logger.Debug("THEBASICS - Allowing GotoGroupPacket");
         return true;
     }
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(EntityShapeRenderer), "OnChatMessage")]
-    protected static bool OnChatMessage(EntityPlayerShapeRenderer __instance, int groupId, string message, EnumChatType chattype, string data)
+    protected static bool OnChatMessage(EntityPlayerShapeRenderer __instance, int groupId, string message,
+        EnumChatType chattype, string data)
     {
         if (!(__instance.entity is EntityPlayer))
         {
             return true;
         }
-        if (data == null || !data.Contains("from:") || __instance.entity.Pos.SquareDistanceTo(__instance.capi.World.Player.Entity.Pos.XYZ) >= 400.0 || message.Length <= 0)
+
+        if (data == null || !data.Contains("from:") ||
+            __instance.entity.Pos.SquareDistanceTo(__instance.capi.World.Player.Entity.Pos.XYZ) >= 400.0 ||
+            message.Length <= 0)
             return false;
-        string[] strArray1 = data.Split(new char[1]{ ',' }, 2);
+        string[] strArray1 = data.Split(new char[1] { ',' }, 2);
         if (strArray1.Length < 2)
             return false;
         string[] strArray2 = strArray1[0].Split(new char[1]
@@ -182,16 +235,17 @@ public class ChatUiSystem : ModSystem
             return false;
         int result;
         int.TryParse(strArray2[1], out result);
-        if (__instance.entity.EntityId != (long) result)
+        if (__instance.entity.EntityId != (long)result)
             return false;
         message = strArray3[1];
         message = message.Replace("&lt;", "<").Replace("&gt;", ">");
-        LoadedTexture loadedTexture = __instance.capi.Gui.TextTexture.GenTextTexture(message, new CairoFont(25.0, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble), 350, new TextBackground()
-        {
-            FillColor = GuiStyle.DialogLightBgColor,
-            Padding = 100,
-            Radius = GuiStyle.ElementBGRadius
-        }, EnumTextOrientation.Center);
+        LoadedTexture loadedTexture = __instance.capi.Gui.TextTexture.GenTextTexture(message,
+            new CairoFont(25.0, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble), 350, new TextBackground()
+            {
+                FillColor = GuiStyle.DialogLightBgColor,
+                Padding = 100,
+                Radius = GuiStyle.ElementBGRadius
+            }, EnumTextOrientation.Center);
         var messageTexturesField = __instance.GetType()
             .GetField("messageTextures", BindingFlags.NonPublic | BindingFlags.Instance);
         var messageTextures = (List<MessageTexture>)messageTexturesField.GetValue(__instance);
@@ -204,13 +258,13 @@ public class ChatUiSystem : ModSystem
 
         return false;
     }
-    
-    public override void Dispose() {
+
+    public override void Dispose()
+    {
         _harmony?.UnpatchAll(Mod.Info.ModID);
     }
 
     public void SetupCharacterDialog()
     {
-        
     }
 }

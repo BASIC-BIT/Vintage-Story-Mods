@@ -122,6 +122,9 @@ namespace thebasics.Configs
         public bool PreventProximityChannelSwitching = true;
 
         // Show RP nickname above players heads
-        public bool ShowRpNametag = true;
+        public bool ShowNicknameInNametag = true;
+        public bool HideNametagUnlessTargeting = false;
+        public bool ShowPlayerNameInNametag = true; // If ShowNicknameInNametag is true, this shows Nickname (PlayerName).  Does nothing if ShowNicknameInNametag is false
+        public int NametagRenderRange = 30;
     }
 }

@@ -17,6 +17,9 @@
     <Exec Command="powershell -NoProfile -ExecutionPolicy RemoteSigned -file &quot;$(ProjectDir)\scripts\package.ps1&quot;" />
   </Target>
   <ItemGroup>
+    <Reference Include="cairo-sharp">
+      <HintPath>$(AppData)\Vintagestory\Lib\cairo-sharp.dll</HintPath>
+    </Reference>
     <Reference Include="protobuf-net">
       <HintPath>$(AppData)\Vintagestory\Lib\protobuf-net.dll</HintPath>
     </Reference>
@@ -60,7 +63,6 @@
     <PackageReference Include="ApacheTech.Common.Extensions" Version="1.2.0" />
     <PackageReference Include="ApacheTech.Common.Extensions.Harmony" Version="1.2.0" />
     <PackageReference Include="ApacheTech.VintageMods.FluentChatCommands" Version="2.0.1" />
-    <PackageReference Include="CairoSharp" Version="3.24.24.34" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
   <ItemGroup>

@@ -21,9 +21,11 @@ public class ProximityCheckUtils : BaseSubSystem
         var blockSel = new BlockSelection();
         var entitySel = new EntitySelection();
 
-        API.World.RayTraceForSelection(player1Pos, direction, ref blockSel, ref entitySel);
+        API.World.RayTraceForSelection(player1Pos, direction, ref blockSel, ref entitySel, efilter: (entity) => entity.EntityId != player1.Entity.EntityId);
 
-        return entitySel.Entity != null;
+        var canSee = entitySel.Entity != null && entitySel.Entity.EntityId == player2.Entity.EntityId;
+        API.Logger.Debug($"THEBASICS - Checking if player {player1.PlayerName} can see player {player2.PlayerName} - {canSee}");
+        return canSee;
     }
     
     private int GetFloodFillDistance(IServerPlayer player1, IServerPlayer player2, int maxDistance)

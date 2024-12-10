@@ -21,6 +21,8 @@ namespace thebasics.ModSystems.ProximityChat
         private LanguageSystem _languageSystem;
         private DistanceObfuscationSystem _distanceObfuscationSystem;
         private IServerNetworkChannel _serverConfigChannel;
+        private ProximityCheckUtils _proximityCheckUtils;
+        
         // private IServerNetworkChannel _serverNicknameChannel;
 
         protected override void BasicStartServerSide()
@@ -31,6 +33,7 @@ namespace thebasics.ModSystems.ProximityChat
 
             _languageSystem = new LanguageSystem(this, API, Config);
             _distanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
+            _proximityCheckUtils = new ProximityCheckUtils(this, API, Config);
         }
 
         private void RegisterCommands()
@@ -194,16 +197,18 @@ namespace thebasics.ModSystems.ProximityChat
         // TODO: Not sure the client will get this data and sync it up.  Supposedly, behaviors should sync seamlessly with the client but I'm not sure that the UI renderer will refire (just like it does for chat), as the PlayerName never usually changes.  NPC names do though, maybe we can tie it in to that?
         private void SwapOutNameTag(IServerPlayer player)
         {
-            if (!player.HasNickname())
-            {
-                API.Logger.Debug($"THEBASICS - Player {player.PlayerName} has no nickname set, therefore nametag updates are not being sent to the clients");
-                return;
-            }
-            
             var behavior = player.Entity.GetBehavior<EntityBehaviorNameTag>();
-            var nickname = player.GetNickname();
+            behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
+            behavior.RenderRange = Config.NametagRenderRange;
 
-            behavior.SetName(nickname);
+            if (Config.ShowNicknameInNametag)
+            {
+                var nickname = player.GetNickname();
+
+                var displayName = Config.ShowPlayerNameInNametag ? $"{nickname} ({player.PlayerName})" : nickname;
+            
+                behavior.SetName(displayName);
+            }
             
             // Broadcast player's name to all clients (except player)
             // _serverNicknameChannel.BroadcastPacket(new TheBasicsPlayerNicknameMessage
@@ -448,7 +453,8 @@ namespace thebasics.ModSystems.ProximityChat
                     _languageSystem.ProcessMessage(receivingPlayer, ref splitMessage[i], lang);
                     _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, ref splitMessage[i]);
                     
-                    // TODO: Should emotes accept a temporary mode? Probably not, too complicated 
+                    // TODO: Should emotes accept a temporary mode or temporary language? Probably not, too complicated 
+                    // TODO: Font size in just the text of an emote seems... weird.  Maybe it should be consistent across the whole message
                     var fontSize = _distanceObfuscationSystem.GetFontSize(sendingPlayer, receivingPlayer);
                     
                     builder.Append($"<font color=\"{lang.Color}\" size=\"{fontSize}\">");
