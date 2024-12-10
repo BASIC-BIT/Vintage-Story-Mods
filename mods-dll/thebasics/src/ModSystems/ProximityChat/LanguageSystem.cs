@@ -18,26 +18,51 @@ namespace thebasics.ModSystems.ProximityChat
         public LanguageSystem(BaseBasicModSystem system, ICoreServerAPI api, ModConfig config) : base(system, api,
             config)
         {
+            // Player commands
             API.ChatCommands.GetOrCreate("addlang")
                 .WithAlias("addlanguage")
                 .WithDescription("Add one of your known languages")
-                .RequiresPrivilege(Privilege.chat)
+                .RequiresPrivilege(Config.ChangeOwnLanguagePermission)
                 .WithArgs(new StringArgParser("language", true))
-                .HandleWith(AddLanguage);
+                .HandleWith(HandleAddLanguageCommand);
 
             API.ChatCommands.GetOrCreate("removelang")
                 .WithAlias("removelanguage", "remlang", "remlanguage")
                 .WithDescription("Remove one of your known languages")
-                .RequiresPrivilege(Privilege.chat)
+                .RequiresPrivilege(Config.ChangeOwnLanguagePermission)
                 .WithArgs(new StringArgParser("language", true))
-                .HandleWith(RemoveLanguage);
+                .HandleWith(HandleRemoveLanguageCommand);
 
             API.ChatCommands.GetOrCreate("listlang")
                 .WithAlias("listlanguage", "listlanguages")
                 .WithDescription("List your known languages, and all available languages.")
                 .RequiresPrivilege(Privilege.chat)
-                .HandleWith(ListLanguages);
+                .HandleWith(HandleListLanguagesCommand);
             
+            // Admin commands
+            API.ChatCommands.GetOrCreate("adminaddlang")
+                .WithAlias("adminaddlanguage")
+                .WithDescription("Add other player's known languages")
+                .RequiresPrivilege(Config.ChangeOtherLanguagePermission)
+                .WithArgs(new PlayersArgParser("player", API, true),
+                    new StringArgParser("language", true))
+                .HandleWith(HandleAdminAddLanguageCommand);
+
+            API.ChatCommands.GetOrCreate("adminremovelang")
+                .WithAlias("adminremovelanguage", "remlang", "remlanguage")
+                .WithDescription("Remove other player's known languages")
+                .RequiresPrivilege(Config.ChangeOtherLanguagePermission)
+                .WithArgs(new PlayersArgParser("player", API, true),
+                    new StringArgParser("language", true))
+                .HandleWith(HandleAdminRemoveLanguageCommand);
+            
+            API.ChatCommands.GetOrCreate("adminlistlang")
+                .WithAlias("adminlistlanguage")
+                .WithDescription("List other player's languages")
+                .RequiresPrivilege(Config.ChangeOtherLanguagePermission)
+                .WithArgs(new PlayersArgParser("player", API, true))
+                .HandleWith(HandleAdminListLanguagesCommand);
+
             api.Event.PlayerJoin += player =>
             {
                 player.InstantiateLanguagesIfNotExist(config);
@@ -46,7 +71,7 @@ namespace thebasics.ModSystems.ProximityChat
         
         public static readonly Language BabbleLang = new("Babble", "Unintelligible", "babble", new[] { "ba", "ble", "bla", "bal" }, "#FF0000");
         
-        private TextCommandResult AddLanguage(TextCommandCallingArgs args)
+        private TextCommandResult HandleAddLanguageCommand(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var languageIdentifier = (string)args.Parsers[0].GetValue();
@@ -76,7 +101,7 @@ namespace thebasics.ModSystems.ProximityChat
             };
         }
 
-        private TextCommandResult RemoveLanguage(TextCommandCallingArgs args)
+        private TextCommandResult HandleRemoveLanguageCommand(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var languageIdentifier = (string)args.Parsers[0].GetValue();
@@ -120,7 +145,7 @@ namespace thebasics.ModSystems.ProximityChat
             };
         }
 
-        private TextCommandResult ListLanguages(TextCommandCallingArgs args)
+        private TextCommandResult HandleListLanguagesCommand(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var languages = GetPlayerLanguages(player);
@@ -128,6 +153,97 @@ namespace thebasics.ModSystems.ProximityChat
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = "You know: " + string.Join(", ", languages.Select(lang => ChatHelper.LangColor(lang.Name, lang))) +
+                                "\n" +
+                                "All languages: " + string.Join(", ", GetAllLanguages(false).Select(lang => ChatHelper.LangColor(lang.Name, lang))),
+            };
+        }
+        
+        private TextCommandResult HandleAdminAddLanguageCommand(TextCommandCallingArgs args)
+        {
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+            var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
+            var languageIdentifier = (string)args.Parsers[1].GetValue();
+            var lang = GetLangFromText(languageIdentifier, false);
+
+            if (lang == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"Invalid language specifier \":{languageIdentifier}\"",
+                };
+            }
+
+            targetPlayer.AddLanguage(lang);
+            
+            // Set players default language if their current language is babble
+            var defaultLang = targetPlayer.GetDefaultLanguage(Config);
+            if(defaultLang == null || defaultLang.Name == BabbleLang.Name)
+            {
+                targetPlayer.SetDefaultLanguage(lang);
+            }
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Language {ChatHelper.LangColor(lang.Name, lang)} added to player {targetPlayer.PlayerName}!",
+            };
+        }
+
+        private TextCommandResult HandleAdminRemoveLanguageCommand(TextCommandCallingArgs args)
+        {
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+            var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
+            var languageIdentifier = (string)args.Parsers[1].GetValue();
+            var language = GetLangFromText(languageIdentifier, false);
+
+            if (!targetPlayer.KnowsLanguage(language))
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"{targetPlayer.PlayerName} doesn't know the language {ChatHelper.LangColor(language.Name, language)}!",
+                };
+            }
+
+            targetPlayer.RemoveLanguage(language);
+
+            // If they just removed their default language, set it to the first language they know
+            var defaultLang = targetPlayer.GetDefaultLanguage(Config);
+            if (defaultLang == null || defaultLang.Name == language.Name)
+            {
+                var newPlayerLanguages = targetPlayer.GetLanguages();
+                
+                // If the player now knows no languages, set their default to babble
+                if (newPlayerLanguages.Count == 0)
+                {
+                    player.SendMessage(GlobalConstants.CurrentChatGroup, $"{targetPlayer.PlayerName} now knows no languages! If they try to speak, they will only {ChatHelper.LangColor("babble", BabbleLang)} incoherently!", EnumChatType.Notification);
+                    targetPlayer.SetDefaultLanguage(BabbleLang);
+                }
+                else
+                {
+                    var newDefaultIdentifier = newPlayerLanguages.First();
+                    var newDefault = GetLangFromText(newDefaultIdentifier, false);
+                    player.SendMessage(GlobalConstants.CurrentChatGroup, $"{targetPlayer.PlayerName} unlearned their default language, their new default is {ChatHelper.LangColor(newDefault.Name, newDefault)}", EnumChatType.Notification);
+                    targetPlayer.SetDefaultLanguage(newDefault);
+                }
+            }
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Language {ChatHelper.LangColor(language.Name, language)} removed from {targetPlayer.PlayerName}!",
+            };
+        }
+
+        private TextCommandResult HandleAdminListLanguagesCommand(TextCommandCallingArgs args)
+        {
+            var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
+            var languages = GetPlayerLanguages(targetPlayer);
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"{targetPlayer.PlayerName} knows: " + string.Join(", ", languages.Select(lang => ChatHelper.LangColor(lang.Name, lang))) +
                                 "\n" +
                                 "All languages: " + string.Join(", ", GetAllLanguages(false).Select(lang => ChatHelper.LangColor(lang.Name, lang))),
             };

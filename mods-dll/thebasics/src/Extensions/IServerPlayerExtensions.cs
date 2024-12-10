@@ -178,7 +178,7 @@ namespace thebasics.Extensions
 
         private static Language GetLangFromName(string langName, ModConfig config, bool allowBabble)
         {
-            return GetAllLanguages(config, allowBabble).Single((lang) => lang.Name == langName);
+            return GetAllLanguages(config, allowBabble).First((lang) => lang.Name == langName);
         }
 
         // TODO: Refactor this to use version in LanguageSystem

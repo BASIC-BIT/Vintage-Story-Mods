@@ -109,7 +109,10 @@ namespace thebasics.Configs
         public string TEXT_SleepNotification = "You start to feel tired...";
 
         public bool EnableLanguageSystem = true;
-        public bool AllowDefaultLanguage = true;
+        public string ChangeOwnLanguagePermission = "chat";
+        public string ChangeOtherLanguagePermission = "commandplayer";
+        
+        // public bool AllowDefaultLanguage = true;
         
         public IList<Language> Languages = new Language[]
         {
