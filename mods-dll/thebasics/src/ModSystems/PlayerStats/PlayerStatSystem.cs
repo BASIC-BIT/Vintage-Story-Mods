@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
 using thebasics.Extensions;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Extensions;
@@ -16,23 +18,95 @@ namespace thebasics.ModSystems.PlayerStats
         {
             if (Config.PlayerStatSystem)
             {
-                if (Config.AnyPlayerStatEnabled(PlayerStatType.Deaths,PlayerStatType.PlayerKills))
-                {
-                    API.Event.PlayerDeath += OnPlayerDeath;
-                }
-
-                if (Config.PlayerStatToggles[PlayerStatType.NpcKills])
-                {
-                    API.Event.OnEntityDeath += OnEntityDeath;
-                }
-
-                API.ChatCommands.GetOrCreate("playerstats")
-                    .WithAlias("pstats")
-                    .WithDescription("Get your player stats, or another players")
-                    .RequiresPrivilege(Privilege.chat)
-                    .WithArgs(new PlayersArgParser("player", API, false))
-                    .HandleWith(GetStats);
+                SubscribeToEvents();
+                SetupCommands();
             }
+        }
+
+        private IDictionary<string, EntityPos> _prevPlayerPositions = new Dictionary<string, EntityPos>();
+
+        private void SetupCommands()
+        {
+            API.ChatCommands.GetOrCreate("playerstats")
+                .WithAlias("pstats")
+                .WithDescription("Get your player stats, or another players")
+                .RequiresPrivilege(Privilege.chat)
+                .WithArgs(new PlayersArgParser("player", API, false))
+                .HandleWith(GetStats);
+
+            API.ChatCommands.GetOrCreate("clearstats")
+                .WithDescription("Clear a players stats")
+                .RequiresPrivilege(Config.PlayerStatClearPermission)
+                .WithArgs(new PlayersArgParser("player", API, true))
+                .WithArgs(new StringArgParser("confirm", false))
+                .HandleWith(ClearStats);
+        }
+
+        private void SubscribeToEvents()
+        {
+            if (Config.AnyPlayerStatEnabled(PlayerStatType.Deaths,PlayerStatType.PlayerKills))
+            {
+                API.Event.PlayerDeath += OnPlayerDeath;
+            }
+            if (Config.PlayerStatToggles[PlayerStatType.NpcKills])
+            {
+                API.Event.OnEntityDeath += OnEntityDeath;
+            }
+            if (Config.PlayerStatEnabled(PlayerStatType.BlockBreaks))
+            {
+                API.Event.BreakBlock += OnBreakBlock;
+            }
+            if (Config.PlayerStatEnabled(PlayerStatType.DistanceTravelled))
+            {
+                API.Event.RegisterGameTickListener(AddToPlayerMovement, Config.PlayerStatDistanceTravelledTimer);
+            }
+        }
+
+        private void AddToPlayerMovement(float dt)
+        {
+            foreach (var player1 in API.World.AllOnlinePlayers)
+            {
+                var player = (IServerPlayer)player1;
+                var newPos = player.Entity.Pos;
+                if (_prevPlayerPositions.TryGetValue(player.PlayerUID, out EntityPos prevPos))
+                {
+                    var movement = (int) Math.Round(newPos.DistanceTo(prevPos));
+                    player.AddPlayerStat(PlayerStatType.DistanceTravelled, movement);
+                    _prevPlayerPositions[player.PlayerUID] = newPos.Copy();
+                }
+                else
+                {
+                    _prevPlayerPositions[player.PlayerUID] = newPos.Copy();
+                }
+            }
+        }
+
+        private void OnBreakBlock(IServerPlayer byplayer, BlockSelection blocksel, ref float dropquantitymultiplier, ref EnumHandling handling)
+        {
+            byplayer.AddPlayerStat(PlayerStatType.BlockBreaks);
+        }
+
+        private TextCommandResult ClearStats(TextCommandCallingArgs args)
+        {
+            var confirmed = !args.Parsers[1].IsMissing && args.Parsers[1].GetValue().ToString()?.ToLower() == "confirm";
+            var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
+
+            if (!confirmed)
+            {
+                return new TextCommandResult()
+                {
+                    Status = EnumCommandStatus.Success,
+                    StatusMessage =
+                        $"Are you SURE you want to clear this players stats? Type \"/clearstats {targetPlayer.PlayerName} confirm\" to confirm.",
+                };
+            }
+            
+            targetPlayer.ClearPlayerStats();
+            return new TextCommandResult()
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Player {targetPlayer.PlayerName} stats cleared.",
+            };
         }
 
         private TextCommandResult GetStats(TextCommandCallingArgs args)
@@ -68,7 +142,8 @@ namespace thebasics.ModSystems.PlayerStats
             {
                 if (Config.PlayerStatEnabled(stat.Key))
                 {
-                    message.Append(ChatHelper.Build("\n", stat.Value.Title, ": ", targetPlayer.GetPlayerStat(stat.Key).ToString()));
+                    var statValue = targetPlayer.GetPlayerStat(stat.Key);
+                    message.Append(ChatHelper.Build("\n", stat.Value.Title, ": ", statValue.ToString()));
                 }
             }
 
@@ -97,8 +172,7 @@ namespace thebasics.ModSystems.PlayerStats
         {
             if (Config.PlayerStatEnabled(PlayerStatType.NpcKills) &&
                 entity.GetPlayer() == null &&
-                damageSource != null && 
-                damageSource.Source == EnumDamageSource.Player)
+                damageSource is { Source: EnumDamageSource.Player })
             {
                 // var wasRangedKill = damageSource.SourceEntity != damageSource.CauseEntity;
                 var player = (damageSource.CauseEntity ?? damageSource.SourceEntity).GetPlayer();

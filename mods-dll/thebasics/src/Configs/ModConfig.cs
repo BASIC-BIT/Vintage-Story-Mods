@@ -35,7 +35,14 @@ namespace thebasics.Configs
             { ProximityChatMode.Whisper, 12 },
             { ProximityChatMode.Sign, 16 }
         };
-        public int ProximityChatMinimumFontSize = 6;
+
+        // In order to prevent font sizes from being all over the place for every message, clamp them to a set of standard values
+        public int[] ProximityChatClampFontSizes = [
+            30,
+            16,
+            12,
+            6,
+        ];
         
         public bool BoldNicknames = false;
 
@@ -93,6 +100,8 @@ namespace thebasics.Configs
             { PlayerStatType.BlockBreaks, true },
             { PlayerStatType.DistanceTravelled, true },
         };
+        public string PlayerStatClearPermission = "commandplayer";
+        public int PlayerStatDistanceTravelledTimer = 2000; //ms between checks of player distance travelled
 
         public bool AllowPlayerTpa = true;
         public bool AllowTpaPrivilegeByDefault = false;

@@ -10,7 +10,7 @@ namespace thebasics.ModSystems.ProximityChat;
 
 public class DistanceObfuscationSystem : BaseSubSystem
 {
-    private Random _random;
+    private readonly Random _random;
 
     public DistanceObfuscationSystem(BaseBasicModSystem system, ICoreServerAPI api, ModConfig config) : base(system,
         api, config)
@@ -62,9 +62,19 @@ public class DistanceObfuscationSystem : BaseSubSystem
         var chatMode = sendingPlayer.GetChatMode(tempMode);
         var maxRange = Config.ProximityChatModeDistances[chatMode];
         var defaultSize = Config.ProximityChatDefaultFontSize[chatMode];
-        
-        var size = ((defaultSize - Config.ProximityChatMinimumFontSize) * (1.0d - (distance / maxRange))) + Config.ProximityChatMinimumFontSize;
 
-        return (int) Math.Round(size);
+        var minFontSize = Config.ProximityChatClampFontSizes.Min();
+        
+        var unclampedSize = ((defaultSize - minFontSize) * (1.0d - (distance / maxRange))) + minFontSize;
+
+        var clampedSize = GetClampedFontSize(unclampedSize);
+
+        return clampedSize;
+    }
+
+    private int GetClampedFontSize(double unclamped)
+    {
+        // Get the closest value in the Config.ProximityChatClampFontSizes array to the unclamped value
+        return Config.ProximityChatClampFontSizes.MinBy(size => Math.Abs(size - unclamped));
     }
 }

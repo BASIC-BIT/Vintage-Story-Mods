@@ -5,7 +5,7 @@ namespace thebasics.ModSystems.PlayerStats.Definitions
 {
     public static class StatTypes
     {
-        public static IDictionary<PlayerStatType, PlayerStatDefinition> Types = new Dictionary<PlayerStatType, PlayerStatDefinition>
+        public static readonly IDictionary<PlayerStatType, PlayerStatDefinition> Types = new Dictionary<PlayerStatType, PlayerStatDefinition>
         {
             {
                 PlayerStatType.Deaths, new PlayerStatDefinition

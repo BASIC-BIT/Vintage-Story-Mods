@@ -107,6 +107,15 @@ namespace thebasics.ModSystems.ProximityChat
             var languageIdentifier = (string)args.Parsers[0].GetValue();
             var language = GetLangFromText(languageIdentifier, false);
 
+            if (language == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"Invalid language specifier \":{languageIdentifier}\"",
+                };
+            }
+            
             if (!player.KnowsLanguage(language))
             {
                 return new TextCommandResult
@@ -197,6 +206,15 @@ namespace thebasics.ModSystems.ProximityChat
             var languageIdentifier = (string)args.Parsers[1].GetValue();
             var language = GetLangFromText(languageIdentifier, false);
 
+            if (language == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"Invalid language specifier \":{languageIdentifier}\"",
+                };
+            }
+            
             if (!targetPlayer.KnowsLanguage(language))
             {
                 return new TextCommandResult

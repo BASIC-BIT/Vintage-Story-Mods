@@ -106,9 +106,9 @@ namespace thebasics.Extensions
             return GetModData(player, GetPlayerStatID(type), defaultValue);
         }
 
-        public static void AddPlayerStat(this IServerPlayer player, PlayerStatType type)
+        public static void AddPlayerStat(this IServerPlayer player, PlayerStatType type, int value = 1)
         {
-            AddCount(player, GetPlayerStatID(type));
+            AddCount(player, GetPlayerStatID(type), value);
         }
 
         public static void ClearPlayerStats(this IServerPlayer player)
@@ -117,10 +117,10 @@ namespace thebasics.Extensions
                 SetModData(player, GetPlayerStatID(type), 0));
         }
 
-        private static void AddCount(IServerPlayer player, string key)
+        private static void AddCount(IServerPlayer player, string key, int val = 1)
         {
             var previousCount = GetModData(player, key, 0);
-            SetModData(player, key, previousCount + 1);
+            SetModData(player, key, previousCount + val);
         }
         #endregion
 
