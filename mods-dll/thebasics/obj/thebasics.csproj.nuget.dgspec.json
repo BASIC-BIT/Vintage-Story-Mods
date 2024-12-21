@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\steve\\RiderProjects\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj": {}
+    "C:\\bench\\vs\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj": {}
   },
   "projects": {
-    "C:\\Users\\steve\\RiderProjects\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj": {
+    "C:\\bench\\vs\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\steve\\RiderProjects\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj",
+        "projectUniqueName": "C:\\bench\\vs\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj",
         "projectName": "thebasics",
-        "projectPath": "C:\\Users\\steve\\RiderProjects\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj",
+        "projectPath": "C:\\bench\\vs\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj",
         "packagesPath": "C:\\Users\\steve\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\steve\\RiderProjects\\Vintage-Story-Mods\\mods-dll\\thebasics\\obj\\",
+        "outputPath": "C:\\bench\\vs\\Vintage-Story-Mods\\mods-dll\\thebasics\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\steve\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -50,10 +50,6 @@
               "target": "Package",
               "version": "[2.0.1, )"
             },
-            "CairoSharp": {
-              "target": "Package",
-              "version": "[3.24.24.34, )"
-            },
             "Microsoft.CSharp": {
               "target": "Package",
               "version": "[4.7.0, )"
@@ -87,7 +83,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.302\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.400\\RuntimeIdentifierGraph.json"
         }
       }
     }

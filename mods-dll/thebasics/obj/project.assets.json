@@ -39,15 +39,6 @@
           "lib/netstandard2.0/ApacheTech.VintageMods.FluentChatCommands.dll": {}
         }
       },
-      "CairoSharp/3.24.24.34": {
-        "type": "package",
-        "compile": {
-          "lib/netstandard2.0/CairoSharp.dll": {}
-        },
-        "runtime": {
-          "lib/netstandard2.0/CairoSharp.dll": {}
-        }
-      },
       "Microsoft.CSharp/4.7.0": {
         "type": "package",
         "compile": {
@@ -142,18 +133,6 @@
         "apachetech.vintagemods.fluentchatcommands.2.0.1.nupkg.sha512",
         "apachetech.vintagemods.fluentchatcommands.nuspec",
         "lib/netstandard2.0/ApacheTech.VintageMods.FluentChatCommands.dll"
-      ]
-    },
-    "CairoSharp/3.24.24.34": {
-      "sha512": "hr75uYPGFlmB3RvpL3/6ZJtb+UiKsrpkyjb5VGI+8y1/lkY405FMBhPZKlxFqoEH0iIZ9gAMPBqKzT1lSVaDqA==",
-      "type": "package",
-      "path": "cairosharp/3.24.24.34",
-      "files": [
-        ".nupkg.metadata",
-        ".signature.p7s",
-        "cairosharp.3.24.24.34.nupkg.sha512",
-        "cairosharp.nuspec",
-        "lib/netstandard2.0/CairoSharp.dll"
       ]
     },
     "Microsoft.CSharp/4.7.0": {
@@ -306,7 +285,6 @@
       "ApacheTech.Common.Extensions >= 1.2.0",
       "ApacheTech.Common.Extensions.Harmony >= 1.2.0",
       "ApacheTech.VintageMods.FluentChatCommands >= 2.0.1",
-      "CairoSharp >= 3.24.24.34",
       "Microsoft.CSharp >= 4.7.0",
       "Newtonsoft.Json >= 13.0.3",
       "System.ComponentModel.Composition >= 8.0.0",
@@ -319,11 +297,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\steve\\RiderProjects\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj",
+      "projectUniqueName": "C:\\bench\\vs\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj",
       "projectName": "thebasics",
-      "projectPath": "C:\\Users\\steve\\RiderProjects\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj",
+      "projectPath": "C:\\bench\\vs\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj",
       "packagesPath": "C:\\Users\\steve\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\steve\\RiderProjects\\Vintage-Story-Mods\\mods-dll\\thebasics\\obj\\",
+      "outputPath": "C:\\bench\\vs\\Vintage-Story-Mods\\mods-dll\\thebasics\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\steve\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -362,10 +340,6 @@
             "target": "Package",
             "version": "[2.0.1, )"
           },
-          "CairoSharp": {
-            "target": "Package",
-            "version": "[3.24.24.34, )"
-          },
           "Microsoft.CSharp": {
             "target": "Package",
             "version": "[4.7.0, )"
@@ -399,7 +373,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.302\\RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.400\\RuntimeIdentifierGraph.json"
       }
     }
   }

@@ -68,5 +68,9 @@
   <ItemGroup>
     <Compile Remove="src\ModSystems\ProximityChat\Models\MessageTransformers.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="assets\" />
+    <Folder Include="assets_bak\" />
+  </ItemGroup>
   <PropertyGroup />
 </Project>

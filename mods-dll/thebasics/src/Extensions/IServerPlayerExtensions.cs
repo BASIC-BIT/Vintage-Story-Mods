@@ -35,7 +35,24 @@ namespace thebasics.Extensions
 
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
         {
-            return SerializerUtil.Deserialize(player.GetModdata(key), defaultValue);
+            try
+            {
+                return SerializerUtil.Deserialize(player.GetModdata(key), defaultValue);
+            }
+            catch (Exception e)
+            {
+                player.Entity.Api.Logger.Error("THEBASICS: Failed to get mod data for key " + key + " for player " + player.PlayerName + ", clearing mod data: " + e.Message);
+                try
+                {
+                    player.SetModdata(key, null);
+                }
+                catch (Exception e2)
+                {
+                    player.Entity.Api.Logger.Error("THEBASICS: Failed to clear mod data for key " + key + " for player " + player.PlayerName + ": " + e2.Message);
+                }
+            }
+
+            return defaultValue;
         }
 
         public static void SetModData<T>(this IServerPlayer player, string key, T value)
