@@ -1,16 +1,16 @@
 {
   "version": 2,
-  "dgSpecHash": "NcalfbbOt3nfCl5Y8ruV8gziQzqLIh9qGDnhAZeXqUPm/OU7wogFU4eqd7W66siPLLD2ig3Z1ASEsD0C3XCbbA==",
+  "dgSpecHash": "IuheeQsSslkjzZzXi+Jq4W/b2aVG5vuRhaQ9StiDJiCeIzR0zfXOGpwV6QtHkZjFU8fVH4Xa1Tm7K+VxfAJBTw==",
   "success": true,
   "projectFilePath": "C:\\bench\\vs\\Vintage-Story-Mods\\mods-dll\\thebasics\\thebasics.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\steve\\.nuget\\packages\\apachetech.common.extensions\\1.2.0\\apachetech.common.extensions.1.2.0.nupkg.sha512",
-    "C:\\Users\\steve\\.nuget\\packages\\apachetech.common.extensions.harmony\\1.2.0\\apachetech.common.extensions.harmony.1.2.0.nupkg.sha512",
-    "C:\\Users\\steve\\.nuget\\packages\\apachetech.vintagemods.fluentchatcommands\\2.0.1\\apachetech.vintagemods.fluentchatcommands.2.0.1.nupkg.sha512",
-    "C:\\Users\\steve\\.nuget\\packages\\microsoft.csharp\\4.7.0\\microsoft.csharp.4.7.0.nupkg.sha512",
-    "C:\\Users\\steve\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
-    "C:\\Users\\steve\\.nuget\\packages\\system.componentmodel.composition\\8.0.0\\system.componentmodel.composition.8.0.0.nupkg.sha512",
-    "C:\\Users\\steve\\.nuget\\packages\\system.data.datasetextensions\\4.5.0\\system.data.datasetextensions.4.5.0.nupkg.sha512"
+    "C:\\Users\\steve_y696t0m\\.nuget\\packages\\apachetech.common.extensions\\1.2.0\\apachetech.common.extensions.1.2.0.nupkg.sha512",
+    "C:\\Users\\steve_y696t0m\\.nuget\\packages\\apachetech.common.extensions.harmony\\1.2.0\\apachetech.common.extensions.harmony.1.2.0.nupkg.sha512",
+    "C:\\Users\\steve_y696t0m\\.nuget\\packages\\apachetech.vintagemods.fluentchatcommands\\2.0.1\\apachetech.vintagemods.fluentchatcommands.2.0.1.nupkg.sha512",
+    "C:\\Users\\steve_y696t0m\\.nuget\\packages\\microsoft.csharp\\4.7.0\\microsoft.csharp.4.7.0.nupkg.sha512",
+    "C:\\Users\\steve_y696t0m\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
+    "C:\\Users\\steve_y696t0m\\.nuget\\packages\\system.componentmodel.composition\\8.0.0\\system.componentmodel.composition.8.0.0.nupkg.sha512",
+    "C:\\Users\\steve_y696t0m\\.nuget\\packages\\system.data.datasetextensions\\4.5.0\\system.data.datasetextensions.4.5.0.nupkg.sha512"
   ],
   "logs": []
 }

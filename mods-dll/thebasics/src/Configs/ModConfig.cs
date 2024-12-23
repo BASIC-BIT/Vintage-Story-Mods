@@ -37,12 +37,12 @@ namespace thebasics.Configs
         };
 
         // In order to prevent font sizes from being all over the place for every message, clamp them to a set of standard values
-        public int[] ProximityChatClampFontSizes = [
+        public int[] ProximityChatClampFontSizes = {
             30,
             16,
             12,
             6,
-        ];
+        };
         
         public bool BoldNicknames = false;
 
