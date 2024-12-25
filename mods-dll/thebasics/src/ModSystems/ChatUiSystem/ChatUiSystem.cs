@@ -56,7 +56,19 @@ public class ChatUiSystem : ModSystem
         //     api.Gui.LoadedGuis.Find((Predicate<GuiDialog>)(dlg => dlg is GuiDialogCharacterBase)) as
         //         GuiDialogCharacterBase;
         // this.dlg.ComposeExtraGuis += Dlg_ComposeExtraGuis;
+        
+        // TODO: Translate sign posts into language?
+        var signPost = api.Gui.LoadedGuis.Find((Predicate<GuiDialog>)(dlg => dlg is GuiDialogSignPost)) as
+            GuiDialogSignPost;
 
+        // TODO: Translate journals into language?
+        var journal = api.Gui.LoadedGuis.Find((Predicate<GuiDialog>)(dlg => dlg is GuiDialogSignPost)) as
+            GuiDialogJournal;
+        
+        var chatBox = api.Gui.LoadedGuis.Find((Predicate<GuiDialog>)(dlg => dlg is HudDialogChat)) as
+            HudDialogChat;
+        
+        
         // api.Event.IsPlayerReady += OnPlayerReady;
     }
 
@@ -141,6 +153,8 @@ public class ChatUiSystem : ModSystem
         _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
+        // .RegisterMessageType<TheBasicsChatTypingMessage>();
+
         // _clientNicknameChannel = _api.Network.RegisterChannel("thebasics_nickname")
         //     .RegisterMessageType<TheBasicsPlayerNicknameMessage>()
         //     .SetMessageHandler<TheBasicsPlayerNicknameMessage>(OnServerPlayerNicknameMessage);

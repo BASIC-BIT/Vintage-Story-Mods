@@ -37,9 +37,17 @@ namespace thebasics.ModSystems.PlayerStats
             API.ChatCommands.GetOrCreate("clearstats")
                 .WithDescription("Clear a players stats")
                 .RequiresPrivilege(Config.PlayerStatClearPermission)
-                .WithArgs(new PlayersArgParser("player", API, true))
-                .WithArgs(new StringArgParser("confirm", false))
+                .WithArgs(new PlayersArgParser("player", API, true),
+                    new WordArgParser("confirm", false))
                 .HandleWith(ClearStats);
+
+            API.ChatCommands.GetOrCreate("clearstat")
+                .WithDescription("Clear a specific stat on a player")
+                .RequiresPrivilege(Config.PlayerStatClearPermission)
+                .WithArgs(new PlayersArgParser("player", API, true),
+                    new WordArgParser("statName", true),
+                    new WordArgParser("confirm", false))
+                .HandleWith(ClearOneStat);
         }
 
         private void SubscribeToEvents()
@@ -71,7 +79,11 @@ namespace thebasics.ModSystems.PlayerStats
                 if (_prevPlayerPositions.TryGetValue(player.PlayerUID, out EntityPos prevPos))
                 {
                     var movement = (int) Math.Round(newPos.DistanceTo(prevPos));
-                    player.AddPlayerStat(PlayerStatType.DistanceTravelled, movement);
+                    // only track if current game mode is survival
+                    if (player.WorldData.CurrentGameMode == EnumGameMode.Survival)
+                    {
+                        player.AddPlayerStat(PlayerStatType.DistanceTravelled, movement);
+                    }
                     _prevPlayerPositions[player.PlayerUID] = newPos.Copy();
                 }
                 else
@@ -83,7 +95,10 @@ namespace thebasics.ModSystems.PlayerStats
 
         private void OnBreakBlock(IServerPlayer byplayer, BlockSelection blocksel, ref float dropquantitymultiplier, ref EnumHandling handling)
         {
-            byplayer.AddPlayerStat(PlayerStatType.BlockBreaks);
+            if (byplayer.WorldData.CurrentGameMode == EnumGameMode.Survival)
+            {
+                byplayer.AddPlayerStat(PlayerStatType.BlockBreaks);
+            }
         }
 
         private TextCommandResult ClearStats(TextCommandCallingArgs args)
@@ -106,6 +121,57 @@ namespace thebasics.ModSystems.PlayerStats
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = $"Player {targetPlayer.PlayerName} stats cleared.",
+            };
+        }
+
+        private PlayerStatType? ResolveStat(string input)
+        {
+            var lowerInput = input.ToLower();
+            foreach (var playerStatDefinition in StatTypes.Types)
+            {
+                if (playerStatDefinition.Key.ToString().ToLower() == lowerInput ||
+                    playerStatDefinition.Value.Title.ToLower() == lowerInput ||
+                    playerStatDefinition.Value.ID.ToLower() == lowerInput)
+                {
+                    return playerStatDefinition.Key;
+                }
+            }
+
+            return null;
+        }
+        private TextCommandResult ClearOneStat(TextCommandCallingArgs args)
+        {
+            var confirmed = !args.Parsers[2].IsMissing && args.Parsers[2].GetValue().ToString()?.ToLower() == "confirm";
+            var statName = args.Parsers[1].GetValue().ToString()!.ToLower();
+            var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
+
+            
+            var resolvedStat = ResolveStat(statName);
+            
+            if(resolvedStat == null)
+            {
+                return new TextCommandResult()
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"Cannot find stat {statName}.",
+                };
+            }
+            
+            if (!confirmed)
+            {
+                return new TextCommandResult()
+                {
+                    Status = EnumCommandStatus.Success,
+                    StatusMessage =
+                        $"Are you SURE you want to clear this players stats? Type \"/clearstats {targetPlayer.PlayerName} {statName} confirm\" to confirm.",
+                };
+            }
+
+            targetPlayer.ClearPlayerStat(resolvedStat.Value);
+            return new TextCommandResult()
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Player {targetPlayer.PlayerName} stat {statName} cleared.",
             };
         }
 

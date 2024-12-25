@@ -139,7 +139,13 @@ namespace thebasics.Utilities
         {
             return $"<font color=\"{lang.Color}\">{message}</font>";
         }
+        
 
+        public static string LangIdentifier(Language lang)
+        {
+            return LangColor($"{lang.Name} (:{lang.Prefix})", lang);
+        }
+        
         public delegate void OnOffChatCommandDelegate(IServerPlayer player, int groupId, bool value);
         
         public delegate void PlayerTargetChatCommandDelegate(IServerPlayer player, int groupId, IServerPlayer targetPlayer);

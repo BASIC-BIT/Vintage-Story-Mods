@@ -134,6 +134,11 @@ namespace thebasics.Extensions
                 SetModData(player, GetPlayerStatID(type), 0));
         }
 
+        public static void ClearPlayerStat(this IServerPlayer player, PlayerStatType stat)
+        {
+            SetModData(player, GetPlayerStatID(stat), 0);
+        }
+
         private static void AddCount(IServerPlayer player, string key, int val = 1)
         {
             var previousCount = GetModData(player, key, 0);

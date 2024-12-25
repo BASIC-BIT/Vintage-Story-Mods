@@ -9,7 +9,6 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
-using Vintagestory.API.Util;
 using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.ProximityChat
@@ -56,7 +55,8 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithAlias("adminsetnick")
                 .WithDescription("Admin: Get or set another player's nickname")
                 .WithRootAlias("adminsetnick")
-                .WithArgs(new PlayersArgParser("target player", API, true), new StringArgParser("new nickname", false))
+                .WithArgs(new PlayersArgParser("target player", API, true),
+                    new StringArgParser("new nickname", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameAdmin);
 
@@ -107,7 +107,7 @@ namespace thebasics.ModSystems.ProximityChat
                 .HandleWith(RpTextEnabled);
 
             API.ChatCommands.GetOrCreate("hands")
-                .WithAlias("h")
+                .WithAlias("h", "sign")
                 .WithDescription("Set your chat mode to Sign Language, or sign a single message")
                 .WithArgs(new StringArgParser("message", false))
                 .RequiresPrivilege(Privilege.chat)
@@ -118,9 +118,14 @@ namespace thebasics.ModSystems.ProximityChat
                 .RequiresPrivilege(Privilege.chat)
                 .HandleWith(ClearNickname);
 
-            _serverConfigChannel = API.Network.RegisterChannel("thebasics_config")
+            _serverConfigChannel = API.Network.RegisterChannel("thebasics")
                 .RegisterMessageType<TheBasicsConfigMessage>();
-            
+            // .RegisterMessageType<TheBasicsChatTypingMessage>()
+            // .SetMessageHandler<TheBasicsChatTypingMessage>((player, packet) =>
+            // {
+            //     
+            // });
+
             // _serverNicknameChannel = API.Network.RegisterChannel("thebasics_nickname")
             //     .RegisterMessageType<TheBasicsPlayerNicknameMessage>();
         }
@@ -189,6 +194,7 @@ namespace thebasics.ModSystems.ProximityChat
                 playerProximityGroup.Level = EnumPlayerGroupMemberShip.Member;
             }
 
+            // TODO: Wait until client has requested config to send it? Commonly done in other mods
             SendClientConfig(byPlayer);
 
             SwapOutNameTag(byPlayer);
@@ -311,7 +317,7 @@ namespace thebasics.ModSystems.ProximityChat
             // TODO: Only send this message if the player tried to speak in babble accidentally
             if (byPlayer.GetDefaultLanguage(Config) == LanguageSystem.BabbleLang)
             {
-                byPlayer.SendMessage(GlobalConstants.CurrentChatGroup, "You are speaking in babble.  Add a language via /addlang or set your default lang with a language identifier, ex. \":c\"", EnumChatType.CommandError);
+                byPlayer.SendMessage(GlobalConstants.CurrentChatGroup, "You are speaking in babble.  Add a language via /addlang or set your default lang with a language identifier, ex. \":c\".  Use /listlang to see all available languages", EnumChatType.CommandError);
             }
         }
 
