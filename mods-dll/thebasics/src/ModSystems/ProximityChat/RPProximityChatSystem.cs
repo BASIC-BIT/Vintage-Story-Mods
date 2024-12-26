@@ -264,8 +264,9 @@ namespace thebasics.ModSystems.ProximityChat
             }
             else if (isEnvironmentMessage)
             {
+                content = content.Remove(0, 1);
                 messageCopy = ChatHelper.Wrap(
-                    AddAutoCapitalizationAndPunctuation(sendingPlayer, messageCopy, ProximityChatMode.Normal),
+                    AddAutoCapitalizationAndPunctuation(sendingPlayer, content, ProximityChatMode.Normal),
                     "*");
             }
             else
@@ -304,12 +305,13 @@ namespace thebasics.ModSystems.ProximityChat
                 consumed.value = true;
                 return;
             }
-
             
             // TODO: Fix this hack - using a check here to check for environment messages to apply specific message type
-            var isEnvironmentMessage = message[0] == '!';
+            // I'm checking the content twice, both here and in GetPlayerChat. Should be cleaned up
+            var content = ChatHelper.GetMessage(message);
+            var isEnvironmentMessage = content[0] == '!';
             
-            var chatType = isEnvironmentMessage ? EnumChatType.Notification : EnumChatType.OthersMessage;
+            EnumChatType chatType = isEnvironmentMessage ? EnumChatType.Notification : EnumChatType.OthersMessage;
             var messageCopy = (string)message.Clone();
             SendLocalChatByPlayer(byPlayer,
                 receivingPlayer => GetPlayerChat(byPlayer, receivingPlayer, messageCopy, channelId), chatType: chatType, data: data);
