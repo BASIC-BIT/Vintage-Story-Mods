@@ -85,6 +85,7 @@ namespace thebasics.Configs
             };
         public string ProximityChatName = "Proximity"; //unused if EXPERIMENTAL_UseGeneralChannelAsProximityChat is true
         public bool UseGeneralChannelAsProximityChat = false;
+        public bool EnableGlobalOOC = false; // Use dual parens (()) to send a message to the whole server in proximity chat
 
         public bool SendServerSaveAnnouncement = true;
         public bool SendServerSaveFinishedAnnouncement = false;

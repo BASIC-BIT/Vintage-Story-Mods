@@ -156,12 +156,12 @@ namespace thebasics.ModSystems.ProximityChat
 
         private void SetupProximityGroup()
         {
-            if (Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat)
+            if (Config.UseGeneralChannelAsProximityChat)
             {
                 _proximityChatId = GlobalConstants.GeneralChatGroup;
                 RemoveProximityGroupIfExists();
             }
-            if (!Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat)
+            if (!Config.UseGeneralChannelAsProximityChat)
             {
                 var proximityGroup = GetProximityGroup();
                 if (proximityGroup == null)
@@ -191,7 +191,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private void Event_PlayerJoin(IServerPlayer byPlayer)
         {
-            if (!Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat)
+            if (!Config.UseGeneralChannelAsProximityChat)
             {
                 var proximityGroup = GetProximityGroup();
                 var playerProximityGroup = byPlayer.GetGroup(proximityGroup.Uid);
@@ -262,7 +262,8 @@ namespace thebasics.ModSystems.ProximityChat
         {
             var content = ChatHelper.GetMessage(message);
             var isEmote = content[0] == '*';
-            var isOOC = content[0] == '(';
+            var isGlobalOoc = Config.EnableGlobalOOC && content.StartsWith("((");
+            var isOOC = !isGlobalOoc && content[0] == '(';
             var isEnvironmentMessage = content[0] == '!';
 
             var messageCopy = (string) message.Clone();
@@ -304,11 +305,11 @@ namespace thebasics.ModSystems.ProximityChat
             Vintagestory.API.Datastructures.BoolRef consumed)
         {
             // Handle cases of incorrect channel
-            if(Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat && channelId != GlobalConstants.GeneralChatGroup)
+            if(Config.UseGeneralChannelAsProximityChat && channelId != GlobalConstants.GeneralChatGroup)
             {
                 return;
             }
-            if (!Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat)
+            if (!Config.UseGeneralChannelAsProximityChat)
             {
                 var proximityGroup = GetProximityGroup();
                 if (proximityGroup.Uid != channelId)
@@ -342,6 +343,14 @@ namespace thebasics.ModSystems.ProximityChat
             // I'm checking the content twice, both here and in GetPlayerChat. Should be cleaned up
             var content = ChatHelper.GetMessage(message);
             var isEnvironmentMessage = content[0] == '!';
+            var isGlobalOOC = Config.EnableGlobalOOC && content.StartsWith("((");
+
+            if (isGlobalOOC)
+            {
+                // If Global OOC, let the message be sent out like normal just like we do with other channels
+                consumed.value = false;
+                return;
+            }
             
             EnumChatType chatType = isEnvironmentMessage ? EnumChatType.Notification : EnumChatType.OthersMessage;
             var messageCopy = (string)message.Clone();
