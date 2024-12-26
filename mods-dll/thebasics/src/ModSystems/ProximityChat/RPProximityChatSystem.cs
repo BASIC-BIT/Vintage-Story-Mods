@@ -15,8 +15,7 @@ namespace thebasics.ModSystems.ProximityChat
 {
     public class RPProximityChatSystem : BaseBasicModSystem
     {
-        private const string ProximityGroupName = "Proximity";
-        private PlayerGroup _proximityGroup;
+        private int _proximityChatId;
         private LanguageSystem _languageSystem;
         private DistanceObfuscationSystem _distanceObfuscationSystem;
         private IServerNetworkChannel _serverConfigChannel;
@@ -134,7 +133,7 @@ namespace thebasics.ModSystems.ProximityChat
         {
             _serverConfigChannel.SendPacket(new TheBasicsConfigMessage
             {
-                ProximityGroupId = _proximityGroup.Uid,
+                ProximityGroupId = _proximityChatId,
                 PreventProximityChannelSwitching = Config.PreventProximityChannelSwitching,
             }, byPlayer);
         }
@@ -157,41 +156,59 @@ namespace thebasics.ModSystems.ProximityChat
 
         private void SetupProximityGroup()
         {
-            _proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
-            if (_proximityGroup == null)
+            if (Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat)
             {
-                _proximityGroup = new PlayerGroup()
+                _proximityChatId = GlobalConstants.GeneralChatGroup;
+                RemoveProximityGroupIfExists();
+            }
+            if (!Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat)
+            {
+                var proximityGroup = GetProximityGroup();
+                if (proximityGroup == null)
                 {
-                    Name = ProximityGroupName,
-                    OwnerUID = null
-                };
-                API.Groups.AddPlayerGroup(_proximityGroup);
-                _proximityGroup.Md5Identifier = GameMath.Md5Hash(_proximityGroup.Uid + "null");
+                    proximityGroup = new PlayerGroup()
+                    {
+                        Name = Config.ProximityChatName,
+                        OwnerUID = null
+                    };
+                    API.Groups.AddPlayerGroup(proximityGroup);
+                    proximityGroup.Md5Identifier = GameMath.Md5Hash(proximityGroup.Uid + "null");
+                }
+
+                _proximityChatId = proximityGroup.Uid;
+            }
+        }
+
+        private void RemoveProximityGroupIfExists()
+        {
+            
+            var proximityGroup = GetProximityGroup();
+            if (proximityGroup != null)
+            {
+                API.Groups.RemovePlayerGroup(proximityGroup);
             }
         }
 
         private void Event_PlayerJoin(IServerPlayer byPlayer)
         {
-            var proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
-            var playerProximityGroup = byPlayer.GetGroup(proximityGroup.Uid);
-            if (playerProximityGroup == null)
+            if (!Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat)
             {
-                var newMembership = new PlayerGroupMembership()
+                var proximityGroup = GetProximityGroup();
+                var playerProximityGroup = byPlayer.GetGroup(proximityGroup.Uid);
+                if (playerProximityGroup == null)
                 {
-                    GroupName = proximityGroup.Name,
-                    GroupUid = proximityGroup.Uid,
-                    Level = EnumPlayerGroupMemberShip.Member
-                };
-                byPlayer.ServerData.PlayerGroupMemberships.Add(proximityGroup.Uid, newMembership);
-                proximityGroup.OnlinePlayers.Add(byPlayer);
-                foreach (var serverDataPlayerGroupMembership in byPlayer.ServerData.PlayerGroupMemberships)
+                    var newMembership = new PlayerGroupMembership()
+                    {
+                        GroupName = proximityGroup.Name,
+                        GroupUid = proximityGroup.Uid,
+                        Level = EnumPlayerGroupMemberShip.Member
+                    };
+                    byPlayer.ServerData.PlayerGroupMemberships.Add(proximityGroup.Uid, newMembership);
+                    proximityGroup.OnlinePlayers.Add(byPlayer);
+                } else if (playerProximityGroup.Level == EnumPlayerGroupMemberShip.None)
                 {
-                    byPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
-                        serverDataPlayerGroupMembership.Value.GroupName, EnumChatType.Notification);
+                    playerProximityGroup.Level = EnumPlayerGroupMemberShip.Member;
                 }
-            } else if (playerProximityGroup.Level == EnumPlayerGroupMemberShip.None)
-            {
-                playerProximityGroup.Level = EnumPlayerGroupMemberShip.Member;
             }
 
             // TODO: Wait until client has requested config to send it? Commonly done in other mods
@@ -277,14 +294,29 @@ namespace thebasics.ModSystems.ProximityChat
             return messageCopy;
 
         }
+
+        private PlayerGroup GetProximityGroup()
+        {
+            return API.Groups.GetPlayerGroupByName(Config.ProximityChatName);
+        }
+        
         private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
             Vintagestory.API.Datastructures.BoolRef consumed)
         {
-            var proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
-            if (proximityGroup.Uid != channelId)
+            // Handle cases of incorrect channel
+            if(Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat && channelId != GlobalConstants.GeneralChatGroup)
             {
                 return;
             }
+            if (!Config.EXPERIMENTAL_UseGeneralChannelAsProximityChat)
+            {
+                var proximityGroup = GetProximityGroup();
+                if (proximityGroup.Uid != channelId)
+                {
+                    return;
+                }
+            }
+            
             consumed.value = true;
             if (!byPlayer.GetRpTextEnabled())
             {
@@ -387,14 +419,13 @@ namespace thebasics.ModSystems.ProximityChat
             ProximityChatMode? tempMode = null,
             EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
         {
-            var proximityGroup = API.Groups.GetPlayerGroupByName(ProximityGroupName);
             foreach (var player in API.World.AllOnlinePlayers.Where(x =>
                          x.Entity.Pos.AsBlockPos.ManhattenDistance(byPlayer.Entity.Pos.AsBlockPos) <
                          GetProximityChatRange(byPlayer, tempMode)))
             {
                 var serverPlayer = player as IServerPlayer;
 
-                serverPlayer.SendMessage(proximityGroup.Uid, messageGenerator(serverPlayer), chatType, data);
+                serverPlayer.SendMessage(_proximityChatId, messageGenerator(serverPlayer), chatType, data);
             }
         }
 

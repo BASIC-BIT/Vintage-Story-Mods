@@ -83,6 +83,8 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, "\"" },
                 { ProximityChatMode.Sign, "\'</i>" }
             };
+        public string ProximityChatName = "Proximity"; //unused if EXPERIMENTAL_UseGeneralChannelAsProximityChat is true
+        public bool UseGeneralChannelAsProximityChat = false;
 
         public bool SendServerSaveAnnouncement = true;
         public bool SendServerSaveFinishedAnnouncement = false;
