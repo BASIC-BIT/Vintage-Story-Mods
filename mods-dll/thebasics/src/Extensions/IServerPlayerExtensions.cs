@@ -8,6 +8,7 @@ using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.TPA.Models;
+using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -17,6 +18,7 @@ namespace thebasics.Extensions
     public static class IServerPlayerExtensions
     {
         private const string ModDataNickname = "BASIC_NICKNAME";
+        private const string ModDataNicknameColor = "BASIC_NICKNAME_COLOR";
         private const string ModDataChatMode = "BASIC_CHATMODE";
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
         private const string ModDataRpTextEnabled = "BASIC_RPTEXTENABLED";
@@ -65,6 +67,11 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataNickname, player.PlayerName);
         }
+        public static string GetNicknameWithColor(this IServerPlayer player)
+        {
+            return ChatHelper.Color(GetNickname(player), GetNicknameColor(player));
+        }
+
 
         public static void SetNickname(this IServerPlayer player, string nickname)
         {
@@ -79,6 +86,28 @@ namespace thebasics.Extensions
         public static void ClearNickname(this IServerPlayer player)
         {
             player.RemoveModdata(ModDataNickname);
+        }
+        #endregion
+
+        #region Nickname Colors
+        public static string GetNicknameColor(this IServerPlayer player)
+        {
+            return GetModData(player, ModDataNicknameColor, "#FFFFFF");
+        }
+
+        public static void SetNicknameColor(this IServerPlayer player, string nickname)
+        {
+            SetModData(player, ModDataNicknameColor, nickname);
+        }
+
+        public static bool HasNicknameColor(this IServerPlayer player)
+        {
+            return GetModData<string>(player, ModDataNicknameColor, null) != null;
+        }
+
+        public static void ClearNicknameColor(this IServerPlayer player)
+        {
+            player.RemoveModdata(ModDataNicknameColor);
         }
         #endregion
 

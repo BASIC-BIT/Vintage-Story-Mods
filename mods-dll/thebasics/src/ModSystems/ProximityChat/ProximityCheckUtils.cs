@@ -14,6 +14,10 @@ public class ProximityCheckUtils : BaseSubSystem
 
     private bool CanSeePlayer(IServerPlayer player1, IServerPlayer player2)
     {
+        if (player1.PlayerUID == player2.PlayerUID)
+        {
+            return true; // Player can always see themselves
+        }
         var player1Pos = player1.Entity.LocalEyePos;
         var player2Pos = player2.Entity.LocalEyePos;
         var direction = player2Pos.SubCopy(player1Pos).Normalize();

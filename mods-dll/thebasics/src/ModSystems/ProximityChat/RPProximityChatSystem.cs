@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Drawing;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using thebasics.Extensions;
@@ -50,6 +51,13 @@ namespace thebasics.ModSystems.ProximityChat
                     .HandleWith(SetNickname);
             }
 
+            API.ChatCommands.GetOrCreate("nickcolor")
+                .WithAlias("nicknamecolor", "nickcol")
+                .WithDescription("Get or set nickname color")
+                .WithArgs(new ColorArgParser("new nickname color", false))
+                .RequiresPrivilege(Privilege.chat)
+                .HandleWith(HandleNicknameColor);
+
             API.ChatCommands.GetOrCreate("adminsetnickname")
                 .WithAlias("adminsetnick")
                 .WithDescription("Admin: Get or set another player's nickname")
@@ -58,6 +66,14 @@ namespace thebasics.ModSystems.ProximityChat
                     new StringArgParser("new nickname", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameAdmin);
+            
+            API.ChatCommands.GetOrCreate("adminsetnicknamecolor")
+                .WithAlias("adminsetnickcolor", "adminsetnickcol")
+                .WithDescription("Admin: Get or set another player's nickname color")
+                .WithArgs(new PlayersArgParser("target player", API, true),
+                    new ColorArgParser("new nickname color", false))
+                .RequiresPrivilege(Privilege.commandplayer)
+                .HandleWith(SetNicknameColorAdmin);
 
             API.ChatCommands.GetOrCreate("me")
                 .WithAlias("m")
@@ -127,6 +143,89 @@ namespace thebasics.ModSystems.ProximityChat
 
             // _serverNicknameChannel = API.Network.RegisterChannel("thebasics_nickname")
             //     .RegisterMessageType<TheBasicsPlayerNicknameMessage>();
+        }
+
+        private TextCommandResult SetNicknameColorAdmin(TextCommandCallingArgs args)
+        {
+            var attemptTarget = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
+            if (attemptTarget == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Cannot find player.",
+                };
+            }
+            var oldNicknameColor = attemptTarget.GetNicknameColor();
+            
+            if (args.Parsers[1].IsMissing)
+            {
+                if (!attemptTarget.HasNicknameColor())
+                {
+                    return new TextCommandResult
+                    {
+                        Status = EnumCommandStatus.Error,
+                        StatusMessage = $"Player {attemptTarget.PlayerName} does not have a nickname color!  You can set it with `/adminsetnickcolor {attemptTarget.PlayerName} NewColor`",
+                    };
+                }
+
+                var color = attemptTarget.GetNicknameColor();
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Success,
+                    StatusMessage = $"Player {attemptTarget.PlayerName} nickname color is: {ChatHelper.Color(color, color)}",
+                };
+
+            }
+            
+            var newNicknameColor = (Color)args.Parsers[1].GetValue();
+            var newColorHex = ColorTranslator.ToHtml(newNicknameColor);
+            
+            attemptTarget.SetNicknameColor(newColorHex);
+            
+            SwapOutNameTag(attemptTarget);
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Player {attemptTarget.PlayerName} nickname color has been set to: {newColorHex}.  Old Nickname Color: {oldNicknameColor}",
+            };
+        }
+
+        private TextCommandResult HandleNicknameColor(TextCommandCallingArgs args)
+        {
+            var player = (IServerPlayer)args.Caller.Player;
+            if (args.Parsers[0].IsMissing)
+            {
+                if (player.HasNicknameColor())
+                {
+                    var color = player.GetNicknameColor();
+                    return new TextCommandResult
+                    {
+                        Status = EnumCommandStatus.Success,
+                        StatusMessage = $"Your nickname color is: {ChatHelper.Color(color, color)}",
+                    };
+                }
+                else
+                {
+                    return new TextCommandResult
+                    {
+                        Status = EnumCommandStatus.Error,
+                        StatusMessage = "You don't have a nickname color!  You can set it with `/nickcolor [color]`",
+                    };
+                }
+            }
+            else
+            {
+                var nicknameColor = (Color)args.Parsers[0].GetValue();
+                var colorHex = ColorTranslator.ToHtml(nicknameColor);
+                player.SetNicknameColor(colorHex);
+                SwapOutNameTag(player);
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Success,
+                    StatusMessage = $"Okay, your nickname color is set to {ChatHelper.Color(colorHex, colorHex)}",
+                };
+            }
         }
 
         private void SendClientConfig(IServerPlayer byPlayer)
@@ -407,7 +506,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private string GetFormattedNickname(IServerPlayer player)
         {
-            var nick = player.GetNickname();
+            var nick = player.GetNicknameWithColor();
             return Config.BoldNicknames ? ChatHelper.Strong(nick) : nick;
         }
 
@@ -535,7 +634,7 @@ namespace thebasics.ModSystems.ProximityChat
                     return new TextCommandResult
                     {
                         Status = EnumCommandStatus.Success,
-                        StatusMessage = $"Your nickname is: {player.GetNickname()}",
+                        StatusMessage = $"Your nickname is: {player.GetNicknameWithColor()}",
                     };
                 }
                 else
@@ -582,7 +681,7 @@ namespace thebasics.ModSystems.ProximityChat
                     StatusMessage = "Cannot find player.",
                 };
             }
-            var oldNickname = attemptTarget.GetNickname();
+            var oldNickname = attemptTarget.GetNicknameWithColor();
             
             if (fullArgs.Parsers[1].IsMissing)
             {
@@ -598,7 +697,7 @@ namespace thebasics.ModSystems.ProximityChat
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
-                    StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {attemptTarget.GetNickname()}",
+                    StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {attemptTarget.GetNicknameWithColor()}",
                 };
 
             }

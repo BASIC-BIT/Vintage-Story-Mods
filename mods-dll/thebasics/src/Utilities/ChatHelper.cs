@@ -135,11 +135,15 @@ namespace thebasics.Utilities
             return builder.ToString();
         }
 
-        public static string LangColor(string message, Language lang)
+        public static string Color(string message, string color)
         {
-            return $"<font color=\"{lang.Color}\">{message}</font>";
+            return $"<font color=\"{color}\">{message}</font>";
         }
         
+        public static string LangColor(string message, Language lang)
+        {
+            return Color(message, lang.Color);
+        }
 
         public static string LangIdentifier(Language lang)
         {
