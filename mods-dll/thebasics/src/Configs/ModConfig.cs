@@ -129,7 +129,7 @@ namespace thebasics.Configs
         public IList<Language> Languages = new Language[]
         {
             new("Common", "The universal language", "c",
-                new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#92C4E1", true),
+                new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#E9DDCE", true),
             new("Tradeband", "A common language for ease of trade across regions", "tr",
             new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A"),
         };
