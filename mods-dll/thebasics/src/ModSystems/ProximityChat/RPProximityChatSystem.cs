@@ -49,14 +49,24 @@ namespace thebasics.ModSystems.ProximityChat
                     .WithArgs(new StringArgParser("new nickname", false))
                     .RequiresPrivilege(Privilege.chat)
                     .HandleWith(SetNickname);
-            }
+                
+                API.ChatCommands.GetOrCreate("nickcolor")
+                    .WithAlias("nicknamecolor", "nickcol")
+                    .WithDescription("Get or set nickname color")
+                    .WithArgs(new ColorArgParser("new nickname color", false))
+                    .RequiresPrivilege(Privilege.chat)
+                    .HandleWith(HandleNicknameColor);
 
-            API.ChatCommands.GetOrCreate("nickcolor")
-                .WithAlias("nicknamecolor", "nickcol")
-                .WithDescription("Get or set nickname color")
-                .WithArgs(new ColorArgParser("new nickname color", false))
-                .RequiresPrivilege(Privilege.chat)
-                .HandleWith(HandleNicknameColor);
+                API.ChatCommands.GetOrCreate("clearnick")
+                    .WithDescription("Clear your nickname")
+                    .RequiresPrivilege(Privilege.chat)
+                    .HandleWith(ClearNickname);
+            
+                API.ChatCommands.GetOrCreate("clearnickcolor")
+                    .WithDescription("Clear your nickname color")
+                    .RequiresPrivilege(Privilege.chat)
+                    .HandleWith(ClearNicknameColor);
+            }
 
             API.ChatCommands.GetOrCreate("adminsetnickname")
                 .WithAlias("adminsetnick")
@@ -127,11 +137,6 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithArgs(new StringArgParser("message", false))
                 .RequiresPrivilege(Privilege.chat)
                 .HandleWith(Sign);
-
-            API.ChatCommands.GetOrCreate("clearnick")
-                .WithDescription("Clear your nickname")
-                .RequiresPrivilege(Privilege.chat)
-                .HandleWith(ClearNickname);
 
             _serverConfigChannel = API.Network.RegisterChannel("thebasics")
                 .RegisterMessageType<TheBasicsConfigMessage>();
@@ -754,13 +759,26 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult ClearNickname(TextCommandCallingArgs args)
         {
-            ((IServerPlayer)args.Caller.Player).ClearNickname();
+            var player = (IServerPlayer)args.Caller.Player;
+            player.ClearNickname();
+            SwapOutNameTag(player);
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = "Your nickname has been cleared.",
             };
-            // TODO: Send broadcast to clear nickname from clients
+        }
+        
+        private TextCommandResult ClearNicknameColor(TextCommandCallingArgs args)
+        {
+            var player = (IServerPlayer)args.Caller.Player;
+            player.ClearNicknameColor();
+            SwapOutNameTag(player);
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = "Your nickname color has been cleared.",
+            };
         }
 
         private TextCommandResult Yell(TextCommandCallingArgs args)

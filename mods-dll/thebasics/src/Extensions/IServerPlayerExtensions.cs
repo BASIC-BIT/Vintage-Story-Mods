@@ -92,7 +92,7 @@ namespace thebasics.Extensions
         #region Nickname Colors
         public static string GetNicknameColor(this IServerPlayer player)
         {
-            return GetModData(player, ModDataNicknameColor, "#FFFFFF");
+            return GetModData(player, ModDataNicknameColor, "#E9DDCE");
         }
 
         public static void SetNicknameColor(this IServerPlayer player, string nickname)
