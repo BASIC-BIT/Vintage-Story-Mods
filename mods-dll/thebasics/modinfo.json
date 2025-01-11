@@ -4,7 +4,7 @@
   "name": "The BASICs",
   "author": "BASIC",
   "description": "Adds an RP proximity chat system, with configurable talking ranges, nicknames, automatic message formatting, and more!",
-  "version": "5.0.1-pre.1",
+  "version": "5.0.1",
   "dependencies": {
     "game": "",
     "creative": "",
