@@ -12,8 +12,9 @@ public class ProximityCheckUtils : BaseSubSystem
     {
     }
 
-    private bool CanSeePlayer(IServerPlayer player1, IServerPlayer player2)
+    public bool CanSeePlayer(IServerPlayer player1, IServerPlayer player2)
     {
+        // TODO: Implement FOV check to ensure player1 is looking at player2
         if (player1.PlayerUID == player2.PlayerUID)
         {
             return true; // Player can always see themselves

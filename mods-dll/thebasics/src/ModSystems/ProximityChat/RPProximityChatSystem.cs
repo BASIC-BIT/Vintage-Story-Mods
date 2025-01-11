@@ -527,14 +527,29 @@ namespace thebasics.ModSystems.ProximityChat
                 _ => message, tempMode,
                 chatType, data);
         }
+        
+        private IServerPlayer[] GetNearbyPlayers(IServerPlayer player, ProximityChatMode? tempMode = null)
+        {
+            var range = GetProximityChatRange(player, tempMode);
+            var nearbyPlayers = API.World.AllOnlinePlayers.Where(x =>
+                x.Entity.Pos.AsBlockPos.ManhattenDistance(player.Entity.Pos.AsBlockPos) < range
+                ).Cast<IServerPlayer>()
+                .ToArray();
+            
+            if (tempMode == ProximityChatMode.Sign && player is { } serverPlayer)
+            {
+                return nearbyPlayers.Where(nearbyPlayer => _proximityCheckUtils.CanSeePlayer(serverPlayer, nearbyPlayer)).ToArray();
+            }
+
+            return nearbyPlayers;
+        }
 
         private void SendLocalChatByPlayer(IServerPlayer byPlayer, System.Func<IServerPlayer, string> messageGenerator,
             ProximityChatMode? tempMode = null,
             EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
         {
-            foreach (var player in API.World.AllOnlinePlayers.Where(x =>
-                         x.Entity.Pos.AsBlockPos.ManhattenDistance(byPlayer.Entity.Pos.AsBlockPos) <
-                         GetProximityChatRange(byPlayer, tempMode)))
+            var nearbyPlayers = GetNearbyPlayers(byPlayer, tempMode);
+            foreach (var player in nearbyPlayers)
             {
                 var serverPlayer = player as IServerPlayer;
 
