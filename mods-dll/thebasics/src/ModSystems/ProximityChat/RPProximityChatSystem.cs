@@ -48,6 +48,7 @@ namespace thebasics.ModSystems.ProximityChat
                     .WithRootAlias("nick")
                     .WithArgs(new StringArgParser("new nickname", false))
                     .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
                     .HandleWith(SetNickname);
                 
                 API.ChatCommands.GetOrCreate("nickcolor")
@@ -55,16 +56,19 @@ namespace thebasics.ModSystems.ProximityChat
                     .WithDescription("Get or set nickname color")
                     .WithArgs(new ColorArgParser("new nickname color", false))
                     .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
                     .HandleWith(HandleNicknameColor);
 
                 API.ChatCommands.GetOrCreate("clearnick")
                     .WithDescription("Clear your nickname")
                     .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
                     .HandleWith(ClearNickname);
             
                 API.ChatCommands.GetOrCreate("clearnickcolor")
                     .WithDescription("Clear your nickname color")
                     .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
                     .HandleWith(ClearNicknameColor);
             }
 
@@ -90,12 +94,14 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithDescription("Send a proximity emote message")
                 .WithArgs(new StringArgParser("emote", true))
                 .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
                 .HandleWith(Emote);
 
             API.ChatCommands.GetOrCreate("it")
                 .WithDescription("Send a proximity environment message")
                 .WithArgs(new StringArgParser("envMessage", true))
                 .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
                 .HandleWith(EnvironmentMessage);
 
             API.ChatCommands.GetOrCreate("yell")
@@ -103,6 +109,7 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithDescription("Set your chat mode to Yelling, or yell a single message")
                 .WithArgs(new StringArgParser("message", false))
                 .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
                 .HandleWith(Yell);
 
             API.ChatCommands.GetOrCreate("say")
@@ -110,6 +117,7 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithDescription("Set your chat mode back to normal, or say a single message")
                 .WithArgs(new StringArgParser("message", false))
                 .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
                 .HandleWith(Say);
 
             API.ChatCommands.GetOrCreate("whisper")
@@ -117,18 +125,21 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithDescription("Set your chat mode to Whispering, or whisper a single message")
                 .WithArgs(new StringArgParser("message", false))
                 .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
                 .HandleWith(Whisper);
 
             API.ChatCommands.GetOrCreate("emotemode")
                 .WithDescription("Turn Emote-only mode on or off")
                 .WithArgs(new BoolArgParser("mode", "on", true))
                 .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
                 .HandleWith(EmoteMode);
 
             API.ChatCommands.GetOrCreate("rptext")
                 .WithDescription("Turn the whole RP system on or off for your messages")
                 .WithArgs(new BoolArgParser("mode", "on", true))
                 .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
                 .HandleWith(RpTextEnabled);
 
             API.ChatCommands.GetOrCreate("hands")
@@ -136,6 +147,7 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithDescription("Set your chat mode to Sign Language, or sign a single message")
                 .WithArgs(new StringArgParser("message", false))
                 .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
                 .HandleWith(Sign);
 
             _serverConfigChannel = API.Network.RegisterChannel("thebasics")

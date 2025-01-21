@@ -81,33 +81,39 @@ namespace thebasics.ModSystems.TPA
                     .WithDescription("Request a teleport to another player")
                     .RequiresPrivilege(Config.AllowTpaPrivilegeByDefault ? Privilege.chat : "tpa")
                     .WithArgs(new PlayersArgParser("player", API, true))
+                    .RequiresPlayer()
                     .HandleWith(HandleTpa);
 
                 API.ChatCommands.GetOrCreate("tpahere")
                     .WithDescription("Request to teleport another player to you")
                     .RequiresPrivilege(Config.AllowTpaPrivilegeByDefault ? Privilege.chat : "tpa")
                     .WithArgs(new PlayersArgParser("player", API, true))
+                    .RequiresPlayer()
                     .HandleWith(HandleTpaHere);
 
                 API.ChatCommands.GetOrCreate("tpaccept")
                     .WithDescription("Accept last teleport request")
                     .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
                     .HandleWith(HandleTpAccept);
 
                 API.ChatCommands.GetOrCreate("tpdeny")
                     .WithDescription("Deny last teleport request")
                     .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
                     .HandleWith(HandleTpDeny);
 
                 API.ChatCommands.GetOrCreate("tpallow")
                     .WithDescription("Allow or deny all teleport requests from other players")
                     .WithArgs(new BoolArgParser("allow", "on", true))
                     .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
                     .HandleWith(HandleTpAllow);
 
                 API.ChatCommands.GetOrCreate("cleartpa")
                     .WithDescription("Clear all outstanding TPA requests")
                     .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
                     .HandleWith(HandleTpaClear);
             }
         }

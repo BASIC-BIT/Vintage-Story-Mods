@@ -24,6 +24,7 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithDescription("Add one of your known languages")
                 .RequiresPrivilege(Config.ChangeOwnLanguagePermission)
                 .WithArgs(new WordArgParser("language", true))
+                .RequiresPlayer()
                 .HandleWith(HandleAddLanguageCommand);
 
             API.ChatCommands.GetOrCreate("removelang")
@@ -31,12 +32,14 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithDescription("Remove one of your known languages")
                 .RequiresPrivilege(Config.ChangeOwnLanguagePermission)
                 .WithArgs(new WordArgParser("language", true))
+                .RequiresPlayer()
                 .HandleWith(HandleRemoveLanguageCommand);
 
             API.ChatCommands.GetOrCreate("listlang")
                 .WithAlias("listlanguage", "listlanguages")
                 .WithDescription("List your known languages, and all available languages.")
                 .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
                 .HandleWith(HandleListLanguagesCommand);
             
             // Admin commands

@@ -11,6 +11,7 @@ namespace thebasics.ModSystems.Repair
             API.ChatCommands.GetOrCreate("setdurability")
                 .WithDescription("Sets the durability of the item held in your hand")
                 .RequiresPrivilege(Privilege.root)
+                .RequiresPlayer()
                 .HandleWith(SetDurabilityCommand);
         }
 

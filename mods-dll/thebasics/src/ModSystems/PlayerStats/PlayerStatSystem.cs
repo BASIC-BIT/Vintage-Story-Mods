@@ -181,6 +181,15 @@ namespace thebasics.ModSystems.PlayerStats
             var isOtherPlayer = !args.Parsers[0].IsMissing;
             var otherPlayer = args.Parsers[0].GetValue();
 
+            if (!isOtherPlayer && args.Caller.Type != EnumCallerType.Player)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "You must be a player to use this command.",
+                };
+            }
+
             if (isOtherPlayer && otherPlayer == null)
             {
                 return new TextCommandResult
