@@ -634,9 +634,19 @@ namespace thebasics.ModSystems.ProximityChat
                     
                     // TODO: Should emotes accept a temporary mode or temporary language? Probably not, too complicated 
                     // TODO: Font size in just the text of an emote seems... weird.  Maybe it should be consistent across the whole message
-                    var fontSize = _distanceObfuscationSystem.GetFontSize(sendingPlayer, receivingPlayer);
                     
-                    builder.Append($"<font color=\"{lang.Color}\" size=\"{fontSize}\">");
+                    // TODO: Refactor this check
+                    if (Config.EnableDistanceFontSizeSystem)
+                    {
+                        var fontSize = _distanceObfuscationSystem.GetFontSize(sendingPlayer, receivingPlayer);
+                    
+                        builder.Append($"<font color=\"{lang.Color}\" size=\"{fontSize}\">");
+                    }
+                    else
+                    {
+                        builder.Append($"<font color=\"{lang.Color}\">");
+                    }
+                    
                     builder.Append("\"");
                     builder.Append(splitMessage[i]);
                     builder.Append("\"");
