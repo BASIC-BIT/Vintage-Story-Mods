@@ -337,8 +337,6 @@ namespace thebasics.ModSystems.ProximityChat
         private void SwapOutNameTag(IServerPlayer player)
         {
             var behavior = player.Entity.GetBehavior<EntityBehaviorNameTag>();
-            behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
-            behavior.RenderRange = Config.NametagRenderRange;
 
             if (Config.ShowNicknameInNametag)
             {
@@ -347,6 +345,10 @@ namespace thebasics.ModSystems.ProximityChat
                 var displayName = Config.ShowPlayerNameInNametag ? $"{nickname} ({player.PlayerName})" : nickname;
             
                 behavior.SetName(displayName);
+                
+                behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
+                behavior.RenderRange = Config.NametagRenderRange;
+                player.Entity.WatchedAttributes.MarkPathDirty("nametag");
             }
             
             // Broadcast player's name to all clients (except player)
