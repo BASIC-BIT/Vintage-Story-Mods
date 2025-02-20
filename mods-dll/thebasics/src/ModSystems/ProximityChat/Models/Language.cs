@@ -1,14 +1,32 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace thebasics.ModSystems.ProximityChat.Models;
 
-public record Language(string Name, string Description, string Prefix, string[] Syllables, string Color, bool Default = false, bool Hidden = false)
+public class Language
 {
-    public string[] Syllables { get; } = Syllables;
-    public string Prefix { get; } = Prefix;
-    public string Description { get; } = Description;
-    public string Name { get; } = Name;
-    public string Color { get; } = Color;
-    public bool Default { get; set; } = Default;
-    public bool Hidden { get; set; } = Hidden;
+    public string Name { get; }
+    public string Description { get; }
+    public string Prefix { get; }
+    public string[] Syllables { get; }
+    public string Color { get; }
+    public bool Default { get; }
+    public bool Hidden { get; }
+    public bool IsSignLanguage { get; }
+    public int SignLanguageRange { get; }
+    public bool UseItalics { get; }
+
+    public Language(string name, string description, string prefix, string[] syllables, string color, bool isDefault, bool hidden, bool isSignLanguage = false, int signLanguageRange = 60, bool useItalics = false)
+    {
+        Name = name;
+        Description = description;
+        Prefix = prefix;
+        Syllables = syllables;
+        Color = color;
+        Default = isDefault;
+        Hidden = hidden;
+        IsSignLanguage = isSignLanguage;
+        SignLanguageRange = signLanguageRange;
+        UseItalics = useItalics;
+    }
 }

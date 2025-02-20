@@ -72,7 +72,7 @@ namespace thebasics.ModSystems.ProximityChat
             };
         }
         
-        public static readonly Language BabbleLang = new("Babble", "Unintelligible", "babble", new[] { "ba", "ble", "bla", "bal" }, "#FF0000");
+        public static readonly Language BabbleLang = new Language("Babble", "Unintelligible", "babble", new[] { "ba", "ble", "bla", "bal" }, "#FF0000", false, true);
         
         private TextCommandResult HandleAddLanguageCommand(TextCommandCallingArgs args)
         {

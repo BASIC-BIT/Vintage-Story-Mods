@@ -4,7 +4,6 @@
     {
         Normal,
         Whisper,
-        Yell,
-        Sign,
+        Yell
     }
 }
