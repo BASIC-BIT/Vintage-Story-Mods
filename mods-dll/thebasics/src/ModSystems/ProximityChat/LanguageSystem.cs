@@ -89,6 +89,27 @@ namespace thebasics.ModSystems.ProximityChat
                 };
             }
 
+            // Check if player already knows this language
+            if (player.KnowsLanguage(lang))
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"You already know the language {ChatHelper.LangIdentifier(lang)}!",
+                };
+            }
+
+            // Check language limit
+            var currentLanguages = player.GetLanguages();
+            if (Config.MaxLanguagesPerPlayer >= 0 && currentLanguages.Count >= Config.MaxLanguagesPerPlayer)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"You cannot learn more than {Config.MaxLanguagesPerPlayer} languages! Remove one first.",
+                };
+            }
+
             player.AddLanguage(lang);
             
             // Set players default language if their current language is babble
@@ -183,6 +204,27 @@ namespace thebasics.ModSystems.ProximityChat
                 {
                     Status = EnumCommandStatus.Error,
                     StatusMessage = $"Invalid language specifier \":{languageIdentifier}\"",
+                };
+            }
+
+            // Check if player already knows this language
+            if (targetPlayer.KnowsLanguage(lang))
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"{targetPlayer.PlayerName} already knows the language {ChatHelper.LangIdentifier(lang)}!",
+                };
+            }
+
+            // Check language limit
+            var currentLanguages = targetPlayer.GetLanguages();
+            if (Config.MaxLanguagesPerPlayer >= 0 && currentLanguages.Count >= Config.MaxLanguagesPerPlayer)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"{targetPlayer.PlayerName} cannot learn more than {Config.MaxLanguagesPerPlayer} languages! Remove one first.",
                 };
             }
 

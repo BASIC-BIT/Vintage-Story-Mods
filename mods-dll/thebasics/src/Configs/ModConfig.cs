@@ -123,6 +123,7 @@ namespace thebasics.Configs
         public bool EnableLanguageSystem = true;
         public string ChangeOwnLanguagePermission = "chat";
         public string ChangeOtherLanguagePermission = "commandplayer";
+        public int MaxLanguagesPerPlayer = 3; // Maximum number of languages a player can know at once, -1 for unlimited
         
         // public bool AllowDefaultLanguage = true;
         

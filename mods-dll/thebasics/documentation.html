@@ -187,18 +187,18 @@
   "EnableLanguageSystem": true,
   "ChangeOwnLanguagePermission": "chat",
   "ChangeOtherLanguagePermission": "commandplayer",
+  "MaxLanguagesPerPlayer": 3, // Maximum number of languages a player can know at once, -1 for unlimited
   "Languages": [
     {
       "Name": "Common",
-      "Prefix": "c",
       "Description": "The universal language",
+      "Prefix": "c",
       "Syllables": ["al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve"],
       "Color": "#92C4E1",
       "Default": true
     },
     {
       "Name": "Tradeband",
-      "Prefix": "tr",
       "Description": "A common language for ease of trade across regions",
       "Syllables": ["feng", "tar", "kin", "ga", "shin", "ji"],
       "Color": "#D4A96A",
@@ -213,6 +213,15 @@
   "ShowPlayerNameInNametag": true,
   "NametagRenderRange": 30
 }</pre>
+
+<p>The language system allows players to learn and use different languages for roleplay. Key features:</p>
+<ul>
+<li>Players can learn languages using <code>/addlang [language]</code> and remove them with <code>/remlang [language]</code></li>
+<li>Players are limited to knowing a maximum number of languages at once (configurable, default 3)</li>
+<li>Players must remove a language before learning a new one if they're at the limit</li>
+<li>Admins can manage player languages with <code>/adminaddlang</code> and <code>/adminremlang</code></li>
+<li>Players who don't know any languages or try to speak in an unknown language will "babble" incoherently</li>
+</ul>
 </div>
 </div>
 <h3>System Details</h3>
