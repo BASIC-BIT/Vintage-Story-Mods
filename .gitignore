@@ -42,3 +42,7 @@ local-research/*.repomix.*
 
 # Local package script
 **/package.ps1
+
+# Environment files
+.env
+*.env

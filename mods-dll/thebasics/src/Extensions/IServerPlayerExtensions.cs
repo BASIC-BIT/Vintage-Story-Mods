@@ -22,6 +22,7 @@ namespace thebasics.Extensions
         private const string ModDataChatMode = "BASIC_CHATMODE";
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
         private const string ModDataRpTextEnabled = "BASIC_RPTEXTENABLED";
+        private const string ModDataOOCEnabled = "BASIC_OOCENABLED";
 
         private const string ModDataPlayerStatsPrefix = "BASIC_COUNT_";
 
@@ -321,5 +322,15 @@ namespace thebasics.Extensions
             return GetModData(player, ModDataTpAllowed, true);
         }
         #endregion
+
+        public static void SetOOCEnabled(this IServerPlayer player, bool enabled)
+        {
+            SetModData(player, ModDataOOCEnabled, enabled);
+        }
+
+        public static bool GetOOCEnabled(this IServerPlayer player)
+        {
+            return GetModData(player, ModDataOOCEnabled, false);
+        }
     }
 }

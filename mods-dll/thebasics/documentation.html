@@ -40,6 +40,7 @@
 <li><strong>"/whisper (text)"</strong>, "/w" - Set your chat mode to Whispering, or whisper a single message</li>
 <li><strong>"/say (text)"</strong>, "/normal", "/s" - Set your chat mode back to normal, or say a single message</li>
 <li><strong>"/hands (text)"</strong>, "/h" - Set your chat mode to Sign Language, or sign a single message</li>
+<li><strong>"/ooc (on|off)"</strong> - Toggle Out-Of-Character chat mode. When enabled, messages wrapped in (( )) will be treated as OOC chat</li>
 </ul>
 </li>
 <li>Chat Messages
@@ -223,7 +224,11 @@
   "ShowNicknameInNametag": true,
   "HideNametagUnlessTargeting": false,
   "ShowPlayerNameInNametag": true,
-  "NametagRenderRange": 30
+  "NametagRenderRange": 30,
+
+  // ----- OOC Chat ----- //
+  "AllowOOCToggle": true,
+  "OOCTogglePermission": "chat"
 }</pre>
 
 <p>The language system allows players to learn and use different languages for roleplay. Key features:</p>

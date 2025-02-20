@@ -150,6 +150,13 @@ namespace thebasics.ModSystems.ProximityChat
                 .RequiresPlayer()
                 .HandleWith(Sign);
 
+            API.ChatCommands.GetOrCreate("ooc")
+                .WithDescription("Toggle Out-Of-Character chat mode")
+                .WithArgs(new BoolArgParser("mode", "on", false))
+                .RequiresPrivilege(Config.OOCTogglePermission)
+                .RequiresPlayer()
+                .HandleWith(OOCMode);
+
             _serverConfigChannel = API.Network.RegisterChannel("thebasics")
                 .RegisterMessageType<TheBasicsConfigMessage>();
             // .RegisterMessageType<TheBasicsChatTypingMessage>()
@@ -378,6 +385,14 @@ namespace thebasics.ModSystems.ProximityChat
 
         private string GetPlayerChat(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message, int groupId)
         {
+            // Check if message is OOC format
+            if (message.StartsWith("((") && message.EndsWith("))") && sendingPlayer.GetOOCEnabled())
+            {
+                // Strip the (( and )) and send as OOC message
+                message = message.Substring(2, message.Length - 4).Trim();
+                return $"{ChatHelper.Color("#808080", $"(OOC) {sendingPlayer.PlayerName}: {message}")}";
+            }
+
             var content = ChatHelper.GetMessage(message);
             var isEmote = content[0] == '*';
             var isGlobalOoc = Config.EnableGlobalOOC && content.StartsWith("((");
@@ -937,6 +952,28 @@ namespace thebasics.ModSystems.ProximityChat
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = $"RP Text is now {ChatHelper.OnOff(rpTextEnabled)} for your messages.",
+            };
+        }
+
+        private TextCommandResult OOCMode(TextCommandCallingArgs args)
+        {
+            if (!Config.AllowOOCToggle)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "OOC chat toggle is disabled on this server.",
+                };
+            }
+
+            var player = (IServerPlayer)args.Caller.Player;
+            var newMode = args.Parsers[0].IsMissing ? !player.GetOOCEnabled() : (bool)args.Parsers[0].GetValue();
+            player.SetOOCEnabled(newMode);
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"OOC chat mode {(newMode ? "enabled" : "disabled")}.",
             };
         }
     }

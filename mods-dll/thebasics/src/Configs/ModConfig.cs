@@ -86,6 +86,8 @@ namespace thebasics.Configs
         public string ProximityChatName = "Proximity"; //unused if EXPERIMENTAL_UseGeneralChannelAsProximityChat is true
         public bool UseGeneralChannelAsProximityChat = false;
         public bool EnableGlobalOOC = false; // Use dual parens (()) to send a message to the whole server in proximity chat
+        public bool AllowOOCToggle = true; // Allow players to toggle OOC chat when using General as Proximity
+        public string OOCTogglePermission = "chat"; // Permission required to toggle OOC chat
 
         public bool SendServerSaveAnnouncement = true;
         public bool SendServerSaveFinishedAnnouncement = false;
