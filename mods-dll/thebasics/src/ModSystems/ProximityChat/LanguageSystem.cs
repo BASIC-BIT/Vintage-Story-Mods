@@ -80,7 +80,7 @@ namespace thebasics.ModSystems.ProximityChat
             var languageIdentifier = (string)args.Parsers[0].GetValue();
             var lang = GetLangFromText(languageIdentifier, false);
 
-            if (lang == null)
+            if (lang == null || lang.Hidden)
             {
                 return new TextCommandResult
                 {
@@ -187,7 +187,7 @@ namespace thebasics.ModSystems.ProximityChat
                 Status = EnumCommandStatus.Success,
                 StatusMessage = "You know: " + string.Join(", ", languages.Select(ChatHelper.LangIdentifier)) +
                                 "\n" +
-                                "All languages: " + string.Join(", ", GetAllLanguages(false).Select(ChatHelper.LangIdentifier)),
+                                "All languages: " + string.Join(", ", GetAllLanguages(false).Where(l => !l.Hidden).Select(ChatHelper.LangIdentifier)),
             };
         }
         
@@ -196,7 +196,7 @@ namespace thebasics.ModSystems.ProximityChat
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
             var languageIdentifier = (string)args.Parsers[1].GetValue();
-            var lang = GetLangFromText(languageIdentifier, false);
+            var lang = GetLangFromText(languageIdentifier, true);
 
             if (lang == null)
             {
@@ -306,7 +306,9 @@ namespace thebasics.ModSystems.ProximityChat
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"{targetPlayer.PlayerName} knows: " + string.Join(", ", languages.Select(ChatHelper.LangIdentifier)),
+                StatusMessage = $"{targetPlayer.PlayerName} knows: " + string.Join(", ", languages.Select(ChatHelper.LangIdentifier)) +
+                                "\n" +
+                                "All languages: " + string.Join(", ", GetAllLanguages(true).Select(ChatHelper.LangIdentifier)),
             };
         }
 

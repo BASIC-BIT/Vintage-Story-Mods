@@ -195,14 +195,26 @@
       "Prefix": "c",
       "Syllables": ["al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve"],
       "Color": "#92C4E1",
-      "Default": true
+      "Default": true,
+      "Hidden": false
     },
     {
       "Name": "Tradeband",
       "Description": "A common language for ease of trade across regions",
+      "Prefix": "tr",
       "Syllables": ["feng", "tar", "kin", "ga", "shin", "ji"],
       "Color": "#D4A96A",
-      "Default": false
+      "Default": false,
+      "Hidden": false
+    },
+    {
+      "Name": "Ancient",
+      "Description": "A mysterious ancient language",
+      "Prefix": "anc",
+      "Syllables": ["xar", "eth", "oth", "ith", "uth", "yth"],
+      "Color": "#8B0000",
+      "Default": false,
+      "Hidden": true
     }
   ],
 
@@ -219,7 +231,9 @@
 <li>Players can learn languages using <code>/addlang [language]</code> and remove them with <code>/remlang [language]</code></li>
 <li>Players are limited to knowing a maximum number of languages at once (configurable, default 3)</li>
 <li>Players must remove a language before learning a new one if they're at the limit</li>
-<li>Admins can manage player languages with <code>/adminaddlang</code> and <code>/adminremlang</code></li>
+<li>Languages can be hidden from players to prevent unauthorized access</li>
+<li>Hidden languages can only be added by admins using <code>/adminaddlang</code></li>
+<li>Admins can see all languages (including hidden ones) with <code>/adminlistlang</code></li>
 <li>Players who don't know any languages or try to speak in an unknown language will "babble" incoherently</li>
 </ul>
 </div>

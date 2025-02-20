@@ -132,7 +132,9 @@ namespace thebasics.Configs
             new("Common", "The universal language", "c",
                 new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#E9DDCE", true),
             new("Tradeband", "A common language for ease of trade across regions", "tr",
-            new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A"),
+                new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A"),
+            new("Ancient", "A mysterious ancient language", "anc",
+                new[] { "xar", "eth", "oth", "ith", "uth", "yth" }, "#8B0000", false, true),
         };
 
         public bool PreventProximityChannelSwitching = true;

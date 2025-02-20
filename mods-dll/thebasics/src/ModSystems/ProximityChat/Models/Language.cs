@@ -2,7 +2,7 @@
 
 namespace thebasics.ModSystems.ProximityChat.Models;
 
-public record Language(string Name, string Description, string Prefix, string[] Syllables, string Color, bool Default = false)
+public record Language(string Name, string Description, string Prefix, string[] Syllables, string Color, bool Default = false, bool Hidden = false)
 {
     public string[] Syllables { get; } = Syllables;
     public string Prefix { get; } = Prefix;
@@ -10,4 +10,5 @@ public record Language(string Name, string Description, string Prefix, string[] 
     public string Name { get; } = Name;
     public string Color { get; } = Color;
     public bool Default { get; set; } = Default;
+    public bool Hidden { get; set; } = Hidden;
 }
