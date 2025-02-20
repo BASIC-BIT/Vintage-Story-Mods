@@ -39,3 +39,6 @@ local-research/*.repomix.*
 **/*.mkv
 **/*.iso
 **/*.img
+
+# Local package script
+package.ps1
