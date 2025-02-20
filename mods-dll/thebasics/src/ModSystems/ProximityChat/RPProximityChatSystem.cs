@@ -51,23 +51,25 @@ namespace thebasics.ModSystems.ProximityChat
                     .RequiresPlayer()
                     .HandleWith(SetNickname);
                 
-                API.ChatCommands.GetOrCreate("nickcolor")
-                    .WithAlias("nicknamecolor", "nickcol")
-                    .WithDescription("Get or set nickname color")
-                    .WithArgs(new ColorArgParser("new nickname color", false))
-                    .RequiresPrivilege(Privilege.chat)
-                    .RequiresPlayer()
-                    .HandleWith(HandleNicknameColor);
-
                 API.ChatCommands.GetOrCreate("clearnick")
                     .WithDescription("Clear your nickname")
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(ClearNickname);
-            
+            }
+
+            if (Config.ProximityChatAllowPlayersToChangeNicknameColors)
+            {
+                API.ChatCommands.GetOrCreate("nickcolor")
+                    .WithAlias("nicknamecolor", "nickcol")
+                    .WithDescription("Get or set nickname color")
+                    .WithArgs(new ColorArgParser("new nickname color", false))
+                    .RequiresPrivilege(Config.ChangeNicknameColorPermission)
+                    .RequiresPlayer()
+                    .HandleWith(HandleNicknameColor);
                 API.ChatCommands.GetOrCreate("clearnickcolor")
                     .WithDescription("Clear your nickname color")
-                    .RequiresPrivilege(Privilege.chat)
+                    .RequiresPrivilege(Config.ChangeNicknameColorPermission)
                     .RequiresPlayer()
                     .HandleWith(ClearNicknameColor);
             }

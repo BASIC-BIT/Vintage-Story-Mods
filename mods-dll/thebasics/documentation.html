@@ -101,6 +101,20 @@
 <p>The mod is highly configurable through the config file. Here are the main configuration sections:</p>
 
 <h4>Proximity Chat Settings</h4>
+<p>The proximity chat system can be configured in several ways:</p>
+
+<ul>
+<li><strong>Chat Distances:</strong> Configure how far different chat modes can be heard</li>
+<li><strong>Nickname Control:</strong>
+  <ul>
+    <li><code>ProximityChatAllowPlayersToChangeNicknames</code>: Controls whether players can set their own nicknames</li>
+    <li><code>ProximityChatAllowPlayersToChangeNicknameColors</code>: Controls whether players can change their nickname colors</li>
+    <li><code>ChangeNicknameColorPermission</code>: The privilege required for players to change their nickname colors (if allowed)</li>
+  </ul>
+</li>
+<li><strong>Message Formatting:</strong> Customize how messages appear in chat</li>
+</ul>
+
 <pre>{
   // ----- Proximity Chat ----- //
   "ProximityChatModeDistances": {
@@ -110,6 +124,8 @@
     "Sign": 15     // Sign language visibility range
   },
   "ProximityChatAllowPlayersToChangeNicknames": true,
+  "ProximityChatAllowPlayersToChangeNicknameColors": true,  // Whether players can change their nickname colors
+  "ChangeNicknameColorPermission": "chat",  // The privilege required to change nickname colors (if allowed)
   "EnableDistanceObfuscationSystem": true,
   "ProximityChatModeObfuscationRanges": {
     "Yell": 45,

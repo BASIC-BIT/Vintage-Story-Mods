@@ -15,6 +15,9 @@ namespace thebasics.Configs
         };
 
         public bool ProximityChatAllowPlayersToChangeNicknames = true;
+        public bool ProximityChatAllowPlayersToChangeNicknameColors = true;
+        public string ChangeNicknameColorPermission = "chat";
+        public bool BoldNicknames = false;
 
         public bool EnableDistanceObfuscationSystem = true;
         // TODO: Notification range past the falloff range, that says "you hear blah whispering something"
@@ -44,8 +47,6 @@ namespace thebasics.Configs
             6,
         };
         
-        public bool BoldNicknames = false;
-
         public IDictionary<ProximityChatMode, string[]> ProximityChatModeVerbs =
             new Dictionary<ProximityChatMode, string[]>
             {
