@@ -1,0 +1,94 @@
+<p><em>As seen on Saltpoint RP, Fair Travels, The Expansion, and various other servers!</em></p>
+<h1>The Basics</h1>
+<p>Mod Systems:</p>
+<ul>
+<li>Roleplaying (RP) local proximity chat system, with configurable talking ranges, nicknames, automatic message formatting, and more!</li>
+<li>Server save notification (sends a message when save starts, which can help lower frustration about lag for large worlds)</li>
+<li>Player sleep notification (encourages players to go to sleep when at least 50% of players are in bed)</li>
+<li>Player Stats system (Keeps track of stats about players that can be viewed by anybody.&nbsp; Currently tracks deaths, player kills, and NPC kills)</li>
+<li>TPA System (Allow players to teleport to each other by consuming a temporal gear)</li>
+<li>Repair system (Adds an admin command /setdurability to set the durability of an item held in your hand)</li>
+</ul>
+<p>Join my discord for support! <a class="anchor_af404b anchorUnderlineOnHover_af404b" tabindex="0" title="https://discord.gg/PYKTaJ5Ett" role="button" href="https://discord.gg/PYKTaJ5Ett" target="_blank" rel="noreferrer noopener">https://discord.gg/PYKTaJ5Ett</a></p>
+<h2>Roleplay Proximity Chat System</h2>
+<p>Adds a Proximity chat tab with local chat designed for roleplaying</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/SetNickAndChat.gif" alt="Set Nickname And Chat" width="800" height="297" /></p>
+<p>Yell or whisper!</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/TalkVolumes.gif" alt="Talking Ranges" width="800" height="297" /></p>
+<p>Speak in configurable languages, so that only others that speak it can understand you!</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/Languages.gif" alt="Languages" width="800" height="297" /></p>
+<p>Use emotes and environment messages for additional flavor!</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/Emote.gif" alt="Emotes" width="800" height="297" /></p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/Environment.gif" alt="Environment Messages" width="800" height="297" /></p>
+<p>Use&nbsp;<strong>Bold</strong> and&nbsp;<em>Italics&nbsp;</em>to spice things up!</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/Accents.gif" alt="Accents" width="800" height="297" /></p>
+<h3>Commands:</h3>
+<p><em>Note: [value] denotes a required argument, while (value) denotes an optional one&nbsp; Pipes</em> (|)<em> denote a range of allowable values. Aliases are listed after the first string, but with argument lists omitted.</em></p>
+<ul>
+<li>Nicknames
+<ul>
+<li><strong>"/nick (nick)"</strong>, "/setnick", "/nickname" - Get or set your nickname</li>
+<li><strong>"/clearnick"</strong> - Clear your nickname</li>
+<li><strong>"/nickcolor (color)"</strong> - Get or set your nickname color</li>
+<li><strong>"/clearnickcolor"</strong> - Clear your nickname color</li>
+<li><strong>"/adminsetnickname \[player\] (nickname)"</strong></li>
+</ul>
+</li>
+<li>Chat modes/Chat messages
+<ul>
+<li><strong>"/yell (text)"</strong>, "/y" - Set your chat mode to Yelling, or yell a single message</li>
+<li><strong>"/whisper (text)"</strong>, "/w" - Set your chat mode to Whispering, or whisper a single message</li>
+<li><strong>"/say (text)"</strong>, "/normal", "/s" - Set your chat mode back to normal, or say a single message</li>
+<li><strong>"/hands (text)"</strong>, "/h" - Set your chat mode to Sign Language, or sign a single message</li>
+</ul>
+</li>
+<li>Chat Messages
+<ul>
+<li><strong>"/me \[text\]"</strong>, "/m" - ("\*" prefix) - Send a proximity emote message</li>
+<li><strong>"/it \[text\]"</strong> - ("!" prefix) - Send a proximity environment message</li>
+</ul>
+</li>
+<li>Configurable Options
+<ul>
+<li><strong>"/emotemode \[on|off\]"</strong> - Turn Emote-only mode on or off</li>
+<li><strong>"/rptext \[on|off\]"</strong> - Turn the whole RP system on or off for your messages</li>
+</ul>
+</li>
+<li>Languages
+<ul>
+<li>Player Commands
+<ul>
+<li><strong>"/addlang \[langCode\]"</strong> - Add a known language</li>
+<li><strong>"/remlang \[langCode\]"</strong> - Remove a known language</li>
+<li><strong>"/listlang \[langCode\]"</strong> - List your known languages, and all available languages</li>
+</ul>
+</li>
+<li>Admin Commands
+<ul>
+<li><strong>"/adminaddlang \[player\] \[langCode\]"</strong> - Add a language to another player</li>
+<li><strong>"/adminremlang \[player\] \[langCode\]"</strong> - Remove a language from another player</li>
+<li><strong>"/adminlistlang \[player\]"</strong> - List a player's known languages</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Player Stats
+<ul>
+<li><strong>"/playerstats (player)"</strong> - Get your player stats, or another players</li>
+<li><strong>"/clearstats \[player\] (confirm)"</strong> - Clear all of the stats of a player</li>
+<li><strong>"/clearstat \[player\] \[statName\] (confirm)"</strong> - Clear a specific stat a player</li>
+</ul>
+</li>
+</ul>
+<h3>Configuration:</h3>
+<div class="spoiler">
+<div class="spoiler-toggle">Spoiler!</div>
+<div class="spoiler-text">
+<p>{<br />// ----- Proximity Chat ----- //<br />"ProximityChatModeDistances": {<br />"Yell": 90,<br />"Normal": 35,<br />"Whisper": 5,<br />"Sign": 15<br />},<br />"ProximityChatAllowPlayersToChangeNicknames": true,<br />"EnableDistanceObfuscationSystem": true,<br />"ProximityChatModeObfuscationRanges": {<br />"Yell": 45,<br />"Normal": 15,<br />"Whisper": 2,<br />"Sign": 15<br />},<br />"EnableDistanceFontSizeSystem": true,<br />"ProximityChatDefaultFontSize": {<br />"Yell": 30,<br />"Normal": 16,<br />"Whisper": 12,<br />"Sign": 16<br />},<br />"ProximityChatClampFontSizes": [30, 16, 12, 6],<br />"BoldNicknames": false,<br />"ProximityChatModeVerbs": {<br />"Yell": ["yells", "shouts", "exclaims"],<br />"Normal": ["says", "states", "mentions"],<br />"Whisper": ["whispers", "mumbles", "mutters"],<br />"Sign": ["signs", "gestures", "motions"]<br />},<br />"ProximityChatModeBabbleVerb": "babbles",<br />"ProximityChatModePunctuation": {<br />"Yell": "!",<br />"Normal": ".",<br />"Whisper": ".",<br />"Sign": "."<br />},<br />"ProximityChatModeQuotationStart": {<br />"Yell": "\"",<br />"Normal": "\"",<br />"Whisper": "\"",<br />"Sign": "&lt;i&gt;'"<br />},<br />"ProximityChatModeQuotationEnd": {<br />"Yell": "\"",<br />"Normal": "\"",<br />"Whisper": "\"",<br />"Sign": "'&lt;/i&gt;"<br />},<br />// ----- /Proximity Chat ----- //<br /><br />// ----- Server Save Announcement ----- //<br />"SendServerSaveAnnouncement": true,<br />"SendServerSaveFinishedAnnouncement": false,<br />"TEXT_ServerSaveAnnouncement": "Server save has started - expect lag for a few seconds.",<br />"TEXT_ServerSaveFinished": "Server save has finished.",<br />// ----- /Server Save Announcement ----- //<br /><br />// ----- Player Stats ----- //<br />"PlayerStatSystem": true,<br />"PlayerStatToggles": {<br />"Deaths": true,<br />"NpcKills": true,<br />"PlayerKills": true,<br />"BlockBreaks": true,<br />"DistanceTravelled": true<br />},<br />"PlayerStatClearPermission": "commandplayer",<br />"PlayerStatDistanceTravelledTimer": 2000,<br />// ----- /Player Stats ----- //<br /><br />// ----- TPA Requests ----- //<br />"AllowPlayerTpa": true,<br />"AllowTpaPrivilegeByDefault": false,<br />"TpaRequireTemporalGear": true,<br />"TpaUseCooldown": false,<br />"TpaCooldownInGameHours": 0.5,<br />// ----- /TPA Requests ----- //<br /><br />// ----- Sleep Notifications ----- //<br />"EnableSleepNotifications": true,<br />"SleepNotificationThreshold": 0.5,<br />"TEXT_SleepNotification": "You start to feel tired...",<br />// ----- /Sleep Notifications ----- //<br /><br />// ----- Language System ----- //<br />"EnableLanguageSystem": true,<br />"ChangeOwnLanguagePermission": "chat",<br />"ChangeOtherLanguagePermission": "commandplayer",<br />"Languages": [<br />{<br />"Syllables": ["al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve"],<br />"Prefix": "c",<br />"Description": "The universal language",<br />"Name": "Common",<br />"Color": "#92C4E1",<br />"Default": true<br />},<br />{<br />"Syllables": ["feng", "tar", "kin", "ga", "shin", "ji"],<br />"Prefix": "tr",<br />"Description": "A common language for ease of trade across regions",<br />"Name": "Tradeband",<br />"Color": "#D4A96A",<br />"Default": false<br />}<br />],<br />// ----- /Language System ----- //<br /><br />// ----- Nametags ----- //<br />"PreventProximityChannelSwitching": true,<br />"ShowNicknameInNametag": true,<br />"HideNametagUnlessTargeting": false,<br />"ShowPlayerNameInNametag": true,<br />"NametagRenderRange": 30<br />// ----- /Nametags ----- //<br />}</p>
+</div>
+</div>
+<h3>Potential Future Improvements</h3>
+<ul>
+<li>Use actual line of sight for sign language</li>
+</ul>
+<p>Feel free to leave suggestions!</p>
