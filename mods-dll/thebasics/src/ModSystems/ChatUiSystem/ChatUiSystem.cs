@@ -68,8 +68,8 @@ public class ChatUiSystem : ModSystem
         var chatBox = api.Gui.LoadedGuis.Find((Predicate<GuiDialog>)(dlg => dlg is HudDialogChat)) as
             HudDialogChat;
         
-        
-        // api.Event.IsPlayerReady += OnPlayerReady;
+        // Wait for player to be ready before requesting config
+        api.Event.PlayerJoin += OnPlayerJoin;
     }
 
     // private void Dlg_ComposeExtraGuis()
@@ -148,10 +148,17 @@ public class ChatUiSystem : ModSystem
     //     }
     // }
 
+    private void OnPlayerJoin(IClientPlayer byPlayer) 
+    {
+        _api.Logger.Debug("THEBASICS - Player joined, sending ready message to server");
+        _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
+    }
+
     private void RegisterForServerSideConfig()
     {
         _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
+            .RegisterMessageType<TheBasicsClientReadyMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
         // .RegisterMessageType<TheBasicsChatTypingMessage>();
 
@@ -197,6 +204,8 @@ public class ChatUiSystem : ModSystem
     {
         _preventProximityChannelSwitching = configMessage.PreventProximityChannelSwitching;
         _proximityGroupId = configMessage.ProximityGroupId;
+        
+        _api.Logger.Debug($"THEBASICS - Received server config: Prevention={_preventProximityChannelSwitching}, ProximityId={_proximityGroupId}");
     }
 
     /*
@@ -209,7 +218,8 @@ public class ChatUiSystem : ModSystem
         var game = (ClientMain)_api.World;
         int gotoGroupId = packet.GotoGroup.GroupId;
         _api.Logger.Debug(
-            $"THEBASICS - Handling GotoGroupPacket ~ Current group: {game.currentGroupid} GotoGroup: {gotoGroupId}");
+            $"THEBASICS - HandleGotoGroupPacket ~ Prevention: {_preventProximityChannelSwitching}, Current: {game.currentGroupid}, Target: {gotoGroupId}, Proximity: {_proximityGroupId}");
+        
         if (_preventProximityChannelSwitching && game.currentGroupid == _proximityGroupId)
         {
             _api.Logger.Debug("THEBASICS - Denying GotoGroupPacket");
@@ -275,6 +285,7 @@ public class ChatUiSystem : ModSystem
 
     public override void Dispose()
     {
+        _api.Event.PlayerJoin -= OnPlayerJoin;
         _harmony?.UnpatchAll(Mod.Info.ModID);
     }
 }

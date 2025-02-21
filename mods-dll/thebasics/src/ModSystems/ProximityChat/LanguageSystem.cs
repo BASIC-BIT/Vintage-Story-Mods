@@ -287,8 +287,16 @@ namespace thebasics.ModSystems.ProximityChat
                 {
                     var newDefaultIdentifier = newPlayerLanguages.First();
                     var newDefault = GetLangFromText(newDefaultIdentifier, false);
-                    player.SendMessage(GlobalConstants.CurrentChatGroup, $"{targetPlayer.PlayerName} unlearned their default language, their new default is {ChatHelper.LangColor(newDefault.Name, newDefault)}", EnumChatType.Notification);
-                    targetPlayer.SetDefaultLanguage(newDefault);
+                    if (newDefault == null)
+                    {
+                        player.SendMessage(GlobalConstants.CurrentChatGroup, $"{targetPlayer.PlayerName} unlearned their default language, but no valid default language was found!", EnumChatType.Notification);
+                        targetPlayer.SetDefaultLanguage(BabbleLang);
+                    }
+                    else 
+                    {
+                        player.SendMessage(GlobalConstants.CurrentChatGroup, $"{targetPlayer.PlayerName} unlearned their default language, their new default is {ChatHelper.LangColor(newDefault.Name, newDefault)}", EnumChatType.Notification);
+                        targetPlayer.SetDefaultLanguage(newDefault);
+                    }
                 }
             }
 
@@ -315,8 +323,9 @@ namespace thebasics.ModSystems.ProximityChat
         private List<Language> GetPlayerLanguages(IServerPlayer player)
         {
             return player.GetLanguages()
-                .Select((lang) => GetLangFromText(lang, false))
-                .Cast<Language>()
+                .Select(lang => GetLangFromText(lang, false))
+                .Where(lang => lang != null)
+                .Cast<Language>()  // Cast after filtering out nulls
                 .ToList();
         }
 
@@ -326,8 +335,8 @@ namespace thebasics.ModSystems.ProximityChat
         private Language? GetLangFromText(string text, bool allowBabble)
         {
             return GetAllLanguages(allowBabble).FirstOrDefault(lang =>
-                lang.Prefix.ToLower() == text.ToLower() ||
-                lang.Name.ToLower() == text.ToLower());
+                lang?.Prefix?.ToLower() == text.ToLower() ||
+                lang?.Name?.ToLower() == text.ToLower());
         }
 
         private List<Language> GetAllLanguages(bool allowBabble)

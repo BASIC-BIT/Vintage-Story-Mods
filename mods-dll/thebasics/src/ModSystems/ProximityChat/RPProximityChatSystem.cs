@@ -152,16 +152,24 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RequiresPlayer()
             .HandleWith(OOCMode);
 
-        _serverConfigChannel = API.Network.RegisterChannel("thebasics")
-            .RegisterMessageType<TheBasicsConfigMessage>();
-        // .RegisterMessageType<TheBasicsChatTypingMessage>()
-        // .SetMessageHandler<TheBasicsChatTypingMessage>((player, packet) =>
-        // {
-        //     
-        // });
+        RegisterForServerSideConfig();
 
         // _serverNicknameChannel = API.Network.RegisterChannel("thebasics_nickname")
         //     .RegisterMessageType<TheBasicsPlayerNicknameMessage>();
+    }
+
+    private void RegisterForServerSideConfig()
+    {
+        _serverConfigChannel = API.Network.RegisterChannel("thebasics")
+            .RegisterMessageType<TheBasicsConfigMessage>()
+            .RegisterMessageType<TheBasicsClientReadyMessage>()
+            .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady);
+    }
+
+    private void OnClientReady(IServerPlayer player, TheBasicsClientReadyMessage message)
+    {
+        API.Logger.Debug($"THEBASICS - Received ready message from {player.PlayerName}, sending config");
+        SendClientConfig(player);
     }
 
     private TextCommandResult SetNicknameColorAdmin(TextCommandCallingArgs args)
@@ -329,9 +337,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             }
         }
 
-        // TODO: Wait until client has requested config to send it? Commonly done in other mods
-        SendClientConfig(byPlayer);
-
+        // Config will be sent when client indicates it's ready
         SwapOutNameTag(byPlayer);
     }
     
