@@ -419,7 +419,8 @@ namespace thebasics.ModSystems.ProximityChat
         {
             if (Config.EnableLanguageSystem && !receivingPlayer.KnowsLanguage(lang))
             {
-                message = LanguageScrambler.ScrambleMessage(message, lang);
+                var scrambledMessage = LanguageScrambler.ScrambleMessage(message, lang);
+                message = $"<i>{scrambledMessage}</i>";
             }
         }
     }
