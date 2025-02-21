@@ -82,6 +82,9 @@ namespace thebasics.Configs
         public bool AllowOOCToggle = true;
         public string OOCTogglePermission = "chat";
 
+        public bool ProximityChatAsDefault = false;
+        public bool PreserveDefaultChatChoice = true;
+
         public bool SendServerSaveAnnouncement = true;
         public bool SendServerSaveFinishedAnnouncement = false;
 
