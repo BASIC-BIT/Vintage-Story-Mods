@@ -6,6 +6,7 @@
 !mods/
 !mods-dll/
 !Tests/
+!docs/
 
 # Ignore user files anywhere inside the "mods" directory.
 mods/**/*.user

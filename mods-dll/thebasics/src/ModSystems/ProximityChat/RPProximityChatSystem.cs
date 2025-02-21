@@ -6,12 +6,14 @@ using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat;
+using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
+using System.Collections.Generic;
 
 namespace thebasics.ModSystems.ProximityChat;
 
@@ -22,6 +24,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private DistanceObfuscationSystem _distanceObfuscationSystem;
     private IServerNetworkChannel _serverConfigChannel;
     private ProximityCheckUtils _proximityCheckUtils;
+    private List<IMessageTransformer> _transformers;
     
     // private IServerNetworkChannel _serverNicknameChannel;
 
@@ -34,6 +37,16 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _languageSystem = new LanguageSystem(this, API, Config);
         _distanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
         _proximityCheckUtils = new ProximityCheckUtils(this, API, Config);
+        
+        // Initialize transformers
+        _transformers = new List<IMessageTransformer>
+        {
+            new LanguageTransformer(_languageSystem),
+            new ObfuscationTransformer(_distanceObfuscationSystem),
+            new FormatTransformer(this),
+            new EmoteTransformer(this),
+            new ChatModeTransformer(this)
+        };
     }
 
     private void RegisterCommands()
@@ -384,6 +397,19 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // });
     }
 
+    private MessageContext ExecuteTransformers(MessageContext context)
+    {
+        foreach (var transformer in _transformers)
+        {
+            context = transformer.Transform(context);
+            if (context.State != MessageContextState.CONTINUE)
+            {
+                break;
+            }
+        }
+        return context;
+    }
+
     private string GetPlayerChat(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message, int groupId)
     {
         // Check if message is OOC format
@@ -400,34 +426,423 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var isOOC = !isGlobalOoc && content[0] == '(';
         var isEnvironmentMessage = content[0] == '!';
 
-        var messageCopy = (string) message.Clone();
+        // If Global OOC, let the message be sent out like normal
+        if (isGlobalOoc)
+        {
+            return message;
+        }
+
+        var context = new MessageContext
+        {
+            Message = content,
+            SendingPlayer = sendingPlayer,
+            ReceivingPlayer = receivingPlayer,
+            GroupId = groupId,
+            Metadata = new Dictionary<string, object>()
+        };
 
         if (isEmote)
         {
-            content = content.Remove(0, 1);
-            messageCopy = GetFullEmoteMessage(sendingPlayer, receivingPlayer, content);
+            context.Message = content.Remove(0, 1);
+            context.Metadata["isEmote"] = true;
         }
         else if (isOOC)
         {
-            if (!messageCopy.EndsWith(")")) // End the messageCopy with ) if it didn't end with it, to close out the (
+            if (!message.EndsWith(")"))
             {
-                messageCopy += ")";
+                message += ")";
             }
+            return message;
         }
         else if (isEnvironmentMessage)
         {
-            content = content.Remove(0, 1);
-            messageCopy = ChatHelper.Wrap(
-                AddAutoCapitalizationAndPunctuation(sendingPlayer, content, ProximityChatMode.Normal),
-                "*");
+            context.Message = content.Remove(0, 1);
+            context.Metadata["isEnvironmental"] = true;
+        }
+
+        context.Metadata["chatMode"] = sendingPlayer.GetChatMode();
+        return ExecuteTransformers(context).Message;
+    }
+
+    private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content, int groupId)
+    {
+        var context = new MessageContext
+        {
+            Message = content,
+            SendingPlayer = sendingPlayer,
+            ReceivingPlayer = receivingPlayer,
+            GroupId = groupId
+        };
+
+        return ExecuteTransformers(context).Message;
+    }
+
+    public string GetFormattedNickname(IServerPlayer player)
+    {
+        var nick = player.GetNicknameWithColor();
+        return Config.BoldNicknames ? ChatHelper.Strong(nick) : nick;
+    }
+
+    private string GetFullEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content)
+    {
+        return ChatHelper.Build(GetFormattedNickname(sendingPlayer), " ", GetEmoteMessage(sendingPlayer, receivingPlayer, content));
+    }
+
+    private void SendLocalChat(IServerPlayer byPlayer, string message, ProximityChatMode? tempMode = null,
+        EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
+    {
+        SendLocalChatByPlayer(byPlayer,
+            _ => message, tempMode,
+            chatType, data);
+    }
+    
+    private IServerPlayer[] GetNearbyPlayers(IServerPlayer player, ProximityChatMode? tempMode = null)
+    {
+        var range = GetProximityChatRange(player, tempMode);
+        var nearbyPlayers = API.World.AllOnlinePlayers.Where(x =>
+            x.Entity.Pos.AsBlockPos.ManhattenDistance(player.Entity.Pos.AsBlockPos) < range
+            ).Cast<IServerPlayer>()
+            .ToArray();
+        
+        var message = "";
+        var lang = _languageSystem.GetSpeakingLanguage(player, _proximityChatId, ref message);
+        if (lang.IsSignLanguage)
+        {
+            return nearbyPlayers.Where(nearbyPlayer => _proximityCheckUtils.CanSeePlayer(player, nearbyPlayer)).ToArray();
+        }
+
+        return nearbyPlayers;
+    }
+
+    private void SendLocalChatByPlayer(IServerPlayer byPlayer, System.Func<IServerPlayer, string> messageGenerator,
+        ProximityChatMode? tempMode = null,
+        EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
+    {
+        var nearbyPlayers = GetNearbyPlayers(byPlayer, tempMode);
+        foreach (var player in nearbyPlayers)
+        {
+            var serverPlayer = player as IServerPlayer;
+            var context = new MessageContext
+            {
+                SendingPlayer = byPlayer,
+                ReceivingPlayer = serverPlayer,
+                Message = messageGenerator(serverPlayer),
+                Metadata = { ["chatMode"] = tempMode ?? byPlayer.GetChatMode() }
+            };
+
+            context = ExecuteTransformers(context);
+            serverPlayer.SendMessage(_proximityChatId, context.Message, chatType, data);
+        }
+    }
+
+    private int GetProximityChatRange(IServerPlayer player, ProximityChatMode? tempMode = null)
+    {
+        var message = "";
+        var lang = _languageSystem.GetSpeakingLanguage(player, _proximityChatId, ref message);
+        if (lang.IsSignLanguage)
+        {
+            return lang.SignLanguageRange;
+        }
+
+        var mode = tempMode ?? player.GetChatMode();
+        return mode switch
+        {
+            ProximityChatMode.Normal => Config.ProximityChatModeDistances[ProximityChatMode.Normal],
+            ProximityChatMode.Whisper => Config.ProximityChatModeDistances[ProximityChatMode.Whisper],
+            ProximityChatMode.Yell => Config.ProximityChatModeDistances[ProximityChatMode.Yell],
+            _ => Config.ProximityChatModeDistances[ProximityChatMode.Normal]
+        };
+    }
+
+    private string GetProximityChatPunctuation(IServerPlayer player, ProximityChatMode? tempMode = null)
+    {
+        return Config.ProximityChatModePunctuation[player.GetChatMode(tempMode)];
+    }
+
+    private string AddAutoCapitalizationAndPunctuation(IServerPlayer player, string message, ProximityChatMode? tempMode = null)
+    {
+        var autoCapitalizationRegex = new Regex(@"^([\s+|]*)(.)(.*)$");
+        var autoPunctuationRegex = new Regex(@"^(.*?)(.)([\s+|]*)$");
+
+        message = autoPunctuationRegex.Replace(message, match =>
+        {
+            var possiblePunctuation = match.Groups[2].Value[0];
+            return
+                $"{match.Groups[1].Value}{possiblePunctuation}{(ChatHelper.IsPunctuation(possiblePunctuation) ? "" : GetProximityChatPunctuation(player, tempMode))}{match.Groups[3].Value}";
+        });
+
+        message = autoCapitalizationRegex.Replace(message, match =>
+        {
+            var firstLetter = match.Groups[2].Value;
+            return
+                $"{match.Groups[1].Value}{firstLetter.ToUpper()}{match.Groups[3].Value}";
+        });
+
+        return message;
+    }
+
+    private string GetEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message)
+    {
+        var context = new MessageContext
+        {
+            Message = message,
+            SendingPlayer = sendingPlayer,
+            ReceivingPlayer = receivingPlayer,
+            Metadata = { ["isEmote"] = true }
+        };
+
+        return ExecuteTransformers(context).Message;
+    }
+
+    private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
+    {
+        var player = (IServerPlayer)fullArgs.Caller.Player;
+        if (fullArgs.Parsers[0].IsMissing)
+        {
+            if (player.HasNickname())
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Success,
+                    StatusMessage = $"Your nickname is: {player.GetNicknameWithColor()}",
+                };
+            }
+            else
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "You don't have a nickname!  You can set it with `/nick MyName`",
+                };
+            }
         }
         else
         {
-            messageCopy = GetFullRPMessage(sendingPlayer, receivingPlayer, content, groupId);
+            var nickname = (string)fullArgs.Parsers[0].GetValue();
+            player.SetNickname(nickname);
+            SwapOutNameTag(player);
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Okay, your nickname is set to {ChatHelper.Quote(nickname)}",
+            };
+        }
+    }
+
+    private string ProcessAccents(string message)
+    {
+        message = Regex.Replace(message, @"\|(.*?)\|", "<i>$1</i>");
+        message = Regex.Replace(message, @"\|(.*)$", "<i>$1</i>");
+        message = Regex.Replace(message, @"\+(.*?)\+", "<strong>$1</strong>");
+        message = Regex.Replace(message, @"\+(.*)$", "<strong>$1</strong>");
+        return message;
+    }
+    private TextCommandResult SetNicknameAdmin(TextCommandCallingArgs fullArgs)
+    {
+        var attemptTarget = API.GetPlayerByUID(((PlayerUidName[])fullArgs.Parsers[0].GetValue())[0].Uid);
+        if (attemptTarget == null)
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = "Cannot find player.",
+            };
+        }
+        var oldNickname = attemptTarget.GetNicknameWithColor();
+        
+        if (fullArgs.Parsers[1].IsMissing)
+        {
+            if (!attemptTarget.HasNickname())
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"Player {attemptTarget.PlayerName} does not have a nickname!  You can set it with `/adminsetnick {attemptTarget.PlayerName} NewName`",
+                };
+            }
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {attemptTarget.GetNicknameWithColor()}",
+            };
+
+        }
+        
+        var newNickname = (string)fullArgs.Parsers[1].GetValue();
+        
+        attemptTarget.SetNickname(newNickname);
+        
+        SwapOutNameTag(attemptTarget);
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {newNickname}.  Old Nickname: {oldNickname}",
+        };
+    }
+
+    public TextCommandResult HandleEmoteCommand(TextCommandCallingArgs args, bool isEmote)
+    {
+        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+        if (isEmote && !player.HasNickname())
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = "You need a nickname to use emotes!  You can set it with `/nick MyName`"
+            };
         }
 
-        return messageCopy;
+        var context = new MessageContext
+        {
+            Message = (string)args.Parsers[0].GetValue(),
+            SendingPlayer = player,
+            Metadata = { [isEmote ? "isEmote" : "isEnvironmental"] = true }
+        };
 
+        SendLocalChatByPlayer(player,
+            targetPlayer =>
+            {
+                context.ReceivingPlayer = targetPlayer;
+                return ExecuteTransformers(context).Message;
+            },
+            chatType: isEmote ? EnumChatType.OthersMessage : EnumChatType.Notification);
+
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+        };
+    }
+
+    private TextCommandResult Emote(TextCommandCallingArgs args)
+    {
+        return HandleEmoteCommand(args, true);
+    }
+
+    private TextCommandResult EnvironmentMessage(TextCommandCallingArgs args)
+    {
+        return HandleEmoteCommand(args, false);
+    }
+
+    private TextCommandResult ClearNickname(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        player.ClearNickname();
+        SwapOutNameTag(player);
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = "Your nickname has been cleared.",
+        };
+    }
+    
+    private TextCommandResult ClearNicknameColor(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        player.ClearNicknameColor();
+        SwapOutNameTag(player);
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = "Your nickname color has been cleared.",
+        };
+    }
+
+    public TextCommandResult HandleChatCommand(TextCommandCallingArgs args, ProximityChatMode mode)
+    {
+        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+        var message = (string)args.Parsers[0].GetValue();
+        var groupId = args.Caller.FromChatGroupId;
+        if (!args.Parsers[0].IsMissing)
+        {
+            var context = new MessageContext
+            {
+                Message = message,
+                SendingPlayer = player,
+                GroupId = groupId,
+                Metadata = { ["chatMode"] = mode }
+            };
+
+            SendLocalChatByPlayer(player,
+                targetPlayer =>
+                {
+                    context.ReceivingPlayer = targetPlayer;
+                    return ExecuteTransformers(context).Message;
+                },
+                mode);
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+            };
+        }
+
+        player.SetChatMode(mode);
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = $"You are now {mode.ToString().ToLower()}.",
+        };
+    }
+
+    private TextCommandResult Yell(TextCommandCallingArgs args)
+    {
+        return HandleChatCommand(args, ProximityChatMode.Yell);
+    }
+
+    private TextCommandResult Whisper(TextCommandCallingArgs args)
+    {
+        return HandleChatCommand(args, ProximityChatMode.Whisper);
+    }
+
+    private TextCommandResult Say(TextCommandCallingArgs args)
+    {
+        return HandleChatCommand(args, ProximityChatMode.Normal);
+    }
+
+    private TextCommandResult EmoteMode(TextCommandCallingArgs args)
+    {
+        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+        var emoteMode = (bool)args.Parsers[0].GetValue();
+        player.SetEmoteMode(emoteMode);
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = $"Emote mode is now {ChatHelper.OnOff(emoteMode)}",
+        };
+    }
+
+    private TextCommandResult RpTextEnabled(TextCommandCallingArgs args)
+    {
+        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+        var rpTextEnabled = (bool)args.Parsers[0].GetValue();
+        player.SetRpTextEnabled(rpTextEnabled);
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = $"RP Text is now {ChatHelper.OnOff(rpTextEnabled)} for your messages.",
+        };
+    }
+
+    private TextCommandResult OOCMode(TextCommandCallingArgs args)
+    {
+        if (!Config.AllowOOCToggle)
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = "OOC chat toggle is disabled on this server.",
+            };
+        }
+
+        var player = (IServerPlayer)args.Caller.Player;
+        var newMode = args.Parsers[0].IsMissing ? !player.GetOOCEnabled() : (bool)args.Parsers[0].GetValue();
+        player.SetOOCEnabled(newMode);
+
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = $"OOC chat mode {(newMode ? "enabled" : "disabled")}.",
+        };
     }
 
     private PlayerGroup GetProximityGroup()
@@ -496,464 +911,5 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             byPlayer.SendMessage(GlobalConstants.CurrentChatGroup, "You are speaking in babble.  Add a language via /addlang or set your default lang with a language identifier, ex. \":c\".  Use /listlang to see all available languages", EnumChatType.CommandError);
         }
-    }
-
-    private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content, int groupId, ProximityChatMode? tempMode = null)
-    {
-        var lang = _languageSystem.GetSpeakingLanguage(sendingPlayer, groupId, ref content);
-        _languageSystem.ProcessMessage(receivingPlayer, ref content, lang);
-
-        var verb = GetProximityChatVerb(sendingPlayer, lang, tempMode);
-        var punctuation = GetProximityChatPunctuation(sendingPlayer, tempMode);
-        var nickname = GetFormattedNickname(sendingPlayer);
-
-        content = AddAutoCapitalizationAndPunctuation(sendingPlayer, content, tempMode);
-        content = ProcessAccents(content);
-
-        if (lang.UseItalics)
-        {
-            content = $"*{content}*";
-        }
-
-        return $"{nickname} {verb}: {content}{punctuation}";
-    }
-
-    private string GetFormattedNickname(IServerPlayer player)
-    {
-        var nick = player.GetNicknameWithColor();
-        return Config.BoldNicknames ? ChatHelper.Strong(nick) : nick;
-    }
-
-    private string GetFullEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content)
-    {
-        return ChatHelper.Build(GetFormattedNickname(sendingPlayer), " ", GetEmoteMessage(sendingPlayer, receivingPlayer, content));
-    }
-
-    private void SendLocalChat(IServerPlayer byPlayer, string message, ProximityChatMode? tempMode = null,
-        EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
-    {
-        SendLocalChatByPlayer(byPlayer,
-            _ => message, tempMode,
-            chatType, data);
-    }
-    
-    private IServerPlayer[] GetNearbyPlayers(IServerPlayer player, ProximityChatMode? tempMode = null)
-    {
-        var range = GetProximityChatRange(player, tempMode);
-        var nearbyPlayers = API.World.AllOnlinePlayers.Where(x =>
-            x.Entity.Pos.AsBlockPos.ManhattenDistance(player.Entity.Pos.AsBlockPos) < range
-            ).Cast<IServerPlayer>()
-            .ToArray();
-        
-        var message = "";
-        var lang = _languageSystem.GetSpeakingLanguage(player, _proximityChatId, ref message);
-        if (lang.IsSignLanguage)
-        {
-            return nearbyPlayers.Where(nearbyPlayer => _proximityCheckUtils.CanSeePlayer(player, nearbyPlayer)).ToArray();
-        }
-
-        return nearbyPlayers;
-    }
-
-    private void SendLocalChatByPlayer(IServerPlayer byPlayer, System.Func<IServerPlayer, string> messageGenerator,
-        ProximityChatMode? tempMode = null,
-        EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
-    {
-        var nearbyPlayers = GetNearbyPlayers(byPlayer, tempMode);
-        foreach (var player in nearbyPlayers)
-        {
-            var serverPlayer = player as IServerPlayer;
-
-            serverPlayer.SendMessage(_proximityChatId, messageGenerator(serverPlayer), chatType, data);
-        }
-    }
-
-    private int GetProximityChatRange(IServerPlayer player, ProximityChatMode? tempMode = null)
-    {
-        var message = "";
-        var lang = _languageSystem.GetSpeakingLanguage(player, _proximityChatId, ref message);
-        if (lang.IsSignLanguage)
-        {
-            return lang.SignLanguageRange;
-        }
-
-        var mode = tempMode ?? player.GetChatMode();
-        return mode switch
-        {
-            ProximityChatMode.Normal => Config.ProximityChatModeDistances[ProximityChatMode.Normal],
-            ProximityChatMode.Whisper => Config.ProximityChatModeDistances[ProximityChatMode.Whisper],
-            ProximityChatMode.Yell => Config.ProximityChatModeDistances[ProximityChatMode.Yell],
-            _ => Config.ProximityChatModeDistances[ProximityChatMode.Normal]
-        };
-    }
-
-    private string GetProximityChatVerb(IServerPlayer player, Language lang, ProximityChatMode? tempMode = null)
-    {
-        if (lang.IsSignLanguage)
-        {
-            return "signs";
-        }
-
-        var mode = tempMode ?? player.GetChatMode();
-        return mode switch
-        {
-            ProximityChatMode.Normal => "says",
-            ProximityChatMode.Whisper => "whispers",
-            ProximityChatMode.Yell => "yells",
-            _ => "says"
-        };
-    }
-
-    private string GetProximityChatPunctuation(IServerPlayer player, ProximityChatMode? tempMode = null)
-    {
-        return Config.ProximityChatModePunctuation[player.GetChatMode(tempMode)];
-    }
-
-    private string AddAutoCapitalizationAndPunctuation(IServerPlayer player, string message, ProximityChatMode? tempMode = null)
-    {
-        var autoCapitalizationRegex = new Regex(@"^([\s+|]*)(.)(.*)$");
-        var autoPunctuationRegex = new Regex(@"^(.*?)(.)([\s+|]*)$");
-
-        message = autoPunctuationRegex.Replace(message, match =>
-        {
-            var possiblePunctuation = match.Groups[2].Value[0];
-            return
-                $"{match.Groups[1].Value}{possiblePunctuation}{(ChatHelper.IsPunctuation(possiblePunctuation) ? "" : GetProximityChatPunctuation(player, tempMode))}{match.Groups[3].Value}";
-        });
-
-        message = autoCapitalizationRegex.Replace(message, match =>
-        {
-            var firstLetter = match.Groups[2].Value;
-            return
-                $"{match.Groups[1].Value}{firstLetter.ToUpper()}{match.Groups[3].Value}";
-        });
-
-        return message;
-    }
-
-    private string GetEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message)
-    {
-        var builder = new StringBuilder();
-
-        var trimmedMessage = message.Trim();
-        
-        // Separate trimmed message by quotes, applying the language system to every other part
-        // TODO: Allow for multiple languages in a single message
-        var splitMessage = trimmedMessage.Split('"');
-        for (var i = 0; i < splitMessage.Length; i++)
-        {
-            if (i % 2 == 0)
-            {
-                builder.Append(splitMessage[i]);
-            }
-            else
-            {
-                // TODO: apply obfuscation system here too!
-                var lang = sendingPlayer.GetDefaultLanguage(Config);
-                _languageSystem.ProcessMessage(receivingPlayer, ref splitMessage[i], lang);
-                _distanceObfuscationSystem.ObfuscateMessage(sendingPlayer, receivingPlayer, ref splitMessage[i]);
-                
-                // TODO: Should emotes accept a temporary mode or temporary language? Probably not, too complicated 
-                // TODO: Font size in just the text of an emote seems... weird.  Maybe it should be consistent across the whole message
-                
-                // TODO: Refactor this check
-                if (Config.EnableDistanceFontSizeSystem)
-                {
-                    var fontSize = _distanceObfuscationSystem.GetFontSize(sendingPlayer, receivingPlayer);
-                
-                    builder.Append($"<font color=\"{lang.Color}\" size=\"{fontSize}\">");
-                }
-                else
-                {
-                    builder.Append($"<font color=\"{lang.Color}\">");
-                }
-                
-                builder.Append("\"");
-                builder.Append(splitMessage[i]);
-                builder.Append("\"");
-                builder.Append("</font>");
-            }
-        }
-        
-        if (ChatHelper.DoesMessageNeedPunctuation(message))
-        {
-            builder.Append(".");
-        }
-
-        var output = builder.ToString();
-
-        output = ProcessAccents(output);
-
-        return output;
-    }
-
-    private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
-    {
-        var player = (IServerPlayer)fullArgs.Caller.Player;
-        if (fullArgs.Parsers[0].IsMissing)
-        {
-            if (player.HasNickname())
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Success,
-                    StatusMessage = $"Your nickname is: {player.GetNicknameWithColor()}",
-                };
-            }
-            else
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = "You don't have a nickname!  You can set it with `/nick MyName`",
-                };
-            }
-        }
-        else
-        {
-            var nickname = (string)fullArgs.Parsers[0].GetValue();
-            player.SetNickname(nickname);
-            SwapOutNameTag(player);
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Success,
-                StatusMessage = $"Okay, your nickname is set to {ChatHelper.Quote(nickname)}",
-            };
-        }
-    }
-
-    private string ProcessAccents(string message)
-    {
-
-        message = Regex.Replace(message, @"\|(.*?)\|", "<i>$1</i>");
-        message = Regex.Replace(message, @"\|(.*)$", "<i>$1</i>");
-        message = Regex.Replace(message, @"\+(.*?)\+", "<strong>$1</strong>");
-        message = Regex.Replace(message, @"\+(.*)$", "<strong>$1</strong>");
-        // message = Regex.Replace(message, @"=(.*?)=", "<font size=\"50\">$1</font>");
-
-        return message;
-    }
-    private TextCommandResult SetNicknameAdmin(TextCommandCallingArgs fullArgs)
-    {
-        var attemptTarget = API.GetPlayerByUID(((PlayerUidName[])fullArgs.Parsers[0].GetValue())[0].Uid);
-        if (attemptTarget == null)
-        {
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Error,
-                StatusMessage = "Cannot find player.",
-            };
-        }
-        var oldNickname = attemptTarget.GetNicknameWithColor();
-        
-        if (fullArgs.Parsers[1].IsMissing)
-        {
-            if (!attemptTarget.HasNickname())
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Player {attemptTarget.PlayerName} does not have a nickname!  You can set it with `/adminsetnick {attemptTarget.PlayerName} NewName`",
-                };
-            }
-
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {attemptTarget.GetNicknameWithColor()}",
-            };
-
-        }
-        
-        var newNickname = (string)fullArgs.Parsers[1].GetValue();
-        
-        attemptTarget.SetNickname(newNickname);
-        
-        SwapOutNameTag(attemptTarget);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {newNickname}.  Old Nickname: {oldNickname}",
-        };
-    }
-
-    private TextCommandResult Emote(TextCommandCallingArgs args)
-    {
-        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        if (player.HasNickname())
-        {
-            SendLocalChatByPlayer(player,
-                targetPlayer => GetFullEmoteMessage(player, targetPlayer, 
-                    (string)args.Parsers[0].GetValue()));
-            
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Success,
-            };
-        }
-        else
-        {
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Error,
-                StatusMessage = "You need a nickname to use emotes!  You can set it with `/nick MyName`"
-            };
-        }
-    }
-
-    private TextCommandResult EnvironmentMessage(TextCommandCallingArgs args)
-    {
-        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        SendLocalChat(player,
-            ChatHelper.Wrap(AddAutoCapitalizationAndPunctuation(player, (string)args.Parsers[0].GetValue(), ProximityChatMode.Normal),
-                "*"),
-            chatType: EnumChatType.Notification);
-
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-        };
-    }
-
-    private TextCommandResult ClearNickname(TextCommandCallingArgs args)
-    {
-        var player = (IServerPlayer)args.Caller.Player;
-        player.ClearNickname();
-        SwapOutNameTag(player);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = "Your nickname has been cleared.",
-        };
-    }
-    
-    private TextCommandResult ClearNicknameColor(TextCommandCallingArgs args)
-    {
-        var player = (IServerPlayer)args.Caller.Player;
-        player.ClearNicknameColor();
-        SwapOutNameTag(player);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = "Your nickname color has been cleared.",
-        };
-    }
-
-    private TextCommandResult Yell(TextCommandCallingArgs args)
-    {
-        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        var message = (string)args.Parsers[0].GetValue();
-        var groupId = args.Caller.FromChatGroupId;
-        if (!args.Parsers[0].IsMissing)
-        {
-            SendLocalChatByPlayer(player,
-                targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Yell),
-                ProximityChatMode.Yell);
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Success,
-            };
-        }
-
-        player.SetChatMode(ProximityChatMode.Yell);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = "You are now yelling.",
-        };
-    }
-
-    private TextCommandResult Whisper(TextCommandCallingArgs args)
-    {
-        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        var message = (string)args.Parsers[0].GetValue();
-        var groupId = args.Caller.FromChatGroupId;
-        if (!args.Parsers[0].IsMissing)
-        {
-            SendLocalChatByPlayer(player,
-                targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Whisper),
-                ProximityChatMode.Whisper);
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Success,
-            };
-        }
-
-        player.SetChatMode(ProximityChatMode.Whisper);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = "You are now whispering.",
-        };
-    }
-
-    private TextCommandResult Say(TextCommandCallingArgs args)
-    {
-        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        var message = (string)args.Parsers[0].GetValue();
-        var groupId = args.Caller.FromChatGroupId;
-        if (!args.Parsers[0].IsMissing) 
-        {
-            SendLocalChatByPlayer(player,
-                targetPlayer => GetFullRPMessage(player, targetPlayer, message, groupId, ProximityChatMode.Normal),
-                ProximityChatMode.Normal);
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Success,
-            };
-        }
-
-        player.SetChatMode(ProximityChatMode.Normal);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = "You are now talking normally.",
-        };
-    }
-
-    private TextCommandResult EmoteMode(TextCommandCallingArgs args)
-    {
-        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        var emoteMode = (bool)args.Parsers[0].GetValue();
-        player.SetEmoteMode(emoteMode);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = $"Emote mode is now {ChatHelper.OnOff(emoteMode)}",
-        };
-    }
-
-    private TextCommandResult RpTextEnabled(TextCommandCallingArgs args)
-    {
-        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        var rpTextEnabled = (bool)args.Parsers[0].GetValue();
-        player.SetRpTextEnabled(rpTextEnabled);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = $"RP Text is now {ChatHelper.OnOff(rpTextEnabled)} for your messages.",
-        };
-    }
-
-    private TextCommandResult OOCMode(TextCommandCallingArgs args)
-    {
-        if (!Config.AllowOOCToggle)
-        {
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Error,
-                StatusMessage = "OOC chat toggle is disabled on this server.",
-            };
-        }
-
-        var player = (IServerPlayer)args.Caller.Player;
-        var newMode = args.Parsers[0].IsMissing ? !player.GetOOCEnabled() : (bool)args.Parsers[0].GetValue();
-        player.SetOOCEnabled(newMode);
-
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = $"OOC chat mode {(newMode ? "enabled" : "disabled")}.",
-        };
     }
 }

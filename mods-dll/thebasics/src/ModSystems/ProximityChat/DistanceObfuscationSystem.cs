@@ -5,6 +5,7 @@ using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Server;
+using Vintagestory.API.Common;
 
 namespace thebasics.ModSystems.ProximityChat;
 
@@ -76,5 +77,10 @@ public class DistanceObfuscationSystem : BaseSubSystem
     {
         // Get the closest value in the Config.ProximityChatClampFontSizes array to the unclamped value
         return Config.ProximityChatClampFontSizes.MinBy(size => Math.Abs(size - unclamped));
+    }
+
+    public bool IsDistanceFontSizeEnabled()
+    {
+        return Config.EnableDistanceFontSizeSystem;
     }
 }
