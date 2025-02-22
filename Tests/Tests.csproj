@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net7.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
@@ -23,27 +23,35 @@
     <ItemGroup>
         <Reference Include="cairo-sharp">
             <HintPath>$(AppData)\Vintagestory\Lib\cairo-sharp.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="protobuf-net">
             <HintPath>$(AppData)\Vintagestory\Lib\protobuf-net.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="VintagestoryAPI">
             <HintPath>$(AppData)\Vintagestory\VintagestoryAPI.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="VSSurvivalMod">
             <HintPath>$(AppData)\Vintagestory\Mods\VSSurvivalMod.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="VintagestoryLib">
             <HintPath>$(AppData)\Vintagestory\VintagestoryLib.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="VSEssentials">
             <HintPath>$(AppData)\Vintagestory\Mods\VSEssentials.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="VSCreativeMod">
             <HintPath>$(AppData)\Vintagestory\Mods\VSCreativeMod.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="Harmony">
             <HintPath>$(VINTAGE_STORY)/Lib/0Harmony.dll</HintPath>
+            <Private>False</Private>
         </Reference>
     </ItemGroup>
 
