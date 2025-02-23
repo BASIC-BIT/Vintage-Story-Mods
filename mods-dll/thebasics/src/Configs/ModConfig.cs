@@ -15,6 +15,12 @@ namespace thebasics.Configs
         };
 
         public bool ProximityChatAllowPlayersToChangeNicknames = true;
+        
+        // New configuration options for disabling features
+        public bool DisableNicknames { get; set; } = false;
+        
+        public bool DisableRPChat { get; set; } = false;
+        
         public bool ProximityChatAllowPlayersToChangeNicknameColors = true;
         public string ChangeNicknameColorPermission = "chat";
         public bool BoldNicknames = false;

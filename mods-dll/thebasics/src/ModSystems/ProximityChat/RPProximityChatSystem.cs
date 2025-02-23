@@ -51,75 +51,102 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     private void RegisterCommands()
     {
-        // API.RegisterCommand("pmessage", "Sends a message to all players in a specific area", null,
-        //     OnPMessageHandler, Privilege.announce);  
-
-        if (Config.ProximityChatAllowPlayersToChangeNicknames)
+        // Skip all nickname-related commands if nicknames are disabled
+        if (!Config.DisableNicknames)
         {
-            API.ChatCommands.GetOrCreate("nickname")
-                .WithAlias("nick", "setnick")
-                .WithDescription("Get or set your nickname")
-                .WithRootAlias("nick")
-                .WithArgs(new StringArgParser("new nickname", false))
-                .RequiresPrivilege(Privilege.chat)
-                .RequiresPlayer()
-                .HandleWith(SetNickname);
+            if (Config.ProximityChatAllowPlayersToChangeNicknames)
+            {
+                API.ChatCommands.GetOrCreate("nickname")
+                    .WithAlias("nick", "setnick")
+                    .WithDescription("Get or set your nickname")
+                    .WithRootAlias("nick")
+                    .WithArgs(new StringArgParser("new nickname", false))
+                    .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
+                    .HandleWith(SetNickname);
+                
+                API.ChatCommands.GetOrCreate("clearnick")
+                    .WithDescription("Clear your nickname")
+                    .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
+                    .HandleWith(ClearNickname);
+            }
+
+            if (Config.ProximityChatAllowPlayersToChangeNicknameColors)
+            {
+                API.ChatCommands.GetOrCreate("nickcolor")
+                    .WithAlias("nicknamecolor", "nickcol")
+                    .WithDescription("Get or set nickname color")
+                    .WithArgs(new ColorArgParser("new nickname color", false))
+                    .RequiresPrivilege(Config.ChangeNicknameColorPermission)
+                    .RequiresPlayer()
+                    .HandleWith(HandleNicknameColor);
+                API.ChatCommands.GetOrCreate("clearnickcolor")
+                    .WithDescription("Clear your nickname color")
+                    .RequiresPrivilege(Config.ChangeNicknameColorPermission)
+                    .RequiresPlayer()
+                    .HandleWith(ClearNicknameColor);
+            }
+
+            API.ChatCommands.GetOrCreate("adminsetnickname")
+                .WithAlias("adminsetnick")
+                .WithDescription("Admin: Get or set another player's nickname")
+                .WithRootAlias("adminsetnick")
+                .WithArgs(new PlayersArgParser("target player", API, true),
+                    new StringArgParser("new nickname", false))
+                .RequiresPrivilege(Privilege.commandplayer)
+                .HandleWith(SetNicknameAdmin);
             
-            API.ChatCommands.GetOrCreate("clearnick")
-                .WithDescription("Clear your nickname")
+            API.ChatCommands.GetOrCreate("adminsetnicknamecolor")
+                .WithAlias("adminsetnickcolor", "adminsetnickcol")
+                .WithDescription("Admin: Get or set another player's nickname color")
+                .WithArgs(new PlayersArgParser("target player", API, true),
+                    new ColorArgParser("new nickname color", false))
+                .RequiresPrivilege(Privilege.commandplayer)
+                .HandleWith(SetNicknameColorAdmin);
+        }
+
+        // Skip RP-specific commands if RP chat is disabled
+        if (!Config.DisableRPChat)
+        {
+            API.ChatCommands.GetOrCreate("me")
+                .WithAlias("m")
+                .WithDescription("Send a proximity emote message")
+                .WithArgs(new StringArgParser("emote", true))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
-                .HandleWith(ClearNickname);
+                .HandleWith(Emote);
+
+            API.ChatCommands.GetOrCreate("it")
+                .WithDescription("Send a proximity environment message")
+                .WithArgs(new StringArgParser("envMessage", true))
+                .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
+                .HandleWith(EnvironmentMessage);
+
+            API.ChatCommands.GetOrCreate("emotemode")
+                .WithDescription("Turn Emote-only mode on or off")
+                .WithArgs(new BoolArgParser("mode", "on", true))
+                .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
+                .HandleWith(EmoteMode);
+
+            API.ChatCommands.GetOrCreate("rptext")
+                .WithDescription("Turn the whole RP system on or off for your messages")
+                .WithArgs(new BoolArgParser("mode", "on", true))
+                .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
+                .HandleWith(RpTextEnabled);
+
+            API.ChatCommands.GetOrCreate("ooc")
+                .WithDescription("Toggle Out-Of-Character chat mode")
+                .WithArgs(new BoolArgParser("mode", "on", false))
+                .RequiresPrivilege(Config.OOCTogglePermission)
+                .RequiresPlayer()
+                .HandleWith(OOCMode);
         }
 
-        if (Config.ProximityChatAllowPlayersToChangeNicknameColors)
-        {
-            API.ChatCommands.GetOrCreate("nickcolor")
-                .WithAlias("nicknamecolor", "nickcol")
-                .WithDescription("Get or set nickname color")
-                .WithArgs(new ColorArgParser("new nickname color", false))
-                .RequiresPrivilege(Config.ChangeNicknameColorPermission)
-                .RequiresPlayer()
-                .HandleWith(HandleNicknameColor);
-            API.ChatCommands.GetOrCreate("clearnickcolor")
-                .WithDescription("Clear your nickname color")
-                .RequiresPrivilege(Config.ChangeNicknameColorPermission)
-                .RequiresPlayer()
-                .HandleWith(ClearNicknameColor);
-        }
-
-        API.ChatCommands.GetOrCreate("adminsetnickname")
-            .WithAlias("adminsetnick")
-            .WithDescription("Admin: Get or set another player's nickname")
-            .WithRootAlias("adminsetnick")
-            .WithArgs(new PlayersArgParser("target player", API, true),
-                new StringArgParser("new nickname", false))
-            .RequiresPrivilege(Privilege.commandplayer)
-            .HandleWith(SetNicknameAdmin);
-        
-        API.ChatCommands.GetOrCreate("adminsetnicknamecolor")
-            .WithAlias("adminsetnickcolor", "adminsetnickcol")
-            .WithDescription("Admin: Get or set another player's nickname color")
-            .WithArgs(new PlayersArgParser("target player", API, true),
-                new ColorArgParser("new nickname color", false))
-            .RequiresPrivilege(Privilege.commandplayer)
-            .HandleWith(SetNicknameColorAdmin);
-
-        API.ChatCommands.GetOrCreate("me")
-            .WithAlias("m")
-            .WithDescription("Send a proximity emote message")
-            .WithArgs(new StringArgParser("emote", true))
-            .RequiresPrivilege(Privilege.chat)
-            .RequiresPlayer()
-            .HandleWith(Emote);
-
-        API.ChatCommands.GetOrCreate("it")
-            .WithDescription("Send a proximity environment message")
-            .WithArgs(new StringArgParser("envMessage", true))
-            .RequiresPrivilege(Privilege.chat)
-            .RequiresPlayer()
-            .HandleWith(EnvironmentMessage);
-
+        // Always register basic chat mode commands
         API.ChatCommands.GetOrCreate("yell")
             .WithAlias("y")
             .WithDescription("Set your chat mode to Yelling, or yell a single message")
@@ -143,27 +170,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RequiresPrivilege(Privilege.chat)
             .RequiresPlayer()
             .HandleWith(Whisper);
-
-        API.ChatCommands.GetOrCreate("emotemode")
-            .WithDescription("Turn Emote-only mode on or off")
-            .WithArgs(new BoolArgParser("mode", "on", true))
-            .RequiresPrivilege(Privilege.chat)
-            .RequiresPlayer()
-            .HandleWith(EmoteMode);
-
-        API.ChatCommands.GetOrCreate("rptext")
-            .WithDescription("Turn the whole RP system on or off for your messages")
-            .WithArgs(new BoolArgParser("mode", "on", true))
-            .RequiresPrivilege(Privilege.chat)
-            .RequiresPlayer()
-            .HandleWith(RpTextEnabled);
-
-        API.ChatCommands.GetOrCreate("ooc")
-            .WithDescription("Toggle Out-Of-Character chat mode")
-            .WithArgs(new BoolArgParser("mode", "on", false))
-            .RequiresPrivilege(Config.OOCTogglePermission)
-            .RequiresPlayer()
-            .HandleWith(OOCMode);
 
         RegisterForServerSideConfig();
 
@@ -868,7 +874,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
         
         consumed.value = true;
-        if (!byPlayer.GetRpTextEnabled())
+
+        // If RP chat is disabled or player has disabled RP text, use simple chat
+        if (Config.DisableRPChat || !byPlayer.GetRpTextEnabled())
         {
             SendLocalChat(byPlayer, message, data: data);
             return;

@@ -8,7 +8,6 @@ using thebasics.ModSystems.ProximityChat.Transformers;
 using Tests.TestDoubles;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
-using Vintagestory.API.Common.CommandSystem;
 using Vintagestory.API.Util;
 using Xunit;
 
