@@ -132,6 +132,9 @@ namespace thebasics.Utilities
 
         public static string Color(string message, string color)
         {
+            if (string.IsNullOrEmpty(color))
+                return message;
+                
             return $"<font color=\"{color}\">{message}</font>";
         }
         

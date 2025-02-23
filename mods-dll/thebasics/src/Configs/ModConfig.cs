@@ -25,6 +25,10 @@ namespace thebasics.Configs
         public string ChangeNicknameColorPermission = "chat";
         public bool BoldNicknames = false;
 
+        // Color application configuration
+        public bool ApplyColorsToNicknames { get; set; } = true;  // Apply colors to IC nicknames
+        public bool ApplyColorsToPlayerNames { get; set; } = false;  // Apply colors to OOC names
+
         public bool EnableDistanceObfuscationSystem = true;
         public IDictionary<ProximityChatMode, int> ProximityChatModeObfuscationRanges = new Dictionary<ProximityChatMode, int>
         {

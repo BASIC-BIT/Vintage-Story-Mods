@@ -242,36 +242,33 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var player = (IServerPlayer)args.Caller.Player;
         if (args.Parsers[0].IsMissing)
         {
-            if (player.HasNicknameColor())
-            {
-                var color = player.GetNicknameColor();
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Success,
-                    StatusMessage = $"Your nickname color is: {ChatHelper.Color(color, color)}",
-                };
-            }
-            else
+            if (!player.HasNicknameColor())
             {
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "You don't have a nickname color!  You can set it with `/nickcolor [color]`",
+                    StatusMessage = "You don't have a color set! You can set it with `/nickcolor [color]`",
                 };
             }
-        }
-        else
-        {
-            var nicknameColor = (Color)args.Parsers[0].GetValue();
-            var colorHex = ColorTranslator.ToHtml(nicknameColor);
-            player.SetNicknameColor(colorHex);
-            SwapOutNameTag(player);
+
+            var color = player.GetNicknameColor();
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Okay, your nickname color is set to {ChatHelper.Color(colorHex, colorHex)}",
+                StatusMessage = $"Your color is: {ChatHelper.Color(color, color)}",
             };
         }
+
+        var newColor = (Color)args.Parsers[0].GetValue();
+        var colorHex = ColorTranslator.ToHtml(newColor);
+        player.SetNicknameColor(colorHex);
+        SwapOutNameTag(player);
+        
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = $"Color set to: {ChatHelper.Color(colorHex, colorHex)}",
+        };
     }
 
     private void SendClientConfig(IServerPlayer byPlayer)
@@ -485,8 +482,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     public string GetFormattedNickname(IServerPlayer player)
     {
-        var nick = player.GetNicknameWithColor();
-        return Config.BoldNicknames ? ChatHelper.Strong(nick) : nick;
+        var name = player.GetFormattedName(true, Config);
+        return Config.BoldNicknames ? ChatHelper.Strong(name) : name;
     }
 
     private string GetFullEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content)
@@ -750,7 +747,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = "Your nickname color has been cleared.",
+            StatusMessage = "Your color has been cleared.",
         };
     }
 
@@ -859,6 +856,15 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
         Vintagestory.API.Datastructures.BoolRef consumed)
     {
+        // Format the player's name regardless of channel
+        bool isRoleplay = byPlayer.GetRpTextEnabled() && !Config.DisableRPChat;
+        var formattedName = byPlayer.GetFormattedName(false, Config); // Always use real name as base
+        if (isRoleplay && channelId == _proximityChatId) // Only use nickname in RP context and proximity chat
+        {
+            formattedName = byPlayer.GetFormattedName(true, Config);
+        }
+        message = message.Replace(byPlayer.PlayerName + ">", formattedName + ">");
+
         // Handle cases of incorrect channel
         if(Config.UseGeneralChannelAsProximityChat && channelId != GlobalConstants.GeneralChatGroup)
         {
