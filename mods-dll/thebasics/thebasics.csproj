@@ -72,6 +72,12 @@
   <ItemGroup>
     <Folder Include="assets\" />
     <Folder Include="assets_bak\" />
+    <Folder Include="assets" />
+    <Folder Include="src\ModSystems\Surgery\Models" />
+    <Folder Include="src\ModSystems\Surgery\Behaviors" />
+    <Folder Include="src\ModSystems\Surgery\Handlers" />
+    <Folder Include="src\ModSystems\Surgery\Registry" />
+    <Folder Include="documentation" />
   </ItemGroup>
   <PropertyGroup />
 </Project>

@@ -3,7 +3,7 @@
   "modid": "thebasics",
   "name": "The BASICs",
   "author": "BASIC",
-  "description": "Adds an RP proximity chat system, with configurable talking ranges, customizable name colors, automatic message formatting, and more!",
+  "description": "Adds an RP proximity chat system, with configurable talking ranges, customizable name colors, automatic message formatting, and a comprehensive surgery system!",
   "version": "5.0.2",
   "dependencies": {
     "game": "",
