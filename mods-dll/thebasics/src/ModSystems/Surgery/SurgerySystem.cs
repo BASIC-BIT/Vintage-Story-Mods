@@ -544,10 +544,13 @@ namespace thebasics.ModSystems.Surgery
             var api = serverPlayer.Entity.Api as ICoreServerAPI;
             if (api == null) return;
             
-            var nearbyPlayers = api.World.GetPlayersAround(targetEntity.Pos.XYZ, 8f);
+            var nearbyPlayers = api.World.GetPlayersAround(targetEntity.Pos.XYZ, 8f, 8f);
             foreach (var nearbyPlayer in nearbyPlayers)
             {
-                nearbyPlayer.SendMessage(GlobalConstants.GeneralChatGroup, message, EnumChatType.OthersMessage);
+                if (nearbyPlayer is IServerPlayer serverNearbyPlayer)
+                {
+                    serverNearbyPlayer.SendMessage(GlobalConstants.GeneralChatGroup, message, EnumChatType.OthersMessage);
+                }
             }
         }
         
@@ -556,30 +559,40 @@ namespace thebasics.ModSystems.Surgery
         {
             if (entity == null) return;
             
-            // Try to get health behavior or health component
-            var behavior = entity.GetBehavior<EntityBehavior>();
-            if (behavior != null)
+            // Try to get the entity's health behavior
+            var healthBehavior = entity.GetBehavior<EntityBehaviorHealth>();
+            if (healthBehavior != null)
             {
-                // Try to use the entity's health properties
-                if (entity.Properties.StatsByType.TryGetValue("health", out EntityStats healthStats))
+                // Modify health through the health behavior
+                healthBehavior.Health += amount;
+                
+                // Trigger damage or healing animations
+                if (amount < 0 && entity.World.Side == EnumAppSide.Server)
+                {
+                    entity.World.PlaySoundAt(new AssetLocation("sounds/damage"), entity);
+                }
+                
+                // Kill entity if health reaches 0
+                if (healthBehavior.Health <= 0 && entity.Alive)
+                {
+                    entity.Die(EnumDespawnReason.Death);
+                }
+            }
+            else
+            {
+                // If no health behavior, try using attributes directly
+                if (entity.WatchedAttributes.HasAttribute("health"))
                 {
                     float health = entity.WatchedAttributes.GetFloat("health");
-                    health = Math.Min(Math.Max(0, health + amount), healthStats.Max);
-                    entity.WatchedAttributes.SetFloat("health", health);
+                    float maxHealth = entity.WatchedAttributes.GetFloat("maxhealth", 20f);
                     
-                    // Trigger damage or healing animations
-                    if (amount < 0)
-                    {
-                        if (entity.World.Side == EnumAppSide.Server)
-                        {
-                            entity.World.PlaySoundAt(new AssetLocation("sounds/damage"), entity);
-                        }
-                    }
+                    health = Math.Min(Math.Max(0, health + amount), maxHealth);
+                    entity.WatchedAttributes.SetFloat("health", health);
                     
                     // Kill entity if health reaches 0
                     if (health <= 0 && entity.Alive)
                     {
-                        entity.Die(EnumDespawnReason.Killed);
+                        entity.Die(EnumDespawnReason.Death);
                     }
                 }
             }

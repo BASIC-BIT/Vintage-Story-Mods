@@ -3,6 +3,9 @@ using thebasics.ModSystems.Surgery.Registry;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
+using Vintagestory.API.Common.CommandAbbr;
+using Vintagestory.API.Config;
 
 namespace thebasics.ModSystems.Surgery
 {
@@ -56,163 +59,176 @@ namespace thebasics.ModSystems.Surgery
         private void RegisterCommands()
         {
             // Command to cause bleeding for testing
-            api.RegisterCommand("bleed", "Causes an entity to bleed for testing", "[rate]", (player, groupId, args) =>
-            {
-                if (player.CurrentEntitySelection == null)
-                {
-                    player.SendMessage(groupId, "You must be looking at an entity to use this command", EnumChatType.CommandError);
-                    return;
-                }
-                
-                var entity = player.CurrentEntitySelection.Entity;
-                var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
-                
-                if (medicalBehavior == null)
-                {
-                    player.SendMessage(groupId, "Target entity doesn't support medical conditions", EnumChatType.CommandError);
-                    return;
-                }
-                
-                float rate = 1.0f;
-                if (args.Length > 0)
-                {
-                    float.TryParse(args[0], out rate);
-                }
-                
-                medicalBehavior.SetBleeding(true, rate);
-                player.SendMessage(groupId, $"Made {entity.GetName()} bleed at rate {rate}", EnumChatType.CommandSuccess);
-            });
+            api.ChatCommands.Create("bleed")
+                .WithDescription("Causes an entity to bleed for testing")
+                .RequiresPrivilege(Privilege.controlserver)
+                .RequiresPlayer()
+                .HandleWith(args => {
+                    var player = args.Caller.Player as IServerPlayer;
+                    if (player.CurrentEntitySelection == null)
+                    {
+                        return TextCommandResult.Error("You must be looking at an entity to use this command");
+                    }
+                    
+                    var entity = player.CurrentEntitySelection.Entity;
+                    var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
+                    
+                    if (medicalBehavior == null)
+                    {
+                        return TextCommandResult.Error("Target entity doesn't support medical conditions");
+                    }
+                    
+                    float rate = 1.0f;
+                    if (args.ArgCount > 0 && float.TryParse(args[0].ToString(), out float parsedRate))
+                    {
+                        rate = parsedRate;
+                    }
+                    
+                    medicalBehavior.SetBleeding(true, rate);
+                    return TextCommandResult.Success($"Made {entity.GetName()} bleed at rate {rate}");
+                });
             
             // Command to cause infection for testing
-            api.RegisterCommand("infect", "Causes an entity to be infected for testing", "[level]", (player, groupId, args) =>
-            {
-                if (player.CurrentEntitySelection == null)
-                {
-                    player.SendMessage(groupId, "You must be looking at an entity to use this command", EnumChatType.CommandError);
-                    return;
-                }
-                
-                var entity = player.CurrentEntitySelection.Entity;
-                var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
-                
-                if (medicalBehavior == null)
-                {
-                    player.SendMessage(groupId, "Target entity doesn't support medical conditions", EnumChatType.CommandError);
-                    return;
-                }
-                
-                float level = 1.0f;
-                if (args.Length > 0)
-                {
-                    float.TryParse(args[0], out level);
-                }
-                
-                medicalBehavior.SetInfection(true, level);
-                player.SendMessage(groupId, $"Infected {entity.GetName()} at level {level}", EnumChatType.CommandSuccess);
-            });
+            api.ChatCommands.Create("infect")
+                .WithDescription("Causes an entity to be infected for testing")
+                .RequiresPrivilege(Privilege.controlserver)
+                .RequiresPlayer()
+                .HandleWith(args => {
+                    var player = args.Caller.Player as IServerPlayer;
+                    if (player.CurrentEntitySelection == null)
+                    {
+                        return TextCommandResult.Error("You must be looking at an entity to use this command");
+                    }
+                    
+                    var entity = player.CurrentEntitySelection.Entity;
+                    var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
+                    
+                    if (medicalBehavior == null)
+                    {
+                        return TextCommandResult.Error("Target entity doesn't support medical conditions");
+                    }
+                    
+                    float level = 1.0f;
+                    if (args.ArgCount > 0 && float.TryParse(args[0].ToString(), out float parsedLevel))
+                    {
+                        level = parsedLevel;
+                    }
+                    
+                    medicalBehavior.SetInfection(true, level);
+                    return TextCommandResult.Success($"Infected {entity.GetName()} at level {level}");
+                });
             
             // Command to damage a specific body part
-            api.RegisterCommand("damagebody", "Damages a body part on an entity", "<bodypart> [amount] [bleed] [infect]", (player, groupId, args) =>
-            {
-                if (args.Length < 1)
-                {
-                    player.SendMessage(groupId, "Usage: /damagebody <bodypart> [amount] [bleed] [infect]", EnumChatType.CommandError);
-                    return;
-                }
-                
-                if (player.CurrentEntitySelection == null)
-                {
-                    player.SendMessage(groupId, "You must be looking at an entity to use this command", EnumChatType.CommandError);
-                    return;
-                }
-                
-                var entity = player.CurrentEntitySelection.Entity;
-                var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
-                
-                if (medicalBehavior == null)
-                {
-                    player.SendMessage(groupId, "Target entity doesn't support medical conditions", EnumChatType.CommandError);
-                    return;
-                }
-                
-                string bodyPartCode = args[0];
-                float amount = args.Length > 1 ? float.Parse(args[1]) : 1.0f;
-                bool bleed = args.Length > 2 && bool.Parse(args[2]);
-                bool infect = args.Length > 3 && bool.Parse(args[3]);
-                
-                medicalBehavior.DamageBodyPart(bodyPartCode, amount, bleed, infect);
-                player.SendMessage(groupId, $"Damaged {entity.GetName()}'s {bodyPartCode} by {amount}", EnumChatType.CommandSuccess);
-            });
+            api.ChatCommands.Create("damagebody")
+                .WithDescription("Damages a body part on an entity")
+                .RequiresPrivilege(Privilege.controlserver)
+                .RequiresPlayer()
+                .HandleWith(args => {
+                    if (args.ArgCount < 1)
+                    {
+                        return TextCommandResult.Error("Usage: /damagebody <bodypart> [amount] [bleed] [infect]");
+                    }
+                    
+                    var player = args.Caller.Player as IServerPlayer;
+                    if (player.CurrentEntitySelection == null)
+                    {
+                        return TextCommandResult.Error("You must be looking at an entity to use this command");
+                    }
+                    
+                    var entity = player.CurrentEntitySelection.Entity;
+                    var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
+                    
+                    if (medicalBehavior == null)
+                    {
+                        return TextCommandResult.Error("Target entity doesn't support medical conditions");
+                    }
+                    
+                    string bodyPartCode = args[0].ToString();
+                    float amount = args.ArgCount > 1 ? float.Parse(args[1].ToString()) : 1.0f;
+                    bool bleed = args.ArgCount > 2 && bool.Parse(args[2].ToString());
+                    bool infect = args.ArgCount > 3 && bool.Parse(args[3].ToString());
+                    
+                    medicalBehavior.DamageBodyPart(bodyPartCode, amount, bleed, infect);
+                    return TextCommandResult.Success($"Damaged {entity.GetName()}'s {bodyPartCode} by {amount}");
+                });
             
             // Command to heal a specific body part
-            api.RegisterCommand("healbody", "Heals a body part on an entity", "<bodypart> [amount]", (player, groupId, args) =>
-            {
-                if (args.Length < 1)
-                {
-                    player.SendMessage(groupId, "Usage: /healbody <bodypart> [amount]", EnumChatType.CommandError);
-                    return;
-                }
-                
-                if (player.CurrentEntitySelection == null)
-                {
-                    player.SendMessage(groupId, "You must be looking at an entity to use this command", EnumChatType.CommandError);
-                    return;
-                }
-                
-                var entity = player.CurrentEntitySelection.Entity;
-                var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
-                
-                if (medicalBehavior == null)
-                {
-                    player.SendMessage(groupId, "Target entity doesn't support medical conditions", EnumChatType.CommandError);
-                    return;
-                }
-                
-                string bodyPartCode = args[0];
-                float amount = args.Length > 1 ? float.Parse(args[1]) : 1.0f;
-                
-                medicalBehavior.HealBodyPart(bodyPartCode, amount);
-                player.SendMessage(groupId, $"Healed {entity.GetName()}'s {bodyPartCode} by {amount}", EnumChatType.CommandSuccess);
-            });
+            api.ChatCommands.Create("healbody")
+                .WithDescription("Heals a body part on an entity")
+                .RequiresPrivilege(Privilege.controlserver)
+                .RequiresPlayer()
+                .HandleWith(args => {
+                    if (args.ArgCount < 1)
+                    {
+                        return TextCommandResult.Error("Usage: /healbody <bodypart> [amount]");
+                    }
+                    
+                    var player = args.Caller.Player as IServerPlayer;
+                    if (player.CurrentEntitySelection == null)
+                    {
+                        return TextCommandResult.Error("You must be looking at an entity to use this command");
+                    }
+                    
+                    var entity = player.CurrentEntitySelection.Entity;
+                    var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
+                    
+                    if (medicalBehavior == null)
+                    {
+                        return TextCommandResult.Error("Target entity doesn't support medical conditions");
+                    }
+                    
+                    string bodyPartCode = args[0].ToString();
+                    float amount = args.ArgCount > 1 ? float.Parse(args[1].ToString()) : 1.0f;
+                    
+                    medicalBehavior.HealBodyPart(bodyPartCode, amount);
+                    return TextCommandResult.Success($"Healed {entity.GetName()}'s {bodyPartCode} by {amount}");
+                });
             
             // Command to start surgery
-            api.RegisterCommand("surgery", "Starts a surgical procedure", "<bodypart> <procedure>", (player, groupId, args) =>
-            {
-                if (args.Length < 2)
-                {
-                    player.SendMessage(groupId, "Usage: /surgery <bodypart> <procedure>", EnumChatType.CommandError);
-                    return;
-                }
-                
-                if (player.CurrentEntitySelection == null)
-                {
-                    player.SendMessage(groupId, "You must be looking at an entity to use this command", EnumChatType.CommandError);
-                    return;
-                }
-                
-                string bodyPartCode = args[0];
-                string procedureCode = args[1];
-                
-                bool success = surgerySystem.StartSurgery(player, player.CurrentEntitySelection.Entity, bodyPartCode, procedureCode);
-                
-                if (success)
-                {
-                    player.SendMessage(groupId, "Surgery started. Use surgical tools to perform the procedure.", EnumChatType.CommandSuccess);
-                }
-            });
+            api.ChatCommands.Create("surgery")
+                .WithDescription("Starts a surgical procedure")
+                .RequiresPlayer()
+                .HandleWith(args => {
+                    if (args.ArgCount < 2)
+                    {
+                        return TextCommandResult.Error("Usage: /surgery <bodypart> <procedure>");
+                    }
+                    
+                    var player = args.Caller.Player as IServerPlayer;
+                    if (player.CurrentEntitySelection == null)
+                    {
+                        return TextCommandResult.Error("You must be looking at an entity to use this command");
+                    }
+                    
+                    string bodyPartCode = args[0].ToString();
+                    string procedureCode = args[1].ToString();
+                    
+                    bool success = surgerySystem.StartSurgery(player, player.CurrentEntitySelection.Entity, bodyPartCode, procedureCode);
+                    
+                    if (success)
+                    {
+                        return TextCommandResult.Success("Surgery started. Use surgical tools to perform the procedure.");
+                    }
+                    else
+                    {
+                        return TextCommandResult.Error("Failed to start surgery. Check if the body part and procedure are valid.");
+                    }
+                });
             
             // Command to cancel surgery
-            api.RegisterCommand("cancelsurgery", "Cancels an active surgical procedure", "", (player, groupId, args) =>
-            {
-                if (player.CurrentEntitySelection == null)
-                {
-                    player.SendMessage(groupId, "You must be looking at an entity to use this command", EnumChatType.CommandError);
-                    return;
-                }
-                
-                surgerySystem.CancelSurgery(player, player.CurrentEntitySelection.Entity);
-                player.SendMessage(groupId, "Surgery cancelled.", EnumChatType.CommandSuccess);
-            });
+            api.ChatCommands.Create("cancelsurgery")
+                .WithDescription("Cancels an active surgical procedure")
+                .RequiresPlayer()
+                .HandleWith(args => {
+                    var player = args.Caller.Player as IServerPlayer;
+                    if (player.CurrentEntitySelection == null)
+                    {
+                        return TextCommandResult.Error("You must be looking at an entity to use this command");
+                    }
+                    
+                    surgerySystem.CancelSurgery(player, player.CurrentEntitySelection.Entity);
+                    return TextCommandResult.Success("Surgery cancelled.");
+                });
         }
         
         public override void Dispose()
