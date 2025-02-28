@@ -6,6 +6,7 @@ using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using Vintagestory.API.Common.CommandAbbr;
 using Vintagestory.API.Config;
+using System.Text;
 
 namespace thebasics.ModSystems.Surgery
 {
@@ -17,6 +18,11 @@ namespace thebasics.ModSystems.Surgery
         
         public SurgicalToolRegistry ToolRegistry => toolRegistry;
         
+        /// <summary>
+        /// Gets the surgery system instance
+        /// </summary>
+        public SurgerySystem SurgerySystem => surgerySystem;
+        
         public override bool ShouldLoad(EnumAppSide forSide)
         {
             return forSide == EnumAppSide.Server;
@@ -26,6 +32,10 @@ namespace thebasics.ModSystems.Surgery
         {
             this.api = api;
             
+            // Initialize tool registry first (needed by surgery system)
+            toolRegistry = new SurgicalToolRegistry(api);
+            toolRegistry.RegisterSurgicalTools();
+            
             // Initialize surgery system
             surgerySystem = new SurgerySystem(api);
             
@@ -34,10 +44,6 @@ namespace thebasics.ModSystems.Surgery
             
             // Add medical condition behavior to entities with health
             api.Event.OnEntitySpawn += OnEntitySpawn;
-            
-            // Initialize tool registry
-            toolRegistry = new SurgicalToolRegistry(api);
-            toolRegistry.RegisterSurgicalTools();
             
             // Register additional commands
             RegisterCommands();
@@ -50,205 +56,251 @@ namespace thebasics.ModSystems.Surgery
             // Only add to entities with health
             if (entity.WatchedAttributes.HasAttribute("health"))
             {
-                // Skip if already has the behavior
-                if (entity.GetBehavior<MedicalConditionBehavior>() == null)
-                {
-                    entity.AddBehavior(new MedicalConditionBehavior(entity));
-                }
+                entity.AddBehavior(new MedicalConditionBehavior(entity));
             }
         }
         
         private void RegisterCommands()
         {
-            // Command to cause bleeding for testing
-            api.ChatCommands.Create("bleed")
-                .WithDescription("Causes an entity to bleed for testing")
+            CommandAbbr cmd = api.ChatCommands
+                .Create("surgery")
+                .WithDescription("Surgery commands");
+                
+            cmd.BeginSubCommand("info")
+                .WithDescription("Shows information about a player's or entity's medical conditions")
+                .WithArgs(api.ChatCommands.Parsers.WordRange("playerName", 0, 1))
+                .HandleWith(OnSurgeryInfoCommand);
+                
+            cmd.BeginSubCommand("list")
+                .WithDescription("Lists available surgery procedures")
+                .HandleWith(OnSurgeryListCommand);
+                
+            cmd.BeginSubCommand("perform")
+                .WithDescription("Performs a surgery procedure")
+                .WithArgs(
+                    api.ChatCommands.Parsers.Word("procedureCode"),
+                    api.ChatCommands.Parsers.OptionalWord("playerName")
+                )
+                .HandleWith(OnSurgeryPerformCommand);
+                
+            cmd.BeginSubCommand("heal")
+                .WithDescription("Heals a player or entity's medical conditions")
+                .WithArgs(
+                    api.ChatCommands.Parsers.OptionalWord("playerName"),
+                    api.ChatCommands.Parsers.OptionalWord("conditionCode")
+                )
                 .RequiresPrivilege(Privilege.controlserver)
-                .RequiresPlayer()
-                .HandleWith(HandleBleedCommand);
-            
-            // Command to cause infection for testing
-            api.ChatCommands.Create("infect")
-                .WithDescription("Causes an entity to be infected for testing")
+                .HandleWith(OnSurgeryHealCommand);
+                
+            cmd.BeginSubCommand("add")
+                .WithDescription("Adds a medical condition to a player or entity")
+                .WithArgs(
+                    api.ChatCommands.Parsers.Word("conditionCode"),
+                    api.ChatCommands.Parsers.OptionalWord("playerName"),
+                    api.ChatCommands.Parsers.OptionalFloat("severity", 1.0f)
+                )
                 .RequiresPrivilege(Privilege.controlserver)
-                .RequiresPlayer()
-                .HandleWith(HandleInfectCommand);
-            
-            // Command to damage a specific body part
-            api.ChatCommands.Create("damagebody")
-                .WithDescription("Damages a body part on an entity")
+                .HandleWith(OnSurgeryAddCommand);
+                
+            cmd.BeginSubCommand("remove")
+                .WithDescription("Removes a medical condition from a player or entity")
+                .WithArgs(
+                    api.ChatCommands.Parsers.Word("conditionCode"),
+                    api.ChatCommands.Parsers.OptionalWord("playerName")
+                )
                 .RequiresPrivilege(Privilege.controlserver)
-                .RequiresPlayer()
-                .HandleWith(HandleDamageBodyCommand);
-            
-            // Command to heal a specific body part
-            api.ChatCommands.Create("healbody")
-                .WithDescription("Heals a body part on an entity")
-                .RequiresPrivilege(Privilege.controlserver)
-                .RequiresPlayer()
-                .HandleWith(HandleHealBodyCommand);
-            
-            // Command to start surgery
-            api.ChatCommands.Create("surgery")
-                .WithDescription("Starts a surgical procedure")
-                .RequiresPlayer()
-                .HandleWith(HandleSurgeryCommand);
-            
-            // Command to cancel surgery
-            api.ChatCommands.Create("cancelsurgery")
-                .WithDescription("Cancels an active surgical procedure")
-                .RequiresPlayer()
-                .HandleWith(HandleCancelSurgeryCommand);
+                .HandleWith(OnSurgeryRemoveCommand);
         }
         
-        private TextCommandResult HandleBleedCommand(TextCommandCallingArgs args)
+        private TextCommandResult OnSurgeryInfoCommand(TextCommandCallingArgs args)
         {
-            var player = args.Caller.Player as IServerPlayer;
-            if (player.CurrentEntitySelection == null)
+            var player = args.Caller.Player;
+            string playerName = args.Parsers[0].GetValue() as string;
+            
+            // Get the target player
+            var targetPlayer = player;
+            if (!string.IsNullOrEmpty(playerName))
             {
-                return TextCommandResult.Error("You must be looking at an entity to use this command");
+                targetPlayer = api.World.PlayerByName(playerName);
+                if (targetPlayer == null)
+                {
+                    return TextCommandResult.Error($"Player '{playerName}' not found");
+                }
             }
             
-            var entity = player.CurrentEntitySelection.Entity;
-            var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
+            // Get the target entity
+            var targetEntity = targetPlayer.Entity;
             
-            if (medicalBehavior == null)
+            // Get the medical conditions
+            var medicalConditions = surgerySystem.GetEntityMedicalConditions(targetEntity);
+            if (medicalConditions.Count == 0)
             {
-                return TextCommandResult.Error("Target entity doesn't support medical conditions");
+                return TextCommandResult.Success($"{targetPlayer.PlayerName} has no medical conditions");
             }
             
-            float rate = 1.0f;
-            if (args.ArgCount > 0 && float.TryParse(args[0].ToString(), out float parsedRate))
+            // Build the result
+            var result = new StringBuilder();
+            result.AppendLine($"{targetPlayer.PlayerName}'s medical conditions:");
+            
+            foreach (var condition in medicalConditions)
             {
-                rate = parsedRate;
+                result.AppendLine($"- {condition.Name}: {condition.Severity:P0} severity");
             }
             
-            medicalBehavior.SetBleeding(true, rate);
-            return TextCommandResult.Success($"Made {entity.GetName()} bleed at rate {rate}");
+            return TextCommandResult.Success(result.ToString());
         }
         
-        private TextCommandResult HandleInfectCommand(TextCommandCallingArgs args)
+        private TextCommandResult OnSurgeryListCommand(TextCommandCallingArgs args)
         {
-            var player = args.Caller.Player as IServerPlayer;
-            if (player.CurrentEntitySelection == null)
+            var procedures = surgerySystem.GetAvailableProcedures();
+            if (procedures.Count == 0)
             {
-                return TextCommandResult.Error("You must be looking at an entity to use this command");
+                return TextCommandResult.Success("No surgery procedures available");
             }
             
-            var entity = player.CurrentEntitySelection.Entity;
-            var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
+            // Build the result
+            var result = new StringBuilder();
+            result.AppendLine("Available surgery procedures:");
             
-            if (medicalBehavior == null)
+            foreach (var procedure in procedures)
             {
-                return TextCommandResult.Error("Target entity doesn't support medical conditions");
+                result.AppendLine($"- {procedure.Name} (Code: {procedure.Code})");
+                result.AppendLine($"  Treats: {string.Join(", ", procedure.TreatedConditions)}");
+                result.AppendLine($"  Steps: {procedure.Steps.Count}");
             }
             
-            float level = 1.0f;
-            if (args.ArgCount > 0 && float.TryParse(args[0].ToString(), out float parsedLevel))
-            {
-                level = parsedLevel;
-            }
-            
-            medicalBehavior.SetInfection(true, level);
-            return TextCommandResult.Success($"Infected {entity.GetName()} at level {level}");
+            return TextCommandResult.Success(result.ToString());
         }
         
-        private TextCommandResult HandleDamageBodyCommand(TextCommandCallingArgs args)
+        private TextCommandResult OnSurgeryPerformCommand(TextCommandCallingArgs args)
         {
-            if (args.ArgCount < 1)
-            {
-                return TextCommandResult.Error("Usage: /damagebody <bodypart> [amount] [bleed] [infect]");
-            }
-            
             var player = args.Caller.Player as IServerPlayer;
-            if (player.CurrentEntitySelection == null)
+            string procedureCode = args.Parsers[0].GetValue() as string;
+            string playerName = args.Parsers[1].GetValue() as string;
+            
+            // Get the target player
+            IServerPlayer targetPlayer = player;
+            if (!string.IsNullOrEmpty(playerName))
             {
-                return TextCommandResult.Error("You must be looking at an entity to use this command");
+                targetPlayer = api.World.PlayerByName(playerName) as IServerPlayer;
+                if (targetPlayer == null)
+                {
+                    return TextCommandResult.Error($"Player '{playerName}' not found");
+                }
             }
             
-            var entity = player.CurrentEntitySelection.Entity;
-            var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
+            // Get the target entity
+            var targetEntity = targetPlayer.Entity;
             
-            if (medicalBehavior == null)
+            // Attempt to perform the procedure
+            bool success = surgerySystem.StartProcedure(player, targetEntity, procedureCode);
+            if (!success)
             {
-                return TextCommandResult.Error("Target entity doesn't support medical conditions");
+                return TextCommandResult.Error($"Failed to start procedure '{procedureCode}'");
             }
             
-            string bodyPartCode = args[0].ToString();
-            float amount = args.ArgCount > 1 ? float.Parse(args[1].ToString()) : 1.0f;
-            bool bleed = args.ArgCount > 2 && bool.Parse(args[2].ToString());
-            bool infect = args.ArgCount > 3 && bool.Parse(args[3].ToString());
-            
-            medicalBehavior.DamageBodyPart(bodyPartCode, amount, bleed, infect);
-            return TextCommandResult.Success($"Damaged {entity.GetName()}'s {bodyPartCode} by {amount}");
+            return TextCommandResult.Success($"Started procedure '{procedureCode}' on {targetPlayer.PlayerName}");
         }
         
-        private TextCommandResult HandleHealBodyCommand(TextCommandCallingArgs args)
+        private TextCommandResult OnSurgeryHealCommand(TextCommandCallingArgs args)
         {
-            if (args.ArgCount < 1)
-            {
-                return TextCommandResult.Error("Usage: /healbody <bodypart> [amount]");
-            }
-            
             var player = args.Caller.Player as IServerPlayer;
-            if (player.CurrentEntitySelection == null)
+            string playerName = args.Parsers[0].GetValue() as string;
+            string conditionCode = args.Parsers[1].GetValue() as string;
+            
+            // Get the target player
+            IServerPlayer targetPlayer = player;
+            if (!string.IsNullOrEmpty(playerName))
             {
-                return TextCommandResult.Error("You must be looking at an entity to use this command");
+                targetPlayer = api.World.PlayerByName(playerName) as IServerPlayer;
+                if (targetPlayer == null)
+                {
+                    return TextCommandResult.Error($"Player '{playerName}' not found");
+                }
             }
             
-            var entity = player.CurrentEntitySelection.Entity;
-            var medicalBehavior = entity.GetBehavior<MedicalConditionBehavior>();
+            // Get the target entity
+            var targetEntity = targetPlayer.Entity;
             
-            if (medicalBehavior == null)
+            // Heal the condition
+            if (string.IsNullOrEmpty(conditionCode))
             {
-                return TextCommandResult.Error("Target entity doesn't support medical conditions");
-            }
-            
-            string bodyPartCode = args[0].ToString();
-            float amount = args.ArgCount > 1 ? float.Parse(args[1].ToString()) : 1.0f;
-            
-            medicalBehavior.HealBodyPart(bodyPartCode, amount);
-            return TextCommandResult.Success($"Healed {entity.GetName()}'s {bodyPartCode} by {amount}");
-        }
-        
-        private TextCommandResult HandleSurgeryCommand(TextCommandCallingArgs args)
-        {
-            if (args.ArgCount < 2)
-            {
-                return TextCommandResult.Error("Usage: /surgery <bodypart> <procedure>");
-            }
-            
-            var player = args.Caller.Player as IServerPlayer;
-            if (player.CurrentEntitySelection == null)
-            {
-                return TextCommandResult.Error("You must be looking at an entity to use this command");
-            }
-            
-            string bodyPartCode = args[0].ToString();
-            string procedureCode = args[1].ToString();
-            
-            bool success = surgerySystem.StartSurgery(player, player.CurrentEntitySelection.Entity, bodyPartCode, procedureCode);
-            
-            if (success)
-            {
-                return TextCommandResult.Success("Surgery started. Use surgical tools to perform the procedure.");
+                // Heal all conditions
+                surgerySystem.HealAllConditions(targetEntity);
+                return TextCommandResult.Success($"Healed all medical conditions for {targetPlayer.PlayerName}");
             }
             else
             {
-                return TextCommandResult.Error("Failed to start surgery. Check if the body part and procedure are valid.");
+                // Heal specific condition
+                bool success = surgerySystem.HealCondition(targetEntity, conditionCode);
+                if (!success)
+                {
+                    return TextCommandResult.Error($"Failed to heal condition '{conditionCode}' for {targetPlayer.PlayerName}");
+                }
+                
+                return TextCommandResult.Success($"Healed condition '{conditionCode}' for {targetPlayer.PlayerName}");
             }
         }
         
-        private TextCommandResult HandleCancelSurgeryCommand(TextCommandCallingArgs args)
+        private TextCommandResult OnSurgeryAddCommand(TextCommandCallingArgs args)
         {
             var player = args.Caller.Player as IServerPlayer;
-            if (player.CurrentEntitySelection == null)
+            string conditionCode = args.Parsers[0].GetValue() as string;
+            string playerName = args.Parsers[1].GetValue() as string;
+            float severity = (float)args.Parsers[2].GetValue();
+            
+            // Get the target player
+            IServerPlayer targetPlayer = player;
+            if (!string.IsNullOrEmpty(playerName))
             {
-                return TextCommandResult.Error("You must be looking at an entity to use this command");
+                targetPlayer = api.World.PlayerByName(playerName) as IServerPlayer;
+                if (targetPlayer == null)
+                {
+                    return TextCommandResult.Error($"Player '{playerName}' not found");
+                }
             }
             
-            surgerySystem.CancelSurgery(player, player.CurrentEntitySelection.Entity);
-            return TextCommandResult.Success("Surgery cancelled.");
+            // Get the target entity
+            var targetEntity = targetPlayer.Entity;
+            
+            // Add the condition
+            bool success = surgerySystem.AddCondition(targetEntity, conditionCode, severity);
+            if (!success)
+            {
+                return TextCommandResult.Error($"Failed to add condition '{conditionCode}' to {targetPlayer.PlayerName}");
+            }
+            
+            return TextCommandResult.Success($"Added condition '{conditionCode}' to {targetPlayer.PlayerName} with severity {severity:P0}");
+        }
+        
+        private TextCommandResult OnSurgeryRemoveCommand(TextCommandCallingArgs args)
+        {
+            var player = args.Caller.Player as IServerPlayer;
+            string conditionCode = args.Parsers[0].GetValue() as string;
+            string playerName = args.Parsers[1].GetValue() as string;
+            
+            // Get the target player
+            IServerPlayer targetPlayer = player;
+            if (!string.IsNullOrEmpty(playerName))
+            {
+                targetPlayer = api.World.PlayerByName(playerName) as IServerPlayer;
+                if (targetPlayer == null)
+                {
+                    return TextCommandResult.Error($"Player '{playerName}' not found");
+                }
+            }
+            
+            // Get the target entity
+            var targetEntity = targetPlayer.Entity;
+            
+            // Remove the condition
+            bool success = surgerySystem.RemoveCondition(targetEntity, conditionCode);
+            if (!success)
+            {
+                return TextCommandResult.Error($"Failed to remove condition '{conditionCode}' from {targetPlayer.PlayerName}");
+            }
+            
+            return TextCommandResult.Success($"Removed condition '{conditionCode}' from {targetPlayer.PlayerName}");
         }
         
         public override void Dispose()

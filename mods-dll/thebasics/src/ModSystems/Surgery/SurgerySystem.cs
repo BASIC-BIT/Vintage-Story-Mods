@@ -27,15 +27,74 @@ namespace thebasics.ModSystems.Surgery
         private readonly Dictionary<string, List<string>> entityBodyParts = new Dictionary<string, List<string>>();
         private readonly Dictionary<string, Dictionary<string, SurgeryProcedureState>> activeSurgeries = new Dictionary<string, Dictionary<string, SurgeryProcedureState>>();
         
+        // Configuration
+        private SurgeryConfig config;
+        
         public SurgerySystem(ICoreAPI api)
         {
             this.api = api;
             Instance = this;
             
+            // Initialize configuration
+            config = LoadConfig();
+            
             // Load definitions from configuration
             LoadBodyPartDefinitions();
             LoadProcedureDefinitions();
             MapEntityBodyParts();
+        }
+        
+        private SurgeryConfig LoadConfig()
+        {
+            // Default config
+            var defaultConfig = new SurgeryConfig();
+            
+            try
+            {
+                // Try to load from file
+                string configPath = "thebasics/config/surgery.json";
+                var configObj = api.Assets.TryGet(configPath)?.ToObject<Dictionary<string, object>>();
+                
+                if (configObj != null)
+                {
+                    // Parse configuration values
+                    if (configObj.TryGetValue("MaxSuccessRate", out object maxSuccessRate))
+                        defaultConfig.MaxSuccessRate = Convert.ToSingle(maxSuccessRate);
+                        
+                    if (configObj.TryGetValue("SurgeryFailChancePerStep", out object failChance))
+                        defaultConfig.SurgeryFailChancePerStep = Convert.ToSingle(failChance);
+                        
+                    if (configObj.TryGetValue("SurgeryFailChanceModifierPerSkillLevel", out object skillModifier))
+                        defaultConfig.SurgeryFailChanceModifierPerSkillLevel = Convert.ToSingle(skillModifier);
+                        
+                    if (configObj.TryGetValue("RequireOperatingTable", out object requireTable))
+                        defaultConfig.RequireOperatingTable = Convert.ToBoolean(requireTable);
+                        
+                    if (configObj.TryGetValue("RequireSterilization", out object requireSterilization))
+                        defaultConfig.RequireSterilization = Convert.ToBoolean(requireSterilization);
+                        
+                    if (configObj.TryGetValue("BleedingChanceOnFail", out object bleedingChance))
+                        defaultConfig.BleedingChanceOnFail = Convert.ToSingle(bleedingChance);
+                        
+                    if (configObj.TryGetValue("InfectionChanceOnFail", out object infectionChance))
+                        defaultConfig.InfectionChanceOnFail = Convert.ToSingle(infectionChance);
+                        
+                    if (configObj.TryGetValue("DamageOnFailAmount", out object damageAmount))
+                        defaultConfig.DamageOnFailAmount = Convert.ToSingle(damageAmount);
+                        
+                    if (configObj.TryGetValue("HealOnSuccessAmount", out object healAmount))
+                        defaultConfig.HealOnSuccessAmount = Convert.ToSingle(healAmount);
+                        
+                    if (configObj.TryGetValue("DamageOnFailChance", out object damageChance))
+                        defaultConfig.DamageOnFailChance = Convert.ToSingle(damageChance);
+                }
+            }
+            catch (Exception ex)
+            {
+                api.Logger.Error($"Error loading surgery configuration: {ex.Message}");
+            }
+            
+            return defaultConfig;
         }
         
         private void LoadBodyPartDefinitions()
@@ -451,7 +510,7 @@ namespace thebasics.ModSystems.Surgery
             }
             
             // Perform the step with success chance modified by tool quality
-            float adjustedSuccessRate = Math.Min(currentStep.SuccessRate * qualityModifier, 0.95f); // Cap at 95% success
+            float adjustedSuccessRate = Math.Min(currentStep.SuccessRate * qualityModifier, config.MaxSuccessRate); // Cap at configured max success rate
             bool success = api.World.Rand.NextDouble() < adjustedSuccessRate;
             surgeryState.LastStepTime = currentTime;
             
@@ -474,9 +533,9 @@ namespace thebasics.ModSystems.Surgery
                 player.SendMessage(GlobalConstants.GeneralChatGroup, "You failed this surgical step. Try again.", EnumChatType.CommandError);
                 
                 // Check for patient damage on failure
-                if (api.World.Rand.NextDouble() < 0.3) // 30% chance of causing damage on failure
+                if (api.World.Rand.NextDouble() < config.DamageOnFailChance) // Configurable chance of causing damage on failure
                 {
-                    ModifyEntityHealth(targetEntity, -5); // Damage the patient
+                    ModifyEntityHealth(targetEntity, -config.DamageOnFailAmount); // Configurable damage amount
                     NotifyNearbyPlayers(player, targetEntity, $"{player.PlayerName} makes a mistake during surgery, causing {targetEntity.GetName()} pain!");
                 }
                 
@@ -524,7 +583,7 @@ namespace thebasics.ModSystems.Surgery
                 NotifyNearbyPlayers(player, targetEntity, $"{player.PlayerName} has successfully completed surgery on {targetEntity.GetName()}");
                 
                 // Heal the entity a bit
-                ModifyEntityHealth(targetEntity, 10);
+                ModifyEntityHealth(targetEntity, config.HealOnSuccessAmount);
             }
             else
             {

@@ -19,6 +19,10 @@ namespace thebasics.ModSystems.Surgery.Models
         public bool RequireSterilization { get; set; } = true;
         public float BleedingChanceOnFail { get; set; } = 0.3f;
         public float InfectionChanceOnFail { get; set; } = 0.2f;
+        public float MaxSuccessRate { get; set; } = 0.95f; // Maximum success rate cap (default 95%)
+        public float DamageOnFailAmount { get; set; } = 5.0f; // Amount of damage on surgery failure
+        public float HealOnSuccessAmount { get; set; } = 10.0f; // Amount of healing on surgery success
+        public float DamageOnFailChance { get; set; } = 0.3f; // Chance of causing damage on failure (30%)
     }
     
     public class BodyPartDefinition
