@@ -4,9 +4,10 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
-using Vintagestory.API.Common.CommandAbbr;
-using Vintagestory.API.Config;
 using System.Text;
+using Vintagestory.API.Config;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace thebasics.ModSystems.Surgery
 {
@@ -15,6 +16,7 @@ namespace thebasics.ModSystems.Surgery
         private ICoreServerAPI api;
         private SurgerySystem surgerySystem;
         private SurgicalToolRegistry toolRegistry;
+        private BedSurgeryHandler bedSurgeryHandler;
         
         public SurgicalToolRegistry ToolRegistry => toolRegistry;
         
@@ -39,6 +41,9 @@ namespace thebasics.ModSystems.Surgery
             // Initialize surgery system
             surgerySystem = new SurgerySystem(api);
             
+            // Initialize bed surgery handler
+            bedSurgeryHandler = new BedSurgeryHandler(api, surgerySystem);
+            
             // Register entity behaviors
             api.RegisterEntityBehaviorClass("medicalconditions", typeof(MedicalConditionBehavior));
             
@@ -62,19 +67,28 @@ namespace thebasics.ModSystems.Surgery
         
         private void RegisterCommands()
         {
-            CommandAbbr cmd = api.ChatCommands
+            // Create the main surgery command
+            var cmd = api.ChatCommands
                 .Create("surgery")
                 .WithDescription("Surgery commands");
                 
+            // Handle the base surgery command
+            cmd.HandleWith(args => {
+                return TextCommandResult.Success("Available surgery commands: info, list, perform, heal, add, remove");
+            });
+                
+            // Info subcommand
             cmd.BeginSubCommand("info")
                 .WithDescription("Shows information about a player's or entity's medical conditions")
-                .WithArgs(api.ChatCommands.Parsers.WordRange("playerName", 0, 1))
+                .WithArgs(api.ChatCommands.Parsers.OptionalWord("playerName"))
                 .HandleWith(OnSurgeryInfoCommand);
                 
+            // List subcommand
             cmd.BeginSubCommand("list")
                 .WithDescription("Lists available surgery procedures")
                 .HandleWith(OnSurgeryListCommand);
                 
+            // Perform subcommand
             cmd.BeginSubCommand("perform")
                 .WithDescription("Performs a surgery procedure")
                 .WithArgs(
@@ -83,6 +97,7 @@ namespace thebasics.ModSystems.Surgery
                 )
                 .HandleWith(OnSurgeryPerformCommand);
                 
+            // Heal subcommand
             cmd.BeginSubCommand("heal")
                 .WithDescription("Heals a player or entity's medical conditions")
                 .WithArgs(
@@ -92,6 +107,7 @@ namespace thebasics.ModSystems.Surgery
                 .RequiresPrivilege(Privilege.controlserver)
                 .HandleWith(OnSurgeryHealCommand);
                 
+            // Add subcommand
             cmd.BeginSubCommand("add")
                 .WithDescription("Adds a medical condition to a player or entity")
                 .WithArgs(
@@ -102,6 +118,7 @@ namespace thebasics.ModSystems.Surgery
                 .RequiresPrivilege(Privilege.controlserver)
                 .HandleWith(OnSurgeryAddCommand);
                 
+            // Remove subcommand
             cmd.BeginSubCommand("remove")
                 .WithDescription("Removes a medical condition from a player or entity")
                 .WithArgs(
@@ -121,10 +138,23 @@ namespace thebasics.ModSystems.Surgery
             var targetPlayer = player;
             if (!string.IsNullOrEmpty(playerName))
             {
-                targetPlayer = api.World.PlayerByName(playerName);
+                targetPlayer = api.World.PlayerByUid(playerName);
                 if (targetPlayer == null)
                 {
-                    return TextCommandResult.Error($"Player '{playerName}' not found");
+                    // Try to find by partial name
+                    foreach (var connectedPlayer in api.World.AllPlayers)
+                    {
+                        if (connectedPlayer.PlayerName.IndexOf(playerName, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            targetPlayer = connectedPlayer;
+                            break;
+                        }
+                    }
+                    
+                    if (targetPlayer == player) // Still the original player
+                    {
+                        return TextCommandResult.Error($"Player '{playerName}' not found");
+                    }
                 }
             }
             
@@ -132,7 +162,7 @@ namespace thebasics.ModSystems.Surgery
             var targetEntity = targetPlayer.Entity;
             
             // Get the medical conditions
-            var medicalConditions = surgerySystem.GetEntityMedicalConditions(targetEntity);
+            var medicalConditions = surgerySystem.GetEntityConditions(targetEntity);
             if (medicalConditions.Count == 0)
             {
                 return TextCommandResult.Success($"{targetPlayer.PlayerName} has no medical conditions");
@@ -144,7 +174,7 @@ namespace thebasics.ModSystems.Surgery
             
             foreach (var condition in medicalConditions)
             {
-                result.AppendLine($"- {condition.Name}: {condition.Severity:P0} severity");
+                result.AppendLine($"- {condition.ConditionType}: {condition.Severity:P0} severity");
             }
             
             return TextCommandResult.Success(result.ToString());
@@ -165,7 +195,7 @@ namespace thebasics.ModSystems.Surgery
             foreach (var procedure in procedures)
             {
                 result.AppendLine($"- {procedure.Name} (Code: {procedure.Code})");
-                result.AppendLine($"  Treats: {string.Join(", ", procedure.TreatedConditions)}");
+                result.AppendLine($"  Treats: {string.Join(", ", procedure.ApplicableConditions)}");
                 result.AppendLine($"  Steps: {procedure.Steps.Count}");
             }
             
@@ -176,14 +206,23 @@ namespace thebasics.ModSystems.Surgery
         {
             var player = args.Caller.Player as IServerPlayer;
             string procedureCode = args.Parsers[0].GetValue() as string;
-            string playerName = args.Parsers[1].GetValue() as string;
+            string playerName = args.Parsers.Length > 1 ? args.Parsers[1].GetValue() as string : null;
             
             // Get the target player
             IServerPlayer targetPlayer = player;
             if (!string.IsNullOrEmpty(playerName))
             {
-                targetPlayer = api.World.PlayerByName(playerName) as IServerPlayer;
-                if (targetPlayer == null)
+                // Try to find by partial name
+                foreach (var connectedPlayer in api.World.AllOnlinePlayers)
+                {
+                    if (connectedPlayer.PlayerName.IndexOf(playerName, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        targetPlayer = connectedPlayer as IServerPlayer;
+                        break;
+                    }
+                }
+                
+                if (targetPlayer == player && playerName != player.PlayerName)
                 {
                     return TextCommandResult.Error($"Player '{playerName}' not found");
                 }
@@ -192,8 +231,18 @@ namespace thebasics.ModSystems.Surgery
             // Get the target entity
             var targetEntity = targetPlayer.Entity;
             
+            // Get available body parts
+            var bodyParts = surgerySystem.GetEntityBodyParts(targetEntity);
+            if (bodyParts.Count == 0)
+            {
+                return TextCommandResult.Error("Target has no valid body parts for surgery");
+            }
+            
+            // Default to first body part for now - could be improved with additional argument
+            string bodyPartCode = bodyParts.First();
+            
             // Attempt to perform the procedure
-            bool success = surgerySystem.StartProcedure(player, targetEntity, procedureCode);
+            bool success = surgerySystem.StartSurgery(player, targetEntity, bodyPartCode, procedureCode);
             if (!success)
             {
                 return TextCommandResult.Error($"Failed to start procedure '{procedureCode}'");
@@ -205,15 +254,24 @@ namespace thebasics.ModSystems.Surgery
         private TextCommandResult OnSurgeryHealCommand(TextCommandCallingArgs args)
         {
             var player = args.Caller.Player as IServerPlayer;
-            string playerName = args.Parsers[0].GetValue() as string;
-            string conditionCode = args.Parsers[1].GetValue() as string;
+            string playerName = args.Parsers.Length > 0 ? args.Parsers[0].GetValue() as string : null;
+            string conditionCode = args.Parsers.Length > 1 ? args.Parsers[1].GetValue() as string : null;
             
             // Get the target player
             IServerPlayer targetPlayer = player;
             if (!string.IsNullOrEmpty(playerName))
             {
-                targetPlayer = api.World.PlayerByName(playerName) as IServerPlayer;
-                if (targetPlayer == null)
+                // Try to find by partial name
+                foreach (var connectedPlayer in api.World.AllOnlinePlayers)
+                {
+                    if (connectedPlayer.PlayerName.IndexOf(playerName, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        targetPlayer = connectedPlayer as IServerPlayer;
+                        break;
+                    }
+                }
+                
+                if (targetPlayer == player && playerName != player.PlayerName)
                 {
                     return TextCommandResult.Error($"Player '{playerName}' not found");
                 }
@@ -222,23 +280,36 @@ namespace thebasics.ModSystems.Surgery
             // Get the target entity
             var targetEntity = targetPlayer.Entity;
             
-            // Heal the condition
+            // Get medical conditions
+            var conditions = surgerySystem.GetEntityConditions(targetEntity);
+            
             if (string.IsNullOrEmpty(conditionCode))
             {
-                // Heal all conditions
-                surgerySystem.HealAllConditions(targetEntity);
-                return TextCommandResult.Success($"Healed all medical conditions for {targetPlayer.PlayerName}");
+                // Heal all conditions by removing them
+                var medicalBehavior = targetEntity.GetBehavior<MedicalConditionBehavior>();
+                if (medicalBehavior != null)
+                {
+                    medicalBehavior.BodyPartConditions.Clear();
+                    return TextCommandResult.Success($"Healed all medical conditions for {targetPlayer.PlayerName}");
+                }
+                return TextCommandResult.Error($"No medical conditions to heal for {targetPlayer.PlayerName}");
             }
             else
             {
                 // Heal specific condition
-                bool success = surgerySystem.HealCondition(targetEntity, conditionCode);
-                if (!success)
+                var medicalBehavior = targetEntity.GetBehavior<MedicalConditionBehavior>();
+                if (medicalBehavior != null)
                 {
-                    return TextCommandResult.Error($"Failed to heal condition '{conditionCode}' for {targetPlayer.PlayerName}");
+                    var condition = medicalBehavior.BodyPartConditions.FirstOrDefault(c => 
+                        c.ConditionType.ToString().Equals(conditionCode, System.StringComparison.OrdinalIgnoreCase));
+                    
+                    if (condition != null)
+                    {
+                        medicalBehavior.BodyPartConditions.Remove(condition);
+                        return TextCommandResult.Success($"Healed condition '{conditionCode}' for {targetPlayer.PlayerName}");
+                    }
                 }
-                
-                return TextCommandResult.Success($"Healed condition '{conditionCode}' for {targetPlayer.PlayerName}");
+                return TextCommandResult.Error($"Failed to heal condition '{conditionCode}' for {targetPlayer.PlayerName}");
             }
         }
         
@@ -246,15 +317,24 @@ namespace thebasics.ModSystems.Surgery
         {
             var player = args.Caller.Player as IServerPlayer;
             string conditionCode = args.Parsers[0].GetValue() as string;
-            string playerName = args.Parsers[1].GetValue() as string;
-            float severity = (float)args.Parsers[2].GetValue();
+            string playerName = args.Parsers.Length > 1 ? args.Parsers[1].GetValue() as string : null;
+            float severity = args.Parsers.Length > 2 ? (args.Parsers[2].GetValue() is float f ? f : 1.0f) : 1.0f;
             
             // Get the target player
             IServerPlayer targetPlayer = player;
             if (!string.IsNullOrEmpty(playerName))
             {
-                targetPlayer = api.World.PlayerByName(playerName) as IServerPlayer;
-                if (targetPlayer == null)
+                // Try to find by partial name
+                foreach (var connectedPlayer in api.World.AllOnlinePlayers)
+                {
+                    if (connectedPlayer.PlayerName.IndexOf(playerName, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        targetPlayer = connectedPlayer as IServerPlayer;
+                        break;
+                    }
+                }
+                
+                if (targetPlayer == player && playerName != player.PlayerName)
                 {
                     return TextCommandResult.Error($"Player '{playerName}' not found");
                 }
@@ -263,12 +343,35 @@ namespace thebasics.ModSystems.Surgery
             // Get the target entity
             var targetEntity = targetPlayer.Entity;
             
-            // Add the condition
-            bool success = surgerySystem.AddCondition(targetEntity, conditionCode, severity);
-            if (!success)
+            // Try to parse the condition type
+            if (!System.Enum.TryParse<MedicalConditionType>(conditionCode, true, out var conditionType))
             {
-                return TextCommandResult.Error($"Failed to add condition '{conditionCode}' to {targetPlayer.PlayerName}");
+                return TextCommandResult.Error($"Unknown condition '{conditionCode}'");
             }
+            
+            // Add the condition
+            var medicalBehavior = targetEntity.GetBehavior<MedicalConditionBehavior>();
+            if (medicalBehavior == null)
+            {
+                return TextCommandResult.Error($"Entity doesn't support medical conditions");
+            }
+            
+            // Get body parts and add to first body part for simplicity
+            var bodyParts = surgerySystem.GetEntityBodyParts(targetEntity);
+            if (bodyParts.Count == 0)
+            {
+                return TextCommandResult.Error("Entity has no valid body parts");
+            }
+            
+            // Create new condition
+            var condition = new BodyPartCondition
+            {
+                BodyPartCode = bodyParts.First(),
+                ConditionType = conditionType,
+                Severity = severity
+            };
+            
+            medicalBehavior.BodyPartConditions.Add(condition);
             
             return TextCommandResult.Success($"Added condition '{conditionCode}' to {targetPlayer.PlayerName} with severity {severity:P0}");
         }
@@ -277,14 +380,23 @@ namespace thebasics.ModSystems.Surgery
         {
             var player = args.Caller.Player as IServerPlayer;
             string conditionCode = args.Parsers[0].GetValue() as string;
-            string playerName = args.Parsers[1].GetValue() as string;
+            string playerName = args.Parsers.Length > 1 ? args.Parsers[1].GetValue() as string : null;
             
             // Get the target player
             IServerPlayer targetPlayer = player;
             if (!string.IsNullOrEmpty(playerName))
             {
-                targetPlayer = api.World.PlayerByName(playerName) as IServerPlayer;
-                if (targetPlayer == null)
+                // Try to find by partial name
+                foreach (var connectedPlayer in api.World.AllOnlinePlayers)
+                {
+                    if (connectedPlayer.PlayerName.IndexOf(playerName, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        targetPlayer = connectedPlayer as IServerPlayer;
+                        break;
+                    }
+                }
+                
+                if (targetPlayer == player && playerName != player.PlayerName)
                 {
                     return TextCommandResult.Error($"Player '{playerName}' not found");
                 }
@@ -293,14 +405,35 @@ namespace thebasics.ModSystems.Surgery
             // Get the target entity
             var targetEntity = targetPlayer.Entity;
             
-            // Remove the condition
-            bool success = surgerySystem.RemoveCondition(targetEntity, conditionCode);
-            if (!success)
+            // Try to parse the condition type
+            if (!System.Enum.TryParse<MedicalConditionType>(conditionCode, true, out var conditionType))
             {
-                return TextCommandResult.Error($"Failed to remove condition '{conditionCode}' from {targetPlayer.PlayerName}");
+                return TextCommandResult.Error($"Unknown condition '{conditionCode}'");
             }
             
-            return TextCommandResult.Success($"Removed condition '{conditionCode}' from {targetPlayer.PlayerName}");
+            // Remove the condition
+            var medicalBehavior = targetEntity.GetBehavior<MedicalConditionBehavior>();
+            if (medicalBehavior == null)
+            {
+                return TextCommandResult.Error($"Entity doesn't support medical conditions");
+            }
+            
+            // Find and remove matching conditions
+            var matchingConditions = medicalBehavior.BodyPartConditions
+                .Where(c => c.ConditionType == conditionType)
+                .ToList();
+                
+            if (matchingConditions.Count == 0)
+            {
+                return TextCommandResult.Error($"No '{conditionCode}' condition found on {targetPlayer.PlayerName}");
+            }
+            
+            foreach (var condition in matchingConditions)
+            {
+                medicalBehavior.BodyPartConditions.Remove(condition);
+            }
+            
+            return TextCommandResult.Success($"Removed {matchingConditions.Count} '{conditionCode}' condition(s) from {targetPlayer.PlayerName}");
         }
         
         public override void Dispose()

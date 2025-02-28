@@ -1,0 +1,76 @@
+{
+  "code": "surgicaltools",
+  "class": "SurgicalTool",
+  "creativeinventory": { "general": ["*"], "items": ["*"] },
+  "behaviors": [{ "name": "Stackable", "properties": { "stacklimit": 1 } }],
+  "variantgroups": [
+    {
+      "code": "type",
+      "states": ["scalpel", "forceps", "suture", "bandage", "bone_saw", "splint", "disinfectant"]
+    },
+    {
+      "code": "material",
+      "states": ["flint", "copper", "bronze", "iron", "steel", "meteoriciron"]
+    }
+  ],
+  "attributes": {
+    "handbook": { "groupBy": ["type", "material"] },
+    "surgicalToolCode": { "type": "string", "value": "{type}" },
+    "durability": 100
+  },
+  "variantemissiveintensity": { "meteoriciron": 0.15 },
+  "maxstacksize": 1,
+  "shapeByType": {
+    "*-scalpel": { "base": "game:item/tool/knife" },
+    "*-forceps": { "base": "game:item/tool/shears" },
+    "*-suture": { "base": "game:item/tool/needle" },
+    "*-bandage": { "base": "game:item/material/cloth" },
+    "*-bone_saw": { "base": "game:item/tool/saw" },
+    "*-splint": { "base": "game:item/tool/stick" },
+    "*-disinfectant": { "base": "game:item/food/bottle" }
+  },
+  "texturesByType": {
+    "*-flint": {
+      "material": { "base": "game:block/stone/rock/flint1" }
+    },
+    "*-copper": {
+      "material": { "base": "game:block/metal/ingot/copper" }
+    },
+    "*-bronze": {
+      "material": { "base": "game:block/metal/ingot/bronze" }
+    },
+    "*-iron": {
+      "material": { "base": "game:block/metal/ingot/iron" }
+    },
+    "*-steel": {
+      "material": { "base": "game:block/metal/ingot/steel" }
+    },
+    "*-meteoriciron": {
+      "material": { "base": "game:block/metal/ingot/meteoriciron" }
+    }
+  },
+  "guiTransform": {
+    "translation": { "x": 0, "y": 0, "z": 0 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "origin": { "x": 0.5, "y": 0.5, "z": 0.5 },
+    "scale": 2.0
+  },
+  "fpHandTransform": {
+    "translation": { "x": 0, "y": 0, "z": 0 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "origin": { "x": 0.5, "y": 0.5, "z": 0.5 },
+    "scale": 2.0
+  },
+  "tpHandTransform": {
+    "translation": { "x": -0.3, "y": -0.5, "z": -0.6 },
+    "rotation": { "x": 90, "y": 0, "z": 0 },
+    "origin": { "x": 0.5, "y": 0.5, "z": 0.5 },
+    "scale": 0.7
+  },
+  "groundTransform": {
+    "translation": { "x": 0, "y": 0, "z": 0 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "origin": { "x": 0.5, "y": 0, "z": 0.5 },
+    "scale": 2.0
+  }
+} 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using thebasics.ModSystems.Surgery.Behaviors;
 using thebasics.ModSystems.Surgery.Models;
+using thebasics.ModSystems.Surgery.Items;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -10,14 +11,15 @@ namespace thebasics.ModSystems.Surgery.Registry
 {
     public class SurgicalToolRegistry
     {
-        private readonly ICoreServerAPI api;
-        private readonly Dictionary<string, SurgicalToolDefinition> toolDefinitions = new Dictionary<string, SurgicalToolDefinition>();
+        private ICoreServerAPI api;
+        private Dictionary<string, SurgicalToolDefinition> toolDefinitions;
         private Dictionary<string, float> materialQualityModifiers = new Dictionary<string, float>();
         private Dictionary<string, int> toolUsesBeforeDegrading = new Dictionary<string, int>();
         
         public SurgicalToolRegistry(ICoreServerAPI api)
         {
             this.api = api;
+            this.toolDefinitions = new Dictionary<string, SurgicalToolDefinition>();
             
             // Load material quality modifiers from config
             LoadToolConfigurations();
@@ -94,52 +96,105 @@ namespace thebasics.ModSystems.Surgery.Registry
         
         public void RegisterSurgicalTools()
         {
-            // Create default tool definitions
-            var defaultTools = CreateDefaultToolDefinitions();
-            
-            // Register tool definitions
-            foreach (var tool in defaultTools)
-            {
-                toolDefinitions[tool.Code] = tool;
-            }
+            // Register all tool types
+            RegisterTool("scalpel", 1.0f);
+            RegisterTool("forceps", 0.9f);
+            RegisterTool("retractor", 0.85f);
+            RegisterTool("needle", 0.8f);
+            RegisterTool("saw", 0.7f);
+            RegisterTool("scissors", 0.9f);
             
             // Register the SurgicalTool class
-            api.RegisterItemClass("SurgicalTool", typeof(SurgicalTool));
+            api.RegisterItemClass("SurgicalTool", typeof(Behaviors.SurgicalTool));
             
-            api.Server.LogNotification($"The BASICs: Registered {defaultTools.Count} surgical tool definitions");
+            api.Logger.Notification($"SurgicalToolRegistry: Registered {toolDefinitions.Count} surgical tools");
         }
         
-        private List<SurgicalToolDefinition> CreateDefaultToolDefinitions()
+        private void RegisterTool(string code, float qualityModifier)
         {
-            var tools = new List<SurgicalToolDefinition>();
-            
-            // Add all tools with their configurations
-            foreach (var toolPair in toolUsesBeforeDegrading)
+            toolDefinitions[code] = new SurgicalToolDefinition
             {
-                string toolCode = toolPair.Key;
-                int uses = toolPair.Value;
-                bool consumable = uses <= 1;
-                
-                tools.Add(new SurgicalToolDefinition
-                {
-                    Code = toolCode,
-                    Name = char.ToUpper(toolCode[0]) + toolCode.Substring(1).Replace('_', ' '),
-                    UsesBeforeDegrading = uses,
-                    Consumable = consumable
-                });
+                Code = code,
+                QualityModifier = qualityModifier
+            };
+        }
+        
+        public SurgicalToolDefinition GetToolDefinition(string toolCode)
+        {
+            if (toolDefinitions.TryGetValue(toolCode, out SurgicalToolDefinition toolDef))
+            {
+                return toolDef;
             }
             
-            return tools;
+            return null;
         }
         
-        public SurgicalToolDefinition GetToolDefinition(string code)
+        /// <summary>
+        /// Gets the surgical tool code from an ItemStack, or null if not a surgical tool
+        /// </summary>
+        public string GetToolCode(ItemStack itemStack)
         {
-            return toolDefinitions.TryGetValue(code, out var definition) ? definition : null;
+            if (itemStack == null)
+                return null;
+                
+            // Check if the item is a surgical tool
+            if (itemStack.Collectible is Behaviors.SurgicalTool surgicalTool)
+            {
+                // Use the toolCode field or method from the existing implementation
+                return itemStack.Attributes?.HasAttribute("surgicalTool") == true 
+                    ? itemStack.Attributes.GetString("surgicalTool") 
+                    : itemStack.Collectible.Code.Path;
+            }
+            
+            // Alternative method: Check item attributes
+            if (itemStack.Attributes != null && itemStack.Attributes.HasAttribute("surgicalTool"))
+            {
+                return itemStack.Attributes.GetString("surgicalTool");
+            }
+            
+            // Check item class - if it's a SurgicalTool but didn't match above
+            if (itemStack.Collectible.GetType().Name == "SurgicalTool")
+            {
+                // Try to determine tool type from the item code
+                string itemCode = itemStack.Collectible.Code.Path;
+                
+                foreach (var toolDef in toolDefinitions.Keys)
+                {
+                    if (itemCode.Contains(toolDef))
+                    {
+                        return toolDef;
+                    }
+                }
+            }
+            
+            // Not a surgical tool
+            return null;
         }
         
+        /// <summary>
+        /// Gets the quality modifier for a tool material
+        /// </summary>
         public float GetMaterialQualityModifier(string material)
         {
-            return materialQualityModifiers.TryGetValue(material.ToLowerInvariant(), out float modifier) ? modifier : 1.0f;
+            // Define quality modifiers for different materials
+            switch (material?.ToLowerInvariant())
+            {
+                case "flint": return 0.7f;
+                case "copper": return 0.8f;
+                case "bronze": return 0.9f;
+                case "iron": return 1.0f;
+                case "steel": return 1.1f;
+                case "meteoriciron": return 1.2f;
+                default: return 1.0f; // Default quality
+            }
         }
+    }
+    
+    public class SurgicalToolDefinition
+    {
+        public string Code { get; set; }
+        public float QualityModifier { get; set; }
+        public int UsesBeforeDegrading { get; set; } = 10; // Default durability
+        public bool Consumable { get; set; } = false;
     }
 } 

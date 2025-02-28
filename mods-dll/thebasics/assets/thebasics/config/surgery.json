@@ -1,0 +1,35 @@
+{
+  "MaxSuccessRate": 0.95,
+  "SurgeryFailChancePerStep": 0.1,
+  "SurgeryFailChanceModifierPerSkillLevel": -0.01,
+  "RequireOperatingTable": true,
+  "RequireSterilization": true,
+  "BleedingChanceOnFail": 0.3,
+  "InfectionChanceOnFail": 0.2,
+  "DamageOnFailAmount": 5.0,
+  "DamageOnFailChance": 0.5,
+  "HealOnSuccessAmount": 10.0,
+  "ToolSettings": {
+    "MaterialQualityModifiers": {
+      "flint": 0.6,
+      "stone": 0.6,
+      "copper": 0.8,
+      "bronze": 0.9,
+      "brass": 0.9,
+      "gold": 0.9,
+      "silver": 0.9,
+      "iron": 1.0,
+      "steel": 1.2,
+      "meteoriciron": 1.2
+    },
+    "UsesBeforeDegrading": {
+      "scalpel": 15,
+      "forceps": 20,
+      "bone_saw": 15,
+      "suture": 1,
+      "bandage": 1,
+      "splint": 1,
+      "disinfectant": 1
+    }
+  }
+} 

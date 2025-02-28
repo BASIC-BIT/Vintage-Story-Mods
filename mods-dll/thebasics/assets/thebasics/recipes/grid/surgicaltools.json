@@ -1,0 +1,78 @@
+[
+  {
+    "code": "scalpel",
+    "ingredientPattern": "S,H",
+    "ingredients": {
+      "S": { "type": "item", "code": "game:stick" },
+      "H": { "type": "item", "code": "game:blade-*", "name": "material" }
+    },
+    "width": 1,
+    "height": 2,
+    "output": { "type": "item", "code": "thebasics:surgicaltools-scalpel-{material}" }
+  },
+  {
+    "code": "forceps",
+    "ingredientPattern": "M,M",
+    "ingredients": {
+      "M": { "type": "item", "code": "game:metalplate-*", "name": "material" }
+    },
+    "width": 1,
+    "height": 2,
+    "output": { "type": "item", "code": "thebasics:surgicaltools-forceps-{material}" }
+  },
+  {
+    "code": "bone_saw",
+    "ingredientPattern": "BB,SH",
+    "ingredients": {
+      "B": { "type": "item", "code": "game:blade-*", "name": "material" },
+      "S": { "type": "item", "code": "game:stick" },
+      "H": { "type": "item", "code": "game:metalplate-*", "name": "material" }
+    },
+    "width": 2,
+    "height": 2,
+    "output": { "type": "item", "code": "thebasics:surgicaltools-bone_saw-{material}" }
+  },
+  {
+    "code": "suture",
+    "ingredientPattern": "T,N",
+    "ingredients": {
+      "T": { "type": "item", "code": "game:flaxtwine" },
+      "N": { "type": "item", "code": "game:needle-*", "name": "material" }
+    },
+    "width": 1,
+    "height": 2,
+    "output": { "type": "item", "code": "thebasics:surgicaltools-suture-{material}", "quantity": 4 }
+  },
+  {
+    "code": "bandage",
+    "ingredientPattern": "CC",
+    "ingredients": {
+      "C": { "type": "item", "code": "game:cloth-*" }
+    },
+    "width": 2,
+    "height": 1,
+    "output": { "type": "item", "code": "thebasics:surgicaltools-bandage-iron", "quantity": 2 }
+  },
+  {
+    "code": "splint",
+    "ingredientPattern": "S,B",
+    "ingredients": {
+      "S": { "type": "item", "code": "game:stick" },
+      "B": { "type": "item", "code": "thebasics:surgicaltools-bandage-*" }
+    },
+    "width": 1,
+    "height": 2,
+    "output": { "type": "item", "code": "thebasics:surgicaltools-splint-iron" }
+  },
+  {
+    "code": "disinfectant",
+    "ingredientPattern": "A,B",
+    "ingredients": {
+      "A": { "type": "item", "code": "game:alcohol" },
+      "B": { "type": "item", "code": "game:bottle-*" }
+    },
+    "width": 1,
+    "height": 2,
+    "output": { "type": "item", "code": "thebasics:surgicaltools-disinfectant-iron" }
+  }
+] 

@@ -684,5 +684,21 @@ namespace thebasics.ModSystems.Surgery
                 }
             }
         }
+
+        // Get the name of a body part by its code
+        public string GetBodyPartName(string bodyPartCode)
+        {
+            if (bodyPartRegistry.TryGetValue(bodyPartCode, out BodyPartDefinition bodyPart))
+            {
+                return bodyPart.Name;
+            }
+            return bodyPartCode; // Fallback to the code if not found
+        }
+        
+        // Get a list of all available procedures (regardless of body part)
+        public List<SurgicalProcedureDefinition> GetAvailableProcedures()
+        {
+            return procedureRegistry.Values.ToList();
+        }
     }
 } 
