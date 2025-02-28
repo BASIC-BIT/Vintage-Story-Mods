@@ -15,6 +15,8 @@ namespace thebasics.ModSystems.Surgery
         private SurgerySystem surgerySystem;
         private SurgicalToolRegistry toolRegistry;
         
+        public SurgicalToolRegistry ToolRegistry => toolRegistry;
+        
         public override bool ShouldLoad(EnumAppSide forSide)
         {
             return forSide == EnumAppSide.Server;

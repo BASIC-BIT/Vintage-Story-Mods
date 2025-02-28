@@ -28,31 +28,10 @@ namespace thebasics.ModSystems.Surgery.Registry
                 toolDefinitions[tool.Code] = tool;
             }
             
-            // Register collectible behaviors for surgical tools
-            api.RegisterCollectibleBehaviorClass("SurgicalToolBehavior", typeof(SurgicalToolBehavior));
+            // Register the SurgicalTool class
+            api.RegisterItemClass("SurgicalTool", typeof(SurgicalTool));
             
-            api.Event.CollectibleLoaded += OnCollectibleLoaded;
-        }
-        
-        private void OnCollectibleLoaded(CollectibleObject collectible)
-        {
-            // Check if collectible is a surgical tool
-            if (collectible.Attributes?["surgicalTool"]?.AsBool() == true)
-            {
-                string toolCode = collectible.Attributes["surgicalToolCode"].AsString();
-                if (string.IsNullOrEmpty(toolCode) || !toolDefinitions.TryGetValue(toolCode, out var toolDef))
-                {
-                    api.Server.LogWarning($"The BASICs: Item {collectible.Code} has surgicalTool attribute but no valid surgicalToolCode");
-                    return;
-                }
-                
-                // Add surgical tool behavior to the collectible
-                collectible.CollectibleBehaviors = collectible.CollectibleBehaviors.Append(
-                    new SurgicalToolBehavior(collectible, toolDef)
-                ).ToArray();
-                
-                api.Server.LogNotification($"The BASICs: Registered surgical tool {toolDef.Name} for item {collectible.Code}");
-            }
+            api.Server.LogNotification($"The BASICs: Registered {defaultTools.Count} surgical tool definitions");
         }
         
         private List<SurgicalToolDefinition> CreateDefaultToolDefinitions()
@@ -107,20 +86,6 @@ namespace thebasics.ModSystems.Surgery.Registry
         public SurgicalToolDefinition GetToolDefinition(string code)
         {
             return toolDefinitions.TryGetValue(code, out var definition) ? definition : null;
-        }
-    }
-    
-    public class SurgicalItemClass : Item
-    {
-        public override void OnLoaded(ICoreAPI api)
-        {
-            base.OnLoaded(api);
-            
-            // Add surgical tool attribute if not present
-            if (this.Attributes?["surgicalTool"] == null)
-            {
-                this.Attributes.SetBool("surgicalTool", true);
-            }
         }
     }
 } 

@@ -437,9 +437,37 @@ namespace thebasics.ModSystems.Surgery
                 return false;
             }
             
-            // Perform the step with success chance
-            bool success = api.World.Rand.NextDouble() < currentStep.SuccessRate;
+            // Get tool quality from registry
+            var toolRegistry = api.ModLoader.GetModSystem<SurgeryModSystem>().ToolRegistry;
+            float qualityModifier = 1.0f; // Default if tool not found
+            
+            if (toolRegistry != null)
+            {
+                var toolDef = toolRegistry.GetToolDefinition(toolCode);
+                if (toolDef != null)
+                {
+                    qualityModifier = toolDef.QualityModifier;
+                }
+            }
+            
+            // Perform the step with success chance modified by tool quality
+            float adjustedSuccessRate = Math.Min(currentStep.SuccessRate * qualityModifier, 0.95f); // Cap at 95% success
+            bool success = api.World.Rand.NextDouble() < adjustedSuccessRate;
             surgeryState.LastStepTime = currentTime;
+            
+            // Provide feedback about tool quality
+            string qualityMessage = "";
+            if (qualityModifier < 0.7f)
+                qualityMessage = "The poor quality of your tool makes this difficult.";
+            else if (qualityModifier < 0.9f)
+                qualityMessage = "Your tool seems adequate, but not ideal for this task.";
+            else if (qualityModifier < 1.1f)
+                qualityMessage = "Your tool is well-suited for this procedure.";
+            else
+                qualityMessage = "The excellent quality of your tool makes this easier.";
+                
+            player.SendMessage(GlobalConstants.GeneralChatGroup, qualityMessage, EnumChatType.Notification);
+            player.SendMessage(GlobalConstants.GeneralChatGroup, $"Chance of success: {adjustedSuccessRate * 100:0}%", EnumChatType.Notification);
             
             if (!success)
             {

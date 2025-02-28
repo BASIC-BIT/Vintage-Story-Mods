@@ -56,6 +56,7 @@ namespace thebasics.ModSystems.Surgery.Models
         public string Name { get; set; }
         public bool Consumable { get; set; } = false;
         public int UsesBeforeDegrading { get; set; } = 10;
+        public float QualityModifier { get; set; } = 1.0f; // Higher value means better quality
     }
     
     public enum MedicalConditionType
