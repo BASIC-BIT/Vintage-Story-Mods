@@ -42,8 +42,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // Initialize transformers
         _transformers = new List<IMessageTransformer>
         {
+            new PlayerChatTransformer(this),
             new LanguageTransformer(_languageSystem),
             new ObfuscationTransformer(_distanceObfuscationSystem),
+            new OOCTransformer(this),
+            new EnvironmentMessageTransformer(this),
             new FormatTransformer(this),
             new EmoteTransformer(this),
             new ChatModeTransformer(this)
@@ -416,57 +419,24 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     private string GetPlayerChat(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message, int groupId)
     {
-        // Check if message is OOC format
-        if (message.StartsWith("((") && message.EndsWith("))") && sendingPlayer.GetOOCEnabled())
-        {
-            // Strip the (( and )) and send as OOC message
-            message = message.Substring(2, message.Length - 4).Trim();
-            return $"{ChatHelper.Color("#808080", $"(OOC) {sendingPlayer.PlayerName}: {message}")}";
-        }
-
         var content = ChatHelper.GetMessage(message);
-        var isEmote = content[0] == '*';
-        var isGlobalOoc = Config.EnableGlobalOOC && content.StartsWith("((");
-        var isOOC = !isGlobalOoc && content[0] == '(';
-        var isEnvironmentMessage = content[0] == '!';
-
-        // If Global OOC, let the message be sent out like normal
-        if (isGlobalOoc)
-        {
-            return message;
-        }
-
+        
+        // Create a message context with the isPlayerChat flag
         var context = new MessageContext
         {
             Message = content,
             SendingPlayer = sendingPlayer,
             ReceivingPlayer = receivingPlayer,
             GroupId = groupId,
-            Metadata = new Dictionary<string, object>()
-        };
-
-        if (isEmote)
-        {
-            context.Message = content.Remove(0, 1);
-            context.Metadata["isEmote"] = true;
-        }
-        else if (isOOC)
-        {
-            if (!message.EndsWith(")"))
+            Metadata = new Dictionary<string, object>
             {
-                message += ")";
+                ["isPlayerChat"] = true,
+                ["chatMode"] = sendingPlayer.GetChatMode()
             }
-            return message;
-        }
-        else if (isEnvironmentMessage)
-        {
-            context.Message = content.Remove(0, 1);
-            context.Metadata["isEnvironmental"] = true;
-        }
-
-        context.Metadata["chatMode"] = sendingPlayer.GetChatMode();
+        };
         
-        // Return the raw context message without transforming - let SendLocalChatByPlayer handle transformation
+        // Return the raw message content
+        // The PlayerChatTransformer will handle detecting message types during the transformation process
         return context.Message;
     }
 
@@ -906,25 +876,38 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
         
-        // TODO: Fix this hack - using a check here to check for environment messages to apply specific message type
-        // I'm checking the content twice, both here and in GetPlayerChat. Should be cleaned up
+        // Create a context to test for global OOC message
         var content = ChatHelper.GetMessage(message);
-        var isEnvironmentMessage = content[0] == '!';
-        var isGlobalOOC = Config.EnableGlobalOOC && content.StartsWith("((");
-
-        if (isGlobalOOC)
+        var testContext = new MessageContext
         {
-            // If Global OOC, let the message be sent out like normal just like we do with other channels
+            Message = content,
+            SendingPlayer = byPlayer,
+            Metadata = new Dictionary<string, object> { ["isPlayerChat"] = true }
+        };
+        
+        // Apply only the PlayerChatTransformer to detect global OOC
+        var playerChatTransformer = new PlayerChatTransformer(this);
+        testContext = playerChatTransformer.Transform(testContext);
+        
+        // If it's a global OOC message, let the server handle it
+        if (testContext.Metadata.ContainsKey("isGlobalOOC"))
+        {
             consumed.value = false;
             return;
         }
         
-        EnumChatType chatType = isEnvironmentMessage ? EnumChatType.Notification : EnumChatType.OthersMessage;
+        // Determine the appropriate chat type
+        EnumChatType chatType = EnumChatType.OthersMessage;
+        if (content.StartsWith("!"))
+        {
+            chatType = EnumChatType.Notification;
+        }
+        
         var messageCopy = (string)message.Clone();
         SendLocalChatByPlayer(byPlayer,
             receivingPlayer => GetPlayerChat(byPlayer, receivingPlayer, messageCopy, channelId), chatType: chatType, data: data);
         
-        // TODO: Only send this message if the player tried to speak in babble accidentally
+        // Only send this message if the player tried to speak in babble accidentally
         if (byPlayer.GetDefaultLanguage(Config) == LanguageSystem.BabbleLang)
         {
             byPlayer.SendMessage(GlobalConstants.CurrentChatGroup, "You are speaking in babble.  Add a language via /addlang or set your default lang with a language identifier, ex. \":c\".  Use /listlang to see all available languages", EnumChatType.CommandError);

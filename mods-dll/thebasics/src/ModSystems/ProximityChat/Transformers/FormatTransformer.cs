@@ -45,7 +45,7 @@ public class FormatTransformer : IMessageTransformer
         context.Message = content;
         return context;
     }
-    
+
     private string ProcessAccents(string message)
     {
         message = Regex.Replace(message, @"\|(.*?)\|", "<i>$1</i>");
