@@ -197,7 +197,7 @@ namespace thebasics.ModSystems.ProximityChat
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
             var languageIdentifier = (string)args.Parsers[1].GetValue();
-            var lang = GetLangFromText(languageIdentifier, true);
+            var lang = GetLangFromText(languageIdentifier, true, allowHidden: true);
 
             if (lang == null)
             {
@@ -250,7 +250,7 @@ namespace thebasics.ModSystems.ProximityChat
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
             var languageIdentifier = (string)args.Parsers[1].GetValue();
-            var language = GetLangFromText(languageIdentifier, false);
+            var language = GetLangFromText(languageIdentifier, false, allowHidden: true);
 
             if (language == null)
             {
@@ -324,7 +324,7 @@ namespace thebasics.ModSystems.ProximityChat
         private List<Language> GetPlayerLanguages(IServerPlayer player)
         {
             return player.GetLanguages()
-                .Select(lang => GetLangFromText(lang, false))
+                .Select(lang => GetLangFromText(lang, false, allowHidden: true))
                 .Where(lang => lang != null)
                 .Cast<Language>()  // Cast after filtering out nulls
                 .ToList();
@@ -333,11 +333,12 @@ namespace thebasics.ModSystems.ProximityChat
         private static readonly Regex LanguageSwapRegex = new(@"^\s*:(\w+)\s*$");
         private static readonly Regex LanguageTalkRegex = new(@"^\s*:(\w+)\s+(.*)$");
 
-        private Language? GetLangFromText(string text, bool allowBabble)
+        private Language? GetLangFromText(string text, bool allowBabble, bool allowHidden = false)
         {
             return GetAllLanguages(allowBabble).FirstOrDefault(lang =>
-                lang?.Prefix?.ToLower() == text.ToLower() ||
-                lang?.Name?.ToLower() == text.ToLower());
+                (allowHidden || !lang.Hidden) && 
+                (lang?.Prefix?.ToLower() == text.ToLower() ||
+                lang?.Name?.ToLower() == text.ToLower()));
         }
 
         private List<Language> GetAllLanguages(bool allowBabble)
@@ -363,7 +364,7 @@ namespace thebasics.ModSystems.ProximityChat
                 var match = LanguageSwapRegex.Match(ChatHelper.GetMessage(message));
                 var languageIdentifier = match.Groups[1].Value;
 
-                var lang = GetLangFromText(languageIdentifier, true);
+                var lang = GetLangFromText(languageIdentifier, true, sendingPlayer.HasPrivilege(Config.ChangeOtherLanguagePermission));
                 
                 if (lang == null)
                 {
@@ -396,7 +397,7 @@ namespace thebasics.ModSystems.ProximityChat
             {
                 var match = LanguageTalkRegex.Match(message);
                 var languageIdentifier = match.Groups[1].Value;
-                var lang = GetLangFromText(languageIdentifier, true);
+                var lang = GetLangFromText(languageIdentifier, true, sendingPlayer.HasPrivilege(Config.ChangeOtherLanguagePermission));
 
                 if (lang == null)
                 {
@@ -423,6 +424,13 @@ namespace thebasics.ModSystems.ProximityChat
         public void ProcessMessage(IServerPlayer receivingPlayer,
             ref string message, Language lang)
         {
+            // Special handling for Sign Language - always display in italics
+            if (lang == SignLanguage && !message.StartsWith("<i>") && !message.EndsWith("</i>"))
+            {
+                message = $"<i>{message}</i>";
+                return;
+            }
+
             if (Config.EnableLanguageSystem && !receivingPlayer.KnowsLanguage(lang))
             {
                 var scrambledMessage = LanguageScrambler.ScrambleMessage(message, lang);

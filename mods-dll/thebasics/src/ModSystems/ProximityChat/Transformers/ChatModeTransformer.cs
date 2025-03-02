@@ -29,6 +29,12 @@ public class ChatModeTransformer : IMessageTransformer
         var verb = GetProximityChatVerb(context.SendingPlayer, mode, context);
         var punctuation = GetProximityChatPunctuation(mode);
         
+        // Format sign language in italics
+        if (context.Metadata.TryGetValue("language", out var langObj) && langObj is Language lang && lang == LanguageSystem.SignLanguage)
+        {
+            content = $"<i>{content}</i>";
+        }
+        
         context.Message = $"{nickname} {verb}: {content}{punctuation}";
         return context;
     }
