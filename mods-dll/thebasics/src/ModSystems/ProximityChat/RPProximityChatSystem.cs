@@ -381,16 +381,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         foreach (var transformer in _transformers)
         {
-            // Check if transformer is stage-aware
-            if (transformer is IStageAwareTransformer stageAwareTransformer)
-            {
-                // Skip if this transformer doesn't apply to the current stage
-                if (!stageAwareTransformer.ApplicableStages.Contains(context.Stage))
-                {
-                    continue;
-                }
-            }
-
             context = transformer.Transform(context);
             if (context.State != MessageContextState.CONTINUE)
             {
@@ -401,36 +391,26 @@ public class RPProximityChatSystem : BaseBasicModSystem
     }
 
     /// <summary>
-    /// Processes a message through the entire pipeline from sender-only to sending to all recipients
+    /// Processes a message through the unified pipeline, handling all steps from validation to delivery
     /// </summary>
     public void ProcessMessagePipeline(MessageContext initialContext, EnumChatType defaultChatType = EnumChatType.OthersMessage)
     {
-        // STAGE 1: Process sender context and check for any warnings/validations
+        // Process the context through all transformers
         var context = ExecuteTransformers(initialContext);
         
-        // Check for warnings that should be sent to the sender
-        NicknameRequirementTransformer.SendNicknameWarningIfNeeded(context);
-        BabbleWarningTransformer.SendBabbleWarningIfNeeded(context);
-        
-        // If processing was stopped, don't continue with the pipeline
+        // If processing was stopped, don't continue
         if (context.State != MessageContextState.CONTINUE)
         {
             return;
         }
         
-        // STAGE 2: Determine recipients
-        // Reset stage for recipient determination (but keep the same context so metadata carries over)
-        context.Stage = MessageStage.SENDER_ONLY;
-        context.State = MessageContextState.CONTINUE; // Reset state to continue processing
-        context = ExecuteTransformers(context);
-        
-        // If processing was stopped or no recipients, nothing to do
-        if (context.State != MessageContextState.CONTINUE || context.Recipients == null || context.Recipients.Count == 0)
+        // If no recipients were determined, nothing to do
+        if (context.Recipients == null || context.Recipients.Count == 0)
         {
             return;
         }
         
-        // STAGE 3: Send to each recipient
+        // Send to each recipient
         foreach (var recipient in context.Recipients)
         {
             var recipientContext = new MessageContext
@@ -439,11 +419,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 SendingPlayer = context.SendingPlayer,
                 ReceivingPlayer = recipient,
                 GroupId = context.GroupId,
-                Metadata = new Dictionary<string, object>(context.Metadata),
-                Stage = MessageStage.SENDING_TO_RECIPIENT,
-                State = MessageContextState.CONTINUE  // Start with fresh state
+                Metadata = new Dictionary<string, object>(context.Metadata)
             };
             
+            // Process this recipient's context
             recipientContext = ExecuteTransformers(recipientContext);
             
             // Skip sending if processing was stopped for this recipient

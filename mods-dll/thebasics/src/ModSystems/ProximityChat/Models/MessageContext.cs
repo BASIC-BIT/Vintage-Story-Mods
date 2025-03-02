@@ -6,8 +6,7 @@ namespace thebasics.ModSystems.ProximityChat.Models;
 public enum MessageContextState
 {
     CONTINUE,
-    STOP,
-    ERROR
+    STOP
 }
 
 public class MessageContext
@@ -16,17 +15,13 @@ public class MessageContext
     public IServerPlayer SendingPlayer { get; set; }
     public IServerPlayer ReceivingPlayer { get; set; }
     public int GroupId { get; set; }
-    public Dictionary<string, object> Metadata { get; set; } = new Dictionary<string, object>();
+    public Dictionary<string, object> Metadata { get; set; } = new();
+    public MessageStage Stage { get; set; } = MessageStage.SENDER_ONLY;
     public MessageContextState State { get; set; } = MessageContextState.CONTINUE;
     
     /// <summary>
-    /// The current stage in the message processing pipeline
+    /// The players who should receive this message (populated during recipient determination)
     /// </summary>
-    public MessageStage Stage { get; set; } = MessageStage.SENDER_ONLY;
-    
-    /// <summary>
-    /// Players who should receive this message (only populated during RECIPIENTS_DETERMINED stage)
-    /// </summary>
-    public List<IServerPlayer> Recipients { get; set; } = new List<IServerPlayer>();
+    public List<IServerPlayer> Recipients { get; set; }
     public string ErrorMessage { get; set; }
 } 

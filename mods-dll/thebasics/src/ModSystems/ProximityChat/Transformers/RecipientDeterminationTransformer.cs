@@ -9,13 +9,11 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 /// <summary>
 /// Determines which players should receive a message based on proximity and other factors
 /// </summary>
-public class RecipientDeterminationTransformer : IStageAwareTransformer
+public class RecipientDeterminationTransformer : IMessageTransformer
 {
     private readonly RPProximityChatSystem _chatSystem;
     private readonly LanguageSystem _languageSystem;
     private readonly ProximityCheckUtils _proximityCheckUtils;
-    
-    public MessageStage[] ApplicableStages => new[] { MessageStage.SENDER_ONLY };
     
     public RecipientDeterminationTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem, ProximityCheckUtils proximityCheckUtils)
     {
@@ -26,8 +24,14 @@ public class RecipientDeterminationTransformer : IStageAwareTransformer
     
     public MessageContext Transform(MessageContext context)
     {
-        // Only process at the correct stage
-        if (context.Stage != MessageStage.SENDER_ONLY || context.State != MessageContextState.CONTINUE)
+        // Skip if this is a context for an individual recipient
+        if (context.SendingPlayer != context.ReceivingPlayer)
+        {
+            return context;
+        }
+        
+        // Skip if we already have recipients
+        if (context.Recipients != null && context.Recipients.Count > 0)
         {
             return context;
         }
@@ -61,9 +65,6 @@ public class RecipientDeterminationTransformer : IStageAwareTransformer
         
         // Add players to context
         context.Recipients = nearbyPlayers;
-        
-        // Update stage
-        context.Stage = MessageStage.RECIPIENTS_DETERMINED;
         
         return context;
     }

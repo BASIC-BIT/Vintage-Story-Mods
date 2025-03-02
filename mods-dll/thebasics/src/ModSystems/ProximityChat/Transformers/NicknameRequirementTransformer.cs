@@ -2,6 +2,7 @@ using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
@@ -16,43 +17,40 @@ public class NicknameRequirementTransformer : IMessageTransformer
     
     public MessageContext Transform(MessageContext context)
     {
-        // Only check for the sender's context
+        var config = _chatSystem.GetModConfig();
+        
+        // Skip if nicknames are disabled in the config
+        if (config.DisableNicknames)
+        {
+            return context;
+        }
+        
+        // Only check for nickname requirement during player chat
+        if (!context.Metadata.ContainsKey("isPlayerChat"))
+        {
+            return context;
+        }
+        
+        // Only process for the sending player
         if (context.SendingPlayer != context.ReceivingPlayer)
         {
             return context;
         }
         
-        // Skip check if it's not a message type that requires a nickname
-        bool requiresNickname = context.Metadata.ContainsKey("isEmote") || 
-                                (context.Metadata.ContainsKey("isPlayerChat") && !context.Metadata.ContainsKey("isGlobalOOC"));
-        
-        if (!requiresNickname)
-        {
-            return context;
-        }
-        
-        // Check if player has a nickname
+        // Check if the player has a nickname
         if (!context.SendingPlayer.HasNickname())
         {
-            // Add warning flag to metadata
-            context.Metadata["showNicknameWarning"] = true;
+            // Send nickname requirement warning directly to the player
+            context.SendingPlayer.SendMessage(
+                _chatSystem.GetProximityChatGroupId(),
+                "You need a nickname to use proximity chat! You can set it with `/nick MyName`",
+                EnumChatType.CommandError
+            );
+            
             // Stop processing this message
             context.State = MessageContextState.STOP;
         }
         
         return context;
-    }
-    
-    // Static method to send warning if needed
-    public static void SendNicknameWarningIfNeeded(MessageContext context)
-    {
-        if (context.Metadata.TryGetValue("showNicknameWarning", out var showWarning) && (bool)showWarning)
-        {
-            context.SendingPlayer.SendMessage(
-                GlobalConstants.CurrentChatGroup,
-                "You need a nickname to use this feature! You can set it with `/nick MyName`",
-                EnumChatType.CommandError
-            );
-        }
     }
 } 

@@ -1,8 +1,10 @@
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
@@ -19,34 +21,47 @@ public class BabbleWarningTransformer : IMessageTransformer
     
     public MessageContext Transform(MessageContext context)
     {
-        var config = _chatSystem.GetModConfig();
+        // Skip if this is not a player chat message
+        if (!context.Metadata.ContainsKey("isPlayerChat"))
+        {
+            return context;
+        }
         
-        // Only process for the sending player
+        // Only check for babble warning when we're in the initial context with the sending player
         if (context.SendingPlayer != context.ReceivingPlayer)
         {
             return context;
         }
         
-        // Check if the player is speaking in babble
-        if (context.SendingPlayer.GetDefaultLanguage(config) == LanguageSystem.BabbleLang)
+        // Get the message text
+        var message = context.Message;
+        
+        // Check if player is using babble language
+        var speakingLanguage = _languageSystem.GetSpeakingLanguage(
+            context.SendingPlayer, 
+            _chatSystem.GetProximityChatGroupId(), 
+            ref message
+        );
+        
+        if (speakingLanguage == null)
         {
-            // Add a warning flag to show a babble warning message
-            context.Metadata["showBabbleWarning"] = true;
+            return context;
+        }
+        
+        // Get the player's default language
+        var defaultLanguage = context.SendingPlayer.GetDefaultLanguage(_chatSystem.GetModConfig());
+        
+        // Check if player is speaking a different language than their default
+        if (speakingLanguage != defaultLanguage)
+        {
+            // Send babble warning directly to the player
+            context.SendingPlayer.SendMessage(
+                _chatSystem.GetProximityChatGroupId(), 
+                $"Warning: You are speaking in the {speakingLanguage.Name} language. Other players may not understand you.", 
+                EnumChatType.Notification
+            );
         }
         
         return context;
-    }
-    
-    // Method to send the babble warning if needed
-    public static void SendBabbleWarningIfNeeded(MessageContext context)
-    {
-        if (context.Metadata.TryGetValue("showBabbleWarning", out var showWarning) && (bool)showWarning)
-        {
-            context.SendingPlayer.SendMessage(
-                GlobalConstants.CurrentChatGroup, 
-                "You are speaking in babble. Add a language via /addlang or set your default lang with a language identifier, ex. \":c\". Use /listlang to see all available languages", 
-                EnumChatType.CommandError
-            );
-        }
     }
 } 

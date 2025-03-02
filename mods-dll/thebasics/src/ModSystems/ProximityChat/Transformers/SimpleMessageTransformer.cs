@@ -8,7 +8,7 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 /// <summary>
 /// Handles simple non-RP messages that don't require special formatting.
 /// </summary>
-public class SimpleMessageTransformer : IStageAwareTransformer
+public class SimpleMessageTransformer : IMessageTransformer
 {
     private readonly RPProximityChatSystem _chatSystem;
     
@@ -16,12 +16,6 @@ public class SimpleMessageTransformer : IStageAwareTransformer
     {
         _chatSystem = chatSystem;
     }
-    
-    public MessageStage[] ApplicableStages => new[] 
-    { 
-        MessageStage.SENDER_ONLY, 
-        MessageStage.SENDING_TO_RECIPIENT 
-    };
     
     public MessageContext Transform(MessageContext context)
     {
@@ -52,7 +46,6 @@ public class SimpleMessageTransformer : IStageAwareTransformer
             Message = message,
             SendingPlayer = sender,
             ReceivingPlayer = sender, // Initially set to sender for validation
-            Stage = MessageStage.SENDER_ONLY,
             Metadata = new System.Collections.Generic.Dictionary<string, object>
             {
                 ["isSimpleMessage"] = true,
