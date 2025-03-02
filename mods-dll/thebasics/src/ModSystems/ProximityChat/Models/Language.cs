@@ -10,8 +10,5 @@ public record Language(
     string[] Syllables,
     string Color,
     bool Default,
-    bool Hidden,
-    bool IsSignLanguage = false,
-    int SignLanguageRange = 60,
-    bool UseItalics = false
+    bool Hidden
 );

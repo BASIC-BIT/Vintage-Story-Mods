@@ -1,4 +1,5 @@
 using thebasics.Extensions;
+using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Server;
@@ -34,7 +35,7 @@ public class ChatModeTransformer : IMessageTransformer
     
     private string GetProximityChatVerb(IServerPlayer player, ProximityChatMode mode, MessageContext context)
     {
-        if (context.Metadata.TryGetValue("language", out var langObj) && langObj is Language lang && lang.IsSignLanguage)
+        if (context.Metadata.TryGetValue("language", out var langObj) && langObj is Language lang && lang == LanguageSystem.SignLanguage)
         {
             return "signs";
         }

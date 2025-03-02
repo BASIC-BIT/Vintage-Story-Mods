@@ -129,14 +129,15 @@ namespace thebasics.Configs
         public string ChangeOtherLanguagePermission = "commandplayer";
         public int MaxLanguagesPerPlayer = 3;
         
+        // Sign language configuration
+        public int SignLanguageRange = 60;
+        
         public IList<Language> Languages = new Language[]
         {
             new Language("Common", "The universal language", "c",
                 new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#E9DDCE", true, false),
             new Language("Tradeband", "A common language for trade", "tr",
-                new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A", false, false),
-            new Language("Sign", "A visual language using hand gestures and movements", "sign",
-                new string[] { }, "#A0A0A0", false, false, true, 60, true)
+                new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A", false, false)
         };
 
         public bool PreventProximityChannelSwitching = true;

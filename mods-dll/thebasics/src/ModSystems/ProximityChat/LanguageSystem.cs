@@ -73,6 +73,7 @@ namespace thebasics.ModSystems.ProximityChat
         }
         
         public static readonly Language BabbleLang = new Language("Babble", "Unintelligible", "babble", new[] { "ba", "ble", "bla", "bal" }, "#FF0000", false, true);
+        public static readonly Language SignLanguage = new Language("Sign", "A visual language using hand gestures and movements", "sign", new string[] { }, "#A0A0A0", false, false);
         
         private TextCommandResult HandleAddLanguageCommand(TextCommandCallingArgs args)
         {
@@ -343,10 +344,15 @@ namespace thebasics.ModSystems.ProximityChat
         {
             List<Language> languages = new();
             languages.AddRange(Config.Languages);
+            
+            // Always include SignLanguage
+            languages.Add(SignLanguage);
+            
             if (allowBabble)
             {
                 languages.Add(BabbleLang);
             }
+            
             return languages;
         }
 

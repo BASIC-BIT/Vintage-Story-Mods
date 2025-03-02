@@ -509,7 +509,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         
         var message = "";
         var lang = _languageSystem.GetSpeakingLanguage(player, _proximityChatId, ref message);
-        if (lang.IsSignLanguage)
+        if (lang == LanguageSystem.SignLanguage)
         {
             return nearbyPlayers.Where(nearbyPlayer => _proximityCheckUtils.CanSeePlayer(player, nearbyPlayer)).ToArray();
         }
@@ -542,9 +542,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         var message = "";
         var lang = _languageSystem.GetSpeakingLanguage(player, _proximityChatId, ref message);
-        if (lang.IsSignLanguage)
+        if (lang == LanguageSystem.SignLanguage)
         {
-            return lang.SignLanguageRange;
+            return Config.SignLanguageRange;
         }
 
         var mode = tempMode ?? player.GetChatMode();
