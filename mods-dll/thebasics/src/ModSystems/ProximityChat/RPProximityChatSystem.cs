@@ -8,6 +8,7 @@ using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
+using thebasics.Configs;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
@@ -464,7 +465,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
 
         context.Metadata["chatMode"] = sendingPlayer.GetChatMode();
-        return ExecuteTransformers(context).Message;
+        
+        // Return the raw context message without transforming - let SendLocalChatByPlayer handle transformation
+        return context.Message;
     }
 
     private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content, int groupId)
@@ -533,6 +536,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 Metadata = { ["chatMode"] = tempMode ?? byPlayer.GetChatMode() }
             };
 
+            // Only transform once, here
             context = ExecuteTransformers(context);
             serverPlayer.SendMessage(_proximityChatId, context.Message, chatType, data);
         }
@@ -925,5 +929,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             byPlayer.SendMessage(GlobalConstants.CurrentChatGroup, "You are speaking in babble.  Add a language via /addlang or set your default lang with a language identifier, ex. \":c\".  Use /listlang to see all available languages", EnumChatType.CommandError);
         }
+    }
+
+    // Add this method to provide access to the config
+    public ModConfig GetModConfig()
+    {
+        return Config;
     }
 }

@@ -25,8 +25,11 @@ public class FormatTransformer : IMessageTransformer
             return $"{match.Groups[1].Value}{firstLetter.ToUpper()}{match.Groups[3].Value}";
         });
         
-        // Handle auto-punctuation if needed
-        if (ChatHelper.DoesMessageNeedPunctuation(content))
+        // Only add auto-punctuation for emotes and environmental messages
+        // Regular chat messages will get punctuation from ChatModeTransformer
+        bool isRegularChat = !context.Metadata.ContainsKey("isEmote") && !context.Metadata.ContainsKey("isEnvironmental");
+        
+        if (!isRegularChat && ChatHelper.DoesMessageNeedPunctuation(content))
         {
             var autoPunctuationRegex = new Regex(@"^(.*?)(.)([\s+|]*)$");
             content = autoPunctuationRegex.Replace(content, match =>
