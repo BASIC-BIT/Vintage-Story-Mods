@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using thebasics.Configs;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 
@@ -62,5 +63,11 @@ public class PlayerChatTransformer : IMessageTransformer
         }
         
         return context;
+    }
+    
+    // Static utility method to check if a message is a global OOC message
+    public static bool IsGlobalOOC(string message, ModConfig config)
+    {
+        return config.EnableGlobalOOC && message.StartsWith("((");
     }
 } 

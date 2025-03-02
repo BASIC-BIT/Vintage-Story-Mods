@@ -42,14 +42,23 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // Initialize transformers
         _transformers = new List<IMessageTransformer>
         {
+            // Pre-validation transformers (run during SENDER_ONLY stage)
+            new NicknameRequirementTransformer(this),
             new PlayerChatTransformer(this),
+            new BabbleWarningTransformer(this, _languageSystem),
+            
+            // Recipient determination (runs during SENDER_ONLY stage after validations)
+            new RecipientDeterminationTransformer(this, _languageSystem, _proximityCheckUtils),
+            
+            // Content transformation (runs during all stages)
             new LanguageTransformer(_languageSystem),
             new ObfuscationTransformer(_distanceObfuscationSystem),
             new OOCTransformer(this),
             new EnvironmentMessageTransformer(this),
             new FormatTransformer(this),
             new EmoteTransformer(this),
-            new ChatModeTransformer(this)
+            new ChatModeTransformer(this),
+            new ChatTypeTransformer(this)
         };
     }
 
@@ -408,6 +417,16 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         foreach (var transformer in _transformers)
         {
+            // Check if transformer is stage-aware
+            if (transformer is IStageAwareTransformer stageAwareTransformer)
+            {
+                // Skip if this transformer doesn't apply to the current stage
+                if (!stageAwareTransformer.ApplicableStages.Contains(context.Stage))
+                {
+                    continue;
+                }
+            }
+            
             context = transformer.Transform(context);
             if (context.State != MessageContextState.CONTINUE)
             {
@@ -415,6 +434,69 @@ public class RPProximityChatSystem : BaseBasicModSystem
             }
         }
         return context;
+    }
+
+    /// <summary>
+    /// Processes a message through the entire pipeline from sender-only to sending to all recipients
+    /// </summary>
+    public void ProcessMessagePipeline(MessageContext initialContext, EnumChatType defaultChatType = EnumChatType.OthersMessage)
+    {
+        // STAGE 1: Process sender context and check for any warnings/validations
+        var context = ExecuteTransformers(initialContext);
+        
+        // Check for warnings that should be sent to the sender
+        NicknameRequirementTransformer.SendNicknameWarningIfNeeded(context);
+        BabbleWarningTransformer.SendBabbleWarningIfNeeded(context);
+        
+        // If processing was stopped, don't continue with the pipeline
+        if (context.State != MessageContextState.CONTINUE)
+        {
+            return;
+        }
+        
+        // STAGE 2: Determine recipients
+        // Reset stage for recipient determination (but keep the same context so metadata carries over)
+        context.Stage = MessageStage.SENDER_ONLY;
+        context.State = MessageContextState.CONTINUE; // Reset state to continue processing
+        context = ExecuteTransformers(context);
+        
+        // If processing was stopped or no recipients, nothing to do
+        if (context.State != MessageContextState.CONTINUE || context.Recipients == null || context.Recipients.Count == 0)
+        {
+            return;
+        }
+        
+        // STAGE 3: Send to each recipient
+        foreach (var recipient in context.Recipients)
+        {
+            var recipientContext = new MessageContext
+            {
+                Message = context.Message,
+                SendingPlayer = context.SendingPlayer,
+                ReceivingPlayer = recipient,
+                GroupId = context.GroupId,
+                Metadata = new Dictionary<string, object>(context.Metadata),
+                Stage = MessageStage.SENDING_TO_RECIPIENT,
+                State = MessageContextState.CONTINUE  // Start with fresh state
+            };
+            
+            recipientContext = ExecuteTransformers(recipientContext);
+            
+            // Skip sending if processing was stopped for this recipient
+            if (recipientContext.State != MessageContextState.CONTINUE)
+            {
+                continue;
+            }
+            
+            // Get the chat type from the context metadata or use the provided default
+            var chatType = recipientContext.Metadata.ContainsKey("chatType") 
+                ? (EnumChatType)recipientContext.Metadata["chatType"] 
+                : defaultChatType;
+                
+            // Send the message to this recipient
+            string data = null; // TODO: Handle any data if needed
+            recipient.SendMessage(GetProximityChatGroupId(), recipientContext.Message, chatType, data);
+        }
     }
 
     private string GetPlayerChat(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message, int groupId)
@@ -495,6 +577,22 @@ public class RPProximityChatSystem : BaseBasicModSystem
         EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
     {
         var nearbyPlayers = GetNearbyPlayers(byPlayer, tempMode);
+        
+        // First process sending player's context to check for warnings (like babble)
+        var senderContext = new MessageContext
+        {
+            SendingPlayer = byPlayer,
+            ReceivingPlayer = byPlayer,
+            Message = messageGenerator(byPlayer),
+            Metadata = { ["chatMode"] = tempMode ?? byPlayer.GetChatMode() }
+        };
+        
+        senderContext = ExecuteTransformers(senderContext);
+        
+        // Check for any warnings (like babble) that should be sent to the sender
+        BabbleWarningTransformer.SendBabbleWarningIfNeeded(senderContext);
+        
+        // Then process for each receiving player
         foreach (var player in nearbyPlayers)
         {
             var serverPlayer = player as IServerPlayer;
@@ -508,7 +606,13 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             // Only transform once, here
             context = ExecuteTransformers(context);
-            serverPlayer.SendMessage(_proximityChatId, context.Message, chatType, data);
+            
+            // Get the chat type from the context metadata or use the provided default
+            var messageChatType = context.Metadata.ContainsKey("chatType") 
+                ? (EnumChatType)context.Metadata["chatType"] 
+                : chatType;
+                
+            serverPlayer.SendMessage(_proximityChatId, context.Message, messageChatType, data);
         }
     }
 
@@ -658,32 +762,22 @@ public class RPProximityChatSystem : BaseBasicModSystem
         };
     }
 
-    public TextCommandResult HandleEmoteCommand(TextCommandCallingArgs args, bool isEmote)
+    private TextCommandResult Emote(TextCommandCallingArgs args)
     {
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        if (isEmote && !player.HasNickname())
-        {
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Error,
-                StatusMessage = "You need a nickname to use emotes!  You can set it with `/nick MyName`"
-            };
-        }
-
+        
         var context = new MessageContext
         {
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
-            Metadata = { [isEmote ? "isEmote" : "isEnvironmental"] = true }
+            ReceivingPlayer = player, // Start with sender context for validation
+            GroupId = GetProximityChatGroupId(),
+            Metadata = { ["isEmote"] = true },
+            Stage = MessageStage.SENDER_ONLY
         };
-
-        SendLocalChatByPlayer(player,
-            targetPlayer =>
-            {
-                context.ReceivingPlayer = targetPlayer;
-                return ExecuteTransformers(context).Message;
-            },
-            chatType: isEmote ? EnumChatType.OthersMessage : EnumChatType.Notification);
+        
+        // Process the entire pipeline
+        ProcessMessagePipeline(context, EnumChatType.OthersMessage);
 
         return new TextCommandResult
         {
@@ -691,14 +785,27 @@ public class RPProximityChatSystem : BaseBasicModSystem
         };
     }
 
-    private TextCommandResult Emote(TextCommandCallingArgs args)
-    {
-        return HandleEmoteCommand(args, true);
-    }
-
     private TextCommandResult EnvironmentMessage(TextCommandCallingArgs args)
     {
-        return HandleEmoteCommand(args, false);
+        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+        
+        var context = new MessageContext
+        {
+            Message = (string)args.Parsers[0].GetValue(),
+            SendingPlayer = player,
+            ReceivingPlayer = player, // Start with sender context for validation
+            GroupId = GetProximityChatGroupId(),
+            Metadata = { ["isEnvironmental"] = true },
+            Stage = MessageStage.SENDER_ONLY
+        };
+        
+        // Process the entire pipeline
+        ProcessMessagePipeline(context, EnumChatType.Notification);
+        
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+        };
     }
 
     private TextCommandResult ClearNickname(TextCommandCallingArgs args)
@@ -876,47 +983,36 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
         
-        // Create a context to test for global OOC message
+        // Check for global OOC without creating a new transformer
         var content = ChatHelper.GetMessage(message);
-        var testContext = new MessageContext
-        {
-            Message = content,
-            SendingPlayer = byPlayer,
-            Metadata = new Dictionary<string, object> { ["isPlayerChat"] = true }
-        };
-        
-        // Apply only the PlayerChatTransformer to detect global OOC
-        var playerChatTransformer = new PlayerChatTransformer(this);
-        testContext = playerChatTransformer.Transform(testContext);
-        
-        // If it's a global OOC message, let the server handle it
-        if (testContext.Metadata.ContainsKey("isGlobalOOC"))
+        if (PlayerChatTransformer.IsGlobalOOC(content, Config))
         {
             consumed.value = false;
             return;
         }
         
-        // Determine the appropriate chat type
-        EnumChatType chatType = EnumChatType.OthersMessage;
-        if (content.StartsWith("!"))
-        {
-            chatType = EnumChatType.Notification;
-        }
-        
+        // Send the message to nearby players - the ChatTypeTransformer will determine the appropriate chat type
         var messageCopy = (string)message.Clone();
         SendLocalChatByPlayer(byPlayer,
-            receivingPlayer => GetPlayerChat(byPlayer, receivingPlayer, messageCopy, channelId), chatType: chatType, data: data);
-        
-        // Only send this message if the player tried to speak in babble accidentally
-        if (byPlayer.GetDefaultLanguage(Config) == LanguageSystem.BabbleLang)
-        {
-            byPlayer.SendMessage(GlobalConstants.CurrentChatGroup, "You are speaking in babble.  Add a language via /addlang or set your default lang with a language identifier, ex. \":c\".  Use /listlang to see all available languages", EnumChatType.CommandError);
-        }
+            receivingPlayer => GetPlayerChat(byPlayer, receivingPlayer, messageCopy, channelId), 
+            chatType: EnumChatType.OthersMessage, data: data);
     }
 
     // Add this method to provide access to the config
     public ModConfig GetModConfig()
     {
         return Config;
+    }
+    
+    // Add this method to provide access to the proximity chat group ID
+    public int GetProximityChatGroupId()
+    {
+        return _proximityChatId;
+    }
+
+    // Add this method to provide access to the API
+    public ICoreServerAPI GetAPI()
+    {
+        return API as ICoreServerAPI;
     }
 }
