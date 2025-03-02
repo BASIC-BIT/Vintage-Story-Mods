@@ -26,6 +26,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private IServerNetworkChannel _serverConfigChannel;
     private ProximityCheckUtils _proximityCheckUtils;
     private List<IMessageTransformer> _transformers;
+    private List<IMessageTransformer> _senderPhaseTransformers;
+    private List<IMessageTransformer> _recipientPhaseTransformers;
     
     // private IServerNetworkChannel _serverNicknameChannel;
 
@@ -39,28 +41,39 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _distanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
         _proximityCheckUtils = new ProximityCheckUtils(this, API, Config);
         
-        // Initialize transformers
-        _transformers = new List<IMessageTransformer>
+        // Initialize transformers for the sender phase (validation and recipient determination)
+        _senderPhaseTransformers = new List<IMessageTransformer>
         {
-            // Pre-validation transformers (run during SENDER_ONLY stage)
+            // Validation transformers
             new NicknameRequirementTransformer(this),
             new PlayerChatTransformer(this),
             new BabbleWarningTransformer(this, _languageSystem),
             new SimpleMessageTransformer(this),
             
-            // Recipient determination (runs during SENDER_ONLY stage after validations)
-            new RecipientDeterminationTransformer(this, _languageSystem, _proximityCheckUtils),
-            
-            // Content transformation (runs during all stages)
-            new LanguageTransformer(_languageSystem),
-            new ObfuscationTransformer(_distanceObfuscationSystem),
+            // Format and content transformers - moved from recipient phase
             new OOCTransformer(this),
             new EnvironmentMessageTransformer(this),
             new FormatTransformer(this),
             new EmoteTransformer(this),
             new ChatModeTransformer(this),
-            new ChatTypeTransformer(this)
+            new ChatTypeTransformer(this),
+            
+            // Recipient determination runs last in the sender phase
+            new RecipientDeterminationTransformer(this, _languageSystem, _proximityCheckUtils),
         };
+        
+        // Initialize transformers for the recipient phase (content transformation for each recipient)
+        _recipientPhaseTransformers = new List<IMessageTransformer>
+        {
+            // Keep only transformers that need recipient-specific processing
+            new LanguageTransformer(_languageSystem),
+            new ObfuscationTransformer(_distanceObfuscationSystem)
+        };
+        
+        // For backward compatibility, maintain the combined list
+        _transformers = new List<IMessageTransformer>();
+        _transformers.AddRange(_senderPhaseTransformers);
+        _transformers.AddRange(_recipientPhaseTransformers);
     }
 
     private void RegisterCommands()
@@ -377,9 +390,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
     }
 
-    private MessageContext ExecuteTransformers(MessageContext context)
+    private MessageContext ExecuteTransformers(MessageContext context, List<IMessageTransformer> transformers)
     {
-        foreach (var transformer in _transformers)
+        foreach (var transformer in transformers)
         {
             context = transformer.Transform(context);
             if (context.State != MessageContextState.CONTINUE)
@@ -391,28 +404,23 @@ public class RPProximityChatSystem : BaseBasicModSystem
     }
 
     /// <summary>
-    /// Processes a message through the unified pipeline, handling all steps from validation to delivery
+    /// Processes a message through the two-phase pipeline: sender validation followed by per-recipient processing
     /// </summary>
     public void ProcessMessagePipeline(MessageContext initialContext, EnumChatType defaultChatType = EnumChatType.OthersMessage)
     {
-        // Process the context through all transformers
-        var context = ExecuteTransformers(initialContext);
+        // ----- PHASE 1: Process sender context (validation and recipient determination) -----
+        var context = ExecuteTransformers(initialContext, _senderPhaseTransformers);
         
-        // If processing was stopped, don't continue
-        if (context.State != MessageContextState.CONTINUE)
+        // If processing was stopped or no recipients were determined, we're done
+        if (context.State != MessageContextState.CONTINUE || context.Recipients == null || context.Recipients.Count == 0)
         {
             return;
         }
         
-        // If no recipients were determined, nothing to do
-        if (context.Recipients == null || context.Recipients.Count == 0)
-        {
-            return;
-        }
-        
-        // Send to each recipient
+        // ----- PHASE 2: Process for each recipient (content transformation) -----
         foreach (var recipient in context.Recipients)
         {
+            // Create a fresh context for this recipient
             var recipientContext = new MessageContext
             {
                 Message = context.Message,
@@ -422,8 +430,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 Metadata = new Dictionary<string, object>(context.Metadata)
             };
             
-            // Process this recipient's context
-            recipientContext = ExecuteTransformers(recipientContext);
+            // Process only the recipient-phase transformers
+            recipientContext = ExecuteTransformers(recipientContext, _recipientPhaseTransformers);
             
             // Skip sending if processing was stopped for this recipient
             if (recipientContext.State != MessageContextState.CONTINUE)
@@ -543,8 +551,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             SendingPlayer = player,
             ReceivingPlayer = player, // Start with sender context for validation
             GroupId = GetProximityChatGroupId(),
-            Metadata = { ["isEmote"] = true },
-            Stage = MessageStage.SENDER_ONLY
+            Metadata = { ["isEmote"] = true }
         };
         
         // Process the entire pipeline
@@ -566,8 +573,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             SendingPlayer = player,
             ReceivingPlayer = player, // Start with sender context for validation
             GroupId = GetProximityChatGroupId(),
-            Metadata = { ["isEnvironmental"] = true },
-            Stage = MessageStage.SENDER_ONLY
+            Metadata = { ["isEnvironmental"] = true }
         };
         
         // Process the entire pipeline
@@ -618,7 +624,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 SendingPlayer = player,
                 ReceivingPlayer = player, // Start with sender for validation
                 GroupId = groupId,
-                Stage = MessageStage.SENDER_ONLY,
                 Metadata = 
                 { 
                     ["chatMode"] = mode,
@@ -785,7 +790,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             SendingPlayer = byPlayer,
             ReceivingPlayer = byPlayer, // Start with sender for validation
             GroupId = channelId,
-            Stage = MessageStage.SENDER_ONLY,
             Metadata = 
             { 
                 ["isPlayerChat"] = true,

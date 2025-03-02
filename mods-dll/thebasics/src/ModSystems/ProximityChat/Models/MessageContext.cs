@@ -16,7 +16,6 @@ public class MessageContext
     public IServerPlayer ReceivingPlayer { get; set; }
     public int GroupId { get; set; }
     public Dictionary<string, object> Metadata { get; set; } = new();
-    public MessageStage Stage { get; set; } = MessageStage.SENDER_ONLY;
     public MessageContextState State { get; set; } = MessageContextState.CONTINUE;
     
     /// <summary>
