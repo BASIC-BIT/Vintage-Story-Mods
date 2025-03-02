@@ -50,45 +50,15 @@ public class ChatModeTransformer : IMessageTransformer
             return "signs";
         }
         
-        // Get config from RPProximityChatSystem
-        var config = _chatSystem.GetModConfig();
-        
         // Use the verbs from config
-        if (config?.ProximityChatModeVerbs != null && config.ProximityChatModeVerbs.TryGetValue(mode, out var verbs) && verbs.Length > 0)
-        {
-            // Randomly select one of the verbs for variety
-            var random = new Random();
-            return verbs[random.Next(verbs.Length)];
-        }
-        
-        // Fallback verbs if config is not available
-        return mode switch
-        {
-            ProximityChatMode.Normal => "says",
-            ProximityChatMode.Whisper => "whispers",
-            ProximityChatMode.Yell => "yells",
-            _ => "says"
-        };
+        var verbs = _chatSystem.GetModConfig().ProximityChatModeVerbs[mode];
+
+        var random = new Random();
+        return verbs[random.Next(verbs.Length)];
     }
     
     private string GetProximityChatPunctuation(ProximityChatMode mode)
     {
-        // Get config from RPProximityChatSystem
-        var config = _chatSystem.GetModConfig();
-        
-        // Use punctuation from config
-        if (config?.ProximityChatModePunctuation != null && config.ProximityChatModePunctuation.TryGetValue(mode, out var punctuation))
-        {
-            return punctuation;
-        }
-        
-        // Fallback punctuation if config is not available
-        return mode switch
-        {
-            ProximityChatMode.Normal => ".",
-            ProximityChatMode.Whisper => "...",
-            ProximityChatMode.Yell => "!",
-            _ => "."
-        };
+        return _chatSystem.GetModConfig().ProximityChatModePunctuation[mode];
     }
 } 

@@ -46,6 +46,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             new NicknameRequirementTransformer(this),
             new PlayerChatTransformer(this),
             new BabbleWarningTransformer(this, _languageSystem),
+            new SimpleMessageTransformer(this),
             
             // Recipient determination (runs during SENDER_ONLY stage after validations)
             new RecipientDeterminationTransformer(this, _languageSystem, _proximityCheckUtils),
@@ -185,9 +186,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .HandleWith(Whisper);
 
         RegisterForServerSideConfig();
-
-        // _serverNicknameChannel = API.Network.RegisterChannel("thebasics_nickname")
-        //     .RegisterMessageType<TheBasicsPlayerNicknameMessage>();
     }
 
     private void RegisterForServerSideConfig()
@@ -297,17 +295,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         API.Event.PlayerChat += Event_PlayerChat;
         API.Event.PlayerJoin += Event_PlayerJoin;
-        // API.Event.OnEntitySpawn += SetPlayerRenderer;
     }
-
-    // private void SetPlayerRenderer(Entity entity)
-    // {
-    //     if (entity is EntityPlayer entityPlayer)
-    //     {
-    //         API.Logger.Debug($"THEBASICS - Loading Player - {entity.Properties.Client.RendererName}");
-    //         entity.Properties.Client.RendererName = "TestPlayerShape";
-    //     }
-    // }
 
     private void SetupProximityGroup()
     {
@@ -387,30 +375,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             behavior.RenderRange = Config.NametagRenderRange;
             player.Entity.WatchedAttributes.MarkPathDirty("nametag");
         }
-        
-        // Broadcast player's name to all clients (except player)
-        // _serverNicknameChannel.BroadcastPacket(new TheBasicsPlayerNicknameMessage
-        // {
-        //     PlayerUID = player.PlayerUID,
-        //     Nickname = nickname,
-        // }, player);
-        
-        // Send player's name specifically to connecting player
-        // _serverNicknameChannel.SendPacket(new TheBasicsPlayerNicknameMessage
-        // {
-        //     PlayerUID = player.PlayerUID,
-        //     Nickname = nickname,
-        // }, player);
-        
-        // Send the player all other nicknames to sync them up
-        // API.World.AllOnlinePlayers.Foreach((loopPlayer) =>
-        // {
-        //     _serverNicknameChannel.SendPacket(new TheBasicsPlayerNicknameMessage
-        //     {
-        //         PlayerUID = loopPlayer.PlayerUID,
-        //         Nickname = (loopPlayer as IServerPlayer).GetNickname(),
-        //     }, player);
-        // });
     }
 
     private MessageContext ExecuteTransformers(MessageContext context)
@@ -426,7 +390,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     continue;
                 }
             }
-            
+
             context = transformer.Transform(context);
             if (context.State != MessageContextState.CONTINUE)
             {
@@ -492,187 +456,23 @@ public class RPProximityChatSystem : BaseBasicModSystem
             var chatType = recipientContext.Metadata.ContainsKey("chatType") 
                 ? (EnumChatType)recipientContext.Metadata["chatType"] 
                 : defaultChatType;
+            
+            // Get client data if available
+            string data = null;
+            if (recipientContext.Metadata.ContainsKey("clientData") && recipientContext.Metadata["clientData"] is string clientData)
+            {
+                data = clientData;
+            }
                 
             // Send the message to this recipient
-            string data = null; // TODO: Handle any data if needed
             recipient.SendMessage(GetProximityChatGroupId(), recipientContext.Message, chatType, data);
         }
-    }
-
-    private string GetPlayerChat(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message, int groupId)
-    {
-        var content = ChatHelper.GetMessage(message);
-        
-        // Create a message context with the isPlayerChat flag
-        var context = new MessageContext
-        {
-            Message = content,
-            SendingPlayer = sendingPlayer,
-            ReceivingPlayer = receivingPlayer,
-            GroupId = groupId,
-            Metadata = new Dictionary<string, object>
-            {
-                ["isPlayerChat"] = true,
-                ["chatMode"] = sendingPlayer.GetChatMode()
-            }
-        };
-        
-        // Return the raw message content
-        // The PlayerChatTransformer will handle detecting message types during the transformation process
-        return context.Message;
-    }
-
-    private string GetFullRPMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content, int groupId)
-    {
-        var context = new MessageContext
-        {
-            Message = content,
-            SendingPlayer = sendingPlayer,
-            ReceivingPlayer = receivingPlayer,
-            GroupId = groupId
-        };
-
-        return ExecuteTransformers(context).Message;
     }
 
     public string GetFormattedNickname(IServerPlayer player)
     {
         var name = player.GetFormattedName(true, Config);
         return Config.BoldNicknames ? ChatHelper.Strong(name) : name;
-    }
-
-    private string GetFullEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content)
-    {
-        return ChatHelper.Build(GetFormattedNickname(sendingPlayer), " ", GetEmoteMessage(sendingPlayer, receivingPlayer, content));
-    }
-
-    private void SendLocalChat(IServerPlayer byPlayer, string message, ProximityChatMode? tempMode = null,
-        EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
-    {
-        SendLocalChatByPlayer(byPlayer,
-            _ => message, tempMode,
-            chatType, data);
-    }
-    
-    private IServerPlayer[] GetNearbyPlayers(IServerPlayer player, ProximityChatMode? tempMode = null)
-    {
-        var range = GetProximityChatRange(player, tempMode);
-        var nearbyPlayers = API.World.AllOnlinePlayers.Where(x =>
-            x.Entity.Pos.AsBlockPos.ManhattenDistance(player.Entity.Pos.AsBlockPos) < range
-            ).Cast<IServerPlayer>()
-            .ToArray();
-        
-        var message = "";
-        var lang = _languageSystem.GetSpeakingLanguage(player, _proximityChatId, ref message);
-        if (lang == LanguageSystem.SignLanguage)
-        {
-            return nearbyPlayers.Where(nearbyPlayer => _proximityCheckUtils.CanSeePlayer(player, nearbyPlayer)).ToArray();
-        }
-
-        return nearbyPlayers;
-    }
-
-    private void SendLocalChatByPlayer(IServerPlayer byPlayer, System.Func<IServerPlayer, string> messageGenerator,
-        ProximityChatMode? tempMode = null,
-        EnumChatType chatType = EnumChatType.OthersMessage, string data = null)
-    {
-        var nearbyPlayers = GetNearbyPlayers(byPlayer, tempMode);
-        
-        // First process sending player's context to check for warnings (like babble)
-        var senderContext = new MessageContext
-        {
-            SendingPlayer = byPlayer,
-            ReceivingPlayer = byPlayer,
-            Message = messageGenerator(byPlayer),
-            Metadata = { ["chatMode"] = tempMode ?? byPlayer.GetChatMode() }
-        };
-        
-        senderContext = ExecuteTransformers(senderContext);
-        
-        // Check for any warnings (like babble) that should be sent to the sender
-        BabbleWarningTransformer.SendBabbleWarningIfNeeded(senderContext);
-        
-        // Then process for each receiving player
-        foreach (var player in nearbyPlayers)
-        {
-            var serverPlayer = player as IServerPlayer;
-            var context = new MessageContext
-            {
-                SendingPlayer = byPlayer,
-                ReceivingPlayer = serverPlayer,
-                Message = messageGenerator(serverPlayer),
-                Metadata = { ["chatMode"] = tempMode ?? byPlayer.GetChatMode() }
-            };
-
-            // Only transform once, here
-            context = ExecuteTransformers(context);
-            
-            // Get the chat type from the context metadata or use the provided default
-            var messageChatType = context.Metadata.ContainsKey("chatType") 
-                ? (EnumChatType)context.Metadata["chatType"] 
-                : chatType;
-                
-            serverPlayer.SendMessage(_proximityChatId, context.Message, messageChatType, data);
-        }
-    }
-
-    private int GetProximityChatRange(IServerPlayer player, ProximityChatMode? tempMode = null)
-    {
-        var message = "";
-        var lang = _languageSystem.GetSpeakingLanguage(player, _proximityChatId, ref message);
-        if (lang == LanguageSystem.SignLanguage)
-        {
-            return Config.SignLanguageRange;
-        }
-
-        var mode = tempMode ?? player.GetChatMode();
-        return mode switch
-        {
-            ProximityChatMode.Normal => Config.ProximityChatModeDistances[ProximityChatMode.Normal],
-            ProximityChatMode.Whisper => Config.ProximityChatModeDistances[ProximityChatMode.Whisper],
-            ProximityChatMode.Yell => Config.ProximityChatModeDistances[ProximityChatMode.Yell],
-            _ => Config.ProximityChatModeDistances[ProximityChatMode.Normal]
-        };
-    }
-
-    private string GetProximityChatPunctuation(IServerPlayer player, ProximityChatMode? tempMode = null)
-    {
-        return Config.ProximityChatModePunctuation[player.GetChatMode(tempMode)];
-    }
-
-    private string AddAutoCapitalizationAndPunctuation(IServerPlayer player, string message, ProximityChatMode? tempMode = null)
-    {
-        var autoCapitalizationRegex = new Regex(@"^([\s+|]*)(.)(.*)$");
-        var autoPunctuationRegex = new Regex(@"^(.*?)(.)([\s+|]*)$");
-
-        message = autoPunctuationRegex.Replace(message, match =>
-        {
-            var possiblePunctuation = match.Groups[2].Value[0];
-            return
-                $"{match.Groups[1].Value}{possiblePunctuation}{(ChatHelper.IsPunctuation(possiblePunctuation) ? "" : GetProximityChatPunctuation(player, tempMode))}{match.Groups[3].Value}";
-        });
-
-        message = autoCapitalizationRegex.Replace(message, match =>
-        {
-            var firstLetter = match.Groups[2].Value;
-            return
-                $"{match.Groups[1].Value}{firstLetter.ToUpper()}{match.Groups[3].Value}";
-        });
-
-        return message;
-    }
-
-    private string GetEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string message)
-    {
-        var context = new MessageContext
-        {
-            Message = message,
-            SendingPlayer = sendingPlayer,
-            ReceivingPlayer = receivingPlayer,
-            Metadata = { ["isEmote"] = true }
-        };
-
-        return ExecuteTransformers(context).Message;
     }
 
     private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
@@ -710,14 +510,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
     }
 
-    private string ProcessAccents(string message)
-    {
-        message = Regex.Replace(message, @"\|(.*?)\|", "<i>$1</i>");
-        message = Regex.Replace(message, @"\|(.*)$", "<i>$1</i>");
-        message = Regex.Replace(message, @"\+(.*?)\+", "<strong>$1</strong>");
-        message = Regex.Replace(message, @"\+(.*)$", "<strong>$1</strong>");
-        return message;
-    }
     private TextCommandResult SetNicknameAdmin(TextCommandCallingArgs fullArgs)
     {
         var attemptTarget = API.GetPlayerByUID(((PlayerUidName[])fullArgs.Parsers[0].GetValue())[0].Uid);
@@ -837,29 +629,34 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
         var message = (string)args.Parsers[0].GetValue();
         var groupId = args.Caller.FromChatGroupId;
+        
         if (!args.Parsers[0].IsMissing)
         {
+            // Create a context for this chat message with the specified chat mode
             var context = new MessageContext
             {
                 Message = message,
                 SendingPlayer = player,
+                ReceivingPlayer = player, // Start with sender for validation
                 GroupId = groupId,
-                Metadata = { ["chatMode"] = mode }
+                Stage = MessageStage.SENDER_ONLY,
+                Metadata = 
+                { 
+                    ["chatMode"] = mode,
+                    ["isPlayerChat"] = true // Mark as player chat so it goes through player transformers
+                }
             };
 
-            SendLocalChatByPlayer(player,
-                targetPlayer =>
-                {
-                    context.ReceivingPlayer = targetPlayer;
-                    return ExecuteTransformers(context).Message;
-                },
-                mode);
+            // Process the entire pipeline
+            ProcessMessagePipeline(context);
+            
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
             };
         }
 
+        // If no message provided, just set the player's chat mode
         player.SetChatMode(mode);
         return new TextCommandResult
         {
@@ -962,40 +759,68 @@ public class RPProximityChatSystem : BaseBasicModSystem
         
         consumed.value = true;
 
+        // Extract the content from the full message
+        var content = ChatHelper.GetMessage(message);
+        
         // If RP chat is disabled or player has disabled RP text, use simple chat
         if (Config.DisableRPChat || !byPlayer.GetRpTextEnabled())
         {
-            SendLocalChat(byPlayer, message, data: data);
+            // Create a simple message context and process it
+            var simpleContext = SimpleMessageTransformer.CreateSimpleMessageContext(byPlayer, message);
+            simpleContext.GroupId = channelId;
+            if (data != null)
+            {
+                simpleContext.Metadata["clientData"] = data;
+            }
+            
+            ProcessMessagePipeline(simpleContext);
             return;
         }
 
+        // Check for nickname requirement for RP chat
         if (!byPlayer.HasNickname())
         {
             byPlayer.SendMessage(channelId,
-                "You need a nickname to use proximity chat!  You can set it with `/nick MyName`",
+                "You need a nickname to use proximity chat! You can set it with `/nick MyName`",
                 EnumChatType.CommandError);
             return;
         }
         
+        // Handle language switching commands
         if (_languageSystem.HandleSwapLanguage(byPlayer, channelId, message))
         {
-            consumed.value = true;
             return;
         }
         
         // Check for global OOC without creating a new transformer
-        var content = ChatHelper.GetMessage(message);
         if (PlayerChatTransformer.IsGlobalOOC(content, Config))
         {
-            consumed.value = false;
+            consumed.value = false; // Let the server handle global OOC
             return;
         }
         
-        // Send the message to nearby players - the ChatTypeTransformer will determine the appropriate chat type
-        var messageCopy = (string)message.Clone();
-        SendLocalChatByPlayer(byPlayer,
-            receivingPlayer => GetPlayerChat(byPlayer, receivingPlayer, messageCopy, channelId), 
-            chatType: EnumChatType.OthersMessage, data: data);
+        // Create a player chat context
+        var context = new MessageContext
+        {
+            Message = content,
+            SendingPlayer = byPlayer,
+            ReceivingPlayer = byPlayer, // Start with sender for validation
+            GroupId = channelId,
+            Stage = MessageStage.SENDER_ONLY,
+            Metadata = 
+            { 
+                ["isPlayerChat"] = true,
+                ["chatMode"] = byPlayer.GetChatMode()
+            }
+        };
+        
+        if (data != null)
+        {
+            context.Metadata["clientData"] = data;
+        }
+        
+        // Process the message through the pipeline
+        ProcessMessagePipeline(context);
     }
 
     // Add this method to provide access to the config
