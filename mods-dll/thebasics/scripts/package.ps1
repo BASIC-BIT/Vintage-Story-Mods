@@ -1,7 +1,7 @@
 ﻿# Get absolute paths
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project root
 $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
-$outputDir = Join-Path $solutionRoot "output/net8.0"
+$outputDir = Join-Path $solutionRoot "output/net7.0"
 $assetsDir = Join-Path $projectRoot "assets"
 $modInfoFile = Join-Path $projectRoot "modinfo.json"
 $dllFile = Join-Path $outputDir "thebasics.dll"

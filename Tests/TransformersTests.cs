@@ -20,7 +20,7 @@ public class TransformersTests
     {
         // Arrange
         var languageSystemMock = new Mock<LanguageSystem>(null, null, null);
-        var mockLang = new Language("test", "#FF0000", "Test Language", Array.Empty<string>(), "test", false, false, false, 10, false);
+        var mockLang = new Language("test", "Test Language", "test", Array.Empty<string>(), "#FF0000", false, false, false, 10, false);
         
         languageSystemMock.Setup(x => x.GetSpeakingLanguage(
                 It.IsAny<IServerPlayer>(), 
@@ -148,7 +148,7 @@ public class TransformersTests
             SendingPlayer = Mock.Of<IServerPlayer>(),
             Metadata = { 
                 ["isEmote"] = true,
-                ["language"] = new Language("test", "#FF0000", "Test Language", Array.Empty<string>(), "test", false, false, false, 10, false)
+                ["language"] = new Language("test", "Test Language", "test", Array.Empty<string>(), "#FF0000", false, false, false, 10, false)
             }
         };
         
