@@ -41,7 +41,7 @@ namespace thebasics.ModSystems.ProximityChat
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(HandleListLanguagesCommand);
-            
+
             // Admin commands
             API.ChatCommands.GetOrCreate("adminaddlang")
                 .WithAlias("adminaddlanguage")
@@ -58,7 +58,7 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithArgs(new PlayersArgParser("player", API, true),
                     new WordArgParser("language", true))
                 .HandleWith(HandleAdminRemoveLanguageCommand);
-            
+
             API.ChatCommands.GetOrCreate("adminlistlang")
                 .WithAlias("adminlistlanguage")
                 .WithDescription("List other player's languages")
@@ -71,10 +71,10 @@ namespace thebasics.ModSystems.ProximityChat
                 player.InstantiateLanguagesIfNotExist(config);
             };
         }
-        
+
         public static readonly Language BabbleLang = new Language("Babble", "Unintelligible", "babble", new[] { "ba", "ble", "bla", "bal" }, "#FF0000", false, true);
         public static readonly Language SignLanguage = new Language("Sign", "A visual language using hand gestures and movements", "sign", new string[] { }, "#A0A0A0", false, false);
-        
+
         private TextCommandResult HandleAddLanguageCommand(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
@@ -112,7 +112,7 @@ namespace thebasics.ModSystems.ProximityChat
             }
 
             player.AddLanguage(lang);
-            
+
             // Set players default language if their current language is babble
             if(player.GetDefaultLanguage(Config).Name == BabbleLang.Name)
             {
@@ -140,7 +140,7 @@ namespace thebasics.ModSystems.ProximityChat
                     StatusMessage = $"Invalid language specifier \":{languageIdentifier}\"",
                 };
             }
-            
+
             if (!player.KnowsLanguage(language))
             {
                 return new TextCommandResult
@@ -156,7 +156,7 @@ namespace thebasics.ModSystems.ProximityChat
             if (player.GetDefaultLanguage(Config).Name == language.Name)
             {
                 var newPlayerLanguages = player.GetLanguages();
-                
+
                 // If the player now knows no languages, set their default to babble
                 if (newPlayerLanguages.Count == 0)
                 {
@@ -191,7 +191,7 @@ namespace thebasics.ModSystems.ProximityChat
                                 "All languages: " + string.Join(", ", GetAllLanguages(false).Where(l => !l.Hidden).Select(ChatHelper.LangIdentifier)),
             };
         }
-        
+
         private TextCommandResult HandleAdminAddLanguageCommand(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
@@ -230,7 +230,7 @@ namespace thebasics.ModSystems.ProximityChat
             }
 
             targetPlayer.AddLanguage(lang);
-            
+
             // Set players default language if their current language is babble
             var defaultLang = targetPlayer.GetDefaultLanguage(Config);
             if(defaultLang == null || defaultLang.Name == BabbleLang.Name)
@@ -260,7 +260,7 @@ namespace thebasics.ModSystems.ProximityChat
                     StatusMessage = $"Invalid language specifier \":{languageIdentifier}\"",
                 };
             }
-            
+
             if (!targetPlayer.KnowsLanguage(language))
             {
                 return new TextCommandResult
@@ -277,7 +277,7 @@ namespace thebasics.ModSystems.ProximityChat
             if (defaultLang == null || defaultLang.Name == language.Name)
             {
                 var newPlayerLanguages = targetPlayer.GetLanguages();
-                
+
                 // If the player now knows no languages, set their default to babble
                 if (newPlayerLanguages.Count == 0)
                 {
@@ -293,7 +293,7 @@ namespace thebasics.ModSystems.ProximityChat
                         player.SendMessage(GlobalConstants.CurrentChatGroup, $"{targetPlayer.PlayerName} unlearned their default language, but no valid default language was found!", EnumChatType.Notification);
                         targetPlayer.SetDefaultLanguage(BabbleLang);
                     }
-                    else 
+                    else
                     {
                         player.SendMessage(GlobalConstants.CurrentChatGroup, $"{targetPlayer.PlayerName} unlearned their default language, their new default is {ChatHelper.LangColor(newDefault.Name, newDefault)}", EnumChatType.Notification);
                         targetPlayer.SetDefaultLanguage(newDefault);
@@ -330,95 +330,29 @@ namespace thebasics.ModSystems.ProximityChat
                 .ToList();
         }
 
-        private static readonly Regex LanguageSwapRegex = new(@"^\s*:(\w+)\s*$");
-        private static readonly Regex LanguageTalkRegex = new(@"^\s*:(\w+)\s+(.*)$");
 
-        private Language? GetLangFromText(string text, bool allowBabble, bool allowHidden = false)
+        public Language? GetLangFromText(string text, bool allowBabble, bool allowHidden = false)
         {
             return GetAllLanguages(allowBabble).FirstOrDefault(lang =>
-                (allowHidden || !lang.Hidden) && 
+                (allowHidden || !lang.Hidden) &&
                 (lang?.Prefix?.ToLower() == text.ToLower() ||
                 lang?.Name?.ToLower() == text.ToLower()));
         }
 
-        private List<Language> GetAllLanguages(bool allowBabble)
+        public List<Language> GetAllLanguages(bool allowBabble)
         {
             List<Language> languages = new();
             languages.AddRange(Config.Languages);
-            
+
             // Always include SignLanguage
             languages.Add(SignLanguage);
-            
+
             if (allowBabble)
             {
                 languages.Add(BabbleLang);
             }
-            
+
             return languages;
-        }
-
-        public bool HandleSwapLanguage(IServerPlayer sendingPlayer, int groupId, string message)
-        {
-            if (LanguageSwapRegex.IsMatch(ChatHelper.GetMessage(message)))
-            {
-                var match = LanguageSwapRegex.Match(ChatHelper.GetMessage(message));
-                var languageIdentifier = match.Groups[1].Value;
-
-                var lang = GetLangFromText(languageIdentifier, true, sendingPlayer.HasPrivilege(Config.ChangeOtherLanguagePermission));
-                
-                if (lang == null)
-                {
-                    API.SendMessage(sendingPlayer, groupId,
-                        $"Invalid language specifier \":{languageIdentifier}\".  Valid prefixes include: " + string.Join(", ",
-                            GetAllLanguages(true).Select(listLang => ChatHelper.LangColor($":{listLang.Prefix} ({listLang.Name})", listLang))),
-                        EnumChatType.CommandError);
-                    return true;
-                }
-
-                if (lang.Name != BabbleLang.Name && !sendingPlayer.KnowsLanguage(lang))
-                {
-                    API.SendMessage(sendingPlayer, groupId, "You don't know that language!", EnumChatType.CommandError);
-                    return true;
-                }
-
-                sendingPlayer.SetDefaultLanguage(lang);
-                API.SendMessage(sendingPlayer, groupId, "You are now speaking " + lang.Name + ".",
-                    EnumChatType.CommandSuccess);
-
-                return true;
-            }
-
-            return false;
-        }
-
-        public Language GetSpeakingLanguage(IServerPlayer sendingPlayer, int groupId, ref string message)
-        {
-            if (LanguageTalkRegex.IsMatch(message))
-            {
-                var match = LanguageTalkRegex.Match(message);
-                var languageIdentifier = match.Groups[1].Value;
-                var lang = GetLangFromText(languageIdentifier, true, sendingPlayer.HasPrivilege(Config.ChangeOtherLanguagePermission));
-
-                if (lang == null)
-                {
-                    API.SendMessage(sendingPlayer, groupId,
-                        $"Invalid language specifier \":{languageIdentifier}\".  Valid prefixes include: " + string.Join(", ",
-                            GetAllLanguages(true).Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang))),
-                        EnumChatType.CommandError);
-                    throw new Exception($"Invalid language specifier \":{languageIdentifier}\"");
-                }
-
-                if (lang.Name != BabbleLang.Name && !sendingPlayer.KnowsLanguage(lang))
-                {
-                    API.SendMessage(sendingPlayer, groupId, "You don't know that language!", EnumChatType.CommandError);
-                    throw new Exception($"Character doesn't know language {ChatHelper.LangIdentifier(lang)}!");
-                }
-
-                message = match.Groups[2].Value;
-                return lang;
-            }
-
-            return sendingPlayer.GetDefaultLanguage(Config);
         }
 
         public void ProcessMessage(IServerPlayer receivingPlayer,

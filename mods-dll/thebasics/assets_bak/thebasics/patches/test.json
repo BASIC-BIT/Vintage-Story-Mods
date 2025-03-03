@@ -1,8 +1,0 @@
-﻿[
-  {
-    "file": "game:entities/humanoid/player",
-    "op": "replace",
-    "path": "/client/renderer",
-    "value": "TestPlayerShape"
-  }
-]

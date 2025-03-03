@@ -9,6 +9,14 @@ public enum MessageContextState {
     ERROR,
 }
 
+public interface IMessageTransformer
+{
+    /// <summary>
+    /// Transform a message context and return the updated context
+    /// </summary>
+    MessageContext Transform(MessageContext context);
+}
+
 public class MessageContext
 {
     public string Message { get; set; }

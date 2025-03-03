@@ -23,8 +23,7 @@ public class EmoteTransformer : IMessageTransformer
         var content = context.Message;
         var builder = new StringBuilder();
         
-        var nickname = _chatSystem.GetFormattedNickname(context.SendingPlayer);
-        builder.Append(nickname);
+        builder.Append(context.Metadata["formattedName"]);
         builder.Append(" ");
         
         // Process the emote content

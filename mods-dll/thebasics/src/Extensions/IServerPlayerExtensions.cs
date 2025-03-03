@@ -73,19 +73,6 @@ namespace thebasics.Extensions
             return ChatHelper.Color(GetNickname(player), GetNicknameColor(player));
         }
 
-        public static string GetFormattedName(this IServerPlayer player, bool isIC, ModConfig config)
-        {
-            string name = isIC ? player.GetNickname() : player.PlayerName;
-            
-            // Only apply color if configured for this name type
-            bool applyColor = isIC ? config.ApplyColorsToNicknames : config.ApplyColorsToPlayerNames;
-            if (!applyColor)
-                return name;
-                
-            string color = player.GetNicknameColor();
-            return string.IsNullOrEmpty(color) ? name : ChatHelper.Color(name, color);
-        }
-
         public static void SetNickname(this IServerPlayer player, string nickname)
         {
             SetModData(player, ModDataNickname, nickname);

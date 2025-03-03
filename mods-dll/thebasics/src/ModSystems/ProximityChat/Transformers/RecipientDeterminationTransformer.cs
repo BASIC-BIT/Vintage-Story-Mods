@@ -14,14 +14,14 @@ public class RecipientDeterminationTransformer : IMessageTransformer
     private readonly RPProximityChatSystem _chatSystem;
     private readonly LanguageSystem _languageSystem;
     private readonly ProximityCheckUtils _proximityCheckUtils;
-    
+
     public RecipientDeterminationTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem, ProximityCheckUtils proximityCheckUtils)
     {
         _chatSystem = chatSystem;
         _languageSystem = languageSystem;
         _proximityCheckUtils = proximityCheckUtils;
     }
-    
+
     public MessageContext Transform(MessageContext context)
     {
         // Skip if this is a context for an individual recipient
@@ -29,70 +29,50 @@ public class RecipientDeterminationTransformer : IMessageTransformer
         {
             return context;
         }
-        
+
         // Skip if we already have recipients
         if (context.Recipients != null && context.Recipients.Count > 0)
         {
             return context;
         }
-        
-        // Get chat mode from context
-        var chatMode = context.Metadata.ContainsKey("chatMode") 
-            ? (ProximityChatMode)context.Metadata["chatMode"] 
-            : context.SendingPlayer.GetChatMode();
-            
+
         // Determine communication range based on chat mode and language
-        var range = GetCommunicationRange(context.SendingPlayer, chatMode);
-        
+        var range = GetCommunicationRange(context);
+
         // Find players within range
         var allPlayers = _chatSystem.GetAPI().World.AllOnlinePlayers;
-        var nearbyPlayers = allPlayers.Where(player => 
+        var nearbyPlayers = allPlayers.Where(player =>
         {
             var serverPlayer = player as IServerPlayer;
             if (serverPlayer == null) return false;
-            
+
             bool inRange = player.Entity.Pos.AsBlockPos.ManhattenDistance(
                 context.SendingPlayer.Entity.Pos.AsBlockPos) < range;
-                
+
+            var lang = context.Metadata["language"] as Language;
             // Special check for sign language - must be within line of sight
-            if (inRange && IsUsingSignLanguage(context.SendingPlayer))
+            if (inRange && lang == LanguageSystem.SignLanguage)
             {
                 return _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, serverPlayer);
             }
-            
+
             return inRange;
         }).Cast<IServerPlayer>().ToList();
-        
+
         // Add players to context
         context.Recipients = nearbyPlayers;
-        
+
         return context;
     }
-    
-    private int GetCommunicationRange(IServerPlayer player, ProximityChatMode chatMode)
+
+    private int GetCommunicationRange(MessageContext context)
     {
-        var config = _chatSystem.GetModConfig();
-        
-        // Sign language has a special range
-        if (IsUsingSignLanguage(player))
+        if (context.Metadata["language"] is Language lang && lang == LanguageSystem.SignLanguage)
         {
-            return config.SignLanguageRange;
+            return _chatSystem.GetModConfig().SignLanguageRange;
         }
-        
-        // Otherwise use configured ranges for chat modes
-        return chatMode switch
-        {
-            ProximityChatMode.Normal => config.ProximityChatModeDistances[ProximityChatMode.Normal],
-            ProximityChatMode.Whisper => config.ProximityChatModeDistances[ProximityChatMode.Whisper],
-            ProximityChatMode.Yell => config.ProximityChatModeDistances[ProximityChatMode.Yell],
-            _ => config.ProximityChatModeDistances[ProximityChatMode.Normal]
-        };
+
+        var chatMode = (ProximityChatMode)context.Metadata["chatMode"];
+        return _chatSystem.GetModConfig().ProximityChatModeDistances[chatMode];
     }
-    
-    private bool IsUsingSignLanguage(IServerPlayer player)
-    {
-        var message = "";
-        var lang = _languageSystem.GetSpeakingLanguage(player, _chatSystem.GetProximityChatGroupId(), ref message);
-        return lang == LanguageSystem.SignLanguage;
-    }
-} 
+}

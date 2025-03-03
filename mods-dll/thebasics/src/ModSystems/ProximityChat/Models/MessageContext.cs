@@ -23,4 +23,4 @@ public class MessageContext
     /// </summary>
     public List<IServerPlayer> Recipients { get; set; }
     public string ErrorMessage { get; set; }
-} 
+}   

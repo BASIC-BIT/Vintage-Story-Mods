@@ -1,11 +1,7 @@
 ﻿using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
-using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
 using thebasics.Configs;
@@ -15,6 +11,7 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 using System.Collections.Generic;
+using thebasics.src.ModSystems.ProximityChat.Transformers;
 
 namespace thebasics.ModSystems.ProximityChat;
 
@@ -25,11 +22,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private DistanceObfuscationSystem _distanceObfuscationSystem;
     private IServerNetworkChannel _serverConfigChannel;
     private ProximityCheckUtils _proximityCheckUtils;
-    private List<IMessageTransformer> _transformers;
     private List<IMessageTransformer> _senderPhaseTransformers;
     private List<IMessageTransformer> _recipientPhaseTransformers;
-    
-    // private IServerNetworkChannel _serverNicknameChannel;
 
     protected override void BasicStartServerSide()
     {
@@ -40,28 +34,27 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _languageSystem = new LanguageSystem(this, API, Config);
         _distanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
         _proximityCheckUtils = new ProximityCheckUtils(this, API, Config);
-        
+
         // Initialize transformers for the sender phase (validation and recipient determination)
         _senderPhaseTransformers = new List<IMessageTransformer>
         {
             // Validation transformers
-            new NicknameRequirementTransformer(this),
-            new PlayerChatTransformer(this),
-            new BabbleWarningTransformer(this, _languageSystem),
-            new SimpleMessageTransformer(this),
-            
-            // Format and content transformers - moved from recipient phase
+            new RoleplayTransformer(this), // Add roleplay metadata
+            new NicknameRequirementTransformer(this), // Require nickname if we're in RP chat
+            new PlayerChatTransformer(this), // If player chat, process special modifiers
+            new BabbleWarningTransformer(this, _languageSystem), // Warn if babbling
+
             new OOCTransformer(this),
             new EnvironmentMessageTransformer(this),
             new FormatTransformer(this),
             new EmoteTransformer(this),
             new ChatModeTransformer(this),
             new ChatTypeTransformer(this),
-            
+
             // Recipient determination runs last in the sender phase
             new RecipientDeterminationTransformer(this, _languageSystem, _proximityCheckUtils),
         };
-        
+
         // Initialize transformers for the recipient phase (content transformation for each recipient)
         _recipientPhaseTransformers = new List<IMessageTransformer>
         {
@@ -69,11 +62,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             new LanguageTransformer(_languageSystem),
             new ObfuscationTransformer(_distanceObfuscationSystem)
         };
-        
-        // For backward compatibility, maintain the combined list
-        _transformers = new List<IMessageTransformer>();
-        _transformers.AddRange(_senderPhaseTransformers);
-        _transformers.AddRange(_recipientPhaseTransformers);
     }
 
     private void RegisterCommands()
@@ -91,7 +79,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(SetNickname);
-                
+
                 API.ChatCommands.GetOrCreate("clearnick")
                     .WithDescription("Clear your nickname")
                     .RequiresPrivilege(Privilege.chat)
@@ -123,7 +111,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     new StringArgParser("new nickname", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameAdmin);
-            
+
             API.ChatCommands.GetOrCreate("adminsetnicknamecolor")
                 .WithAlias("adminsetnickcolor", "adminsetnickcol")
                 .WithDescription("Admin: Get or set another player's nickname color")
@@ -227,7 +215,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             };
         }
         var oldNicknameColor = attemptTarget.GetNicknameColor();
-        
+
         if (args.Parsers[1].IsMissing)
         {
             if (!attemptTarget.HasNicknameColor())
@@ -247,12 +235,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
             };
 
         }
-        
+
         var newNicknameColor = (Color)args.Parsers[1].GetValue();
         var newColorHex = ColorTranslator.ToHtml(newNicknameColor);
-        
+
         attemptTarget.SetNicknameColor(newColorHex);
-        
+
         SwapOutNameTag(attemptTarget);
         return new TextCommandResult
         {
@@ -287,7 +275,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var colorHex = ColorTranslator.ToHtml(newColor);
         player.SetNicknameColor(colorHex);
         SwapOutNameTag(player);
-        
+
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -337,7 +325,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     private void RemoveProximityGroupIfExists()
     {
-        
+
         var proximityGroup = GetProximityGroup();
         if (proximityGroup != null)
         {
@@ -370,7 +358,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // Config will be sent when client indicates it's ready
         SwapOutNameTag(byPlayer);
     }
-    
+
     // TODO: Not sure the client will get this data and sync it up.  Supposedly, behaviors should sync seamlessly with the client but I'm not sure that the UI renderer will refire (just like it does for chat), as the PlayerName never usually changes.  NPC names do though, maybe we can tie it in to that?
     private void SwapOutNameTag(IServerPlayer player)
     {
@@ -381,9 +369,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
             var nickname = player.GetNickname();
 
             var displayName = Config.ShowPlayerNameInNametag ? $"{nickname} ({player.PlayerName})" : nickname;
-        
+
             behavior.SetName(displayName);
-            
+
             behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
             behavior.RenderRange = Config.NametagRenderRange;
             player.Entity.WatchedAttributes.MarkPathDirty("nametag");
@@ -410,13 +398,13 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         // ----- PHASE 1: Process sender context (validation and recipient determination) -----
         var context = ExecuteTransformers(initialContext, _senderPhaseTransformers);
-        
+
         // If processing was stopped or no recipients were determined, we're done
         if (context.State != MessageContextState.CONTINUE || context.Recipients == null || context.Recipients.Count == 0)
         {
             return;
         }
-        
+
         // ----- PHASE 2: Process for each recipient (content transformation) -----
         foreach (var recipient in context.Recipients)
         {
@@ -429,37 +417,31 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 GroupId = context.GroupId,
                 Metadata = new Dictionary<string, object>(context.Metadata)
             };
-            
+
             // Process only the recipient-phase transformers
             recipientContext = ExecuteTransformers(recipientContext, _recipientPhaseTransformers);
-            
+
             // Skip sending if processing was stopped for this recipient
             if (recipientContext.State != MessageContextState.CONTINUE)
             {
                 continue;
             }
-            
+
             // Get the chat type from the context metadata or use the provided default
-            var chatType = recipientContext.Metadata.ContainsKey("chatType") 
-                ? (EnumChatType)recipientContext.Metadata["chatType"] 
+            var chatType = recipientContext.Metadata.ContainsKey("chatType")
+                ? (EnumChatType)recipientContext.Metadata["chatType"]
                 : defaultChatType;
-            
+
             // Get client data if available
             string data = null;
             if (recipientContext.Metadata.ContainsKey("clientData") && recipientContext.Metadata["clientData"] is string clientData)
             {
                 data = clientData;
             }
-                
+
             // Send the message to this recipient
             recipient.SendMessage(GetProximityChatGroupId(), recipientContext.Message, chatType, data);
         }
-    }
-
-    public string GetFormattedNickname(IServerPlayer player)
-    {
-        var name = player.GetFormattedName(true, Config);
-        return Config.BoldNicknames ? ChatHelper.Strong(name) : name;
     }
 
     private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
@@ -509,7 +491,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             };
         }
         var oldNickname = attemptTarget.GetNicknameWithColor();
-        
+
         if (fullArgs.Parsers[1].IsMissing)
         {
             if (!attemptTarget.HasNickname())
@@ -528,11 +510,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
             };
 
         }
-        
+
         var newNickname = (string)fullArgs.Parsers[1].GetValue();
-        
+
         attemptTarget.SetNickname(newNickname);
-        
+
         SwapOutNameTag(attemptTarget);
         return new TextCommandResult
         {
@@ -544,7 +526,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private TextCommandResult Emote(TextCommandCallingArgs args)
     {
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        
+
         var context = new MessageContext
         {
             Message = (string)args.Parsers[0].GetValue(),
@@ -553,7 +535,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             GroupId = GetProximityChatGroupId(),
             Metadata = { ["isEmote"] = true }
         };
-        
+
         // Process the entire pipeline
         ProcessMessagePipeline(context, EnumChatType.OthersMessage);
 
@@ -566,7 +548,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private TextCommandResult EnvironmentMessage(TextCommandCallingArgs args)
     {
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        
+
         var context = new MessageContext
         {
             Message = (string)args.Parsers[0].GetValue(),
@@ -575,10 +557,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
             GroupId = GetProximityChatGroupId(),
             Metadata = { ["isEnvironmental"] = true }
         };
-        
+
         // Process the entire pipeline
         ProcessMessagePipeline(context, EnumChatType.Notification);
-        
+
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -596,7 +578,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             StatusMessage = "Your nickname has been cleared.",
         };
     }
-    
+
     private TextCommandResult ClearNicknameColor(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
@@ -614,7 +596,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
         var message = (string)args.Parsers[0].GetValue();
         var groupId = args.Caller.FromChatGroupId;
-        
+
         if (!args.Parsers[0].IsMissing)
         {
             // Create a context for this chat message with the specified chat mode
@@ -624,8 +606,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 SendingPlayer = player,
                 ReceivingPlayer = player, // Start with sender for validation
                 GroupId = groupId,
-                Metadata = 
-                { 
+                Metadata =
+                {
                     ["chatMode"] = mode,
                     ["isPlayerChat"] = true // Mark as player chat so it goes through player transformers
                 }
@@ -633,7 +615,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             // Process the entire pipeline
             ProcessMessagePipeline(context);
-            
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -645,7 +627,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = $"You are now {mode.ToString().ToLower()}.",
+            StatusMessage = $"Chat mode set to: {mode.ToString().ToLower()}",
         };
     }
 
@@ -714,75 +696,27 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         return API.Groups.GetPlayerGroupByName(Config.ProximityChatName);
     }
-    
+
     private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
         Vintagestory.API.Datastructures.BoolRef consumed)
     {
-        // Format the player's name regardless of channel
-        bool isRoleplay = byPlayer.GetRpTextEnabled() && !Config.DisableRPChat;
-        var formattedName = byPlayer.GetFormattedName(false, Config); // Always use real name as base
-        if (isRoleplay && channelId == _proximityChatId) // Only use nickname in RP context and proximity chat
-        {
-            formattedName = byPlayer.GetFormattedName(true, Config);
-        }
-        message = message.Replace(byPlayer.PlayerName + ">", formattedName + ">");
-
-        // Handle cases of incorrect channel
-        if(Config.UseGeneralChannelAsProximityChat && channelId != GlobalConstants.GeneralChatGroup)
+        if(channelId != _proximityChatId)
         {
             return;
         }
-        if (!Config.UseGeneralChannelAsProximityChat)
-        {
-            var proximityGroup = GetProximityGroup();
-            if (proximityGroup.Uid != channelId)
-            {
-                return;
-            }
-        }
-        
+
         consumed.value = true;
 
         // Extract the content from the full message
         var content = ChatHelper.GetMessage(message);
-        
-        // If RP chat is disabled or player has disabled RP text, use simple chat
-        if (Config.DisableRPChat || !byPlayer.GetRpTextEnabled())
-        {
-            // Create a simple message context and process it
-            var simpleContext = SimpleMessageTransformer.CreateSimpleMessageContext(byPlayer, message);
-            simpleContext.GroupId = channelId;
-            if (data != null)
-            {
-                simpleContext.Metadata["clientData"] = data;
-            }
-            
-            ProcessMessagePipeline(simpleContext);
-            return;
-        }
 
-        // Check for nickname requirement for RP chat
-        if (!byPlayer.HasNickname())
-        {
-            byPlayer.SendMessage(channelId,
-                "You need a nickname to use proximity chat! You can set it with `/nick MyName`",
-                EnumChatType.CommandError);
-            return;
-        }
-        
-        // Handle language switching commands
-        if (_languageSystem.HandleSwapLanguage(byPlayer, channelId, message))
-        {
-            return;
-        }
-        
         // Check for global OOC without creating a new transformer
         if (PlayerChatTransformer.IsGlobalOOC(content, Config))
         {
             consumed.value = false; // Let the server handle global OOC
             return;
         }
-        
+
         // Create a player chat context
         var context = new MessageContext
         {
@@ -790,18 +724,18 @@ public class RPProximityChatSystem : BaseBasicModSystem
             SendingPlayer = byPlayer,
             ReceivingPlayer = byPlayer, // Start with sender for validation
             GroupId = channelId,
-            Metadata = 
-            { 
+            Metadata =
+            {
                 ["isPlayerChat"] = true,
                 ["chatMode"] = byPlayer.GetChatMode()
             }
         };
-        
+
         if (data != null)
         {
             context.Metadata["clientData"] = data;
         }
-        
+
         // Process the message through the pipeline
         ProcessMessagePipeline(context);
     }
@@ -811,7 +745,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         return Config;
     }
-    
+
     // Add this method to provide access to the proximity chat group ID
     public int GetProximityChatGroupId()
     {
