@@ -101,7 +101,8 @@ public class TransformerSystem
                 SendingPlayer = context.SendingPlayer,
                 ReceivingPlayer = recipient,
                 GroupId = context.GroupId,
-                Metadata = new Dictionary<string, object>(context.Metadata)
+                Metadata = new Dictionary<string, object>(context.Metadata),
+                Flags = new Dictionary<string, bool>(context.Flags)
             };
 
             // Process only the recipient-phase transformers

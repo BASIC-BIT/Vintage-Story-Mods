@@ -58,6 +58,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                     _chatSystem.ProximityChatId,
                     "You are now speaking " + lang.Name + ".",
                     EnumChatType.CommandSuccess);
+                context.State = MessageContextState.STOP;
             } else {
                 // Remove the language identifier and continue processing
                 context.Message = match.Groups[2].Value;
