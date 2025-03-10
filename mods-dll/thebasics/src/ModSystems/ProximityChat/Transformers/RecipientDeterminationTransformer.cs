@@ -9,30 +9,26 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 /// <summary>
 /// Determines which players should receive a message based on proximity and other factors
 /// </summary>
-public class RecipientDeterminationTransformer : IMessageTransformer
+public class RecipientDeterminationTransformer : MessageTransformerBase
 {
-    private readonly RPProximityChatSystem _chatSystem;
-    private readonly LanguageSystem _languageSystem;
     private readonly ProximityCheckUtils _proximityCheckUtils;
 
-    public RecipientDeterminationTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem, ProximityCheckUtils proximityCheckUtils)
+    public RecipientDeterminationTransformer(RPProximityChatSystem chatSystem, ProximityCheckUtils proximityCheckUtils) : base(chatSystem)
     {
-        _chatSystem = chatSystem;
-        _languageSystem = languageSystem;
         _proximityCheckUtils = proximityCheckUtils;
     }
 
-    public MessageContext Transform(MessageContext context)
+    public override bool ShouldTransform(MessageContext context)
     {
-        // Skip if this is a context for an individual recipient
-        if (context.SendingPlayer != context.ReceivingPlayer)
-        {
-            return context;
-        }
+        return true;
+    }
 
-        // Skip if we already have recipients
-        if (context.Recipients != null && context.Recipients.Count > 0)
+    public override MessageContext Transform(MessageContext context)
+    {
+        // Short circuit for global OOC and send to all players
+        if(context.HasFlag(MessageContext.IS_GLOBAL_OOC))
         {
+            context.Recipients = _chatSystem.API.World.AllOnlinePlayers.Cast<IServerPlayer>().ToList();
             return context;
         }
 
@@ -40,7 +36,7 @@ public class RecipientDeterminationTransformer : IMessageTransformer
         var range = GetCommunicationRange(context);
 
         // Find players within range
-        var allPlayers = _chatSystem.GetAPI().World.AllOnlinePlayers;
+        var allPlayers = _chatSystem.API.World.AllOnlinePlayers;
         var nearbyPlayers = allPlayers.Where(player =>
         {
             var serverPlayer = player as IServerPlayer;
@@ -49,7 +45,7 @@ public class RecipientDeterminationTransformer : IMessageTransformer
             bool inRange = player.Entity.Pos.AsBlockPos.ManhattenDistance(
                 context.SendingPlayer.Entity.Pos.AsBlockPos) < range;
 
-            var lang = context.Metadata["language"] as Language;
+            var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
             // Special check for sign language - must be within line of sight
             if (inRange && lang == LanguageSystem.SignLanguage)
             {
@@ -67,12 +63,12 @@ public class RecipientDeterminationTransformer : IMessageTransformer
 
     private int GetCommunicationRange(MessageContext context)
     {
-        if (context.Metadata["language"] is Language lang && lang == LanguageSystem.SignLanguage)
+        if (context.TryGetMetadata<Language>(MessageContext.LANGUAGE, out var lang) && lang == LanguageSystem.SignLanguage)
         {
-            return _chatSystem.GetModConfig().SignLanguageRange;
+            return _chatSystem.Config.SignLanguageRange;
         }
 
-        var chatMode = (ProximityChatMode)context.Metadata["chatMode"];
-        return _chatSystem.GetModConfig().ProximityChatModeDistances[chatMode];
+        var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+        return _chatSystem.Config.ProximityChatModeDistances[chatMode];
     }
 }

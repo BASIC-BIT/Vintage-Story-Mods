@@ -72,8 +72,8 @@ namespace thebasics.ModSystems.ProximityChat
             };
         }
 
-        public static readonly Language BabbleLang = new Language("Babble", "Unintelligible", "babble", new[] { "ba", "ble", "bla", "bal" }, "#FF0000", false, true);
-        public static readonly Language SignLanguage = new Language("Sign", "A visual language using hand gestures and movements", "sign", new string[] { }, "#A0A0A0", false, false);
+        public static readonly Language BabbleLang = new Language("Babble", "Unintelligible", "babble", ["ba", "ble", "bla", "bal"], "#FF0000", false, true);
+        public static readonly Language SignLanguage = new Language("Sign", "A visual language using hand gestures and movements", "sign", [], "#A0A0A0", false, false);
 
         private TextCommandResult HandleAddLanguageCommand(TextCommandCallingArgs args)
         {
@@ -358,17 +358,10 @@ namespace thebasics.ModSystems.ProximityChat
         public void ProcessMessage(IServerPlayer receivingPlayer,
             ref string message, Language lang)
         {
-            // Special handling for Sign Language - always display in italics
-            if (lang == SignLanguage && !message.StartsWith("<i>") && !message.EndsWith("</i>"))
-            {
-                message = $"<i>{message}</i>";
-                return;
-            }
-
             if (Config.EnableLanguageSystem && !receivingPlayer.KnowsLanguage(lang))
             {
                 var scrambledMessage = LanguageScrambler.ScrambleMessage(message, lang);
-                message = $"<i>{scrambledMessage}</i>";
+                message = ChatHelper.Italic(scrambledMessage);
             }
         }
     }

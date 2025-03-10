@@ -45,12 +45,12 @@ namespace thebasics.Configs
             { ProximityChatMode.Whisper, 12 }
         };
 
-        public int[] ProximityChatClampFontSizes = {
+        public int[] ProximityChatClampFontSizes = [
             30,
             16,
             12,
             6,
-        };
+        ];
         
         public IDictionary<ProximityChatMode, string[]> ProximityChatModeVerbs =
             new Dictionary<ProximityChatMode, string[]>
@@ -135,9 +135,9 @@ namespace thebasics.Configs
         public IList<Language> Languages = new Language[]
         {
             new Language("Common", "The universal language", "c",
-                new[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" }, "#E9DDCE", true, false),
+                ["al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve"], "#E9DDCE", true, false),
             new Language("Tradeband", "A common language for trade", "tr",
-                new[] { "feng", "tar", "kin", "ga", "shin", "ji" }, "#D4A96A", false, false)
+                ["feng", "tar", "kin", "ga", "shin", "ji"], "#D4A96A", false, false)
         };
 
         public bool PreventProximityChannelSwitching = true;

@@ -2,23 +2,26 @@ using thebasics.ModSystems.ProximityChat.Models;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
-public class LanguageTransformer : IMessageTransformer
+public class LanguageTransformer : MessageTransformerBase
 {
     private readonly LanguageSystem _languageSystem;
     
-    public LanguageTransformer(LanguageSystem languageSystem)
+    public LanguageTransformer(LanguageSystem languageSystem, RPProximityChatSystem chatSystem) : base(chatSystem)
     {
         _languageSystem = languageSystem;
     }
     
-    public MessageContext Transform(MessageContext context)
+    public override bool ShouldTransform(MessageContext context)
+    {
+        return context.HasFlag(MessageContext.IS_ROLEPLAY) && !context.HasFlag(MessageContext.IS_EMOTE) && !context.HasFlag(MessageContext.IS_ENVIRONMENTAL) && !context.HasFlag(MessageContext.IS_OOC);
+    }
+    
+    public override MessageContext Transform(MessageContext context)
     {
         var content = context.Message;
-        var lang = _languageSystem.GetSpeakingLanguage(context.SendingPlayer, context.GroupId, ref content);
-        _languageSystem.ProcessMessage(context.ReceivingPlayer, ref content, lang);
+        _languageSystem.ProcessMessage(context.ReceivingPlayer, ref content, context.GetMetadata<Language>(MessageContext.LANGUAGE));
         
         context.Message = content;
-        context.Metadata["language"] = lang;
         
         return context;
     }

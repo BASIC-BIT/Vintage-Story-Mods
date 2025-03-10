@@ -3,33 +3,36 @@ using Vintagestory.API.Common;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
-public class ChatTypeTransformer : IMessageTransformer
+public class ChatTypeTransformer : MessageTransformerBase
 {
-    private readonly RPProximityChatSystem _chatSystem;
-    
-    public ChatTypeTransformer(RPProximityChatSystem chatSystem)
+    public ChatTypeTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
-        _chatSystem = chatSystem;
     }
     
-    public MessageContext Transform(MessageContext context)
+    public override bool ShouldTransform(MessageContext context)
     {
-        // Set default chat type
-        if (!context.Metadata.ContainsKey("chatType"))
-        {
-            context.Metadata["chatType"] = EnumChatType.OthersMessage;
-        }
+        return true;
+    }
+    
+    public override MessageContext Transform(MessageContext context)
+    {
         
         // Environmental messages use Notification chat type
-        if (context.Metadata.ContainsKey("isEnvironmental"))
+        if (context.HasFlag(MessageContext.IS_ENVIRONMENTAL))
         {
-            context.Metadata["chatType"] = EnumChatType.Notification;
+            context.SetMetadata(MessageContext.CHAT_TYPE, EnumChatType.Notification);
         }
         
         // Emotes always use OthersMessage
-        if (context.Metadata.ContainsKey("isEmote"))
+        if (context.HasFlag(MessageContext.IS_EMOTE))
         {
-            context.Metadata["chatType"] = EnumChatType.OthersMessage;
+            context.SetMetadata(MessageContext.CHAT_TYPE, EnumChatType.OthersMessage);
+        }
+
+        // Set default chat type
+        if (!context.HasMetadata(MessageContext.CHAT_TYPE))
+        {
+            context.SetMetadata(MessageContext.CHAT_TYPE, EnumChatType.OthersMessage);
         }
         
         return context;

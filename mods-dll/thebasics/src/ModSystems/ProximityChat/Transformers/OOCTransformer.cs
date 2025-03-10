@@ -3,21 +3,20 @@ using thebasics.Utilities;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
-public class OOCTransformer : IMessageTransformer
+public class OOCTransformer : MessageTransformerBase
 {
-    private readonly RPProximityChatSystem _chatSystem;
-    
-    public OOCTransformer(RPProximityChatSystem chatSystem)
+    public OOCTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
-        _chatSystem = chatSystem;
     }
     
-    public MessageContext Transform(MessageContext context)
+    public override bool ShouldTransform(MessageContext context)
     {
-        if (context.Metadata["isOOC"] as bool? == true)
-        {
-            context.Message = ChatHelper.Color("#808080", $"(OOC) {context.Metadata["formattedName"]}: {context.Message}");
-        }
+        return context.HasMetadata(MessageContext.IS_OOC);
+    }
+
+    public override MessageContext Transform(MessageContext context)
+    {
+        context.Message = ChatHelper.Color("#808080", $"(OOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}");
 
         return context;
     }

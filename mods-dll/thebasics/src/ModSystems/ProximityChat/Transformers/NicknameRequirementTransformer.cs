@@ -7,38 +7,36 @@ using Vintagestory.API.Server;
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 // Require nicknames if we're doing RP chat
-public class NicknameRequirementTransformer : IMessageTransformer
-{
-    private readonly RPProximityChatSystem _chatSystem;
-    
-    public NicknameRequirementTransformer(RPProximityChatSystem chatSystem)
+public class NicknameRequirementTransformer : MessageTransformerBase
+{   
+    public NicknameRequirementTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
-        _chatSystem = chatSystem;
+    }
+
+    public override bool ShouldTransform(MessageContext context)
+    {
+        return RequiresNickname(context) && !context.SendingPlayer.HasNickname();
+    }
+
+    public override MessageContext Transform(MessageContext context)
+    {   
+        // Send nickname requirement warning directly to the player
+        context.SendingPlayer.SendMessage(
+            _chatSystem.ProximityChatId,
+            "You need a nickname to use proximity chat! You can set it with `/nick MyName`",
+            EnumChatType.CommandError
+        );
+        
+        // Stop processing this message
+        context.State = MessageContextState.STOP;
+
+        return context;
     }
 
     private bool RequiresNickname(MessageContext context)
     {
-        var config = _chatSystem.GetModConfig();
-        return !config.DisableNickname && 
-        context.Metadata["isRoleplay"] as bool == true;
+        var config = _chatSystem.Config;
+        return !config.DisableNicknames && 
+        context.HasFlag(MessageContext.IS_ROLEPLAY);
     }
-    
-    public MessageContext Transform(MessageContext context)
-    {   
-        // Check if the player has a nickname
-        if (RequiresNickname(context) && !context.SendingPlayer.HasNickname())
-        {
-            // Send nickname requirement warning directly to the player
-            context.SendingPlayer.SendMessage(
-                _chatSystem.GetProximityChatGroupId(),
-                "You need a nickname to use proximity chat! You can set it with `/nick MyName`",
-                EnumChatType.CommandError
-            );
-            
-            // Stop processing this message
-            context.State = MessageContextState.STOP;
-        }
-        
-        return context;
-    }
-} 
+}

@@ -3,29 +3,22 @@ using thebasics.Utilities;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
-public class EnvironmentMessageTransformer : IMessageTransformer
+public class EnvironmentMessageTransformer : MessageTransformerBase
 {
-    private readonly RPProximityChatSystem _chatSystem;
-    
-    public EnvironmentMessageTransformer(RPProximityChatSystem chatSystem)
+    public EnvironmentMessageTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
-        _chatSystem = chatSystem;
+
     }
-    
-    public MessageContext Transform(MessageContext context)
+
+    public override bool ShouldTransform(MessageContext context)
     {
-        if (!context.Metadata.ContainsKey("isEnvironmental"))
-        {
-            return context;
-        }
-        
-        // Environment messages are already tagged with "isEnvironmental" by GetPlayerChat
-        // We just need to ensure they're properly formatted
-        
-        var content = context.Message;
-        
+        return context.HasFlag(MessageContext.IS_ENVIRONMENTAL);
+    }
+
+    public override MessageContext Transform(MessageContext context)
+    {
         // Apply italic formatting to environmental messages for visual distinction
-        context.Message = $"<i>{content}</i>";
+        context.Message = ChatHelper.Italic(context.Message);
         
         return context;
     }

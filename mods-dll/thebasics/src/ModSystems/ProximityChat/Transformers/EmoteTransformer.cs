@@ -4,31 +4,33 @@ using thebasics.Utilities;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
-public class EmoteTransformer : IMessageTransformer
+public class EmoteTransformer : MessageTransformerBase
 {
-    private readonly RPProximityChatSystem _chatSystem;
-    
-    public EmoteTransformer(RPProximityChatSystem chatSystem)
+    private LanguageSystem _languageSystem;
+    public EmoteTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem) : base(chatSystem)
     {
-        _chatSystem = chatSystem;
+        _languageSystem = languageSystem;
     }
     
-    public MessageContext Transform(MessageContext context)
+    public override bool ShouldTransform(MessageContext context)
     {
-        if (!context.Metadata.ContainsKey("isEmote"))
-        {
-            return context;
-        }
-        
+        return context.HasFlag(MessageContext.IS_EMOTE);
+    }
+    
+    public override MessageContext Transform(MessageContext context)
+    {   
         var content = context.Message;
         var builder = new StringBuilder();
         
-        builder.Append(context.Metadata["formattedName"]);
+        var formattedName = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
+        builder.Append(formattedName);
         builder.Append(" ");
         
         // Process the emote content
         var trimmedMessage = content.Trim();
         var splitMessage = trimmedMessage.Split('"');
+
+        var language = context.GetMetadata<Language>(MessageContext.LANGUAGE);
         
         for (var i = 0; i < splitMessage.Length; i++)
         {
@@ -38,13 +40,15 @@ public class EmoteTransformer : IMessageTransformer
             }
             else
             {
-                // Handle quoted text in emotes
-                if (context.Metadata.TryGetValue("language", out var langObj) && langObj is Language lang)
-                {
-                    builder.Append('"');
-                    builder.Append(splitMessage[i]);
-                    builder.Append('"');
-                }
+                // TODO: Find better way of applying language in emotes - ideally this happens in the language transformer
+                // TODO: Cont. but because we don't split out the message, we either apply to apply the language before or after the emote transformer
+                // TODO: Cont. both of which fuck up the messages
+                var text = splitMessage[i];
+                _languageSystem.ProcessMessage(context.SendingPlayer, ref text, language);
+                text = ChatHelper.LangColor(text, language);
+                builder.Append('"');
+                builder.Append(text);
+                builder.Append('"');
             }
         }
         

@@ -1,40 +1,36 @@
 using System.Collections.Generic;
 using thebasics.Configs;
+using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
-public class PlayerChatTransformer : IMessageTransformer
+public class PlayerChatTransformer : MessageTransformerBase
 {
-    private readonly RPProximityChatSystem _chatSystem;
-    
-    public PlayerChatTransformer(RPProximityChatSystem chatSystem)
+    public PlayerChatTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
-        _chatSystem = chatSystem;
     }
     
-    public MessageContext Transform(MessageContext context)
+    public override bool ShouldTransform(MessageContext context)
     {
-        // Only process messages that have the isPlayerChat flag
-        if (!context.Metadata.ContainsKey("isPlayerChat"))
-        {
-            return context;
-        }
-        
+        return context.HasFlag(MessageContext.IS_PLAYER_CHAT);
+    }
+
+    public override MessageContext Transform(MessageContext context)
+    {   
         var content = context.Message;
-        var config = _chatSystem.GetModConfig();
         
         // Check message type based on first character or pattern
-        var isEmote = content.StartsWith("*");
-        var isGlobalOoc = config.EnableGlobalOOC && content.StartsWith("((");
+        var isGlobalOoc = _chatSystem.Config.EnableGlobalOOC && content.StartsWith("((");
         var isOOC = !isGlobalOoc && content.StartsWith("(");
         var isEnvironmentMessage = content.StartsWith("!");
+        var isEmote = content.StartsWith("*") || (context.SendingPlayer.GetEmoteMode() && !isOOC && !isGlobalOoc && !isEnvironmentMessage);
         
         // Handle Global OOC - this will be processed normally by the server
         if (isGlobalOoc)
         {
-            context.Metadata["isGlobalOOC"] = true;
+            context.SetFlag(MessageContext.IS_GLOBAL_OOC);
             context.State = MessageContextState.STOP; // Stop further processing
             return context;
         }
@@ -42,15 +38,17 @@ public class PlayerChatTransformer : IMessageTransformer
         // Handle Emote
         if (isEmote)
         {
-            context.Message = content.Substring(1); // Remove the * character
-            context.Metadata["isEmote"] = true;
+            if (content.StartsWith("*")) {
+                context.Message = content[1..]; // Remove the leading * character if it exists
+            }
+            context.SetFlag(MessageContext.IS_EMOTE);
             return context;
         }
         
         // Handle OOC
         if (isOOC)
         {
-            context.Metadata["isOOC"] = true;
+            context.SetFlag(MessageContext.IS_OOC);
             return context;
         }
         
@@ -58,7 +56,7 @@ public class PlayerChatTransformer : IMessageTransformer
         if (isEnvironmentMessage)
         {
             context.Message = content.Substring(1); // Remove the ! character
-            context.Metadata["isEnvironmental"] = true;
+            context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
             return context;
         }
         

@@ -45,7 +45,7 @@ public class DistanceObfuscationSystem : BaseSubSystem
 
         message = string.Join("", message.Select(character =>
         {
-            if (ChatHelper.IsPunctuation(character) || ChatHelper.IsDelimiter(character))
+            if (ChatHelper.IsPunctuation(character) || ChatHelper.IsWhitespace(character))
             {
                 return character;
             }

@@ -2,50 +2,52 @@ using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using thebasics.Extensions;
-using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
 
-namespace thebasics.src.ModSystems.ProximityChat.Transformers;
+namespace thebasics.ModSystems.ProximityChat.Transformers;
 
-public class ChangeSpeakingLanguageTransformer : IMessageTransformer
+public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
 {
     private readonly LanguageSystem _languageSystem;
-    private readonly RPProximityChatSystem _chatSystem;
 
-    public ChangeSpeakingLanguageTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem)
+    public ChangeSpeakingLanguageTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem) : base(chatSystem)
     {
-        _chatSystem = chatSystem;
         _languageSystem = languageSystem;
     }
     private static readonly Regex LanguageTalkRegex = new(@"^\s*:(\w+)\s*(.*)$");
 
-    public MessageContext Transform(MessageContext context)
+    public override bool ShouldTransform(MessageContext context)
+    {
+        return true;
+    }
+
+    public override MessageContext Transform(MessageContext context)
     {
         if (LanguageTalkRegex.IsMatch(context.Message))
         {
             var match = LanguageTalkRegex.Match(context.Message);
             var languageIdentifier = match.Groups[1].Value;
-            var lang = _languageSystem.GetLangFromText(languageIdentifier, true, context.SendingPlayer.HasPrivilege(_chatSystem.GetModConfig().ChangeOtherLanguagePermission));
+            var lang = _languageSystem.GetLangFromText(languageIdentifier, true, context.SendingPlayer.HasPrivilege(_chatSystem.Config.ChangeOtherLanguagePermission));
 
             if (lang == null)
             {
                 context.SendingPlayer.SendMessage(
-                    _chatSystem.GetProximityChatGroupId(),
+                    _chatSystem.ProximityChatId,
                     $"Invalid language specifier \":{languageIdentifier}\".  Valid prefixes include: " + string.Join(", ",
                         _languageSystem.GetAllLanguages(true).Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang))),
                     EnumChatType.CommandError);
-                throw new Exception($"Invalid language specifier \":{languageIdentifier}\"");
+                context.State = MessageContextState.STOP;
             }
 
             if (lang.Name != LanguageSystem.BabbleLang.Name && !context.SendingPlayer.KnowsLanguage(lang))
             {
                 context.SendingPlayer.SendMessage(
-                    _chatSystem.GetProximityChatGroupId(),
+                    _chatSystem.ProximityChatId,
                     "You don't know that language!",
                     EnumChatType.CommandError);
-                throw new Exception($"Character doesn't know language {ChatHelper.LangIdentifier(lang)}!");
+                context.State = MessageContextState.STOP;
             }
 
             // If the message is empty, set the default language and stop processing
@@ -53,15 +55,16 @@ public class ChangeSpeakingLanguageTransformer : IMessageTransformer
             {
                 context.SendingPlayer.SetDefaultLanguage(lang);
                 context.SendingPlayer.SendMessage(
-                    _chatSystem.GetProximityChatGroupId(),
+                    _chatSystem.ProximityChatId,
                     "You are now speaking " + lang.Name + ".",
                     EnumChatType.CommandSuccess);
-                context.State = MessageContextState.STOP;
             } else {
                 // Remove the language identifier and continue processing
                 context.Message = match.Groups[2].Value;
-                context.Metadata["language"] = lang;
+                context.SetMetadata(MessageContext.LANGUAGE, lang);
             }
+        } else {
+            context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_chatSystem.Config));
         }
         
         return context;

@@ -11,7 +11,7 @@ namespace thebasics.Utilities
     public static class ChatHelper
     {
         private static readonly char[] Punctuation =
-        {
+        [
             '.',
             '!',
             '?',
@@ -23,24 +23,24 @@ namespace thebasics.Utilities
             ',',
             '"',
             '\'',
-        };
+        ];
 
         public static bool IsPunctuation(char character)
         {
             return Punctuation.Any(punctuation => character == punctuation);
         }
 
-        private static readonly char[] Delimiter = //TODO: Come up with a better name for this
-        {
+        private static readonly char[] Whitespace =
+        [
             ' ',
             '\t',
             '\n',
             '\r',
-        };
+        ];
 
-        public static bool IsDelimiter(char character)
+        public static bool IsWhitespace(char character)
         {
-            return Delimiter.Any(punctuation => character == punctuation);
+            return Whitespace.Any(punctuation => character == punctuation);
         }
 
         public static bool DoesMessageNeedPunctuation(string input)
@@ -50,7 +50,7 @@ namespace thebasics.Utilities
                 return false;
             }
 
-            var lastCharacter = input[input.Length - 1];
+            var lastCharacter = input[^1];
 
             return !IsPunctuation(lastCharacter);
         }
@@ -153,6 +153,11 @@ namespace thebasics.Utilities
             var foundText = new Regex(@".*?> (.+)$").Match(message);
 
             return foundText.Groups[1].Value.Trim();
+        }
+
+        public static string Italic(string input)
+        {
+            return WrapWithTag(input, "i");
         }
     }
 }

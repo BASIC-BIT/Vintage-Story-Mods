@@ -4,26 +4,22 @@ using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
-using thebasics.Configs;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
-using System.Collections.Generic;
-using thebasics.src.ModSystems.ProximityChat.Transformers;
 
 namespace thebasics.ModSystems.ProximityChat;
 
 public class RPProximityChatSystem : BaseBasicModSystem
 {
-    private int _proximityChatId;
-    private LanguageSystem _languageSystem;
-    private DistanceObfuscationSystem _distanceObfuscationSystem;
+    public int ProximityChatId;
+    public LanguageSystem LanguageSystem;
+    public DistanceObfuscationSystem DistanceObfuscationSystem;
     private IServerNetworkChannel _serverConfigChannel;
-    private ProximityCheckUtils _proximityCheckUtils;
-    private List<IMessageTransformer> _senderPhaseTransformers;
-    private List<IMessageTransformer> _recipientPhaseTransformers;
+    public ProximityCheckUtils ProximityCheckUtils;
+    public TransformerSystem TransformerSystem;
 
     protected override void BasicStartServerSide()
     {
@@ -31,37 +27,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
         RegisterCommands();
         SetupProximityGroup();
 
-        _languageSystem = new LanguageSystem(this, API, Config);
-        _distanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
-        _proximityCheckUtils = new ProximityCheckUtils(this, API, Config);
-
-        // Initialize transformers for the sender phase (validation and recipient determination)
-        _senderPhaseTransformers = new List<IMessageTransformer>
-        {
-            // Validation transformers
-            new RoleplayTransformer(this), // Add roleplay metadata
-            new NicknameRequirementTransformer(this), // Require nickname if we're in RP chat
-            new PlayerChatTransformer(this), // If player chat, process special modifiers
-            new BabbleWarningTransformer(this, _languageSystem), // Warn if babbling
-
-            new OOCTransformer(this),
-            new EnvironmentMessageTransformer(this),
-            new FormatTransformer(this),
-            new EmoteTransformer(this),
-            new ChatModeTransformer(this),
-            new ChatTypeTransformer(this),
-
-            // Recipient determination runs last in the sender phase
-            new RecipientDeterminationTransformer(this, _languageSystem, _proximityCheckUtils),
-        };
-
-        // Initialize transformers for the recipient phase (content transformation for each recipient)
-        _recipientPhaseTransformers = new List<IMessageTransformer>
-        {
-            // Keep only transformers that need recipient-specific processing
-            new LanguageTransformer(_languageSystem),
-            new ObfuscationTransformer(_distanceObfuscationSystem)
-        };
+        LanguageSystem = new LanguageSystem(this, API, Config);
+        DistanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
+        ProximityCheckUtils = new ProximityCheckUtils(this, API, Config);
+        TransformerSystem = new TransformerSystem(this, LanguageSystem, DistanceObfuscationSystem, ProximityCheckUtils);
     }
 
     private void RegisterCommands()
@@ -287,7 +256,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         _serverConfigChannel.SendPacket(new TheBasicsConfigMessage
         {
-            ProximityGroupId = _proximityChatId,
+            ProximityGroupId = ProximityChatId,
             PreventProximityChannelSwitching = Config.PreventProximityChannelSwitching,
         }, byPlayer);
     }
@@ -302,7 +271,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         if (Config.UseGeneralChannelAsProximityChat)
         {
-            _proximityChatId = GlobalConstants.GeneralChatGroup;
+            ProximityChatId = GlobalConstants.GeneralChatGroup;
             RemoveProximityGroupIfExists();
         }
         if (!Config.UseGeneralChannelAsProximityChat)
@@ -319,7 +288,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 proximityGroup.Md5Identifier = GameMath.Md5Hash(proximityGroup.Uid + "null");
             }
 
-            _proximityChatId = proximityGroup.Uid;
+            ProximityChatId = proximityGroup.Uid;
         }
     }
 
@@ -359,7 +328,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
         SwapOutNameTag(byPlayer);
     }
 
-    // TODO: Not sure the client will get this data and sync it up.  Supposedly, behaviors should sync seamlessly with the client but I'm not sure that the UI renderer will refire (just like it does for chat), as the PlayerName never usually changes.  NPC names do though, maybe we can tie it in to that?
     private void SwapOutNameTag(IServerPlayer player)
     {
         var behavior = player.Entity.GetBehavior<EntityBehaviorNameTag>();
@@ -375,72 +343,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
             behavior.RenderRange = Config.NametagRenderRange;
             player.Entity.WatchedAttributes.MarkPathDirty("nametag");
-        }
-    }
-
-    private MessageContext ExecuteTransformers(MessageContext context, List<IMessageTransformer> transformers)
-    {
-        foreach (var transformer in transformers)
-        {
-            context = transformer.Transform(context);
-            if (context.State != MessageContextState.CONTINUE)
-            {
-                break;
-            }
-        }
-        return context;
-    }
-
-    /// <summary>
-    /// Processes a message through the two-phase pipeline: sender validation followed by per-recipient processing
-    /// </summary>
-    public void ProcessMessagePipeline(MessageContext initialContext, EnumChatType defaultChatType = EnumChatType.OthersMessage)
-    {
-        // ----- PHASE 1: Process sender context (validation and recipient determination) -----
-        var context = ExecuteTransformers(initialContext, _senderPhaseTransformers);
-
-        // If processing was stopped or no recipients were determined, we're done
-        if (context.State != MessageContextState.CONTINUE || context.Recipients == null || context.Recipients.Count == 0)
-        {
-            return;
-        }
-
-        // ----- PHASE 2: Process for each recipient (content transformation) -----
-        foreach (var recipient in context.Recipients)
-        {
-            // Create a fresh context for this recipient
-            var recipientContext = new MessageContext
-            {
-                Message = context.Message,
-                SendingPlayer = context.SendingPlayer,
-                ReceivingPlayer = recipient,
-                GroupId = context.GroupId,
-                Metadata = new Dictionary<string, object>(context.Metadata)
-            };
-
-            // Process only the recipient-phase transformers
-            recipientContext = ExecuteTransformers(recipientContext, _recipientPhaseTransformers);
-
-            // Skip sending if processing was stopped for this recipient
-            if (recipientContext.State != MessageContextState.CONTINUE)
-            {
-                continue;
-            }
-
-            // Get the chat type from the context metadata or use the provided default
-            var chatType = recipientContext.Metadata.ContainsKey("chatType")
-                ? (EnumChatType)recipientContext.Metadata["chatType"]
-                : defaultChatType;
-
-            // Get client data if available
-            string data = null;
-            if (recipientContext.Metadata.ContainsKey("clientData") && recipientContext.Metadata["clientData"] is string clientData)
-            {
-                data = clientData;
-            }
-
-            // Send the message to this recipient
-            recipient.SendMessage(GetProximityChatGroupId(), recipientContext.Message, chatType, data);
         }
     }
 
@@ -532,12 +434,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
             ReceivingPlayer = player, // Start with sender context for validation
-            GroupId = GetProximityChatGroupId(),
+            GroupId = ProximityChatId,
             Metadata = { ["isEmote"] = true }
         };
 
         // Process the entire pipeline
-        ProcessMessagePipeline(context, EnumChatType.OthersMessage);
+        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
 
         return new TextCommandResult
         {
@@ -554,12 +456,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
             ReceivingPlayer = player, // Start with sender context for validation
-            GroupId = GetProximityChatGroupId(),
+            GroupId = ProximityChatId,
             Metadata = { ["isEnvironmental"] = true }
         };
 
         // Process the entire pipeline
-        ProcessMessagePipeline(context, EnumChatType.Notification);
+        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.Notification);
 
         return new TextCommandResult
         {
@@ -608,13 +510,16 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 GroupId = groupId,
                 Metadata =
                 {
-                    ["chatMode"] = mode,
-                    ["isPlayerChat"] = true // Mark as player chat so it goes through player transformers
+                    [MessageContext.CHAT_MODE] = mode,
+                },
+                Flags =
+                {
+                    [MessageContext.IS_PLAYER_CHAT] = true // Mark as player chat so it goes through player transformers
                 }
             };
 
             // Process the entire pipeline
-            ProcessMessagePipeline(context);
+            TransformerSystem.ProcessMessagePipeline(context);
 
             return new TextCommandResult
             {
@@ -700,7 +605,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
         Vintagestory.API.Datastructures.BoolRef consumed)
     {
-        if(channelId != _proximityChatId)
+        if(channelId != ProximityChatId)
         {
             return;
         }
@@ -709,13 +614,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         // Extract the content from the full message
         var content = ChatHelper.GetMessage(message);
-
-        // Check for global OOC without creating a new transformer
-        if (PlayerChatTransformer.IsGlobalOOC(content, Config))
-        {
-            consumed.value = false; // Let the server handle global OOC
-            return;
-        }
 
         // Create a player chat context
         var context = new MessageContext
@@ -726,35 +624,15 @@ public class RPProximityChatSystem : BaseBasicModSystem
             GroupId = channelId,
             Metadata =
             {
-                ["isPlayerChat"] = true,
-                ["chatMode"] = byPlayer.GetChatMode()
+                ["clientData"] = data,
+            },
+            Flags =
+            {
+                [MessageContext.IS_PLAYER_CHAT] = true,
             }
         };
 
-        if (data != null)
-        {
-            context.Metadata["clientData"] = data;
-        }
-
         // Process the message through the pipeline
-        ProcessMessagePipeline(context);
-    }
-
-    // Add this method to provide access to the config
-    public ModConfig GetModConfig()
-    {
-        return Config;
-    }
-
-    // Add this method to provide access to the proximity chat group ID
-    public int GetProximityChatGroupId()
-    {
-        return _proximityChatId;
-    }
-
-    // Add this method to provide access to the API
-    public ICoreServerAPI GetAPI()
-    {
-        return API as ICoreServerAPI;
+        TransformerSystem.ProcessMessagePipeline(context);
     }
 }

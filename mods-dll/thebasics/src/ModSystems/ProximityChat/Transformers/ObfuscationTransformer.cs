@@ -1,24 +1,30 @@
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.Utilities;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
-public class ObfuscationTransformer : IMessageTransformer
+public class ObfuscationTransformer : MessageTransformerBase
 {
     private readonly DistanceObfuscationSystem _distanceObfuscationSystem;
     
-    public ObfuscationTransformer(DistanceObfuscationSystem distanceObfuscationSystem)
+    public ObfuscationTransformer(DistanceObfuscationSystem distanceObfuscationSystem, RPProximityChatSystem chatSystem) : base(chatSystem)
     {
         _distanceObfuscationSystem = distanceObfuscationSystem;
     }
-    
-    public MessageContext Transform(MessageContext context)
+
+    public override bool ShouldTransform(MessageContext context)
+    {
+        return context.HasFlag(MessageContext.IS_ROLEPLAY) && !context.HasFlag(MessageContext.IS_EMOTE) && !context.HasFlag(MessageContext.IS_ENVIRONMENTAL) && !context.HasFlag(MessageContext.IS_OOC);
+    }
+
+    public override MessageContext Transform(MessageContext context)
     {
         var content = context.Message;
         _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref content);
         
-        if (context.Metadata.TryGetValue("language", out var langObj) && langObj is Language lang)
+        if (context.TryGetMetadata<Language>(MessageContext.LANGUAGE, out var lang))
         {
-            if (context.Metadata.ContainsKey("isEmote"))
+            if (context.HasMetadata(MessageContext.IS_EMOTE))
             {
                 // For emotes, we need to handle font size differently
                 if (_distanceObfuscationSystem.IsDistanceFontSizeEnabled())
@@ -28,7 +34,7 @@ public class ObfuscationTransformer : IMessageTransformer
                 }
                 else
                 {
-                    content = $"<font color=\"{lang.Color}\">{content}</font>";
+                    content = ChatHelper.LangColor(content, lang);
                 }
             }
         }

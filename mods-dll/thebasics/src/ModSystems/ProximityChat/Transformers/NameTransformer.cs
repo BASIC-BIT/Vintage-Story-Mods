@@ -4,19 +4,28 @@ using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Server;
-namespace thebasics.src.ModSystems.ProximityChat.Transformers;
+namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 // Update name formatting (real name or nickname, bold, colorized) for use in later transformers
-public class NameTransformer : IMessageTransformer
+public class NameTransformer : MessageTransformerBase
 {
     private readonly ModConfig _config;
-    public NameTransformer(ModConfig config)
+    
+    public NameTransformer(ModConfig config, RPProximityChatSystem chatSystem) : base(chatSystem)
     {
         _config = config;
     }
-    public MessageContext Transform(MessageContext context)
+
+    public override bool ShouldTransform(MessageContext context)
     {
-        context.Metadata["formattedName"] = GetFormattedName(context.SendingPlayer, false, _config);
+        return true;
+    }
+
+    public override MessageContext Transform(MessageContext context)
+    {
+        bool isIC = context.HasFlag(MessageContext.IS_ROLEPLAY) || context.HasFlag(MessageContext.IS_EMOTE);
+        
+        context.SetMetadata(MessageContext.FORMATTED_NAME, GetFormattedName(context.SendingPlayer, isIC, _config));
         return context;
     }
     
