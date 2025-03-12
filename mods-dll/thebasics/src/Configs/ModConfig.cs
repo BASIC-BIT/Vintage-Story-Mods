@@ -141,5 +141,6 @@ namespace thebasics.Configs
         public bool HideNametagUnlessTargeting = false;
         public bool ShowPlayerNameInNametag = true; // If ShowNicknameInNametag is true, this shows Nickname (PlayerName).  Does nothing if ShowNicknameInNametag is false
         public int NametagRenderRange = 30;
+        public string EmoteColor = "#E9DDCE";
     }
 }

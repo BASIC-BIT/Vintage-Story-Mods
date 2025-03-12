@@ -15,3 +15,12 @@ mods/**/obj/*
 mods/**/*.user
 mods/**/bin/*
 mods/**/obj/*
+
+# Ignore user files anywhere inside the "mods" directory.
+mods-dll/**/*.user
+mods-dll/**/bin/*
+mods-dll/**/obj/*
+
+.env
+obj/
+bin/

@@ -529,7 +529,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private string GetFullEmoteMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, string content)
         {
-            return ChatHelper.Build(GetFormattedNickname(sendingPlayer), " ", GetEmoteMessage(sendingPlayer, receivingPlayer, content));
+            return ChatHelper.Color(ChatHelper.Build(GetFormattedNickname(sendingPlayer), " ", GetEmoteMessage(sendingPlayer, receivingPlayer, content)), Config.EmoteColor);
         }
 
         private void SendLocalChat(IServerPlayer byPlayer, string message, ProximityChatMode? tempMode = null,
