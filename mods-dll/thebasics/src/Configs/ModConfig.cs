@@ -142,5 +142,12 @@ namespace thebasics.Configs
         public bool ShowPlayerNameInNametag = true; // If ShowNicknameInNametag is true, this shows Nickname (PlayerName).  Does nothing if ShowNicknameInNametag is false
         public int NametagRenderRange = 30;
         public string EmoteColor = "#E9DDCE";
+
+        public int MinNicknameLength = 3;
+        public int MaxNicknameLength = 100;
+
+        // TODO: Should this also warn admins when they do this and/or ask for confirmation?
+        // TODO: Catalog all existing nicknames and player names for all users in the server, to implement this functionality
+        public bool DisallowNicknameThatIsAnotherPlayersName = true;
     }
 }

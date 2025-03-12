@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -6,6 +7,7 @@ using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
+using thebasics.Utilities.Parsers;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
@@ -74,9 +76,11 @@ namespace thebasics.ModSystems.ProximityChat
 
             API.ChatCommands.GetOrCreate("adminsetnickname")
                 .WithAlias("adminsetnick")
+                .WithAlias("adminnick")
+                .WithAlias("adminnickname")
                 .WithDescription("Admin: Get or set another player's nickname")
                 .WithRootAlias("adminsetnick")
-                .WithArgs(new PlayersArgParser("target player", API, true),
+                .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
                     new StringArgParser("new nickname", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameAdmin);
@@ -84,7 +88,7 @@ namespace thebasics.ModSystems.ProximityChat
             API.ChatCommands.GetOrCreate("adminsetnicknamecolor")
                 .WithAlias("adminsetnickcolor", "adminsetnickcol")
                 .WithDescription("Admin: Get or set another player's nickname color")
-                .WithArgs(new PlayersArgParser("target player", API, true),
+                .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
                     new ColorArgParser("new nickname color", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameColorAdmin);
@@ -690,9 +694,19 @@ namespace thebasics.ModSystems.ProximityChat
             }
             else
             {
+                // Validate nickname length, and return an error if it's too long or too short
                 var nickname = (string)fullArgs.Parsers[0].GetValue();
+                if(nickname.Length < Config.MinNicknameLength || nickname.Length > Config.MaxNicknameLength) {
+                    return new TextCommandResult
+                    {
+                        Status = EnumCommandStatus.Error,
+                        StatusMessage = $"Nickname must be between {Config.MinNicknameLength} and {Config.MaxNicknameLength} characters long",
+                    };
+                }
+
                 player.SetNickname(nickname);
                 SwapOutNameTag(player);
+                
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
@@ -739,7 +753,7 @@ namespace thebasics.ModSystems.ProximityChat
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
-                    StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {attemptTarget.GetNicknameWithColor()}",
+                    StatusMessage = $"Player Name: {attemptTarget.PlayerName}\n Nickname: {oldNickname}",
                 };
 
             }
@@ -752,7 +766,7 @@ namespace thebasics.ModSystems.ProximityChat
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {newNickname}.  Old Nickname: {oldNickname}",
+                StatusMessage = $"Player Name: {attemptTarget.PlayerName}\nOld Nickname: {oldNickname}\nNew Nickname: {newNickname}",
             };
         }
 
@@ -936,6 +950,35 @@ namespace thebasics.ModSystems.ProximityChat
                 Status = EnumCommandStatus.Success,
                 StatusMessage = $"RP Text is now {ChatHelper.OnOff(rpTextEnabled)} for your messages.",
             };
+        }
+
+        
+        private bool IsNicknameClash(IPlayer player, string newNickname) {
+            // Check if any other online player has this nickname
+            foreach (var otherPlayer in API.World.AllOnlinePlayers)
+            {
+                // Skip self
+                if (otherPlayer.PlayerUID == player.PlayerUID)
+                {
+                    continue;
+                }
+            
+                var serverPlayer = otherPlayer as IServerPlayer;
+                if (serverPlayer != null && serverPlayer.HasNickname())
+                {
+                    var nickname = serverPlayer.GetNickname();
+                    if (nickname.Equals(newNickname, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+            
+            // For offline players, we would need server access to their moddata
+            // This would require more work with persistent storage
+            // For now, let's just check online players
+            
+            return false;
         }
     }
 }
