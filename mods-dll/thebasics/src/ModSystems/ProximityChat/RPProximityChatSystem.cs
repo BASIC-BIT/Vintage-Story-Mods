@@ -1,9 +1,11 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
+using thebasics.Utilities.Parsers;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
@@ -74,9 +76,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             API.ChatCommands.GetOrCreate("adminsetnickname")
                 .WithAlias("adminsetnick")
+                .WithAlias("adminnick")
+                .WithAlias("adminnickname")
                 .WithDescription("Admin: Get or set another player's nickname")
                 .WithRootAlias("adminsetnick")
-                .WithArgs(new PlayersArgParser("target player", API, true),
+                .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
                     new StringArgParser("new nickname", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameAdmin);
@@ -84,7 +88,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             API.ChatCommands.GetOrCreate("adminsetnicknamecolor")
                 .WithAlias("adminsetnickcolor", "adminsetnickcol")
                 .WithDescription("Admin: Get or set another player's nickname color")
-                .WithArgs(new PlayersArgParser("target player", API, true),
+                .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
                     new ColorArgParser("new nickname color", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameColorAdmin);

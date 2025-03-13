@@ -48,3 +48,12 @@ local-research/*.repomix.*
 # Environment files
 .env
 *.env
+
+# Ignore user files anywhere inside the "mods" directory.
+mods-dll/**/*.user
+mods-dll/**/bin/*
+mods-dll/**/obj/*
+
+.env
+obj/
+bin/
