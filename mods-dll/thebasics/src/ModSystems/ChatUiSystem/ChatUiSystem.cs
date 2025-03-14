@@ -12,10 +12,10 @@ public class ChatUiSystem : ModSystem
 {
     private static ICoreClientAPI _api;
     private Harmony _harmony;
-    private static int _proximityGroupId;
+    private static int? _proximityGroupId = null;
+    private static int? _lastSelectedGroupId = null;
     private static ModConfig _config = null;
     private static readonly System.Collections.Generic.List<System.Action> _pendingConfigActions = new System.Collections.Generic.List<System.Action>();
-    private static string _lastSelectedChannel;
     private static bool _isInitialized;
     private static int _initializationAttempts;
     private const int MAX_INITIALIZATION_ATTEMPTS = 3;
@@ -38,11 +38,8 @@ public class ChatUiSystem : ModSystem
         _isInitialized = false;
         _initializationAttempts = 0;
         
-        LoadConfig();
         RegisterForServerSideConfig();
-        
-        // Load last selected channel from client settings
-        _lastSelectedChannel = _api.Settings.String["lastSelectedChatChannel"];
+
         
         // Register event handlers
         _api.Event.PlayerJoin += OnPlayerJoin;
@@ -135,14 +132,6 @@ public class ChatUiSystem : ModSystem
     //     }
     // }
 
-    // Config is loaded from server
-    private void LoadConfig()
-    {
-        // Initialize config to null until we receive it from the server
-        _config = null;
-        _api.Logger.Debug("[THEBASICS] Waiting for server config");
-    }
-
     // Queue an action to be executed once we have the config from server
     private static void QueueConfigAction(System.Action action)
     {
@@ -231,6 +220,7 @@ public class ChatUiSystem : ModSystem
     {
         _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
+            .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
         // .RegisterMessageType<TheBasicsChatTypingMessage>();
@@ -286,8 +276,8 @@ public class ChatUiSystem : ModSystem
                 return;
             }
             
-            // Set the proximity group ID
             _proximityGroupId = configMessage.ProximityGroupId;
+            _lastSelectedGroupId = configMessage.LastSelectedGroupId;
             
             _api.Logger.Debug($"[THEBASICS] Received server config: Prevention={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}");
             _api.Logger.Debug($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}");
@@ -403,12 +393,12 @@ public class ChatUiSystem : ModSystem
             }
 
             // Validate stored channel name if preservation is enabled
-            if (_config.PreserveDefaultChatChoice && !string.IsNullOrEmpty(_lastSelectedChannel))
+            if (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null)
             {
                 bool validChannel = false;
                 for (int i = 0; i < chatTabs.Length; i++)
                 {
-                    if (chatTabs[i].Name == _lastSelectedChannel)
+                    if (chatTabs[i].DataInt == _lastSelectedGroupId)
                     {
                         validChannel = true;
                         break;
@@ -416,18 +406,19 @@ public class ChatUiSystem : ModSystem
                 }
                 if (!validChannel)
                 {
-                    _api.Logger.Warning($"[THEBASICS] Stored channel '{_lastSelectedChannel}' is no longer valid, reverting to default");
-                    _lastSelectedChannel = null;
+                    _api.Logger.Warning($"[THEBASICS] Stored channel '{_lastSelectedGroupId}' is no longer valid, reverting to default");
+                    _lastSelectedGroupId = null;
+                    _clientConfigChannel.SendPacket(new ChannelSelectedMessage() { GroupId = null });
                 }
             }
 
             // Determine which tab should be active
             GuiTab targetTab = null;
 
-            if (_config.PreserveDefaultChatChoice && !string.IsNullOrEmpty(_lastSelectedChannel))
+            if (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null)
             {
                 // Use last selected channel if preservation is enabled
-                targetTab = _lastSelectedChannel == _config.ProximityChatName ? proximityTab : generalTab;
+                targetTab = _lastSelectedGroupId == _proximityGroupId ? proximityTab : generalTab;
             }
             else
             {
@@ -474,9 +465,9 @@ public class ChatUiSystem : ModSystem
             if (_config.UseGeneralChannelAsProximityChat) return;
 
             // Store the selected channel
-            _lastSelectedChannel = tab.Name;
-            _api.Settings.String["lastSelectedChatChannel"] = _lastSelectedChannel;
-            _api.Logger.Debug($"[THEBASICS] Stored last selected channel: {_lastSelectedChannel}");
+            _lastSelectedGroupId = tab.DataInt;
+            _clientConfigChannel.SendPacket(new ChannelSelectedMessage() { GroupId = _lastSelectedGroupId });
+            _api.Logger.Debug($"[THEBASICS] Stored last selected channel: {_lastSelectedGroupId}");
         }
         catch (System.Exception e)
         {
@@ -548,7 +539,7 @@ public class ChatUiSystem : ModSystem
             }
             _harmony?.UnpatchAll(Mod.Info.ModID);
             _config = null;
-            _lastSelectedChannel = null;
+            _lastSelectedGroupId = null;
             _isInitialized = false;
             _initializationAttempts = 0;
         }

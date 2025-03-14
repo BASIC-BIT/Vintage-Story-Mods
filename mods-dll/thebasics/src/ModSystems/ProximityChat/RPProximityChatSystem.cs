@@ -167,7 +167,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _serverConfigChannel = API.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
-            .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady);
+            .RegisterMessageType<ChannelSelectedMessage>()
+            .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
+            .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected);
+    }
+
+    private void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)
+    {
+        player.SetLastSelectedGroupId(message.GroupId);
     }
 
     private void OnClientReady(IServerPlayer player, TheBasicsClientReadyMessage message)
@@ -261,7 +268,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _serverConfigChannel.SendPacket(new TheBasicsConfigMessage
         {
             ProximityGroupId = ProximityChatId,
-            Config = Config
+            Config = Config,
+            LastSelectedGroupId = byPlayer.GetLastSelectedGroupId()
         }, byPlayer);
         
         API.Logger.Debug($"THEBASICS - Sent complete config to client {byPlayer.PlayerName}");

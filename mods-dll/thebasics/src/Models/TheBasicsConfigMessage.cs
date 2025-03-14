@@ -12,4 +12,7 @@ public class TheBasicsConfigMessage
     // Full config object instead of individual properties
     [ProtoMember(2)]
     public ModConfig Config;
+
+    [ProtoMember(3)]
+    public int? LastSelectedGroupId;
 }

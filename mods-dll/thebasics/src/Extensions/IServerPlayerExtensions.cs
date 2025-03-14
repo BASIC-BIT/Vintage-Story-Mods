@@ -36,6 +36,8 @@ namespace thebasics.Extensions
 
         private const string TpaPrivilege = "tpa";
 
+        private const string ModDataLastSelectedGroupId = "BASIC_LAST_SELECTED_GROUP_ID";
+
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
         {
             try
@@ -86,6 +88,18 @@ namespace thebasics.Extensions
         public static void ClearNickname(this IServerPlayer player)
         {
             player.RemoveModdata(ModDataNickname);
+        }
+        #endregion
+
+        #region Last Selected Group ID
+        public static int? GetLastSelectedGroupId(this IServerPlayer player)
+        {
+            return GetModData<int?>(player, ModDataLastSelectedGroupId, null);
+        }
+
+        public static void SetLastSelectedGroupId(this IServerPlayer player, int? groupId)
+        {
+            SetModData(player, ModDataLastSelectedGroupId, groupId);
         }
         #endregion
 
