@@ -13,7 +13,6 @@ public class ChatUiSystem : ModSystem
     private static ICoreClientAPI _api;
     private Harmony _harmony;
     private static int _proximityGroupId;
-    private static bool _preventProximityChannelSwitching;
     private static ModConfig _config = null;
     private static readonly System.Collections.Generic.List<System.Action> _pendingConfigActions = new System.Collections.Generic.List<System.Action>();
     private static string _lastSelectedChannel;
@@ -290,10 +289,7 @@ public class ChatUiSystem : ModSystem
             // Set the proximity group ID
             _proximityGroupId = configMessage.ProximityGroupId;
             
-            // Extract specific values needed for other functionality
-            _preventProximityChannelSwitching = _config.PreventProximityChannelSwitching;
-            
-            _api.Logger.Debug($"[THEBASICS] Received server config: Prevention={_preventProximityChannelSwitching}, ProximityId={_proximityGroupId}");
+            _api.Logger.Debug($"[THEBASICS] Received server config: Prevention={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}");
             _api.Logger.Debug($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}");
             
             // Process any actions that were waiting for config
@@ -326,9 +322,9 @@ public class ChatUiSystem : ModSystem
         var game = (ClientMain)_api.World;
         int gotoGroupId = packet.GotoGroup.GroupId;
         _api.Logger.Debug(
-            $"[THEBASICS] HandleGotoGroupPacket ~ Prevention: {_preventProximityChannelSwitching}, Current: {game.currentGroupid}, Target: {gotoGroupId}, Proximity: {_proximityGroupId}");
+            $"[THEBASICS] HandleGotoGroupPacket ~ Prevention: {_config.PreventProximityChannelSwitching}, Current: {game.currentGroupid}, Target: {gotoGroupId}, Proximity: {_proximityGroupId}");
         
-        if (_preventProximityChannelSwitching && game.currentGroupid == _proximityGroupId)
+        if (_config.PreventProximityChannelSwitching && game.currentGroupid == _proximityGroupId)
         {
             _api.Logger.Debug("[THEBASICS] Denying GotoGroupPacket - proximity channel switching prevented");
             return false;
