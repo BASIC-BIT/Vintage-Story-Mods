@@ -261,8 +261,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _serverConfigChannel.SendPacket(new TheBasicsConfigMessage
         {
             ProximityGroupId = ProximityChatId,
-            PreventProximityChannelSwitching = Config.PreventProximityChannelSwitching,
+            Config = Config,  // Send the entire config object to the client
         }, byPlayer);
+        
+        API.Logger.Debug($"THEBASICS - Sent full config to client {byPlayer.PlayerName}");
     }
 
     private void HookEvents()

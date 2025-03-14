@@ -135,23 +135,12 @@ public class ChatUiSystem : ModSystem
     //     }
     // }
 
+    // Config is now loaded from server
     private void LoadConfig()
     {
-        try
-        {
-            _config = _api.LoadModConfig<ModConfig>("the_basics.json");
-            if (_config == null)
-            {
-                _api.Logger.Warning("[THEBASICS] No config found, creating default configuration");
-                _config = new ModConfig();
-                _api.StoreModConfig(_config, "the_basics.json");
-            }
-        }
-        catch (System.Exception e)
-        {
-            _api.Logger.Error("[THEBASICS] Failed to load mod config: {0}", e);
-            _config = new ModConfig();
-        }
+        // Initialize with default config until we receive from server
+        _config = new ModConfig();
+        _api.Logger.Debug("[THEBASICS] Initialized with default config, waiting for server config");
     }
 
     private void InitializeIfNeeded()
@@ -256,10 +245,17 @@ public class ChatUiSystem : ModSystem
 
     private void OnServerConfigMessage(TheBasicsConfigMessage configMessage)
     {
-        _preventProximityChannelSwitching = configMessage.PreventProximityChannelSwitching;
+        // Store the received config
+        _config = configMessage.Config;
+        
+        // Set the proximity group ID
         _proximityGroupId = configMessage.ProximityGroupId;
         
+        // Extract specific values needed for other functionality
+        _preventProximityChannelSwitching = _config.PreventProximityChannelSwitching;
+        
         _api.Logger.Debug($"[THEBASICS] Received server config: Prevention={_preventProximityChannelSwitching}, ProximityId={_proximityGroupId}");
+        _api.Logger.Debug($"[THEBASICS] Full config received from server");
     }
 
     /*

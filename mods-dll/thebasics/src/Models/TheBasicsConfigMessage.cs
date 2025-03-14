@@ -1,5 +1,5 @@
-﻿
-using ProtoBuf;
+﻿using ProtoBuf;
+using thebasics.Configs;
 
 namespace thebasics.Models;
 
@@ -7,5 +7,5 @@ namespace thebasics.Models;
 public class TheBasicsConfigMessage
 {
     public int ProximityGroupId;
-    public bool PreventProximityChannelSwitching;
+    public ModConfig Config;
 }

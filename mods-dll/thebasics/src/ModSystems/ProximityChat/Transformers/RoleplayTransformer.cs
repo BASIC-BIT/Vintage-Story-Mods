@@ -21,6 +21,5 @@ namespace thebasics.ModSystems.ProximityChat.Transformers
             context.SetFlag(MessageContext.IS_ROLEPLAY);
             return context;
         }
-
     }
 }
