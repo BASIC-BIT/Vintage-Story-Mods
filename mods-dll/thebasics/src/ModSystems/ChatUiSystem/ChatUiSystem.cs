@@ -4,6 +4,7 @@ using thebasics.Configs;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.Client.NoObf;
+using Vintagestory.API.Config;
 
 namespace thebasics.ModSystems.ChatUiSystem;
 
@@ -16,10 +17,10 @@ public class ChatUiSystem : ModSystem
     private static int? _lastSelectedGroupId = null;
     private static ModConfig _config = null;
     private static readonly System.Collections.Generic.List<System.Action> _pendingConfigActions = new System.Collections.Generic.List<System.Action>();
-    private static bool _isInitialized;
-    private static int _initializationAttempts;
-    private const int MAX_INITIALIZATION_ATTEMPTS = 3;
-    private const int INITIALIZATION_RETRY_DELAY_MS = 500;
+    // private static bool _isInitialized;
+    // private static int _initializationAttempts;
+    // private const int MAX_INITIALIZATION_ATTEMPTS = 20;
+    // private const int INITIALIZATION_RETRY_DELAY_MS = 500;
 
     private static IClientNetworkChannel _clientConfigChannel;
 
@@ -35,14 +36,15 @@ public class ChatUiSystem : ModSystem
     {
         base.StartClientSide(api);
         _api = api;
-        _isInitialized = false;
-        _initializationAttempts = 0;
+        // _isInitialized = false;
+        // _initializationAttempts = 0;
         
         RegisterForServerSideConfig();
 
         
         // Register event handlers
         _api.Event.PlayerJoin += OnPlayerJoin;
+        // _api.Event.PlayerLeave += OnPlayerLeave;
         
         // Initialize Harmony patches if needed
         if (!Harmony.HasAnyPatches(Mod.Info.ModID))
@@ -52,8 +54,6 @@ public class ChatUiSystem : ModSystem
             _harmony.PatchAll();
         }
         
-        // Schedule initialization check
-        _api.Event.RegisterCallback(dt => InitializeIfNeeded(), 1000);
     }
 
     // private void Dlg_ComposeExtraGuis()
@@ -168,60 +168,60 @@ public class ChatUiSystem : ModSystem
         _pendingConfigActions.Clear();
     }
 
-    private void InitializeIfNeeded()
-    {
-        if (_isInitialized || _initializationAttempts >= MAX_INITIALIZATION_ATTEMPTS) return;
+    // private void InitializeIfNeeded()
+    // {
+    //     if (_isInitialized || _initializationAttempts >= MAX_INITIALIZATION_ATTEMPTS) return;
 
-        try
-        {
-            var chatDialog = _api.Gui.LoadedGuis.Find(dlg => dlg is HudDialogChat) as HudDialogChat;
-            if (chatDialog != null)
-            {
-                var chatTabs = Traverse.Create(chatDialog).Field("chatTabs").GetValue<GuiTab[]>();
-                if (chatTabs != null && chatTabs.Length > 0)
-                {
-                    _isInitialized = true;
-                    _api.Logger.Debug("[THEBASICS] Chat system successfully initialized");
-                    return;
-                }
-            }
+    //     try
+    //     {
+    //         var chatDialog = _api.Gui.LoadedGuis.Find(dlg => dlg is HudDialogChat) as HudDialogChat;
+    //         if (chatDialog != null)
+    //         {
+    //             var chatTabs = Traverse.Create(chatDialog).Field("chatTabs").GetValue<GuiTab[]>();
+    //             if (chatTabs != null && chatTabs.Length > 0)
+    //             {
+    //                 _isInitialized = true;
+    //                 _api.Logger.Debug("[THEBASICS] Chat system successfully initialized");
+    //                 return;
+    //             }
+    //         }
 
-            _initializationAttempts++;
-            if (_initializationAttempts < MAX_INITIALIZATION_ATTEMPTS)
-            {
-                _api.Logger.Debug($"[THEBASICS] Initialization attempt {_initializationAttempts} failed, retrying in {INITIALIZATION_RETRY_DELAY_MS}ms");
-                _api.Event.RegisterCallback(dt => InitializeIfNeeded(), INITIALIZATION_RETRY_DELAY_MS);
-            }
-            else
-            {
-                _api.Logger.Warning("[THEBASICS] Failed to initialize chat system after maximum attempts");
-            }
-        }
-        catch (System.Exception e)
-        {
-            _api.Logger.Error($"[THEBASICS] Error during initialization: {e}");
-        }
-    }
+    //         _initializationAttempts++;
+    //         if (_initializationAttempts < MAX_INITIALIZATION_ATTEMPTS)
+    //         {
+    //             _api.Logger.Debug($"[THEBASICS] Initialization attempt {_initializationAttempts} failed, retrying in {INITIALIZATION_RETRY_DELAY_MS}ms");
+    //             _api.Event.RegisterCallback(dt => InitializeIfNeeded(), INITIALIZATION_RETRY_DELAY_MS);
+    //         }
+    //         else
+    //         {
+    //             _api.Logger.Warning("[THEBASICS] Failed to initialize chat system after maximum attempts");
+    //         }
+    //     }
+    //     catch (System.Exception e)
+    //     {
+    //         _api.Logger.Error($"[THEBASICS] Error during initialization: {e}");
+    //     }
+    // }
 
     private void OnPlayerJoin(IClientPlayer byPlayer)
     {
-        try
-        {
-            _api.Logger.Debug("THEBASICS - Player joined, sending ready message to server");
-            _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
-        }
-        catch (System.Exception e)
-        {
-            _api.Logger.Error($"THEBASICS - Error in OnPlayerJoin: {e}");
-        }
+        _api.Logger.Debug("THEBASICS - Player joined, sending ready message to server");
+        _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
+        // InitializeIfNeeded();
     }
+
+    // private void OnPlayerLeave(IClientPlayer byPlayer)
+    // {
+    //     _isInitialized = false;
+    //     _initializationAttempts = 0;
+    // }
 
     private void RegisterForServerSideConfig()
     {
         _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
-            .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
+            .RegisterMessageType<ChannelSelectedMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
         // .RegisterMessageType<TheBasicsChatTypingMessage>();
 
@@ -279,8 +279,8 @@ public class ChatUiSystem : ModSystem
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;
             
-            _api.Logger.Debug($"[THEBASICS] Received server config: Prevention={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}");
-            _api.Logger.Debug($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}");
+            _api.Logger.Debug($"[THEBASICS] Received server config: Prevention={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
+            _api.Logger.Debug($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
             
             // Process any actions that were waiting for config
             if (_pendingConfigActions.Count > 0)
@@ -343,102 +343,29 @@ public class ChatUiSystem : ModSystem
 
         try
         {
-            if (!_isInitialized)
-            {
-                _api.Logger.Debug("[THEBASICS] Chat system not fully initialized, deferring tab modification");
-                _api.Event.RegisterCallback(dt => PostfixOnGuiOpened(__instance), INITIALIZATION_RETRY_DELAY_MS);
-                return;
-            }
+            // if (!_isInitialized)
+            // {
+            //     _api.Logger.Debug("[THEBASICS] Chat system not fully initialized, deferring tab modification");
+            //     _api.Event.RegisterCallback(dt => PostfixOnGuiOpened(__instance), INITIALIZATION_RETRY_DELAY_MS);
+            //     return;
+            // }
 
-            // Don't modify chat tabs if using general channel as proximity chat
-            if (_config.UseGeneralChannelAsProximityChat)
-            {
-                _api.Logger.Debug("[THEBASICS] UseGeneralChannelAsProximityChat is enabled, skipping default channel modification");
-                return;
-            }
+            int targetGroupId = (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null) ? _lastSelectedGroupId.Value :
+            (_config.ProximityChatAsDefault && _proximityGroupId != null) ? _proximityGroupId.Value : GlobalConstants.GeneralChatGroup;
 
-            // Get the chat tabs
-            var chatTabs = Traverse.Create(__instance).Field("chatTabs").GetValue<GuiTab[]>();
-            if (chatTabs == null || chatTabs.Length == 0)
-            {
-                _api.Logger.Warning("[THEBASICS] Failed to get chat tabs, they may not be initialized yet");
-                return;
-            }
 
-            // Find the Proximity and General chat tabs
-            GuiTab proximityTab = null;
-            GuiTab generalTab = null;
+            // Call OnTabClicked via reflection to select the tab
+            System.Reflection.MethodInfo onTabClickedMethod = typeof(HudDialogChat).GetMethod("OnTabClicked", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             
-            for (int i = 0; i < chatTabs.Length; i++)
+            if (onTabClickedMethod != null)
             {
-                if (chatTabs[i].Name == _config.ProximityChatName)
-                {
-                    proximityTab = chatTabs[i];
-                }
-                else if (chatTabs[i].Name == "general")
-                {
-                    generalTab = chatTabs[i];
-                }
-            }
-
-            if (proximityTab == null)
-            {
-                _api.Logger.Warning($"[THEBASICS] Proximity chat tab '{_config.ProximityChatName}' not found");
-                return;
-            }
-            if (generalTab == null)
-            {
-                _api.Logger.Warning("[THEBASICS] General chat tab not found");
-                return;
-            }
-
-            // Validate stored channel name if preservation is enabled
-            if (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null)
-            {
-                bool validChannel = false;
-                for (int i = 0; i < chatTabs.Length; i++)
-                {
-                    if (chatTabs[i].DataInt == _lastSelectedGroupId)
-                    {
-                        validChannel = true;
-                        break;
-                    }
-                }
-                if (!validChannel)
-                {
-                    _api.Logger.Warning($"[THEBASICS] Stored channel '{_lastSelectedGroupId}' is no longer valid, reverting to default");
-                    _lastSelectedGroupId = null;
-                    _clientConfigChannel.SendPacket(new ChannelSelectedMessage() { GroupId = null });
-                }
-            }
-
-            // Determine which tab should be active
-            GuiTab targetTab = null;
-
-            if (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null)
-            {
-                // Use last selected channel if preservation is enabled
-                targetTab = _lastSelectedGroupId == _proximityGroupId ? proximityTab : generalTab;
+                onTabClickedMethod.Invoke(__instance, [targetGroupId]);
+                _api.Logger.Debug($"[THEBASICS] Set active tab to {targetGroupId} group id chat");
             }
             else
             {
-                // Use configured default
-                targetTab = _config.ProximityChatAsDefault ? proximityTab : generalTab;
-            }
-
-            // Set the active tab
-            if (targetTab != null)
-            {
-                try
-                {
-                    Traverse.Create(__instance).Field("activeTab").SetValue(targetTab);
-                    Traverse.Create(__instance).Field("activeTabName").SetValue(targetTab.Name);
-                    _api.Logger.Debug($"[THEBASICS] Set active chat tab to {targetTab.Name}");
-                }
-                catch (System.Exception e)
-                {
-                    _api.Logger.Error($"[THEBASICS] Failed to set active chat tab: {e.Message}");
-                }
+                _api.Logger.Error("[THEBASICS] Could not find OnTabClicked method via reflection");
             }
         }
         catch (System.Exception e)
@@ -449,9 +376,9 @@ public class ChatUiSystem : ModSystem
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(HudDialogChat), "OnTabClicked")]
-    public static void PostfixOnTabClicked(GuiTab tab)
+    public static void PostfixOnTabClicked(int groupId)
     {
-        if (_config == null || tab == null)
+        if (_config == null)
         {
             // Can't process this yet, but it's not important enough to queue
             return;
@@ -465,7 +392,7 @@ public class ChatUiSystem : ModSystem
             if (_config.UseGeneralChannelAsProximityChat) return;
 
             // Store the selected channel
-            _lastSelectedGroupId = tab.DataInt;
+            _lastSelectedGroupId = groupId;
             _clientConfigChannel.SendPacket(new ChannelSelectedMessage() { GroupId = _lastSelectedGroupId });
             _api.Logger.Debug($"[THEBASICS] Stored last selected channel: {_lastSelectedGroupId}");
         }
@@ -540,8 +467,8 @@ public class ChatUiSystem : ModSystem
             _harmony?.UnpatchAll(Mod.Info.ModID);
             _config = null;
             _lastSelectedGroupId = null;
-            _isInitialized = false;
-            _initializationAttempts = 0;
+            // _isInitialized = false;
+            // _initializationAttempts = 0;
         }
         catch (System.Exception e)
         {
