@@ -44,6 +44,7 @@ namespace thebasics.ModSystems
                 API.Server.LogNotification("The BASICs: non-existant modconfig at 'ModConfig/" + ConfigName +
                                            "', creating default...");
                 Config = new ModConfig();
+                Config.InitializeDefaultsIfNeeded();
                 API.StoreModConfig(this.Config, ConfigName);
             }
         }

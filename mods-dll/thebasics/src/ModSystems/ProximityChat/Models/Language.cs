@@ -4,7 +4,7 @@ using ProtoBuf;
 
 namespace thebasics.ModSystems.ProximityChat.Models;
 
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 public record Language(string Name, string Description, string Prefix, string[] Syllables, string Color, bool Default = false, bool Hidden = false)
 {
     [ProtoMember(1)]
