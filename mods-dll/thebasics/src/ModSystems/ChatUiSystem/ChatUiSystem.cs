@@ -14,7 +14,8 @@ public class ChatUiSystem : ModSystem
     private Harmony _harmony;
     private static int _proximityGroupId;
     private static bool _preventProximityChannelSwitching;
-    private static ModConfig _config;
+    private static ModConfig _config = null;
+    private static readonly System.Collections.Generic.List<System.Action> _pendingConfigActions = new System.Collections.Generic.List<System.Action>();
     private static string _lastSelectedChannel;
     private static bool _isInitialized;
     private static int _initializationAttempts;
@@ -135,12 +136,48 @@ public class ChatUiSystem : ModSystem
     //     }
     // }
 
-    // Config is now loaded from server
+    // Config is loaded from server
     private void LoadConfig()
     {
-        // Initialize with default config until we receive from server
-        _config = new ModConfig();
-        _api.Logger.Debug("[THEBASICS] Initialized with default config, waiting for server config");
+        // Initialize config to null until we receive it from the server
+        _config = null;
+        _api.Logger.Debug("[THEBASICS] Waiting for server config");
+    }
+
+    // Queue an action to be executed once we have the config from server
+    private static void QueueConfigAction(System.Action action)
+    {
+        if (_config != null)
+        {
+            // If we already have the config, execute immediately
+            action();
+        }
+        else
+        {
+            // Otherwise queue for later execution
+            _pendingConfigActions.Add(action);
+            _api.Logger.Debug("[THEBASICS] Action queued until config is received");
+        }
+    }
+
+    // Process all queued actions
+    private static void ProcessConfigActionQueue()
+    {
+        _api.Logger.Debug($"[THEBASICS] Processing {_pendingConfigActions.Count} queued actions");
+        
+        foreach (var action in _pendingConfigActions)
+        {
+            try
+            {
+                action();
+            }
+            catch (System.Exception e)
+            {
+                _api.Logger.Error($"[THEBASICS] Error executing queued action: {e}");
+            }
+        }
+        
+        _pendingConfigActions.Clear();
     }
 
     private void InitializeIfNeeded()
@@ -182,12 +219,6 @@ public class ChatUiSystem : ModSystem
     {
         try
         {
-            if (_config == null)
-            {
-                _api.Logger.Warning("THEBASICS - Config not initialized during player join");
-                return;
-            }
-
             _api.Logger.Debug("THEBASICS - Player joined, sending ready message to server");
             _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
         }
@@ -245,17 +276,37 @@ public class ChatUiSystem : ModSystem
 
     private void OnServerConfigMessage(TheBasicsConfigMessage configMessage)
     {
-        // Store the received config
-        _config = configMessage.Config;
-        
-        // Set the proximity group ID
-        _proximityGroupId = configMessage.ProximityGroupId;
-        
-        // Extract specific values needed for other functionality
-        _preventProximityChannelSwitching = _config.PreventProximityChannelSwitching;
-        
-        _api.Logger.Debug($"[THEBASICS] Received server config: Prevention={_preventProximityChannelSwitching}, ProximityId={_proximityGroupId}");
-        _api.Logger.Debug($"[THEBASICS] Full config received from server");
+        try
+        {
+            // Store the received config
+            _config = configMessage.Config;
+            
+            if (_config == null)
+            {
+                _api.Logger.Error("[THEBASICS] Received null config from server!");
+                return;
+            }
+            
+            // Set the proximity group ID
+            _proximityGroupId = configMessage.ProximityGroupId;
+            
+            // Extract specific values needed for other functionality
+            _preventProximityChannelSwitching = _config.PreventProximityChannelSwitching;
+            
+            _api.Logger.Debug($"[THEBASICS] Received server config: Prevention={_preventProximityChannelSwitching}, ProximityId={_proximityGroupId}");
+            _api.Logger.Debug($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}");
+            
+            // Process any actions that were waiting for config
+            if (_pendingConfigActions.Count > 0)
+            {
+                _api.Logger.Debug($"[THEBASICS] Processing {_pendingConfigActions.Count} queued actions");
+                ProcessConfigActionQueue();
+            }
+        }
+        catch (System.Exception e)
+        {
+            _api.Logger.Error($"[THEBASICS] Error processing server config message: {e}");
+        }
     }
 
     /*
@@ -265,6 +316,13 @@ public class ChatUiSystem : ModSystem
     [HarmonyPatch(typeof(HudDialogChat), "HandleGotoGroupPacket")]
     public static bool HandleGotoGroupPacket(HudDialogChat __instance, Packet_Server packet)
     {
+        if (_config == null)
+        {
+            _api.Logger.Debug("[THEBASICS] Config not yet received, queuing channel switch check");
+            // We can't make a decision yet, so allow the packet for now
+            return true;
+        }
+        
         var game = (ClientMain)_api.World;
         int gotoGroupId = packet.GotoGroup.GroupId;
         _api.Logger.Debug(
@@ -287,7 +345,15 @@ public class ChatUiSystem : ModSystem
     [HarmonyPatch(typeof(HudDialogChat), "OnGuiOpened")]
     public static void PostfixOnGuiOpened(HudDialogChat __instance)
     {
-        if (_api == null || _config == null) return;
+        if (_api == null) return;
+        
+        if (_config == null)
+        {
+            // Queue this action for when config is received
+            QueueConfigAction(() => PostfixOnGuiOpened(__instance));
+            _api.Logger.Debug("[THEBASICS] OnGuiOpened queued until config is received");
+            return;
+        }
 
         try
         {
@@ -398,7 +464,13 @@ public class ChatUiSystem : ModSystem
     [HarmonyPatch(typeof(HudDialogChat), "OnTabClicked")]
     public static void PostfixOnTabClicked(GuiTab tab)
     {
-        if (!_config.PreserveDefaultChatChoice || tab == null) return;
+        if (_config == null || tab == null)
+        {
+            // Can't process this yet, but it's not important enough to queue
+            return;
+        }
+        
+        if (!_config.PreserveDefaultChatChoice) return;
 
         try
         {
