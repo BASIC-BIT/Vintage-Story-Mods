@@ -1,0 +1,299 @@
+<p><em>As seen on Saltpoint RP, Fair Travels, The Expansion, and various other servers!</em></p>
+<h1>The Basics</h1>
+<p>Mod Systems:</p>
+<ul>
+<li>Roleplaying (RP) local proximity chat system, with configurable talking ranges, nicknames, automatic message formatting, and more!</li>
+<li>Server save notification (sends a message when save starts, which can help lower frustration about lag for large worlds)</li>
+<li>Player sleep notification (encourages players to go to sleep when at least 50% of players are in bed)</li>
+<li>Player Stats system (Keeps track of stats about players that can be viewed by anybody.&nbsp; Currently tracks deaths, player kills, and NPC kills)</li>
+<li>TPA System (Allow players to teleport to each other by consuming a temporal gear)</li>
+<li>Repair system (Adds an admin command /setdurability to set the durability of an item held in your hand)</li>
+</ul>
+<p>Join my discord for support! <a class="anchor_af404b anchorUnderlineOnHover_af404b" tabindex="0" title="https://discord.gg/PYKTaJ5Ett" role="button" href="https://discord.gg/PYKTaJ5Ett" target="_blank" rel="noreferrer noopener">https://discord.gg/PYKTaJ5Ett</a></p>
+<h2>Roleplay Proximity Chat System</h2>
+<p>Adds a Proximity chat tab with local chat designed for roleplaying</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/SetNickAndChat.gif" alt="Set Nickname And Chat" width="800" height="297" /></p>
+<p>Yell or whisper!</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/TalkVolumes.gif" alt="Talking Ranges" width="800" height="297" /></p>
+<p>Speak in configurable languages, so that only others that speak it can understand you!</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/Languages.gif" alt="Languages" width="800" height="297" /></p>
+<p>Use emotes and environment messages for additional flavor!</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/Emote.gif" alt="Emotes" width="800" height="297" /></p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/Environment.gif" alt="Environment Messages" width="800" height="297" /></p>
+<p>Use&nbsp;<strong>Bold</strong> and&nbsp;<em>Italics&nbsp;</em>to spice things up!</p>
+<p><img src="https://thebasics-vs-mod.s3.us-east-1.amazonaws.com/BASICsTutorial/Accents.gif" alt="Accents" width="800" height="297" /></p>
+<h3>Commands:</h3>
+<p><em>Note: [value] denotes a required argument, while (value) denotes an optional one&nbsp; Pipes</em> (|)<em> denote a range of allowable values. Aliases are listed after the first string, but with argument lists omitted.</em></p>
+<ul>
+<li>Nicknames
+<ul>
+<li><strong>"/nick (nick)"</strong>, "/setnick", "/nickname" - Get or set your nickname</li>
+<li><strong>"/clearnick"</strong> - Clear your nickname</li>
+<li><strong>"/nickcolor (color)"</strong> - Get or set your nickname color</li>
+<li><strong>"/clearnickcolor"</strong> - Clear your nickname color</li>
+<li><strong>"/adminsetnickname \[player\] (nickname)"</strong></li>
+</ul>
+</li>
+<li>Chat modes/Chat messages
+<ul>
+<li><strong>"/yell (text)"</strong>, "/y" - Set your chat mode to Yelling, or yell a single message</li>
+<li><strong>"/whisper (text)"</strong>, "/w" - Set your chat mode to Whispering, or whisper a single message</li>
+<li><strong>"/say (text)"</strong>, "/normal", "/s" - Set your chat mode back to normal, or say a single message</li>
+<li><strong>"/hands (text)"</strong>, "/h" - Set your chat mode to Sign Language, or sign a single message</li>
+<li><strong>"/ooc (on|off)"</strong> - Toggle Out-Of-Character chat mode. When enabled, messages wrapped in (( )) will be treated as OOC chat</li>
+</ul>
+</li>
+<li>Chat Messages
+<ul>
+<li><strong>"/me \[text\]"</strong>, "/m" - ("\*" prefix) - Send a proximity emote message</li>
+<li><strong>"/it \[text\]"</strong> - ("!" prefix) - Send a proximity environment message</li>
+</ul>
+</li>
+<li>Configurable Options
+<ul>
+<li><strong>"/emotemode \[on|off\]"</strong> - Turn Emote-only mode on or off</li>
+<li><strong>"/rptext \[on|off\]"</strong> - Turn the whole RP system on or off for your messages</li>
+</ul>
+</li>
+<li>Languages
+<ul>
+<li>Player Commands
+<ul>
+<li><strong>"/addlang \[langCode\]"</strong> - Add a known language</li>
+<li><strong>"/remlang \[langCode\]"</strong> - Remove a known language</li>
+<li><strong>"/listlang \[langCode\]"</strong> - List your known languages, and all available languages</li>
+</ul>
+</li>
+<li>Admin Commands
+<ul>
+<li><strong>"/adminaddlang \[player\] \[langCode\]"</strong> - Add a language to another player</li>
+<li><strong>"/adminremlang \[player\] \[langCode\]"</strong> - Remove a language from another player</li>
+<li><strong>"/adminlistlang \[player\]"</strong> - List a player's known languages</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Player Stats
+<ul>
+<li><strong>"/playerstats (player)"</strong> - Get your player stats, or another players</li>
+<li><strong>"/clearstats [player] (confirm)"</strong> - Clear all of the stats of a player</li>
+<li><strong>"/clearstat [player] [statName] (confirm)"</strong> - Clear a specific stat a player</li>
+</ul>
+</li>
+<li>TPA (Teleport) System
+<ul>
+<li><strong>"/tpa [player]"</strong> - Request to teleport to another player</li>
+<li><strong>"/tpaccept"</strong> - Accept a pending teleport request</li>
+<li><strong>"/tpdeny"</strong> - Deny a pending teleport request</li>
+</ul>
+<p><em>Note: TPA requires a temporal gear to use by default, and can be configured with cooldowns and permissions.</em></p>
+</li>
+<li>Repair System
+<ul>
+<li><strong>"/setdurability [value]"</strong> - (Admin only) Set the durability of the item you're holding</li>
+</ul>
+</li>
+</ul>
+<h3>Configuration:</h3>
+<div class="spoiler">
+<div class="spoiler-toggle">Spoiler!</div>
+<div class="spoiler-text">
+<p>The mod is highly configurable through the config file. Here are the main configuration sections:</p>
+
+<h4>Proximity Chat Settings</h4>
+<p>The proximity chat system can be configured in several ways:</p>
+
+<ul>
+<li><strong>Chat Distances:</strong> Configure how far different chat modes can be heard</li>
+<li><strong>Feature Toggles:</strong>
+  <ul>
+    <li><code>DisableNicknames</code>: When set to true, completely disables the nickname system</li>
+    <li><code>DisableRPChat</code>: When set to true, disables all RP-specific features, making it function as a standard proximity chat</li>
+  </ul>
+</li>
+<li><strong>Nickname Control:</strong>
+  <ul>
+    <li><code>ProximityChatAllowPlayersToChangeNicknames</code>: Controls whether players can set their own nicknames</li>
+    <li><code>ProximityChatAllowPlayersToChangeNicknameColors</code>: Controls whether players can change their nickname colors</li>
+    <li><code>ChangeNicknameColorPermission</code>: The privilege required for players to change their nickname colors (if allowed)</li>
+  </ul>
+</li>
+<li><strong>Message Formatting:</strong> Customize how messages appear in chat</li>
+</ul>
+
+<pre>{
+  // ----- Proximity Chat ----- //
+  "ProximityChatModeDistances": {
+    "Yell": 90,    // Maximum distance for yelling
+    "Normal": 35,  // Normal talking distance
+    "Whisper": 5,  // Whisper range
+    "Sign": 15     // Sign language visibility range
+  },
+  "ProximityChatAllowPlayersToChangeNicknames": true,
+  "ProximityChatAllowPlayersToChangeNicknameColors": true,  // Whether players can change their nickname colors
+  "ChangeNicknameColorPermission": "chat",  // The privilege required to change nickname colors (if allowed)
+  "EnableDistanceObfuscationSystem": true,
+  "ProximityChatModeObfuscationRanges": {
+    "Yell": 45,
+    "Normal": 15,
+    "Whisper": 2,
+    "Sign": 15
+  },
+  "EnableDistanceFontSizeSystem": true,
+  "ProximityChatDefaultFontSize": {
+    "Yell": 30,
+    "Normal": 16,
+    "Whisper": 12,
+    "Sign": 16
+  },
+  "ProximityChatClampFontSizes": [30, 16, 12, 6],
+  "BoldNicknames": false,
+  
+  // Message formatting
+  "ProximityChatModeVerbs": {
+    "Yell": ["yells", "shouts", "exclaims"],
+    "Normal": ["says", "states", "mentions"],
+    "Whisper": ["whispers", "mumbles", "mutters"],
+    "Sign": ["signs", "gestures", "motions"]
+  },
+  "ProximityChatModeBabbleVerb": "babbles",
+  "ProximityChatModePunctuation": {
+    "Yell": "!",
+    "Normal": ".",
+    "Whisper": ".",
+    "Sign": "."
+  },
+  "ProximityChatModeQuotationStart": {
+    "Yell": "\"",
+    "Normal": "\"",
+    "Whisper": "\"",
+    "Sign": "<i>'"
+  },
+  "ProximityChatModeQuotationEnd": {
+    "Yell": "\"",
+    "Normal": "\"",
+    "Whisper": "\"",
+    "Sign": "'</i>"
+  },
+
+  // ----- Server Save Announcement ----- //
+  "SendServerSaveAnnouncement": true,
+  "SendServerSaveFinishedAnnouncement": false,
+  "TEXT_ServerSaveAnnouncement": "Server save has started - expect lag for a few seconds.",
+  "TEXT_ServerSaveFinished": "Server save has finished.",
+
+  // ----- Player Stats ----- //
+  "PlayerStatSystem": true,
+  "PlayerStatToggles": {
+    "Deaths": true,
+    "NpcKills": true,
+    "PlayerKills": true,
+    "BlockBreaks": true,
+    "DistanceTravelled": true
+  },
+  "PlayerStatClearPermission": "commandplayer",
+  "PlayerStatDistanceTravelledTimer": 2000,
+
+  // ----- TPA Requests ----- //
+  "AllowPlayerTpa": true,
+  "AllowTpaPrivilegeByDefault": false,
+  "TpaRequireTemporalGear": true,
+  "TpaUseCooldown": false,
+  "TpaCooldownInGameHours": 0.5,
+
+  // ----- Sleep Notifications ----- //
+  "EnableSleepNotifications": true,
+  "SleepNotificationThreshold": 0.5,
+  "TEXT_SleepNotification": "You start to feel tired...",
+
+  // ----- Language System ----- //
+  "EnableLanguageSystem": true,
+  "ChangeOwnLanguagePermission": "chat",
+  "ChangeOtherLanguagePermission": "commandplayer",
+  "MaxLanguagesPerPlayer": 3, // Maximum number of languages a player can know at once, -1 for unlimited
+  "Languages": [
+    {
+      "Name": "Common",
+      "Description": "The universal language",
+      "Prefix": "c",
+      "Syllables": ["al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve"],
+      "Color": "#92C4E1",
+      "Default": true,
+      "Hidden": false
+    },
+    {
+      "Name": "Tradeband",
+      "Description": "A common language for ease of trade across regions",
+      "Prefix": "tr",
+      "Syllables": ["feng", "tar", "kin", "ga", "shin", "ji"],
+      "Color": "#D4A96A",
+      "Default": false,
+      "Hidden": false
+    },
+    {
+      "Name": "Ancient",
+      "Description": "A mysterious ancient language",
+      "Prefix": "anc",
+      "Syllables": ["xar", "eth", "oth", "ith", "uth", "yth"],
+      "Color": "#8B0000",
+      "Default": false,
+      "Hidden": true
+    }
+  ],
+
+  // ----- Nametags ----- //
+  "PreventProximityChannelSwitching": true,
+  "ShowNicknameInNametag": true,
+  "HideNametagUnlessTargeting": false,
+  "ShowPlayerNameInNametag": true,
+  "NametagRenderRange": 30,
+
+  // ----- OOC Chat ----- //
+  "AllowOOCToggle": true,
+  "OOCTogglePermission": "chat"
+}</pre>
+
+<p>The language system allows players to learn and use different languages for roleplay. Key features:</p>
+<ul>
+<li>Players can learn languages using <code>/addlang [language]</code> and remove them with <code>/remlang [language]</code></li>
+<li>Players are limited to knowing a maximum number of languages at once (configurable, default 3)</li>
+<li>Players must remove a language before learning a new one if they're at the limit</li>
+<li>Languages can be hidden from players to prevent unauthorized access</li>
+<li>Hidden languages can only be added by admins using <code>/adminaddlang</code></li>
+<li>Admins can see all languages (including hidden ones) with <code>/adminlistlang</code></li>
+<li>Players who don't know any languages or try to speak in an unknown language will "babble" incoherently</li>
+</ul>
+</div>
+</div>
+<h3>System Details</h3>
+
+<h4>TPA (Teleport) System</h4>
+<p>The TPA system allows players to request teleportation to other players. Key features:</p>
+<ul>
+<li>Requires a temporal gear by default (configurable)</li>
+<li>Optional cooldown system</li>
+<li>Permission-based access</li>
+<li>Request/accept/deny workflow for safety</li>
+</ul>
+
+<h4>Player Stats System</h4>
+<p>Tracks various player statistics including:</p>
+<ul>
+<li>Deaths</li>
+<li>Player kills</li>
+<li>NPC/Mob kills</li>
+<li>Blocks broken</li>
+<li>Distance travelled</li>
+</ul>
+
+<h4>Server Save Notification</h4>
+<p>Automatically notifies players when the server is saving, helping reduce confusion about temporary lag spikes. The notification messages and timing are fully configurable.</p>
+
+<h4>Sleep Notification System</h4>
+<p>Encourages coordinated sleeping by notifying players when enough others are in bed. This helps servers manage the day/night cycle more effectively.</p>
+
+<h3>Potential Future Improvements</h3>
+<ul>
+<li>Use actual line of sight for sign language</li>
+</ul>
+<p>Feel free to leave suggestions!</p>

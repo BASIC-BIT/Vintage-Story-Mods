@@ -22,6 +22,7 @@ namespace thebasics.Extensions
         private const string ModDataChatMode = "BASIC_CHATMODE";
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
         private const string ModDataRpTextEnabled = "BASIC_RPTEXTENABLED";
+        private const string ModDataOOCEnabled = "BASIC_OOCENABLED";
 
         private const string ModDataPlayerStatsPrefix = "BASIC_COUNT_";
 
@@ -34,6 +35,8 @@ namespace thebasics.Extensions
         private const string ModDataDefaultLanguage = "BASIC_DEFAULT_LANGUAGE";
 
         private const string TpaPrivilege = "tpa";
+
+        private const string ModDataLastSelectedGroupId = "BASIC_LAST_SELECTED_GROUP_ID";
 
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
         {
@@ -72,7 +75,6 @@ namespace thebasics.Extensions
             return ChatHelper.Color(GetNickname(player), GetNicknameColor(player));
         }
 
-
         public static void SetNickname(this IServerPlayer player, string nickname)
         {
             SetModData(player, ModDataNickname, nickname);
@@ -89,10 +91,22 @@ namespace thebasics.Extensions
         }
         #endregion
 
+        #region Last Selected Group ID
+        public static int? GetLastSelectedGroupId(this IServerPlayer player)
+        {
+            return GetModData<int?>(player, ModDataLastSelectedGroupId, null);
+        }
+
+        public static void SetLastSelectedGroupId(this IServerPlayer player, int? groupId)
+        {
+            SetModData(player, ModDataLastSelectedGroupId, groupId);
+        }
+        #endregion
+
         #region Nickname Colors
         public static string GetNicknameColor(this IServerPlayer player)
         {
-            return GetModData(player, ModDataNicknameColor, "#E9DDCE");
+            return GetModData<string>(player, ModDataNicknameColor, null);
         }
 
         public static void SetNicknameColor(this IServerPlayer player, string nickname)
@@ -224,22 +238,25 @@ namespace thebasics.Extensions
 
         public static Language GetDefaultLanguage(this IServerPlayer player, ModConfig config)
         {
-            return GetLangFromName(GetModData<string>(player, ModDataDefaultLanguage, null), config, true);
+            return GetLangFromName(GetModData<string>(player, ModDataDefaultLanguage, null), config, true, true);
         }
 
-        private static Language GetLangFromName(string langName, ModConfig config, bool allowBabble)
+        private static Language GetLangFromName(string langName, ModConfig config, bool allowBabble, bool allowSignLanguage)
         {
-            return GetAllLanguages(config, allowBabble).First((lang) => lang.Name == langName);
+            return GetAllLanguages(config, allowBabble, allowSignLanguage).First((lang) => lang.Name == langName);
         }
 
         // TODO: Refactor this to use version in LanguageSystem
-        private static List<Language> GetAllLanguages(ModConfig config, bool allowBabble)
+        private static List<Language> GetAllLanguages(ModConfig config, bool allowBabble, bool allowSignLanguage = false)
         {
-            List<Language> languages = new();
-            languages.AddRange(config.Languages);
+            List<Language> languages = [.. config.Languages];
             if (allowBabble)
             {
                 languages.Add(LanguageSystem.BabbleLang);
+            }
+            if (allowSignLanguage)
+            {
+                languages.Add(LanguageSystem.SignLanguage);
             }
             return languages;
         }
@@ -321,5 +338,15 @@ namespace thebasics.Extensions
             return GetModData(player, ModDataTpAllowed, true);
         }
         #endregion
+
+        public static void SetOOCEnabled(this IServerPlayer player, bool enabled)
+        {
+            SetModData(player, ModDataOOCEnabled, enabled);
+        }
+
+        public static bool GetOOCEnabled(this IServerPlayer player)
+        {
+            return GetModData(player, ModDataOOCEnabled, false);
+        }
     }
 }

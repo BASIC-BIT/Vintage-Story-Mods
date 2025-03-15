@@ -55,7 +55,9 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
                 Z = Pos.Z,
             };
             
-            var foundFirepit = Api.World.BlockAccessor.GetInterface<IFirePit>(searchPos);
+            // Get the block entity and check if it implements IFirePit
+            var blockEntity = Api.World.BlockAccessor.GetBlockEntity(searchPos);
+            var foundFirepit = blockEntity as IFirePit;
 
             if (foundFirepit != null && foundFirepit.IsBurning)
             {

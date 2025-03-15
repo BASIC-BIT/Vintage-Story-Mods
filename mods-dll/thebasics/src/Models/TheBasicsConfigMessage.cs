@@ -1,11 +1,18 @@
-﻿
-using ProtoBuf;
+﻿using ProtoBuf;
+using thebasics.Configs;
 
 namespace thebasics.Models;
 
-[ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+[ProtoContract]
 public class TheBasicsConfigMessage
 {
+    [ProtoMember(1)]
     public int ProximityGroupId;
-    public bool PreventProximityChannelSwitching;
+    
+    // Full config object instead of individual properties
+    [ProtoMember(2)]
+    public ModConfig Config;
+
+    [ProtoMember(3)]
+    public int? LastSelectedGroupId;
 }
