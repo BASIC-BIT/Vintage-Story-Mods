@@ -65,10 +65,10 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
     {
         if (context.TryGetMetadata<Language>(MessageContext.LANGUAGE, out var lang) && lang == LanguageSystem.SignLanguage)
         {
-            return _chatSystem.Config.SignLanguageRange;
+            return _config.SignLanguageRange;
         }
 
         var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
-        return _chatSystem.Config.ProximityChatModeDistances[chatMode];
+        return _config.ProximityChatModeDistances[chatMode];
     }
 }

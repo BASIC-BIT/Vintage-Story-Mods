@@ -13,7 +13,10 @@ namespace thebasics.ModSystems.ProximityChat.Transformers
 
         public override bool ShouldTransform(MessageContext context)
         {
-            return !_chatSystem.Config.DisableRPChat && context.SendingPlayer.GetRpTextEnabled();
+            return !_config.DisableRPChat &&
+            context.SendingPlayer.GetRpTextEnabled() &&
+            !context.HasFlag(MessageContext.IS_OOC) &&
+            !context.HasFlag(MessageContext.IS_GLOBAL_OOC);
         }
 
         public override MessageContext Transform(MessageContext context)

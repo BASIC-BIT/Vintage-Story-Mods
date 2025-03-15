@@ -238,22 +238,25 @@ namespace thebasics.Extensions
 
         public static Language GetDefaultLanguage(this IServerPlayer player, ModConfig config)
         {
-            return GetLangFromName(GetModData<string>(player, ModDataDefaultLanguage, null), config, true);
+            return GetLangFromName(GetModData<string>(player, ModDataDefaultLanguage, null), config, true, true);
         }
 
-        private static Language GetLangFromName(string langName, ModConfig config, bool allowBabble)
+        private static Language GetLangFromName(string langName, ModConfig config, bool allowBabble, bool allowSignLanguage)
         {
-            return GetAllLanguages(config, allowBabble).First((lang) => lang.Name == langName);
+            return GetAllLanguages(config, allowBabble, allowSignLanguage).First((lang) => lang.Name == langName);
         }
 
         // TODO: Refactor this to use version in LanguageSystem
-        private static List<Language> GetAllLanguages(ModConfig config, bool allowBabble)
+        private static List<Language> GetAllLanguages(ModConfig config, bool allowBabble, bool allowSignLanguage = false)
         {
-            List<Language> languages = new();
-            languages.AddRange(config.Languages);
+            List<Language> languages = [.. config.Languages];
             if (allowBabble)
             {
                 languages.Add(LanguageSystem.BabbleLang);
+            }
+            if (allowSignLanguage)
+            {
+                languages.Add(LanguageSystem.SignLanguage);
             }
             return languages;
         }

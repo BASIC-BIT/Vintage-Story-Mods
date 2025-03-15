@@ -15,7 +15,7 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
 
     public override bool ShouldTransform(MessageContext context)
     {
-        return context.HasFlag(MessageContext.IS_ROLEPLAY) && !context.HasFlag(MessageContext.IS_EMOTE) && !context.HasFlag(MessageContext.IS_ENVIRONMENTAL) && !context.HasFlag(MessageContext.IS_OOC);
+        return context.HasFlag(MessageContext.IS_SPEECH);
     }
 
     public override MessageContext Transform(MessageContext context)
@@ -45,7 +45,7 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         }
 
         // Use the verbs from config
-        var verbs = _chatSystem.Config.ProximityChatModeVerbs[mode];
+        var verbs = _config.ProximityChatModeVerbs[mode];
 
         var random = new Random();
         return verbs[random.Next(verbs.Length)];

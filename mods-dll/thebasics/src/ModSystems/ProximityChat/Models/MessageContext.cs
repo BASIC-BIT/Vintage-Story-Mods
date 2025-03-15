@@ -71,4 +71,5 @@ public class MessageContext
     public static readonly string CHAT_MODE = "chatMode";
     public static readonly string CHAT_TYPE = "chatType";
     public static readonly string FORMATTED_NAME = "formattedName";
+    public static readonly string IS_SPEECH = "isSpeech";
 }   

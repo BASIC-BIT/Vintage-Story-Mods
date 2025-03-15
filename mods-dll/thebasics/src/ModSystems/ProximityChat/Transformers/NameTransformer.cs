@@ -9,11 +9,9 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 // Update name formatting (real name or nickname, bold, colorized) for use in later transformers
 public class NameTransformer : MessageTransformerBase
 {
-    private readonly ModConfig _config;
     
-    public NameTransformer(ModConfig config, RPProximityChatSystem chatSystem) : base(chatSystem)
+    public NameTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
-        _config = config;
     }
 
     public override bool ShouldTransform(MessageContext context)
@@ -23,7 +21,10 @@ public class NameTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        bool isIC = context.HasFlag(MessageContext.IS_ROLEPLAY) || context.HasFlag(MessageContext.IS_EMOTE);
+        bool isIC = context.HasFlag(MessageContext.IS_ROLEPLAY) ||
+            context.HasFlag(MessageContext.IS_EMOTE) ||
+            (context.HasFlag(MessageContext.IS_OOC) && _config.UseNicknameInOOC) ||
+            (context.HasFlag(MessageContext.IS_GLOBAL_OOC) && _config.UseNicknameInGlobalOOC);
         
         context.SetMetadata(MessageContext.FORMATTED_NAME, GetFormattedName(context.SendingPlayer, isIC, _config));
         return context;

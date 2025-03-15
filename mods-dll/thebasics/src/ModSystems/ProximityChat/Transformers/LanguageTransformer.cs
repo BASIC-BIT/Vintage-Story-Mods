@@ -13,7 +13,8 @@ public class LanguageTransformer : MessageTransformerBase
     
     public override bool ShouldTransform(MessageContext context)
     {
-        return context.HasFlag(MessageContext.IS_ROLEPLAY) && !context.HasFlag(MessageContext.IS_EMOTE) && !context.HasFlag(MessageContext.IS_ENVIRONMENTAL) && !context.HasFlag(MessageContext.IS_OOC);
+        // Emotes language is handled by the EmoteTransformer
+        return context.HasFlag(MessageContext.IS_SPEECH);
     }
     
     public override MessageContext Transform(MessageContext context)

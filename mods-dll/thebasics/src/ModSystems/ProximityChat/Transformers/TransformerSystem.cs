@@ -30,15 +30,16 @@ public class TransformerSystem
         _senderPhaseTransformers = new List<MessageTransformerBase>
         {
             // Validation transformers
+            new PlayerChatTransformer(_chatSystem), // If player chat, process special modifiers
             new RoleplayTransformer(_chatSystem), // Add roleplay metadata
             new NicknameRequirementTransformer(_chatSystem), // Require nickname if we're in RP chat
-            new PlayerChatTransformer(_chatSystem), // If player chat, process special modifiers
             new ChangeSpeakingLanguageTransformer(_chatSystem, _languageSystem), // Handle changing speaking language
             new BabbleWarningTransformer(_chatSystem), // Warn if babbling
             
             new ChatTypeTransformer(_chatSystem),
-            new NameTransformer(_chatSystem.Config, _chatSystem), // Use nickname if RP chat, add color/bold
+            new NameTransformer(_chatSystem), // Use nickname if RP chat, add color/bold
             new OOCTransformer(_chatSystem), // Format OOC Messages
+            new GlobalOOCTransformer(_chatSystem), // Format Global OOC Messages
             new AutoCapitalizationTransformer(_chatSystem), // Add capitalization if needed
             new AutoPunctuationTransformer(_chatSystem), // Add punctuation if needed
             new AccentTransformer(_chatSystem), // Process accents

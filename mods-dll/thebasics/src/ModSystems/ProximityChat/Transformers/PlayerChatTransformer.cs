@@ -22,7 +22,7 @@ public class PlayerChatTransformer : MessageTransformerBase
         var content = context.Message;
         
         // Check message type based on first character or pattern
-        var isGlobalOoc = _chatSystem.Config.EnableGlobalOOC && content.StartsWith("((");
+        var isGlobalOoc = _config.EnableGlobalOOC && content.StartsWith("((");
         var isOOC = !isGlobalOoc && content.StartsWith("(");
         var isEnvironmentMessage = content.StartsWith("!");
         var isEmote = content.StartsWith("*") || (context.SendingPlayer.GetEmoteMode() && !isOOC && !isGlobalOoc && !isEnvironmentMessage);
@@ -30,42 +30,39 @@ public class PlayerChatTransformer : MessageTransformerBase
         // Handle Global OOC - this will be processed normally by the server
         if (isGlobalOoc)
         {
+            context.Message = content[2..]; // Remove the leading (( characters
+            if (context.Message.EndsWith(")")) {
+                context.Message = context.Message[..^1]; // Remove the trailing ) character if it exists
+            }
+            if (context.Message.EndsWith(")")) {
+                context.Message = context.Message[..^1]; // Remove the trailing ) character if it exists
+            }
+
             context.SetFlag(MessageContext.IS_GLOBAL_OOC);
-            context.State = MessageContextState.STOP; // Stop further processing
-            return context;
-        }
-        
-        // Handle Emote
-        if (isEmote)
+        } else if (isEmote)
         {
             if (content.StartsWith("*")) {
                 context.Message = content[1..]; // Remove the leading * character if it exists
             }
             context.SetFlag(MessageContext.IS_EMOTE);
-            return context;
-        }
-        
-        // Handle OOC
-        if (isOOC)
+        } else if (isOOC)
         {
+            context.Message = content[1..]; // Remove the leading ( character
+            if (context.Message.EndsWith(")")) {
+                context.Message = context.Message[..^1]; // Remove the trailing ) character if it exists
+            }
             context.SetFlag(MessageContext.IS_OOC);
-            return context;
-        }
-        
-        // Handle Environment Message
-        if (isEnvironmentMessage)
+        } else if (isEnvironmentMessage)
         {
-            context.Message = content.Substring(1); // Remove the ! character
+            context.Message = content[1..]; // Remove the ! character
             context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
-            return context;
+        } else {
+            context.SetFlag(MessageContext.IS_SPEECH);
         }
+
+        // Trim whitespace
+        context.Message = context.Message.Trim();
         
         return context;
     }
-    
-    // Static utility method to check if a message is a global OOC message
-    public static bool IsGlobalOOC(string message, ModConfig config)
-    {
-        return config.EnableGlobalOOC && message.StartsWith("((");
-    }
-} 
+}

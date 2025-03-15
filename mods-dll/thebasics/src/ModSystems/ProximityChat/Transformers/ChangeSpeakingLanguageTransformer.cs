@@ -20,6 +20,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
 
     public override bool ShouldTransform(MessageContext context)
     {
+        // TODO: Is this condition accurate? Should we check for roleplay/player chat flags?
         return true;
     }
 
@@ -29,7 +30,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         {
             var match = LanguageTalkRegex.Match(context.Message);
             var languageIdentifier = match.Groups[1].Value;
-            var lang = _languageSystem.GetLangFromText(languageIdentifier, true, context.SendingPlayer.HasPrivilege(_chatSystem.Config.ChangeOtherLanguagePermission));
+            var lang = _languageSystem.GetLangFromText(languageIdentifier, true, context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission));
 
             if (lang == null)
             {
@@ -65,7 +66,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                 context.SetMetadata(MessageContext.LANGUAGE, lang);
             }
         } else {
-            context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_chatSystem.Config));
+            context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_config));
         }
         
         return context;

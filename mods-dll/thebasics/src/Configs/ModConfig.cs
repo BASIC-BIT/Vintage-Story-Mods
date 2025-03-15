@@ -42,7 +42,7 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, 12 }
             };
             
-            ProximityChatClampFontSizes ??= new int[] { 30, 16, 12, 6 };
+            ProximityChatClampFontSizes ??= [30, 16, 12, 6];
             
             ProximityChatModeVerbs ??= new Dictionary<ProximityChatMode, string[]>
             {
@@ -267,5 +267,17 @@ namespace thebasics.Configs
         // TODO: Catalog all existing nicknames and player names for all users in the server, to implement this functionality
         [ProtoMember(57)]
         public bool DisallowNicknameThatIsAnotherPlayersName { get; set; } = true;
+        
+        [ProtoMember(58)]
+        public string OOCColor { get; set; } = "#eaf188";
+
+        [ProtoMember(59)]
+        public string GlobalOOCColor { get; set; } = "#f1b288";
+
+        [ProtoMember(60)]
+        public bool UseNicknameInGlobalOOC { get; set; } = false;
+        
+        [ProtoMember(61)]
+        public bool UseNicknameInOOC { get; set; } = true;
     }
 }

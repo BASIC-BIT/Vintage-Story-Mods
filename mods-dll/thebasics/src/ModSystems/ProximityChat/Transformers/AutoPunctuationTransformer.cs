@@ -15,7 +15,8 @@ public class AutoPunctuationTransformer : MessageTransformerBase
     
     public override bool ShouldTransform(MessageContext context)
     {
-        return !context.HasFlag(MessageContext.IS_OOC) && context.HasFlag(MessageContext.IS_ROLEPLAY) && ChatHelper.DoesMessageNeedPunctuation(context.Message);
+        return context.HasFlag(MessageContext.IS_ROLEPLAY) &&
+            ChatHelper.DoesMessageNeedPunctuation(context.Message);
     }
     
     public override MessageContext Transform(MessageContext context)
@@ -23,7 +24,7 @@ public class AutoPunctuationTransformer : MessageTransformerBase
         context.Message = AutoPunctuationRegex.Replace(context.Message, match =>
         {
             var possiblePunctuation = match.Groups[2].Value[0];
-            var punctuation = _chatSystem.Config.ProximityChatModePunctuation[context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode())];
+            var punctuation = _config.ProximityChatModePunctuation[context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode())];
             if(context.HasFlag(MessageContext.IS_EMOTE) || context.HasFlag(MessageContext.IS_ENVIRONMENTAL)){
                 punctuation = "."; // Emotes and environmental messages don't need punctuation based on chat mode
             }

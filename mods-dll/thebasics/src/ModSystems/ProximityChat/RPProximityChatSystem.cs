@@ -126,12 +126,29 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .RequiresPlayer()
                 .HandleWith(RpTextEnabled);
 
-            API.ChatCommands.GetOrCreate("ooc")
+            API.ChatCommands.GetOrCreate("oocToggle")
                 .WithDescription("Toggle Out-Of-Character chat mode")
                 .WithArgs(new BoolArgParser("mode", "on", false))
                 .RequiresPrivilege(Config.OOCTogglePermission)
                 .RequiresPlayer()
                 .HandleWith(OOCMode);
+
+            API.ChatCommands.GetOrCreate("ooc")
+                .WithDescription("Send an Out-Of-Character message")
+                .WithArgs(new StringArgParser("message", true))
+                .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
+                .HandleWith(SendOOCMessage);
+
+            if(Config.EnableGlobalOOC)
+            {
+                API.ChatCommands.GetOrCreate("gooc")
+                    .WithDescription("Send a Global Out-Of-Character message")
+                    .WithArgs(new StringArgParser("message", true))
+                    .RequiresPrivilege(Privilege.chat)
+                    .RequiresPlayer()
+                    .HandleWith(SendGlobalOOCMessage);
+            }
         }
 
         // Always register basic chat mode commands
@@ -160,6 +177,50 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .HandleWith(Whisper);
 
         RegisterForServerSideConfig();
+    }
+
+    private TextCommandResult SendGlobalOOCMessage(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        var message = (string)args.Parsers[0].GetValue();
+        var groupId = args.Caller.FromChatGroupId;
+
+        var context = new MessageContext
+        {
+            Message = message,
+            SendingPlayer = player,
+            GroupId = groupId,
+            Flags = { [MessageContext.IS_GLOBAL_OOC] = true }
+        };
+        
+        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
+
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+        };
+    }
+
+    private TextCommandResult SendOOCMessage(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        var message = (string)args.Parsers[0].GetValue();
+        var groupId = args.Caller.FromChatGroupId;
+
+        var context = new MessageContext
+        {
+            Message = message,
+            SendingPlayer = player,
+            GroupId = groupId,
+            Flags = { [MessageContext.IS_OOC] = true },
+        };
+        
+        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
+
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+        };
     }
 
     private void RegisterForServerSideConfig()
@@ -447,7 +508,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
-            ReceivingPlayer = player, // Start with sender context for validation
             GroupId = ProximityChatId,
             Metadata = { ["isEmote"] = true }
         };
@@ -469,7 +529,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
-            ReceivingPlayer = player, // Start with sender context for validation
             GroupId = ProximityChatId,
             Metadata = { ["isEnvironmental"] = true }
         };
@@ -520,7 +579,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             {
                 Message = message,
                 SendingPlayer = player,
-                ReceivingPlayer = player, // Start with sender for validation
                 GroupId = groupId,
                 Metadata =
                 {
@@ -634,7 +692,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             Message = content,
             SendingPlayer = byPlayer,
-            ReceivingPlayer = byPlayer, // Start with sender for validation
             GroupId = channelId,
             Metadata =
             {

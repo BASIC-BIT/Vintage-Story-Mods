@@ -15,7 +15,9 @@ public class NicknameRequirementTransformer : MessageTransformerBase
 
     public override bool ShouldTransform(MessageContext context)
     {
-        return RequiresNickname(context) && !context.SendingPlayer.HasNickname();
+        return !_config.DisableNicknames && 
+            context.HasFlag(MessageContext.IS_ROLEPLAY) &&
+            !context.SendingPlayer.HasNickname();
     }
 
     public override MessageContext Transform(MessageContext context)
@@ -31,12 +33,5 @@ public class NicknameRequirementTransformer : MessageTransformerBase
         context.State = MessageContextState.STOP;
 
         return context;
-    }
-
-    private bool RequiresNickname(MessageContext context)
-    {
-        var config = _chatSystem.Config;
-        return !config.DisableNicknames && 
-        context.HasFlag(MessageContext.IS_ROLEPLAY);
     }
 }

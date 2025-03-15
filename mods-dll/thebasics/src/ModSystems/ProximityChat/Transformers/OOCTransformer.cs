@@ -11,12 +11,12 @@ public class OOCTransformer : MessageTransformerBase
     
     public override bool ShouldTransform(MessageContext context)
     {
-        return context.HasMetadata(MessageContext.IS_OOC);
+        return context.HasFlag(MessageContext.IS_OOC);
     }
 
     public override MessageContext Transform(MessageContext context)
     {
-        context.Message = ChatHelper.Color("#808080", $"(OOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}");
+        context.Message = ChatHelper.Color($"(OOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}", _config.OOCColor);
 
         return context;
     }

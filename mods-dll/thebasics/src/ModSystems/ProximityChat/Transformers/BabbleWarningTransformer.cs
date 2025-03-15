@@ -12,7 +12,10 @@ public class BabbleWarningTransformer : MessageTransformerBase
     public override bool ShouldTransform(MessageContext context)
     {
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
-        return context.HasFlag(MessageContext.IS_PLAYER_CHAT) && lang == LanguageSystem.BabbleLang;
+        // TODO: If it's an emote, we only want to send this if they're using quoted speech
+        return (context.HasFlag(MessageContext.IS_EMOTE) ||
+            context.HasFlag(MessageContext.IS_SPEECH)) &&
+                lang == LanguageSystem.BabbleLang;
     }
 
     public override MessageContext Transform(MessageContext context)
