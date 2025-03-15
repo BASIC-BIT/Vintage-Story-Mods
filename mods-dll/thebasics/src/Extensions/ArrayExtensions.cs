@@ -1,39 +1,39 @@
 ﻿#nullable enable
 using System;
 
-namespace thebasics.Extensions
+namespace thebasics.Extensions;
+
+public static class ArrayExtensions
 {
-    public static class ArrayExtensions
+    static Random random = new Random();
+    
+    public static T GetRandomElement<T>(this T[] items, Random customRandom)
     {
-        public static T GetRandomElement<T>(this T[] items, Random random)
+        if (items.Length == 0)
         {
-            if (items.Length == 0)
-            {
-                throw new ArgumentException();
-            }
-
-            if (items.Length == 1)
-            {
-                return items[0];
-            }
-
-            return items[random.Next(items.Length)];
+            throw new ArgumentException();
         }
-        public static T GetRandomElement<T>(this T[] items)
+
+        if (items.Length == 1)
         {
-            if (items.Length == 0)
-            {
-                throw new ArgumentException();
-            }
-
-            if (items.Length == 1)
-            {
-                return items[0];
-            }
-
-            var useRandom = new Random();
-
-            return items[useRandom.Next(items.Length)];
+            return items[0];
         }
+
+        return items[customRandom.Next(items.Length)];
+    }
+
+    public static T GetRandomElement<T>(this T[] items)
+    {
+        if (items.Length == 0)
+        {
+            throw new ArgumentException();
+        }
+
+        if (items.Length == 1)
+        {
+            return items[0];
+        }
+
+        return items[random.Next(items.Length)];
     }
 }

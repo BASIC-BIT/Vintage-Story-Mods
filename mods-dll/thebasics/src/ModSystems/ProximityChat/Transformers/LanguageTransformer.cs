@@ -14,7 +14,7 @@ public class LanguageTransformer : MessageTransformerBase
     public override bool ShouldTransform(MessageContext context)
     {
         // Emotes language is handled by the EmoteTransformer
-        return context.HasFlag(MessageContext.IS_SPEECH);
+        return context.HasFlag(MessageContext.IS_SPEECH) && _config.EnableLanguageSystem;
     }
     
     public override MessageContext Transform(MessageContext context)

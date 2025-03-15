@@ -1,4 +1,5 @@
 using System.Text;
+using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 
@@ -31,6 +32,7 @@ public class EmoteTransformer : MessageTransformerBase
         var splitMessage = trimmedMessage.Split('"');
 
         var language = context.GetMetadata<Language>(MessageContext.LANGUAGE);
+        var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
         
         for (var i = 0; i < splitMessage.Length; i++)
         {
@@ -45,14 +47,43 @@ public class EmoteTransformer : MessageTransformerBase
                 // TODO: Cont. both of which fuck up the messages
                 var text = splitMessage[i];
                 _languageSystem.ProcessMessage(context.SendingPlayer, ref text, language);
+
+                text = AddQuotes(text, language, chatMode);
                 text = ChatHelper.LangColor(text, language);
-                builder.Append('"');
+                if(language == LanguageSystem.SignLanguage)
+                {
+                    text = ChatHelper.Italic(text);
+                }
                 builder.Append(text);
-                builder.Append('"');
             }
         }
         
         context.Message = builder.ToString();
         return context;
+    }
+
+    private string AddQuotes(string text, Language lang, ProximityChatMode mode)
+    {
+        return $"{GetStartQuote(lang, mode)}{text}{GetEndQuote(lang, mode)}";
+    }
+
+    private string GetStartQuote(Language lang, ProximityChatMode mode)
+    {
+        if(lang == LanguageSystem.SignLanguage)
+        {
+            return "'";
+        }
+
+        return _config.ProximityChatModeQuotationStart[mode];
+    }
+
+    private string GetEndQuote(Language lang, ProximityChatMode mode)
+    {
+        if(lang == LanguageSystem.SignLanguage)
+        {
+            return "'";
+        }
+
+        return _config.ProximityChatModeQuotationEnd[mode];
     }
 } 

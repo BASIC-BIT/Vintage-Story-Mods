@@ -106,6 +106,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .HandleWith(Emote);
 
             API.ChatCommands.GetOrCreate("it")
+                .WithAlias("do")
                 .WithDescription("Send a proximity environment message")
                 .WithArgs(new StringArgParser("envMessage", true))
                 .RequiresPrivilege(Privilege.chat)
@@ -114,14 +115,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             API.ChatCommands.GetOrCreate("emotemode")
                 .WithDescription("Turn Emote-only mode on or off")
-                .WithArgs(new BoolArgParser("mode", "on", true))
+                .WithArgs(new BoolArgParser("mode", "on", false))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(EmoteMode);
 
             API.ChatCommands.GetOrCreate("rptext")
                 .WithDescription("Turn the whole RP system on or off for your messages")
-                .WithArgs(new BoolArgParser("mode", "on", true))
+                .WithArgs(new BoolArgParser("mode", "on", false))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(RpTextEnabled);
@@ -509,7 +510,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
             GroupId = ProximityChatId,
-            Metadata = { ["isEmote"] = true }
+            Flags = { [MessageContext.IS_EMOTE] = true }
         };
 
         // Process the entire pipeline
@@ -530,7 +531,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
             GroupId = ProximityChatId,
-            Metadata = { ["isEnvironmental"] = true }
+            Flags = { [MessageContext.IS_ENVIRONMENTAL] = true }
         };
 
         // Process the entire pipeline
@@ -626,7 +627,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private TextCommandResult EmoteMode(TextCommandCallingArgs args)
     {
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        var emoteMode = (bool)args.Parsers[0].GetValue();
+        // If no argument provided, toggle the current state
+        var emoteMode = args.Parsers[0].IsMissing ? !player.GetEmoteMode() : (bool)args.Parsers[0].GetValue();
         player.SetEmoteMode(emoteMode);
         return new TextCommandResult
         {
@@ -638,7 +640,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private TextCommandResult RpTextEnabled(TextCommandCallingArgs args)
     {
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-        var rpTextEnabled = (bool)args.Parsers[0].GetValue();
+        // If no argument provided, toggle the current state
+        var rpTextEnabled = args.Parsers[0].IsMissing ? !player.GetRpTextEnabled() : (bool)args.Parsers[0].GetValue();
         player.SetRpTextEnabled(rpTextEnabled);
         return new TextCommandResult
         {
@@ -678,6 +681,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
         Vintagestory.API.Datastructures.BoolRef consumed)
     {
         if(channelId != ProximityChatId)
+        {
+            return;
+        }
+
+        // Short circuit if RP text is disabled
+        if(!byPlayer.GetRpTextEnabled())
         {
             return;
         }

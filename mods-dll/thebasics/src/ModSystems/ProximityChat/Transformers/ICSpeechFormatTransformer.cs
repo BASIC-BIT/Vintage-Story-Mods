@@ -2,6 +2,7 @@ using System;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
@@ -21,25 +22,30 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
     public override MessageContext Transform(MessageContext context)
     {
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
-        var content = ChatHelper.LangColor(context.Message, lang);    
-        if(lang == LanguageSystem.SignLanguage){
-            content = ChatHelper.Italic(content);
-        }
-        // TODO: Make this configurable (and less hacky for sign language, maybe another transformer?)
         var quote = lang == LanguageSystem.SignLanguage ? "'" : "\"";
         var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
 
-        var verb = GetProximityChatVerb(context.SendingPlayer, mode, context);
+        // Add Quotes
+        context.Message = $"{quote}{context.Message}{quote}";
+        // Add Italics if sign language
+        if(lang == LanguageSystem.SignLanguage){
+            _chatSystem.API.Logger.Debug("Adding italics to sign language");
+            context.Message = ChatHelper.Italic(context.Message);
+        }
 
-        context.Message = $"{nickname} {verb} {quote}{content}{quote}";
+        // Add Lang color
+        context.Message = ChatHelper.LangColor(context.Message, lang);
+        var verb = GetProximityChatVerb(lang, mode);
+
+        context.Message = $"{nickname} {verb} {context.Message}";
         return context;
     }
 
-    private string GetProximityChatVerb(IServerPlayer player, ProximityChatMode mode, MessageContext context)
+    private string GetProximityChatVerb(Language lang, ProximityChatMode mode)
     {
         // Check for sign language first
-        if (context.TryGetMetadata<Language>(MessageContext.LANGUAGE, out var lang) && lang == LanguageSystem.SignLanguage)
+        if (lang == LanguageSystem.SignLanguage)
         {
             return "signs";
         }
@@ -47,7 +53,6 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         // Use the verbs from config
         var verbs = _config.ProximityChatModeVerbs[mode];
 
-        var random = new Random();
-        return verbs[random.Next(verbs.Length)];
+        return verbs.GetRandomElement();
     }
 }
