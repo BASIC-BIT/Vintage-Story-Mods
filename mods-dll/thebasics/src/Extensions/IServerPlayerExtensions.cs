@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using thebasics.Configs;
+using thebasics.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat;
@@ -23,6 +24,7 @@ namespace thebasics.Extensions
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
         private const string ModDataRpTextEnabled = "BASIC_RPTEXTENABLED";
         private const string ModDataOOCEnabled = "BASIC_OOCENABLED";
+        private const string ModDataCharacterSheet = "BASIC_CHARACTER_SHEET";
 
         private const string ModDataPlayerStatsPrefix = "BASIC_COUNT_";
 
@@ -344,5 +346,22 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataOOCEnabled, false);
         }
+
+        #region Character Sheet
+        public static CharacterSheetModel GetCharacterSheet(this IServerPlayer player)
+        {
+            return GetModData(player, ModDataCharacterSheet, new CharacterSheetModel());
+        }
+
+        public static void SetCharacterSheet(this IServerPlayer player, CharacterSheetModel sheet)
+        {
+            SetModData(player, ModDataCharacterSheet, sheet);
+        }
+
+        public static void ClearCharacterSheet(this IServerPlayer player)
+        {
+            player.RemoveModdata(ModDataCharacterSheet);
+        }
+        #endregion
     }
 }
