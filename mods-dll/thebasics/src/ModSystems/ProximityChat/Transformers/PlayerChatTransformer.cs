@@ -5,23 +5,22 @@ using thebasics.Utilities;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
-public class PlayerChatTransformer : IMessageTransformer
+public class PlayerChatTransformer : MessageTransformerBase
 {
     private readonly RPProximityChatSystem _chatSystem;
     
-    public PlayerChatTransformer(RPProximityChatSystem chatSystem)
+    public PlayerChatTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
         _chatSystem = chatSystem;
     }
     
-    public MessageContext Transform(MessageContext context)
+    public override bool ShouldTransform(MessageContext context)
     {
-        // Only process messages that have the isPlayerChat flag
-        if (!context.Metadata.ContainsKey("isPlayerChat"))
-        {
-            return context;
-        }
-        
+        return context.HasFlag(MessageContext.IS_PLAYER_CHAT);
+    }
+
+    public override MessageContext Transform(MessageContext context)
+    {   
         var content = context.Message;
         var config = _chatSystem.GetModConfig();
         
@@ -34,7 +33,7 @@ public class PlayerChatTransformer : IMessageTransformer
         // Handle Global OOC - this will be processed normally by the server
         if (isGlobalOoc)
         {
-            context.Metadata["isGlobalOOC"] = true;
+            context.SetFlag(MessageContext.IS_GLOBAL_OOC);
             context.State = MessageContextState.STOP; // Stop further processing
             return context;
         }
@@ -43,14 +42,14 @@ public class PlayerChatTransformer : IMessageTransformer
         if (isEmote)
         {
             context.Message = content.Substring(1); // Remove the * character
-            context.Metadata["isEmote"] = true;
+            context.SetFlag(MessageContext.IS_EMOTE);
             return context;
         }
         
         // Handle OOC
         if (isOOC)
         {
-            context.Metadata["isOOC"] = true;
+            context.SetFlag(MessageContext.IS_OOC);
             return context;
         }
         
@@ -58,7 +57,7 @@ public class PlayerChatTransformer : IMessageTransformer
         if (isEnvironmentMessage)
         {
             context.Message = content.Substring(1); // Remove the ! character
-            context.Metadata["isEnvironmental"] = true;
+            context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
             return context;
         }
         

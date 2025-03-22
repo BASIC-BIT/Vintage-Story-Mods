@@ -51,7 +51,7 @@ public class ChatModeTransformer : IMessageTransformer
         }
 
         // Use the verbs from config
-        var verbs = _chatSystem.GetModConfig().ProximityChatModeVerbs[mode];
+        var verbs = _chatSystem.Config.ProximityChatModeVerbs[mode];
 
         var random = new Random();
         return verbs[random.Next(verbs.Length)];
@@ -59,6 +59,6 @@ public class ChatModeTransformer : IMessageTransformer
 
     private string GetProximityChatPunctuation(ProximityChatMode mode)
     {
-        return _chatSystem.GetModConfig().ProximityChatModePunctuation[mode];
+        return _chatSystem.Config.ProximityChatModePunctuation[mode];
     }
 }

@@ -1,10 +1,5 @@
-using thebasics.Configs;
-using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
-using thebasics.Utilities;
 using Vintagestory.API.Common;
-using Vintagestory.API.Config;
-using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
@@ -30,7 +25,7 @@ public class BabbleWarningTransformer : MessageTransformerBase
         
         // Send babble warning directly to the player
         context.SendingPlayer.SendMessage(
-            _chatSystem.GetProximityChatGroupId(),
+            _chatSystem.ProximityChatId,
             $"Warning: You are speaking in babble. Other players may not understand you.",
             EnumChatType.Notification
         );

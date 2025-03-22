@@ -4,7 +4,7 @@ using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Server;
-namespace thebasics.src.ModSystems.ProximityChat.Transformers;
+namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 // Update name formatting (real name or nickname, bold, colorized) for use in later transformers
 public class NameTransformer : IMessageTransformer

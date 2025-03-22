@@ -7,7 +7,7 @@ using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
 
-namespace thebasics.src.ModSystems.ProximityChat.Transformers;
+namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 public class ChangeSpeakingLanguageTransformer : IMessageTransformer
 {
@@ -27,12 +27,12 @@ public class ChangeSpeakingLanguageTransformer : IMessageTransformer
         {
             var match = LanguageTalkRegex.Match(context.Message);
             var languageIdentifier = match.Groups[1].Value;
-            var lang = _languageSystem.GetLangFromText(languageIdentifier, true, context.SendingPlayer.HasPrivilege(_chatSystem.GetModConfig().ChangeOtherLanguagePermission));
+            var lang = _languageSystem.GetLangFromText(languageIdentifier, true, context.SendingPlayer.HasPrivilege(_chatSystem.Config.ChangeOtherLanguagePermission));
 
             if (lang == null)
             {
                 context.SendingPlayer.SendMessage(
-                    _chatSystem.GetProximityChatGroupId(),
+                    _chatSystem.ProximityChatId,
                     $"Invalid language specifier \":{languageIdentifier}\".  Valid prefixes include: " + string.Join(", ",
                         _languageSystem.GetAllLanguages(true).Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang))),
                     EnumChatType.CommandError);
@@ -42,7 +42,7 @@ public class ChangeSpeakingLanguageTransformer : IMessageTransformer
             if (lang.Name != LanguageSystem.BabbleLang.Name && !context.SendingPlayer.KnowsLanguage(lang))
             {
                 context.SendingPlayer.SendMessage(
-                    _chatSystem.GetProximityChatGroupId(),
+                    _chatSystem.ProximityChatId,
                     "You don't know that language!",
                     EnumChatType.CommandError);
                 throw new Exception($"Character doesn't know language {ChatHelper.LangIdentifier(lang)}!");
@@ -53,7 +53,7 @@ public class ChangeSpeakingLanguageTransformer : IMessageTransformer
             {
                 context.SendingPlayer.SetDefaultLanguage(lang);
                 context.SendingPlayer.SendMessage(
-                    _chatSystem.GetProximityChatGroupId(),
+                    _chatSystem.ProximityChatId,
                     "You are now speaking " + lang.Name + ".",
                     EnumChatType.CommandSuccess);
                 context.State = MessageContextState.STOP;

@@ -2,9 +2,9 @@ using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 
-namespace thebasics.src.ModSystems.ProximityChat.Transformers
+namespace thebasics.ModSystems.ProximityChat.Transformers
 {
-    // Add the isRoleplay metadata for future transformers
+    // Set the isRoleplay flag for future transformers
     public class RoleplayTransformer : MessageTransformerBase
     {
         public RoleplayTransformer(RPProximityChatSystem chatSystem) : base(chatSystem) {
@@ -13,12 +13,12 @@ namespace thebasics.src.ModSystems.ProximityChat.Transformers
 
         public override bool ShouldTransform(MessageContext context)
         {
-            return true;
+            return !_chatSystem.Config.DisableRPChat && context.SendingPlayer.GetRpTextEnabled();
         }
 
         public override MessageContext Transform(MessageContext context)
         {
-            context.Metadata["isRoleplay"] = !_chatSystem.GetModConfig().DisableRPChat && context.SendingPlayer.GetRpTextEnabled();
+            context.SetFlag(MessageContext.IS_ROLEPLAY);
             return context;
         }
 

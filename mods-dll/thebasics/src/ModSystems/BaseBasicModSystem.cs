@@ -7,8 +7,8 @@ namespace thebasics.ModSystems
 {
     public abstract class BaseBasicModSystem : ModSystem
     {
-        protected ICoreServerAPI API;
-        protected ModConfig Config;
+        public ICoreServerAPI API;
+        public ModConfig Config;
         private const string ConfigName = "the_basics.json";
 
         public override bool ShouldLoad(EnumAppSide forSide)
