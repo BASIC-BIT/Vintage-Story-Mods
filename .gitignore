@@ -5,16 +5,49 @@
 !LICENSE
 !mods/
 !mods-dll/
+!Tests/
+!docs/
 
 # Ignore user files anywhere inside the "mods" directory.
 mods/**/*.user
 mods/**/bin/*
 mods/**/obj/*
 
-# Ignore user files anywhere inside the "mods" directory.
-mods/**/*.user
-mods/**/bin/*
-mods/**/obj/*
+# Ignore build artifacts and large files
+**/*.dll
+**/*.pdb
+**/*.exe
+**/*.zip
+**/*.tar
+**/*.gz
+**/*.rar
+**/*.7z
+**/bin/
+**/obj/
+**/output/
+**/packages/
+**/.vs/
+**/.idea/
+
+# Ignore repomix output files
+.repomix-output.txt
+**/*.repomix-output.*
+local-research/*.repomix.*
+
+# Ignore large media files
+**/*.mp4
+**/*.mov
+**/*.avi
+**/*.mkv
+**/*.iso
+**/*.img
+
+# Local package script
+**/package.ps1
+
+# Environment files
+.env
+*.env
 
 # Ignore user files anywhere inside the "mods" directory.
 mods-dll/**/*.user

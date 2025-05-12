@@ -9,6 +9,14 @@ public enum MessageContextState {
     ERROR,
 }
 
+public interface IMessageTransformer
+{
+    /// <summary>
+    /// Transform a message context and return the updated context
+    /// </summary>
+    MessageContext Transform(MessageContext context);
+}
+
 public class MessageContext
 {
     public string Message { get; set; }
@@ -43,39 +51,5 @@ public static class MessageTransformerExtensions
             var result = first(messageContext);
             return second(result);
         };
-    }
-}
-
-public static class MessageTransformers
-{
-    public static MessageContext AddTimestamp(MessageContext messageContext)
-    {
-        messageContext.Metadata["timestamp"] = DateTime.UtcNow;
-        return messageContext;
-    }
-
-    public static MessageContext ConvertToUpperCase(MessageContext messageContext)
-    {
-        messageContext.Message = messageContext.Message.ToUpperInvariant();
-        return messageContext;
-    }
-
-    public static MessageContext HandleLanguageSwitch(MessageContext messageContext)
-    {
-        messageContext.Message = messageContext.Message.ToUpperInvariant();
-        return messageContext;
-    }
-
-    public static MessageContext HandleEmote(MessageContext messageContext)
-    {
-        // if(messageContext.M)
-        messageContext.Message = messageContext.Message.ToUpperInvariant();
-        return messageContext;
-    }
-
-    public static MessageContext HandleEnvironmentMessage(MessageContext messageContext)
-    {
-        messageContext.Message = messageContext.Message.ToUpperInvariant();
-        return messageContext;
     }
 }

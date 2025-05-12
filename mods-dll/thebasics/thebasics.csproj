@@ -1,10 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
     <OutputType>Library</OutputType>
     <LangVersion>default</LangVersion>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
+
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <OutputPath>..\..\output\</OutputPath>
     <IntermediateOutputPath>..\..\obj\Debug\thebasics\</IntermediateOutputPath>
@@ -14,7 +16,7 @@
     <IntermediateOutputPath>..\..\obj\Release\thebasics\</IntermediateOutputPath>
   </PropertyGroup>
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy RemoteSigned -file &quot;$(ProjectDir)\scripts\package.ps1&quot;" />
+    <Exec Command="powershell -NoProfile -NonInteractive -Command &quot;&amp; { &amp; '$(ProjectDir)scripts\package.ps1' }&quot;" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
     <Reference Include="cairo-sharp">
@@ -62,7 +64,6 @@
   <ItemGroup>
     <PackageReference Include="ApacheTech.Common.Extensions" Version="1.2.0" />
     <PackageReference Include="ApacheTech.Common.Extensions.Harmony" Version="1.2.0" />
-    <PackageReference Include="ApacheTech.VintageMods.FluentChatCommands" Version="2.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
   <ItemGroup>
