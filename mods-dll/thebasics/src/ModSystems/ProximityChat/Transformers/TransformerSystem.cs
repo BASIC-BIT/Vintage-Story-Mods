@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Common;
 
@@ -78,6 +79,40 @@ public class TransformerSystem
         return context;
     }
 
+    // TODO: Refactor common usage
+    private string GetProximityChatVerb(Language lang, ProximityChatMode mode)
+    {
+        // Check for sign language first
+        if (lang == LanguageSystem.SignLanguage)
+        {
+            return "signs";
+        }
+
+        // Use the verbs from config
+        var verbs = _chatSystem.Config.ProximityChatModeVerbs[mode];
+
+        return verbs.GetRandomElement();
+    }
+
+    // TODO: Refactor common usage with ICSpeechFormatTransformer
+    private void LogChatMessage(MessageContext context) {
+        var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
+        var quote = lang == LanguageSystem.SignLanguage ? "'" : "\"";
+        var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
+        var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+
+        var outputMessage = context.Message;
+        // Add Quotes
+        outputMessage = $"{quote}{outputMessage}{quote}";
+
+        var verb = GetProximityChatVerb(lang, mode);
+
+        outputMessage = $"{nickname} {verb} {outputMessage}";
+
+        // log message
+        _chatSystem.API.Logger.Chat(outputMessage);
+    }
+
     /// <summary>
     /// Processes a message through the two-phase pipeline: sender validation followed by per-recipient processing
     /// </summary>
@@ -91,6 +126,8 @@ public class TransformerSystem
         {
             return;
         }
+
+        LogChatMessage(context);
 
         // ----- PHASE 2: Process for each recipient (content transformation) -----
         foreach (var recipient in context.Recipients)
