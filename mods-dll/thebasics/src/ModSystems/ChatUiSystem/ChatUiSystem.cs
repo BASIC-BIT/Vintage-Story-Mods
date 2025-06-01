@@ -205,8 +205,20 @@ public class ChatUiSystem : ModSystem
 
     private void OnPlayerJoin(IClientPlayer byPlayer)
     {
-        _api.Logger.Debug("THEBASICS - Player joined, sending ready message to server");
-        _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
+        _api.Logger.Debug("THEBASICS - Player joined, attempting to send ready message to server");
+        
+        // We need to send the ready message to initiate the config exchange
+        // The server will only send config after receiving this ready message
+        try
+        {
+            _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
+            _api.Logger.Debug("THEBASICS - Ready message sent to server");
+        }
+        catch (System.Exception e)
+        {
+            _api.Logger.Error($"THEBASICS - Failed to send ready message: {e.Message}");
+            // Don't crash the client, just log the error
+        }
         // InitializeIfNeeded();
     }
 
@@ -393,8 +405,17 @@ public class ChatUiSystem : ModSystem
 
             // Store the selected channel
             _lastSelectedGroupId = groupId;
-            _clientConfigChannel.SendPacket(new ChannelSelectedMessage() { GroupId = _lastSelectedGroupId });
-            _api.Logger.Debug($"[THEBASICS] Stored last selected channel: {_lastSelectedGroupId}");
+            
+            // Check if channel is connected before sending
+            if (_clientConfigChannel != null && _clientConfigChannel.Connected)
+            {
+                _clientConfigChannel.SendPacket(new ChannelSelectedMessage() { GroupId = _lastSelectedGroupId });
+                _api.Logger.Debug($"[THEBASICS] Stored last selected channel: {_lastSelectedGroupId}");
+            }
+            else
+            {
+                _api.Logger.Debug($"[THEBASICS] Channel not connected, cannot store selected channel: {_lastSelectedGroupId}");
+            }
         }
         catch (System.Exception e)
         {

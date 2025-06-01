@@ -119,15 +119,22 @@
 
 ## Known Issues
 
+### Partially Addressed
+- **🔄 Issue #22**: Connection crash in 5.1.0-rc.1 - Crash prevented but root timing issue unresolved
+  - **Current State**: Try-catch prevents client crash, but network timing problem persists
+  - **Real Solution Needed**: Proper channel readiness detection or retry mechanism
+
 ### Minor Issues
 - **Complex configuration**: Large config file can be overwhelming for new admins
 - **Client patch dependency**: Harmony patches may break with game updates
 - **Limited error messages**: Some configuration errors could be more descriptive
+- **Network timing**: Channel connection timing issues during player join
 
 ### No Critical Issues
 - All major functionality works as designed
 - No game-breaking bugs or performance problems
 - Stable in production environments
+- Client crashes prevented through error handling
 
 ## Evolution of Project Decisions
 

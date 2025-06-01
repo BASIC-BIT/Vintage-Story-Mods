@@ -75,7 +75,7 @@ public class MessageContext
 ```
 
 ### 4. Network Synchronization Pattern
-Client-server config synchronization using protobuf messages:
+Client-server config synchronization using protobuf messages with connection safety:
 ```csharp
 [ProtoContract]
 public class TheBasicsConfigMessage
@@ -83,6 +83,17 @@ public class TheBasicsConfigMessage
     [ProtoMember(1)] public int ProximityGroupId;
     [ProtoMember(2)] public ModConfig Config;
     [ProtoMember(3)] public int? LastSelectedGroupId;
+}
+
+// Safe packet sending pattern
+if (_clientConfigChannel != null && _clientConfigChannel.Connected)
+{
+    _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
+}
+else
+{
+    // Queue for later or handle gracefully
+    QueueConfigAction(() => SendPacketWhenReady());
 }
 ```
 
@@ -136,11 +147,19 @@ RPProximityChatSystem
 - Missing config values fall back to defaults via `InitializeDefaultsIfNeeded()`
 - Invalid language references default to "Babble" language
 - Network failures queue actions until connection restored
+- Disconnected channels defer packet sending via `QueueConfigAction()`
+
+### Network Connection Safety
+- **Always check `channel.Connected` before sending packets**
+- Use existing `QueueConfigAction()` mechanism for deferred operations
+- Log connection status for debugging network timing issues
+- Graceful handling when channels are not yet established
 
 ### Validation Strategy
 - Command argument parsing with clear error messages
 - Language validation before allowing speech
 - Nickname requirements enforced before roleplay chat
+- Network channel connection validation before packet transmission
 
 ## Performance Considerations
 
