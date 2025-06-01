@@ -30,9 +30,16 @@ mods/**/obj/*
 **/.idea/
 
 # Ignore repomix output files
-.repomix-output.txt
-**/*.repomix-output.*
-local-research/*.repomix.*
+ .repomix-output.txt
+ **/*.repomix-output.*
+ local-research/*.repomix.*
+
+# Temporarily allow the repomix output file
+#!repomix-output.xml
+
+# Allow the memory bank files
+!memory-bank
+!Vintage-Story-Mods.sln
 
 # Ignore large media files
 **/*.mp4

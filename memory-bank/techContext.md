@@ -1,0 +1,192 @@
+# Technical Context: The BASICs Mod
+
+## Technology Stack
+
+### Core Framework
+- **Vintage Story Modding API**: Primary framework for game integration
+- **C# .NET 7.0**: Programming language and runtime
+- **Protobuf-net**: Network serialization for client-server communication
+- **Harmony**: Runtime patching for client-side modifications
+
+### Dependencies
+```xml
+<PackageReference Include="ApacheTech.Common.Extensions" Version="1.2.0" />
+<PackageReference Include="ApacheTech.Common.Extensions.Harmony" Version="1.2.0" />
+<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+<PackageReference Include="System.ComponentModel.Composition" Version="8.0.0" />
+```
+
+### Vintage Story References
+- **VintagestoryAPI.dll**: Core game API
+- **VSSurvivalMod.dll**: Survival mode integration
+- **VintagestoryLib.dll**: Game engine access
+- **VSEssentials.dll**: Essential game systems
+- **VSCreativeMod.dll**: Creative mode support
+
+## Development Environment
+
+### Build Configuration
+- **Debug**: Outputs to `../../output/` for development testing
+- **Release**: Outputs to current directory for distribution
+- **Post-build**: PowerShell packaging script (`scripts/package.ps1`)
+
+### Project Structure
+```
+mods-dll/thebasics/
+├── src/                          # Source code
+│   ├── Configs/                  # Configuration classes
+│   ├── Extensions/               # Extension methods
+│   ├── Models/                   # Data models and DTOs
+│   ├── ModSystems/               # Feature implementations
+│   ├── Utilities/                # Helper classes
+│   └── Properties/               # Assembly metadata
+├── assets/                       # Game assets (currently empty)
+├── scripts/                      # Build and deployment scripts
+├── modinfo.json                  # Mod metadata
+├── thebasics.csproj             # Project configuration
+└── README.md                     # Documentation
+```
+
+## Technical Constraints
+
+### Vintage Story Limitations
+- **Server-side Only**: Most functionality requires server-side implementation
+- **Network Protocol**: Must use Vintage Story's networking system
+- **Mod Loading**: Subject to game's mod loading order and lifecycle
+- **API Boundaries**: Limited to exposed game APIs and reflection where necessary
+
+### Performance Requirements
+- **Minimal Server Impact**: Chat processing must be efficient for large player counts
+- **Network Efficiency**: Minimize bandwidth usage for frequent chat messages
+- **Memory Management**: Avoid memory leaks in long-running server environments
+
+### Compatibility Constraints
+- **Backward Compatibility**: Player data must survive mod updates
+- **Cross-Platform**: Must work on Windows and Linux servers
+- **Version Support**: Target current stable Vintage Story version
+
+## Development Setup
+
+### Prerequisites
+```
+- Vintage Story installed at %APPDATA%\Vintagestory\
+- .NET 7.0 SDK
+- Visual Studio or VS Code with C# extension
+- PowerShell (for build scripts)
+```
+
+### Environment Variables
+```
+VINTAGE_STORY=%APPDATA%\Vintagestory\
+```
+
+### Build Process
+1. **Compilation**: MSBuild compiles C# source to DLL
+2. **Reference Resolution**: Links against Vintage Story assemblies
+3. **Post-build**: PowerShell script packages mod for distribution
+4. **Output**: Creates mod package in appropriate directory
+
+## Network Architecture
+
+### Client-Server Communication
+```csharp
+// Server-side channel registration
+_serverConfigChannel = API.Network.RegisterChannel("thebasics")
+    .RegisterMessageType<TheBasicsConfigMessage>()
+    .RegisterMessageType<TheBasicsClientReadyMessage>()
+    .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady);
+
+// Client-side channel registration  
+_clientConfigChannel = _api.Network.RegisterChannel("thebasics")
+    .RegisterMessageType<TheBasicsConfigMessage>()
+    .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
+```
+
+### Message Types
+- **TheBasicsConfigMessage**: Server config synchronization to clients
+- **TheBasicsClientReadyMessage**: Client ready notification to server
+- **ChannelSelectedMessage**: Chat channel selection persistence
+- **TheBasicsPlayerNicknameMessage**: Player nickname updates
+- **TheBasicsRpChatMessage**: Roleplay chat messages
+
+## Data Persistence
+
+### Player Data Storage
+Uses Vintage Story's built-in mod data system:
+```csharp
+// Storage pattern
+player.SetModdata("BASIC_NICKNAME", SerializerUtil.Serialize(nickname));
+
+// Retrieval pattern  
+var nickname = SerializerUtil.Deserialize(player.GetModdata("BASIC_NICKNAME"), defaultValue);
+```
+
+### Configuration Management
+- **Server Config**: Stored in `ModConfig/the_basics.json`
+- **Auto-generation**: Creates default config if missing
+- **Runtime Updates**: Config changes require server restart
+
+## Testing Strategy
+
+### Unit Testing
+- None yet, we need this!
+
+### Integration Testing
+- **Server Testing**: Manual testing on development servers
+- **Multi-player Testing**: Coordination testing with multiple clients
+- **Performance Testing**: Load testing with simulated player counts
+
+## Deployment Process
+
+### Packaging
+1. **Build**: Compile mod DLL and dependencies
+2. **Asset Collection**: Gather mod assets and metadata
+3. **Archive Creation**: Package into distributable format
+4. **Validation**: Verify mod structure and dependencies
+
+### Distribution
+- **ModDB**: Primary distribution through Vintage Story ModDB
+- **GitHub Releases**: Source code and development builds
+- **Server Installation**: Direct deployment to server mod directories
+
+## Tool Usage Patterns
+
+### Harmony Patching
+```csharp
+[HarmonyPrefix]
+[HarmonyPatch(typeof(HudDialogChat), "HandleGotoGroupPacket")]
+public static bool HandleGotoGroupPacket(HudDialogChat __instance, Packet_Server packet)
+{
+    // Prevent channel switching when in proximity chat
+    if (_config.PreventProximityChannelSwitching && game.currentGroupid == _proximityGroupId)
+    {
+        return false; // Block original method
+    }
+    return true; // Allow original method
+}
+```
+
+### Extension Method Pattern
+```csharp
+public static class IServerPlayerExtensions
+{
+    private const string ModDataNickname = "BASIC_NICKNAME";
+    
+    public static string GetNickname(this IServerPlayer player)
+    {
+        return GetModData(player, ModDataNickname, player.PlayerName);
+    }
+}
+```
+
+### Configuration Serialization
+```csharp
+[ProtoContract]
+public class ModConfig
+{
+    [ProtoAfterDeserialization]
+    private void OnDeserialized()
+    {
+        InitializeDefaultsIfNeeded();
+    }
+}
