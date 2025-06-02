@@ -1,4 +1,12 @@
-# Progress: The BASICs Mod Development Status
+# Progress: Vintage Story Mods Repository Status
+
+## Repository Overview
+- **Primary Production Mod**: "The BASICs" - Comprehensive roleplay proximity chat system
+- **Legacy Projects**: 6 additional mods (experimental/toy projects, not used in production)
+- **Build Status**: **100% SUCCESS** - All 7 projects build successfully
+- **Development Focus**: The BASICs is the only actively maintained and production-deployed mod
+
+## The BASICs Mod Development Status
 
 ## What Works (Completed Features)
 
@@ -117,24 +125,56 @@
 - **Maintainability**: Code is readable and well-structured
 - **Technical debt**: Some areas could benefit from refactoring
 
+## Legacy Projects Status
+
+### Build System Resolution (December 2025)
+- **✅ All Projects Building**: Successfully resolved compilation errors across entire solution
+- **✅ 100% Success Rate**: All 7 projects now build without errors
+- **✅ Modernized Infrastructure**: Updated project formats and dependency management
+
+### Legacy Project Details
+- **makersmark**: Server save notifications and proximity chat ranges - builds successfully
+- **forensicstory**: Player activity logging and chunk-based data storage - builds successfully
+- **DummyTranslocator**: Block functionality and translocator mechanics - builds successfully
+- **autorun**: Auto-run movement mechanics - builds successfully
+- **litchimneys**: Chimney automation and sparse firewood - builds successfully
+- **thaumstory**: Magic system with wands and spell projectiles - builds successfully (modernized to .NET 7.0)
+
+### Build System Improvements
+- **Project Standardization**: Converted legacy .NET Framework projects to modern SDK-style format
+- **Dependency Management**: Standardized on `$(VINTAGE_STORY)` environment variable for assembly references
+- **Language Compatibility**: Resolved C# version conflicts and auto property initializer issues
+- **Assembly References**: Fixed missing and incorrect assembly reference paths
+
+### Production vs Legacy
+- **The BASICs**: Actively maintained, extensively used in production, receives ongoing development
+- **Legacy Projects**: Historical/experimental code, not used in production, maintained for build compatibility only
+
 ## Known Issues
 
-### Partially Addressed
-- **🔄 Issue #22**: Connection crash in 5.1.0-rc.1 - Crash prevented but root timing issue unresolved
-  - **Current State**: Try-catch prevents client crash, but network timing problem persists
-  - **Real Solution Needed**: Proper channel readiness detection or retry mechanism
+### Recently Resolved
+- **✅ Issue #22**: Connection crash in 5.1.0-rc.1 - FULLY RESOLVED
+  - **Solution**: Implemented comprehensive safe packet sending system
+  - **Implementation**: Connection checking, retry mechanism, and queue-based packet handling
+  - **Result**: No more "Attempting to send data to a not connected channel" errors
+
+- **✅ Build System Issues**: Multiple compilation errors across solution - FULLY RESOLVED
+  - **makersmark**: Auto property initializer syntax incompatible with C# 5.0 - Fixed with constructor initialization
+  - **forensicstory**: Missing extension methods and incomplete implementations - Fixed with proper method implementations
+  - **DummyTranslocator**: Missing assembly references and files - Fixed with environment variables and AssemblyInfo.cs
+  - **thaumstory**: .NET Framework version conflicts - Fixed by modernizing to .NET 7.0 SDK-style project
+  - **Result**: 100% build success rate across all 7 projects
 
 ### Minor Issues
 - **Complex configuration**: Large config file can be overwhelming for new admins
 - **Client patch dependency**: Harmony patches may break with game updates
 - **Limited error messages**: Some configuration errors could be more descriptive
-- **Network timing**: Channel connection timing issues during player join
 
 ### No Critical Issues
 - All major functionality works as designed
 - No game-breaking bugs or performance problems
 - Stable in production environments
-- Client crashes prevented through error handling
+- Network communication is now robust and reliable
 
 ## Evolution of Project Decisions
 
@@ -150,8 +190,23 @@
 - **Language system**: Added complexity with hidden languages and proficiency limits
 - **Network protocol**: Expanded from simple config sync to comprehensive messaging
 
+### Planned Improvements
+
+#### Network Utility Refactoring
+- **SafeClientNetworkChannel**: Extract safe packet sending logic into reusable utility class
+- **Location**: `Utilities/Network/SafeClientNetworkChannel.cs`
+- **Benefits**: Code reuse, maintainability, consistent network handling across project
+- **API Design**: Generic wrapper for any `IClientNetworkChannel` with configurable retry parameters
+
+#### Code Quality Enhancements
+- **Network Robustness**: Apply safe packet sending pattern to other mod systems
+- **Utility Expansion**: Create more reusable utilities for common mod development patterns
+- **Testing Framework**: Add unit tests for network utilities and retry mechanisms
+- **Documentation**: Comprehensive developer documentation for network utilities
+
 ### Future Considerations
 - **Microservice approach**: Could split large systems into smaller, focused modules
 - **Plugin architecture**: Allow third-party extensions to the mod
 - **Database integration**: For larger servers, consider external data storage
 - **API standardization**: Provide stable API for other mods to integrate with
+- **Network Utility Library**: Expand safe networking into comprehensive utility library

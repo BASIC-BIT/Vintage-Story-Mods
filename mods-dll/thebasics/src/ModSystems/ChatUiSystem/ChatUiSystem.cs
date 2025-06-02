@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using thebasics.Models;
 using thebasics.Configs;
+using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.Client.NoObf;
@@ -17,12 +18,9 @@ public class ChatUiSystem : ModSystem
     private static int? _lastSelectedGroupId = null;
     private static ModConfig _config = null;
     private static readonly System.Collections.Generic.List<System.Action> _pendingConfigActions = new System.Collections.Generic.List<System.Action>();
-    // private static bool _isInitialized;
-    // private static int _initializationAttempts;
-    // private const int MAX_INITIALIZATION_ATTEMPTS = 20;
-    // private const int INITIALIZATION_RETRY_DELAY_MS = 500;
 
     private static IClientNetworkChannel _clientConfigChannel;
+    private static SafeClientNetworkChannel _safeNetworkChannel;
 
     // private static IClientNetworkChannel _clientNicknameChannel;
     // private GuiDialogCharacterBase dlg;
@@ -207,19 +205,9 @@ public class ChatUiSystem : ModSystem
     {
         _api.Logger.Debug("THEBASICS - Player joined, attempting to send ready message to server");
         
-        // We need to send the ready message to initiate the config exchange
+        // Use safe packet sending with connection checking and retry mechanism
         // The server will only send config after receiving this ready message
-        try
-        {
-            _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
-            _api.Logger.Debug("THEBASICS - Ready message sent to server");
-        }
-        catch (System.Exception e)
-        {
-            _api.Logger.Error($"THEBASICS - Failed to send ready message: {e.Message}");
-            // Don't crash the client, just log the error
-        }
-        // InitializeIfNeeded();
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsClientReadyMessage());
     }
 
     // private void OnPlayerLeave(IClientPlayer byPlayer)
@@ -236,6 +224,16 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<ChannelSelectedMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
         // .RegisterMessageType<TheBasicsChatTypingMessage>();
+
+        // Initialize the safe network channel wrapper
+        var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
+        {
+            LogPrefix = "[THEBASICS]",
+            EnableDebugLogging = true,
+            RetryDelayMs = 2000,
+            MaxRetries = 10
+        };
+        _safeNetworkChannel = new SafeClientNetworkChannel(_clientConfigChannel, _api, config);
 
         // _clientNicknameChannel = _api.Network.RegisterChannel("thebasics_nickname")
         //     .RegisterMessageType<TheBasicsPlayerNicknameMessage>()
@@ -406,16 +404,8 @@ public class ChatUiSystem : ModSystem
             // Store the selected channel
             _lastSelectedGroupId = groupId;
             
-            // Check if channel is connected before sending
-            if (_clientConfigChannel != null && _clientConfigChannel.Connected)
-            {
-                _clientConfigChannel.SendPacket(new ChannelSelectedMessage() { GroupId = _lastSelectedGroupId });
-                _api.Logger.Debug($"[THEBASICS] Stored last selected channel: {_lastSelectedGroupId}");
-            }
-            else
-            {
-                _api.Logger.Debug($"[THEBASICS] Channel not connected, cannot store selected channel: {_lastSelectedGroupId}");
-            }
+            // Use safe packet sending with connection checking and retry mechanism
+            _safeNetworkChannel?.SendPacketSafely(new ChannelSelectedMessage() { GroupId = _lastSelectedGroupId });
         }
         catch (System.Exception e)
         {
@@ -488,8 +478,9 @@ public class ChatUiSystem : ModSystem
             _harmony?.UnpatchAll(Mod.Info.ModID);
             _config = null;
             _lastSelectedGroupId = null;
-            // _isInitialized = false;
-            // _initializationAttempts = 0;
+            _pendingConfigActions.Clear();
+            _safeNetworkChannel?.Dispose();
+            _safeNetworkChannel = null;
         }
         catch (System.Exception e)
         {

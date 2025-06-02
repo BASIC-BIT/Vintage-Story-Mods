@@ -1,6 +1,33 @@
-# Technical Context: The BASICs Mod
+# Technical Context: Vintage Story Mods Repository
+
+## Repository Structure
+
+### Production vs Legacy Projects
+- **Production**: `mods-dll/thebasics/` - Actively maintained, extensively used in production
+- **Legacy**: `mods/` directory - Historical/experimental projects, not used in production
+
+### Build System Architecture
+- **Modern Projects**: SDK-style .csproj with .NET 7.0 (thebasics, modernized thaumstory)
+- **Legacy Projects**: Traditional .csproj with .NET Framework 4.8 or mixed formats
+- **Build Success**: 100% success rate across all 7 projects after modernization efforts
+
+### Project Patterns
+```
+Repository Root
+├── mods-dll/
+│   ├── thebasics/          # Primary production mod (.NET 7.0, SDK-style)
+│   └── litchimneys/        # Working legacy mod (.NET 7.0, SDK-style)
+└── mods/
+    ├── makersmark/         # Legacy mod (.NET Framework 4.8)
+    ├── forensicstory/      # Legacy mod (.NET Framework 4.8)
+    ├── DummyTranslocator/  # Legacy mod (.NET Framework 4.8)
+    ├── thaumstory/         # Modernized to .NET 7.0 SDK-style
+    └── autorun/            # Legacy mod (.NET Framework 4.8)
+```
 
 ## Technology Stack
+
+### Primary Production Stack (The BASICs)
 
 ### Core Framework
 - **Vintage Story Modding API**: Primary framework for game integration
@@ -96,11 +123,39 @@ _serverConfigChannel = API.Network.RegisterChannel("thebasics")
     .RegisterMessageType<TheBasicsClientReadyMessage>()
     .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady);
 
-// Client-side channel registration  
+// Client-side channel registration
 _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
     .RegisterMessageType<TheBasicsConfigMessage>()
     .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
 ```
+
+### Network Connection Safety Patterns
+Based on analysis of VS source code at `D:\bench\vs_source\VintagestoryAPI`:
+
+#### Key VS API Insights
+- **IClientNetworkChannel.Connected**: Property indicates if server is listening on channel
+- **IServerNetworkChannel**: No connection property needed (always "connected" from server perspective)
+- **Connection Timing**: Channels exist immediately but may not be "connected" until handshake complete
+
+#### Safe Packet Sending Implementation
+```csharp
+// Check connection before sending
+if (_clientConfigChannel != null && _clientConfigChannel.Connected)
+{
+    _clientConfigChannel.SendPacket(message);
+}
+else
+{
+    // Queue for retry when connection established
+    QueuePacketAction(() => SendPacketWhenReady(message));
+}
+```
+
+#### Retry Mechanism Configuration
+- **Retry Delay**: 2000ms (2 seconds) between connection attempts
+- **Max Retries**: 10 attempts before giving up
+- **Queue Management**: Clear queue on max retries to prevent memory buildup
+- **State Tracking**: Monitor retry progress and connection status
 
 ### Message Types
 - **TheBasicsConfigMessage**: Server config synchronization to clients

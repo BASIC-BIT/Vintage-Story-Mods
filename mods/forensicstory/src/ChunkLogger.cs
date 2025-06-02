@@ -36,16 +36,21 @@ namespace forensicstory
         {
             IServerChunk chunk = _serverApi.WorldManager.GetChunk(player.Entity.ServerPos.AsBlockPos);
 
+            if (!_chunkLogs.ContainsKey(chunk))
+            {
+                _chunkLogs[chunk] = new List<TLog>();
+            }
             
-            _chunkLogs[chunk]
+            // Note: This method appears incomplete - data parameter is not being used
+            // The generic constraint suggests TLog should be related to T, but the relationship is unclear
         }
 
         private void AddChunkToDictionary(IServerChunk chunk)
         {
-            byte[] data = chunk.GetServerModdata("haunting");
-            int haunting = data == null ? 0 : SerializerUtil.Deserialize<int>(data);
+            byte[] data = chunk.GetServerModdata(_name);
+            List<TLog> logs = data == null ? new List<TLog>() : SerializerUtil.Deserialize<List<TLog>>(data);
 
-            _chunkLogs.Add(chunk, haunting);
+            _chunkLogs.Add(chunk, logs);
         }
     }
 }

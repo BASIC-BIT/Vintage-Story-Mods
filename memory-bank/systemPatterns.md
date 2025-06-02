@@ -151,9 +151,54 @@ RPProximityChatSystem
 
 ### Network Connection Safety
 - **Always check `channel.Connected` before sending packets**
-- Use existing `QueueConfigAction()` mechanism for deferred operations
-- Log connection status for debugging network timing issues
-- Graceful handling when channels are not yet established
+- **Safe Packet Sending Pattern**: Use `SendPacketSafely<T>()` wrapper method
+- **Retry Mechanism**: Automatic retry with configurable delays (2 seconds) and max attempts (10)
+- **Queue-Based Deferral**: Actions queued until channel connection established
+- **Connection State Tracking**: Monitor retry progress and connection status
+- **Memory Management**: Clear queues when max retries reached to prevent buildup
+
+#### Safe Network Communication Pattern
+```csharp
+// Safe packet sending with automatic retry
+private static void SendPacketSafely<T>(T message)
+{
+    QueuePacketAction(() =>
+    {
+        if (_clientConfigChannel != null && _clientConfigChannel.Connected)
+        {
+            _clientConfigChannel.SendPacket(message);
+            _api.Logger.Debug($"Successfully sent packet: {typeof(T).Name}");
+        }
+        else
+        {
+            _api.Logger.Warning($"Cannot send packet {typeof(T).Name} - channel not connected");
+        }
+    });
+}
+
+// Connection checking with retry mechanism
+private static void QueuePacketAction(System.Action action)
+{
+    if (_clientConfigChannel != null && _clientConfigChannel.Connected)
+    {
+        action(); // Execute immediately if connected
+    }
+    else
+    {
+        _pendingPacketActions.Enqueue(action); // Queue for later
+        if (!_connectionRetryInProgress)
+        {
+            StartConnectionRetry(); // Begin retry mechanism
+        }
+    }
+}
+```
+
+#### Planned Refactoring: SafeClientNetworkChannel Utility
+- **Extract to Utility**: Move safe packet logic to reusable `SafeClientNetworkChannel` class
+- **Generic Implementation**: Support any `IClientNetworkChannel` and message types
+- **Configurable Parameters**: Retry delays, max attempts, logging levels
+- **Drop-in Replacement**: Easy integration for existing network code
 
 ### Validation Strategy
 - Command argument parsing with clear error messages

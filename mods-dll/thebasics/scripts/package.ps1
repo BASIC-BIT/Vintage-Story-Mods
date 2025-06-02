@@ -97,7 +97,7 @@ if (Test-Path $envPath) {
     }
 
     # Only attempt SFTP upload if we have the required environment variables
-    if ($env:SFTP_HOST -and $env:SFTP_PORT -and $env:SFTP_USERNAME -and $env:SFTP_PASSWORD) {
+    if ($env:SFTP_HOST -and $env:SFTP_PORT -and $env:SFTP_USERNAME -and $env:SFTP_PASSWORD -and $env:SFTP_HOST_KEY_FINGERPRINT) {
         $msg = "Attempting SFTP upload with host: $($env:SFTP_HOST), port: $($env:SFTP_PORT), username: $($env:SFTP_USERNAME)"
         Write-Host $msg
         "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
@@ -127,7 +127,7 @@ if (Test-Path $envPath) {
                 PortNumber = [int]$env:SFTP_PORT
                 UserName = $env:SFTP_USERNAME
                 Password = $env:SFTP_PASSWORD
-                SshHostKeyFingerprint = "ssh-ed25519 255 kJWg4FFXMDFxoyCchYF6gC/DuhP+4oX5k0Bi4Jj+yoU"
+                SshHostKeyFingerprint = $env:SFTP_HOST_KEY_FINGERPRINT
                 Timeout = [TimeSpan]::FromSeconds(30)
                 FtpMode = [WinSCP.FtpMode]::Passive
             }
