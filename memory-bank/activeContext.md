@@ -299,3 +299,47 @@ Successfully implemented comprehensive server log fetching capabilities to compl
 - **Dependencies**: All Vintage Story references correctly configured
 - **Packaging**: Automated packaging script for distribution
 - **Testing**: Basic test framework in place, could be expanded
+
+## Community Issues Analysis (June 2025)
+
+### Comprehensive Issue Cataloging
+Successfully analyzed and cataloged all community feedback from both GitHub repository and ModDB comments, creating organized documentation for development prioritization.
+
+#### New Documentation Structure
+- **[`github-issues-catalog.md`](memory-bank/github-issues-catalog.md)**: Complete analysis of 22 GitHub issues (15 open, 7 closed)
+- **[`community-issues-catalog.md`](memory-bank/community-issues-catalog.md)**: Analysis of 49 ModDB comments with user feedback
+- **[`active-bugs.md`](memory-bank/active-bugs.md)**: 8 critical and high-priority bugs requiring immediate attention
+- **[`feature-requests.md`](memory-bank/feature-requests.md)**: 12 community-requested features prioritized by impact
+
+#### Critical Findings Summary
+**Total Issues Identified**: 24 distinct issues across all sources
+- **Critical Bugs**: 3 (server crashes, connection issues)
+- **High Priority Bugs**: 3 (core feature malfunctions)
+- **Medium Priority Bugs**: 2 (feature implementation gaps)
+- **High Priority Features**: 4 (high community demand)
+- **Medium Priority Features**: 5 (valuable additions)
+- **Low Priority Features**: 3 (nice to have)
+
+#### Key Insights from Cross-Platform Analysis
+1. **GitHub-ModDB Correlation**: Many GitHub issues originated from ModDB comments
+2. **Implementation Status Gaps**: Some GitHub issues marked open are actually implemented
+3. **Community Communication**: Need better feedback loop between platforms
+4. **Priority Alignment**: Community priorities align well with technical priorities
+
+### Immediate Action Items (Critical Path)
+1. **Connection Crash (GitHub #22)**: Validate and stress-test existing safe networking implementation
+2. **Server Console Crash (GitHub #11)**: Fix null reference in `/say` command
+3. **TPA Gear Bug (ModDB)**: Implement proper temporal gear consumption
+4. **OnPlayerChat Exception (ModDB)**: Resolve null reference in chat system
+
+### Development Roadmap Insights
+- **Network Stability**: Multiple issues point to network handling as primary concern
+- **Nickname System**: Requires comprehensive overhaul for reliability
+- **Channel Management**: High community demand for better channel control
+- **Language System**: Sign language implementation needs completion
+
+### Community Engagement Strategy
+- **Issue Cleanup**: Close implemented GitHub issues (#16, #17)
+- **Progress Communication**: Update community on bug fix progress
+- **Feature Voting**: Implement community voting for feature priorities
+- **Beta Testing**: Establish structured beta testing for critical fixes

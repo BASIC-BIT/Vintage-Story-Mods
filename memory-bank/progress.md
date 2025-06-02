@@ -152,6 +152,43 @@
 
 ## Known Issues
 
+### Comprehensive Issue Analysis (June 2025)
+Complete analysis of community feedback from GitHub repository and ModDB comments, organized into specialized documentation for efficient development prioritization.
+
+#### Issue Documentation Structure
+- **[`active-bugs.md`](memory-bank/active-bugs.md)**: 8 critical and high-priority bugs requiring immediate attention
+- **[`feature-requests.md`](memory-bank/feature-requests.md)**: 12 community-requested features prioritized by impact
+- **[`github-issues-catalog.md`](memory-bank/github-issues-catalog.md)**: Complete analysis of 22 GitHub issues
+- **[`community-issues-catalog.md`](memory-bank/community-issues-catalog.md)**: Analysis of 49 ModDB comments
+
+#### Critical Issues Summary (Immediate Attention)
+**Total Active Issues**: 24 distinct issues identified
+- **🔴 Critical Bugs (3)**: Server crashes and connection failures
+  - Connection crash in 5.1.0-rc.1 (GitHub #22)
+  - Server console `/say` command crash (GitHub #11)
+  - OnPlayerChat null reference exception (ModDB reports)
+
+- **🟡 High Priority Bugs (3)**: Core feature malfunctions
+  - TPA temporal gear not consumed (ModDB reports)
+  - Language text display in floating bubbles (ModDB reports)
+  - Nickname system display format problems (GitHub #14)
+
+- **🟠 Medium Priority Bugs (2)**: Feature implementation gaps
+  - Sign language line of sight not working (GitHub #8)
+  - Sign language using spoken languages (GitHub #9)
+
+#### High-Impact Feature Requests
+- **🟢 Channel Management**: Default channel control and order management
+- **🟢 Admin Visual Tools**: Username colors and admin distinction
+- **🟢 Nickname System Overhaul**: Duplicate prevention and conflict resolution
+- **🟢 Client Customization**: Personal notification preferences
+
+#### Development Priority Matrix
+1. **Immediate (This Week)**: Critical stability bugs
+2. **Short-term (2 Weeks)**: High-priority bugs and core feature fixes
+3. **Medium-term (1 Month)**: Feature implementation gaps and community requests
+4. **Long-term (Future Releases)**: Advanced features and system enhancements
+
 ### Recently Resolved
 - **🔄 Issue #22**: Connection crash in 5.1.0-rc.1 - IMPLEMENTATION COMPLETE, VALIDATION LIMITED
   - **Solution**: Implemented comprehensive safe packet sending system with [`SafeClientNetworkChannel`](mods-dll/thebasics/src/Utilities/Network/SafeClientNetworkChannel.cs)
