@@ -204,6 +204,24 @@ var nickname = SerializerUtil.Deserialize(player.GetModdata("BASIC_NICKNAME"), d
 - **GitHub Releases**: Source code and development builds
 - **Server Installation**: Direct deployment to server mod directories
 
+## Infrastructure Tools
+
+### Server Log Fetching ([`fetch-logs.ps1`](mods-dll/thebasics/scripts/fetch-logs.ps1))
+- **SFTP Integration**: Uses same WinSCP .NET assembly and `.env` configuration as deployment
+- **Flexible Parameters**: `-LogType`, `-Days`, `-OutputDir` for customized log retrieval
+- **Verified Remote Paths**:
+  - `/data/Logs/server-main.log`, `/data/Logs/server-debug.log`
+  - `/data/Logs/server-audit.log`, `/data/Logs/server-chat.log`
+  - `/data/Logs/server-build.log`, `/data/Logs/server-worldgen.log`
+  - `/data/Logs/Archive/` (historical logs with timestamps)
+- **Local Organization**: Timestamped subdirectories in `logs/` folder
+- **Error Handling**: Graceful handling of missing directories and SFTP errors
+
+### Repository Structure
+- **Modernized [`.gitignore`](.gitignore)**: Blacklist approach with proper exclusions
+- **Rule Integration**: `.roo/` directory now version controlled
+- **Development Workflow**: Structured memory bank update process in [`05-memory-bank-updates.md`](.roo/rules/05-memory-bank-updates.md)
+
 ## Tool Usage Patterns
 
 ### Harmony Patching

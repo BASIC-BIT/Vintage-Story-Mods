@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../vs_source"
+		},
+		{
+			"path": "C:/Users/steve/AppData/Roaming/VintagestoryData"
+		}
+	],
+	"settings": {
+		"dotnet.preferCSharpExtension": true,
+		"powershell.cwd": "Vintage-Story-Mods"
+	}
+}

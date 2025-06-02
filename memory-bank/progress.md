@@ -210,3 +210,28 @@
 - **Database integration**: For larger servers, consider external data storage
 - **API standardization**: Provide stable API for other mods to integrate with
 - **Network Utility Library**: Expand safe networking into comprehensive utility library
+## Infrastructure Tools (June 2025)
+
+### ✅ Server Log Fetching System
+- **[`fetch-logs.ps1`](mods-dll/thebasics/scripts/fetch-logs.ps1)**: Production-ready script for downloading server logs
+- **SFTP Integration**: Uses existing deployment infrastructure and credentials
+- **Flexible Parameters**: Support for different log types, date ranges, and output directories
+- **Verified Functionality**: Successfully tested with production server
+- **Organized Storage**: Timestamped local storage with proper directory structure
+- **Error Handling**: Graceful handling of missing directories and connection issues
+
+### ✅ Repository Modernization
+- **Updated [`.gitignore`](.gitignore)**: Converted from whitelist to blacklist approach
+- **Rule Integration**: `.roo/` rules now properly version controlled
+- **Cleaner Structure**: Easier to maintain and understand exclusion patterns
+
+### ✅ Development Workflow Enhancement
+- **New Rule [`05-memory-bank-updates.md`](.roo/rules/05-memory-bank-updates.md)**: Structured process for memory bank updates
+- **Enhanced [`04-logs.md`](.roo/rules/04-logs.md)**: Comprehensive log access documentation with verified examples
+- **User-Driven Process**: Clear phases for implementation, validation, log analysis, and documentation
+
+### 🔄 Future Infrastructure Considerations
+- **FTP MCP Server**: Potential development of reusable SFTP/FTP MCP server for broader file management
+- **Variable-Based Rules**: Consideration of placeholder-based rule system to reduce hard-coded paths
+- **Automated Log Analysis**: Integration of log parsing and monitoring tools
+- **Cross-Project Tooling**: Expansion of infrastructure tools for other projects

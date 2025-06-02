@@ -1,7 +1,7 @@
 # Active Context: Current Project State
 
 ## Current Work Focus
-**Build System Resolution & Repository Modernization**: Successfully resolved all build issues across the entire solution and modernized project configurations to ensure 100% build success rate.
+**Development Infrastructure Enhancement**: Successfully implemented server log fetching capabilities and modernized repository structure with improved .gitignore and new development workflow processes.
 
 ## Recent Analysis Findings
 
@@ -101,6 +101,49 @@ Successfully resolved all compilation errors across the entire Vintage Story Mod
 - **Environment Variables**: Using `$(VINTAGE_STORY)` for assembly references ensures portability
 - **C# Language Versions**: Legacy projects constrained to C# 5.0, modern projects use default language version
 - **Assembly References**: Consistent pattern across working projects for Vintage Story API dependencies
+
+## Recent Infrastructure Improvements (June 2025)
+
+### Server Log Fetching System
+Successfully implemented comprehensive server log fetching capabilities to complement the existing deployment infrastructure.
+
+#### New [`fetch-logs.ps1`](mods-dll/thebasics/scripts/fetch-logs.ps1) Script
+- **SFTP Integration**: Leverages existing `.env` configuration and WinSCP infrastructure
+- **Flexible Parameters**: `-LogType` (server/debug/crash/mod/all), `-Days`, `-OutputDir`
+- **Verified Functionality**: Successfully downloads 6+ server log files including:
+  - `server-main.log` (144KB+ of operational data)
+  - `server-debug.log` (16KB+ of debug information)
+  - `server-audit.log`, `server-chat.log`, `server-build.log`, `server-worldgen.log`
+  - Historical archived logs from `/data/Logs/Archive/`
+- **Organized Storage**: Creates timestamped subdirectories in `logs/` folder
+- **Error Handling**: Graceful handling of missing directories (e.g., CrashReports)
+- **Comprehensive Logging**: Detailed operation logging with full SFTP transaction records
+
+#### Repository Structure Modernization
+- **Updated [`.gitignore`](.gitignore)**: Converted from whitelist to blacklist approach
+  - Now includes `.roo/` rules in version control
+  - Cleaner structure with proper exclusions for build artifacts and logs
+  - Easier to maintain and understand
+- **New Rule [`05-memory-bank-updates.md`](.roo/rules/05-memory-bank-updates.md)**: Established structured workflow
+  - Implementation → Validation → Log Analysis → Memory Bank Update phases
+  - User-driven process with explicit memory bank update triggers
+  - Clear workflow prompts to guide development process
+
+#### Enhanced Development Workflow
+- **Log Analysis Integration**: Server logs now easily accessible for debugging and monitoring
+- **Consistent Tooling**: Both deployment (`package.ps1`) and log fetching (`fetch-logs.ps1`) use same infrastructure
+- **Improved Documentation**: Updated [`04-logs.md`](.roo/rules/04-logs.md) with verified working examples
+
+### Key Technical Insights from Implementation
+1. **WinSCP Integration**: Proper destination path formatting (`"$fetchDir\"`) crucial for successful file transfers
+2. **SFTP Error Handling**: Different remote directories have varying permissions and existence
+3. **Log File Patterns**: Server uses `.log` extensions, not `.txt` as initially assumed
+4. **Archive Structure**: Historical logs stored in timestamped subdirectories under `/data/Logs/Archive/`
+
+### Future Infrastructure Considerations
+- **FTP MCP Server**: Potential development of reusable FTP/SFTP MCP server for broader file management
+- **Variable-Based Rules**: Consideration of placeholder-based rule system to avoid hard-coded paths
+- **Automated Log Analysis**: Potential integration of log parsing and analysis tools
 
 ## Next Steps for Development
 
