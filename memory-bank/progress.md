@@ -153,10 +153,12 @@
 ## Known Issues
 
 ### Recently Resolved
-- **✅ Issue #22**: Connection crash in 5.1.0-rc.1 - FULLY RESOLVED
-  - **Solution**: Implemented comprehensive safe packet sending system
+- **🔄 Issue #22**: Connection crash in 5.1.0-rc.1 - IMPLEMENTATION COMPLETE, VALIDATION LIMITED
+  - **Solution**: Implemented comprehensive safe packet sending system with [`SafeClientNetworkChannel`](mods-dll/thebasics/src/Utilities/Network/SafeClientNetworkChannel.cs)
   - **Implementation**: Connection checking, retry mechanism, and queue-based packet handling
-  - **Result**: No more "Attempting to send data to a not connected channel" errors
+  - **Validation Status**: Initial validation shows implementation working, but limited test coverage
+  - **Validation Limitations**: Only one connection session since implementation (June 2, 2025)
+  - **Next Steps**: Comprehensive stress testing with multiple connections and extended monitoring
 
 - **✅ Build System Issues**: Multiple compilation errors across solution - FULLY RESOLVED
   - **makersmark**: Auto property initializer syntax incompatible with C# 5.0 - Fixed with constructor initialization
@@ -235,3 +237,34 @@
 - **Variable-Based Rules**: Consideration of placeholder-based rule system to reduce hard-coded paths
 - **Automated Log Analysis**: Integration of log parsing and monitoring tools
 - **Cross-Project Tooling**: Expansion of infrastructure tools for other projects
+
+## Validation Methodology Insights (June 2025)
+
+### Key Learnings from Safe Networking Validation
+- **Timeline Awareness Critical**: Implementation dates must be tracked to guide log analysis scope
+- **Log Size Management**: Debug logs can be gigabytes; need filtering tools to prevent downloading massive files
+- **Test Coverage Limitations**: Single connection sessions insufficient for robust validation
+- **Stress Testing Required**: Need multiple simultaneous connections, network interruptions, extended sessions
+
+### Infrastructure Improvements Needed
+1. **Enhanced [`fetch-logs.ps1`](mods-dll/thebasics/scripts/fetch-logs.ps1)**:
+   - Add `--tail-lines` parameter for log truncation
+   - Implement date-range filtering
+   - Create focused log analysis for specific scenarios
+
+2. **Validation Protocol Development**:
+   - Establish stress testing scenarios with multiple connections
+   - Create network interruption test cases
+   - Develop long-term monitoring strategies
+   - Define quantitative validation metrics
+
+3. **Timeline Tracking System**:
+   - Document implementation dates for proper validation scope
+   - Correlate deployment history with log analysis windows
+   - Establish clear validation timeframes based on change deployment
+
+### Validation Status Framework
+- **🔄 Implementation Complete, Validation Limited**: Code implemented but needs comprehensive testing
+- **✅ Fully Validated**: Comprehensive testing across multiple scenarios completed
+- **❌ Validation Failed**: Testing revealed issues requiring fixes
+- **⏳ Validation Pending**: Awaiting sufficient test data or scenarios
