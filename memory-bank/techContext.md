@@ -206,6 +206,13 @@ var nickname = SerializerUtil.Deserialize(player.GetModdata("BASIC_NICKNAME"), d
 
 ## Infrastructure Tools
 
+### Build and Packaging System
+- **[`build-and-package.ps1`](mods-dll/thebasics/scripts/build-and-package.ps1)**: **RECOMMENDED** - Ensures fresh builds before packaging
+- **[`package.ps1`](mods-dll/thebasics/scripts/package.ps1)**: **LEGACY** - Only packages existing DLLs without building
+- **Critical Issue**: Original package script can deploy stale builds if DLLs aren't rebuilt
+- **Best Practice**: Always use `build-and-package.ps1` to prevent stale build deployment
+- **Deployment Pipeline**: Build → Package → Local Copy → SFTP Upload to production server
+
 ### Server Log Fetching ([`fetch-logs.ps1`](mods-dll/thebasics/scripts/fetch-logs.ps1))
 - **SFTP Integration**: Uses same WinSCP .NET assembly and `.env` configuration as deployment
 - **Flexible Parameters**: `-LogType`, `-Days`, `-OutputDir` for customized log retrieval

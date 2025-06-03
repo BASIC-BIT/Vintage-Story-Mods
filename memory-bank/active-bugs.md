@@ -38,12 +38,16 @@ Critical and high-priority bugs that need immediate development attention, compi
 
 ## 🟡 High Priority Bugs (Core Features)
 
-### Bug #4: TPA Temporal Gear Not Consumed
+### Bug #4: TPA Temporal Gear Not Consumed ✅ RESOLVED
 - **Source**: ModDB Comments (Kasel, May 2025)
 - **Issue**: TPA requires temporal gear but doesn't consume it
 - **Impact**: Game balance issue - infinite teleportation with single gear
 - **Config**: `TpaRequireTemporalGear: true`
-- **Status**: Unresolved
+- **Status**: **RESOLVED** (June 2, 2025)
+- **Root Cause**: Original code had only TODO comment - no gear consumption implemented at all
+- **Solution**: Implemented proper temporal gear consumption using VS API patterns (`TakeOut(1)` + `MarkDirty()`)
+- **Implementation**: Added immediate consumption when TPA request is made (following VS spawn point pattern)
+- **Testing**: Validated with `/tpatest` command, confirmed gear consumption working correctly
 
 ### Bug #5: Language Text Display in Floating Bubbles
 - **Source**: ModDB Comments (Ragolution, March 2025)

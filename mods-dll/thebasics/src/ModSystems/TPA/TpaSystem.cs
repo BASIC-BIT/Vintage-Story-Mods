@@ -66,7 +66,9 @@ namespace thebasics.ModSystems.TPA
 
             var itemSlot = leftHand ? player.Entity.LeftHandItemSlot : player.Entity.RightHandItemSlot;
 
+            // Follow VS pattern: TakeOut + MarkDirty for proper inventory synchronization
             itemSlot.TakeOut(1);
+            itemSlot.MarkDirty();
 
             return true;
         }
@@ -115,6 +117,7 @@ namespace thebasics.ModSystems.TPA
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpaClear);
+
             }
         }
 
@@ -152,6 +155,7 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpaRequest(IServerPlayer player, IServerPlayer targetPlayer,
             TpaRequestType type)
         {
+            // Validate temporal gear requirement FIRST, but don't consume yet
             if (Config.TpaRequireTemporalGear)
             {
                 if(!IsPlayerHoldingTemporalGear(player))
@@ -163,13 +167,9 @@ namespace thebasics.ModSystems.TPA
                             "You must hold a temporal gear to initiate a teleport request. (This will consume it)",
                     };
                 }
-                else
-                {
-                    // TODO: Remove temporal gear from inventory (temporarily if request times out or is declined?)
-                }
-                
             }
 
+            // Validate cooldown restrictions
             if (!player.CanTpa(API.World.Calendar, Config)) // TODO: Dynamic error message
             {
                 var hoursString = Config.TpaCooldownInGameHours.ToString("0.##");
@@ -181,6 +181,7 @@ namespace thebasics.ModSystems.TPA
                 };
             }
 
+            // Validate self-teleport prevention
             if (targetPlayer.PlayerUID == player.PlayerUID)
             {
                 return new TextCommandResult
@@ -190,6 +191,7 @@ namespace thebasics.ModSystems.TPA
                 };
             }
 
+            // Validate target player permissions
             if (!targetPlayer.GetTpAllowed())
             {
                 return new TextCommandResult
@@ -199,7 +201,21 @@ namespace thebasics.ModSystems.TPA
                 };
             }
 
-            API.World.SpawnParticles(GetTpaRequestParticles(player));
+            // ALL validations passed - NOW consume the temporal gear
+            if (Config.TpaRequireTemporalGear)
+            {
+                if (!RemoveTemporalGear(player))
+                {
+                    return new TextCommandResult
+                    {
+                        Status = EnumCommandStatus.Error,
+                        StatusMessage = "Failed to consume temporal gear. Please try again.",
+                    };
+                }
+            }
+
+            // Fix particle spawning - add player parameter following VS pattern
+            API.World.SpawnParticles(GetTpaRequestParticles(player), player);
 
 
             var requestMessage = new StringBuilder();
@@ -332,5 +348,6 @@ namespace thebasics.ModSystems.TPA
                 StatusMessage = "Teleport requests have been cleared.",
             };
         }
+
     }
 }

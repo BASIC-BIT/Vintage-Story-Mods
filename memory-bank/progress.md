@@ -162,14 +162,14 @@ Complete analysis of community feedback from GitHub repository and ModDB comment
 - **[`community-issues-catalog.md`](memory-bank/community-issues-catalog.md)**: Analysis of 49 ModDB comments
 
 #### Critical Issues Summary (Immediate Attention)
-**Total Active Issues**: 24 distinct issues identified
+**Total Active Issues**: 23 distinct issues identified (1 resolved)
 - **🔴 Critical Bugs (3)**: Server crashes and connection failures
   - Connection crash in 5.1.0-rc.1 (GitHub #22)
   - Server console `/say` command crash (GitHub #11)
   - OnPlayerChat null reference exception (ModDB reports)
 
-- **🟡 High Priority Bugs (3)**: Core feature malfunctions
-  - TPA temporal gear not consumed (ModDB reports)
+- **🟡 High Priority Bugs (2)**: Core feature malfunctions
+  - ✅ **TPA temporal gear not consumed (RESOLVED June 2, 2025)**
   - Language text display in floating bubbles (ModDB reports)
   - Nickname system display format problems (GitHub #14)
 

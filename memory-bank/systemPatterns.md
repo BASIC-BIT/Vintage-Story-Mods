@@ -217,3 +217,78 @@ private static void QueuePacketAction(System.Action action)
 - Protobuf serialization for network efficiency
 - Extension methods avoid object creation overhead
 - Transformer reuse in pipeline processing
+
+## TPA System Patterns
+
+### Temporal Gear Consumption Pattern
+Proper item consumption in Vintage Story requires two-step process:
+```csharp
+// Step 1: Remove item from inventory slot
+itemSlot.TakeOut(1);
+
+// Step 2: Sync change to client (CRITICAL)
+itemSlot.MarkDirty();
+```
+
+### TPA Request Flow (Improved)
+1. **Pre-Validation Phase**: Check temporal gear presence (but don't consume yet)
+2. **Validation Phase**: Check cooldowns, self-teleport prevention, target permissions
+3. **Consumption Phase**: Only consume temporal gear AFTER all validations pass
+4. **Request Creation**: Create TPA request object with metadata
+5. **Notification Phase**: Notify target player of incoming request
+6. **Response Handling**: Accept/deny workflow with teleportation execution
+
+### Improved Consumption Strategy
+- **Design Decision**: Consume temporal gear only after ALL validations pass
+- **Rationale**: Prevents gear loss when request fails validation (cooldown, permissions, etc.)
+- **Game Balance**: Players don't lose gear for invalid requests, but still pay for valid attempts
+- **User Experience**: Fair system - gear only consumed when request is actually sent
+- **Future Consideration**: Potential gear return logic for denied/timed-out requests (complex implementation)
+
+### Testing Framework Pattern
+```csharp
+// Admin-only testing commands for single-player validation
+API.ChatCommands.GetOrCreate("tpatest")
+    .RequiresPrivilege(Privilege.controlserver)
+    .WithArgs(new StringArgParser("action", true))  // Required parameter
+    .HandleWith(HandleTpaTest);
+```
+
+### Error Handling in TPA System
+- **Gear Validation**: Check for temporal gear before processing request
+- **Consumption Verification**: Validate gear removal succeeded before proceeding
+- **Clear Error Messages**: Provide specific feedback for each failure condition
+- **Graceful Degradation**: System continues working if gear requirement disabled
+
+## Particle System Patterns
+
+### VS Particle Spawning API
+Correct pattern for spawning particles in Vintage Story:
+```csharp
+// Server-side particle spawning requires player parameter
+API.World.SpawnParticles(particleProperties, player);
+
+// NOT: API.World.SpawnParticles(particleProperties); // Missing player parameter
+```
+
+### Particle Properties Configuration
+```csharp
+private SimpleParticleProperties GetTpaRequestParticles(IServerPlayer player)
+{
+    var pos = player.Entity.LocalEyePos;  // Use LocalEyePos for server-side
+    return new SimpleParticleProperties()
+    {
+        LifeLength = 0.8f,
+        Color = ColorUtil.ToRgba(180, 200, 220, 250),
+        MinPos = pos,
+        SelfPropelled = true,
+        MinVelocity = new Vec3f(/* random velocity */),
+        // ... other properties
+    };
+}
+```
+
+### Key Insights from VS Source Analysis
+- **Player Parameter Required**: Server-side particle spawning needs player context
+- **Position Handling**: Use `player.Entity.LocalEyePos` for server-side positioning
+- **VS Pattern Reference**: Found in `CollectibleObject.cs` line 504 - standard pattern for particle spawning

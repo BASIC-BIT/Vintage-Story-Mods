@@ -1,7 +1,7 @@
 # Active Context: Current Project State
 
 ## Current Work Focus
-**Development Infrastructure Enhancement**: Successfully implemented server log fetching capabilities and modernized repository structure with improved .gitignore and new development workflow processes.
+**Bug Resolution and Debugging Methodology**: Successfully resolved TPA temporal gear consumption bug (Bug #4) and established comprehensive debugging methodology for systematic problem diagnosis.
 
 ## Recent Analysis Findings
 
@@ -22,6 +22,94 @@
 2. **Configuration-Driven**: Extensive `ModConfig` class controls all behavior
 3. **Message Context Flow**: Chat messages flow through transformer pipeline with metadata
 4. **Harmony Patches**: Client-side UI modifications for chat system integration
+
+## Recent Bug Resolution: TPA Temporal Gear Consumption (June 2, 2025)
+
+### Bug #4: TPA Temporal Gear Not Consumed ✅ RESOLVED
+- **Problem**: Players reported temporal gears not being consumed during TPA requests despite `TpaRequireTemporalGear: true` config
+- **Impact**: Game balance issue allowing infinite teleportation with single temporal gear
+- **Community Reports**: ModDB user Kasel (May 2025) and others experiencing this issue
+
+### Debugging Methodology Applied
+1. **Systematic Problem Diagnosis**: Analyzed 5-7 potential sources before focusing on most likely causes
+2. **Log Analysis**: Used [`fetch-logs.ps1`](mods-dll/thebasics/scripts/fetch-logs.ps1) to retrieve server logs for error investigation
+3. **Code Investigation**: Examined TPA system implementation to understand gear consumption logic
+4. **Testing Framework**: Created `/tpatest` command for single-player validation of gear consumption
+5. **User Validation**: Confirmed fix working before removing test code
+
+### Root Cause Discovery
+**Critical Finding**: The original code had **NO gear consumption implementation at all**
+- Line 168 in [`TpaSystem.cs`](mods-dll/thebasics/src/ModSystems/TPA/TpaSystem.cs) contained only: `// TODO: Remove temporal gear from inventory`
+- This was not a sync issue or partial implementation - the feature was completely unimplemented
+- Players could teleport infinitely because no gear was ever removed from inventory
+
+### Technical Solution Implemented
+```csharp
+// Added proper temporal gear consumption following VS API patterns
+if (!RemoveTemporalGear(player))
+{
+    return new TextCommandResult
+    {
+        Status = EnumCommandStatus.Error,
+        StatusMessage = "Failed to consume temporal gear. Please try again.",
+    };
+}
+
+// Enhanced RemoveTemporalGear method with proper inventory synchronization
+itemSlot.TakeOut(1);        // Remove gear server-side
+itemSlot.MarkDirty();       // Sync change to client
+```
+
+### Key Technical Insights
+1. **VS API Patterns**: Proper item consumption requires both `TakeOut(1)` and `MarkDirty()` calls
+2. **Immediate Consumption**: Gear consumed when request is made (following VS spawn point pattern)
+3. **Build Process Issues**: Discovered stale build problem with packaging script
+4. **Testing Framework Value**: `/tpatest` command proved invaluable for single-player validation
+
+### Build System Improvements
+- **Stale Build Detection**: Original [`package.ps1`](mods-dll/thebasics/scripts/package.ps1) only packaged existing DLLs without building
+- **Solution**: Created [`build-and-package.ps1`](mods-dll/thebasics/scripts/build-and-package.ps1) that ensures fresh builds before packaging
+- **Critical Learning**: Always build before packaging to prevent deploying stale code
+
+### Debugging Session Challenges
+1. **Null Reference Exception**: Initial `/tpatest` command crashed due to optional parameter handling
+2. **Root Cause**: `StringArgParser("action", false)` allowed null values, causing `.ToLower()` to fail
+3. **Fix**: Changed to `StringArgParser("action", true)` to require action parameter
+4. **Log Analysis**: Used server logs to identify exact error location and cause
+
+### Validation and Testing
+- **Testing Command**: Created comprehensive `/tpatest` system with request/accept/deny subcommands
+- **User Validation**: User confirmed temporal gear consumption working correctly
+- **Code Cleanup**: Removed test code after validation as requested
+- **Deployment**: Successfully built and deployed fix to both local and remote servers
+
+### Post-Implementation Improvements (June 2, 2025)
+Following user feedback, identified and resolved additional issues with the temporal gear system:
+
+#### **Temporal Gear Consumption Timing Fix**
+- **Problem**: Gear consumed too early, before all validations (cooldown, self-teleport, permissions)
+- **Risk**: Players lose gear even when request fails validation
+- **Solution**: Moved gear consumption to AFTER all validations pass
+- **New Flow**: Validate gear presence → Validate cooldown → Validate self-teleport → Validate permissions → Consume gear
+
+#### **Particle System Fix**
+- **Problem**: Particles not spawning due to incorrect API usage
+- **Root Cause**: Missing player parameter in `API.World.SpawnParticles()` call
+- **VS Pattern**: `API.World.SpawnParticles(properties, player)` - player parameter required
+- **Fix**: Added player parameter following VS source code pattern at line 504
+
+#### **Future Enhancement Considerations**
+- **Gear Return Logic**: Consider implementing temporal gear return for denied/timed-out requests
+- **Technical Challenge**: Returning gear when hand is full requires dropping at player's feet
+- **Implementation Complexity**: Would need inventory space checking and ground item spawning
+- **Design Decision**: Current immediate consumption follows VS spawn point pattern (accepted trade-off)
+
+### Debugging Methodology Insights
+1. **Multiple Hypothesis Generation**: Consider 5-7 potential sources before narrowing focus
+2. **Log-Driven Investigation**: Server logs provide precise error locations and stack traces
+3. **Systematic Validation**: Create isolated test cases to validate specific functionality
+4. **User Confirmation Required**: Always wait for user validation before claiming success
+5. **Build Process Verification**: Ensure deployment pipeline integrity throughout debugging
 
 ## Recent Issue Resolution
 
