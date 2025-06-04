@@ -164,6 +164,12 @@ else
 - **TheBasicsPlayerNicknameMessage**: Player nickname updates
 - **TheBasicsRpChatMessage**: Roleplay chat messages
 
+### TPA System Configuration (June 3, 2025)
+- **TpaUseTimeout**: Boolean flag to enable/disable timeout system (default: true)
+- **TpaTimeoutMinutes**: Real-time timeout duration in minutes (default: 2.0)
+- **Temporal Gear Tracking**: Enhanced TpaRequest model with gear consumption tracking
+- **Real-Time Processing**: Background timer checks for expired requests every 30 seconds
+
 ## Data Persistence
 
 ### Player Data Storage

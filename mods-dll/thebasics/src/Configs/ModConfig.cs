@@ -210,6 +210,12 @@ namespace thebasics.Configs
         
         [ProtoMember(39)]
         public double TpaCooldownInGameHours { get; set; } = 0.5;
+        
+        [ProtoMember(62)]
+        public bool TpaUseTimeout { get; set; } = true;
+        
+        [ProtoMember(63)]
+        public double TpaTimeoutMinutes { get; set; } = 2.0;
 
         [ProtoMember(40)]
         public bool EnableSleepNotifications { get; set; } = true;

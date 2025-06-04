@@ -57,7 +57,9 @@
 - **Bidirectional**: Both "tpa" (go to player) and "tpahere" (bring player)
 - **Accept/deny workflow**: Target players must approve teleportation
 - **Cooldown system**: Configurable delays between teleport requests
-- **Temporal gear requirement**: Optional consumption of temporal gears
+- **Temporal gear requirement**: Optional consumption of temporal gears with smart return system
+- **Temporal gear return**: Returns gears on denial, timeout, and clearing with priority system (inventory → hand → ground)
+- **Real-time timeouts**: Configurable timeout system using real-time (default 2 minutes)
 - **Permission-based**: Configurable privilege requirements
 
 ### ✅ Server Quality of Life Features
@@ -168,8 +170,9 @@ Complete analysis of community feedback from GitHub repository and ModDB comment
   - Server console `/say` command crash (GitHub #11)
   - OnPlayerChat null reference exception (ModDB reports)
 
-- **🟡 High Priority Bugs (2)**: Core feature malfunctions
+- **🟡 High Priority Bugs (1)**: Core feature malfunctions
   - ✅ **TPA temporal gear not consumed (RESOLVED June 2, 2025)**
+  - ✅ **TPA temporal gear return system (IMPLEMENTED June 3, 2025)**
   - Language text display in floating bubbles (ModDB reports)
   - Nickname system display format problems (GitHub #14)
 

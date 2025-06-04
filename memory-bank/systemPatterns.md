@@ -230,20 +230,60 @@ itemSlot.TakeOut(1);
 itemSlot.MarkDirty();
 ```
 
-### TPA Request Flow (Improved)
+### TPA Request Flow (Complete Implementation)
 1. **Pre-Validation Phase**: Check temporal gear presence (but don't consume yet)
 2. **Validation Phase**: Check cooldowns, self-teleport prevention, target permissions
 3. **Consumption Phase**: Only consume temporal gear AFTER all validations pass
-4. **Request Creation**: Create TPA request object with metadata
+4. **Request Creation**: Create TPA request object with metadata and gear tracking
 5. **Notification Phase**: Notify target player of incoming request
 6. **Response Handling**: Accept/deny workflow with teleportation execution
+7. **Gear Return Phase**: Return gears on denial, timeout, or clearing
+
+### Temporal Gear Return System (June 3, 2025)
+- **Smart Priority System**: Inventory → Hand → Ground (as requested)
+- **Comprehensive Coverage**: Returns gears on all failure scenarios
+- **Real-Time Timeouts**: Uses `DateTime.UtcNow.Ticks` for actual time tracking
+- **User-Friendly Messaging**: Clear notifications for all return scenarios
+
+#### Gear Return Implementation Pattern
+```csharp
+private void ReturnTemporalGear(IServerPlayer player, string reason)
+{
+    var temporalGear = API.World.GetItem(new AssetLocation("game:temporalgear"));
+    var itemStack = new ItemStack(temporalGear, 1);
+    
+    // Priority 1: Try to add to inventory
+    if (player.InventoryManager.TryGiveItemstack(itemStack))
+    {
+        player.SendMessage(GlobalConstants.InfoLogChatGroup,
+            $"Temporal gear returned to your inventory ({reason}).", EnumChatType.Notification);
+        return;
+    }
+    
+    // Priority 2: Try to put in hand
+    var activeSlot = player.InventoryManager.ActiveHotbarSlot;
+    if (activeSlot.Empty)
+    {
+        activeSlot.Itemstack = itemStack;
+        activeSlot.MarkDirty();
+        player.SendMessage(GlobalConstants.InfoLogChatGroup,
+            $"Temporal gear returned to your hand ({reason}).", EnumChatType.Notification);
+        return;
+    }
+    
+    // Priority 3: Drop on ground
+    API.World.SpawnItemEntity(itemStack, player.Entity.Pos.XYZ);
+    player.SendMessage(GlobalConstants.InfoLogChatGroup,
+        $"Temporal gear dropped at your feet ({reason}).", EnumChatType.Notification);
+}
+```
 
 ### Improved Consumption Strategy
 - **Design Decision**: Consume temporal gear only after ALL validations pass
 - **Rationale**: Prevents gear loss when request fails validation (cooldown, permissions, etc.)
 - **Game Balance**: Players don't lose gear for invalid requests, but still pay for valid attempts
 - **User Experience**: Fair system - gear only consumed when request is actually sent
-- **Future Consideration**: Potential gear return logic for denied/timed-out requests (complex implementation)
+- **✅ Gear Return Logic**: Implemented comprehensive return system for denied/timed-out requests
 
 ### Testing Framework Pattern
 ```csharp

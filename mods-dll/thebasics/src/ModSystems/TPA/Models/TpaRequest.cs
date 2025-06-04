@@ -12,6 +12,16 @@ namespace thebasics.ModSystems.TPA.Models
 
         public double RequestTimeHours;
 
+        /// <summary>
+        /// Real-time timestamp when the request was made (DateTime.UtcNow.Ticks)
+        /// </summary>
+        public long RequestTimeRealTicks;
+
+        /// <summary>
+        /// Whether a temporal gear was consumed when this request was made
+        /// </summary>
+        public bool TemporalGearConsumed;
+
         public bool Equals(TpaRequest other)
         {
             if (ReferenceEquals(null, other)) return false;

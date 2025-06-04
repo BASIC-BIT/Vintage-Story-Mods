@@ -98,11 +98,28 @@ Following user feedback, identified and resolved additional issues with the temp
 - **VS Pattern**: `API.World.SpawnParticles(properties, player)` - player parameter required
 - **Fix**: Added player parameter following VS source code pattern at line 504
 
-#### **Future Enhancement Considerations**
-- **Gear Return Logic**: Consider implementing temporal gear return for denied/timed-out requests
-- **Technical Challenge**: Returning gear when hand is full requires dropping at player's feet
-- **Implementation Complexity**: Would need inventory space checking and ground item spawning
-- **Design Decision**: Current immediate consumption follows VS spawn point pattern (accepted trade-off)
+#### **Temporal Gear Return System Implementation (June 3, 2025)**
+- **✅ COMPLETED**: Comprehensive temporal gear return system implemented
+- **Smart Return Priority**: Inventory → Hand → Ground (as requested by user)
+- **Coverage**: Returns gears on request denial, timeout, and clearing
+- **Real-Time Timeouts**: 2-minute default timeout using real-time (not game-time)
+- **Configuration Options**: `TpaUseTimeout` and `TpaTimeoutMinutes` added to ModConfig
+- **Enhanced Request Tracking**: Added `TemporalGearConsumed` and `RequestTimeRealTicks` fields
+- **User-Friendly Messages**: Updated error messages to say "this is probably a mod bug, report this!" instead of corporate "contact an admin"
+- **Error Messaging Guidelines**: Created new rule file [`07-error-messaging.md`](.roo/rules/07-error-messaging.md)
+- **⚠️ UNTESTED**: Implementation complete and builds successfully, but not yet tested in-game due to lack of second player for testing
+
+#### **Files Modified for Temporal Gear Return**
+- **[`TpaRequest.cs`](mods-dll/thebasics/src/ModSystems/TPA/Models/TpaRequest.cs)**: Added gear tracking fields
+- **[`TpaSystem.cs`](mods-dll/thebasics/src/ModSystems/TPA/TpaSystem.cs)**: Implemented return logic and timeout system
+- **[`ModConfig.cs`](mods-dll/thebasics/src/Configs/ModConfig.cs)**: Added timeout configuration options
+- **[`.roo/rules/07-error-messaging.md`](.roo/rules/07-error-messaging.md)**: New error messaging guidelines
+
+#### **Key Implementation Details**
+- **Background Processing**: Timer checks for expired requests every 30 seconds
+- **Dual Time Tracking**: Maintains both game-time and real-time for compatibility
+- **Comprehensive Return Logic**: Handles all failure scenarios (deny, timeout, clear)
+- **Priority-Based Return**: Smart inventory management with fallback to ground drop
 
 ### Debugging Methodology Insights
 1. **Multiple Hypothesis Generation**: Consider 5-7 potential sources before narrowing focus
