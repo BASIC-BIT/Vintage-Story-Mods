@@ -127,7 +127,7 @@ if (Test-Path $envPath) {
                 PortNumber = [int]$env:SFTP_PORT
                 UserName = $env:SFTP_USERNAME
                 Password = $env:SFTP_PASSWORD
-                SshHostKeyFingerprint = "ssh-ed25519 255 kJWg4FFXMDFxoyCchYF6gC/DuhP+4oX5k0Bi4Jj+yoU"
+                SshHostKeyFingerprint = "ssh-ed25519 255 Yt8gMWt15RHpwrweVKkKa1rEXE4Va/WIVi0iwQYo9eE"
                 Timeout = [TimeSpan]::FromSeconds(30)
                 FtpMode = [WinSCP.FtpMode]::Passive
             }

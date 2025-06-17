@@ -205,8 +205,12 @@ public class ChatUiSystem : ModSystem
 
     private void OnPlayerJoin(IClientPlayer byPlayer)
     {
-        _api.Logger.Debug("THEBASICS - Player joined, sending ready message to server");
-        _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
+        // Only send ready message when the local player joins, not when any player joins
+        if (byPlayer.PlayerUID == _api.World.Player.PlayerUID)
+        {
+            _api.Logger.Debug("THEBASICS - Local player joined, sending ready message to server");
+            _clientConfigChannel.SendPacket(new TheBasicsClientReadyMessage());
+        }
         // InitializeIfNeeded();
     }
 
