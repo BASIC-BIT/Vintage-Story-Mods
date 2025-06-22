@@ -97,7 +97,7 @@ namespace thebasics.ModSystems.TPA
             }
 
             // Create a temporal gear itemstack to return
-            var temporalGearItem = API.World.GetItem(new AssetLocation("game:temporalgear"));
+            var temporalGearItem = API.World.GetItem(new AssetLocation("game:gear-temporal"));
             if (temporalGearItem == null)
             {
                 API.Logger.Error("Could not find temporal gear item to return to player - this is probably a mod bug!");

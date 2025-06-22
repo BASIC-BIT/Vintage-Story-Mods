@@ -58,23 +58,37 @@ try {
     exit 1
 }
 
-# Copy to local mods directory
-$localModsDir = Join-Path $env:APPDATA "VintagestoryData/Mods"
-$localModFile = Join-Path $localModsDir "thebasics.zip"
+# Copy to local mods directories
+$localModsDirectories = @(
+    (Join-Path $env:APPDATA "VintagestoryData/Mods"),
+    "D:\Games\VSProfiles\Profile2\Mods"
+)
 
-try {
-    if (-not (Test-Path $localModsDir)) {
-        New-Item -ItemType Directory -Path $localModsDir -Force | Out-Null
+$msg = "Deploying mod to $($localModsDirectories.Count) local directories..."
+Write-Host $msg
+"[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+
+foreach ($localModsDir in $localModsDirectories) {
+    $localModFile = Join-Path $localModsDir "thebasics.zip"
+    
+    try {
+        if (-not (Test-Path $localModsDir)) {
+            New-Item -ItemType Directory -Path $localModsDir -Force | Out-Null
+            $msg = "Created directory: $localModsDir"
+            Write-Host $msg
+            "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+        }
+        
+        Copy-Item -Path $zipFile -Destination $localModFile -Force
+        $msg = "Successfully copied mod to local mods directory at $localModFile"
+        Write-Host $msg
+        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+    } catch {
+        $msg = "Error copying to local mods directory $localModsDir : $($_.Exception.Message)"
+        Write-Host $msg
+        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+        # Continue with other directories instead of exiting
     }
-    Copy-Item -Path $zipFile -Destination $localModFile -Force
-    $msg = "Successfully copied mod to local mods directory at $localModFile"
-    Write-Host $msg
-    "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
-} catch {
-    $msg = "Error copying to local mods: $($_.Exception.Message)"
-    Write-Host $msg
-    "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
-    exit 1
 }
 
 # Load environment variables from .env file in mod folder

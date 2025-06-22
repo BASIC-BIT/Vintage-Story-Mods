@@ -249,7 +249,7 @@ itemSlot.MarkDirty();
 ```csharp
 private void ReturnTemporalGear(IServerPlayer player, string reason)
 {
-    var temporalGear = API.World.GetItem(new AssetLocation("game:temporalgear"));
+    var temporalGear = API.World.GetItem(new AssetLocation("game:gear-temporal"));
     var itemStack = new ItemStack(temporalGear, 1);
     
     // Priority 1: Try to add to inventory
