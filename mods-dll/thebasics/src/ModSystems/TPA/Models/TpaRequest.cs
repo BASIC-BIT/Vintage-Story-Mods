@@ -26,7 +26,12 @@ namespace thebasics.ModSystems.TPA.Models
         {
             if (ReferenceEquals(null, other)) return false;
             if (ReferenceEquals(this, other)) return true;
-            return Type == other.Type && RequestPlayerUID == other.RequestPlayerUID && TargetPlayerUID == other.TargetPlayerUID && RequestTimeHours.Equals(other.RequestTimeHours);
+            return Type == other.Type && 
+                   RequestPlayerUID == other.RequestPlayerUID && 
+                   TargetPlayerUID == other.TargetPlayerUID && 
+                   RequestTimeHours.Equals(other.RequestTimeHours) && 
+                   RequestTimeRealTicks == other.RequestTimeRealTicks && 
+                   TemporalGearConsumed == other.TemporalGearConsumed;
         }
 
         public override bool Equals(object obj)
@@ -45,6 +50,8 @@ namespace thebasics.ModSystems.TPA.Models
                 hashCode = (hashCode * 397) ^ (RequestPlayerUID != null ? RequestPlayerUID.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ (TargetPlayerUID != null ? TargetPlayerUID.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ RequestTimeHours.GetHashCode();
+                hashCode = (hashCode * 397) ^ RequestTimeRealTicks.GetHashCode();
+                hashCode = (hashCode * 397) ^ TemporalGearConsumed.GetHashCode();
                 return hashCode;
             }
         }
