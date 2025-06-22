@@ -203,11 +203,15 @@ public class ChatUiSystem : ModSystem
 
     private void OnPlayerJoin(IClientPlayer byPlayer)
     {
-        _api.Logger.Debug("THEBASICS - Player joined, attempting to send ready message to server");
-        
-        // Use safe packet sending with connection checking and retry mechanism
-        // The server will only send config after receiving this ready message
-        _safeNetworkChannel?.SendPacketSafely(new TheBasicsClientReadyMessage());
+        // Only send ready message when the local player joins, not when any player joins
+        if (byPlayer.PlayerUID == _api.World.Player.PlayerUID)
+        {
+            _api.Logger.Debug("THEBASICS - Local player joined, attempting to send ready message to server");
+            
+            // Use safe packet sending with connection checking and retry mechanism
+            // The server will only send config after receiving this ready message
+            _safeNetworkChannel?.SendPacketSafely(new TheBasicsClientReadyMessage());
+        }
     }
 
     // private void OnPlayerLeave(IClientPlayer byPlayer)
