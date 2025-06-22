@@ -74,6 +74,20 @@ namespace thebasics.ModSystems.TPA
             return true;
         }
 
+        private bool TryPutInHandSlot(ItemSlot slot, ItemStack itemStack, IServerPlayer player)
+        {
+            if (slot != null && slot.Empty)
+            {
+                slot.Itemstack = itemStack;
+                slot.MarkDirty();
+                player.SendMessage(GlobalConstants.GeneralChatGroup,
+                    "Your temporal gear has been returned to your hand.",
+                    EnumChatType.Notification);
+                return true;
+            }
+            return false;
+        }
+
         private bool ReturnTemporalGear(IServerPlayer player)
         {
             // Create a temporal gear itemstack to return
@@ -93,44 +107,13 @@ namespace thebasics.ModSystems.TPA
             }
 
             // Priority 2: Try to put it in hand if hand is free
-            // Check both hands, but prefer the active slot last (as requested)
             var leftHand = player.Entity.LeftHandItemSlot;
             var rightHand = player.Entity.RightHandItemSlot;
-            var activeSlot = player.Entity.RightHandItemSlot; // Default to right hand as active
             
-            // Try to determine which is the active slot based on hotbar selection
-            // We'll put the active slot last in priority
-            ItemSlot[] handSlots;
-            if (leftHand.Empty && rightHand.Empty)
+            if (TryPutInHandSlot(leftHand, temporalGearStack, player) ||
+                TryPutInHandSlot(rightHand, temporalGearStack, player))
             {
-                // Both hands empty, use right hand (most common active slot)
-                handSlots = new[] { leftHand, rightHand };
-            }
-            else if (leftHand.Empty)
-            {
-                handSlots = new[] { leftHand };
-            }
-            else if (rightHand.Empty)
-            {
-                handSlots = new[] { rightHand };
-            }
-            else
-            {
-                // Both hands full, can't put in hand
-                handSlots = new ItemSlot[0];
-            }
-
-            foreach (var handSlot in handSlots)
-            {
-                if (handSlot.Empty)
-                {
-                    handSlot.Itemstack = temporalGearStack;
-                    handSlot.MarkDirty();
-                    player.SendMessage(GlobalConstants.GeneralChatGroup,
-                        "Your temporal gear has been returned to your hand.",
-                        EnumChatType.Notification);
-                    return true;
-                }
+                return true;
             }
 
             // Priority 3: Drop it on the ground as last resort
