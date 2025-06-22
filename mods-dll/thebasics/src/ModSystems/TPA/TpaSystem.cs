@@ -90,6 +90,12 @@ namespace thebasics.ModSystems.TPA
 
         private bool ReturnTemporalGear(IServerPlayer player)
         {
+            // Null check - player might have disconnected
+            if (player == null)
+            {
+                return false;
+            }
+
             // Create a temporal gear itemstack to return
             var temporalGearItem = API.World.GetItem(new AssetLocation("game:temporalgear"));
             if (temporalGearItem == null)
