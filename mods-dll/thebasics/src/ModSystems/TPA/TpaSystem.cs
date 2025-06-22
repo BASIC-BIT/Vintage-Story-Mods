@@ -234,6 +234,18 @@ namespace thebasics.ModSystems.TPA
             }
         }
 
+        public override void Dispose()
+        {
+            // Unregister the timeout check timer to prevent resource leaks
+            if (_timeoutCheckTimer != 0)
+            {
+                API.World.UnregisterGameTickListener(_timeoutCheckTimer);
+                _timeoutCheckTimer = 0;
+            }
+            
+            base.Dispose();
+        }
+
         private TextCommandResult HandleTpa(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
