@@ -1,11 +1,12 @@
 ﻿# Get absolute paths
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project root
 $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
-$outputDir = Join-Path $solutionRoot "output/net7.0"
+$outputDir = Join-Path $projectRoot "net7.0"  # DLL is built to project/net7.0/
 $assetsDir = Join-Path $projectRoot "assets"
 $modInfoFile = Join-Path $projectRoot "modinfo.json"
 $dllFile = Join-Path $outputDir "thebasics.dll"
 $pdbFile = Join-Path $outputDir "thebasics.pdb"
+
 $zipFile = Join-Path $projectRoot "thebasics.zip"
 $logFile = Join-Path $solutionRoot "package.log"
 $envPath = Join-Path $projectRoot ".env"  # Look for .env in the mod folder
@@ -198,42 +199,30 @@ if (Test-Path $envPath) {
                 Write-Host $msg
                 "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
                 
-                if (Test-Path $winscp_log) {
-                    $msg = "WinSCP Log:"
-                    Write-Host $msg
-                    "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
-                    Get-Content $winscp_log | ForEach-Object {
-                        Write-Host $_
-                        "[$timestamp] $_" | Out-File -FilePath $logFile -Append
-                    }
-                }
-                
-                throw
+                # Continue the script without exiting on SFTP errors
+            } finally {
+                $session.Dispose()
+                $msg = "SFTP session closed"
+                Write-Host $msg
+                "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
             }
         } catch {
-            $msg = "SFTP Upload Error: $($_.Exception.Message)"
+            $msg = "WinSCP Error: $($_.Exception.Message)"
             Write-Host $msg
             "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
-            $msg = "Continuing since local deployment was successful..."
-            Write-Host $msg
-            "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
-        } finally {
-            if ($session) {
-                $session.Dispose()
-            }
+            # Continue the script without exiting on WinSCP errors
         }
     } else {
-        $msg = "Skipping SFTP upload - missing required environment variables"
+        $msg = "SFTP configuration incomplete - skipping SFTP upload"
         Write-Host $msg
         "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
     }
 } else {
-    $msg = "No .env file found at $envPath - skipping SFTP upload"
+    $msg = "No .env file found - skipping SFTP upload"
     Write-Host $msg
     "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
 }
 
-$msg = "Build and deployment completed successfully!"
+$msg = "Package script completed successfully"
 Write-Host $msg
 "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
-exit 0
