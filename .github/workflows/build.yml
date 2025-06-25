@@ -1,0 +1,187 @@
+name: Build Vintage Story Mods
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  VS_VERSION: "1.20.12"
+  DOTNET_VERSION: "7.0.x"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Cache VS Dependencies
+      id: cache-vs-deps
+      uses: actions/cache@v4
+      with:
+        path: vs-dependencies
+        key: vs-deps-${{ env.VS_VERSION }}
+        
+    - name: Download VS Dependencies
+      if: steps.cache-vs-deps.outputs.cache-hit != 'true'
+      run: |
+        Write-Host "Downloading VS ${{ env.VS_VERSION }} dependencies..." -ForegroundColor Yellow
+        
+        # Clone the dependencies repository
+        git clone https://github.com/BASIC-BIT/vs-build-dependencies.git vs-dependencies-repo
+        
+        # Check if the version exists
+        if (-not (Test-Path "vs-dependencies-repo\${{ env.VS_VERSION }}")) {
+          Write-Host "Error: Version ${{ env.VS_VERSION }} not found in dependencies repository" -ForegroundColor Red
+          Write-Host "Available versions:" -ForegroundColor Yellow
+          Get-ChildItem "vs-dependencies-repo" -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
+          exit 1
+        }
+        
+        # Create vs-dependencies directory structure
+        New-Item -ItemType Directory -Path "vs-dependencies" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-dependencies\core" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-dependencies\mods" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-dependencies\lib" -Force | Out-Null
+        
+        # Copy DLLs to vs-dependencies
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\core\*" "vs-dependencies\core\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\mods\*" "vs-dependencies\mods\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\lib\*" "vs-dependencies\lib\" -Force
+        
+        # Clean up the cloned repo
+        Remove-Item -Path "vs-dependencies-repo" -Recurse -Force
+        
+        Write-Host "✓ VS dependencies downloaded successfully" -ForegroundColor Green
+      shell: pwsh
+      
+    - name: Verify Dependencies
+      run: |
+        Write-Host "Verifying VS dependencies..." -ForegroundColor Yellow
+        
+        $requiredDlls = @(
+          "vs-dependencies\core\VintagestoryAPI.dll",
+          "vs-dependencies\core\VintagestoryLib.dll",
+          "vs-dependencies\mods\VSSurvivalMod.dll",
+          "vs-dependencies\mods\VSEssentials.dll",
+          "vs-dependencies\mods\VSCreativeMod.dll",
+          "vs-dependencies\lib\cairo-sharp.dll",
+          "vs-dependencies\lib\protobuf-net.dll",
+          "vs-dependencies\lib\0Harmony.dll"
+        )
+        
+        $missingDlls = @()
+        foreach ($dll in $requiredDlls) {
+          if (Test-Path $dll) {
+            Write-Host "✓ Found: $dll" -ForegroundColor Green
+          } else {
+            $missingDlls += $dll
+          }
+        }
+        
+        if ($missingDlls.Count -gt 0) {
+          Write-Host "Error: Missing required DLLs:" -ForegroundColor Red
+          $missingDlls | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+          exit 1
+        }
+        
+        Write-Host "✓ All dependencies verified" -ForegroundColor Green
+      shell: pwsh
+      
+    - name: Set VINTAGE_STORY Environment Variable
+      run: |
+        # Set VINTAGE_STORY to point to our downloaded dependencies
+        $vsPath = "$(pwd)\vs-dependencies".Replace('\', '/')
+        echo "VINTAGE_STORY=$vsPath" >> $env:GITHUB_ENV
+        Write-Host "Set VINTAGE_STORY=$vsPath" -ForegroundColor Green
+      shell: pwsh
+      
+    - name: Restore Dependencies
+      run: dotnet restore Vintage-Story-Mods.sln
+      
+    - name: Build Solution
+      run: |
+        Write-Host "Building Vintage Story Mods solution..." -ForegroundColor Yellow
+        dotnet build Vintage-Story-Mods.sln --configuration Release --no-restore --verbosity normal
+      shell: pwsh
+      
+    - name: Test Build Output
+      run: |
+        Write-Host "Checking build outputs..." -ForegroundColor Yellow
+        
+        # Check main production mod
+        if (Test-Path "output\thebasics.dll") {
+          Write-Host "✓ thebasics.dll built successfully" -ForegroundColor Green
+          $size = (Get-Item "output\thebasics.dll").Length
+          Write-Host "  Size: $($size / 1KB) KB" -ForegroundColor Gray
+        } else {
+          Write-Host "✗ thebasics.dll not found" -ForegroundColor Red
+        }
+        
+        # Check for other built DLLs
+        Get-ChildItem "output" -Filter "*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+          Write-Host "✓ Built: $($_.Name) ($($_.Length / 1KB) KB)" -ForegroundColor Green
+        }
+        
+        # Check legacy mods
+        $legacyMods = @("makersmark", "forensicstory", "DummyTranslocator", "autorun", "thaumstory")
+        foreach ($mod in $legacyMods) {
+          $dllPath = "mods\$mod\bin\Release\net48\$mod.dll"
+          if (Test-Path $dllPath) {
+            Write-Host "✓ Legacy mod built: $mod" -ForegroundColor Green
+          } else {
+            Write-Host "✗ Legacy mod missing: $mod" -ForegroundColor Yellow
+          }
+        }
+      shell: pwsh
+      
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: vintage-story-mods-${{ env.VS_VERSION }}
+        path: |
+          output/*.dll
+          output/*.pdb
+          mods/*/bin/Release/**/*.dll
+          mods-dll/*/bin/Release/**/*.dll
+          mods-dll/*/*.zip
+        retention-days: 30
+        
+    - name: Package Main Mod
+      if: success()
+      run: |
+        Write-Host "Creating distribution packages..." -ForegroundColor Yellow
+        
+        # Package thebasics if it exists
+        if (Test-Path "output\thebasics.dll") {
+          # Run the existing package script for thebasics
+          Push-Location "mods-dll\thebasics"
+          try {
+            & ".\scripts\package.ps1"
+            Write-Host "✓ thebasics packaged successfully" -ForegroundColor Green
+          } catch {
+            Write-Host "Warning: thebasics packaging failed: $_" -ForegroundColor Yellow
+          } finally {
+            Pop-Location
+          }
+        }
+      shell: pwsh
+      
+    - name: Upload Mod Packages
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mod-packages-${{ env.VS_VERSION }}
+        path: |
+          mods-dll/*/*.zip
+          mods/*/*.zip
+        retention-days: 30 

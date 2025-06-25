@@ -67,9 +67,10 @@ namespace thebasics.ModSystems.TPA
 
             var itemSlot = leftHand ? player.Entity.LeftHandItemSlot : player.Entity.RightHandItemSlot;
 
-            // Follow VS pattern: TakeOut + MarkDirty for proper inventory synchronization
             itemSlot.TakeOut(1);
             itemSlot.MarkDirty();
+            player.Entity.MarkShapeModified();
+            player.BroadcastPlayerData(true);
 
             return true;
         }
@@ -354,11 +355,11 @@ namespace thebasics.ModSystems.TPA
             requestMessage.Append(player.PlayerName);
             if (type == TpaRequestType.Bring)
             {
-                requestMessage.Append(" has requested to teleport to you.");
+                requestMessage.Append(" has requested to bring you to them.");
             }
             else if (type == TpaRequestType.Goto)
             {
-                requestMessage.Append(" has requested to bring you to them.");
+                requestMessage.Append(" has requested to teleport to you.");
             }
 
             requestMessage.Append(" Type `/tpaccept` to accept, or `/tpdeny` to deny.");
@@ -409,16 +410,16 @@ namespace thebasics.ModSystems.TPA
             {
                 var pos = player.Entity.Pos;
                 targetPlayer.Entity.TeleportToDouble(pos.X, pos.Y, pos.Z);
-                API.World.SpawnParticles(GetTpaRequestParticles(player), player);
-                API.World.SpawnParticles(GetTpaRequestParticles(player), targetPlayer);
+                API.World.SpawnParticles(GetTpaRequestParticles(targetPlayer));
+                API.World.SpawnParticles(GetTpaRequestParticles(player));
             }
 
             else if (request.Type == TpaRequestType.Bring)
             {
                 var pos = targetPlayer.Entity.Pos;
                 player.Entity.TeleportToDouble(pos.X, pos.Y, pos.Z);
-                API.World.SpawnParticles(GetTpaRequestParticles(targetPlayer), player);
-                API.World.SpawnParticles(GetTpaRequestParticles(targetPlayer), targetPlayer);
+                API.World.SpawnParticles(GetTpaRequestParticles(targetPlayer));
+                API.World.SpawnParticles(GetTpaRequestParticles(player));
             }
 
             player.RemoveTpaRequest(request);
