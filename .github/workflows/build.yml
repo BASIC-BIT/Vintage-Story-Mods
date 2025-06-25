@@ -28,7 +28,9 @@ jobs:
       id: cache-vs-deps
       uses: actions/cache@v4
       with:
-        path: vs-dependencies
+        path: |
+          vs-dependencies
+          vs-installation
         key: vs-deps-${{ env.VS_VERSION }}
         
     - name: Download VS Dependencies
@@ -92,7 +94,14 @@ jobs:
       run: |
         Write-Host "Verifying VS dependencies..." -ForegroundColor Yellow
         
-        # Check legacy structure
+        $cacheHit = "${{ steps.cache-vs-deps.outputs.cache-hit }}" -eq "true"
+        if ($cacheHit) {
+          Write-Host "Cache hit detected - dependencies restored from cache" -ForegroundColor Green
+        } else {
+          Write-Host "Cache miss - dependencies were downloaded fresh" -ForegroundColor Yellow
+        }
+        
+        # Check legacy structure (required for build)
         $legacyDlls = @(
           "vs-installation\VintagestoryAPI.dll",
           "vs-installation\VintagestoryLib.dll",
@@ -104,7 +113,7 @@ jobs:
           "vs-installation\Lib\0Harmony.dll"
         )
         
-        # Check modern structure
+        # Check modern structure (optional, for future use)
         $modernDlls = @(
           "vs-dependencies\core\VintagestoryAPI.dll",
           "vs-dependencies\core\VintagestoryLib.dll",
@@ -116,22 +125,36 @@ jobs:
           "vs-dependencies\lib\0Harmony.dll"
         )
         
-        $missingDlls = @()
-        foreach ($dll in ($legacyDlls + $modernDlls)) {
+        $missingLegacyDlls = @()
+        $missingModernDlls = @()
+        
+        foreach ($dll in $legacyDlls) {
           if (Test-Path $dll) {
-            Write-Host "Found: $dll" -ForegroundColor Green
+            Write-Host "Found (legacy): $dll" -ForegroundColor Green
           } else {
-            $missingDlls += $dll
+            $missingLegacyDlls += $dll
+            Write-Host "Missing (legacy): $dll" -ForegroundColor Red
           }
         }
         
-        if ($missingDlls.Count -gt 0) {
-          Write-Host "Error: Missing required DLLs:" -ForegroundColor Red
-          $missingDlls | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+        foreach ($dll in $modernDlls) {
+          if (Test-Path $dll) {
+            Write-Host "Found (modern): $dll" -ForegroundColor Gray
+          } else {
+            $missingModernDlls += $dll
+          }
+        }
+        
+        if ($missingLegacyDlls.Count -gt 0) {
+          Write-Host "Error: Missing required legacy DLLs for build:" -ForegroundColor Red
+          $missingLegacyDlls | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+          Write-Host "Cache status: $(if ($cacheHit) { 'HIT' } else { 'MISS' })" -ForegroundColor Yellow
           exit 1
         }
         
-        Write-Host "All dependencies verified" -ForegroundColor Green
+        Write-Host "All required dependencies verified!" -ForegroundColor Green
+        Write-Host "Legacy DLLs: $($legacyDlls.Count - $missingLegacyDlls.Count)/$($legacyDlls.Count)" -ForegroundColor Green
+        Write-Host "Modern DLLs: $($modernDlls.Count - $missingModernDlls.Count)/$($modernDlls.Count)" -ForegroundColor Gray
       shell: pwsh
       
     - name: Set VINTAGE_STORY Environment Variable
