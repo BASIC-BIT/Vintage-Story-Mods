@@ -36,8 +36,8 @@ jobs:
       run: |
         Write-Host "Downloading VS ${{ env.VS_VERSION }} dependencies..." -ForegroundColor Yellow
         
-        # Clone the dependencies repository using token authentication
-        $repoUrl = "https://${{ secrets.GITHUB_TOKEN }}@github.com/BASIC-BIT/vs-build-dependencies.git"
+        # Clone the dependencies repository using Personal Access Token
+        $repoUrl = "https://${{ secrets.VS_DEPS_TOKEN }}@github.com/BASIC-BIT/vs-build-dependencies.git"
         git clone $repoUrl vs-dependencies-repo
         
         # Check if the version exists
