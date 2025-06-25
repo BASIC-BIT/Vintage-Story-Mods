@@ -1,0 +1,295 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_version:
+        description: 'New version (e.g., 5.1.1, 6.0.0-rc.1)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+      release_notes:
+        description: 'Release notes (optional - will use auto-generated if empty)'
+        required: false
+        type: string
+
+env:
+  VS_VERSION: "1.20.12"
+  DOTNET_VERSION: "7.0.x"
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      actions: read
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: master
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Validate version format
+      shell: pwsh
+      run: |
+        $version = "${{ github.event.inputs.new_version }}"
+        if (-not ($version -match '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\-\.]+)?$')) {
+          Write-Host "Error: Invalid version format. Use semantic versioning (e.g., 1.2.3 or 1.2.3-rc.1)" -ForegroundColor Red
+          exit 1
+        }
+        Write-Host "Version format is valid: $version" -ForegroundColor Green
+        
+    - name: Get current version
+      id: current_version
+      shell: pwsh
+      run: |
+        $modInfoPath = "mods-dll/thebasics/modinfo.json"
+        $modInfo = Get-Content $modInfoPath | ConvertFrom-Json
+        $currentVersion = $modInfo.version
+        Write-Host "Current version: $currentVersion"
+        echo "current=$currentVersion" >> $env:GITHUB_OUTPUT
+        
+    - name: Update modinfo.json version
+      shell: pwsh
+      run: |
+        $newVersion = "${{ github.event.inputs.new_version }}"
+        $modInfoPath = "mods-dll/thebasics/modinfo.json"
+        
+        Write-Host "Updating modinfo.json version to: $newVersion" -ForegroundColor Yellow
+        
+        $modInfo = Get-Content $modInfoPath | ConvertFrom-Json
+        $modInfo.version = $newVersion
+        $modInfo | ConvertTo-Json -Depth 10 | Set-Content $modInfoPath -Encoding UTF8
+        
+        Write-Host "Updated modinfo.json successfully" -ForegroundColor Green
+        
+    - name: Update AssemblyInfo.cs version
+      shell: pwsh
+      run: |
+        $newVersion = "${{ github.event.inputs.new_version }}"
+        $assemblyInfoPath = "mods-dll/thebasics/Properties/AssemblyInfo.cs"
+        
+        Write-Host "Updating AssemblyInfo.cs version to: $newVersion" -ForegroundColor Yellow
+        
+        $content = Get-Content $assemblyInfoPath -Raw
+        $content = $content -replace 'Version = "[^"]*"', "Version = `"$newVersion`""
+        $content | Set-Content $assemblyInfoPath -Encoding UTF8
+        
+        Write-Host "Updated AssemblyInfo.cs successfully" -ForegroundColor Green
+        
+    - name: Configure Git
+      shell: pwsh
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+    - name: Commit version changes
+      shell: pwsh
+      run: |
+        $newVersion = "${{ github.event.inputs.new_version }}"
+        
+        git add mods-dll/thebasics/modinfo.json
+        git add mods-dll/thebasics/Properties/AssemblyInfo.cs
+        
+        git commit -m "Release v$newVersion - Update version numbers"
+        git push origin master
+        
+        Write-Host "Version update committed and pushed" -ForegroundColor Green
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Cache VS Dependencies
+      id: cache-vs-deps
+      uses: actions/cache@v4
+      with:
+        path: vs-dependencies
+        key: vs-deps-${{ env.VS_VERSION }}
+        
+    - name: Download VS Dependencies
+      if: steps.cache-vs-deps.outputs.cache-hit != 'true'
+      run: |
+        Write-Host "Downloading VS ${{ env.VS_VERSION }} dependencies..." -ForegroundColor Yellow
+        
+        # Clone the dependencies repository using Personal Access Token
+        $repoUrl = "https://${{ secrets.VS_DEPS_TOKEN }}@github.com/BASIC-BIT/vs-build-dependencies.git"
+        git clone $repoUrl vs-dependencies-repo
+        
+        # Check if the version exists
+        if (-not (Test-Path "vs-dependencies-repo\${{ env.VS_VERSION }}")) {
+          Write-Host "Error: Version ${{ env.VS_VERSION }} not found in dependencies repository" -ForegroundColor Red
+          exit 1
+        }
+        
+        # Create directory structure that matches legacy VS installation expectations
+        New-Item -ItemType Directory -Path "vs-installation" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-installation\Mods" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-installation\Lib" -Force | Out-Null
+        
+        # Copy DLLs to match legacy project expectations
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\core\*" "vs-installation\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\mods\*" "vs-installation\Mods\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\lib\*" "vs-installation\Lib\" -Force
+        
+        # Also create the modern structure for newer projects
+        New-Item -ItemType Directory -Path "vs-dependencies" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-dependencies\core" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-dependencies\mods" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-dependencies\lib" -Force | Out-Null
+        
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\core\*" "vs-dependencies\core\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\mods\*" "vs-dependencies\mods\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\lib\*" "vs-dependencies\lib\" -Force
+        
+        # Clean up the cloned repo
+        Remove-Item -Path "vs-dependencies-repo" -Recurse -Force
+        
+        Write-Host "VS dependencies downloaded successfully" -ForegroundColor Green
+      shell: pwsh
+      
+    - name: Set VINTAGE_STORY Environment Variable
+      run: |
+        # Set VINTAGE_STORY to point to our legacy-compatible directory structure
+        $vsPath = "$(pwd)\vs-installation"
+        echo "VINTAGE_STORY=$vsPath" >> $env:GITHUB_ENV
+        Write-Host "Set VINTAGE_STORY=$vsPath" -ForegroundColor Green
+        
+        # Also set modern path for any scripts that might need it
+        $modernPath = "$(pwd)\vs-dependencies"
+        echo "VS_DEPENDENCIES=$modernPath" >> $env:GITHUB_ENV
+        Write-Host "Set VS_DEPENDENCIES=$modernPath" -ForegroundColor Green
+      shell: pwsh
+      
+    - name: Restore Dependencies
+      run: dotnet restore Vintage-Story-Mods.sln
+      
+    - name: Build Solution
+      run: |
+        Write-Host "Building Vintage Story Mods solution for release..." -ForegroundColor Yellow
+        dotnet build Vintage-Story-Mods.sln --configuration Release --no-restore --verbosity normal
+      shell: pwsh
+      
+    - name: Package Main Mod
+      run: |
+        Write-Host "Creating distribution packages..." -ForegroundColor Yellow
+        
+        # Package thebasics if it exists
+        if (Test-Path "output\thebasics.dll") {
+          # Run the existing package script for thebasics
+          Push-Location "mods-dll\thebasics"
+          try {
+            & ".\scripts\package.ps1"
+            Write-Host "thebasics packaged successfully" -ForegroundColor Green
+          } catch {
+            Write-Host "Error: thebasics packaging failed: $_" -ForegroundColor Red
+            exit 1
+          } finally {
+            Pop-Location
+          }
+        } else {
+          Write-Host "Error: thebasics.dll not found in output directory" -ForegroundColor Red
+          exit 1
+        }
+      shell: pwsh
+      
+    - name: Prepare Release Assets
+      id: prepare_assets
+      shell: pwsh
+      run: |
+        $newVersion = "${{ github.event.inputs.new_version }}"
+        $releaseDir = "release-assets"
+        
+        Write-Host "Preparing release assets..." -ForegroundColor Yellow
+        
+        # Create release directory
+        New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+        
+        # Copy and rename the main mod package
+        $sourceZip = "mods-dll\thebasics\thebasics.zip"
+        $targetZip = "$releaseDir\thebasics-v$newVersion.zip"
+        
+        if (Test-Path $sourceZip) {
+          Copy-Item $sourceZip $targetZip
+          Write-Host "Created release asset: thebasics-v$newVersion.zip" -ForegroundColor Green
+        } else {
+          Write-Host "Error: Source zip file not found: $sourceZip" -ForegroundColor Red
+          exit 1
+        }
+        
+        # Set outputs for later steps
+        echo "asset_path=$targetZip" >> $env:GITHUB_OUTPUT
+        echo "asset_name=thebasics-v$newVersion.zip" >> $env:GITHUB_OUTPUT
+        
+    - name: Create Release Notes
+      id: release_notes
+      shell: pwsh
+      run: |
+        $newVersion = "${{ github.event.inputs.new_version }}"
+        $currentVersion = "${{ steps.current_version.outputs.current }}"
+        $customNotes = "${{ github.event.inputs.release_notes }}"
+        
+                 if ($customNotes -and $customNotes.Trim()) {
+           $releaseNotes = $customNotes
+         } else {
+           # Generate basic release notes
+           $releaseNotes = "# The BASICs v$newVersion`n`n"
+           $releaseNotes += "## What's Changed`n"
+           $releaseNotes += "This release updates The BASICs mod from v$currentVersion to v$newVersion.`n`n"
+           $releaseNotes += "## Installation`n"
+           $releaseNotes += "1. Download the ``thebasics-v$newVersion.zip`` file below`n"
+           $releaseNotes += "2. Place it in your Vintage Story mods folder`n"
+           $releaseNotes += "3. Restart your server/client`n`n"
+           $releaseNotes += "## Support`n"
+           $releaseNotes += "- Join our [Discord](https://discord.gg/PYKTaJ5Ett) for support`n"
+           $releaseNotes += "- Visit the [ModDB page](https://mods.vintagestory.at/thebasics) for more information`n"
+           $releaseNotes += "- Report issues on [GitHub](https://github.com/BASIC-BIT/Vintage-Story-Mods/issues)`n`n"
+           $releaseNotes += "**Full Changelog**: https://github.com/BASIC-BIT/Vintage-Story-Mods/compare/V$currentVersion...V$newVersion"
+         }
+        
+        # Save to file for the release action
+        $releaseNotes | Out-File -FilePath "release-notes.md" -Encoding UTF8
+        Write-Host "Release notes prepared" -ForegroundColor Green
+        
+    - name: Create Git Tag
+      shell: pwsh
+      run: |
+        $newVersion = "${{ github.event.inputs.new_version }}"
+        $tagName = "V$newVersion"
+        
+        Write-Host "Creating git tag: $tagName" -ForegroundColor Yellow
+        
+        git tag $tagName
+        git push origin $tagName
+        
+        Write-Host "Tag created and pushed successfully" -ForegroundColor Green
+        
+    - name: Create GitHub Release
+      uses: ncipollo/release-action@v1
+      with:
+        tag: "V${{ github.event.inputs.new_version }}"
+        name: "The BASICs v${{ github.event.inputs.new_version }}"
+        bodyFile: "release-notes.md"
+        draft: false
+        prerelease: ${{ github.event.inputs.prerelease }}
+        artifacts: "${{ steps.prepare_assets.outputs.asset_path }}"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Release Summary
+      shell: pwsh
+      run: |
+        $newVersion = "${{ github.event.inputs.new_version }}"
+        $currentVersion = "${{ steps.current_version.outputs.current }}"
+        
+        Write-Host "🎉 Release completed successfully!" -ForegroundColor Green
+        Write-Host "   Version: $currentVersion → $newVersion" -ForegroundColor Cyan
+        Write-Host "   Tag: V$newVersion" -ForegroundColor Cyan
+        Write-Host "   Asset: thebasics-v$newVersion.zip" -ForegroundColor Cyan
+        Write-Host "   Release URL: https://github.com/BASIC-BIT/Vintage-Story-Mods/releases/tag/V$newVersion" -ForegroundColor Cyan 
