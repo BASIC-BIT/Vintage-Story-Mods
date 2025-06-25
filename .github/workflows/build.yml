@@ -36,14 +36,24 @@ jobs:
       run: |
         Write-Host "Downloading VS ${{ env.VS_VERSION }} dependencies..." -ForegroundColor Yellow
         
-        # Clone the dependencies repository
-        git clone https://github.com/BASIC-BIT/vs-build-dependencies.git vs-dependencies-repo
+        # Clone the dependencies repository using token authentication
+        $repoUrl = "https://${{ secrets.GITHUB_TOKEN }}@github.com/BASIC-BIT/vs-build-dependencies.git"
+        git clone $repoUrl vs-dependencies-repo
         
         # Check if the version exists
         if (-not (Test-Path "vs-dependencies-repo\${{ env.VS_VERSION }}")) {
           Write-Host "Error: Version ${{ env.VS_VERSION }} not found in dependencies repository" -ForegroundColor Red
           Write-Host "Available versions:" -ForegroundColor Yellow
-          Get-ChildItem "vs-dependencies-repo" -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
+          if (Test-Path "vs-dependencies-repo") {
+            Get-ChildItem "vs-dependencies-repo" -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
+          } else {
+            Write-Host "  (Repository clone failed - no versions available)"
+          }
+          Write-Host "" -ForegroundColor Yellow
+          Write-Host "To fix this issue:" -ForegroundColor Yellow
+          Write-Host "1. Make sure the vs-build-dependencies repository exists and is accessible" -ForegroundColor Yellow
+          Write-Host "2. Run the upload script to upload VS ${{ env.VS_VERSION }} dependencies:" -ForegroundColor Yellow
+          Write-Host "   .\scripts\upload-vs-dependencies.ps1" -ForegroundColor Yellow
           exit 1
         }
         
@@ -61,7 +71,7 @@ jobs:
         # Clean up the cloned repo
         Remove-Item -Path "vs-dependencies-repo" -Recurse -Force
         
-        Write-Host "✓ VS dependencies downloaded successfully" -ForegroundColor Green
+        Write-Host "VS dependencies downloaded successfully" -ForegroundColor Green
       shell: pwsh
       
     - name: Verify Dependencies
@@ -82,7 +92,7 @@ jobs:
         $missingDlls = @()
         foreach ($dll in $requiredDlls) {
           if (Test-Path $dll) {
-            Write-Host "✓ Found: $dll" -ForegroundColor Green
+            Write-Host "Found: $dll" -ForegroundColor Green
           } else {
             $missingDlls += $dll
           }
@@ -94,7 +104,7 @@ jobs:
           exit 1
         }
         
-        Write-Host "✓ All dependencies verified" -ForegroundColor Green
+        Write-Host "All dependencies verified" -ForegroundColor Green
       shell: pwsh
       
     - name: Set VINTAGE_STORY Environment Variable
@@ -120,16 +130,16 @@ jobs:
         
         # Check main production mod
         if (Test-Path "output\thebasics.dll") {
-          Write-Host "✓ thebasics.dll built successfully" -ForegroundColor Green
+          Write-Host "thebasics.dll built successfully" -ForegroundColor Green
           $size = (Get-Item "output\thebasics.dll").Length
           Write-Host "  Size: $($size / 1KB) KB" -ForegroundColor Gray
         } else {
-          Write-Host "✗ thebasics.dll not found" -ForegroundColor Red
+          Write-Host "thebasics.dll not found" -ForegroundColor Red
         }
         
         # Check for other built DLLs
         Get-ChildItem "output" -Filter "*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
-          Write-Host "✓ Built: $($_.Name) ($($_.Length / 1KB) KB)" -ForegroundColor Green
+          Write-Host "Built: $($_.Name) ($($_.Length / 1KB) KB)" -ForegroundColor Green
         }
         
         # Check legacy mods
@@ -137,9 +147,9 @@ jobs:
         foreach ($mod in $legacyMods) {
           $dllPath = "mods\$mod\bin\Release\net48\$mod.dll"
           if (Test-Path $dllPath) {
-            Write-Host "✓ Legacy mod built: $mod" -ForegroundColor Green
+            Write-Host "Legacy mod built: $mod" -ForegroundColor Green
           } else {
-            Write-Host "✗ Legacy mod missing: $mod" -ForegroundColor Yellow
+            Write-Host "Legacy mod missing: $mod" -ForegroundColor Yellow
           }
         }
       shell: pwsh
@@ -167,7 +177,7 @@ jobs:
           Push-Location "mods-dll\thebasics"
           try {
             & ".\scripts\package.ps1"
-            Write-Host "✓ thebasics packaged successfully" -ForegroundColor Green
+            Write-Host "thebasics packaged successfully" -ForegroundColor Green
           } catch {
             Write-Host "Warning: thebasics packaging failed: $_" -ForegroundColor Yellow
           } finally {
