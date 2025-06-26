@@ -78,9 +78,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .WithAlias("adminsetnick")
                 .WithAlias("adminnick")
                 .WithAlias("adminnickname")
-                .WithDescription("Admin: Get or set another player's nickname")
+                .WithDescription("Admin: Get or set another player's nickname. Use 'force' before the nickname to bypass conflict warnings.")
                 .WithRootAlias("adminsetnick")
                 .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
+                    API.ChatCommands.Parsers.OptionalWordRange("force flag", "force"),
                     new StringArgParser("new nickname", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameAdmin);
@@ -400,6 +401,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
             }
         }
 
+        // Handle nickname conflicts when player joins - always enforced
+        var resetPlayers = NicknameValidationUtils.HandleNicknameConflictsOnJoin(byPlayer, API);
+        if (resetPlayers.Count > 0)
+        {
+            // Log the conflicts that were resolved
+            API.Logger.Notification($"THEBASICS: Player '{byPlayer.PlayerName}' joined and caused {resetPlayers.Count} nickname conflicts to be reset: {string.Join(", ", resetPlayers)}");
+        }
+
         // Config will be sent when client indicates it's ready
         SwapOutNameTag(byPlayer);
     }
@@ -447,6 +456,17 @@ public class RPProximityChatSystem : BaseBasicModSystem
         else
         {
             var nickname = (string)fullArgs.Parsers[0].GetValue();
+            
+            // Validate nickname against conflicts - always enforced
+            if (!NicknameValidationUtils.ValidateNickname(player, nickname, API, out string conflictingPlayer, out string conflictType))
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"The nickname '{nickname}' is already taken by {conflictingPlayer} (as their {conflictType}). Please choose a different nickname.",
+                };
+            }
+            
             player.SetNickname(nickname);
             SwapOutNameTag(player);
             return new TextCommandResult
@@ -470,35 +490,56 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
         var oldNickname = attemptTarget.GetNicknameWithColor();
 
-        if (fullArgs.Parsers[1].IsMissing)
+        // Check if we have a force flag (parser[1])
+        bool isForced = !fullArgs.Parsers[1].IsMissing && ((string)fullArgs.Parsers[1].GetValue())?.ToLowerInvariant() == "force";
+        
+        // If nickname argument is missing (parser[2])
+        if (fullArgs.Parsers[2].IsMissing)
         {
             if (!attemptTarget.HasNickname())
             {
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Player {attemptTarget.PlayerName} does not have a nickname!  You can set it with `/adminsetnick {attemptTarget.PlayerName} NewName`",
+                    StatusMessage = $"Player {attemptTarget.PlayerName} does not have a nickname! You can set it with `/adminsetnick {attemptTarget.PlayerName} NewNickname`",
                 };
             }
 
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {attemptTarget.GetNicknameWithColor()}",
+                StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {oldNickname}",
             };
-
         }
-
-        var newNickname = (string)fullArgs.Parsers[1].GetValue();
-
-        attemptTarget.SetNickname(newNickname);
-
-        SwapOutNameTag(attemptTarget);
-        return new TextCommandResult
+        else
         {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {newNickname}.  Old Nickname: {oldNickname}",
-        };
+            var newNickname = (string)fullArgs.Parsers[2].GetValue();
+            
+            // Validate nickname against conflicts and show warning to admin - always enforced unless forced
+            if (!isForced)
+            {
+                if (!NicknameValidationUtils.ValidateNickname(attemptTarget, newNickname, API, out string conflictingPlayer, out string conflictType))
+                {
+                    return new TextCommandResult
+                    {
+                        Status = EnumCommandStatus.Error,
+                        StatusMessage = $"WARNING: The nickname '{newNickname}' conflicts with {conflictingPlayer} (as their {conflictType}). " +
+                                       $"This can cause confusion and weird behavior. Consider using a different nickname, or " +
+                                       $"if you really want to proceed, use `/adminsetnick {attemptTarget.PlayerName} force {newNickname}` to override this warning.",
+                    };
+                }
+            }
+
+            attemptTarget.SetNickname(newNickname);
+            SwapOutNameTag(attemptTarget);
+
+            string forceMessage = isForced ? " (FORCED - bypassed conflict warnings)" : "";
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Success,
+                StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {attemptTarget.GetNicknameWithColor()}.  Old Nickname: {oldNickname}{forceMessage}",
+            };
+        }
     }
 
     private TextCommandResult Emote(TextCommandCallingArgs args)

@@ -269,11 +269,10 @@ namespace thebasics.Configs
         [ProtoMember(56)]
         public int MaxNicknameLength { get; set; } = 100;
 
-        // TODO: Should this also warn admins when they do this and/or ask for confirmation?
-        // TODO: Catalog all existing nicknames and player names for all users in the server, to implement this functionality
-        [ProtoMember(57)]
-        public bool DisallowNicknameThatIsAnotherPlayersName { get; set; } = true;
-        
+        // ProtoMember(57) - RESERVED/BLACKLISTED
+        // Previously used for DisallowNicknameThatIsAnotherPlayersName (removed - now always enforced)
+        // Do not reuse this number to avoid deserialization issues with existing config files
+
         [ProtoMember(58)]
         public string OOCColor { get; set; } = "#eaf188";
 
