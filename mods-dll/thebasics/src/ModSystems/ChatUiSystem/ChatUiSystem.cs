@@ -293,7 +293,7 @@ public class ChatUiSystem : ModSystem
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;
             
-            _api.Logger.Debug($"[THEBASICS] Received server config: Prevention={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
+            _api.Logger.Debug($"[THEBASICS] Received server config: PreventProximityChannelSwitching={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
             _api.Logger.Debug($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
             
             // Process any actions that were waiting for config
@@ -309,33 +309,48 @@ public class ChatUiSystem : ModSystem
     }
 
     /*
-     * Prevent chat switching by preventing original method from executing if user is currently viewing the proximity tab and server config is set to prevent switching
+     * Prevent automatic chat channel switching when user is in proximity tab
      */
     [HarmonyPrefix]
-    [HarmonyPatch(typeof(HudDialogChat), "HandleGotoGroupPacket")]
-    public static bool HandleGotoGroupPacket(HudDialogChat __instance, Packet_Server packet)
+    [HarmonyPatch(typeof(HudDialogChat), "OnNewServerToClientChatLine")]
+    public static void OnNewServerToClientChatLine_PreventAutoSwitch()
     {
-        if (_config == null)
+        if (_config?.PreventProximityChannelSwitching == true && _proximityGroupId.HasValue)
         {
-            _api.Logger.Debug("[THEBASICS] Config not yet received, queuing channel switch check");
-            // We can't make a decision yet, so allow the packet for now
-            return true;
+            var game = (ClientMain)_api.World;
+            _api.Logger.Debug($"[THEBASICS] OnNewServerToClientChatLine - Current group: {game.currentGroupid}, Proximity group: {_proximityGroupId.Value}");
+            
+            if (game.currentGroupid == _proximityGroupId.Value)
+            {
+                // User is in proximity tab - temporarily disable the client setting that causes auto-switching
+                _originalAutoChatOpenSelected = ClientSettings.AutoChatOpenSelected;
+                ClientSettings.AutoChatOpenSelected = false; // This prevents the auto-switching logic
+                _api.Logger.Debug($"[THEBASICS] Preventing auto-switch - saved original AutoChatOpenSelected: {_originalAutoChatOpenSelected}");
+            }
         }
-        
-        var game = (ClientMain)_api.World;
-        int gotoGroupId = packet.GotoGroup.GroupId;
-        _api.Logger.Debug(
-            $"[THEBASICS] HandleGotoGroupPacket ~ Prevention: {_config.PreventProximityChannelSwitching}, Current: {game.currentGroupid}, Target: {gotoGroupId}, Proximity: {_proximityGroupId}");
-        
-        if (_config.PreventProximityChannelSwitching && game.currentGroupid == _proximityGroupId)
+        else
         {
-            _api.Logger.Debug("[THEBASICS] Denying GotoGroupPacket - proximity channel switching prevented");
-            return false;
+            _api.Logger.Debug($"[THEBASICS] OnNewServerToClientChatLine - Not preventing: config={_config?.PreventProximityChannelSwitching}, proximityId={_proximityGroupId}");
         }
-
-        _api.Logger.Debug("[THEBASICS] Allowing GotoGroupPacket");
-        return true;
     }
+
+    /*
+     * Restore the original AutoChatOpenSelected setting after message processing
+     */
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(HudDialogChat), "OnNewServerToClientChatLine")]
+    public static void OnNewServerToClientChatLine_RestoreAutoSwitch()
+    {
+        if (_config?.PreventProximityChannelSwitching == true && _originalAutoChatOpenSelected.HasValue)
+        {
+            // Restore the original setting
+            ClientSettings.AutoChatOpenSelected = _originalAutoChatOpenSelected.Value;
+            _api.Logger.Debug($"[THEBASICS] Restored AutoChatOpenSelected to: {_originalAutoChatOpenSelected.Value}");
+            _originalAutoChatOpenSelected = null;
+        }
+    }
+
+    private static bool? _originalAutoChatOpenSelected = null;
 
     /*
      * Set default chat channel and handle channel persistence
@@ -499,6 +514,42 @@ public class ChatUiSystem : ModSystem
             {
                 _api.Logger.Error($"[THEBASICS] Error in Dispose: {e}");
             }
+        }
+    }
+
+    private static bool? _originalAutoChatOpenSelectedFinalize = null;
+
+    /*
+     * Prevent automatic chat channel switching in OnFinalizeFrame when user is in proximity tab
+     */
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(HudDialogChat), "OnFinalizeFrame")]
+    public static void OnFinalizeFrame_PreventAutoSwitch()
+    {
+        if (_config?.PreventProximityChannelSwitching == true && _proximityGroupId.HasValue)
+        {
+            var game = (ClientMain)_api.World;
+            if (game.currentGroupid == _proximityGroupId.Value)
+            {
+                // User is in proximity tab - temporarily disable the client setting that causes auto-switching
+                _originalAutoChatOpenSelectedFinalize = ClientSettings.AutoChatOpenSelected;
+                ClientSettings.AutoChatOpenSelected = false; // This prevents the auto-switching logic in OnFinalizeFrame
+            }
+        }
+    }
+
+    /*
+     * Restore the original AutoChatOpenSelected setting after OnFinalizeFrame processing
+     */
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(HudDialogChat), "OnFinalizeFrame")]
+    public static void OnFinalizeFrame_RestoreAutoSwitch()
+    {
+        if (_config?.PreventProximityChannelSwitching == true && _originalAutoChatOpenSelectedFinalize.HasValue)
+        {
+            // Restore the original setting
+            ClientSettings.AutoChatOpenSelected = _originalAutoChatOpenSelectedFinalize.Value;
+            _originalAutoChatOpenSelectedFinalize = null;
         }
     }
 }
