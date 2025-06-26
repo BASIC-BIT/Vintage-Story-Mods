@@ -299,7 +299,6 @@ public class ChatUiSystem : ModSystem
             // Process any actions that were waiting for config
             if (_pendingConfigActions.Count > 0)
             {
-                _api.Logger.Debug($"[THEBASICS] Processing {_pendingConfigActions.Count} queued actions");
                 ProcessConfigActionQueue();
             }
         }
@@ -367,19 +366,27 @@ public class ChatUiSystem : ModSystem
             int targetGroupId = (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null) ? _lastSelectedGroupId.Value :
             (_config.ProximityChatAsDefault && _proximityGroupId != null) ? _proximityGroupId.Value : GlobalConstants.GeneralChatGroup;
 
-
-            // Call OnTabClicked via reflection to select the tab
-            System.Reflection.MethodInfo onTabClickedMethod = typeof(HudDialogChat).GetMethod("OnTabClicked", 
+            // Get the tab index for the target group
+            System.Reflection.MethodInfo tabIndexMethod = typeof(HudDialogChat).GetMethod("tabIndexByGroupId", 
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             
-            if (onTabClickedMethod != null)
+            if (tabIndexMethod != null)
             {
-                onTabClickedMethod.Invoke(__instance, [targetGroupId]);
-                _api.Logger.Debug($"[THEBASICS] Set active tab to {targetGroupId} group id chat");
+                int tabIndex = (int)tabIndexMethod.Invoke(__instance, [targetGroupId]);
+                if (tabIndex >= 0)
+                {
+                    // Set the visual tab state - this will trigger OnTabClicked automatically
+                    __instance.Composers["chat"].GetHorizontalTabs("tabs").SetValue(tabIndex, callhandler: true);
+                    _api.Logger.Debug($"[THEBASICS] Set active tab to index {tabIndex} for group {targetGroupId}");
+                }
+                else
+                {
+                    _api.Logger.Warning($"[THEBASICS] Could not find tab index for group {targetGroupId}");
+                }
             }
             else
             {
-                _api.Logger.Error("[THEBASICS] Could not find OnTabClicked method via reflection");
+                _api.Logger.Error("[THEBASICS] Could not find tabIndexByGroupId method via reflection");
             }
         }
         catch (System.Exception e)

@@ -107,22 +107,16 @@ namespace thebasics.Utilities.Network
         /// <param name="action">The action to execute</param>
         public void QueuePacketAction(Action action)
         {
+            // Always queue the action first to ensure consistent behavior
+            _pendingPacketActions.Enqueue(action);
+            
             if (IsConnected)
             {
-                // Execute immediately if connected
-                try
-                {
-                    action();
-                }
-                catch (Exception e)
-                {
-                    _api.Logger.Error($"{_config.LogPrefix} Error executing immediate packet action: {e}");
-                }
+                // Process the queue immediately if connected
+                ProcessPacketActionQueue();
             }
             else
             {
-                // Queue for later execution
-                _pendingPacketActions.Enqueue(action);
                 if (_config.EnableDebugLogging)
                 {
                     _api.Logger.Debug($"{_config.LogPrefix} Packet action queued until channel is connected");
