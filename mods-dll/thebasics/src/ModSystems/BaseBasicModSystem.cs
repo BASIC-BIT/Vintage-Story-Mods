@@ -45,7 +45,7 @@ namespace thebasics.ModSystems
                                            "', creating default...");
                 Config = new ModConfig();
                 Config.InitializeDefaultsIfNeeded();
-                API.StoreModConfig(this.Config, ConfigName);
+                API.StoreModConfig(this.Config, ConfigName);sdfdsf
             }
         }
     }
