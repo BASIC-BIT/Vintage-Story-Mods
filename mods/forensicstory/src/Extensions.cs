@@ -39,5 +39,14 @@ namespace forensicstory
 
             return blockX + "," + blockY + "," + blockZ;
         }
+        
+        public static string GetPrettyString(this EntityPos pos)
+        {
+            double blockX = (pos.X - 512000);
+            double blockY = pos.Y;
+            double blockZ = (pos.Z - 512000);
+
+            return blockX + "," + blockY + "," + blockZ;
+        }
     }
 }

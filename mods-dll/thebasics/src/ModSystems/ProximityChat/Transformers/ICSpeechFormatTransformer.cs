@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
@@ -36,9 +37,11 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
 
         // Add Lang color
         context.Message = ChatHelper.LangColor(context.Message, lang);
+        
         var verb = GetProximityChatVerb(lang, mode);
 
         context.Message = $"{nickname} {verb} {context.Message}";
+
         return context;
     }
 

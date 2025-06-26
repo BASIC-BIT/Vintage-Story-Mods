@@ -70,7 +70,7 @@ namespace makersmark
             ItemSlot[] ingredients,
             int gridWidth)
         {
-            return ;
+            return false; // Default implementation - no special recipe matching
         }
 
         // private void Event_GameWorldSave()

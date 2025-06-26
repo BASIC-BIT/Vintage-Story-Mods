@@ -21,24 +21,8 @@ public class ObfuscationTransformer : MessageTransformerBase
     public override MessageContext Transform(MessageContext context)
     {
         var content = context.Message;
+
         _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref content);
-        
-        if (context.TryGetMetadata<Language>(MessageContext.LANGUAGE, out var lang))
-        {
-            if (context.HasMetadata(MessageContext.IS_EMOTE))
-            {
-                // For emotes, we need to handle font size differently
-                if (_distanceObfuscationSystem.IsDistanceFontSizeEnabled())
-                {
-                    var fontSize = _distanceObfuscationSystem.GetFontSize(context.SendingPlayer, context.ReceivingPlayer);
-                    content = $"<font color=\"{lang.Color}\" size=\"{fontSize}\">{content}</font>";
-                }
-                else
-                {
-                    content = ChatHelper.LangColor(content, lang);
-                }
-            }
-        }
         
         context.Message = content;
         return context;

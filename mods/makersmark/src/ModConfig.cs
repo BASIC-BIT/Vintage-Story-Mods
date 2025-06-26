@@ -2,16 +2,25 @@
 {
     public class ModConfig
     {
-        public bool SendServerSaveAnnouncement { get; set; } = true;
-        public bool SendServerSaveFinishedAnnouncement { get; set; } = false;
+        public bool SendServerSaveAnnouncement { get; set; }
+        public bool SendServerSaveFinishedAnnouncement { get; set; }
 
-        public string TEXT_ServerSaveAnnouncement { get; set; } =
-            "Server save has started - expect lag for a few seconds.";
-        public string TEXT_ServerSaveFinished { get; set; } =
-            "Server save has finished.";
+        public string TEXT_ServerSaveAnnouncement { get; set; }
+        public string TEXT_ServerSaveFinished { get; set; }
 
-        public int ProximityChatNormalBlockRange { get; set; } = 15;
-        public int ProximityChatYellBlockRange { get; set; } = 60;
-        public int ProximityChatWhisperBlockRange { get; set; } = 5;
+        public int ProximityChatNormalBlockRange { get; set; }
+        public int ProximityChatYellBlockRange { get; set; }
+        public int ProximityChatWhisperBlockRange { get; set; }
+
+        public ModConfig()
+        {
+            SendServerSaveAnnouncement = true;
+            SendServerSaveFinishedAnnouncement = false;
+            TEXT_ServerSaveAnnouncement = "Server save has started - expect lag for a few seconds.";
+            TEXT_ServerSaveFinished = "Server save has finished.";
+            ProximityChatNormalBlockRange = 15;
+            ProximityChatYellBlockRange = 60;
+            ProximityChatWhisperBlockRange = 5;
+        }
     }
 }

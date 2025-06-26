@@ -19,9 +19,6 @@ public class DistanceObfuscationSystem : BaseSubSystem
         _random = new Random();
     }
 
-    private double GetDistance(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer) =>
-        sendingPlayer.Entity.ServerPos.DistanceTo(receivingPlayer.Entity.ServerPos);
-
     public void ObfuscateMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, ref string message,
         ProximityChatMode? tempMode = null)
     {
@@ -30,8 +27,7 @@ public class DistanceObfuscationSystem : BaseSubSystem
             return;
         }
 
-        var distance = GetDistance(sendingPlayer, receivingPlayer);
-
+        var distance = sendingPlayer.GetDistance(receivingPlayer);
         var chatMode = sendingPlayer.GetChatMode(tempMode);
         var obfuscationRange = Config.ProximityChatModeObfuscationRanges[chatMode];
         var maxRange = Config.ProximityChatModeDistances[chatMode];
@@ -52,35 +48,5 @@ public class DistanceObfuscationSystem : BaseSubSystem
 
             return _random.NextDouble() < percentage ? '*' : character;
         }));
-    }
-
-    public int GetFontSize(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer,
-        ProximityChatMode? tempMode = null)
-    {
-        // Doesn't check if the system is disabled, that's up to the consumer
-
-        var distance = GetDistance(sendingPlayer, receivingPlayer);
-        var chatMode = sendingPlayer.GetChatMode(tempMode);
-        var maxRange = Config.ProximityChatModeDistances[chatMode];
-        var defaultSize = Config.ProximityChatDefaultFontSize[chatMode];
-
-        var minFontSize = Config.ProximityChatClampFontSizes.Min();
-        
-        var unclampedSize = ((defaultSize - minFontSize) * (1.0d - (distance / maxRange))) + minFontSize;
-
-        var clampedSize = GetClampedFontSize(unclampedSize);
-
-        return clampedSize;
-    }
-
-    private int GetClampedFontSize(double unclamped)
-    {
-        // Get the closest value in the Config.ProximityChatClampFontSizes array to the unclamped value
-        return Config.ProximityChatClampFontSizes.MinBy(size => Math.Abs(size - unclamped));
-    }
-
-    public bool IsDistanceFontSizeEnabled()
-    {
-        return Config.EnableDistanceFontSizeSystem;
     }
 }

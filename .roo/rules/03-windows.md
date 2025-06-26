@@ -1,0 +1,1 @@
+This is a Windows machine. All console commands should use the Windows PowerShell syntax. This means using semicolons (`;`) instead of double ampersand (`&&`) when trying to chain multiple commands together in the terminal. 

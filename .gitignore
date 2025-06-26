@@ -1,19 +1,4 @@
-# Ignore everything in the root except the readme, license, and "mods" directory.
-/*
-!.gitignore
-!README.md
-!LICENSE
-!mods/
-!mods-dll/
-!Tests/
-!docs/
-
-# Ignore user files anywhere inside the "mods" directory.
-mods/**/*.user
-mods/**/bin/*
-mods/**/obj/*
-
-# Ignore build artifacts and large files
+# Build artifacts and large files
 **/*.dll
 **/*.pdb
 **/*.exe
@@ -29,12 +14,19 @@ mods/**/obj/*
 **/.vs/
 **/.idea/
 
-# Ignore repomix output files
+# User files
+**/*.user
+
+# Environment files
+.env
+*.env
+
+# Repomix output files
 .repomix-output.txt
 **/*.repomix-output.*
 local-research/*.repomix.*
 
-# Ignore large media files
+# Large media files
 **/*.mp4
 **/*.mov
 **/*.avi
@@ -42,18 +34,12 @@ local-research/*.repomix.*
 **/*.iso
 **/*.img
 
-# Local package script
-**/package.ps1
+# Log files (but allow the logs directory structure)
+*.log
+fetch-logs.log
+package.log
+winscp*.log
 
-# Environment files
-.env
-*.env
-
-# Ignore user files anywhere inside the "mods" directory.
-mods-dll/**/*.user
-mods-dll/**/bin/*
-mods-dll/**/obj/*
-
-.env
-obj/
-bin/
+# Downloaded logs directory contents (but keep structure)
+logs/**/
+!logs/.gitkeep
