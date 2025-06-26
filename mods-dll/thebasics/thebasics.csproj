@@ -66,9 +66,7 @@
     <PackageReference Include="ApacheTech.Common.Extensions.Harmony" Version="1.2.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="src\ModSystems\ProximityChat\Models\MessageTransformers.cs" />
-  </ItemGroup>
+
   <ItemGroup>
     <Folder Include="assets\" />
     <Folder Include="assets_bak\" />

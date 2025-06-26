@@ -346,8 +346,7 @@ namespace thebasics.ModSystems.TPA
                 }
             }
 
-            // Fix particle spawning - add player parameter following VS pattern
-            API.World.SpawnParticles(GetTpaRequestParticles(player), player);
+            API.World.SpawnParticles(GetTpaRequestParticles(player));
 
 
             var requestMessage = new StringBuilder();

@@ -95,8 +95,6 @@ Following user feedback, identified and resolved additional issues with the temp
 #### **Particle System Fix**
 - **Problem**: Particles not spawning due to incorrect API usage
 - **Root Cause**: Missing player parameter in `API.World.SpawnParticles()` call
-- **VS Pattern**: `API.World.SpawnParticles(properties, player)` - player parameter required
-- **Fix**: Added player parameter following VS source code pattern at line 504
 
 #### **Temporal Gear Return System Implementation (June 3, 2025)**
 - **✅ COMPLETED**: Comprehensive temporal gear return system implemented

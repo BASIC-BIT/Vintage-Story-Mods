@@ -12,6 +12,7 @@
 	],
 	"settings": {
 		"dotnet.preferCSharpExtension": true,
-		"powershell.cwd": "Vintage-Story-Mods"
+		"powershell.cwd": "Vintage-Story-Mods",
+		"dotnet.defaultSolution": "Vintage-Story-Mods/Vintage-Story-Mods.sln"
 	}
 }

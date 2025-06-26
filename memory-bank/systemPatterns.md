@@ -302,15 +302,6 @@ API.ChatCommands.GetOrCreate("tpatest")
 
 ## Particle System Patterns
 
-### VS Particle Spawning API
-Correct pattern for spawning particles in Vintage Story:
-```csharp
-// Server-side particle spawning requires player parameter
-API.World.SpawnParticles(particleProperties, player);
-
-// NOT: API.World.SpawnParticles(particleProperties); // Missing player parameter
-```
-
 ### Particle Properties Configuration
 ```csharp
 private SimpleParticleProperties GetTpaRequestParticles(IServerPlayer player)
