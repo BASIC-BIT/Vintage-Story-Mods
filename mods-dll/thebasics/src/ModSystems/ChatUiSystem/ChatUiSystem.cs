@@ -22,12 +22,6 @@ public class ChatUiSystem : ModSystem
     private static IClientNetworkChannel _clientConfigChannel;
     private static SafeClientNetworkChannel _safeNetworkChannel;
 
-    // private static IClientNetworkChannel _clientNicknameChannel;
-    // private GuiDialogCharacterBase dlg;
-    // private GuiDialog.DlgComposers Composers => this.dlg.Composers;
-
-    // private Dictionary<string, string> PlayerNicknames = new Dictionary<string, string>();
-
     public override bool ShouldLoad(EnumAppSide side) => side.IsClient();
 
     public override void StartClientSide(ICoreClientAPI api)
@@ -102,33 +96,6 @@ public class ChatUiSystem : ModSystem
     //     }
     // }
 
-    // private bool OnPlayerReady(ref EnumHandling handling)
-    // {
-    //     handling = EnumHandling.PassThrough;
-    //
-    //     if (_api.World.Player != null && _api.World.Player.Entity != null)
-    //     {
-    //         _api.Logger.Debug($"THEBASICS - OnPlayerReady, Setting my player nickname!");
-    //         ApplyNickname(_api.World.Player.Entity);
-    //     }
-    //     else
-    //     {
-    //         _api.Logger.Debug($"THEBASICS - OnPlayerReady, Player or Entity was null!");
-    //     }
-    //
-    //     return true;
-    // }
-
-    // private void ApplyNickname(Entity entity)
-    // {
-    //     if (entity is EntityPlayer entityPlayer)
-    //     {
-    //         if (PlayerNicknames.ContainsKey(entityPlayer.PlayerUID))
-    //         {
-    //             SetPlayerNickname(entityPlayer, PlayerNicknames[entityPlayer.PlayerUID]);
-    //         }
-    //     }
-    // }
 
     // Queue an action to be executed once we have the config from server
     private static void QueueConfigAction(System.Action action)
@@ -166,41 +133,6 @@ public class ChatUiSystem : ModSystem
         _pendingConfigActions.Clear();
     }
 
-    // private void InitializeIfNeeded()
-    // {
-    //     if (_isInitialized || _initializationAttempts >= MAX_INITIALIZATION_ATTEMPTS) return;
-
-    //     try
-    //     {
-    //         var chatDialog = _api.Gui.LoadedGuis.Find(dlg => dlg is HudDialogChat) as HudDialogChat;
-    //         if (chatDialog != null)
-    //         {
-    //             var chatTabs = Traverse.Create(chatDialog).Field("chatTabs").GetValue<GuiTab[]>();
-    //             if (chatTabs != null && chatTabs.Length > 0)
-    //             {
-    //                 _isInitialized = true;
-    //                 _api.Logger.Debug("[THEBASICS] Chat system successfully initialized");
-    //                 return;
-    //             }
-    //         }
-
-    //         _initializationAttempts++;
-    //         if (_initializationAttempts < MAX_INITIALIZATION_ATTEMPTS)
-    //         {
-    //             _api.Logger.Debug($"[THEBASICS] Initialization attempt {_initializationAttempts} failed, retrying in {INITIALIZATION_RETRY_DELAY_MS}ms");
-    //             _api.Event.RegisterCallback(dt => InitializeIfNeeded(), INITIALIZATION_RETRY_DELAY_MS);
-    //         }
-    //         else
-    //         {
-    //             _api.Logger.Warning("[THEBASICS] Failed to initialize chat system after maximum attempts");
-    //         }
-    //     }
-    //     catch (System.Exception e)
-    //     {
-    //         _api.Logger.Error($"[THEBASICS] Error during initialization: {e}");
-    //     }
-    // }
-
     private void OnPlayerJoin(IClientPlayer byPlayer)
     {
         // Only send ready message when the local player joins, not when any player joins
@@ -213,12 +145,6 @@ public class ChatUiSystem : ModSystem
             _safeNetworkChannel?.SendPacketSafely(new TheBasicsClientReadyMessage());
         }
     }
-
-    // private void OnPlayerLeave(IClientPlayer byPlayer)
-    // {
-    //     _isInitialized = false;
-    //     _initializationAttempts = 0;
-    // }
 
     private void RegisterForServerSideConfig()
     {
@@ -238,44 +164,7 @@ public class ChatUiSystem : ModSystem
             MaxRetries = 10
         };
         _safeNetworkChannel = new SafeClientNetworkChannel(_clientConfigChannel, _api, config);
-
-        // _clientNicknameChannel = _api.Network.RegisterChannel("thebasics_nickname")
-        //     .RegisterMessageType<TheBasicsPlayerNicknameMessage>()
-        //     .SetMessageHandler<TheBasicsPlayerNicknameMessage>(OnServerPlayerNicknameMessage);
     }
-
-    // private void OnServerPlayerNicknameMessage(TheBasicsPlayerNicknameMessage packet)
-    // {
-    //     PlayerNicknames[packet.PlayerUID] = packet.Nickname;
-    //
-    //     var player = _api.World.PlayerByUid(packet.PlayerUID);
-    //
-    //     if (player == null)
-    //     {
-    //         _api.Logger.Debug($"Got nickname {packet.PlayerUID} {packet.Nickname} but couldn't find player by UUID");
-    //         return;
-    //     }
-    //
-    //     var entity = player.Entity;
-    //     
-    //     if (entity == null)
-    //     {
-    //         _api.Logger.Debug($"Got nickname {packet.PlayerUID} {packet.Nickname} but couldn't find entity for player");
-    //         return;
-    //     }
-    //     
-    //     SetPlayerNickname(entity, packet.Nickname);
-    //
-    //     // TODO: Check if player is currently being rendered to update nickname
-    // }
-
-    // private void SetPlayerNickname(EntityPlayer entityPlayer, string name)
-    // {
-    //     _api.Logger.Debug($"THEBASICS - Setting player ${entityPlayer.Player.PlayerName} nametag to nickname ${name}");
-    //     var nametag = entityPlayer.GetBehavior<EntityBehaviorNameTag>();
-    //
-    //     nametag.SetName(name);
-    // }
 
     private void OnServerConfigMessage(TheBasicsConfigMessage configMessage)
     {
@@ -371,13 +260,6 @@ public class ChatUiSystem : ModSystem
 
         try
         {
-            // if (!_isInitialized)
-            // {
-            //     _api.Logger.Debug("[THEBASICS] Chat system not fully initialized, deferring tab modification");
-            //     _api.Event.RegisterCallback(dt => PostfixOnGuiOpened(__instance), INITIALIZATION_RETRY_DELAY_MS);
-            //     return;
-            // }
-
             int targetGroupId = (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null) ? _lastSelectedGroupId.Value :
             (_config.ProximityChatAsDefault && _proximityGroupId != null) ? _proximityGroupId.Value : GlobalConstants.GeneralChatGroup;
 

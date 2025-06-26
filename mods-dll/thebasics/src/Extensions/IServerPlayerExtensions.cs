@@ -348,5 +348,8 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataOOCEnabled, false);
         }
+        
+        public static double GetDistance(this IServerPlayer sendingPlayer, IServerPlayer receivingPlayer) =>
+            sendingPlayer.Entity.ServerPos.DistanceTo(receivingPlayer.Entity.ServerPos);
     }
 }
