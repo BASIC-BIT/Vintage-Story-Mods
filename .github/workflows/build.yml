@@ -209,18 +209,7 @@ jobs:
         }
       shell: pwsh
       
-    - name: Upload Build Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: vintage-story-mods-${{ env.VS_VERSION }}
-        path: |
-          output/**/*.dll
-          output/**/*.pdb
-          mods/*/bin/Release/**/*.dll
-          mods-dll/*/bin/Release/**/*.dll
-          mods-dll/*/*.zip
-        retention-days: 30
-        
+
     - name: Package Main Mod
       if: success()
       run: |
