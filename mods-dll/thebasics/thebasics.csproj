@@ -15,7 +15,7 @@
     <OutputPath>..\..\output\net7.0\</OutputPath>
     <IntermediateOutputPath>..\..\obj\Release\thebasics\</IntermediateOutputPath>
   </PropertyGroup>
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(GITHUB_ACTIONS)' != 'true'">
     <Exec Command="powershell -NoProfile -NonInteractive -Command &quot;&amp; { &amp; '$(ProjectDir)scripts\package.ps1' }&quot;" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
