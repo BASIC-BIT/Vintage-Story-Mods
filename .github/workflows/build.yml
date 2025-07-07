@@ -184,16 +184,16 @@ jobs:
         Write-Host "Checking build outputs..." -ForegroundColor Yellow
         
         # Check main production mod
-        if (Test-Path "output\thebasics.dll") {
+        if (Test-Path "output\net7.0\thebasics.dll") {
           Write-Host "thebasics.dll built successfully" -ForegroundColor Green
-          $size = (Get-Item "output\thebasics.dll").Length
+          $size = (Get-Item "output\net7.0\thebasics.dll").Length
           Write-Host "  Size: $($size / 1KB) KB" -ForegroundColor Gray
         } else {
           Write-Host "thebasics.dll not found" -ForegroundColor Red
         }
         
         # Check for other built DLLs
-        Get-ChildItem "output" -Filter "*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+        Get-ChildItem "output\net7.0" -Filter "*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
           Write-Host "Built: $($_.Name) ($($_.Length / 1KB) KB)" -ForegroundColor Green
         }
         
@@ -214,8 +214,8 @@ jobs:
       with:
         name: vintage-story-mods-${{ env.VS_VERSION }}
         path: |
-          output/*.dll
-          output/*.pdb
+          output/**/*.dll
+          output/**/*.pdb
           mods/*/bin/Release/**/*.dll
           mods-dll/*/bin/Release/**/*.dll
           mods-dll/*/*.zip
@@ -227,7 +227,7 @@ jobs:
         Write-Host "Creating distribution packages..." -ForegroundColor Yellow
         
         # Package thebasics if it exists
-        if (Test-Path "output\thebasics.dll") {
+        if (Test-Path "output\net7.0\thebasics.dll") {
           # Run the existing package script for thebasics
           Push-Location "mods-dll\thebasics"
           try {

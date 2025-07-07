@@ -12,7 +12,7 @@
     <IntermediateOutputPath>..\..\obj\Debug\thebasics\</IntermediateOutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <OutputPath>.</OutputPath>
+    <OutputPath>..\..\output\net7.0\</OutputPath>
     <IntermediateOutputPath>..\..\obj\Release\thebasics\</IntermediateOutputPath>
   </PropertyGroup>
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
