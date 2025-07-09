@@ -48,7 +48,13 @@ if (-not (Test-Path $assetsDir)) {
 
 # Create the mod zip file
 try {
-    Compress-Archive -Force -Path $modInfoFile,$dllFile,$pdbFile,$assetsDir -DestinationPath $zipFile
+    # Build list of items to include (only include assets if it exists)
+    $itemsToZip = @($modInfoFile, $dllFile, $pdbFile)
+    if (Test-Path $assetsDir) {
+        $itemsToZip += $assetsDir
+    }
+    
+    Compress-Archive -Force -Path $itemsToZip -DestinationPath $zipFile
     $msg = "Successfully created mod package at $zipFile"
     Write-Host $msg
     "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
