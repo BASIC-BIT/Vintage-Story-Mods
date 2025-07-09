@@ -184,20 +184,17 @@ jobs:
         Write-Host "Checking build outputs..." -ForegroundColor Yellow
         
         # Check main production mod
-        if (Test-Path "output\net7.0\thebasics.dll") {
+        $dllPath = "mods-dll\thebasics\bin\Release\net7.0\thebasics.dll"
+        if (Test-Path $dllPath) {
           Write-Host "thebasics.dll built successfully" -ForegroundColor Green
-          $size = (Get-Item "output\net7.0\thebasics.dll").Length
+          $size = (Get-Item $dllPath).Length
           Write-Host "  Size: $($size / 1KB) KB" -ForegroundColor Gray
         } else {
-          Write-Host "thebasics.dll not found" -ForegroundColor Red
+          Write-Host "thebasics.dll not found at expected location: $dllPath" -ForegroundColor Red
+          exit 1
         }
         
-        # Check for other built DLLs
-        Get-ChildItem "output\net7.0" -Filter "*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
-          Write-Host "Built: $($_.Name) ($($_.Length / 1KB) KB)" -ForegroundColor Green
-        }
-        
-        # Check legacy mods
+        # Check legacy mods  
         $legacyMods = @("makersmark", "forensicstory", "DummyTranslocator", "autorun", "thaumstory")
         foreach ($mod in $legacyMods) {
           $dllPath = "mods\$mod\bin\Release\net48\$mod.dll"
@@ -215,66 +212,16 @@ jobs:
       run: |
         Write-Host "Creating distribution packages..." -ForegroundColor Yellow
         
-        # Debug: Show what actually exists in the output directory
-        Write-Host "Checking output directory structure..." -ForegroundColor Cyan
-        if (Test-Path "output") {
-          Get-ChildItem "output" -Recurse | ForEach-Object {
-            Write-Host "Found: $($_.FullName)" -ForegroundColor Gray
-          }
-        } else {
-          Write-Host "Output directory does not exist!" -ForegroundColor Red
-        }
-        
-        # Debug: Also check if DLL ended up in project directory (old behavior)
-        Write-Host "Checking thebasics project directory..." -ForegroundColor Cyan
-        if (Test-Path "mods-dll\thebasics\thebasics.dll") {
-          Write-Host "Found thebasics.dll in project directory (old location)" -ForegroundColor Yellow
-        }
-        
-        # Debug: Search for any thebasics.dll files
-        Write-Host "Searching for thebasics.dll anywhere..." -ForegroundColor Cyan
-        Get-ChildItem -Name "thebasics.dll" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-          Write-Host "Found thebasics.dll at: $_" -ForegroundColor Yellow
-        }
-        
-        # Package thebasics if it exists (check both possible locations)
-        $dllExists = (Test-Path "output\net7.0\thebasics.dll") -or (Test-Path "mods-dll\thebasics\thebasics.dll")
-        if ($dllExists) {
-          if (Test-Path "output\net7.0\thebasics.dll") {
-            Write-Host "Found thebasics.dll in output directory, proceeding with packaging..." -ForegroundColor Green
-          } else {
-            Write-Host "Found thebasics.dll in project directory, proceeding with packaging..." -ForegroundColor Green
-          }
-          
-          # Run the existing package script for thebasics
-          Push-Location "mods-dll\thebasics"
-          try {
-            & ".\scripts\package.ps1"
-            Write-Host "thebasics packaged successfully" -ForegroundColor Green
-            
-            # Verify the zip file was created
-            if (Test-Path "thebasics.zip") {
-              $zipSize = (Get-Item "thebasics.zip").Length
-              Write-Host "Created thebasics.zip ($($zipSize / 1KB) KB)" -ForegroundColor Green
-            } else {
-              Write-Host "Warning: thebasics.zip was not created" -ForegroundColor Yellow
-            }
-          } catch {
-            Write-Host "Warning: thebasics packaging failed: $_" -ForegroundColor Yellow
-          } finally {
-            Pop-Location
-          }
-        } else {
-          Write-Host "thebasics.dll not found in either location - skipping packaging" -ForegroundColor Yellow
-        }
-        
-        # List all zip files that were created
-        Write-Host "Searching for created zip files..." -ForegroundColor Yellow
-        Get-ChildItem -Path "mods-dll" -Filter "*.zip" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-          Write-Host "Found zip: $($_.FullName) ($($_.Length / 1KB) KB)" -ForegroundColor Green
-        }
-        Get-ChildItem -Path "mods" -Filter "*.zip" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-          Write-Host "Found zip: $($_.FullName) ($($_.Length / 1KB) KB)" -ForegroundColor Green
+        # Run the package script for thebasics
+        Push-Location "mods-dll\thebasics"
+        try {
+          & ".\scripts\package.ps1"
+          Write-Host "thebasics packaged successfully" -ForegroundColor Green
+        } catch {
+          Write-Host "Error: thebasics packaging failed: $_" -ForegroundColor Red
+          exit 1
+        } finally {
+          Pop-Location
         }
       shell: pwsh
       

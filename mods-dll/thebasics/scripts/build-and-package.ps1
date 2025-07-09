@@ -3,20 +3,19 @@
 
 # Get absolute paths
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project root
-$solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
-$outputDir = Join-Path $solutionRoot "output/net7.0"
 
 Write-Host "Building The BASICs mod..."
 
-# Clean output directory to ensure fresh build
-if (Test-Path $outputDir) {
-    Write-Host "Cleaning output directory..."
-    Remove-Item -Path $outputDir -Recurse -Force
+# Clean build directory to ensure fresh build
+$binDir = Join-Path $projectRoot "bin"
+if (Test-Path $binDir) {
+    Write-Host "Cleaning build directory..."
+    Remove-Item -Path $binDir -Recurse -Force
 }
 
-# Build the project with explicit output directory
+# Build the project using standard MSBuild output location
 Write-Host "Compiling project..."
-$buildResult = dotnet build "$projectRoot/thebasics.csproj" --configuration Debug --output $outputDir
+$buildResult = dotnet build "$projectRoot/thebasics.csproj" --configuration Release
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed! Exiting..." -ForegroundColor Red
