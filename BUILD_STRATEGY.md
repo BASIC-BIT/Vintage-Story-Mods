@@ -40,7 +40,7 @@ mods-dll/thebasics/bin/Release/net7.0/thebasics.pdb
 
 #### 2. Package Script (`package.ps1`)
 - **Input**: Reads from `bin/Release/net7.0/thebasics.dll`
-- **Output**: Creates `thebasics.zip` in project root
+- **Output**: Creates `thebasics_VERSION.zip` in project root (e.g., `thebasics_5_1_0_rc_3.zip`)
 - **No path searching** - expects DLL in one specific location
 - **Fails fast** if DLL not found
 
@@ -65,7 +65,7 @@ Developer runs: .\scripts\build-and-package.ps1
 │   └── Outputs to bin/Release/net7.0/
 ├── Calls package.ps1
 │   ├── Reads from bin/Release/net7.0/thebasics.dll
-│   └── Creates thebasics.zip
+│   └── Creates thebasics_VERSION.zip
 └── Success!
 ```
 
@@ -80,7 +80,7 @@ GitHub Actions workflow:
 │   ├── Calls package.ps1
 │   └── FAILS HARD if packaging fails
 └── Upload Mod Packages
-    └── Uploads thebasics.zip
+    └── Uploads thebasics_VERSION.zip
 ```
 
 ## Key Principles
@@ -116,7 +116,7 @@ mods-dll/thebasics/
 │   ├── build-and-package.ps1    # Local development
 │   └── package.ps1               # Packaging logic
 ├── thebasics.csproj              # Standard MSBuild config
-├── thebasics.zip                 # Package output
+├── thebasics_VERSION.zip         # Package output (e.g., thebasics_5_1_0_rc_3.zip)
 └── (source files...)
 ```
 

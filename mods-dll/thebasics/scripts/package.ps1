@@ -7,7 +7,10 @@ $modInfoFile = Join-Path $projectRoot "modinfo.json"
 $dllFile = Join-Path $outputDir "thebasics.dll"
 $pdbFile = Join-Path $outputDir "thebasics.pdb"
 
-$zipFile = Join-Path $projectRoot "thebasics.zip"
+# Read version from modinfo.json and create versioned filename
+$modInfo = Get-Content $modInfoFile | ConvertFrom-Json
+$version = $modInfo.version -replace '\.', '_' -replace '-', '_'
+$zipFile = Join-Path $projectRoot "thebasics_$version.zip"
 $logFile = Join-Path $solutionRoot "package.log"
 $envPath = Join-Path $projectRoot ".env"  # Look for .env in the mod folder
 
@@ -76,12 +79,21 @@ Write-Host $msg
 "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
 
 foreach ($localModsDir in $localModsDirectories) {
-    $localModFile = Join-Path $localModsDir "thebasics.zip"
+    $localModFile = Join-Path $localModsDir (Split-Path $zipFile -Leaf)
     
     try {
         if (-not (Test-Path $localModsDir)) {
             New-Item -ItemType Directory -Path $localModsDir -Force | Out-Null
             $msg = "Created directory: $localModsDir"
+            Write-Host $msg
+            "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+        }
+        
+        # Remove old versions of the mod
+        $oldVersions = Get-ChildItem -Path $localModsDir -Filter "thebasics*.zip" -ErrorAction SilentlyContinue
+        foreach ($oldVersion in $oldVersions) {
+            Remove-Item -Path $oldVersion.FullName -Force
+            $msg = "Removed old version: $($oldVersion.Name)"
             Write-Host $msg
             "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
         }
@@ -184,7 +196,7 @@ if (Test-Path $envPath) {
                 "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
 
                 # Now attempt the file transfer
-                $ftpDestinationFile = "/data/Mods/thebasics.zip"
+                $ftpDestinationFile = "/data/Mods/$(Split-Path $zipFile -Leaf)"
                 $transferOptions = New-Object WinSCP.TransferOptions
                 $transferOptions.TransferMode = [WinSCP.TransferMode]::Binary
 

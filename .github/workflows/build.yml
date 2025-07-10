@@ -225,12 +225,29 @@ jobs:
         }
       shell: pwsh
       
-    - name: Upload Mod Packages
+    - name: Get Mod Version
+      id: mod_version
+      run: |
+        $modInfo = Get-Content "mods-dll\thebasics\modinfo.json" | ConvertFrom-Json
+        $version = $modInfo.version -replace '\.', '_' -replace '-', '_'
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        Write-Host "Mod version: $($modInfo.version) (normalized: $version)" -ForegroundColor Green
+      shell: pwsh
+      
+    - name: Upload Main Mod Package
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: mod-packages-${{ env.VS_VERSION }}
+        name: thebasics-mod-${{ steps.mod_version.outputs.version }}
+        path: mods-dll/thebasics/thebasics_*.zip
+        retention-days: 30
+        
+    - name: Upload All Mod Packages
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mod-packages-${{ steps.mod_version.outputs.version }}
         path: |
-          mods-dll/*/*.zip
+          mods-dll/*/thebasics_*.zip
           mods/*/*.zip
         retention-days: 30 

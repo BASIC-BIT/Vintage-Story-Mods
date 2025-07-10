@@ -183,8 +183,9 @@ jobs:
       run: |
         Write-Host "Creating distribution packages..." -ForegroundColor Yellow
         
-        # Package thebasics if it exists
-        if (Test-Path "output\thebasics.dll") {
+        # Check if thebasics was built
+        $dllPath = "mods-dll\thebasics\bin\Release\net7.0\thebasics.dll"
+        if (Test-Path $dllPath) {
           # Run the existing package script for thebasics
           Push-Location "mods-dll\thebasics"
           try {
@@ -197,7 +198,7 @@ jobs:
             Pop-Location
           }
         } else {
-          Write-Host "Error: thebasics.dll not found in output directory" -ForegroundColor Red
+          Write-Host "Error: thebasics.dll not found at expected location: $dllPath" -ForegroundColor Red
           exit 1
         }
       shell: pwsh
@@ -214,15 +215,15 @@ jobs:
         # Create release directory
         New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
         
-        # Copy and rename the main mod package
-        $sourceZip = "mods-dll\thebasics\thebasics.zip"
+        # Find and copy the versioned mod package
+        $sourceZip = Get-ChildItem "mods-dll\thebasics\thebasics_*.zip" | Select-Object -First 1
         $targetZip = "$releaseDir\thebasics-v$newVersion.zip"
         
-        if (Test-Path $sourceZip) {
-          Copy-Item $sourceZip $targetZip
-          Write-Host "Created release asset: thebasics-v$newVersion.zip" -ForegroundColor Green
+        if ($sourceZip) {
+          Copy-Item $sourceZip.FullName $targetZip
+          Write-Host "Created release asset: thebasics-v$newVersion.zip (from $($sourceZip.Name))" -ForegroundColor Green
         } else {
-          Write-Host "Error: Source zip file not found: $sourceZip" -ForegroundColor Red
+          Write-Host "Error: No versioned thebasics zip file found in mods-dll\thebasics\" -ForegroundColor Red
           exit 1
         }
         
