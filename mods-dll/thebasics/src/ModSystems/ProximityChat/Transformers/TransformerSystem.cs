@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Common;
@@ -98,13 +99,14 @@ public class TransformerSystem
     // TODO: Refactor common usage with ICSpeechFormatTransformer
     private void LogChatMessage(MessageContext context) {
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
-        var quote = lang == LanguageSystem.SignLanguage ? "'" : "\"";
         var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
-
+        
+        // Add quotes based on language type
+        var delimiters = _chatSystem.Config.ChatDelimiters;
+        var quoteDelimiter = lang == LanguageSystem.SignLanguage ? delimiters.SignLanguageQuote : delimiters.Quote;
         var outputMessage = context.Message;
-        // Add Quotes
-        outputMessage = $"{quote}{outputMessage}{quote}";
+        outputMessage = $"{quoteDelimiter.Start}{outputMessage}{quoteDelimiter.End}";
 
         var verb = GetProximityChatVerb(lang, mode);
 

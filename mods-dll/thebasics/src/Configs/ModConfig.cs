@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using ProtoBuf;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -58,19 +59,6 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, "." }
             };
             
-            ProximityChatModeQuotationStart ??= new Dictionary<ProximityChatMode, string>
-            {
-                { ProximityChatMode.Yell, "\"" },
-                { ProximityChatMode.Normal, "\"" },
-                { ProximityChatMode.Whisper, "\"" }
-            };
-            
-            ProximityChatModeQuotationEnd ??= new Dictionary<ProximityChatMode, string>
-            {
-                { ProximityChatMode.Yell, "\"" },
-                { ProximityChatMode.Normal, "\"" },
-                { ProximityChatMode.Whisper, "\"" }
-            };
             
             PlayerStatToggles ??= new Dictionary<PlayerStatType, bool>
             {
@@ -90,6 +78,13 @@ namespace thebasics.Configs
                     new string[] { "feng", "tar", "kin", "ga", "shin", "ji" },
                     "#D4A96A", false, false)
             };
+
+            // Initialize chat delimiters if not already set
+            if (ChatDelimiters == null)
+            {
+                ChatDelimiters = new ChatDelimiters();
+                ChatDelimiters.InitializeDefaultsIfNeeded();
+            }
         }
 
         [ProtoMember(1)]
@@ -145,11 +140,9 @@ namespace thebasics.Configs
         [ProtoMember(17)]
         public IDictionary<ProximityChatMode, string> ProximityChatModePunctuation { get; set; }
 
-        [ProtoMember(18)]
-        public IDictionary<ProximityChatMode, string> ProximityChatModeQuotationStart { get; set; }
-
-        [ProtoMember(19)]
-        public IDictionary<ProximityChatMode, string> ProximityChatModeQuotationEnd { get; set; }
+        // ProtoMember(18) - REMOVED/DEPRECATED - Previously ProximityChatModeQuotationStart
+        // ProtoMember(19) - REMOVED/DEPRECATED - Previously ProximityChatModeQuotationEnd
+        // Quote handling is now done directly in transformers based on language type
 
         [ProtoMember(20)]
         public string ProximityChatName { get; set; } = "Proximity";
@@ -287,5 +280,8 @@ namespace thebasics.Configs
         
         [ProtoMember(64)]
         public bool RemoveClassLanguagesOnClassChange { get; set; } = false;
+
+        [ProtoMember(65)]
+        public ChatDelimiters ChatDelimiters { get; set; }
     }
 }
