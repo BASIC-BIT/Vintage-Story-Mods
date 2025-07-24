@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../../Games/VSProfiles/Profile2"
+		},
+		{
+			"path": "../../../Games/Vintagestory/assets"
 		}
 	],
 	"settings": {

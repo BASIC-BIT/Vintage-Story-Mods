@@ -69,6 +69,7 @@ namespace thebasics.ModSystems.ProximityChat
             api.Event.PlayerJoin += player =>
             {
                 player.InstantiateLanguagesIfNotExist(config);
+                GrantClassLanguages(player);
             };
         }
 
@@ -188,7 +189,7 @@ namespace thebasics.ModSystems.ProximityChat
                 Status = EnumCommandStatus.Success,
                 StatusMessage = "You know: " + string.Join(", ", languages.Select(ChatHelper.LangIdentifier)) +
                                 "\n" +
-                                "All languages: " + string.Join(", ", GetAllLanguages(false).Where(l => !l.Hidden).Select(ChatHelper.LangIdentifier)),
+                                "All languages: " + string.Join(", ", GetAllLanguages(false, includeHidden: false).Select(ChatHelper.LangIdentifier)),
             };
         }
 
@@ -317,7 +318,7 @@ namespace thebasics.ModSystems.ProximityChat
                 Status = EnumCommandStatus.Success,
                 StatusMessage = $"{targetPlayer.PlayerName} knows: " + string.Join(", ", languages.Select(ChatHelper.LangIdentifier)) +
                                 "\n" +
-                                "All languages: " + string.Join(", ", GetAllLanguages(true).Select(ChatHelper.LangIdentifier)),
+                                "All languages: " + string.Join(", ", GetAllLanguages(true, includeHidden: true).Select(ChatHelper.LangIdentifier)),
             };
         }
 
@@ -339,10 +340,18 @@ namespace thebasics.ModSystems.ProximityChat
                 lang?.Name?.ToLower() == text.ToLower()));
         }
 
-        public List<Language> GetAllLanguages(bool allowBabble)
+        public List<Language> GetAllLanguages(bool allowBabble, bool includeHidden = true)
         {
             List<Language> languages = new();
-            languages.AddRange(Config.Languages);
+            
+            if (includeHidden)
+            {
+                languages.AddRange(Config.Languages);
+            }
+            else
+            {
+                languages.AddRange(Config.Languages.Where(lang => !lang.Hidden));
+            }
 
             // Always include SignLanguage
             languages.Add(SignLanguage);
@@ -363,6 +372,76 @@ namespace thebasics.ModSystems.ProximityChat
                 var scrambledMessage = LanguageScrambler.ScrambleMessage(message, lang);
                 message = ChatHelper.Italic(scrambledMessage);
             }
+        }
+
+        private void GrantClassLanguages(IServerPlayer player)
+        {
+            // Get the player's character class
+            string characterClass = player.Entity.WatchedAttributes.GetString("characterClass");
+            if (string.IsNullOrEmpty(characterClass))
+            {
+                // If no class is set yet, we'll check again when they select one
+                return;
+            }
+
+            // Check each language to see if it should be granted to this class
+            foreach (var language in Config.Languages)
+            {
+                if (language.GrantedToClasses != null && language.GrantedToClasses.Length > 0)
+                {
+                    // Check if this class should get this language
+                    if (language.GrantedToClasses.Contains(characterClass))
+                    {
+                        // Only add if they don't already know it
+                        if (!player.KnowsLanguage(language))
+                        {
+                            player.AddLanguage(language);
+                            
+                            // Notify the player
+                            player.SendMessage(
+                                GlobalConstants.CurrentChatGroup, 
+                                $"Your {characterClass} background grants you knowledge of {ChatHelper.LangIdentifier(language)}!", 
+                                EnumChatType.Notification
+                            );
+                            
+                            // If they only know Babble, set this as their default language
+                            if (player.GetDefaultLanguage(Config).Name == BabbleLang.Name)
+                            {
+                                player.SetDefaultLanguage(language);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Method to be called when a player's class changes (for mods that allow class changes)
+        public void OnPlayerClassChanged(IServerPlayer player, string oldClass, string newClass)
+        {
+            // Remove languages from old class (optional - you might want to keep them)
+            if (!string.IsNullOrEmpty(oldClass) && Config.RemoveClassLanguagesOnClassChange)
+            {
+                foreach (var language in Config.Languages)
+                {
+                    if (language.GrantedToClasses != null && 
+                        language.GrantedToClasses.Contains(oldClass) && 
+                        !language.GrantedToClasses.Contains(newClass))
+                    {
+                        if (player.KnowsLanguage(language))
+                        {
+                            player.RemoveLanguage(language);
+                            player.SendMessage(
+                                GlobalConstants.CurrentChatGroup, 
+                                $"You have forgotten {ChatHelper.LangIdentifier(language)} as you are no longer a {oldClass}.", 
+                                EnumChatType.Notification
+                            );
+                        }
+                    }
+                }
+            }
+            
+            // Grant new languages
+            GrantClassLanguages(player);
         }
     }
 }

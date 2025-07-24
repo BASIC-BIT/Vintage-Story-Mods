@@ -30,16 +30,23 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         {
             var match = LanguageTalkRegex.Match(context.Message);
             var languageIdentifier = match.Groups[1].Value;
-            var lang = _languageSystem.GetLangFromText(languageIdentifier, true, context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission));
-
-            if (lang == null)
+            
+            // First try to get the language with allowHidden=true to check if it exists at all
+            var lang = _languageSystem.GetLangFromText(languageIdentifier, true, allowHidden: true);
+            
+            // Determine if we should show hidden languages in the error message
+            bool showHidden = context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission);
+            
+            // If the language doesn't exist, or it's hidden and player can't use it, show error
+            if (lang == null || (lang.Hidden && !context.SendingPlayer.KnowsLanguage(lang) && !showHidden))
             {
                 context.SendingPlayer.SendMessage(
                     _chatSystem.ProximityChatId,
                     $"Invalid language specifier \":{languageIdentifier}\".  Valid prefixes include: " + string.Join(", ",
-                        _languageSystem.GetAllLanguages(true).Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang))),
+                        _languageSystem.GetAllLanguages(true, includeHidden: showHidden).Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang))),
                     EnumChatType.CommandError);
                 context.State = MessageContextState.STOP;
+                return context;
             }
 
             if (lang.Name != LanguageSystem.BabbleLang.Name && !context.SendingPlayer.KnowsLanguage(lang))

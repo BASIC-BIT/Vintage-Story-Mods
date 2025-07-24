@@ -275,7 +275,7 @@ namespace thebasics.Configs
 
         [ProtoMember(58)]
         public string OOCColor { get; set; } = "#eaf188";
-
+        
         [ProtoMember(59)]
         public string GlobalOOCColor { get; set; } = "#f1b288";
 
@@ -284,5 +284,8 @@ namespace thebasics.Configs
         
         [ProtoMember(61)]
         public bool UseNicknameInOOC { get; set; } = true;
+        
+        [ProtoMember(64)]
+        public bool RemoveClassLanguagesOnClassChange { get; set; } = false;
     }
 }
