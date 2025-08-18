@@ -13,14 +13,32 @@ namespace thebasics.Configs
 
         public void InitializeDefaultsIfNeeded()
         {
-            Bold ??= new ChatDelimiter("+", "+");
-            Italic ??= new ChatDelimiter("|", "|");
-            Emote ??= new ChatDelimiter("*");
-            Environmental ??= new ChatDelimiter("!");
-            OOC ??= new ChatDelimiter("(", ")");
-            GlobalOOC ??= new ChatDelimiter("((", "))");
-            Quote ??= new ChatDelimiter("\"", "\"");
-            SignLanguageQuote ??= new ChatDelimiter("'", "'");
+            // Ensure nested delimiter objects exist before applying defaults
+            Bold ??= new ChatDelimiter();
+            Italic ??= new ChatDelimiter();
+            Emote ??= new ChatDelimiter();
+            Environmental ??= new ChatDelimiter();
+            OOC ??= new ChatDelimiter();
+            GlobalOOC ??= new ChatDelimiter();
+            Quote ??= new ChatDelimiter();
+            SignLanguageQuote ??= new ChatDelimiter();
+
+            DefaultChatDelimiterIfUsingDefaultValues(Bold, "+", "+");
+            DefaultChatDelimiterIfUsingDefaultValues(Italic, "|", "|");
+            DefaultChatDelimiterIfUsingDefaultValues(Emote, "*", "");
+            DefaultChatDelimiterIfUsingDefaultValues(Environmental, "!", "");
+            DefaultChatDelimiterIfUsingDefaultValues(OOC, "(", ")");
+            DefaultChatDelimiterIfUsingDefaultValues(GlobalOOC, "((", "))");
+            DefaultChatDelimiterIfUsingDefaultValues(Quote, "\"", "\"");
+            DefaultChatDelimiterIfUsingDefaultValues(SignLanguageQuote, "'", "'");
+        }
+
+        private void DefaultChatDelimiterIfUsingDefaultValues(ChatDelimiter delimiter, string start, string end)
+        { 
+            if(string.IsNullOrEmpty(delimiter.Start) && string.IsNullOrEmpty(delimiter.End)) {
+                delimiter.Start = start;
+                delimiter.End = end;
+            }
         }
 
         [ProtoMember(1)]

@@ -27,6 +27,8 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
 
+        // Note: content is escaped earlier in the pipeline for speech
+
         // Add Quotes based on language type
         var delimiters = _config.ChatDelimiters;
         var quoteDelimiter = lang == LanguageSystem.SignLanguage ? delimiters.SignLanguageQuote : delimiters.Quote;

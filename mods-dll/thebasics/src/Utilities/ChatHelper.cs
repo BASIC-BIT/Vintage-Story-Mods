@@ -143,6 +143,25 @@ namespace thebasics.Utilities
             return Color(message, lang.Color);
         }
 
+        // Escape user-provided text before embedding into VTML markup
+        public static string EscapeMarkup(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return input;
+
+            var sb = new StringBuilder(input.Length + 16);
+            foreach (var ch in input)
+            {
+                switch (ch)
+                {
+                    case '&': sb.Append("&amp;"); break;
+                    case '<': sb.Append("&lt;"); break;
+                    case '>': sb.Append("&gt;"); break;
+                    default: sb.Append(ch); break;
+                }
+            }
+            return sb.ToString();
+        }
+
         public static string LangIdentifier(Language lang)
         {
             return LangColor($"{lang.Name} (:{lang.Prefix})", lang);

@@ -281,6 +281,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         var newNicknameColor = (Color)args.Parsers[1].GetValue();
         var newColorHex = ColorTranslator.ToHtml(newNicknameColor);
+        if (newColorHex.Contains('<') || newColorHex.Contains('>'))
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = "Invalid color.",
+            };
+        }
 
         attemptTarget.SetNicknameColor(newColorHex);
 
@@ -316,6 +324,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         var newColor = (Color)args.Parsers[0].GetValue();
         var colorHex = ColorTranslator.ToHtml(newColor);
+        if (colorHex.Contains('<') || colorHex.Contains('>'))
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = "Invalid color.",
+            };
+        }
         player.SetNicknameColor(colorHex);
         SwapOutNameTag(player);
 
@@ -457,6 +473,16 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             var nickname = (string)fullArgs.Parsers[0].GetValue();
             
+            // Disallow VTML injection via nicknames
+            if (nickname.Contains('<') || nickname.Contains('>'))
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Nicknames cannot contain '<' or '>' characters. If you want color, use /nickcolor instead.",
+                };
+            }
+            
             // Validate nickname against conflicts - always enforced
             if (!NicknameValidationUtils.ValidateNickname(player, nickname, API, out string conflictingPlayer, out string conflictType))
             {
@@ -514,6 +540,16 @@ public class RPProximityChatSystem : BaseBasicModSystem
         else
         {
             var newNickname = (string)fullArgs.Parsers[2].GetValue();
+            
+            // Disallow VTML injection via nicknames
+            if (newNickname.Contains('<') || newNickname.Contains('>'))
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Nicknames cannot contain '<' or '>' characters. If you want color, use /adminsetnickcolor or have the player use /nickcolor.",
+                };
+            }
             
             // Validate nickname against conflicts and show warning to admin - always enforced unless forced
             if (!isForced)

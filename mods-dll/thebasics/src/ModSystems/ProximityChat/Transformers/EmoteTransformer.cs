@@ -39,7 +39,8 @@ public class EmoteTransformer : MessageTransformerBase
         {
             if (i % 2 == 0)
             {
-                builder.Append(splitMessage[i]);
+                // Narrative parts outside quotes: escape markup
+                builder.Append(ChatHelper.EscapeMarkup(splitMessage[i]));
             }
             else
             {
@@ -48,6 +49,9 @@ public class EmoteTransformer : MessageTransformerBase
                 // TODO: Cont. both of which fuck up the messages
                 var text = splitMessage[i];
                 _languageSystem.ProcessMessage(context.SendingPlayer, ref text, language);
+
+                // Escape user content before adding quotes/colors
+                text = ChatHelper.EscapeMarkup(text);
 
                 // Add quotes based on language type
                 var delimiters = _config.ChatDelimiters;

@@ -33,6 +33,9 @@ public class NameTransformer : MessageTransformerBase
     public string GetFormattedName(IServerPlayer player, bool isIC, ModConfig config)
     {
         string name = isIC ? player.GetNickname() : player.PlayerName;
+
+        // Escape user-supplied name to prevent VTML injection
+        name = ChatHelper.EscapeMarkup(name);
         
         string color = player.GetNicknameColor();
         bool applyColor = !string.IsNullOrEmpty(color) && (isIC ? config.ApplyColorsToNicknames : config.ApplyColorsToPlayerNames);

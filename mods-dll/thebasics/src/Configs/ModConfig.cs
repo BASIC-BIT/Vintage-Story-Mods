@@ -69,22 +69,19 @@ namespace thebasics.Configs
                 { PlayerStatType.DistanceTravelled, true }
             };
             
-            Languages ??= new Language[]
-            {
+            Languages ??=
+            [
                 new Language("Common", "The universal language", "c",
                     new string[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" },
                     "#E9DDCE", true, false),
                 new Language("Tradeband", "A common language for trade", "tr",
                     new string[] { "feng", "tar", "kin", "ga", "shin", "ji" },
                     "#D4A96A", false, false)
-            };
+            ];
 
-            // Initialize chat delimiters if not already set
-            if (ChatDelimiters == null)
-            {
-                ChatDelimiters = new ChatDelimiters();
-                ChatDelimiters.InitializeDefaultsIfNeeded();
-            }
+            // Initialize chat delimiters and ensure nested defaults even for legacy configs
+            ChatDelimiters ??= new ChatDelimiters();
+            ChatDelimiters.InitializeDefaultsIfNeeded();
         }
 
         [ProtoMember(1)]

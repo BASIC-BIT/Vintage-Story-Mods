@@ -54,6 +54,8 @@ public class TransformerSystem
         // Initialize transformers for the recipient phase (content transformation for each recipient)
         _recipientPhaseTransformers = new List<MessageTransformerBase>
         {
+            // Escape raw speech content before any VTML is added for the recipient
+            new EscapeSpeechContentTransformer(_chatSystem),
             new EmoteTransformer(_chatSystem, _languageSystem), // Format emotes correctly
             // Keep only transformers that need recipient-specific processing
             new LanguageTransformer(_languageSystem, _chatSystem),
