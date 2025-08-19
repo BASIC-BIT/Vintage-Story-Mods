@@ -17,8 +17,8 @@ public class EnvironmentMessageTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        // Apply italic formatting to environmental messages for visual distinction
-        context.Message = ChatHelper.Italic(context.Message);
+        // Apply italic formatting after escaping to avoid VTML injection
+        context.Message = ChatHelper.Italic(ChatHelper.EscapeMarkup(context.Message));
         
         return context;
     }

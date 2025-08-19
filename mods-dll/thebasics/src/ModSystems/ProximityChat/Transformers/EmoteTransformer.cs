@@ -1,4 +1,5 @@
 using System.Text;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
@@ -38,7 +39,8 @@ public class EmoteTransformer : MessageTransformerBase
         {
             if (i % 2 == 0)
             {
-                builder.Append(splitMessage[i]);
+                // Narrative parts outside quotes: escape markup
+                builder.Append(ChatHelper.EscapeMarkup(splitMessage[i]));
             }
             else
             {
@@ -48,7 +50,13 @@ public class EmoteTransformer : MessageTransformerBase
                 var text = splitMessage[i];
                 _languageSystem.ProcessMessage(context.SendingPlayer, ref text, language);
 
-                text = AddQuotes(text, language, chatMode);
+                // Escape user content before adding quotes/colors
+                text = ChatHelper.EscapeMarkup(text);
+
+                // Add quotes based on language type
+                var delimiters = _config.ChatDelimiters;
+                var quoteDelimiter = language == LanguageSystem.SignLanguage ? delimiters.SignLanguageQuote : delimiters.Quote;
+                text = $"{quoteDelimiter.Start}{text}{quoteDelimiter.End}";
                 text = ChatHelper.LangColor(text, language);
                 if(language == LanguageSystem.SignLanguage)
                 {
@@ -62,28 +70,4 @@ public class EmoteTransformer : MessageTransformerBase
         return context;
     }
 
-    private string AddQuotes(string text, Language lang, ProximityChatMode mode)
-    {
-        return $"{GetStartQuote(lang, mode)}{text}{GetEndQuote(lang, mode)}";
-    }
-
-    private string GetStartQuote(Language lang, ProximityChatMode mode)
-    {
-        if(lang == LanguageSystem.SignLanguage)
-        {
-            return "'";
-        }
-
-        return _config.ProximityChatModeQuotationStart[mode];
-    }
-
-    private string GetEndQuote(Language lang, ProximityChatMode mode)
-    {
-        if(lang == LanguageSystem.SignLanguage)
-        {
-            return "'";
-        }
-
-        return _config.ProximityChatModeQuotationEnd[mode];
-    }
 } 

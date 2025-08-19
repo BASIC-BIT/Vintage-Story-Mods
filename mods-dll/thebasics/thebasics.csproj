@@ -8,14 +8,12 @@
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <OutputPath>..\..\output\</OutputPath>
-    <IntermediateOutputPath>..\..\obj\Debug\thebasics\</IntermediateOutputPath>
+    <OutputPath>bin\Debug\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <OutputPath>.</OutputPath>
-    <IntermediateOutputPath>..\..\obj\Release\thebasics\</IntermediateOutputPath>
+    <OutputPath>bin\Release\</OutputPath>
   </PropertyGroup>
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(GITHUB_ACTIONS)' != 'true'">
     <Exec Command="powershell -NoProfile -NonInteractive -Command &quot;&amp; { &amp; '$(ProjectDir)scripts\package.ps1' }&quot;" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
@@ -66,9 +64,7 @@
     <PackageReference Include="ApacheTech.Common.Extensions.Harmony" Version="1.2.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="src\ModSystems\ProximityChat\Models\MessageTransformers.cs" />
-  </ItemGroup>
+
   <ItemGroup>
     <Folder Include="assets\" />
     <Folder Include="assets_bak\" />

@@ -13,6 +13,7 @@ namespace thebasics.ModSystems.TPA
 {
     public class TpaSystem : BaseBasicModSystem
     {
+        private long _timeoutCheckTimer;
         private SimpleParticleProperties GetTpaRequestParticles(IServerPlayer player)
         {
             var rand = new NormalRandom();
@@ -67,14 +68,165 @@ namespace thebasics.ModSystems.TPA
             var itemSlot = leftHand ? player.Entity.LeftHandItemSlot : player.Entity.RightHandItemSlot;
 
             itemSlot.TakeOut(1);
+            itemSlot.MarkDirty();
+            player.Entity.MarkShapeModified();
+            player.BroadcastPlayerData(true);
 
             return true;
+        }
+
+        private bool TryPutInHandSlot(ItemSlot slot, ItemStack itemStack, IServerPlayer player)
+        {
+            if (slot != null && slot.Empty)
+            {
+                slot.Itemstack = itemStack;
+                slot.MarkDirty();
+                player.SendMessage(GlobalConstants.GeneralChatGroup,
+                    "Your temporal gear has been returned to your hand.",
+                    EnumChatType.Notification);
+                return true;
+            }
+            return false;
+        }
+
+        private bool ReturnTemporalGear(IServerPlayer player)
+        {
+            // Null check - player might have disconnected
+            if (player == null)
+            {
+                return false;
+            }
+
+            // Create a temporal gear itemstack to return
+            var temporalGearItem = API.World.GetItem(new AssetLocation("game:gear-temporal"));
+            if (temporalGearItem == null)
+            {
+                API.Logger.Error("Could not find temporal gear item to return to player - this is probably a mod bug!");
+                return false;
+            }
+
+            var temporalGearStack = new ItemStack(temporalGearItem, 1);
+
+            // Priority 1: Try to put it in inventory if there's space
+            if (player.InventoryManager.TryGiveItemstack(temporalGearStack, slotNotifyEffect: true))
+            {
+                return true;
+            }
+
+            // Priority 2: Try to put it in hand if hand is free
+            var leftHand = player.Entity.LeftHandItemSlot;
+            var rightHand = player.Entity.RightHandItemSlot;
+            
+            if (TryPutInHandSlot(leftHand, temporalGearStack, player) ||
+                TryPutInHandSlot(rightHand, temporalGearStack, player))
+            {
+                return true;
+            }
+
+            // Priority 3: Drop it on the ground as last resort
+            API.World.SpawnItemEntity(temporalGearStack, player.Entity.Pos.XYZ);
+            player.SendMessage(GlobalConstants.GeneralChatGroup,
+                "Your temporal gear has been dropped on the ground since your inventory and hands are full.",
+                EnumChatType.Notification);
+            return true;
+        }
+
+        private void ReturnOwedTemporalGears(IServerPlayer player)
+        {
+            // Check if player has an expired outgoing TPA request
+            if (!player.HasExpiredOutgoingTpaRequest(Config.TpaTimeoutMinutes)) return;
+
+            var request = player.GetOutgoingTpaRequest();
+            if (request == null || !request.TemporalGearConsumed) return;
+
+            // Return the temporal gear
+            if (ReturnTemporalGear(player))
+            {
+                player.SendMessage(GlobalConstants.GeneralChatGroup,
+                    "Your temporal gear from a timed-out TPA request has been returned!",
+                    EnumChatType.Notification);
+            }
+            else
+            {
+                API.Logger.Warning($"Failed to return temporal gear to player {player.PlayerName} on login");
+            }
+
+            // Clear the outgoing request (debt settled)
+            player.ClearOutgoingTpaRequest();
+        }
+
+        private void OnPlayerJoin(IServerPlayer player)
+        {
+            // Check for any owed temporal gears in world-specific mod data and return them
+            ReturnOwedTemporalGears(player);
+        }
+
+        private void CheckForExpiredRequests(float dt)
+        {
+            if (!Config.TpaUseTimeout) return;
+
+            var timeoutMinutes = Config.TpaTimeoutMinutes;
+            var currentTime = DateTime.UtcNow;
+            var timeoutTicks = TimeSpan.FromMinutes(timeoutMinutes).Ticks;
+
+            // Check all players for expired outgoing requests
+            foreach (var player in API.World.AllOnlinePlayers)
+            {
+                var serverPlayer = player as IServerPlayer;
+                if (serverPlayer == null) continue;
+
+                var outgoingRequest = serverPlayer.GetOutgoingTpaRequest();
+                if (outgoingRequest == null) continue;
+
+                // Check if the request has expired
+                if (currentTime.Ticks - outgoingRequest.RequestTimeRealTicks >= timeoutTicks)
+                {
+                    var targetPlayer = API.GetPlayerByUID(outgoingRequest.TargetPlayerUID);
+                    var targetPlayerName = targetPlayer?.PlayerName ?? "unknown player";
+
+                    // Handle temporal gear return for the requesting player
+                    if (outgoingRequest.TemporalGearConsumed)
+                    {
+                        if (ReturnTemporalGear(serverPlayer))
+                        {
+                            serverPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                                $"Your TPA request to {targetPlayerName} has timed out. Your temporal gear has been returned.",
+                                EnumChatType.Notification);
+                        }
+                        else
+                        {
+                            serverPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                                $"Your TPA request to {targetPlayerName} has timed out. Failed to return your temporal gear. (this is probably a mod bug, report this!)",
+                                EnumChatType.CommandError);
+                        }
+                    }
+                    else
+                    {
+                        serverPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                            $"Your TPA request to {targetPlayerName} has timed out.",
+                            EnumChatType.Notification);
+                    }
+
+                    // Notify the target player if they're online
+                    if (targetPlayer != null)
+                    {
+                        targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                            $"TPA request from {serverPlayer.PlayerName} has timed out.",
+                            EnumChatType.Notification);
+                    }
+
+                    // Clear the expired outgoing request
+                    serverPlayer.ClearOutgoingTpaRequest();
+                }
+            }
         }
 
         protected override void BasicStartServerSide()
         {
             if (Config.AllowPlayerTpa)
             {
+                // Register player join event to return owed temporal gears
+                API.Event.PlayerJoin += OnPlayerJoin;
                 API.Permissions.RegisterPrivilege("tpa", "Ability to use the /tpa and /tpahere commands");
 
                 API.ChatCommands.GetOrCreate("tpa")
@@ -115,7 +267,32 @@ namespace thebasics.ModSystems.TPA
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpaClear);
+
+                // Set up timeout checking timer if timeouts are enabled
+                if (Config.TpaUseTimeout)
+                {
+                    // Check for expired requests every 30 seconds
+                    _timeoutCheckTimer = API.World.RegisterGameTickListener(CheckForExpiredRequests, 30000);
+                }
             }
+        }
+
+        public override void Dispose()
+        {
+            // Unregister the timeout check timer to prevent resource leaks
+            if (_timeoutCheckTimer != 0)
+            {
+                API.World.UnregisterGameTickListener(_timeoutCheckTimer);
+                _timeoutCheckTimer = 0;
+            }
+
+            // Unregister player join event handler
+            if (API?.Event != null)
+            {
+                API.Event.PlayerJoin -= OnPlayerJoin;
+            }
+            
+            base.Dispose();
         }
 
         private TextCommandResult HandleTpa(TextCommandCallingArgs args)
@@ -152,6 +329,7 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpaRequest(IServerPlayer player, IServerPlayer targetPlayer,
             TpaRequestType type)
         {
+            // Validate temporal gear requirement FIRST, but don't consume yet
             if (Config.TpaRequireTemporalGear)
             {
                 if(!IsPlayerHoldingTemporalGear(player))
@@ -163,13 +341,9 @@ namespace thebasics.ModSystems.TPA
                             "You must hold a temporal gear to initiate a teleport request. (This will consume it)",
                     };
                 }
-                else
-                {
-                    // TODO: Remove temporal gear from inventory (temporarily if request times out or is declined?)
-                }
-                
             }
 
+            // Validate cooldown restrictions
             if (!player.CanTpa(API.World.Calendar, Config)) // TODO: Dynamic error message
             {
                 var hoursString = Config.TpaCooldownInGameHours.ToString("0.##");
@@ -181,6 +355,7 @@ namespace thebasics.ModSystems.TPA
                 };
             }
 
+            // Validate self-teleport prevention
             if (targetPlayer.PlayerUID == player.PlayerUID)
             {
                 return new TextCommandResult
@@ -190,6 +365,7 @@ namespace thebasics.ModSystems.TPA
                 };
             }
 
+            // Validate target player permissions
             if (!targetPlayer.GetTpAllowed())
             {
                 return new TextCommandResult
@@ -197,6 +373,19 @@ namespace thebasics.ModSystems.TPA
                     Status = EnumCommandStatus.Error,
                     StatusMessage = "Player has teleport requests from other players disabled.",
                 };
+            }
+
+            // ALL validations passed - NOW consume the temporal gear
+            if (Config.TpaRequireTemporalGear)
+            {
+                if (!RemoveTemporalGear(player))
+                {
+                    return new TextCommandResult
+                    {
+                        Status = EnumCommandStatus.Error,
+                        StatusMessage = "Failed to consume temporal gear. Please try again.",
+                    };
+                }
             }
 
             API.World.SpawnParticles(GetTpaRequestParticles(player));
@@ -207,11 +396,11 @@ namespace thebasics.ModSystems.TPA
             requestMessage.Append(player.PlayerName);
             if (type == TpaRequestType.Bring)
             {
-                requestMessage.Append(" has requested to teleport to you.");
+                requestMessage.Append(" has requested to bring you to them.");
             }
             else if (type == TpaRequestType.Goto)
             {
-                requestMessage.Append(" has requested to bring you to them.");
+                requestMessage.Append(" has requested to teleport to you.");
             }
 
             requestMessage.Append(" Type `/tpaccept` to accept, or `/tpdeny` to deny.");
@@ -219,13 +408,18 @@ namespace thebasics.ModSystems.TPA
             targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup, requestMessage.ToString(),
                 EnumChatType.Notification);
 
-            targetPlayer.AddTpaRequest(new TpaRequest
+            var request = new TpaRequest
             {
                 Type = type,
                 RequestTimeHours = API.World.Calendar.TotalHours,
+                RequestTimeRealTicks = DateTime.UtcNow.Ticks,
                 RequestPlayerUID = player.PlayerUID,
                 TargetPlayerUID = targetPlayer.PlayerUID,
-            });
+                TemporalGearConsumed = Config.TpaRequireTemporalGear,
+            };
+
+            // Store request only on the requester (single source of truth)
+            player.SetOutgoingTpaRequest(request);
             player.SetTpaTime(API.World.Calendar);
 
             return new TextCommandResult
@@ -238,9 +432,9 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpAccept(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-            var requests = player.GetTpaRequests().ToList();
+            var request = player.FindIncomingTpaRequest(API);
 
-            if (requests.Count == 0)
+            if (request == null)
             {
                 return new TextCommandResult
                 {
@@ -248,8 +442,6 @@ namespace thebasics.ModSystems.TPA
                     StatusMessage = "No recent teleport request to accept!",
                 };
             }
-
-            var request = requests[0];
 
             var targetPlayer = API.GetPlayerByUID(request.RequestPlayerUID);
 
@@ -260,19 +452,20 @@ namespace thebasics.ModSystems.TPA
             {
                 var pos = player.Entity.Pos;
                 targetPlayer.Entity.TeleportToDouble(pos.X, pos.Y, pos.Z);
-                API.World.SpawnParticles(GetTpaRequestParticles(player), player);
-                API.World.SpawnParticles(GetTpaRequestParticles(player), targetPlayer);
+                API.World.SpawnParticles(GetTpaRequestParticles(targetPlayer));
+                API.World.SpawnParticles(GetTpaRequestParticles(player));
             }
 
             else if (request.Type == TpaRequestType.Bring)
             {
                 var pos = targetPlayer.Entity.Pos;
                 player.Entity.TeleportToDouble(pos.X, pos.Y, pos.Z);
-                API.World.SpawnParticles(GetTpaRequestParticles(targetPlayer), player);
-                API.World.SpawnParticles(GetTpaRequestParticles(targetPlayer), targetPlayer);
+                API.World.SpawnParticles(GetTpaRequestParticles(targetPlayer));
+                API.World.SpawnParticles(GetTpaRequestParticles(player));
             }
 
-            player.RemoveTpaRequest(request);
+            // Teleport was successful - clear the outgoing request since gear was used properly
+            targetPlayer.ClearOutgoingTpaRequest();
 
             return new TextCommandResult
             {
@@ -285,9 +478,9 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpDeny(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-            var requests = player.GetTpaRequests().ToList();
+            var request = player.FindIncomingTpaRequest(API);
 
-            if (requests.Count == 0)
+            if (request == null)
             {
                 return new TextCommandResult
                 {
@@ -296,12 +489,35 @@ namespace thebasics.ModSystems.TPA
                 };
             }
 
-            var request = requests[0];
-
             var targetPlayer = API.GetPlayerByUID(request.RequestPlayerUID);
-            targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup, "Your teleport request has been denied!",
-                EnumChatType.CommandError);
-            player.RemoveTpaRequest(request);
+            
+            // Return temporal gear if it was consumed for this request
+            if (request.TemporalGearConsumed)
+            {
+                if (ReturnTemporalGear(targetPlayer))
+                {
+                    targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                        "Your teleport request has been denied! Your temporal gear has been returned.",
+                        EnumChatType.CommandError);
+                }
+                else
+                {
+                    targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                        "Your teleport request has been denied! Failed to return your temporal gear. (this is probably a mod bug, report this!)",
+                        EnumChatType.CommandError);
+                }
+                
+                // Clear the outgoing request since we handled the gear
+                targetPlayer.ClearOutgoingTpaRequest();
+            }
+            else
+            {
+                targetPlayer.SendMessage(GlobalConstants.GeneralChatGroup, "Your teleport request has been denied!",
+                    EnumChatType.CommandError);
+                    
+                // Clear the outgoing request
+                targetPlayer.ClearOutgoingTpaRequest();
+            }
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Error,
@@ -325,12 +541,41 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpaClear(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-            player.ClearTpaRequests();
+            
+            // Find any incoming TPA request to this player and clear it
+            var incomingRequest = player.FindIncomingTpaRequest(API);
+            if (incomingRequest != null)
+            {
+                var requestingPlayer = API.GetPlayerByUID(incomingRequest.RequestPlayerUID);
+                if (requestingPlayer != null && incomingRequest.TemporalGearConsumed)
+                {
+                    if (ReturnTemporalGear(requestingPlayer))
+                    {
+                        requestingPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                            "Your TPA request was cleared. Your temporal gear has been returned.",
+                            EnumChatType.Notification);
+                    }
+                    else
+                    {
+                        requestingPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                            "Your TPA request was cleared. Failed to return your temporal gear. (this is probably a mod bug, report this!)",
+                            EnumChatType.CommandError);
+                    }
+                }
+
+                // Clear the outgoing request
+                if (requestingPlayer != null)
+                {
+                    requestingPlayer.ClearOutgoingTpaRequest();
+                }
+            }
+            
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = "Teleport requests have been cleared.",
+                StatusMessage = incomingRequest != null ? "Teleport request has been cleared." : "No teleport requests to clear.",
             };
         }
+
     }
 }

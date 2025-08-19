@@ -28,7 +28,7 @@ namespace thebasics.Extensions
 
         private const string ModDataTpaTime = "BASIC_TPA_TIME";
         private const string ModDataTpAllowed = "BASIC_TPA_ALLOWED";
-        private const string ModDataTpaRequests = "BASIC_TPA_REQUESTS";
+        private const string ModDataOutgoingTpaRequest = "BASIC_OUTGOING_TPA_REQUEST";
 
 
         private const string ModDataLanguages = "BASIC_LANGUAGES";
@@ -269,44 +269,6 @@ namespace thebasics.Extensions
 
 
         #region TPA Requests
-        private static string SerializeTpaRequests(List<TpaRequest> requests)
-        {
-            return JsonConvert.SerializeObject(requests);
-        }
-
-        private static List<TpaRequest> DeserializeTpaRequests(string data)
-        {
-            return JsonConvert.DeserializeObject<List<TpaRequest>>(data);
-        }
-
-        private static string GetDefaultSerializedTpaRequests()
-        {
-            return SerializeTpaRequests(new List<TpaRequest>());
-        }
-        
-        public static List<TpaRequest> GetTpaRequests(this IServerPlayer player)
-        {
-            return DeserializeTpaRequests(GetModData(player, ModDataTpaRequests, GetDefaultSerializedTpaRequests()));
-        }
-
-        public static void ClearTpaRequests(this IServerPlayer player)
-        {
-            SetModData<string>(player, ModDataTpaRequests, null);
-        }
-
-        public static void AddTpaRequest(this IServerPlayer player, TpaRequest request)
-        {
-            var currentRequests = player.GetTpaRequests().ToList();
-            currentRequests.Add(request);
-            SetModData(player, ModDataTpaRequests, SerializeTpaRequests(currentRequests));
-        }
-
-        public static void RemoveTpaRequest(this IServerPlayer player, TpaRequest request)
-        {
-            var currentRequests = player.GetTpaRequests().ToList();
-            currentRequests.Remove(request);
-            SetModData(player, ModDataTpaRequests, SerializeTpaRequests(currentRequests));
-        }
 
         public static bool CanTpa(this IServerPlayer player, IGameCalendar cal, ModConfig config)
         {
@@ -337,6 +299,62 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataTpAllowed, true);
         }
+
+        public static TpaRequest GetOutgoingTpaRequest(this IServerPlayer player)
+        {
+            var data = GetModData<string>(player, ModDataOutgoingTpaRequest, null);
+            if (string.IsNullOrEmpty(data)) return null;
+            
+            try
+            {
+                return JsonConvert.DeserializeObject<TpaRequest>(data);
+            }
+            catch
+            {
+                // If deserialization fails, clear the corrupted data
+                player.ClearOutgoingTpaRequest();
+                return null;
+            }
+        }
+
+        public static void SetOutgoingTpaRequest(this IServerPlayer player, TpaRequest request)
+        {
+            var data = request == null ? null : JsonConvert.SerializeObject(request);
+            SetModData(player, ModDataOutgoingTpaRequest, data);
+        }
+
+        public static void ClearOutgoingTpaRequest(this IServerPlayer player)
+        {
+            SetModData<string>(player, ModDataOutgoingTpaRequest, null);
+        }
+
+        public static bool HasExpiredOutgoingTpaRequest(this IServerPlayer player, double timeoutMinutes)
+        {
+            var request = player.GetOutgoingTpaRequest();
+            if (request == null) return false;
+
+            var currentTime = DateTime.UtcNow;
+            var timeoutTicks = TimeSpan.FromMinutes(timeoutMinutes).Ticks;
+            
+            return currentTime.Ticks - request.RequestTimeRealTicks >= timeoutTicks;
+        }
+
+        public static TpaRequest FindIncomingTpaRequest(this IServerPlayer targetPlayer, ICoreServerAPI api)
+        {
+            // Find any online player who has an outgoing request targeting this player
+            foreach (var player in api.World.AllOnlinePlayers)
+            {
+                var serverPlayer = player as IServerPlayer;
+                if (serverPlayer == null) continue;
+
+                var outgoingRequest = serverPlayer.GetOutgoingTpaRequest();
+                if (outgoingRequest != null && outgoingRequest.TargetPlayerUID == targetPlayer.PlayerUID)
+                {
+                    return outgoingRequest;
+                }
+            }
+            return null;
+        }
         #endregion
 
         public static void SetOOCEnabled(this IServerPlayer player, bool enabled)
@@ -348,5 +366,8 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataOOCEnabled, false);
         }
+        
+        public static double GetDistance(this IServerPlayer sendingPlayer, IServerPlayer receivingPlayer) =>
+            sendingPlayer.Entity.ServerPos.DistanceTo(receivingPlayer.Entity.ServerPos);
     }
 }

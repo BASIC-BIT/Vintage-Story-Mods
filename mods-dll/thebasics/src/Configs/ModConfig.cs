@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using ProtoBuf;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -58,19 +59,6 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, "." }
             };
             
-            ProximityChatModeQuotationStart ??= new Dictionary<ProximityChatMode, string>
-            {
-                { ProximityChatMode.Yell, "\"" },
-                { ProximityChatMode.Normal, "\"" },
-                { ProximityChatMode.Whisper, "\"" }
-            };
-            
-            ProximityChatModeQuotationEnd ??= new Dictionary<ProximityChatMode, string>
-            {
-                { ProximityChatMode.Yell, "\"" },
-                { ProximityChatMode.Normal, "\"" },
-                { ProximityChatMode.Whisper, "\"" }
-            };
             
             PlayerStatToggles ??= new Dictionary<PlayerStatType, bool>
             {
@@ -81,15 +69,19 @@ namespace thebasics.Configs
                 { PlayerStatType.DistanceTravelled, true }
             };
             
-            Languages ??= new Language[]
-            {
+            Languages ??=
+            [
                 new Language("Common", "The universal language", "c",
                     new string[] { "al", "er", "at", "th", "it", "ha", "er", "es", "s", "le", "ed", "ve" },
                     "#E9DDCE", true, false),
                 new Language("Tradeband", "A common language for trade", "tr",
                     new string[] { "feng", "tar", "kin", "ga", "shin", "ji" },
                     "#D4A96A", false, false)
-            };
+            ];
+
+            // Initialize chat delimiters and ensure nested defaults even for legacy configs
+            ChatDelimiters ??= new ChatDelimiters();
+            ChatDelimiters.InitializeDefaultsIfNeeded();
         }
 
         [ProtoMember(1)]
@@ -145,11 +137,9 @@ namespace thebasics.Configs
         [ProtoMember(17)]
         public IDictionary<ProximityChatMode, string> ProximityChatModePunctuation { get; set; }
 
-        [ProtoMember(18)]
-        public IDictionary<ProximityChatMode, string> ProximityChatModeQuotationStart { get; set; }
-
-        [ProtoMember(19)]
-        public IDictionary<ProximityChatMode, string> ProximityChatModeQuotationEnd { get; set; }
+        // ProtoMember(18) - REMOVED/DEPRECATED - Previously ProximityChatModeQuotationStart
+        // ProtoMember(19) - REMOVED/DEPRECATED - Previously ProximityChatModeQuotationEnd
+        // Quote handling is now done directly in transformers based on language type
 
         [ProtoMember(20)]
         public string ProximityChatName { get; set; } = "Proximity";
@@ -210,6 +200,12 @@ namespace thebasics.Configs
         
         [ProtoMember(39)]
         public double TpaCooldownInGameHours { get; set; } = 0.5;
+        
+        [ProtoMember(62)]
+        public bool TpaUseTimeout { get; set; } = true;
+        
+        [ProtoMember(63)]
+        public double TpaTimeoutMinutes { get; set; } = 2.0;
 
         [ProtoMember(40)]
         public bool EnableSleepNotifications { get; set; } = true;
@@ -263,14 +259,13 @@ namespace thebasics.Configs
         [ProtoMember(56)]
         public int MaxNicknameLength { get; set; } = 100;
 
-        // TODO: Should this also warn admins when they do this and/or ask for confirmation?
-        // TODO: Catalog all existing nicknames and player names for all users in the server, to implement this functionality
-        [ProtoMember(57)]
-        public bool DisallowNicknameThatIsAnotherPlayersName { get; set; } = true;
-        
+        // ProtoMember(57) - RESERVED/BLACKLISTED
+        // Previously used for DisallowNicknameThatIsAnotherPlayersName (removed - now always enforced)
+        // Do not reuse this number to avoid deserialization issues with existing config files
+
         [ProtoMember(58)]
         public string OOCColor { get; set; } = "#eaf188";
-
+        
         [ProtoMember(59)]
         public string GlobalOOCColor { get; set; } = "#f1b288";
 
@@ -279,5 +274,11 @@ namespace thebasics.Configs
         
         [ProtoMember(61)]
         public bool UseNicknameInOOC { get; set; } = true;
+        
+        [ProtoMember(64)]
+        public bool RemoveClassLanguagesOnClassChange { get; set; } = false;
+
+        [ProtoMember(65)]
+        public ChatDelimiters ChatDelimiters { get; set; }
     }
 }

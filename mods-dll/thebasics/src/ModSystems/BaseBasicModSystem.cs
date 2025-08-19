@@ -46,7 +46,13 @@ namespace thebasics.ModSystems
                 Config = new ModConfig();
                 Config.InitializeDefaultsIfNeeded();
                 API.StoreModConfig(this.Config, ConfigName);
+                return;
             }
+
+            // Ensure defaults are applied when loading existing/legacy configs (JSON won't trigger ProtoBuf hooks)
+            Config.InitializeDefaultsIfNeeded();
+            // Optionally persist any backfilled defaults for future runs
+            API.StoreModConfig(this.Config, ConfigName);
         }
     }
 }

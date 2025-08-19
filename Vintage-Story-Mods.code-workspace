@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../vs_source"
+		},
+		{
+			"path": "C:/Users/steve/AppData/Roaming/VintagestoryData"
+		},
+		{
+			"path": "../../Games/VSProfiles/Profile2"
+		},
+		{
+			"path": "../../../Games/Vintagestory/assets"
+		}
+	],
+	"settings": {
+		"dotnet.preferCSharpExtension": true,
+		"powershell.cwd": "Vintage-Story-Mods",
+		"dotnet.defaultSolution": "Vintage-Story-Mods/Vintage-Story-Mods.sln"
+	}
+}

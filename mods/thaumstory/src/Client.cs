@@ -33,7 +33,7 @@ namespace thaumstory
             {
                 this.config = api.LoadModConfig<ModConfig>(CONFIGNAME);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 api.Logger.Error("Thaumstory: Failed to load mod config!");
                 return;

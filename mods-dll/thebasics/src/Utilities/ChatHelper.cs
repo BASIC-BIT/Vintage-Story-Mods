@@ -143,6 +143,26 @@ namespace thebasics.Utilities
             return Color(message, lang.Color);
         }
 
+        // Escape user-provided text before embedding into VTML markup
+        // Since VTML doesn't interpret HTML entities, we use descriptive replacements
+        public static string EscapeMarkup(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return input;
+
+            var sb = new StringBuilder(input.Length + 16);
+            foreach (var ch in input)
+            {
+                switch (ch)
+                {
+                    case '&': sb.Append("[and]"); break;
+                    case '<': sb.Append("[less-than]"); break;
+                    case '>': sb.Append("[greater-than]"); break;
+                    default: sb.Append(ch); break;
+                }
+            }
+            return sb.ToString();
+        }
+
         public static string LangIdentifier(Language lang)
         {
             return LangColor($"{lang.Name} (:{lang.Prefix})", lang);

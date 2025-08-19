@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
@@ -22,12 +24,15 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
     public override MessageContext Transform(MessageContext context)
     {
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
-        var quote = lang == LanguageSystem.SignLanguage ? "'" : "\"";
         var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
 
-        // Add Quotes
-        context.Message = $"{quote}{context.Message}{quote}";
+        // Note: content is escaped earlier in the pipeline for speech
+
+        // Add Quotes based on language type
+        var delimiters = _config.ChatDelimiters;
+        var quoteDelimiter = lang == LanguageSystem.SignLanguage ? delimiters.SignLanguageQuote : delimiters.Quote;
+        context.Message = $"{quoteDelimiter.Start}{context.Message}{quoteDelimiter.End}";
         // Add Italics if sign language
         if(lang == LanguageSystem.SignLanguage){
             _chatSystem.API.Logger.Debug("Adding italics to sign language");
@@ -36,9 +41,11 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
 
         // Add Lang color
         context.Message = ChatHelper.LangColor(context.Message, lang);
+        
         var verb = GetProximityChatVerb(lang, mode);
 
         context.Message = $"{nickname} {verb} {context.Message}";
+
         return context;
     }
 
