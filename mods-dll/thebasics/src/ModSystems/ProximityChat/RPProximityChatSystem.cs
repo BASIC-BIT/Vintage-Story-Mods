@@ -479,7 +479,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Nicknames cannot contain '<' or '>' characters. If you want color, use /nickcolor instead.",
+                    StatusMessage = "Nicknames cannot contain angle brackets. The less-than and greater-than symbols would be displayed as [less-than] and [greater-than]. If you want color, use /nickcolor instead.",
                 };
             }
             
@@ -547,7 +547,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Nicknames cannot contain '<' or '>' characters. If you want color, use /adminsetnickcolor or have the player use /nickcolor.",
+                    StatusMessage = "Nicknames cannot contain angle brackets. The less-than and greater-than symbols would be displayed as [less-than] and [greater-than]. If you want color, use /adminsetnickcolor or have the player use /nickcolor.",
                 };
             }
             

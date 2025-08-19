@@ -144,6 +144,7 @@ namespace thebasics.Utilities
         }
 
         // Escape user-provided text before embedding into VTML markup
+        // Since VTML doesn't interpret HTML entities, we use descriptive replacements
         public static string EscapeMarkup(string input)
         {
             if (string.IsNullOrEmpty(input)) return input;
@@ -153,9 +154,9 @@ namespace thebasics.Utilities
             {
                 switch (ch)
                 {
-                    case '&': sb.Append("&amp;"); break;
-                    case '<': sb.Append("&lt;"); break;
-                    case '>': sb.Append("&gt;"); break;
+                    case '&': sb.Append("[and]"); break;
+                    case '<': sb.Append("[less-than]"); break;
+                    case '>': sb.Append("[greater-than]"); break;
                     default: sb.Append(ch); break;
                 }
             }
