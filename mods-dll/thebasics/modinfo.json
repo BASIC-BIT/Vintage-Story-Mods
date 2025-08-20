@@ -2,7 +2,7 @@
   "type": "code",
   "modid": "thebasics",
   "name": "The BASICs",
-  "author": "BASIC",
+  "authors": ["BASIC"],
   "description": "Adds an RP proximity chat system, with configurable talking ranges, customizable name colors, automatic message formatting, and more!",
   "version": "5.1.2-rc.1",
   "dependencies": {
