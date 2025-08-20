@@ -33,6 +33,7 @@ public class TransformerSystem
         {
             // Validation transformers
             new PlayerChatTransformer(_chatSystem), // If player chat, process special modifiers
+            new CommandMessageEscapeTransformer(_chatSystem), // Escape XML special characters in command messages
             new RoleplayTransformer(_chatSystem), // Add roleplay metadata
             new NicknameRequirementTransformer(_chatSystem), // Require nickname if we're in RP chat
             new ChangeSpeakingLanguageTransformer(_chatSystem, _languageSystem), // Handle changing speaking language
@@ -54,8 +55,6 @@ public class TransformerSystem
         // Initialize transformers for the recipient phase (content transformation for each recipient)
         _recipientPhaseTransformers = new List<MessageTransformerBase>
         {
-            // Escape raw speech content before any VTML is added for the recipient
-            new EscapeSpeechContentTransformer(_chatSystem),
             new EmoteTransformer(_chatSystem, _languageSystem), // Format emotes correctly
             // Keep only transformers that need recipient-specific processing
             new LanguageTransformer(_languageSystem, _chatSystem),

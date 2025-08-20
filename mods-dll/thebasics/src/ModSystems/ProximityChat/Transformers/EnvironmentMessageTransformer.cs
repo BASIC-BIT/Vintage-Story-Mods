@@ -17,8 +17,8 @@ public class EnvironmentMessageTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        // Apply italic formatting after escaping to avoid VTML injection
-        context.Message = ChatHelper.Italic(ChatHelper.EscapeMarkup(context.Message));
+        // Apply italic formatting
+        context.Message = ChatHelper.Italic(context.Message);
         
         return context;
     }

@@ -8,12 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Local Development Build
 ```powershell
-# Full solution build
+# Build and package main mod (thebasics) - ALWAYS USE THIS FOR TESTING
+.\mods-dll\thebasics\scripts\build-and-package.ps1
+
+# Full solution build (rarely needed)
 dotnet restore Vintage-Story-Mods.sln
 dotnet build Vintage-Story-Mods.sln --configuration Release
-
-# Build and package main mod (thebasics)
-.\mods-dll\thebasics\scripts\build-and-package.ps1
 
 # Package only (after build)
 Push-Location mods-dll\thebasics
