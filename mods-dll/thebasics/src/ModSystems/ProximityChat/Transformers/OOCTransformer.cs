@@ -16,8 +16,7 @@ public class OOCTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        var safeMsg = ChatHelper.EscapeMarkup(context.Message);
-        context.Message = ChatHelper.Color($"(OOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {safeMsg}", _config.OOCColor);
+        context.Message = ChatHelper.Color($"(OOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}", _config.OOCColor);
 
         return context;
     }

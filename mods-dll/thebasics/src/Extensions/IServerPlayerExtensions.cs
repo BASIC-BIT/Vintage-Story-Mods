@@ -72,7 +72,9 @@ namespace thebasics.Extensions
         }
         public static string GetNicknameWithColor(this IServerPlayer player)
         {
-            return ChatHelper.Color(GetNickname(player), GetNicknameColor(player));
+            // Escape the nickname first to prevent VTML injection, then apply color
+            var escapedNickname = VtmlUtils.EscapeVtml(GetNickname(player));
+            return ChatHelper.Color(escapedNickname, GetNicknameColor(player));
         }
 
         public static void SetNickname(this IServerPlayer player, string nickname)

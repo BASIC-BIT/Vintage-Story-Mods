@@ -67,6 +67,7 @@ public class MessageContext
     public static readonly string IS_EMOTE = "isEmote";
     public static readonly string IS_ROLEPLAY = "isRoleplay";
     public static readonly string IS_GLOBAL_OOC = "isGlobalOOC";
+    public static readonly string IS_FROM_COMMAND = "isFromCommand";
     public static readonly string LANGUAGE = "language";
     public static readonly string CHAT_MODE = "chatMode";
     public static readonly string CHAT_TYPE = "chatType";

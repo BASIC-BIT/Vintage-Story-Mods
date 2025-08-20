@@ -192,7 +192,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = message,
             SendingPlayer = player,
             GroupId = groupId,
-            Flags = { [MessageContext.IS_GLOBAL_OOC] = true }
+            Flags = { 
+                [MessageContext.IS_GLOBAL_OOC] = true,
+                [MessageContext.IS_FROM_COMMAND] = true
+            }
         };
         
         TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
@@ -214,7 +217,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = message,
             SendingPlayer = player,
             GroupId = groupId,
-            Flags = { [MessageContext.IS_OOC] = true },
+            Flags = { 
+                [MessageContext.IS_OOC] = true,
+                [MessageContext.IS_FROM_COMMAND] = true
+            },
         };
         
         TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
@@ -473,16 +479,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             var nickname = (string)fullArgs.Parsers[0].GetValue();
             
-            // Disallow VTML injection via nicknames
-            if (nickname.Contains('<') || nickname.Contains('>'))
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = "Nicknames cannot contain angle brackets. If you want color, use /nickcolor instead.",
-                };
-            }
-            
             // Validate nickname against conflicts - always enforced
             if (!NicknameValidationUtils.ValidateNickname(player, nickname, API, out string conflictingPlayer, out string conflictType))
             {
@@ -498,7 +494,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Okay, your nickname is set to {ChatHelper.Quote(nickname)}",
+                StatusMessage = $"Okay, your nickname is set to {ChatHelper.Quote(VtmlUtils.EscapeVtml(nickname))}",
             };
         }
     }
@@ -534,22 +530,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {oldNickname}",
+                StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {VtmlUtils.EscapeVtml(oldNickname)}",
             };
         }
         else
         {
             var newNickname = (string)fullArgs.Parsers[2].GetValue();
-            
-            // Disallow VTML injection via nicknames
-            if (newNickname.Contains('<') || newNickname.Contains('>'))
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = "Nicknames cannot contain angle brackets. If you want color, use /adminsetnickcolor or have the player use /nickcolor.",
-                };
-            }
             
             // Validate nickname against conflicts and show warning to admin - always enforced unless forced
             if (!isForced)
@@ -573,7 +559,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {attemptTarget.GetNicknameWithColor()}.  Old Nickname: {oldNickname}{forceMessage}",
+                StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {attemptTarget.GetNicknameWithColor()}.  Old Nickname: {VtmlUtils.EscapeVtml(oldNickname)}{forceMessage}",
             };
         }
     }
@@ -587,7 +573,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
             GroupId = ProximityChatId,
-            Flags = { [MessageContext.IS_EMOTE] = true }
+            Flags = { 
+                [MessageContext.IS_EMOTE] = true,
+                [MessageContext.IS_FROM_COMMAND] = true
+            }
         };
 
         // Process the entire pipeline
@@ -608,7 +597,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
             GroupId = ProximityChatId,
-            Flags = { [MessageContext.IS_ENVIRONMENTAL] = true }
+            Flags = { 
+                [MessageContext.IS_ENVIRONMENTAL] = true,
+                [MessageContext.IS_FROM_COMMAND] = true
+            }
         };
 
         // Process the entire pipeline
@@ -664,7 +656,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 },
                 Flags =
                 {
-                    [MessageContext.IS_PLAYER_CHAT] = true // Mark as player chat so it goes through player transformers
+                    [MessageContext.IS_PLAYER_CHAT] = true, // Mark as player chat so it goes through player transformers
+                    [MessageContext.IS_FROM_COMMAND] = true
                 }
             };
 
