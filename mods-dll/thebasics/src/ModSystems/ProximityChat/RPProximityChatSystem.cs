@@ -20,6 +20,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     public LanguageSystem LanguageSystem;
     public DistanceObfuscationSystem DistanceObfuscationSystem;
     private IServerNetworkChannel _serverConfigChannel;
+    public IServerNetworkChannel ServerNetworkChannel => _serverConfigChannel;
     public ProximityCheckUtils ProximityCheckUtils;
     public TransformerSystem TransformerSystem;
 
@@ -28,6 +29,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         HookEvents();
         RegisterCommands();
         SetupProximityGroup();
+        RegisterForServerSideConfig();
 
         LanguageSystem = new LanguageSystem(this, API, Config);
         DistanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);

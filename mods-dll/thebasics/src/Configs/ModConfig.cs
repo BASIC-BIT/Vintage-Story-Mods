@@ -280,5 +280,8 @@ namespace thebasics.Configs
 
         [ProtoMember(65)]
         public ChatDelimiters ChatDelimiters { get; set; }
+        
+        [ProtoMember(66)]
+        public bool DisableFloatingText { get; set; } = false;
     }
 }

@@ -159,14 +159,24 @@ public class TransformerSystem
             // Get the chat type from the context metadata or use the provided default
             var chatType = recipientContext.GetMetadata(MessageContext.CHAT_TYPE, defaultChatType);
 
-            // Get client data if available
-            string data = null;
-            if (recipientContext.TryGetMetadata("clientData", out string clientData))
+            // Determine if we should show floating text for this message type
+            bool shouldShowFloating = false;
+            if (context.SendingPlayer?.Entity != null && !_chatSystem.Config.DisableFloatingText)
             {
-                data = clientData;
+                shouldShowFloating = true;
             }
-
-            // Send the message to this recipient
+            
+            // Build the data field for floating text if needed
+            string data = null;
+            if (shouldShowFloating && context.SendingPlayer?.Entity != null)
+            {
+                // Format: "from: {entityId},rptext:"
+                // The rptext: marker tells our client-side patch to handle this specially
+                // Empty after colon so nothing shows if vanilla processes it
+                data = $"from: {context.SendingPlayer.Entity.EntityId},rptext:";
+            }
+            
+            // Send the message to this recipient with the proper data field
             recipient.SendMessage(_chatSystem.ProximityChatId, recipientContext.Message, chatType, data);
         }
     }
