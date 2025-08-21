@@ -177,8 +177,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RequiresPrivilege(Privilege.chat)
             .RequiresPlayer()
             .HandleWith(Whisper);
-
-        RegisterForServerSideConfig();
     }
 
     private TextCommandResult SendGlobalOOCMessage(TextCommandCallingArgs args)
