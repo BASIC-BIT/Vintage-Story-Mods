@@ -256,10 +256,20 @@ public static class EntityShapeRendererPatch
         }
     }
     
+    // Hardcoded flag to strip font tags for floating text
+    // Font sizing is already handled by 3D perspective, so we don't need additional size changes
+    private const bool StripFontTagsForFloatingText = true;
+    
     private static LoadedTexture RenderVtmlToTexture(ICoreClientAPI capi, string vtmlText)
     {
         try
         {
+            // Strip font tags if needed (font sizing is handled by 3D perspective)
+            if (StripFontTagsForFloatingText)
+            {
+                vtmlText = System.Text.RegularExpressions.Regex.Replace(vtmlText, @"</?font[^>]*>", "");
+            }
+            
             // Parse VTML to rich text components
             var baseFont = new CairoFont(25.0, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble);
             var components = VtmlUtil.Richtextify(capi, vtmlText, baseFont, null);
@@ -269,14 +279,46 @@ public static class EntityShapeRendererPatch
                 return null;
             }
             
-            // Create TextFlowPath for layout calculation
-            double maxWidth = 350;
-            var flowPath = new TextFlowPath[] { new TextFlowPath(maxWidth) };
+            // First pass: calculate required width
+            double minWidth = 350;
+            double maxWidth = 600;
+            double requiredWidth = minWidth;
             
-            // Calculate bounds for all components
+            // Do a preliminary calculation to find the natural width
+            var testFlowPath = new TextFlowPath[] { new TextFlowPath(9999) }; // Very wide to get natural width
+            foreach (var component in components)
+            {
+                if (component is RichTextComponent rtc)
+                {
+                    var textUtilField = AccessTools.Field(typeof(RichTextComponent), "textUtil");
+                    if (textUtilField != null && textUtilField.GetValue(rtc) == null)
+                    {
+                        textUtilField.SetValue(rtc, new TextDrawUtil());
+                    }
+                }
+                
+                double nextX;
+                component.CalcBounds(testFlowPath, 0, 0, 0, out nextX);
+                
+                if (component.BoundsPerLine != null && component.BoundsPerLine.Length > 0)
+                {
+                    foreach (var bounds in component.BoundsPerLine)
+                    {
+                        requiredWidth = Math.Max(requiredWidth, bounds.X + bounds.Width);
+                    }
+                }
+            }
+            
+            // Clamp the width to reasonable bounds
+            requiredWidth = Math.Min(maxWidth, Math.Max(minWidth, requiredWidth + 20)); // Add 20px padding
+            
+            // Create TextFlowPath with calculated width
+            var flowPath = new TextFlowPath[] { new TextFlowPath(requiredWidth) };
+            
+            // Calculate bounds for all components with proper line height tracking
             double posX = 0;
             double posY = 0;
-            double lineHeight = 0;
+            double currentLineHeight = 0;
             double totalWidth = 0;
             double totalHeight = 0;
             
@@ -296,46 +338,48 @@ public static class EntityShapeRendererPatch
                 
                 // Calculate bounds for this component
                 double nextX;
-                var result = component.CalcBounds(flowPath, lineHeight, posX, posY, out nextX);
-                
-                // Update position based on float behavior
-                if (component.Float == EnumFloat.Inline)
-                {
-                    posX = nextX;
-                }
-                else if (component.Float == EnumFloat.None)
-                {
-                    // Start new line
-                    posX = 0;
-                    posY += lineHeight;
-                    lineHeight = 0;
-                }
-                
-                // Handle multiline components
-                if (result == EnumCalcBoundsResult.Multiline && component.BoundsPerLine != null && component.BoundsPerLine.Length > 0)
-                {
-                    // Component spans multiple lines
-                    var lastLine = component.BoundsPerLine[component.BoundsPerLine.Length - 1];
-                    posY = lastLine.Y + lastLine.Height;
-                    posX = lastLine.X + lastLine.Width;
-                    lineHeight = 0;
-                }
+                var result = component.CalcBounds(flowPath, currentLineHeight, posX, posY, out nextX);
                 
                 // Update dimensions based on component bounds
-                if (component.BoundsPerLine != null)
+                if (component.BoundsPerLine != null && component.BoundsPerLine.Length > 0)
                 {
+                    // Track the maximum height for the current line
+                    currentLineHeight = Math.Max(currentLineHeight, component.BoundsPerLine[0].Height);
+                    
                     foreach (var bounds in component.BoundsPerLine)
                     {
                         totalWidth = Math.Max(totalWidth, bounds.X + bounds.Width);
                         totalHeight = Math.Max(totalHeight, bounds.Y + bounds.Height);
-                        lineHeight = Math.Max(lineHeight, bounds.Height);
+                    }
+                    
+                    // Handle multiline components
+                    if (result == EnumCalcBoundsResult.Multiline && component.BoundsPerLine.Length > 1)
+                    {
+                        // Component spans multiple lines
+                        var lastLine = component.BoundsPerLine[component.BoundsPerLine.Length - 1];
+                        posY = lastLine.Y;
+                        posX = lastLine.X + lastLine.Width;
+                        // Set line height to the last line's height for next component
+                        currentLineHeight = lastLine.Height;
+                    }
+                    else if (component.Float == EnumFloat.Inline)
+                    {
+                        // Continue on same line
+                        posX = nextX;
+                    }
+                    else if (component.Float == EnumFloat.None)
+                    {
+                        // Start new line - move down by current line height
+                        posX = 0;
+                        posY += currentLineHeight;
+                        currentLineHeight = 0; // Reset for new line
                     }
                 }
             }
             
             // Ensure minimum dimensions
             totalWidth = Math.Max(10, totalWidth);
-            totalHeight = Math.Max(lineHeight, Math.Max(10, totalHeight));
+            totalHeight = Math.Max(currentLineHeight, Math.Max(10, totalHeight));
             
             // Create surface with padding
             int surfaceWidth = (int)Math.Ceiling(totalWidth + 6);
