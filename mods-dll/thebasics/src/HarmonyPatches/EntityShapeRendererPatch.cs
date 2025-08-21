@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using Cairo;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -160,30 +161,39 @@ public static class EntityShapeRendererPatch
                 capi.Logger.Debug("THEBASICS: Created new messageTextures list");
             }
             
-            // Process the message - it's already translated/formatted
+            // Process the message - it's already translated/formatted with VTML
             var processedMessage = message.Replace("&lt;", "<").Replace("&gt;", ">");
             
-            // Create texture using the already-translated message
+            // Render VTML to texture with rich text support
             LoadedTexture tex = null;
             try
             {
-                tex = capi.Gui.TextTexture.GenTextTexture(
-                    processedMessage, 
-                    new CairoFont(25.0, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble),
-                    350,
-                    new TextBackground
-                    {
-                        FillColor = GuiStyle.DialogLightBgColor,
-                        Padding = 3,
-                        Radius = GuiStyle.ElementBGRadius
-                    },
-                    EnumTextOrientation.Center
-                );
+                tex = RenderVtmlToTexture(capi, processedMessage);
             }
             catch (Exception texEx)
             {
-                capi.Logger.Error($"THEBASICS: Failed to create texture: {texEx.Message}");
-                return true;
+                capi.Logger.Error($"THEBASICS: Failed to render VTML text: {texEx.Message}");
+                // Fallback to plain text rendering
+                try
+                {
+                    var plainText = System.Text.RegularExpressions.Regex.Replace(processedMessage, @"<[^>]+>", string.Empty);
+                    tex = capi.Gui.TextTexture.GenTextTexture(
+                        plainText, 
+                        new CairoFont(25.0, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble),
+                        350,
+                        new TextBackground
+                        {
+                            FillColor = GuiStyle.DialogLightBgColor,
+                            Padding = 3,
+                            Radius = GuiStyle.ElementBGRadius
+                        },
+                        EnumTextOrientation.Center
+                    );
+                }
+                catch
+                {
+                    return true;
+                }
             }
             
             if (tex == null)
@@ -230,7 +240,7 @@ public static class EntityShapeRendererPatch
             // Insert at beginning of list (newest messages first)
             messageTextures.Insert(0, messageTextureInstance);
             
-            capi.Logger.Debug($"THEBASICS: Successfully added floating text for entity {entityId}: {processedMessage}");
+            capi.Logger.Debug($"THEBASICS: Successfully added rich text floating text for entity {entityId}");
             
             // Skip vanilla processing since we handled it
             return false;
@@ -243,6 +253,161 @@ public static class EntityShapeRendererPatch
                 capi.Logger.Error($"THEBASICS: Exception in EntityShapeRendererPatch: {ex}");
             }
             return true; // Let vanilla handle on error
+        }
+    }
+    
+    private static LoadedTexture RenderVtmlToTexture(ICoreClientAPI capi, string vtmlText)
+    {
+        try
+        {
+            // Parse VTML to rich text components
+            var baseFont = new CairoFont(25.0, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble);
+            var components = VtmlUtil.Richtextify(capi, vtmlText, baseFont, null);
+            
+            if (components == null || components.Length == 0)
+            {
+                return null;
+            }
+            
+            // Create TextFlowPath for layout calculation
+            double maxWidth = 350;
+            var flowPath = new TextFlowPath[] { new TextFlowPath(maxWidth) };
+            
+            // Calculate bounds for all components
+            double posX = 0;
+            double posY = 0;
+            double lineHeight = 0;
+            double totalWidth = 0;
+            double totalHeight = 0;
+            
+            foreach (var component in components)
+            {
+                // Initialize the component if it has an init method (for RichTextComponent)
+                if (component is RichTextComponent rtc)
+                {
+                    // RichTextComponent constructor already calls init() if api is not null
+                    // But we need to ensure TextDrawUtil is initialized
+                    var textUtilField = AccessTools.Field(typeof(RichTextComponent), "textUtil");
+                    if (textUtilField != null && textUtilField.GetValue(rtc) == null)
+                    {
+                        textUtilField.SetValue(rtc, new TextDrawUtil());
+                    }
+                }
+                
+                // Calculate bounds for this component
+                double nextX;
+                var result = component.CalcBounds(flowPath, lineHeight, posX, posY, out nextX);
+                
+                // Update position based on float behavior
+                if (component.Float == EnumFloat.Inline)
+                {
+                    posX = nextX;
+                }
+                else if (component.Float == EnumFloat.None)
+                {
+                    // Start new line
+                    posX = 0;
+                    posY += lineHeight;
+                    lineHeight = 0;
+                }
+                
+                // Handle multiline components
+                if (result == EnumCalcBoundsResult.Multiline && component.BoundsPerLine != null && component.BoundsPerLine.Length > 0)
+                {
+                    // Component spans multiple lines
+                    var lastLine = component.BoundsPerLine[component.BoundsPerLine.Length - 1];
+                    posY = lastLine.Y + lastLine.Height;
+                    posX = lastLine.X + lastLine.Width;
+                    lineHeight = 0;
+                }
+                
+                // Update dimensions based on component bounds
+                if (component.BoundsPerLine != null)
+                {
+                    foreach (var bounds in component.BoundsPerLine)
+                    {
+                        totalWidth = Math.Max(totalWidth, bounds.X + bounds.Width);
+                        totalHeight = Math.Max(totalHeight, bounds.Y + bounds.Height);
+                        lineHeight = Math.Max(lineHeight, bounds.Height);
+                    }
+                }
+            }
+            
+            // Ensure minimum dimensions
+            totalWidth = Math.Max(10, totalWidth);
+            totalHeight = Math.Max(lineHeight, Math.Max(10, totalHeight));
+            
+            // Create surface with padding
+            int surfaceWidth = (int)Math.Ceiling(totalWidth + 6);
+            int surfaceHeight = (int)Math.Ceiling(totalHeight + 6);
+            
+            ImageSurface surface = new ImageSurface(Format.Argb32, surfaceWidth, surfaceHeight);
+            Context ctx = new Context(surface);
+            
+            // Draw background
+            var bgColor = GuiStyle.DialogLightBgColor;
+            ctx.SetSourceRGBA(bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
+            ctx.Rectangle(0, 0, surfaceWidth, surfaceHeight);
+            ctx.Fill();
+            
+            // Apply padding and render components
+            ctx.Save();
+            ctx.Translate(3, 3);
+            
+            foreach (var component in components)
+            {
+                try
+                {
+                    component.ComposeElements(ctx, surface);
+                }
+                catch (Exception compEx)
+                {
+                    capi.Logger.Debug($"THEBASICS: Error rendering component: {compEx.Message}");
+                }
+            }
+            
+            ctx.Restore();
+            
+            // Convert surface to texture
+            LoadedTexture texture = new LoadedTexture(capi);
+            capi.Gui.LoadOrUpdateCairoTexture(surface, true, ref texture);
+            
+            // Clean up
+            ctx.Dispose();
+            surface.Dispose();
+            
+            return texture;
+        }
+        catch (Exception ex)
+        {
+            capi.Logger.Warning($"THEBASICS: Failed to render rich text: {ex.Message}");
+            
+            // Fallback to simple text stripping
+            try
+            {
+                var plainText = System.Text.RegularExpressions.Regex.Replace(vtmlText, @"<[^>]+>", string.Empty);
+                if (string.IsNullOrWhiteSpace(plainText))
+                {
+                    return null;
+                }
+                
+                return capi.Gui.TextTexture.GenTextTexture(
+                    plainText,
+                    new CairoFont(25.0, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble),
+                    350,
+                    new TextBackground
+                    {
+                        FillColor = GuiStyle.DialogLightBgColor,
+                        Padding = 3,
+                        Radius = GuiStyle.ElementBGRadius
+                    },
+                    EnumTextOrientation.Center
+                );
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
