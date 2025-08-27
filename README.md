@@ -4,9 +4,6 @@
 
 ## The BASICs Mod
 
-[![ModDB](https://img.shields.io/badge/ModDB-The%20BASICs-blue)](https://mods.vintagestory.at/thebasics)
-[![Version](https://img.shields.io/badge/Version-5.0.1-green)](https://mods.vintagestory.at/thebasics)
-
 A comprehensive roleplay chat and server management mod for Vintage Story, featuring proximity chat, player statistics, and administrative tools.
 
 As seen on Saltpoint RP, Fair Travels, The Expansion, and various other servers.
