@@ -124,6 +124,8 @@ namespace thebasics.Utilities
                 if (playerDataPair.Key == player.PlayerUID) continue; // Skip self
 
                 var playerData = playerDataPair.Value;
+                if (playerData == null || playerData.LastKnownPlayername == null) continue; // Skip missing
+
                 if (playerData.LastKnownPlayername.Equals(nickname, StringComparison.OrdinalIgnoreCase))
                 {
                     conflictingPlayer = playerData.LastKnownPlayername;
