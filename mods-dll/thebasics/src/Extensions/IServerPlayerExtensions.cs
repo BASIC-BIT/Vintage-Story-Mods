@@ -7,6 +7,7 @@ using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.ModSystems.TPA;
 using thebasics.ModSystems.TPA.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
@@ -330,31 +331,43 @@ namespace thebasics.Extensions
             SetModData<string>(player, ModDataOutgoingTpaRequest, null);
         }
 
-        public static bool HasExpiredOutgoingTpaRequest(this IServerPlayer player, double timeoutMinutes)
-        {
-            var request = player.GetOutgoingTpaRequest();
-            if (request == null) return false;
 
-            var currentTime = DateTime.UtcNow;
-            var timeoutTicks = TimeSpan.FromMinutes(timeoutMinutes).Ticks;
+        public static List<(IServerPlayer requester, TpaRequest request)> FindAllIncomingTpaRequests(this IServerPlayer targetPlayer, TpaSystem tpaSystem)
+        {
+            var incomingRequests = new List<(IServerPlayer, TpaRequest)>();
             
-            return currentTime.Ticks - request.RequestTimeRealTicks >= timeoutTicks;
-        }
-
-        public static TpaRequest FindIncomingTpaRequest(this IServerPlayer targetPlayer, ICoreServerAPI api)
-        {
-            // Find any online player who has an outgoing request targeting this player
-            foreach (var player in api.World.AllOnlinePlayers)
+            // Find all online players who have outgoing requests targeting this player
+            foreach (var player in tpaSystem.API.World.AllOnlinePlayers)
             {
                 var serverPlayer = player as IServerPlayer;
                 if (serverPlayer == null) continue;
 
                 var outgoingRequest = serverPlayer.GetOutgoingTpaRequest();
-                if (outgoingRequest != null && outgoingRequest.TargetPlayerUID == targetPlayer.PlayerUID)
+                if (outgoingRequest != null && 
+                    outgoingRequest.TargetPlayerUID == targetPlayer.PlayerUID &&
+                    !tpaSystem.IsRequestExpired(outgoingRequest))
                 {
-                    return outgoingRequest;
+                    incomingRequests.Add((serverPlayer, outgoingRequest));
                 }
             }
+            
+            return incomingRequests;
+        }
+        
+        public static TpaRequest FindIncomingTpaRequestFrom(this IServerPlayer targetPlayer, string requesterUID, TpaSystem tpaSystem)
+        {
+            // Find a specific player's outgoing request targeting this player
+            var requester = tpaSystem.API.GetPlayerByUID(requesterUID);
+            if (requester == null) return null;
+            
+            var outgoingRequest = requester.GetOutgoingTpaRequest();
+            if (outgoingRequest != null && 
+                outgoingRequest.TargetPlayerUID == targetPlayer.PlayerUID &&
+                !tpaSystem.IsRequestExpired(outgoingRequest))
+            {
+                return outgoingRequest;
+            }
+            
             return null;
         }
         #endregion
