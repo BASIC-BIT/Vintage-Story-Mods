@@ -23,7 +23,9 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        var fontSize = GetFontSize(context.SendingPlayer, context.ReceivingPlayer);
+        var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+        var fontSize = GetFontSize(context.SendingPlayer, context.ReceivingPlayer, chatMode);
+
         context.Message = $"<font size=\"{fontSize}\">{context.Message}</font>";
 
         return context;
@@ -31,12 +33,11 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
     
 
     public int GetFontSize(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer,
-        ProximityChatMode? tempMode = null)
+        ProximityChatMode chatMode)
     {
         // Doesn't check if the system is disabled, that's up to the consumer
 
         var distance = sendingPlayer.GetDistance(receivingPlayer);
-        var chatMode = sendingPlayer.GetChatMode(tempMode);
         var maxRange = _config.ProximityChatModeDistances[chatMode];
         var defaultSize = _config.ProximityChatDefaultFontSize[chatMode];
 
