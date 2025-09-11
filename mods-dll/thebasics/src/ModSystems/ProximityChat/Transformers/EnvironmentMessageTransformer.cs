@@ -17,8 +17,10 @@ public class EnvironmentMessageTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        // Apply italic formatting
+        var envColor = _config.ColorThemes.EnvironmentalTheme.GetEffectiveColor(context.SendingPlayer);
+        
         context.Message = ChatHelper.Italic(context.Message);
+        context.Message = ChatHelper.Color(context.Message, envColor);
         
         return context;
     }

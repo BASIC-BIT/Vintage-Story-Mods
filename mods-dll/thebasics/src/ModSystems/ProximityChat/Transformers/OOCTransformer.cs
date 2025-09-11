@@ -16,8 +16,11 @@ public class OOCTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        context.Message = ChatHelper.Color($"(OOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}", _config.OOCColor);
+        context.Message = $"(OOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}";
+
+        var oocColor = _config.ColorThemes.OOCTheme.GetEffectiveColor(context.SendingPlayer);
+        context.Message = ChatHelper.Color(context.Message, oocColor);
 
         return context;
     }
-} 
+}

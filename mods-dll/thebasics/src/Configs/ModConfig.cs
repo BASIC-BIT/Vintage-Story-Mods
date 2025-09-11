@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using ProtoBuf;
+using thebasics.Config;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Configs;
@@ -82,6 +83,10 @@ namespace thebasics.Configs
             // Initialize chat delimiters and ensure nested defaults even for legacy configs
             ChatDelimiters ??= new ChatDelimiters();
             ChatDelimiters.InitializeDefaultsIfNeeded();
+            
+            // Initialize color themes
+            ColorThemes ??= new ColorThemes();
+            ColorThemes.InitializeDefaultsIfNeeded(this);
         }
 
         [ProtoMember(1)]
@@ -280,5 +285,8 @@ namespace thebasics.Configs
 
         [ProtoMember(65)]
         public ChatDelimiters ChatDelimiters { get; set; }
+        
+        [ProtoMember(66)]
+        public ColorThemes ColorThemes { get; set; }
     }
 }

@@ -1,7 +1,8 @@
 ﻿using System;
-using System.Drawing;
+using System.Linq;
 using thebasics.Extensions;
 using thebasics.Models;
+using thebasics.ModSystems.ProximityChat.Commands;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
@@ -16,12 +17,13 @@ namespace thebasics.ModSystems.ProximityChat;
 
 public class RPProximityChatSystem : BaseBasicModSystem
 {
-    public int ProximityChatId;
+    public int ProximityChatId; // TODO: we should probably instantiate this to an invalid value like -100 or something
     public LanguageSystem LanguageSystem;
     public DistanceObfuscationSystem DistanceObfuscationSystem;
     private IServerNetworkChannel _serverConfigChannel;
     public ProximityCheckUtils ProximityCheckUtils;
     public TransformerSystem TransformerSystem;
+    private UnifiedColorCommand _colorCommand;
 
     protected override void BasicStartServerSide()
     {
@@ -33,6 +35,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         DistanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
         ProximityCheckUtils = new ProximityCheckUtils(this, API, Config);
         TransformerSystem = new TransformerSystem(this, LanguageSystem, DistanceObfuscationSystem, ProximityCheckUtils);
+        _colorCommand = new UnifiedColorCommand(Config.ColorThemes, API);
     }
 
     private void RegisterCommands()
@@ -58,20 +61,20 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     .HandleWith(ClearNickname);
             }
 
-            if (Config.ProximityChatAllowPlayersToChangeNicknameColors)
+            // Register unified color command for all player-configurable themes
+            var themes = Config.ColorThemes?.GetAllThemes() ?? new System.Collections.Generic.Dictionary<string, ColorTheme>();
+            if (themes.Any(t => t.Value.IsPlayerConfigurable))
             {
-                API.ChatCommands.GetOrCreate("nickcolor")
-                    .WithAlias("nicknamecolor", "nickcol")
-                    .WithDescription("Get or set nickname color")
-                    .WithArgs(new ColorArgParser("new nickname color", false))
-                    .RequiresPrivilege(Config.ChangeNicknameColorPermission)
+                API.ChatCommands.GetOrCreate("color")
+                    .WithAlias("col")
+                    .WithDescription("Get, set, or clear color themes")
+                    .WithArgs(
+                        new ColorThemeArgParser("theme", themes.Keys.ToArray(), false),
+                        new OptionalColorOrActionArgParser("color or action")
+                    )
+                    .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
-                    .HandleWith(HandleNicknameColor);
-                API.ChatCommands.GetOrCreate("clearnickcolor")
-                    .WithDescription("Clear your nickname color")
-                    .RequiresPrivilege(Config.ChangeNicknameColorPermission)
-                    .RequiresPlayer()
-                    .HandleWith(ClearNicknameColor);
+                    .HandleWith(_colorCommand.HandleColorCommand);
             }
 
             API.ChatCommands.GetOrCreate("adminsetnickname")
@@ -86,13 +89,17 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameAdmin);
 
-            API.ChatCommands.GetOrCreate("adminsetnicknamecolor")
-                .WithAlias("adminsetnickcolor", "adminsetnickcol")
-                .WithDescription("Admin: Get or set another player's nickname color")
-                .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
-                    new ColorArgParser("new nickname color", false))
+            // Unified admin color command
+            API.ChatCommands.GetOrCreate("admincolor")
+                .WithAlias("admincol")
+                .WithDescription("Admin: Get, set, or clear another player's color themes")
+                .WithArgs(
+                    new PlayerByNameOrNicknameArgParser("target player", API, true),
+                    new ColorThemeArgParser("theme", themes.Keys.ToArray(), false),
+                    new OptionalColorOrActionArgParser("color or action")
+                )
                 .RequiresPrivilege(Privilege.commandplayer)
-                .HandleWith(SetNicknameColorAdmin);
+                .HandleWith(_colorCommand.HandleAdminColorCommand);
         }
 
         // Skip RP-specific commands if RP chat is disabled
@@ -250,102 +257,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         API.Logger.Debug($"THEBASICS - Received ready message from {player.PlayerName}, sending config");
         SendClientConfig(player);
-    }
-
-    private TextCommandResult SetNicknameColorAdmin(TextCommandCallingArgs args)
-    {
-        var attemptTarget = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
-        if (attemptTarget == null)
-        {
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Error,
-                StatusMessage = "Cannot find player.",
-            };
-        }
-        var oldNicknameColor = attemptTarget.GetNicknameColor();
-
-        if (args.Parsers[1].IsMissing)
-        {
-            if (!attemptTarget.HasNicknameColor())
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Player {attemptTarget.PlayerName} does not have a nickname color!  You can set it with `/adminsetnickcolor {attemptTarget.PlayerName} NewColor`",
-                };
-            }
-
-            var color = attemptTarget.GetNicknameColor();
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {attemptTarget.PlayerName} nickname color is: {ChatHelper.Color(color, color)}",
-            };
-
-        }
-
-        var newNicknameColor = (Color)args.Parsers[1].GetValue();
-        var newColorHex = ColorTranslator.ToHtml(newNicknameColor);
-        if (newColorHex.Contains('<') || newColorHex.Contains('>'))
-        {
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Error,
-                StatusMessage = "Invalid color.",
-            };
-        }
-
-        attemptTarget.SetNicknameColor(newColorHex);
-
-        SwapOutNameTag(attemptTarget);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = $"Player {attemptTarget.PlayerName} nickname color has been set to: {newColorHex}.  Old Nickname Color: {oldNicknameColor}",
-        };
-    }
-
-    private TextCommandResult HandleNicknameColor(TextCommandCallingArgs args)
-    {
-        var player = (IServerPlayer)args.Caller.Player;
-        if (args.Parsers[0].IsMissing)
-        {
-            if (!player.HasNicknameColor())
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = "You don't have a color set! You can set it with `/nickcolor [color]`",
-                };
-            }
-
-            var color = player.GetNicknameColor();
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Success,
-                StatusMessage = $"Your color is: {ChatHelper.Color(color, color)}",
-            };
-        }
-
-        var newColor = (Color)args.Parsers[0].GetValue();
-        var colorHex = ColorTranslator.ToHtml(newColor);
-        if (colorHex.Contains('<') || colorHex.Contains('>'))
-        {
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Error,
-                StatusMessage = "Invalid color.",
-            };
-        }
-        player.SetNicknameColor(colorHex);
-        SwapOutNameTag(player);
-
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = $"Color set to: {ChatHelper.Color(colorHex, colorHex)}",
-        };
     }
 
     private void SendClientConfig(IServerPlayer byPlayer)
@@ -621,18 +532,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             Status = EnumCommandStatus.Success,
             StatusMessage = "Your nickname has been cleared.",
-        };
-    }
-
-    private TextCommandResult ClearNicknameColor(TextCommandCallingArgs args)
-    {
-        var player = (IServerPlayer)args.Caller.Player;
-        player.ClearNicknameColor();
-        SwapOutNameTag(player);
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = "Your color has been cleared.",
         };
     }
 

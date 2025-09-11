@@ -66,6 +66,10 @@ public class EmoteTransformer : MessageTransformerBase
         }
         
         context.Message = builder.ToString();
+        
+        var emoteColor = _config.ColorThemes.EmoteTheme.GetEffectiveColor(context.SendingPlayer);
+        context.Message = ChatHelper.Color(context.Message, emoteColor);
+        
         return context;
     }
 

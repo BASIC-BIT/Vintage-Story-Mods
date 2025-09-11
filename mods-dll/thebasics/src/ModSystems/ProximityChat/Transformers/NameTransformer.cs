@@ -37,8 +37,8 @@ public class NameTransformer : MessageTransformerBase
         // Escape user-supplied name to prevent VTML injection
         name = ChatHelper.EscapeMarkup(name);
         
-        string color = player.GetNicknameColor();
-        bool applyColor = !string.IsNullOrEmpty(color) && (isIC ? config.ApplyColorsToNicknames : config.ApplyColorsToPlayerNames);
+        string color = config.ColorThemes.NicknameTheme.GetEffectiveColor(player);
+        bool applyColor = isIC ? config.ApplyColorsToNicknames : config.ApplyColorsToPlayerNames;
         
         if(config.BoldNicknames){
             name = ChatHelper.Strong(name);
