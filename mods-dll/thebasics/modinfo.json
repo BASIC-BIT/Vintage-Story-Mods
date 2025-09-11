@@ -6,7 +6,7 @@
     "BASIC"
   ],
   "description": "Adds an RP proximity chat system, with configurable talking ranges, customizable name colors, automatic message formatting, and more!",
-  "version": "5.2.2",
+  "version": "5.2.3",
   "dependencies": {
     "game": "",
     "creative": "",
