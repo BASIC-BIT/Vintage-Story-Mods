@@ -592,7 +592,7 @@ namespace thebasics.ModSystems.TPA
                     return (null, null, new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
-                        StatusMessage = $"You have multiple teleport requests from: {requesters}. Please specify which one to {commandName}: /{commandName} [player]",
+                        StatusMessage = $"You have multiple teleport requests from: {requesters}. Please specify which one to {commandName}: /tp{commandName} [player]",
                     });
                 }
             }
@@ -603,7 +603,9 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpAccept(TextCommandCallingArgs args)
         {
             var player = args.Caller.Player as IServerPlayer;
-            var specifiedPlayers = args.Parsers[0].GetValue() as PlayerUidName[];
+            var playerParser = (PlayerByNameOrNicknameArgParser)args.Parsers[0];
+
+            var specifiedPlayers = playerParser.IsMissing ? null : args.Parsers[0].GetValue() as PlayerUidName[];
             
             // Use the centralized resolution method
             var (request, targetPlayer, error) = ResolveIncomingTpaRequest(player, specifiedPlayers, "accept");
@@ -637,8 +639,10 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpDeny(TextCommandCallingArgs args)
         {
             var player = args.Caller.Player as IServerPlayer;
-            var specifiedPlayers = args.Parsers[0].GetValue() as PlayerUidName[];
-            
+            var playerParser = (PlayerByNameOrNicknameArgParser)args.Parsers[0];
+
+            var specifiedPlayers = playerParser.IsMissing ? null : args.Parsers[0].GetValue() as PlayerUidName[];
+
             // Use the centralized resolution method
             var (request, targetPlayer, error) = ResolveIncomingTpaRequest(player, specifiedPlayers, "deny");
             if (error != null) return error;
