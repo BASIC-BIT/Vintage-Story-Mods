@@ -17,6 +17,8 @@ if (Test-Path $binDir) {
 Write-Host "Compiling project..."
 $buildResult = dotnet build "$projectRoot/thebasics.csproj" --configuration Release
 
+Write-Host $buildResult
+
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed! Exiting..." -ForegroundColor Red
     exit 1

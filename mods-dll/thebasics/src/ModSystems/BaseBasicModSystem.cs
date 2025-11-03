@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using thebasics.Configs;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -7,6 +8,7 @@ namespace thebasics.ModSystems
 {
     public abstract class BaseBasicModSystem : ModSystem
     {
+        private const string AssetDomain = "thebasics";
         public ICoreServerAPI API;
         public ModConfig Config;
         private const string ConfigName = "the_basics.json";
@@ -20,12 +22,45 @@ namespace thebasics.ModSystems
         {
             API = api;
 
+            RegisterAssetOrigin(api);
+
             LoadConfig();
 
             BasicStartServerSide();
         }
 
         protected abstract void BasicStartServerSide();
+
+        private void RegisterAssetOrigin(ICoreServerAPI api)
+        {
+            if (string.IsNullOrEmpty(Mod.SourcePath))
+            {
+                return;
+            }
+
+            try
+            {
+                if (Directory.Exists(Mod.SourcePath))
+                {
+                    var assetsPath = Path.Combine(Mod.SourcePath, "assets");
+                    if (Directory.Exists(assetsPath))
+                    {
+                        api.Assets.AddModOrigin(AssetDomain, assetsPath);
+                    }
+
+                    return;
+                }
+
+                if (File.Exists(Mod.SourcePath))
+                {
+                    api.Assets.AddModOrigin(AssetDomain, Mod.SourcePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                api.Logger.Warning($"THEBASICS: Failed to register asset origin: {ex.Message}");
+            }
+        }
 
         private void LoadConfig()
         {

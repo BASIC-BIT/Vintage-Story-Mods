@@ -5,6 +5,7 @@ using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
@@ -40,10 +41,13 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
             // If the language doesn't exist, or it's hidden and player can't use it, show error
             if (lang == null || (lang.Hidden && !context.SendingPlayer.KnowsLanguage(lang) && !showHidden))
             {
+                var validPrefixes = string.Join(", ",
+                    _languageSystem.GetAllLanguages(true, includeHidden: showHidden)
+                        .Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang)));
+
                 context.SendingPlayer.SendMessage(
                     _chatSystem.ProximityChatId,
-                    $"Invalid language specifier \":{languageIdentifier}\".  Valid prefixes include: " + string.Join(", ",
-                        _languageSystem.GetAllLanguages(true, includeHidden: showHidden).Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang))),
+                    Lang.Get("thebasics:language.transformer.invalid", $":{languageIdentifier}", validPrefixes),
                     EnumChatType.CommandError);
                 context.State = MessageContextState.STOP;
                 return context;
@@ -53,7 +57,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
             {
                 context.SendingPlayer.SendMessage(
                     _chatSystem.ProximityChatId,
-                    "You don't know that language!",
+                    Lang.Get("thebasics:language.transformer.notKnown"),
                     EnumChatType.CommandError);
                 context.State = MessageContextState.STOP;
             }
@@ -64,7 +68,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                 context.SendingPlayer.SetDefaultLanguage(lang);
                 context.SendingPlayer.SendMessage(
                     _chatSystem.ProximityChatId,
-                    "You are now speaking " + lang.Name + ".",
+                    Lang.Get("thebasics:language.transformer.nowSpeaking", lang.Name),
                     EnumChatType.CommandSuccess);
                 context.State = MessageContextState.STOP;
             } else {
