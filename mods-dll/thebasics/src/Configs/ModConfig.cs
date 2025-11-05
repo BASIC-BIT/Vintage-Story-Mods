@@ -61,7 +61,7 @@ namespace thebasics.Configs
 
             RPTTS_ModeGain ??= new Dictionary<ProximityChatMode, float>
             {
-                { ProximityChatMode.Yell, 1.5f },
+                { ProximityChatMode.Yell, 1.7f },
                 { ProximityChatMode.Normal, 1f },
                 { ProximityChatMode.Whisper, 0.65f }
             };
