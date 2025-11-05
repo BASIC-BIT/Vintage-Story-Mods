@@ -23,9 +23,11 @@ public class ChatUiSystem : ModSystem
     private static SafeClientNetworkChannel _safeNetworkChannel;
     private static bool _usingRptts = false;
     private static dynamic _rpttsApi = null;
+    private static dynamic _rpttsChatSystem = null;
     private const int RpttsInitMaxAttempts = 3;
     private static int _rpttsInitAttempts = 0;
     private static bool _rpttsInitScheduled = false;
+    private static bool _rpttsExplicitModeApplied = false;
 
     public override bool ShouldLoad(EnumAppSide side) => side.IsClient();
 
@@ -37,9 +39,11 @@ public class ChatUiSystem : ModSystem
         // _initializationAttempts = 0;
 
         _rpttsApi = null;
+        _rpttsChatSystem = null;
         _usingRptts = false;
         _rpttsInitAttempts = 0;
         _rpttsInitScheduled = false;
+        _rpttsExplicitModeApplied = false;
         ScheduleRpttsInitialization();
         
         RegisterForServerSideConfig();
@@ -246,26 +250,47 @@ public class ChatUiSystem : ModSystem
         {
             if (!_api.ModLoader.IsModSystemEnabled("RPTTS.RPTTSAPI"))
             {
-                _api.Logger.Debug("[THEBASICS] RPTTS not detected after delayed initialization attempt.");
-                return false;
-            }
+            _api.Logger.Debug("[THEBASICS] RPTTS not detected after delayed initialization attempt.");
+            return false;
+        }
 
-            var detectedApi = _api.ModLoader.GetModSystem("RPTTS.RPTTSAPI");
+        var detectedApi = _api.ModLoader.GetModSystem("RPTTS.RPTTSAPI");
             if (detectedApi == null)
             {
                 _api.Logger.Warning("[THEBASICS] RPTTS reported enabled but API instance unavailable after delayed initialization.");
                 return false;
             }
 
-            _rpttsApi = detectedApi;
-            _usingRptts = true;
-            _api.Logger.Debug("[THEBASICS] RPTTS detected - proximity TTS integration enabled.");
-            return true;
+        _rpttsApi = detectedApi;
+        _rpttsChatSystem = _api.ModLoader.GetModSystem("RPTTS.TTSChatSystem");
+        _usingRptts = true;
+        ApplyRpttsExplicitMode();
+        _api.Logger.Debug("[THEBASICS] RPTTS detected - proximity TTS integration enabled.");
+        return true;
         }
         catch (System.Exception ex)
         {
             _api.Logger.Warning($"[THEBASICS] Failed to initialize RPTTS integration: {ex}");
             return false;
+        }
+    }
+
+    private static void ApplyRpttsExplicitMode()
+    {
+        if (_rpttsExplicitModeApplied || _rpttsChatSystem == null)
+        {
+            return;
+        }
+
+        try
+        {
+            ((dynamic)_rpttsChatSystem).OverwriteChatSubscription(false);
+            _rpttsExplicitModeApplied = true;
+            _api?.Logger.Debug("[THEBASICS] RPTTS auto-chat subscription disabled (explicit mode).");
+        }
+        catch (System.Exception ex)
+        {
+            _api?.Logger.Warning($"[THEBASICS] Failed to disable RPTTS chat subscription: {ex}");
         }
     }
 
