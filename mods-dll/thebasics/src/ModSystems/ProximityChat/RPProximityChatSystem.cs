@@ -236,8 +236,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _serverConfigChannel = API.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
-            .RegisterMessageType<ProximitySpeechMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
+            .RegisterMessageType<ProximitySpeechMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected);
     }
