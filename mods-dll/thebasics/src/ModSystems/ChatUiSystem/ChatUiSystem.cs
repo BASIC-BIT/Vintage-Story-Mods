@@ -248,24 +248,22 @@ public class ChatUiSystem : ModSystem
 
         try
         {
-            if (!_api.ModLoader.IsModSystemEnabled("RPTTS.RPTTSAPI"))
-            {
-            _api.Logger.Debug("[THEBASICS] RPTTS not detected after delayed initialization attempt.");
+        if (!_api.ModLoader.IsModSystemEnabled("RPTTS.RPTTSAPI"))
+        {
             return false;
         }
 
         var detectedApi = _api.ModLoader.GetModSystem("RPTTS.RPTTSAPI");
-            if (detectedApi == null)
-            {
-                _api.Logger.Warning("[THEBASICS] RPTTS reported enabled but API instance unavailable after delayed initialization.");
-                return false;
-            }
+        if (detectedApi == null)
+        {
+            _api.Logger.Warning("[THEBASICS] RPTTS reported enabled but API instance unavailable after delayed initialization.");
+            return false;
+        }
 
         _rpttsApi = detectedApi;
         _rpttsChatSystem = _api.ModLoader.GetModSystem("RPTTS.TTSChatSystem");
         _usingRptts = true;
         ApplyRpttsExplicitMode();
-        _api.Logger.Debug("[THEBASICS] RPTTS detected - proximity TTS integration enabled.");
         return true;
         }
         catch (System.Exception ex)
@@ -286,7 +284,6 @@ public class ChatUiSystem : ModSystem
         {
             ((dynamic)_rpttsChatSystem).OverwriteChatSubscription(false);
             _rpttsExplicitModeApplied = true;
-            _api?.Logger.Debug("[THEBASICS] RPTTS auto-chat subscription disabled (explicit mode).");
         }
         catch (System.Exception ex)
         {

@@ -4,7 +4,6 @@ using ProtoBuf;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Configs;
-using Vintagestory.API.MathTools;
 
 namespace thebasics.Configs
 {
