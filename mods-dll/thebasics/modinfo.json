@@ -8,9 +8,9 @@
   "description": "Adds an RP proximity chat system, with configurable talking ranges, customizable name colors, automatic message formatting, and more!",
   "version": "5.2.4",
   "dependencies": {
-    "game": "1.21.0",
-    "creative": "1.21.0",
-    "survival": "1.21.0"
+    "game": "",
+    "creative": "",
+    "survival": ""
   },
   "side": "universal"
 }
