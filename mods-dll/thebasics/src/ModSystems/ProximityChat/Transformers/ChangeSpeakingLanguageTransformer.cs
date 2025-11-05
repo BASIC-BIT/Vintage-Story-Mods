@@ -69,7 +69,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                 context.State = MessageContextState.STOP;
             } else {
                 // Remove the language identifier and continue processing
-                context.Message = match.Groups[2].Value;
+                context.UpdateMessage(match.Groups[2].Value);
                 context.SetMetadata(MessageContext.LANGUAGE, lang);
             }
         } else {

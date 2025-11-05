@@ -21,12 +21,12 @@ public class AutoCapitalizationTransformer : MessageTransformerBase
     
     public override MessageContext Transform(MessageContext context)
     {
-        context.Message = AutoCapitalizationRegex.Replace(context.Message, match =>
+        context.UpdateMessage(AutoCapitalizationRegex.Replace(context.Message, match =>
         {
             var firstLetter = match.Groups[2].Value;
             return $"{match.Groups[1].Value}{firstLetter.ToUpper()}{match.Groups[3].Value}";
-        });
+        }));
         
         return context;
     }
-} 
+}

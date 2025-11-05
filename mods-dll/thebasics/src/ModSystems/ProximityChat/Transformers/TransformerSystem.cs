@@ -131,6 +131,8 @@ public class TransformerSystem
             return;
         }
 
+        _chatSystem.DispatchSpeechForContext(context);
+
         LogChatMessage(context);
 
         // ----- PHASE 2: Process for each recipient (content transformation) -----

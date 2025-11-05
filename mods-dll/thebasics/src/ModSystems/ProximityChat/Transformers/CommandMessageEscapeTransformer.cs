@@ -22,7 +22,7 @@ public class CommandMessageEscapeTransformer : MessageTransformerBase
     {
         // Use the minimal escaping that VS uses for normal chat
         // This only escapes < and > which are the critical characters
-        context.Message = VtmlUtils.EscapeVtml(context.Message);
+        context.UpdateMessage(VtmlUtils.EscapeVtml(context.Message));
         return context;
     }
 }

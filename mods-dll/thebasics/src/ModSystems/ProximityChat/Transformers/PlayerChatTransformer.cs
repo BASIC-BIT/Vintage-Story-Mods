@@ -20,7 +20,6 @@ public class PlayerChatTransformer : MessageTransformerBase
     public override MessageContext Transform(MessageContext context)
     {   
         var content = context.Message;
-        
         // Check message type based on configured delimiters
         var delimiters = _config.ChatDelimiters;
         var isGlobalOoc = _config.EnableGlobalOOC && !string.IsNullOrEmpty(delimiters.GlobalOOC.Start) && content.StartsWith(delimiters.GlobalOOC.Start);
@@ -31,40 +30,42 @@ public class PlayerChatTransformer : MessageTransformerBase
         // Handle Global OOC - this will be processed normally by the server
         if (isGlobalOoc)
         {
-            context.Message = content[delimiters.GlobalOOC.Start.Length..]; // Remove the leading delimiter
+            var updated = content[delimiters.GlobalOOC.Start.Length..]; // Remove the leading delimiter
             if (!string.IsNullOrEmpty(delimiters.GlobalOOC.End))
             {
                 // Remove all trailing end delimiters
-                while (context.Message.EndsWith(delimiters.GlobalOOC.End))
+                while (updated.EndsWith(delimiters.GlobalOOC.End))
                 {
-                    context.Message = context.Message[..^delimiters.GlobalOOC.End.Length];
+                    updated = updated[..^delimiters.GlobalOOC.End.Length];
                 }
             }
 
             context.SetFlag(MessageContext.IS_GLOBAL_OOC);
+            context.UpdateMessage(updated.Trim(), updateSpeech: false);
         } else if (isEmote)
         {
             if (!string.IsNullOrEmpty(delimiters.Emote.Start) && content.StartsWith(delimiters.Emote.Start)) {
-                context.Message = content[delimiters.Emote.Start.Length..]; // Remove the leading delimiter
+                content = content[delimiters.Emote.Start.Length..]; // Remove the leading delimiter
             }
             context.SetFlag(MessageContext.IS_EMOTE);
+            context.UpdateMessage(content.Trim(), updateSpeech: false);
         } else if (isOOC)
         {
-            context.Message = content[delimiters.OOC.Start.Length..]; // Remove the leading delimiter
-            if (!string.IsNullOrEmpty(delimiters.OOC.End) && context.Message.EndsWith(delimiters.OOC.End)) {
-                context.Message = context.Message[..^delimiters.OOC.End.Length]; // Remove the trailing delimiter
+            var updated = content[delimiters.OOC.Start.Length..]; // Remove the leading delimiter
+            if (!string.IsNullOrEmpty(delimiters.OOC.End) && updated.EndsWith(delimiters.OOC.End)) {
+                updated = updated[..^delimiters.OOC.End.Length]; // Remove the trailing delimiter
             }
             context.SetFlag(MessageContext.IS_OOC);
+            context.UpdateMessage(updated.Trim(), updateSpeech: false);
         } else if (isEnvironmentMessage)
         {
-            context.Message = content[delimiters.Environmental.Start.Length..]; // Remove the delimiter
+            var updated = content[delimiters.Environmental.Start.Length..]; // Remove the delimiter
             context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
+            context.UpdateMessage(updated.Trim(), updateSpeech: false);
         } else {
             context.SetFlag(MessageContext.IS_SPEECH);
+            context.UpdateMessage(content.Trim());
         }
-
-        // Trim whitespace
-        context.Message = context.Message.Trim();
         
         return context;
     }
