@@ -21,6 +21,13 @@ public class ChatUiSystem : ModSystem
 
     private static IClientNetworkChannel _clientConfigChannel;
     private static SafeClientNetworkChannel _safeNetworkChannel;
+    private static bool _usingRptts = false;
+    private static dynamic _rpttsApi = null;
+    private static dynamic _rpttsChatSystem = null;
+    private const int RpttsInitMaxAttempts = 3;
+    private static int _rpttsInitAttempts = 0;
+    private static bool _rpttsInitScheduled = false;
+    private static bool _rpttsExplicitModeApplied = false;
 
     public override bool ShouldLoad(EnumAppSide side) => side.IsClient();
 
@@ -30,6 +37,14 @@ public class ChatUiSystem : ModSystem
         _api = api;
         // _isInitialized = false;
         // _initializationAttempts = 0;
+
+        _rpttsApi = null;
+        _rpttsChatSystem = null;
+        _usingRptts = false;
+        _rpttsInitAttempts = 0;
+        _rpttsInitScheduled = false;
+        _rpttsExplicitModeApplied = false;
+        ScheduleRpttsInitialization();
         
         RegisterForServerSideConfig();
 
@@ -152,7 +167,9 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsConfigMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
-            .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage);
+            .RegisterMessageType<ProximitySpeechMessage>()
+            .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
+            .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage);
         // .RegisterMessageType<TheBasicsChatTypingMessage>();
 
         // Initialize the safe network channel wrapper
@@ -194,6 +211,105 @@ public class ChatUiSystem : ModSystem
         catch (System.Exception e)
         {
             _api.Logger.Error($"[THEBASICS] Error processing server config message: {e}");
+        }
+    }
+
+    private static void ScheduleRpttsInitialization()
+    {
+        if (_api == null || _usingRptts || _rpttsInitAttempts >= RpttsInitMaxAttempts || _rpttsInitScheduled)
+        {
+            return;
+        }
+
+        _rpttsInitScheduled = true;
+        _api.Event.RegisterCallback(_ =>
+        {
+            _rpttsInitScheduled = false;
+            _rpttsInitAttempts++;
+            var initialized = TryInitializeRpttsIntegration();
+            if (!initialized && _rpttsInitAttempts < RpttsInitMaxAttempts)
+            {
+                ScheduleRpttsInitialization();
+            }
+        }, 1000);
+    }
+
+    private static bool TryInitializeRpttsIntegration()
+    {
+        if (_api == null)
+        {
+            return false;
+        }
+
+        if (_usingRptts)
+        {
+            return true;
+        }
+
+        try
+        {
+        if (!_api.ModLoader.IsModSystemEnabled("RPTTS.RPTTSAPI"))
+        {
+            return false;
+        }
+
+        var detectedApi = _api.ModLoader.GetModSystem("RPTTS.RPTTSAPI");
+        if (detectedApi == null)
+        {
+            _api.Logger.Warning("[THEBASICS] RPTTS reported enabled but API instance unavailable after delayed initialization.");
+            return false;
+        }
+
+        _rpttsApi = detectedApi;
+        _rpttsChatSystem = _api.ModLoader.GetModSystem("RPTTS.TTSChatSystem");
+        _usingRptts = true;
+        ApplyRpttsExplicitMode();
+        return true;
+        }
+        catch (System.Exception ex)
+        {
+            _api.Logger.Warning($"[THEBASICS] Failed to initialize RPTTS integration: {ex}");
+            return false;
+        }
+    }
+
+    private static void ApplyRpttsExplicitMode()
+    {
+        if (_rpttsExplicitModeApplied || _rpttsChatSystem == null)
+        {
+            return;
+        }
+
+        try
+        {
+            ((dynamic)_rpttsChatSystem).OverwriteChatSubscription(false);
+            _rpttsExplicitModeApplied = true;
+        }
+        catch (System.Exception ex)
+        {
+            _api?.Logger.Warning($"[THEBASICS] Failed to disable RPTTS chat subscription: {ex}");
+        }
+    }
+
+    private static void OnProximitySpeechMessage(ProximitySpeechMessage speechMessage)
+    {
+        if (!_usingRptts || _rpttsApi == null || speechMessage == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(speechMessage.Text))
+        {
+            return;
+        }
+
+        try
+        {
+            _rpttsApi?.APIChatMessage(speechMessage.Text, (float?)speechMessage.Gain, (float?)speechMessage.Falloff);
+        }
+        catch (System.Exception ex)
+        {
+            _api.Logger.Warning($"[THEBASICS] Failed to dispatch RPTTS speech: {ex}");
         }
     }
 

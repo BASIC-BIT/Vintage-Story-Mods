@@ -74,4 +74,37 @@ public class MessageContext
     public static readonly string FORMATTED_NAME = "formattedName";
     public static readonly string IS_SPEECH = "isSpeech";
     public static readonly string SPEECH_COLOR = "speechColor";
-}   
+    public static readonly string SPEECH_TEXT = "speechText";
+
+    public void UpdateMessage(string message, bool updateSpeech = true)
+    {
+        Message = message;
+        if (updateSpeech && HasFlag(IS_SPEECH))
+        {
+            SetSpeechText(message);
+        }
+    }
+
+    public void SetSpeechText(string text)
+    {
+        if (text == null)
+        {
+            Metadata.Remove(SPEECH_TEXT);
+            return;
+        }
+
+        Metadata[SPEECH_TEXT] = text;
+    }
+
+    public bool TryGetSpeechText(out string text)
+    {
+        if (TryGetMetadata(SPEECH_TEXT, out string value))
+        {
+            text = value;
+            return true;
+        }
+
+        text = null;
+        return false;
+    }
+}

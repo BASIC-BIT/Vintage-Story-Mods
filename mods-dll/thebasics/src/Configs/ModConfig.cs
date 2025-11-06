@@ -58,8 +58,21 @@ namespace thebasics.Configs
                 { ProximityChatMode.Normal, "." },
                 { ProximityChatMode.Whisper, "." }
             };
-            
-            
+
+            RPTTS_ModeGain ??= new Dictionary<ProximityChatMode, float>
+            {
+                { ProximityChatMode.Yell, 1.7f },
+                { ProximityChatMode.Normal, 1f },
+                { ProximityChatMode.Whisper, 0.65f }
+            };
+
+            RPTTS_ModeFalloff ??= new Dictionary<ProximityChatMode, float>
+            {
+                { ProximityChatMode.Yell, 1f },
+                { ProximityChatMode.Normal, 1.5f },
+                { ProximityChatMode.Whisper, 5f }
+            };
+
             PlayerStatToggles ??= new Dictionary<PlayerStatType, bool>
             {
                 { PlayerStatType.Deaths, true },
@@ -280,5 +293,12 @@ namespace thebasics.Configs
 
         [ProtoMember(65)]
         public ChatDelimiters ChatDelimiters { get; set; }
+
+        [ProtoMember(66)]
+        public IDictionary<ProximityChatMode, float> RPTTS_ModeGain { get; set; }
+
+        [ProtoMember(67)]
+        public IDictionary<ProximityChatMode, float> RPTTS_ModeFalloff { get; set; }
+
     }
 }

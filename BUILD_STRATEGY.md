@@ -8,14 +8,14 @@ This document outlines the simplified, consistent build strategy implemented to 
 
 Previously, we had inconsistent output directories across different build scenarios:
 - CI/CD pipeline: `dotnet build` → various complex locations
-- Local `build-and-package.ps1`: Custom output to `solution/output/net7.0/`  
+- Local `build-and-package.ps1`: Custom output to `solution/output/net8.0/`  
 - `package.ps1`: Looking in multiple possible locations
 - Project PostBuild: Running packaging with unclear DLL location
 
 This led to:
 - Silent packaging failures
 - Complex multi-location search logic
-- Nested directory structures (e.g., `output/net7.0/net7.0/`)
+- Nested directory structures (e.g., `output/net8.0/net8.0/`)
 - Build verification not catching actual issues
 
 ## The Solution: Simple & Consistent
@@ -26,8 +26,8 @@ This led to:
 
 All builds now output to the standard MSBuild location:
 ```
-mods-dll/thebasics/bin/Release/net7.0/thebasics.dll
-mods-dll/thebasics/bin/Release/net7.0/thebasics.pdb
+mods-dll/thebasics/bin/Release/net8.0/thebasics.dll
+mods-dll/thebasics/bin/Release/net8.0/thebasics.pdb
 ```
 
 ### Component Responsibilities
@@ -39,7 +39,7 @@ mods-dll/thebasics/bin/Release/net7.0/thebasics.pdb
 - **No custom output paths** - uses MSBuild defaults
 
 #### 2. Package Script (`package.ps1`)
-- **Input**: Reads from `bin/Release/net7.0/thebasics.dll`
+- **Input**: Reads from `bin/Release/net8.0/thebasics.dll`
 - **Output**: Creates `thebasics_VERSION.zip` in project root (e.g., `thebasics_5_1_0_rc_3.zip`)
 - **No path searching** - expects DLL in one specific location
 - **Fails fast** if DLL not found
@@ -62,9 +62,9 @@ mods-dll/thebasics/bin/Release/net7.0/thebasics.pdb
 Developer runs: .\scripts\build-and-package.ps1
 ├── Cleans bin/ directory
 ├── dotnet build --configuration Release
-│   └── Outputs to bin/Release/net7.0/
+│   └── Outputs to bin/Release/net8.0/
 ├── Calls package.ps1
-│   ├── Reads from bin/Release/net7.0/thebasics.dll
+│   ├── Reads from bin/Release/net8.0/thebasics.dll
 │   └── Creates thebasics_VERSION.zip
 └── Success!
 ```
@@ -74,7 +74,7 @@ Developer runs: .\scripts\build-and-package.ps1
 GitHub Actions workflow:
 ├── dotnet build --configuration Release (solution)
 ├── Test Build Output step
-│   ├── Checks bin/Release/net7.0/thebasics.dll exists
+│   ├── Checks bin/Release/net8.0/thebasics.dll exists
 │   └── FAILS HARD if missing
 ├── Package Main Mod step
 │   ├── Calls package.ps1
@@ -91,7 +91,7 @@ GitHub Actions workflow:
 - No silent failures or fallback searching
 
 ### 2. **Single Source of Truth**
-- One output location: `bin/Release/net7.0/`
+- One output location: `bin/Release/net8.0/`
 - One package location: project root
 - No multiple possible paths
 
@@ -109,7 +109,7 @@ GitHub Actions workflow:
 
 ```
 mods-dll/thebasics/
-├── bin/Release/net7.0/           # Build outputs
+├── bin/Release/net8.0/           # Build outputs
 │   ├── thebasics.dll
 │   └── thebasics.pdb
 ├── scripts/
@@ -128,7 +128,7 @@ mods-dll/thebasics/
 ## Troubleshooting
 
 ### DLL Not Found
-- Check: Does `bin/Release/net7.0/thebasics.dll` exist?
+- Check: Does `bin/Release/net8.0/thebasics.dll` exist?
 - Solution: Run clean build (`dotnet clean` then `dotnet build`)
 
 ### Package Script Fails

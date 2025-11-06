@@ -26,7 +26,7 @@ The `VINTAGE_STORY` environment variable must point to your Vintage Story instal
 
 ### Build Output
 All builds output to standard MSBuild locations:
-- `mods-dll/thebasics/bin/Release/net7.0/thebasics.dll`
+- `mods-dll/thebasics/bin/Release/net8.0/thebasics.dll`
 - Packaged mods: `mods-dll/thebasics/thebasics_VERSION.zip`
 
 ## High-Level Architecture

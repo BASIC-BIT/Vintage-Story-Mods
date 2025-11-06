@@ -1,7 +1,19 @@
 ﻿# Get absolute paths
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project root
 $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
-$outputDir = Join-Path $projectRoot "bin/Release/net7.0"  # Standard MSBuild output location
+$releaseDir = Join-Path $projectRoot "bin/Release"
+$outputDir = $null
+
+if (Test-Path $releaseDir) {
+    $tfmDir = Get-ChildItem -Path $releaseDir -Directory | Sort-Object Name -Descending | Select-Object -First 1
+    if ($tfmDir) {
+        $outputDir = $tfmDir.FullName
+    }
+}
+
+if (-not $outputDir) {
+    $outputDir = Join-Path $projectRoot "bin/Release/net8.0"
+}
 $assetsDir = Join-Path $projectRoot "assets"
 $modInfoFile = Join-Path $projectRoot "modinfo.json"
 $dllFile = Join-Path $outputDir "thebasics.dll"
@@ -32,7 +44,7 @@ if (-not (Test-Path $modInfoFile)) {
     exit 1
 }
 if (-not (Test-Path $dllFile)) {
-    $msg = "Error: thebasics.dll not found at $dllFile"
+$msg = "Error: thebasics.dll not found at $dllFile"
     Write-Host $msg
     "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
     exit 1

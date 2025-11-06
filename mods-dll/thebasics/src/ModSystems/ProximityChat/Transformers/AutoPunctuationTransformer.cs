@@ -21,7 +21,7 @@ public class AutoPunctuationTransformer : MessageTransformerBase
     
     public override MessageContext Transform(MessageContext context)
     {
-        context.Message = AutoPunctuationRegex.Replace(context.Message, match =>
+        context.UpdateMessage(AutoPunctuationRegex.Replace(context.Message, match =>
         {
             var possiblePunctuation = match.Groups[2].Value[0];
             var punctuation = _config.ProximityChatModePunctuation[context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode())];
@@ -29,8 +29,8 @@ public class AutoPunctuationTransformer : MessageTransformerBase
                 punctuation = "."; // Emotes and environmental messages don't need punctuation based on chat mode
             }
             return $"{match.Groups[1].Value}{possiblePunctuation}{(ChatHelper.IsPunctuation(possiblePunctuation) ? "" : punctuation)}{match.Groups[3].Value}";
-        });
+        }));
         
         return context;
     }
-} 
+}

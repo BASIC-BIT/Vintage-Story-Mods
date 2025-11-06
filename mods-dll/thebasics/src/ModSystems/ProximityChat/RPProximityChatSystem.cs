@@ -237,6 +237,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<TheBasicsConfigMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
+            .RegisterMessageType<ProximitySpeechMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected);
     }
@@ -358,6 +359,47 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }, byPlayer);
         
         API.Logger.Debug($"THEBASICS - Sent complete config to client {byPlayer.PlayerName}");
+    }
+
+    internal void DispatchSpeechForContext(MessageContext context)
+    {
+        if (_serverConfigChannel == null || !context.HasFlag(MessageContext.IS_SPEECH))
+        {
+            return;
+        }
+
+        if (!context.TryGetSpeechText(out var speechText) || string.IsNullOrWhiteSpace(speechText))
+        {
+            return;
+        }
+
+        if (context.TryGetMetadata(MessageContext.LANGUAGE, out Language lang) && lang == LanguageSystem.SignLanguage)
+        {
+            return;
+        }
+
+        var player = context.SendingPlayer;
+        if (player == null)
+        {
+            return;
+        }
+
+        var (gain, falloff) = CalculateSpeechAudioParameters(context);
+        _serverConfigChannel.SendPacket(new ProximitySpeechMessage
+        {
+            Text = speechText,
+            Gain = gain,
+            Falloff = falloff
+        }, player);
+    }
+
+    private (float gain, float falloff) CalculateSpeechAudioParameters(MessageContext context)
+    {
+        var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+        var gain = Config.RPTTS_ModeGain[mode];
+        var falloff = Config.RPTTS_ModeFalloff[mode];
+
+        return (gain, falloff);
     }
 
     private void HookEvents()
