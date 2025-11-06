@@ -12,7 +12,7 @@ if (Test-Path $releaseDir) {
 }
 
 if (-not $outputDir) {
-    $outputDir = Join-Path $projectRoot "bin/Release/net8.0"
+    $outputDir = Join-Path $projectRoot "bin/Release/net7.0"
 }
 $assetsDir = Join-Path $projectRoot "assets"
 $modInfoFile = Join-Path $projectRoot "modinfo.json"
