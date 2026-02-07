@@ -108,13 +108,20 @@ function isTruthy(v: string | undefined) {
 
 export const status = tool({
   description: "Get Pterodactyl server resource status via Client API (read-only)",
-  args: {},
-  async execute() {
-    const cfgRes = await getConfig(true)
+  args: {
+    serverId: tool.schema.string().optional().describe("Override server identifier (defaults to PTERO_SERVER_ID)")
+  },
+  async execute(args) {
+    const cfgRes = await getConfig(false)
     if (!cfgRes.ok) return cfgRes.error
 
     const cfg = cfgRes.config
-    const r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${cfg.serverId}/resources`)
+    const serverId = String(args?.serverId || cfg.serverId || "").trim()
+    if (!serverId) {
+      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+    }
+
+    const r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/resources`)
     if (!r.ok) {
       return JSON.stringify(
         {
@@ -162,13 +169,14 @@ export const power = tool({
     signal: tool.schema
       .string()
       .describe("One of: start, stop, restart, kill"),
+    serverId: tool.schema.string().optional().describe("Override server identifier (defaults to PTERO_SERVER_ID)"),
     confirm: tool.schema
       .boolean()
       .optional()
       .describe("Must be true to execute"),
   },
   async execute(args) {
-    const cfgRes = await getConfig(true)
+    const cfgRes = await getConfig(false)
     if (!cfgRes.ok) return cfgRes.error
 
     if (!isTruthy(process.env.PTERO_ALLOW_POWER)) {
@@ -185,7 +193,12 @@ export const power = tool({
     }
 
     const cfg = cfgRes.config
-    const r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${cfg.serverId}/power`, { signal })
+    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    if (!serverId) {
+      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+    }
+
+    const r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/power`, { signal })
     if (!r.ok) {
       return JSON.stringify(
         {
@@ -206,16 +219,22 @@ export const power = tool({
 export const files_list = tool({
   description: "List files in a server directory via Pterodactyl Client API (read-only)",
   args: {
+    serverId: tool.schema.string().optional().describe("Override server identifier (defaults to PTERO_SERVER_ID)"),
     directory: tool.schema.string().optional().describe("Directory path (default: '/')"),
   },
   async execute(args) {
-    const cfgRes = await getConfig(true)
+    const cfgRes = await getConfig(false)
     if (!cfgRes.ok) return cfgRes.error
     const cfg = cfgRes.config
 
+    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    if (!serverId) {
+      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+    }
+
     const directory = (args.directory || "/").toString()
     const q = encodeURIComponent(directory)
-    const r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${cfg.serverId}/files/list?directory=${q}`)
+    const r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/list?directory=${q}`)
     if (!r.ok) {
       return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
     }
@@ -227,13 +246,19 @@ export const files_upload = tool({
   description: "Upload a local file to the server via Pterodactyl signed upload URL (destructive)",
   args: {
     localPath: tool.schema.string().describe("Absolute path to local file"),
+    serverId: tool.schema.string().optional().describe("Override server identifier (defaults to PTERO_SERVER_ID)"),
     directory: tool.schema.string().optional().describe("Target directory on server (default: '/')"),
     confirm: tool.schema.boolean().optional().describe("Must be true to execute"),
   },
   async execute(args) {
-    const cfgRes = await getConfig(true)
+    const cfgRes = await getConfig(false)
     if (!cfgRes.ok) return cfgRes.error
     const cfg = cfgRes.config
+
+    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    if (!serverId) {
+      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+    }
 
     if (!isTruthy(process.env.PTERO_ALLOW_FILES)) {
       return "Refusing: set PTERO_ALLOW_FILES=1 to enable file uploads"
@@ -255,7 +280,7 @@ export const files_upload = tool({
 
     // Step 1: get signed URL
     const q = encodeURIComponent(directory)
-    const u = await pteroFetch(cfg as any, "GET", `/api/client/servers/${cfg.serverId}/files/upload?directory=${q}`)
+    const u = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/upload?directory=${q}`)
     if (!u.ok) {
       return JSON.stringify({ error: "Failed to get signed upload URL", status: u.status, statusText: u.statusText, body: u.json ?? u.text }, null, 2)
     }
