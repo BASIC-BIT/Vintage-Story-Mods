@@ -22,6 +22,9 @@ Required env vars (provide via a local `.env` in the repo root or system env var
 - `PTERO_TOKEN`
 - `PTERO_SERVER_ID`
 
+Optional (local multi-profile dev):
+- `VS_PROFILES_DIR` (e.g. `D:/Games/VSProfiles`). When set, `mods-dll/thebasics/scripts/package.ps1` deploys to all `Profile*/Mods` folders (useful for multi-account testing).
+
 To enable destructive actions (ptero tools will refuse otherwise):
 - `PTERO_ALLOW_FILES=1` (uploads)
 - `PTERO_ALLOW_POWER=1` (restart)
