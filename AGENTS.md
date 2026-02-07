@@ -26,6 +26,7 @@ If present, read `AGENTS.local.md` at the start of a session.
 - Design: propose the smallest viable implementation and an incremental rollout plan.
 - Implement: keep changes localized; reuse existing patterns (mod systems, network channel, config distribution).
 - Verify: build/package locally and request human in-game verification for behavior changes.
+- Persist: after a workflow is proven or repeated, promote it into durable docs/skills; for long sessions, consider a quick session audit to capture missed heuristics.
 - Release hygiene: ensure CI builds still pass and config migrations are safe.
 
 ## Human-In-The-Loop Verification Loop
