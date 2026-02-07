@@ -48,6 +48,17 @@ Quick fixes:
 - Restart the client between mod version changes.
 - Ensure only one copy of the mod is discoverable in mod search paths (prefer one location).
 
+## Client startup crash: missing hotkey mapping ("walkforward")
+Symptom (client-main.log):
+- `Could not initiate connection: The given key 'walkforward' was not present in the dictionary.`
+
+Likely cause:
+- `clientsettings.json` has an empty or corrupted `keyMapping` section.
+
+Quick fix:
+- Rename/delete the profile's `clientsettings.json` (the game will regenerate defaults).
+  - Example: `D:\Games\VSProfiles\Profile2\clientsettings.json`
+
 ## Hygiene
 - Do not commit logs.
 - Scrub personally identifying info if logs are shared publicly.
