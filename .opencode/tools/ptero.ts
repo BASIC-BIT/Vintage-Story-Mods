@@ -181,6 +181,24 @@ function isTruthy(v: string | undefined) {
   return s === "1" || s === "true" || s === "yes"
 }
 
+function isPathAllowedForWrite(p: string): boolean {
+  const norm = (p || "").trim().replace(/\\/g, "/")
+  return (
+    norm.startsWith("data/Mods") ||
+    norm.startsWith("/data/Mods") ||
+    norm.startsWith("data/ModConfig") ||
+    norm.startsWith("/data/ModConfig")
+  )
+}
+
+function looksLikeSecretPath(p: string): boolean {
+  const norm = (p || "").trim().toLowerCase().replace(/\\/g, "/")
+  const base = norm.split("/").pop() || norm
+  if (base === ".env") return true
+  if (base.endsWith(".pem") || base.endsWith(".key") || base.endsWith(".pfx")) return true
+  return false
+}
+
 async function tryAutoPickOnlyServerId(cfg: PteroConfig): Promise<string | null> {
   // If the account can only see one server, we can auto-select it.
   // This avoids brittle PTERO_SERVER_ID configuration and reduces 404 failures.
@@ -292,21 +310,14 @@ export const power = tool({
     }
 
     const cfg = cfgRes.config
-    let serverId = String((args as any).serverId || cfg.serverId || "").trim()
+    // Destructive action: require an explicit server identifier.
+    // Avoid auto-picking to reduce the chance of hitting the wrong environment.
+    const serverId = String((args as any).serverId || cfg.serverId || "").trim()
     if (!serverId) {
-      const picked = await tryAutoPickOnlyServerId(cfg)
-      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
-      serverId = picked
+      return "Missing server identifier. Set PTERO_SERVER_ID or pass serverId."
     }
 
-    let r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/power`, { signal })
-    if (!r.ok && r.status === 404) {
-      const picked = await tryAutoPickOnlyServerId(cfg)
-      if (picked && picked !== serverId) {
-        serverId = picked
-        r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/power`, { signal })
-      }
-    }
+    const r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/power`, { signal })
     if (!r.ok) {
       return JSON.stringify(
         {
@@ -371,15 +382,22 @@ export const files_read = tool({
     if (!cfgRes.ok) return cfgRes.error
     const cfg = cfgRes.config
 
-    let serverId = String((args as any).serverId || cfg.serverId || "").trim()
-    if (!serverId) {
-      const picked = await tryAutoPickOnlyServerId(cfg)
-      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
-      serverId = picked
-    }
-
     const file = String(args.file || "").trim()
     if (!file) return "file is required"
+
+    if (!isPathAllowedForWrite(file)) {
+      return "Refusing: writes are restricted to data/Mods and data/ModConfig"
+    }
+
+    // Destructive action: require an explicit server identifier.
+    const serverId = String((args as any).serverId || cfg.serverId || "").trim()
+    if (!serverId) {
+      return "Missing server identifier. Set PTERO_SERVER_ID or pass serverId."
+    }
+
+    if (looksLikeSecretPath(file)) {
+      return "Refusing: file looks like a secret (.env/.pem/.key/.pfx)"
+    }
 
     const q = encodeURIComponent(file)
     let r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/contents?file=${q}`)
@@ -414,12 +432,11 @@ export const files_upload = tool({
     const cfg = cfgRes.config
 
     const dot = await tryLoadDotEnv()
-
-    let serverId = String((args as any).serverId || cfg.serverId || "").trim()
+ 
+    // Destructive action: require an explicit server identifier.
+    const serverId = String((args as any).serverId || cfg.serverId || "").trim()
     if (!serverId) {
-      const picked = await tryAutoPickOnlyServerId(cfg)
-      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
-      serverId = picked
+      return "Missing server identifier. Set PTERO_SERVER_ID or pass serverId."
     }
 
     if (!isTruthy(process.env.PTERO_ALLOW_FILES || dot.PTERO_ALLOW_FILES)) {
@@ -433,6 +450,10 @@ export const files_upload = tool({
     if (!localPath) return "localPath is required"
     const directory = (args.directory || "/").toString()
 
+    if (!isPathAllowedForWrite(directory)) {
+      return "Refusing: uploads are restricted to data/Mods and data/ModConfig"
+    }
+
     let bytes: Uint8Array
     try {
       bytes = await fs.readFile(localPath)
@@ -442,14 +463,7 @@ export const files_upload = tool({
 
     // Step 1: get signed URL
     const q = encodeURIComponent(directory)
-    let u = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/upload?directory=${q}`)
-    if (!u.ok && u.status === 404) {
-      const picked = await tryAutoPickOnlyServerId(cfg)
-      if (picked && picked !== serverId) {
-        serverId = picked
-        u = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/upload?directory=${q}`)
-      }
-    }
+    const u = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/upload?directory=${q}`)
     if (!u.ok) {
       return JSON.stringify({ error: "Failed to get signed upload URL", status: u.status, statusText: u.statusText, body: u.json ?? u.text }, null, 2)
     }
@@ -537,14 +551,7 @@ export const files_write = tool({
     const content = String(args.content ?? "")
  
     const q = encodeURIComponent(file)
-    let r = await pteroFetchText(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
-    if (!r.ok && r.status === 404) {
-      const picked = await tryAutoPickOnlyServerId(cfg)
-      if (picked && picked !== serverId) {
-        serverId = picked
-        r = await pteroFetchText(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
-      }
-    }
+    const r = await pteroFetchText(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
     if (!r.ok) {
       return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
     }
@@ -563,8 +570,19 @@ export const app_get = tool({
     if (!cfgRes.ok) return cfgRes.error
     const cfg = cfgRes.config
 
+    const dot = await tryLoadDotEnv()
+
     const p = normalizeApplicationPath(String((args as any).path || ""))
     if (!p) return "path is required"
+
+    // Application tokens are powerful; restrict reads by default to reduce accidental data disclosure.
+    // Allow overriding with PTERO_APP_ALLOW_ALL_READ=1.
+    if (!isTruthy(process.env.PTERO_APP_ALLOW_ALL_READ || dot.PTERO_APP_ALLOW_ALL_READ)) {
+      const allow = ["/api/application/servers", "/api/application/nodes", "/api/application/locations", "/api/application/nests"]
+      if (!allow.some((prefix) => p.startsWith(prefix))) {
+        return "Refusing: ptero_app_get is restricted by default. Set PTERO_APP_ALLOW_ALL_READ=1 to allow arbitrary application reads"
+      }
+    }
 
     const r = await pteroFetch(cfg as any, "GET", p)
     if (!r.ok) {

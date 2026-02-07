@@ -35,6 +35,8 @@ Cloning is usually safer than constructing a server from scratch because it pres
 - limits/feature limits
 - environment variables
 
+Important: this creates a new server configuration. It does not copy world/save files or server data directories.
+
 ### Step 1: Identify a template server
 
 Use the application API to find the template (the known-good test server):
@@ -63,7 +65,7 @@ Parallelism note: this is race-prone. If clone fails due to allocation assignmen
 
 - Enable writes: set `PTERO_APP_ALLOW_WRITE=1`
 - Call clone:
-- `ptero_app_server_clone sourceServerId=<id> newName="VS Test - <tag>" allocationDefaultId=<allocId> copyEnvironment=true confirm=true`
+  - `ptero_app_server_clone sourceServerId=<id> newName="VS Test - <tag>" allocationDefaultId=<allocId> copyEnvironment=true confirm=true`
 
 ### Step 4: Install/Start and deploy
 
@@ -80,3 +82,8 @@ This depends on the egg. Common follow-ups:
 - Always use a naming convention that makes disposable servers obvious.
 - Prefer cloning within a dedicated location/node to avoid resource contention.
 - Never run destructive operations without the write gate.
+
+Cleanup:
+
+- Keep disposable servers short-lived; delete them when the experiment is done.
+- Maintain a naming convention so manual cleanup is easy (e.g. prefix `VS Test -`).
