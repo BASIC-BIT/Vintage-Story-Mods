@@ -35,6 +35,16 @@ For this repo, prefer:
 - starting with skills + scripts
 - then graduating to MCP/tools when a workflow is stable and frequently repeated
 
+## Project plugins
+
+Project-level plugins live under `.opencode/plugins/`.
+
+This repo includes an opt-in loop driver plugin:
+
+- `.opencode/plugins/auto-continue.ts`
+
+It uses the OpenCode SDK to auto-continue when a session becomes idle, until a stop token is observed.
+
 ## Repo-local custom tools
 This repo includes a small set of OpenCode custom tools under `.opencode/tools/`.
 

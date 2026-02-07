@@ -49,3 +49,23 @@ Suggested pattern:
   - Use the OpenCode `question` tool as the explicit wait point.
 
 In other words: default to forward progress; use human input as a deliberate gate, not as a scheduling mechanism.
+
+## OpenCode plugin: auto-continue stop hook
+
+OpenCode plugins can call the SDK (`client.session.prompt(...)`) when `session.idle` fires. That means we can implement a true in-OpenCode loop driver.
+
+This repo includes an opt-in project plugin:
+
+- `.opencode/plugins/auto-continue.ts`
+
+Enable it by setting environment variables (local only):
+
+- `OPENCODE_AUTO_CONTINUE=1`
+- `OPENCODE_AUTO_CONTINUE_MAX=25`
+- `OPENCODE_AUTO_CONTINUE_PROMISE=<promise>COMPLETE</promise>`
+
+Safety notes:
+
+- Keep a hard iteration cap.
+- Keep destructive operations gated (env flags + confirm=true).
+- Prefer objective stop conditions; for in-game behavior, the loop should pause behind an explicit `question` gate.

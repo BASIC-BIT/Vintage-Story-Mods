@@ -22,6 +22,7 @@ Keep it short. Promote items into skills/tools/playbooks when they become real w
   - optional session metrics snapshot
 
 - "Report, then continue" loop driver for long-running tasks (Ralph-style), with objective stop conditions and explicit wait points.
+  - Implemented first cut as `.opencode/plugins/auto-continue.ts` (opt-in env vars)
 
 ## Long-term
 - Obsidian notes integration (directory indexing + similarity search) for long-horizon memory.
