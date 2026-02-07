@@ -11,6 +11,8 @@ namespace thebasics.ModSystems
         public ModConfig Config;
         private const string ConfigName = "the_basics.json";
 
+        private static bool _loggedConfigLoadFailure;
+
         public override bool ShouldLoad(EnumAppSide forSide)
         {
             return forSide == EnumAppSide.Server;
@@ -33,9 +35,19 @@ namespace thebasics.ModSystems
             {
                 Config = API.LoadModConfig<ModConfig>(ConfigName);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                API.Server.LogError("The BASICs: Failed to load mod config!");
+                // Fail safe: do not crash mod systems if config deserialization fails.
+                // This can happen if the JSON file is corrupted or if the game serializer behavior changes.
+                if (!_loggedConfigLoadFailure)
+                {
+                    _loggedConfigLoadFailure = true;
+                    API.Server.LogError($"The BASICs: Failed to load mod config '{ConfigName}'. Using defaults. Error: {e}");
+                }
+
+                Config = new ModConfig();
+                Config.InitializeDefaultsIfNeeded();
+                // Intentionally do not overwrite the existing config file here.
                 return;
             }
 
