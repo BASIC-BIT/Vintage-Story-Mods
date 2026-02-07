@@ -28,6 +28,12 @@ To use the API, you will need from the maintainer:
 - API token (scoped minimally)
 - Server identifier
 
+Token type matters:
+- `ptlc_...` is a **Client API** key (works with `/api/client/...`).
+- `ptla_...` is an **Application API** key (does **not** work with `/api/client/...`).
+
+This repo's `ptero_*` tools use the Client API, so you want a `ptlc_...` key.
+
 Practical setup options:
 - Put these in system environment variables, or
 - Put them in a local `.env` in the repo root (gitignored).
