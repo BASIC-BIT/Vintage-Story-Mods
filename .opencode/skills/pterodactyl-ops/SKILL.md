@@ -32,13 +32,30 @@ Token type matters:
 - `ptlc_...` is a **Client API** key (works with `/api/client/...`).
 - `ptla_...` is an **Application API** key (does **not** work with `/api/client/...`).
 
-This repo's `ptero_*` tools use the Client API, so you want a `ptlc_...` key.
+This repo ships two tool families:
+
+- `ptero_*`: Client API (use `PTERO_TOKEN=ptlc_...`)
+- `ptero_app_*`: Application API (use `PTERO_TOKEN_APPLICATION=ptla_...`)
 
 Practical setup options:
 - Put these in system environment variables, or
 - Put them in a local `.env` in the repo root (gitignored).
 
 Store secrets as environment variables or in the panel, never in git.
+
+## Application API tooling (admin)
+
+Read-only exploration:
+
+- Use `ptero_app_get` to query application endpoints safely (GET-only).
+  - Examples: `path="servers"`, `path="servers/1"`
+
+Destructive operations:
+
+- Use `ptero_app_request` for POST/PATCH/PUT/DELETE.
+- Guardrails:
+  - Requires `PTERO_APP_ALLOW_WRITE=1`
+  - Requires `confirm=true`
 
 ## Existing workflows in this repo
 - Remote log download via SFTP:

@@ -70,6 +70,50 @@ async function getConfig(requireServerId: boolean): Promise<{ ok: true; config: 
   return { ok: true, config: { baseUrl, token, serverId: serverId || undefined } }
 }
 
+async function getApplicationConfig(): Promise<{ ok: true; config: PteroConfig } | { ok: false; error: string }> {
+  // Prefer real environment variables, but fall back to repo-local .env.
+  const dot = await tryLoadDotEnv()
+
+  const baseUrl = (process.env.PTERO_BASE_URL || dot.PTERO_BASE_URL || "").trim().replace(/\/$/, "")
+  const token = (process.env.PTERO_TOKEN_APPLICATION || dot.PTERO_TOKEN_APPLICATION || "").trim()
+
+  const missing: string[] = []
+  if (!baseUrl) missing.push("PTERO_BASE_URL")
+  if (!token) missing.push("PTERO_TOKEN_APPLICATION")
+
+  if (missing.length) {
+    return {
+      ok: false,
+      error:
+        "Pterodactyl application configuration is missing, so this tool can’t run.\n\nMissing env vars: `" +
+        missing.join("`, `") +
+        "`",
+    }
+  }
+
+  // Application API requires a ptla_ token.
+  if (!token.startsWith("ptla_")) {
+    return {
+      ok: false,
+      error:
+        "PTERO_TOKEN_APPLICATION must be an *application* API key (ptla_...).\n\n" +
+        "Client keys (ptlc_...) do not work on /api/application endpoints.",
+    }
+  }
+
+  return { ok: true, config: { baseUrl, token } }
+}
+
+function normalizeApplicationPath(p: string): string {
+  const raw = (p || "").trim()
+  if (!raw) return ""
+  if (raw.startsWith("/api/application/")) return raw
+  if (raw.startsWith("api/application/")) return "/" + raw
+  // Convenience: allow "servers" or "servers/123".
+  if (raw.startsWith("/")) return "/api/application" + raw
+  return "/api/application/" + raw
+}
+
 async function pteroFetch(cfg: PteroConfig, method: string, path: string, body?: unknown) {
   const url = cfg.baseUrl + path
   const headers: Record<string, string> = {
@@ -506,5 +550,241 @@ export const files_write = tool({
     }
 
     return JSON.stringify({ ok: true, file }, null, 2)
+  },
+})
+
+export const app_get = tool({
+  description: "GET an endpoint via Pterodactyl Application API (read-only)",
+  args: {
+    path: tool.schema.string().describe("Application API path. Examples: 'servers', 'servers/1', '/api/application/servers?per_page=100'")
+  },
+  async execute(args) {
+    const cfgRes = await getApplicationConfig()
+    if (!cfgRes.ok) return cfgRes.error
+    const cfg = cfgRes.config
+
+    const p = normalizeApplicationPath(String((args as any).path || ""))
+    if (!p) return "path is required"
+
+    const r = await pteroFetch(cfg as any, "GET", p)
+    if (!r.ok) {
+      return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
+    }
+    return JSON.stringify(r.json, null, 2)
+  },
+})
+
+export const app_request = tool({
+  description: "Call Pterodactyl Application API with write methods (destructive)",
+  args: {
+    method: tool.schema.string().describe("HTTP method (POST, PATCH, PUT, DELETE)"),
+    path: tool.schema.string().describe("Application API path. Examples: 'servers', 'servers/1'") ,
+    bodyJson: tool.schema.string().optional().describe("Optional JSON string body"),
+    confirm: tool.schema.boolean().optional().describe("Must be true to execute"),
+  },
+  async execute(args) {
+    const cfgRes = await getApplicationConfig()
+    if (!cfgRes.ok) return cfgRes.error
+    const cfg = cfgRes.config
+
+    const dot = await tryLoadDotEnv()
+    if (!isTruthy(process.env.PTERO_APP_ALLOW_WRITE || dot.PTERO_APP_ALLOW_WRITE)) {
+      return "Refusing: set PTERO_APP_ALLOW_WRITE=1 to enable application API write operations"
+    }
+
+    if ((args as any).confirm !== true) {
+      return "Refusing: pass confirm=true"
+    }
+
+    const method = String((args as any).method || "").trim().toUpperCase()
+    if (!method) return "method is required"
+    if (method === "GET") return "Use ptero_app_get for read-only GET requests"
+    if (!['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+      return "Invalid method. Use one of: POST, PATCH, PUT, DELETE"
+    }
+
+    const p = normalizeApplicationPath(String((args as any).path || ""))
+    if (!p) return "path is required"
+
+    let body: any = undefined
+    const bodyJson = (args as any).bodyJson
+    if (typeof bodyJson === 'string' && bodyJson.trim()) {
+      try {
+        body = JSON.parse(bodyJson)
+      } catch (e: any) {
+        return `bodyJson is not valid JSON: ${e?.message || e}`
+      }
+    }
+
+    const r = await pteroFetch(cfg as any, method, p, body)
+    if (!r.ok) {
+      return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
+    }
+
+    return JSON.stringify(r.json ?? { ok: true }, null, 2)
+  },
+})
+
+export const app_servers_list = tool({
+  description: "List servers via Pterodactyl Application API (read-only)",
+  args: {
+    page: tool.schema.number().optional().describe("Page number (default 1)"),
+    perPage: tool.schema.number().optional().describe("Results per page (1-100, default 50)"),
+    include: tool.schema.string().optional().describe("Comma-separated includes (e.g. 'user,node,allocations')"),
+    filterName: tool.schema.string().optional().describe("Filter by name (maps to filter[name])"),
+  },
+  async execute(args) {
+    const cfgRes = await getApplicationConfig()
+    if (!cfgRes.ok) return cfgRes.error
+    const cfg = cfgRes.config
+
+    const page = Number.isFinite((args as any).page) ? Math.max(1, Math.floor((args as any).page)) : 1
+    const perPage = Number.isFinite((args as any).perPage) ? Math.min(100, Math.max(1, Math.floor((args as any).perPage))) : 50
+    const include = String((args as any).include || "").trim()
+    const filterName = String((args as any).filterName || "").trim()
+
+    const qp: string[] = [`page=${page}`, `per_page=${perPage}`]
+    if (include) qp.push(`include=${encodeURIComponent(include)}`)
+    if (filterName) qp.push(`filter[name]=${encodeURIComponent(filterName)}`)
+    const p = `/api/application/servers?${qp.join("&")}`
+
+    const r = await pteroFetch(cfg as any, "GET", p)
+    if (!r.ok) {
+      return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
+    }
+    return JSON.stringify(r.json, null, 2)
+  },
+})
+
+export const app_nodes_list = tool({
+  description: "List nodes via Pterodactyl Application API (read-only)",
+  args: {
+    page: tool.schema.number().optional().describe("Page number (default 1)"),
+    perPage: tool.schema.number().optional().describe("Results per page (1-100, default 50)"),
+    include: tool.schema.string().optional().describe("Comma-separated includes (e.g. 'allocations,location')"),
+  },
+  async execute(args) {
+    const cfgRes = await getApplicationConfig()
+    if (!cfgRes.ok) return cfgRes.error
+    const cfg = cfgRes.config
+
+    const page = Number.isFinite((args as any).page) ? Math.max(1, Math.floor((args as any).page)) : 1
+    const perPage = Number.isFinite((args as any).perPage) ? Math.min(100, Math.max(1, Math.floor((args as any).perPage))) : 50
+    const include = String((args as any).include || "").trim()
+
+    const qp: string[] = [`page=${page}`, `per_page=${perPage}`]
+    if (include) qp.push(`include=${encodeURIComponent(include)}`)
+    const p = `/api/application/nodes?${qp.join("&")}`
+
+    const r = await pteroFetch(cfg as any, "GET", p)
+    if (!r.ok) {
+      return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
+    }
+    return JSON.stringify(r.json, null, 2)
+  },
+})
+
+export const app_node_allocations_list = tool({
+  description: "List allocations for a node via Pterodactyl Application API (read-only)",
+  args: {
+    nodeId: tool.schema.number().describe("Node ID"),
+    page: tool.schema.number().optional().describe("Page number (default 1)"),
+    perPage: tool.schema.number().optional().describe("Results per page (1-100, default 50)"),
+  },
+  async execute(args) {
+    const cfgRes = await getApplicationConfig()
+    if (!cfgRes.ok) return cfgRes.error
+    const cfg = cfgRes.config
+
+    const nodeId = Math.floor(Number((args as any).nodeId))
+    if (!Number.isFinite(nodeId) || nodeId <= 0) return "nodeId must be a positive integer"
+
+    const page = Number.isFinite((args as any).page) ? Math.max(1, Math.floor((args as any).page)) : 1
+    const perPage = Number.isFinite((args as any).perPage) ? Math.min(100, Math.max(1, Math.floor((args as any).perPage))) : 50
+
+    const p = `/api/application/nodes/${nodeId}/allocations?page=${page}&per_page=${perPage}`
+    const r = await pteroFetch(cfg as any, "GET", p)
+    if (!r.ok) {
+      return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
+    }
+    return JSON.stringify(r.json, null, 2)
+  },
+})
+
+export const app_server_clone = tool({
+  description: "Clone a server via Pterodactyl Application API (destructive)",
+  args: {
+    sourceServerId: tool.schema.number().describe("Source server ID (numeric)"),
+    newName: tool.schema.string().describe("New server name"),
+    allocationDefaultId: tool.schema.number().describe("Primary allocation ID to assign to the new server"),
+    copyEnvironment: tool.schema.boolean().optional().describe("When true, copies non-internal environment variables from the source server"),
+    confirm: tool.schema.boolean().optional().describe("Must be true to execute"),
+  },
+  async execute(args) {
+    const cfgRes = await getApplicationConfig()
+    if (!cfgRes.ok) return cfgRes.error
+    const cfg = cfgRes.config
+
+    const dot = await tryLoadDotEnv()
+    if (!isTruthy(process.env.PTERO_APP_ALLOW_WRITE || dot.PTERO_APP_ALLOW_WRITE)) {
+      return "Refusing: set PTERO_APP_ALLOW_WRITE=1 to enable application API write operations"
+    }
+
+    if ((args as any).confirm !== true) {
+      return "Refusing: pass confirm=true"
+    }
+
+    const sourceServerId = Math.floor(Number((args as any).sourceServerId))
+    if (!Number.isFinite(sourceServerId) || sourceServerId <= 0) return "sourceServerId must be a positive integer"
+
+    const allocationDefaultId = Math.floor(Number((args as any).allocationDefaultId))
+    if (!Number.isFinite(allocationDefaultId) || allocationDefaultId <= 0) return "allocationDefaultId must be a positive integer"
+
+    const newName = String((args as any).newName || "").trim()
+    if (!newName) return "newName is required"
+
+    const copyEnvironment = (args as any).copyEnvironment === true
+
+    // Fetch source server details
+    const sourceResp = await pteroFetch(cfg as any, "GET", `/api/application/servers/${sourceServerId}`)
+    if (!sourceResp.ok) {
+      return JSON.stringify({ error: "Failed to fetch source server", status: sourceResp.status, statusText: sourceResp.statusText, body: sourceResp.json ?? sourceResp.text }, null, 2)
+    }
+
+    const src = sourceResp.json?.attributes
+    if (!src) {
+      return JSON.stringify({ error: "Unexpected response shape from application API", body: sourceResp.json ?? sourceResp.text }, null, 2)
+    }
+
+    const payload: any = {
+      name: newName,
+      user: src.user,
+      egg: src.egg,
+      docker_image: src.container?.image,
+      startup: src.container?.startup_command,
+      limits: src.limits,
+      feature_limits: src.feature_limits,
+      allocation: { default: allocationDefaultId },
+    }
+
+    if (copyEnvironment && src.container?.environment && typeof src.container.environment === "object") {
+      const envOut: Record<string, any> = {}
+      for (const [k, v] of Object.entries(src.container.environment)) {
+        // Skip internal/panel-provided variables.
+        if (!k) continue
+        if (k.startsWith("P_")) continue
+        if (k === "STARTUP") continue
+        envOut[k] = v
+      }
+      payload.environment = envOut
+    }
+
+    // Create server
+    const createResp = await pteroFetch(cfg as any, "POST", `/api/application/servers`, payload)
+    if (!createResp.ok) {
+      return JSON.stringify({ error: "Failed to create server", status: createResp.status, statusText: createResp.statusText, body: createResp.json ?? createResp.text }, null, 2)
+    }
+
+    return JSON.stringify(createResp.json, null, 2)
   },
 })
