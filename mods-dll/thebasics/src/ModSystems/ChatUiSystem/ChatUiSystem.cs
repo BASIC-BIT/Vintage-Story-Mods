@@ -683,6 +683,13 @@ public class ChatUiSystem : ModSystem
                 return;
             }
 
+            if (_config.TypingIndicatorShowWhileChatFocused)
+            {
+                // Focus-mode: show indicator as long as the chat input is focused.
+                ForceLocalTypingState(true);
+                return;
+            }
+
             if (requireNonEmpty && text.Length == 0)
             {
                 ForceLocalTypingState(false);

@@ -323,5 +323,10 @@ namespace thebasics.Configs
         // Intended for diagnosing packet send/receive without spamming per-frame logs.
         [ProtoMember(73)]
         public bool TypingIndicatorDebugLogging { get; set; } = false;
+
+        // When true, indicator is shown whenever the chat input has focus (even if the player is not actively typing).
+        // This is often preferred for RP servers because it signals intent/engagement rather than keystrokes.
+        [ProtoMember(74)]
+        public bool TypingIndicatorShowWhileChatFocused { get; set; } = false;
     }
 }

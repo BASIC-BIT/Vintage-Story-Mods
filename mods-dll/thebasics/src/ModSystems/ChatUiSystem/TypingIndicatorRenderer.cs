@@ -89,7 +89,10 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 continue;
             }
 
-            Vec3d pos = MatrixToolsd.Project(esr.getAboveHeadPosition(localPlayerEntity), rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
+            // Lift slightly above the normal nametag position to avoid overlap.
+            // Use the target entity here (not local player), otherwise the projection can drift into the nametag.
+            var aboveHeadPos = esr.getAboveHeadPosition(entity).Add(0, 0.25, 0);
+            Vec3d pos = MatrixToolsd.Project(aboveHeadPos, rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
             if (pos.Z < 0.0)
             {
                 continue;
@@ -104,8 +107,8 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
             float posx = (float)pos.X - cappedScale * _textTexture.Width / 2f;
 
-            // Place slightly above the nametag baseline.
-            float yOffset = 6f;
+            // Small screen-space nudge; most separation comes from the world-space offset above.
+            float yOffset = 2f;
             float posy = (float)rapi.FrameHeight - (float)pos.Y - cappedScale * _textTexture.Height - yOffset;
 
             rapi.Render2DTexture(_textTexture.TextureId, posx, posy, cappedScale * _textTexture.Width, cappedScale * _textTexture.Height, 20f);
