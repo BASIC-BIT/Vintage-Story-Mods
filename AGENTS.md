@@ -39,7 +39,7 @@ If present, read `AGENTS.local.md` at the start of a session.
 
 Reusable agentic tooling/playbooks are being centralized in a dedicated repo:
 
-- Repo: `D:/bench/vs/basics-agentic-dogfooding`
+- Repo: `D:/bench/basics-agentic-dogfooding`
 - GitHub: `https://github.com/BASIC-BIT/basics-agentic-dogfooding`
 
 When working on meta workflows (tools/plugins/skills/docs), prefer updating that repo and only keep mod-specific pieces here.
