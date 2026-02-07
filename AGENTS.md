@@ -35,6 +35,15 @@ If present, read `AGENTS.local.md` at the start of a session.
 - If not blocked, continue to the next highest-value step (use the sticky todo list as the source of truth).
 - Only pause when human input is required for in-game or panel actions; use the `question` tool as the explicit wait gate.
 
+## Agentic Dogfooding Toolbox Repo
+
+Reusable agentic tooling/playbooks are being centralized in a dedicated repo:
+
+- Repo: `D:/bench/vs/basics-agentic-dogfooding`
+- GitHub: `https://github.com/BASIC-BIT/basics-agentic-dogfooding`
+
+When working on meta workflows (tools/plugins/skills/docs), prefer updating that repo and only keep mod-specific pieces here.
+
 ## Human-In-The-Loop Verification Loop
 
 When in-game validation is required (UX, screenshots, reproduction):
