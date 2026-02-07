@@ -40,3 +40,9 @@ This repo includes a small set of OpenCode custom tools under `.opencode/tools/`
 
 Currently:
 - `vsdev_*` tools help discover Vintage Story profiles and browse logs.
+
+Troubleshooting:
+- If you don't see new tools/skills, fully restart OpenCode.
+- If you use `opencode attach`, restart the backend server too.
+- Check config precedence and env vars (notably `OPENCODE_CONFIG_DIR`).
+- See: `.opencode/skills/opencode-troubleshooting/SKILL.md`

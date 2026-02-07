@@ -37,6 +37,10 @@ Ask the maintainer to step in when you need any of the following:
 - Updating Vintage Story DLLs (new game version, or pulling fresh DLLs for decompilation).
 - ModDB verification (checking comments/reports, confirming behavioral expectations).
 
+Also ask for maintainer input when:
+- You are uncertain about expected in-game UX/behavior and can't infer it from the repo.
+- The action is public-facing (issue/PR comment text, release notes) and wording matters.
+
 
 
 ## Build Commands

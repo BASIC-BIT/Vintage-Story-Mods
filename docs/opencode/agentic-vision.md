@@ -7,6 +7,10 @@ This document distills operator guidance for building high-throughput, non-slopp
 - Output must be boring, reliable, and maintainable (tens of thousands of users).
 - Avoid "AI slop": prefer evidence, repo patterns, and small safe increments.
 
+Extra heuristics:
+- Dopamine matters: optimize for fast feedback loops (builds, logs, repro) without sacrificing safety.
+- The system should feel simple even when the implementation is powerful.
+
 ## Key constraints
 - Context is finite. Use:
   - parallel subagents for discovery
@@ -14,6 +18,17 @@ This document distills operator guidance for building high-throughput, non-slopp
   - concise summaries in the main thread
 - Treat the operator as an active tool/input source.
   - Use explicit questions at decision points.
+
+## Uncertainty is a feature
+- Say when we *don't know* yet.
+- When touching unfamiliar surfaces (new VS APIs, networking, release ops), do a research pass first:
+  - search the repo and `../vs_source`
+  - inspect upstream docs/mod references
+  - then propose the smallest safe change
+- Use the operator's judgment for:
+  - UX expectations in-game
+  - public-facing communication
+  - risk tradeoffs and rollout defaults
 
 ## Swarm model
 - Parallel subagents increase throughput but need strong anchoring:
@@ -40,11 +55,21 @@ Start simple, then scale:
   - lightweight locks ("agent owns X")
   - cleanup hooks on agent exit
 
+Long-horizon idea:
+- Adopt lightweight CAPA-style habits for recurring bug classes:
+  - capture root cause
+  - add a guardrail (test/checklist/skill/playbook)
+  - ensure the class of bug is less likely to recur
+
 ## Tooling roadmap (progressive disclosure)
 Prefer the lowest-cost mechanism that works:
 1. Skills (`.opencode/skills/*`) and playbooks (`docs/ops/*`).
 2. OpenCode plugins for hooks/automation glue.
 3. MCP servers for structured tools (logs, server ops, ModDB, etc.).
+
+Portability:
+- Keep these concepts transferable across projects and agent tools.
+- When possible, keep the core playbooks tool-agnostic and add thin adapters per agent platform.
 
 ## Product idea: Vintage Story Dev MCP
 We can dogfood and potentially open-source a "Vintage Story Dev MCP":

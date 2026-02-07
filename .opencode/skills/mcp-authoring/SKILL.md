@@ -62,6 +62,16 @@ Default to requiring approval for new MCP tools:
 }
 ```
 
+You can do the same for custom tools:
+```jsonc
+{
+  "permission": {
+    "vsdev_*": "allow",
+    "ptero_*": "ask"
+  }
+}
+```
+
 ## Vintage Story MCP ideas (MVP)
 A "BasicVintageStoryMCP" could provide read-only primitives:
 - list log files for a given profile
