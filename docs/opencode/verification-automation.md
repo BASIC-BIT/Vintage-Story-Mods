@@ -10,6 +10,16 @@ Goal: shrink the human-in-the-loop step over time, without making the dev loop f
 
 This is reliable and low-risk.
 
+## Level 0.5: Run-To-Completion Loops (Mechanical Work)
+
+For mechanical tasks with clear objective completion checks, an agent can be run in repeated iterations ("Ralph loop" style) until the checks pass.
+
+Key constraints:
+
+- Hard iteration cap and/or budget cap.
+- Stop conditions based on objective signals (build/tests), not self-report.
+- Destructive actions remain gated.
+
 ## Level 1: Reduce Manual Clicks
 
 Vintage Story supports client args:

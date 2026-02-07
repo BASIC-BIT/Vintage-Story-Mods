@@ -42,6 +42,19 @@ Implementation detail:
 - Use `git worktree` to isolate these agents so they can make clean commits without interfering with the main worktree.
 - Keep their scope narrow (docs-only, tooling-only, etc.).
 
+## "Ralph" / Loop drivers (long-running agents)
+
+The "Ralph Wiggum" pattern (popularized as "Ralph is a bash loop") is: repeatedly re-run an agent on the same objective until an objective stop condition is reached.
+
+How to use it safely:
+
+- Always set a hard iteration cap and/or budget cap.
+- Use objective completion criteria (build succeeds, tests pass), not the agent’s self-assessment.
+- Prefer fresh-context iterations with progress persisted in files + git history.
+- Treat destructive operations as gated steps (env flags + confirm=true), even inside loops.
+
+In this repo, the recommended "stop condition" is usually a deterministic build/package step + a human-in-the-loop check (using the `question` tool) for in-game behavior.
+
 ## Manual parallelism (multiple terminals)
 If you can open multiple OpenCode terminals, you can run parallel "main" sessions manually:
 - Give each session a scoped objective and a shared output location (a file path).

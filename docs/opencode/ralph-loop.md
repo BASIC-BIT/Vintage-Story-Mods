@@ -1,0 +1,38 @@
+# Ralph Loop Notes (Agent Run-To-Completion)
+
+This doc captures a recent pattern sometimes called the "Ralph Wiggum loop" ("Ralph is a bash loop"): re-running an AI coding agent repeatedly on the same objective until an objective stop condition is met.
+
+This is not about blind persistence. It is about building reliable control loops.
+
+## Why it helps
+
+- The agent can keep making incremental progress while the human is away.
+- The real "memory" is the repo state (files + git history), not a massive context window.
+
+## Guardrails
+
+- Always set a hard cap: max iterations and/or budget.
+- Always use objective completion checks:
+  - `dotnet build` succeeds
+  - packaging succeeds
+  - (if available) tests pass
+- Never allow destructive steps without explicit gating:
+  - environment flags
+  - `confirm=true`
+- Avoid per-frame logs or spammy debug instrumentation.
+
+## Recommended stop conditions for this repo
+
+- Mechanical code changes: `dotnet build` + packaging outputs expected zip.
+- In-game behavior changes: use a human-in-the-loop step.
+  - Ask for exactly one concrete action + one expected observation.
+  - Use the OpenCode `question` tool as the deliberate wait point.
+
+## Where to persist learnings
+
+- Ultra-durable: `AGENTS.md` (global heuristics)
+- Durable playbooks: `.opencode/skills/*/SKILL.md`
+- Reference docs: `docs/ops/*`, `docs/opencode/*`
+- Sticky (session-only): `todowrite`
+
+If a loop repeats, promote the workflow into a playbook.
