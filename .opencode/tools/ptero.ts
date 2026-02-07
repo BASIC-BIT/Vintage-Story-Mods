@@ -606,6 +606,12 @@ export const app_request = tool({
     const p = normalizeApplicationPath(String((args as any).path || ""))
     if (!p) return "path is required"
 
+    // Reduce blast radius by default. This is an ops tool, but we primarily expect server orchestration.
+    // If you truly need wider access (users/nodes/locations), remove or relax this guard.
+    if (!p.startsWith("/api/application/servers")) {
+      return "Refusing: ptero_app_request is restricted to /api/application/servers* by default"
+    }
+
     let body: any = undefined
     const bodyJson = (args as any).bodyJson
     if (typeof bodyJson === 'string' && bodyJson.trim()) {
@@ -756,6 +762,14 @@ export const app_server_clone = tool({
       return JSON.stringify({ error: "Unexpected response shape from application API", body: sourceResp.json ?? sourceResp.text }, null, 2)
     }
 
+    if (!src.limits || !src.feature_limits) {
+      return JSON.stringify({ error: "Source server is missing limits/feature_limits in response; cannot clone deterministically", body: sourceResp.json ?? sourceResp.text }, null, 2)
+    }
+
+    if (!src.container || !src.container.image || !src.container.startup_command) {
+      return JSON.stringify({ error: "Source server is missing container details (image/startup_command); cannot clone deterministically", body: sourceResp.json ?? sourceResp.text }, null, 2)
+    }
+
     const payload: any = {
       name: newName,
       user: src.user,
@@ -777,6 +791,10 @@ export const app_server_clone = tool({
         envOut[k] = v
       }
       payload.environment = envOut
+    }
+    else if (copyEnvironment) {
+      // Not all panels expose environment variables here; surface this so operators don't assume it's copied.
+      return JSON.stringify({ error: "copyEnvironment=true requested, but source server environment was not present in the response", hint: "Try copyEnvironment=false or use the startup endpoint to set variables explicitly." }, null, 2)
     }
 
     // Create server
