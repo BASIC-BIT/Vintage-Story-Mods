@@ -327,27 +327,46 @@ export const files_upload = tool({
     }
 
     // Step 2: upload
-    const form = new FormData()
     const file = new File([bytes], path.basename(localPath))
-    form.append("files", file)
 
-    // NOTE: Some panel/wings setups error if directory is provided both as
-    // query param and form field. Follow the documented pattern: query param only.
-    const uploadUrl = `${signedUrl}?directory=${encodeURIComponent(directory)}`
-    const res = await fetch(uploadUrl, { method: "POST", body: form })
-    const text = await res.text()
-    let json: any = null
-    try {
-      json = text ? JSON.parse(text) : null
-    } catch {
-      // ignore
+    // Some Wings setups are picky about whether `directory` is provided in the
+    // query string vs the multipart form. Try both patterns.
+    const attempts: Array<{ url: string; form: FormData; label: string }> = []
+
+    // Attempt A: query param only (doc example)
+    {
+      const form = new FormData()
+      form.append("files", file)
+      attempts.push({ url: `${signedUrl}?directory=${encodeURIComponent(directory)}`, form, label: "query" })
     }
 
-    if (!res.ok) {
-      return JSON.stringify({ error: "Upload failed", status: res.status, statusText: res.statusText, body: json ?? text }, null, 2)
+    // Attempt B: form field only (some panels expect this)
+    {
+      const form = new FormData()
+      form.append("files", file)
+      form.append("directory", directory)
+      attempts.push({ url: signedUrl, form, label: "form" })
     }
 
-    return JSON.stringify({ ok: true, uploaded: path.basename(localPath), directory, status: res.status }, null, 2)
+    let lastErr: any = null
+    for (const att of attempts) {
+      const res = await fetch(att.url, { method: "POST", body: att.form })
+      const text = await res.text()
+      let json: any = null
+      try {
+        json = text ? JSON.parse(text) : null
+      } catch {
+        // ignore
+      }
+
+      if (res.ok) {
+        return JSON.stringify({ ok: true, uploaded: path.basename(localPath), directory, status: res.status, mode: att.label }, null, 2)
+      }
+
+      lastErr = { status: res.status, statusText: res.statusText, body: json ?? text, mode: att.label }
+    }
+
+    return JSON.stringify({ error: "Upload failed", ...lastErr }, null, 2)
   },
 })
 
