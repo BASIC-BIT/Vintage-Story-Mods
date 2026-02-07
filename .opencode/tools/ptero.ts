@@ -538,15 +538,18 @@ export const files_write = tool({
       return "Refusing: pass confirm=true"
     }
 
-    let serverId = String((args as any).serverId || cfg.serverId || "").trim()
-    if (!serverId) {
-      const picked = await tryAutoPickOnlyServerId(cfg)
-      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
-      serverId = picked
-    }
-
     const file = String(args.file || "").trim()
     if (!file) return "file is required"
+
+    if (!isPathAllowedForWrite(file)) {
+      return "Refusing: writes are restricted to data/Mods and data/ModConfig"
+    }
+
+    // Destructive action: require an explicit server identifier.
+    const serverId = String((args as any).serverId || cfg.serverId || "").trim()
+    if (!serverId) {
+      return "Missing server identifier. Set PTERO_SERVER_ID or pass serverId."
+    }
 
     const content = String(args.content ?? "")
  
