@@ -59,6 +59,16 @@ Quick fix:
 - Rename/delete the profile's `clientsettings.json` (the game will regenerate defaults).
   - Example: `D:\Games\VSProfiles\Profile2\clientsettings.json`
 
+## Client connect crash: TradeHandbookInfo NRE (VS 1.20.12)
+Symptom (crash log):
+- `Vintagestory.GameContent.TradeHandbookInfo.AddTraderHandbookInfo(...)` throws `NullReferenceException` during `LevelFinalize`.
+
+Notes:
+- This appears to be a vanilla `VSSurvivalMod` issue when a collectible lacks `CollectibleBehaviorHandbookTextAndExtraInfo`.
+
+Mitigation in this repo:
+- `thebasics` ships a Harmony crash-guard patch: `mods-dll/thebasics/src/Patches/TradeHandbookInfoPatches.cs`
+
 ## Hygiene
 - Do not commit logs.
 - Scrub personally identifying info if logs are shared publicly.
