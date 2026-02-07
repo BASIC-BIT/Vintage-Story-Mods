@@ -2,6 +2,14 @@
 
 This file provides guidance to AI Coding Agents when working with code in this repository.
 
+## Local Maintainer Context (Optional)
+
+If present, read `AGENTS.local.md` at the start of a session.
+
+- This file is gitignored and may contain personal workflow preferences (e.g., speech-to-text use).
+- Use it to adapt communication style (ask targeted clarifying questions, summarize decisions), and to respect approval boundaries.
+- Never copy secrets from it into commits, issues, PRs, or public channels.
+
 ## Operating Principles (Ship-Safe)
 
 - This mod has tens of thousands of users. Prefer boring, reliable changes over clever ones; avoid risky refactors unless explicitly scoped.

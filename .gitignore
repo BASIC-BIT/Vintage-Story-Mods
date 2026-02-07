@@ -24,6 +24,9 @@ NUL
 .env
 *.env
 
+# Local maintainer context (optional; contains personal preferences)
+AGENTS.local.md
+
 # Repomix output files
 .repomix-output.txt
 **/*.repomix-output.*

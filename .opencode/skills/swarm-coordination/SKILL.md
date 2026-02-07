@@ -27,6 +27,12 @@ Maximize throughput with parallel subagents while keeping the main context clean
    - `.opencode/skills/*/SKILL.md` for reusable playbooks
 4. Use `todowrite` for session-level tracking.
 
+## Manual parallelism (multiple terminals)
+If you can open multiple OpenCode terminals, you can run parallel "main" sessions manually:
+- Give each session a scoped objective and a shared output location (a file path).
+- Use durable files (skills/docs) for any workflow you expect to repeat.
+- Converge by summarizing into one commit/PR plan.
+
 ## Anchors to give subagents
 Always include:
 - Target directories

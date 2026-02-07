@@ -6,6 +6,10 @@ Key files:
 - Repo rules: `AGENTS.md`
 - Repo skills: `.opencode/skills/*/SKILL.md`
 
+Optional local context:
+- `AGENTS.local.md` (gitignored)
+- Template: `AGENTS.local.md.example`
+
 ## Skills
 OpenCode discovers skills under `.opencode/skills/<skill-name>/SKILL.md`.
 
