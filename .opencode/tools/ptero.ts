@@ -101,6 +101,37 @@ async function pteroFetch(cfg: PteroConfig, method: string, path: string, body?:
   }
 }
 
+async function pteroFetchText(cfg: PteroConfig, method: string, path: string, content: string) {
+  const url = cfg.baseUrl + path
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${cfg.token}`,
+    Accept: "Application/vnd.pterodactyl.v1+json",
+    "Content-Type": "text/plain; charset=utf-8",
+  }
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: content,
+  })
+
+  const text = await res.text()
+  let json: any = null
+  try {
+    json = text ? JSON.parse(text) : null
+  } catch {
+    // ignore
+  }
+
+  return {
+    ok: res.ok,
+    status: res.status,
+    statusText: res.statusText,
+    json,
+    text,
+  }
+}
+
 function isTruthy(v: string | undefined) {
   const s = (v || "").trim().toLowerCase()
   return s === "1" || s === "true" || s === "yes"
@@ -460,14 +491,14 @@ export const files_write = tool({
     if (!file) return "file is required"
 
     const content = String(args.content ?? "")
-
+ 
     const q = encodeURIComponent(file)
-    let r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
+    let r = await pteroFetchText(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
     if (!r.ok && r.status === 404) {
       const picked = await tryAutoPickOnlyServerId(cfg)
       if (picked && picked !== serverId) {
         serverId = picked
-        r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
+        r = await pteroFetchText(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
       }
     }
     if (!r.ok) {
