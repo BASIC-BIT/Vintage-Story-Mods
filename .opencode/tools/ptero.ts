@@ -242,6 +242,38 @@ export const files_list = tool({
   },
 })
 
+export const files_read = tool({
+  description: "Read a server file via Pterodactyl Client API (read-only)",
+  args: {
+    serverId: tool.schema.string().optional().describe("Override server identifier (defaults to PTERO_SERVER_ID)"),
+    file: tool.schema.string().describe("File path to read (e.g. 'data/Logs/server-main.log')"),
+    maxBytes: tool.schema.number().optional().describe("Max bytes to return (default 50000, max 200000)"),
+  },
+  async execute(args) {
+    const cfgRes = await getConfig(false)
+    if (!cfgRes.ok) return cfgRes.error
+    const cfg = cfgRes.config
+
+    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    if (!serverId) {
+      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+    }
+
+    const file = String(args.file || "").trim()
+    if (!file) return "file is required"
+
+    const q = encodeURIComponent(file)
+    const r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/contents?file=${q}`)
+    if (!r.ok) {
+      return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
+    }
+
+    const maxBytes = Math.min(200000, Math.max(1, Math.floor(args.maxBytes ?? 50000)))
+    const text = (r.text || "").slice(-maxBytes)
+    return text
+  },
+})
+
 export const files_upload = tool({
   description: "Upload a local file to the server via Pterodactyl signed upload URL (destructive)",
   args: {
