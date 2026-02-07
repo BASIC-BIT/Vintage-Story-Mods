@@ -78,6 +78,32 @@ async function discoverProfiles(): Promise<VsProfile[]> {
   return profiles
 }
 
+async function resolveProfile(args: { profile?: string; profilePath?: string }): Promise<{ ok: true; profile: VsProfile } | { ok: false; error: any }> {
+  const profiles = await discoverProfiles()
+
+  if (args.profilePath) {
+    const dp = path.normalize(args.profilePath)
+    return {
+      ok: true,
+      profile: {
+        name: "custom",
+        dataPath: dp,
+        logsPath: safeJoin(dp, "Logs"),
+        modsPath: safeJoin(dp, "Mods"),
+        modConfigPath: safeJoin(dp, "ModConfig"),
+        exists: await pathExists(dp),
+      },
+    }
+  }
+
+  const prof = profiles.find((p) => p.name === (args.profile ?? "primary"))
+  if (!prof) {
+    return { ok: false, error: { error: "Profile not found", available: profiles.map((p) => p.name) } }
+  }
+
+  return { ok: true, profile: prof }
+}
+
 async function listFilesSorted(dir: string, limit: number): Promise<{ path: string; mtimeMs: number }[]> {
   const out: { path: string; mtimeMs: number }[] = []
   let names: string[]
@@ -119,29 +145,68 @@ export const logs_list = tool({
   },
   async execute(args) {
     const limit = Math.floor(args.limit ?? 20)
-    const profiles = await discoverProfiles()
 
-    let prof = null as VsProfile | null
-    if (args.profilePath) {
-      const dp = path.normalize(args.profilePath)
-      prof = {
-        name: "custom",
-        dataPath: dp,
-        logsPath: safeJoin(dp, "Logs"),
-        modsPath: safeJoin(dp, "Mods"),
-        modConfigPath: safeJoin(dp, "ModConfig"),
-        exists: await pathExists(dp),
-      }
-    } else {
-      prof = profiles.find((p) => p.name === (args.profile ?? "primary")) || null
-    }
-
-    if (!prof) {
-      return JSON.stringify({ error: "Profile not found", available: profiles.map((p) => p.name) }, null, 2)
-    }
+    const profRes = await resolveProfile(args)
+    if (!profRes.ok) return JSON.stringify(profRes.error, null, 2)
+    const prof = profRes.profile
 
     const files = await listFilesSorted(prof.logsPath, limit)
     return JSON.stringify({ profile: prof, files }, null, 2)
+  },
+})
+
+export const logs_latest = tool({
+  description: "Get the newest log file path for a VS profile",
+  args: {
+    profile: tool.schema.string().optional().describe("Profile name (default: primary)"),
+    profilePath: tool.schema.string().optional().describe("Explicit VS data path"),
+    nameContains: tool.schema.string().optional().describe("Optional substring filter (e.g. 'client-main' or 'server-main')"),
+  },
+  async execute(args) {
+    const profRes = await resolveProfile(args)
+    if (!profRes.ok) return JSON.stringify(profRes.error, null, 2)
+    const prof = profRes.profile
+
+    const files = await listFilesSorted(prof.logsPath, 200)
+    const needle = (args.nameContains ?? "").trim().toLowerCase()
+    const filtered = needle ? files.filter((f) => f.path.toLowerCase().includes(needle)) : files
+    const newest = filtered[0]
+    if (!newest) {
+      return JSON.stringify({ error: "No log files found", profile: prof }, null, 2)
+    }
+
+    return JSON.stringify({ profile: prof, newest }, null, 2)
+  },
+})
+
+export const logs_tail_latest = tool({
+  description: "Tail the newest log file for a VS profile",
+  args: {
+    profile: tool.schema.string().optional().describe("Profile name (default: primary)"),
+    profilePath: tool.schema.string().optional().describe("Explicit VS data path"),
+    nameContains: tool.schema.string().optional().describe("Optional substring filter (e.g. 'client-main')"),
+    lines: tool.schema.number().optional().describe("Lines to return (default 200, max 2000)"),
+  },
+  async execute(args) {
+    const latest = await logs_latest.execute({
+      profile: args.profile,
+      profilePath: args.profilePath,
+      nameContains: args.nameContains,
+    } as any)
+
+    let parsed: any
+    try {
+      parsed = JSON.parse(String(latest))
+    } catch {
+      return String(latest)
+    }
+
+    const fp = parsed?.newest?.path
+    if (!fp) {
+      return JSON.stringify(parsed, null, 2)
+    }
+
+    return logs_tail.execute({ filePath: fp, lines: args.lines } as any)
   },
 })
 
