@@ -11,6 +11,7 @@ Keep it short. Promote items into skills/tools/playbooks when they become real w
   - restart server
   - tail logs
 - Deterministic log triage patterns for large files (tail, grep, last-N matches).
+- Session auditor automation: post-hoc extraction of missed action items + filing into durable storage.
 
 ## Medium-term
 - Observability for swarm sessions:
@@ -19,6 +20,8 @@ Keep it short. Promote items into skills/tools/playbooks when they become real w
 - Context/compaction ergonomics:
   - a pre-compaction "nudge" hook (plugin)
   - optional session metrics snapshot
+
+- "Report, then continue" loop driver for long-running tasks (Ralph-style), with objective stop conditions and explicit wait points.
 
 ## Long-term
 - Obsidian notes integration (directory indexing + similarity search) for long-horizon memory.

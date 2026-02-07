@@ -19,6 +19,19 @@ Extra heuristics:
 - Treat the operator as an active tool/input source.
   - Use explicit questions at decision points.
 
+## Composability and measurable proxies
+
+Many "hard" problems become tractable when decomposed into smaller, checkable problems.
+
+Practical heuristics:
+
+- Prefer composable work units with objective checks (build, package, log signatures) over monolithic efforts.
+- When the true goal is hard to measure directly (UX, RP feel), introduce proxy signals:
+  - config-gated debug logs on state changes
+  - deterministic reproduction steps
+  - screenshots/video only when necessary
+- Convert repeated human feedback loops into playbooks/tools so the agent can operate with a longer time horizon.
+
 ## Uncertainty is a feature
 - Say when we *don't know* yet.
 - When touching unfamiliar surfaces (new VS APIs, networking, release ops), do a research pass first:

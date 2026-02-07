@@ -36,3 +36,16 @@ This is not about blind persistence. It is about building reliable control loops
 - Sticky (session-only): `todowrite`
 
 If a loop repeats, promote the workflow into a playbook.
+
+## "Report, then continue" (preferred operator experience)
+
+In interactive use, the agent should treat intermediate summaries as *reports* to the maintainer, not as a stopping point.
+
+Suggested pattern:
+
+- After each meaningful milestone (a commit landed, server restarted, logs confirm), emit a short report.
+- If not blocked, immediately proceed to the next planned step.
+- Only pause when you need the maintainer to do something in-game or in a panel.
+  - Use the OpenCode `question` tool as the explicit wait point.
+
+In other words: default to forward progress; use human input as a deliberate gate, not as a scheduling mechanism.
