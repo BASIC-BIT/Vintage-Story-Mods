@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Project-level OpenCode settings for this repo.
+  // Keep secrets in global config or environment variables.
+
+  "permission": {
+    // Local log/profile discovery should be frictionless.
+    "vsdev_*": "allow",
+
+    // Server ops should require confirmation.
+    "ptero_*": "ask",
+
+    // Browser automation can be destructive; require ask.
+    "playwright_*": "ask",
+
+    // GitHub tools can be public-facing; require ask.
+    "github_*": "ask"
+  }
+}

@@ -40,6 +40,7 @@ This repo includes a small set of OpenCode custom tools under `.opencode/tools/`
 
 Currently:
 - `vsdev_*` tools help discover Vintage Story profiles and browse logs.
+- `ptero_*` tools provide Pterodactyl Client API helpers (status + gated power actions).
 
 Troubleshooting:
 - If you don't see new tools/skills, fully restart OpenCode.
