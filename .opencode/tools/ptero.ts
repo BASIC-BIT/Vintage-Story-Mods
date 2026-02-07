@@ -349,3 +349,44 @@ export const files_upload = tool({
     return JSON.stringify({ ok: true, uploaded: path.basename(localPath), directory, status: res.status }, null, 2)
   },
 })
+
+export const files_write = tool({
+  description: "Write file contents on the server via Pterodactyl Client API (destructive)",
+  args: {
+    serverId: tool.schema.string().optional().describe("Override server identifier (defaults to PTERO_SERVER_ID)"),
+    file: tool.schema.string().describe("File path to write (e.g. 'data/ModConfig/the_basics.json')"),
+    content: tool.schema.string().describe("Full file contents"),
+    confirm: tool.schema.boolean().optional().describe("Must be true to execute"),
+  },
+  async execute(args) {
+    const cfgRes = await getConfig(false)
+    if (!cfgRes.ok) return cfgRes.error
+    const cfg = cfgRes.config
+
+    const dot = await tryLoadDotEnv()
+    if (!isTruthy(process.env.PTERO_ALLOW_FILES || dot.PTERO_ALLOW_FILES)) {
+      return "Refusing: set PTERO_ALLOW_FILES=1 to enable file writes/uploads"
+    }
+    if (args.confirm !== true) {
+      return "Refusing: pass confirm=true"
+    }
+
+    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    if (!serverId) {
+      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+    }
+
+    const file = String(args.file || "").trim()
+    if (!file) return "file is required"
+
+    const content = String(args.content ?? "")
+
+    const q = encodeURIComponent(file)
+    const r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
+    if (!r.ok) {
+      return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
+    }
+
+    return JSON.stringify({ ok: true, file }, null, 2)
+  },
+})
