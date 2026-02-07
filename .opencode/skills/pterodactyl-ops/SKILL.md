@@ -28,6 +28,10 @@ To use the API, you will need from the maintainer:
 - API token (scoped minimally)
 - Server identifier
 
+Practical setup options:
+- Put these in system environment variables, or
+- Put them in a local `.env` in the repo root (gitignored).
+
 Store secrets as environment variables or in the panel, never in git.
 
 ## Existing workflows in this repo
@@ -41,5 +45,7 @@ If Pterodactyl API access is desired, add a small script that can:
 - Get server status (read-only)
 - Fetch recent console output (read-only)
 - Restart server (explicit flag required)
+
+This repo includes repo-local `ptero_*` OpenCode tools under `.opencode/tools/ptero.ts`.
 
 Keep it opt-in and require an environment variable guard.

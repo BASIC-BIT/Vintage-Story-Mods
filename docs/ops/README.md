@@ -22,3 +22,4 @@ Playbooks:
 - ModDB upload checklist: `docs/ops/moddb-upload.md`
 - SFTP deploy (opt-in): `docs/ops/deploy-sftp.md`
 - Fetch logs (remote): `docs/ops/fetch-logs.md`
+- Test server loop (Pterodactyl): `docs/ops/test-server-loop.md`
