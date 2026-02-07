@@ -30,3 +30,9 @@ OpenCode can be extended via:
 For this repo, prefer:
 - starting with skills + scripts
 - then graduating to MCP/tools when a workflow is stable and frequently repeated
+
+## Repo-local custom tools
+This repo includes a small set of OpenCode custom tools under `.opencode/tools/`.
+
+Currently:
+- `vsdev_*` tools help discover Vintage Story profiles and browse logs.
