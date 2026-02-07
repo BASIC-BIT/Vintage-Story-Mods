@@ -330,8 +330,9 @@ export const files_upload = tool({
     const form = new FormData()
     const file = new File([bytes], path.basename(localPath))
     form.append("files", file)
-    form.append("directory", directory)
 
+    // NOTE: Some panel/wings setups error if directory is provided both as
+    // query param and form field. Follow the documented pattern: query param only.
     const uploadUrl = `${signedUrl}?directory=${encodeURIComponent(directory)}`
     const res = await fetch(uploadUrl, { method: "POST", body: form })
     const text = await res.text()
