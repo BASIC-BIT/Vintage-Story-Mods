@@ -267,6 +267,13 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
 
         var isTyping = message.IsTyping;
+
+        if (_typingStatesByEntityId.TryGetValue(entityId, out var prevState) && prevState == isTyping)
+        {
+            // Avoid redundant broadcasts for an ephemeral signal.
+            return;
+        }
+
         _typingStatesByEntityId[entityId] = isTyping;
 
         // Server is authoritative for EntityId.
@@ -274,6 +281,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         // Best-effort broadcast; clients without this message type will silently ignore it.
         _serverConfigChannel?.BroadcastPacket(message, player);
+
+        if (Config?.TypingIndicatorDebugLogging == true)
+        {
+            API.Logger.Debug($"THEBASICS - TypingIndicator {player.PlayerName} -> {isTyping}");
+        }
     }
 
     private void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)

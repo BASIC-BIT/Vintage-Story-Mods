@@ -106,6 +106,19 @@ function isTruthy(v: string | undefined) {
   return s === "1" || s === "true" || s === "yes"
 }
 
+async function tryAutoPickOnlyServerId(cfg: PteroConfig): Promise<string | null> {
+  // If the account can only see one server, we can auto-select it.
+  // This avoids brittle PTERO_SERVER_ID configuration and reduces 404 failures.
+  const r = await pteroFetch(cfg as any, "GET", `/api/client`)
+  if (!r.ok) return null
+
+  const servers = r.json?.data
+  if (!Array.isArray(servers) || servers.length !== 1) return null
+
+  const id = servers[0]?.attributes?.identifier
+  return typeof id === "string" && id.trim() ? id.trim() : null
+}
+
 export const status = tool({
   description: "Get Pterodactyl server resource status via Client API (read-only)",
   args: {
@@ -116,12 +129,21 @@ export const status = tool({
     if (!cfgRes.ok) return cfgRes.error
 
     const cfg = cfgRes.config
-    const serverId = String(args?.serverId || cfg.serverId || "").trim()
+    let serverId = String((args as any)?.serverId || cfg.serverId || "").trim()
     if (!serverId) {
-      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
+      serverId = picked
     }
 
-    const r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/resources`)
+    let r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/resources`)
+    if (!r.ok && r.status === 404) {
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (picked && picked !== serverId) {
+        serverId = picked
+        r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/resources`)
+      }
+    }
     if (!r.ok) {
       return JSON.stringify(
         {
@@ -195,12 +217,21 @@ export const power = tool({
     }
 
     const cfg = cfgRes.config
-    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    let serverId = String((args as any).serverId || cfg.serverId || "").trim()
     if (!serverId) {
-      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
+      serverId = picked
     }
 
-    const r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/power`, { signal })
+    let r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/power`, { signal })
+    if (!r.ok && r.status === 404) {
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (picked && picked !== serverId) {
+        serverId = picked
+        r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/power`, { signal })
+      }
+    }
     if (!r.ok) {
       return JSON.stringify(
         {
@@ -229,14 +260,23 @@ export const files_list = tool({
     if (!cfgRes.ok) return cfgRes.error
     const cfg = cfgRes.config
 
-    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    let serverId = String((args as any).serverId || cfg.serverId || "").trim()
     if (!serverId) {
-      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
+      serverId = picked
     }
 
     const directory = (args.directory || "/").toString()
     const q = encodeURIComponent(directory)
-    const r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/list?directory=${q}`)
+    let r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/list?directory=${q}`)
+    if (!r.ok && r.status === 404) {
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (picked && picked !== serverId) {
+        serverId = picked
+        r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/list?directory=${q}`)
+      }
+    }
     if (!r.ok) {
       return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
     }
@@ -256,16 +296,25 @@ export const files_read = tool({
     if (!cfgRes.ok) return cfgRes.error
     const cfg = cfgRes.config
 
-    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    let serverId = String((args as any).serverId || cfg.serverId || "").trim()
     if (!serverId) {
-      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
+      serverId = picked
     }
 
     const file = String(args.file || "").trim()
     if (!file) return "file is required"
 
     const q = encodeURIComponent(file)
-    const r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/contents?file=${q}`)
+    let r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/contents?file=${q}`)
+    if (!r.ok && r.status === 404) {
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (picked && picked !== serverId) {
+        serverId = picked
+        r = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/contents?file=${q}`)
+      }
+    }
     if (!r.ok) {
       return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
     }
@@ -291,9 +340,11 @@ export const files_upload = tool({
 
     const dot = await tryLoadDotEnv()
 
-    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    let serverId = String((args as any).serverId || cfg.serverId || "").trim()
     if (!serverId) {
-      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
+      serverId = picked
     }
 
     if (!isTruthy(process.env.PTERO_ALLOW_FILES || dot.PTERO_ALLOW_FILES)) {
@@ -316,7 +367,14 @@ export const files_upload = tool({
 
     // Step 1: get signed URL
     const q = encodeURIComponent(directory)
-    const u = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/upload?directory=${q}`)
+    let u = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/upload?directory=${q}`)
+    if (!u.ok && u.status === 404) {
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (picked && picked !== serverId) {
+        serverId = picked
+        u = await pteroFetch(cfg as any, "GET", `/api/client/servers/${serverId}/files/upload?directory=${q}`)
+      }
+    }
     if (!u.ok) {
       return JSON.stringify({ error: "Failed to get signed upload URL", status: u.status, statusText: u.statusText, body: u.json ?? u.text }, null, 2)
     }
@@ -391,9 +449,11 @@ export const files_write = tool({
       return "Refusing: pass confirm=true"
     }
 
-    const serverId = String(args.serverId || cfg.serverId || "").trim()
+    let serverId = String((args as any).serverId || cfg.serverId || "").trim()
     if (!serverId) {
-      return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (!picked) return "Missing server id. Set PTERO_SERVER_ID."
+      serverId = picked
     }
 
     const file = String(args.file || "").trim()
@@ -402,7 +462,14 @@ export const files_write = tool({
     const content = String(args.content ?? "")
 
     const q = encodeURIComponent(file)
-    const r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
+    let r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
+    if (!r.ok && r.status === 404) {
+      const picked = await tryAutoPickOnlyServerId(cfg)
+      if (picked && picked !== serverId) {
+        serverId = picked
+        r = await pteroFetch(cfg as any, "POST", `/api/client/servers/${serverId}/files/write?file=${q}`, content)
+      }
+    }
     if (!r.ok) {
       return JSON.stringify({ error: "Pterodactyl request failed", status: r.status, statusText: r.statusText, body: r.json ?? r.text }, null, 2)
     }

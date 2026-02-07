@@ -319,5 +319,9 @@ namespace thebasics.Configs
         [ProtoMember(72)]
         public bool TypingIndicatorRequireNonEmptyText { get; set; } = true;
 
+        // When true, emits low-volume debug logs on typing state changes.
+        // Intended for diagnosing packet send/receive without spamming per-frame logs.
+        [ProtoMember(73)]
+        public bool TypingIndicatorDebugLogging { get; set; } = false;
     }
 }

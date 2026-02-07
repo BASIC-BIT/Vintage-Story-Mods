@@ -240,6 +240,10 @@ public class ChatUiSystem : ModSystem
         return Lang.Get("thebasics:typingindicator-typing");
     }
 
+    private static bool IsTypingIndicatorDebugEnabled()
+    {
+        return _config?.TypingIndicatorDebugLogging == true;
+    }
     private void OnServerConfigMessage(TheBasicsConfigMessage configMessage)
     {
         try
@@ -712,7 +716,14 @@ public class ChatUiSystem : ModSystem
         _lastSentTypingState = isTyping;
 
         // Best-effort: do not throw or spam retries for an ephemeral state.
-        if (_clientConfigChannel?.Connected != true)
+        // We intentionally attempt a send even if the Connected flag is unreliable across versions.
+        // Any failure is swallowed; debug logging (when enabled) only logs on state changes.
+        if (IsTypingIndicatorDebugEnabled())
+        {
+            _api?.Logger.Debug($"[THEBASICS] TypingIndicator local state -> {isTyping} (channelConnected={_clientConfigChannel?.Connected})");
+        }
+
+        if (_clientConfigChannel == null)
         {
             return;
         }
@@ -721,9 +732,12 @@ public class ChatUiSystem : ModSystem
         {
             _clientConfigChannel.SendPacket(new ChatTypingStateMessage { IsTyping = isTyping });
         }
-        catch
+        catch (Exception e)
         {
-            // Ignore.
+            if (IsTypingIndicatorDebugEnabled())
+            {
+                _api?.Logger.Debug($"[THEBASICS] TypingIndicator failed to send state {isTyping}: {e.Message}");
+            }
         }
     }
 }
