@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // This is an example config. Do not rename to opencode.json unless you
+  // intentionally want OpenCode to use it for this project.
+  //
+  // Recommended: keep machine-specific settings (external paths, tokens) in
+  // your global config at ~/.config/opencode/opencode.json.
+
+  "permission": {
+    // Default external paths to approval unless explicitly allowlisted.
+    "external_directory": {
+      "*": "ask"
+    }
+  }
+}

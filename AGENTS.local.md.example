@@ -1,0 +1,34 @@
+# Local Maintainer Context (Example)
+
+Copy this file to `AGENTS.local.md` (which is gitignored).
+
+Purpose:
+- Let the agent adapt to your personal workflow without committing private details.
+
+## Maintainer Profile
+- Name/handle: <fill in>
+- Communication: I may use dictation/speech-to-text. Messages may be long and less structured.
+- Preferences:
+  - Prefer short, targeted clarification questions when needed.
+  - Summarize decisions and next steps after long dictation.
+  - Keep public-facing text (issues/PRs/release notes) crisp and non-sloppy.
+
+## Local Machine Paths
+- Workspace root(s): <fill in>
+- Vintage Story install(s): <fill in>
+- Vintage Story data path(s): <fill in>
+- Additional profiles: <fill in>
+
+## Testing Setup
+- I can run multiple VS installs and multiple logged-in client profiles.
+- For changes that affect multiplayer behavior, I can validate with two clients.
+
+## Operational Setup
+- Server hosting: Pterodactyl
+- Preferred posture:
+  - Use a dedicated test server for agentic deploy/restart workflows.
+  - Treat prod release actions as high-risk (explicit confirmation for releases).
+
+## Approval Boundaries
+- Commits: OK to create local commits on topic branches.
+- Push / PR / issue comments / release notes: ask for approval of the exact text/command.

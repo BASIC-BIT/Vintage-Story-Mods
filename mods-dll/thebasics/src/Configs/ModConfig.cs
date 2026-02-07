@@ -300,5 +300,24 @@ namespace thebasics.Configs
         [ProtoMember(67)]
         public IDictionary<ProximityChatMode, float> RPTTS_ModeFalloff { get; set; }
 
+        // ----- Typing Indicator (client-side UI feature, server-configured) ----- //
+
+        [ProtoMember(68)]
+        public bool EnableTypingIndicator { get; set; } = false;
+
+        [ProtoMember(69)]
+        public int TypingIndicatorMaxRange { get; set; } = 50;
+
+        [ProtoMember(70)]
+        public float TypingIndicatorTimeoutSeconds { get; set; } = 5f;
+
+        // If empty/null, client uses lang key `thebasics:typingindicator-typing`.
+        [ProtoMember(71)]
+        public string TypingIndicatorTextOverride { get; set; } = "";
+
+        // When true, indicator only shows once there is at least 1 character in the chat input.
+        [ProtoMember(72)]
+        public bool TypingIndicatorRequireNonEmptyText { get; set; } = true;
+
     }
 }

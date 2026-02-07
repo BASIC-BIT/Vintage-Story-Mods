@@ -23,6 +23,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
     public ProximityCheckUtils ProximityCheckUtils;
     public TransformerSystem TransformerSystem;
 
+    // Ephemeral state; do not persist.
+    private readonly System.Collections.Generic.Dictionary<long, bool> _typingStatesByEntityId = new();
+
     protected override void BasicStartServerSide()
     {
         HookEvents();
@@ -238,8 +241,39 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
+            .RegisterMessageType<ChatTypingStateMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
-            .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected);
+            .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
+            .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage);
+    }
+
+    private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
+    {
+        if (player?.Entity == null || message == null)
+        {
+            return;
+        }
+
+        // If the feature is disabled server-side, ignore.
+        if (Config?.EnableTypingIndicator != true)
+        {
+            return;
+        }
+
+        var entityId = player.Entity.EntityId;
+        if (entityId == 0)
+        {
+            return;
+        }
+
+        var isTyping = message.IsTyping;
+        _typingStatesByEntityId[entityId] = isTyping;
+
+        // Server is authoritative for EntityId.
+        message.EntityId = entityId;
+
+        // Best-effort broadcast; clients without this message type will silently ignore it.
+        _serverConfigChannel?.BroadcastPacket(message, player);
     }
 
     private void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)
@@ -406,6 +440,39 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         API.Event.PlayerChat += Event_PlayerChat;
         API.Event.PlayerJoin += Event_PlayerJoin;
+        API.Event.PlayerDisconnect += Event_PlayerDisconnect;
+    }
+
+    private void Event_PlayerDisconnect(IServerPlayer player)
+    {
+        if (player?.Entity == null)
+        {
+            return;
+        }
+
+        var entityId = player.Entity.EntityId;
+        if (entityId == 0)
+        {
+            return;
+        }
+
+        if (!_typingStatesByEntityId.TryGetValue(entityId, out var wasTyping) || !wasTyping)
+        {
+            return;
+        }
+
+        _typingStatesByEntityId.Remove(entityId);
+
+        if (Config?.EnableTypingIndicator != true)
+        {
+            return;
+        }
+
+        _serverConfigChannel?.BroadcastPacket(new ChatTypingStateMessage
+        {
+            EntityId = entityId,
+            IsTyping = false
+        });
     }
 
     private void SetupProximityGroup()

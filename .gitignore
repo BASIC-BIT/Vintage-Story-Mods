@@ -17,9 +17,15 @@
 # User files
 **/*.user
 
+# Windows reserved device filename (can appear as a phantom file)
+NUL
+
 # Environment files
 .env
 *.env
+
+# Local maintainer context (optional; contains personal preferences)
+AGENTS.local.md
 
 # Repomix output files
 .repomix-output.txt

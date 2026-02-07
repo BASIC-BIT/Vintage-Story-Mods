@@ -9,7 +9,22 @@ $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project 
 $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
 $logsDir = Join-Path $solutionRoot "logs"
 $logFile = Join-Path $solutionRoot "fetch-logs.log"
-$envPath = Join-Path $projectRoot ".env"  # Look for .env in the mod folder
+$envPath = Join-Path $projectRoot ".env"  # Default .env in the mod folder
+
+# Allow selecting a specific env file (useful for test vs prod targets).
+# - THEBASICS_ENV_PATH: absolute path, or relative to the mod folder
+if ($env:THEBASICS_ENV_PATH) {
+    $candidate = $env:THEBASICS_ENV_PATH.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+        if (-not (Test-Path $candidate)) {
+            $candidate = Join-Path $projectRoot $candidate
+        }
+
+        if (Test-Path $candidate) {
+            $envPath = $candidate
+        }
+    }
+}
 
 # Set default output directory if not provided
 if ([string]::IsNullOrEmpty($OutputDir)) {
