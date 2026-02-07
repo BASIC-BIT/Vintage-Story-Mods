@@ -37,6 +37,17 @@ Patterns that add compute without derailing the main thread:
 - Reviewer: cold-context review of a change-set with a checklist (correctness, safety, durability, log noise, backwards compat).
 - Recycler: validates review feedback, decides what is actionable, applies changes, and optionally asks the reviewer to re-check.
 
+## Reviewer -> recycler loop (single-layer delegation)
+
+Even without recursive subagents, you can get most of the value with a single delegation layer:
+
+1) Main agent makes changes and commits small chunks.
+2) Launch 1 reviewer subagent on the diff/paths.
+3) Main agent (recycler role) applies the accepted feedback.
+4) Optional: re-run the reviewer on the updated diff.
+
+This keeps the main thread moving while still getting cold-context critique.
+
 Implementation detail:
 
 - Use `git worktree` to isolate these agents so they can make clean commits without interfering with the main worktree.
