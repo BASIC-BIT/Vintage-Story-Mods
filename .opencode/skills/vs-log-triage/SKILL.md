@@ -35,6 +35,19 @@ By convention in this project, remote paths are under `/data/Logs` and `/data/Cr
    - branch name
    - exact repro steps
 
+## Common multiplayer dev pitfall: "Assembly with same name is already loaded"
+Symptom (client log):
+- `[thebasics] Exception: Assembly with same name is already loaded`
+- Followed by: `Server sends me channel name thebasics, but no client side mod registered it.`
+
+Likely cause:
+- The client process already loaded a different version/copy of the same assembly name.
+- Often triggered by `Mods` vs `ModsByServer/<host-port>` copies, or reconnecting without restarting.
+
+Quick fixes:
+- Restart the client between mod version changes.
+- Ensure only one copy of the mod is discoverable in mod search paths (prefer one location).
+
 ## Hygiene
 - Do not commit logs.
 - Scrub personally identifying info if logs are shared publicly.

@@ -71,6 +71,9 @@ Portability:
 - Keep these concepts transferable across projects and agent tools.
 - When possible, keep the core playbooks tool-agnostic and add thin adapters per agent platform.
 
+## Wishlist
+Keep a short backlog at `docs/opencode/wishlist.md`.
+
 ## Product idea: Vintage Story Dev MCP
 We can dogfood and potentially open-source a "Vintage Story Dev MCP":
 - read-only MVP: local logs + profile discovery + mod/version introspection
