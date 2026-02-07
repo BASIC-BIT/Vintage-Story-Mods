@@ -74,6 +74,16 @@ Long-horizon idea:
   - add a guardrail (test/checklist/skill/playbook)
   - ensure the class of bug is less likely to recur
 
+## Measurement (keep it lightweight)
+
+We want to increase throughput without losing reliability. Track a small set of metrics:
+
+- cycle time (request -> verified)
+- manual steps per loop
+- flake rate (env drift, wrong server/profile/version)
+
+See: `docs/opencode/throughput-metrics.md`
+
 ## Tooling roadmap (progressive disclosure)
 Prefer the lowest-cost mechanism that works:
 1. Skills (`.opencode/skills/*`) and playbooks (`docs/ops/*`).
