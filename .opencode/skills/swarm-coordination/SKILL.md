@@ -41,6 +41,10 @@ Start simple:
 When needed, graduate to infrastructure:
 - Redis (or SQLite) as a coordination store.
 
+## Worktrees for parallelism
+For higher isolation, run parallel efforts in separate `git worktree` checkouts.
+See: `.opencode/skills/git-worktrees/SKILL.md`.
+
 ## OpenCode plugin hooks for coordination
 OpenCode plugins can listen to events such as:
 - `todo.updated`
