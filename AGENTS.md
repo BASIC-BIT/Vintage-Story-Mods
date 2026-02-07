@@ -29,6 +29,12 @@ If present, read `AGENTS.local.md` at the start of a session.
 - Persist: after a workflow is proven or repeated, promote it into durable docs/skills; for long sessions, consider a quick session audit to capture missed heuristics.
 - Release hygiene: ensure CI builds still pass and config migrations are safe.
 
+## Forward Progress Policy ("Report, Then Continue")
+
+- Treat intermediate summaries as progress reports to the maintainer, not as a stopping point.
+- If not blocked, continue to the next highest-value step (use the sticky todo list as the source of truth).
+- Only pause when human input is required for in-game or panel actions; use the `question` tool as the explicit wait gate.
+
 ## Human-In-The-Loop Verification Loop
 
 When in-game validation is required (UX, screenshots, reproduction):
