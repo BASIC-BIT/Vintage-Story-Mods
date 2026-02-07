@@ -28,6 +28,28 @@ If present, read `AGENTS.local.md` at the start of a session.
 - Verify: build/package locally and request human in-game verification for behavior changes.
 - Release hygiene: ensure CI builds still pass and config migrations are safe.
 
+## Human-In-The-Loop Verification Loop
+
+When in-game validation is required (UX, screenshots, reproduction):
+
+- Do all non-blocked work first (build, deploy, log instrumentation, server config).
+- Then ask for exactly one concrete action + one expected observation.
+- Use the OpenCode `question` prompt tool as the deliberate "wait point" (instead of timers).
+- After the user responds, immediately pull the relevant logs and confirm (client + server where applicable).
+
+This keeps testing deterministic even when we can’t run the game ourselves.
+
+## Memory / Storage Tiers
+
+Use the right place based on durability needs:
+
+- Ultra-durable (read every session): `AGENTS.md` (high-level heuristics, safety rules, verify loop)
+- Durable (reusable, invoked when needed): `.opencode/skills/*/SKILL.md` (playbooks)
+- Durable (reference docs): `docs/ops/*`, `docs/opencode/*`, mod READMEs (how-to + context)
+- Ephemeral (session-only): TODO list / chat context; summarize into a doc/skill once proven
+
+Rule of thumb: if it’s a recurring workflow (logs, deploy, UI patching), put it in a skill; if it’s a global rule of engagement, put it in `AGENTS.md`.
+
 ## When To Ask For Human Help
 
 Ask the maintainer to step in when you need any of the following:
@@ -68,7 +90,7 @@ This workspace commonly includes `../vs_source` (see `Vintage-Story-Mods.code-wo
 
 ### Build Output
 All builds output to standard MSBuild locations:
-- `mods-dll/thebasics/bin/Release/net7.0/thebasics.dll`
+- `mods-dll/thebasics/bin/Release/net8.0/thebasics.dll` (on `master` / VS 1.21+)
 - Packaged mods: `mods-dll/thebasics/thebasics_VERSION.zip`
 
 ## High-Level Architecture

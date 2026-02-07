@@ -57,6 +57,10 @@ Test server deploy:
 
 - Prefer SFTP via `mods-dll/thebasics/scripts/package.ps1` (opt-in), or Pterodactyl `ptero_*` tools.
 
+Wait points (human testing):
+
+- When you need the user to perform an in-game action (connect 2 clients, open chat, etc.), use the OpenCode `question` prompt tool to pause and wait for the response.
+
 ## Log Triage
 
 - Local profiles: use `vsdev_profiles`, `vsdev_logs_tail_latest`, `vsdev_logs_grep_latest`.
