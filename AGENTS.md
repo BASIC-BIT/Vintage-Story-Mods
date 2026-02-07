@@ -39,7 +39,7 @@ When in-game validation is required (UX, screenshots, reproduction):
 
 Long-term goal:
 
-- Treat human-in-the-loop verification as a stepping stone. If the same validation loop repeats, invest in automation (tools/scripts/playbooks) to shrink the human step over time (e.g., templated servers, config permutation runners, screenshot capture pipelines).
+- Treat human-in-the-loop verification as a foundation for a longer time horizon. When the same validation loop repeats, invest in automation (tools/scripts/playbooks) to reduce manual effort while keeping the workflow compatible with maintainers, community expectations, and the game’s realities (e.g., templated servers, config permutation runners, screenshot capture pipelines).
 
 This keeps testing deterministic even when we can’t run the game ourselves.
 
