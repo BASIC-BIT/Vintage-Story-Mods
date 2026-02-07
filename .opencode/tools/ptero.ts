@@ -179,7 +179,9 @@ export const power = tool({
     const cfgRes = await getConfig(false)
     if (!cfgRes.ok) return cfgRes.error
 
-    if (!isTruthy(process.env.PTERO_ALLOW_POWER)) {
+    const dot = await tryLoadDotEnv()
+
+    if (!isTruthy(process.env.PTERO_ALLOW_POWER || dot.PTERO_ALLOW_POWER)) {
       return "Refusing: set PTERO_ALLOW_POWER=1 to enable destructive power actions"
     }
 
@@ -287,12 +289,14 @@ export const files_upload = tool({
     if (!cfgRes.ok) return cfgRes.error
     const cfg = cfgRes.config
 
+    const dot = await tryLoadDotEnv()
+
     const serverId = String(args.serverId || cfg.serverId || "").trim()
     if (!serverId) {
       return "Missing server id. Set PTERO_SERVER_ID or pass serverId."
     }
 
-    if (!isTruthy(process.env.PTERO_ALLOW_FILES)) {
+    if (!isTruthy(process.env.PTERO_ALLOW_FILES || dot.PTERO_ALLOW_FILES)) {
       return "Refusing: set PTERO_ALLOW_FILES=1 to enable file uploads"
     }
     if (args.confirm !== true) {
