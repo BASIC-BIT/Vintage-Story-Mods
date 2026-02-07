@@ -135,18 +135,21 @@ try {
         $remotePaths = @()
         switch ($LogType.ToLower()) {
             "server" { 
-                $remotePaths += "/data/Logs/server-main.txt"
-                $remotePaths += "/data/Logs/server-event.txt"
+                # VS versions differ on .txt vs .log naming
+                $remotePaths += "/data/Logs/server-main.*"
+                $remotePaths += "/data/Logs/server-event.*"
             }
             "debug" { 
-                $remotePaths += "/data/Logs/server-debug.txt"
+                $remotePaths += "/data/Logs/server-debug.*"
             }
             "crash" { 
                 $remotePaths += "/data/CrashReports/*"
             }
             "mod" { 
                 $remotePaths += "/data/Logs/*mod*.txt"
+                $remotePaths += "/data/Logs/*mod*.log"
                 $remotePaths += "/data/Logs/*thebasics*.txt"
+                $remotePaths += "/data/Logs/*thebasics*.log"
             }
             "all" { 
                 $remotePaths += "/data/Logs/*"

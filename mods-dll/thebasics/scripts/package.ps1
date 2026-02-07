@@ -119,10 +119,24 @@ if ($env:THEBASICS_LOCAL_MOD_DIRS) {
 }
 
 if (-not $localModsDirectories -or $localModsDirectories.Count -eq 0) {
-    $localModsDirectories = @(
-        (Join-Path $env:APPDATA "VintagestoryData/Mods"),
-        "D:\Games\VSProfiles\Profile2\Mods"
-    )
+    $localModsDirectories = @()
+
+    # Always deploy to the primary data dir.
+    $localModsDirectories += (Join-Path $env:APPDATA "VintagestoryData/Mods")
+
+    # If VS_PROFILES_DIR is set, deploy to all Profile*/Mods folders.
+    # This supports multi-account setups (e.g. Profile2 + Profile3) without hardcoding paths.
+    if ($env:VS_PROFILES_DIR -and (Test-Path $env:VS_PROFILES_DIR)) {
+        Get-ChildItem -Path $env:VS_PROFILES_DIR -Directory -Filter "Profile*" -ErrorAction SilentlyContinue |
+            Sort-Object Name |
+            ForEach-Object {
+                $localModsDirectories += (Join-Path $_.FullName "Mods")
+            }
+    }
+    else {
+        # Backward-compatible fallback.
+        $localModsDirectories += "D:\Games\VSProfiles\Profile2\Mods"
+    }
 }
 
 $msg = "Deploying mod to $($localModsDirectories.Count) local directories..."
