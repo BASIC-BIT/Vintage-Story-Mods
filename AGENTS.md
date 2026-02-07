@@ -37,6 +37,10 @@ When in-game validation is required (UX, screenshots, reproduction):
 - Use the OpenCode `question` prompt tool as the deliberate "wait point" (instead of timers).
 - After the user responds, immediately pull the relevant logs and confirm (client + server where applicable).
 
+Long-term goal:
+
+- Treat human-in-the-loop verification as a stepping stone. If the same validation loop repeats, invest in automation (tools/scripts/playbooks) to shrink the human step over time (e.g., templated servers, config permutation runners, screenshot capture pipelines).
+
 This keeps testing deterministic even when we can’t run the game ourselves.
 
 ## Memory / Storage Tiers
@@ -46,7 +50,9 @@ Use the right place based on durability needs:
 - Ultra-durable (read every session): `AGENTS.md` (high-level heuristics, safety rules, verify loop)
 - Durable (reusable, invoked when needed): `.opencode/skills/*/SKILL.md` (playbooks)
 - Durable (reference docs): `docs/ops/*`, `docs/opencode/*`, mod READMEs (how-to + context)
-- Ephemeral (session-only): TODO list / chat context; summarize into a doc/skill once proven
+
+- Sticky (session-only, repeatedly surfaced): OpenCode todo list (`todowrite`). Use this for work you don’t want to lose during a long session.
+- Ephemeral (session-only, may be compacted): chat context. If it matters later, promote it into a todo, a skill, or `AGENTS.md`.
 
 Rule of thumb: if it’s a recurring workflow (logs, deploy, UI patching), put it in a skill; if it’s a global rule of engagement, put it in `AGENTS.md`.
 

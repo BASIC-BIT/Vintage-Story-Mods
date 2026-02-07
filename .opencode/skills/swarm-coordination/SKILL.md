@@ -18,14 +18,29 @@ Maximize throughput with parallel subagents while keeping the main context clean
 ## Recommended workflow
 1. Main agent creates a short plan and assigns discovery tasks to subagents.
 2. Each subagent returns:
-   - file paths
-   - key findings
-   - recommended next steps
+    - file paths
+    - key findings
+    - recommended next steps
 3. Main agent writes the durable outcome into stable files:
-   - `AGENTS.md` for global repo guidance
-   - `memory-bank/*.md` when explicitly requested
-   - `.opencode/skills/*/SKILL.md` for reusable playbooks
+    - `AGENTS.md` for global repo guidance
+    - `memory-bank/*.md` when explicitly requested
+    - `.opencode/skills/*/SKILL.md` for reusable playbooks
 4. Use `todowrite` for session-level tracking.
+
+## Asynchronous "meta" agents (session auditors, reviewers)
+
+Patterns that add compute without derailing the main thread:
+
+- Session auditor: periodically reviews the last N minutes of chat and extracts action items, decisions, and new heuristics.
+  - Output should be a small patch to durable storage (skill/doc/AGENTS) or a todo list update.
+- Doc coalescer: takes raw notes from auditors/researchers and files them into the right "cabinet" (AGENTS vs skill vs docs).
+- Reviewer: cold-context review of a change-set with a checklist (correctness, safety, durability, log noise, backwards compat).
+- Recycler: validates review feedback, decides what is actionable, applies changes, and optionally asks the reviewer to re-check.
+
+Implementation detail:
+
+- Use `git worktree` to isolate these agents so they can make clean commits without interfering with the main worktree.
+- Keep their scope narrow (docs-only, tooling-only, etc.).
 
 ## Manual parallelism (multiple terminals)
 If you can open multiple OpenCode terminals, you can run parallel "main" sessions manually:
