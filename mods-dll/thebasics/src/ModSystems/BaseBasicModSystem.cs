@@ -1,5 +1,6 @@
 ﻿using System;
 using thebasics.Configs;
+using Newtonsoft.Json;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -12,6 +13,7 @@ namespace thebasics.ModSystems
         private const string ConfigName = "the_basics.json";
 
         private static bool _loggedConfigLoadFailure;
+        private static bool _loggedConfigRepair;
 
         public override bool ShouldLoad(EnumAppSide forSide)
         {
@@ -38,11 +40,42 @@ namespace thebasics.ModSystems
             catch (Exception e)
             {
                 // Fail safe: do not crash mod systems if config deserialization fails.
-                // This can happen if the JSON file is corrupted or if the game serializer behavior changes.
+                // This can happen if the JSON file is corrupted, or if the config file was accidentally stored
+                // as a JSON *string* containing JSON (e.g. "{ ... }").
+
+                // Recovery path: if the file is a JSON string containing object JSON, repair it in-place.
+                try
+                {
+                    var maybeJsonString = API.LoadModConfig<string>(ConfigName);
+                    if (!string.IsNullOrWhiteSpace(maybeJsonString) && maybeJsonString.TrimStart().StartsWith("{"))
+                    {
+                        var repaired = JsonConvert.DeserializeObject<ModConfig>(maybeJsonString);
+                        if (repaired != null)
+                        {
+                            repaired.InitializeDefaultsIfNeeded();
+                            Config = repaired;
+                            API.StoreModConfig(Config, ConfigName);
+
+                            if (!_loggedConfigRepair)
+                            {
+                                _loggedConfigRepair = true;
+                                API.Server.LogWarning($"The BASICs: Repaired malformed config file '{ConfigName}' (was JSON string). Saved corrected config.");
+                            }
+
+                            return;
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore - fall back to defaults
+                }
+
                 if (!_loggedConfigLoadFailure)
                 {
                     _loggedConfigLoadFailure = true;
-                    API.Server.LogError($"The BASICs: Failed to load mod config '{ConfigName}'. Using defaults. Error: {e}");
+                    // Avoid logging the raw exception text: it may contain braces/newlines that some loggers try to format.
+                    API.Server.LogError($"The BASICs: Failed to load mod config '{ConfigName}'. Using defaults. (Exception type: {e.GetType().Name})");
                 }
 
                 Config = new ModConfig();
