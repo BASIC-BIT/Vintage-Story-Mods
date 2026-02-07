@@ -1,4 +1,6 @@
-﻿using HarmonyLib;
+using HarmonyLib;
+using System;
+using System.Collections.Generic;
 using thebasics.Models;
 using thebasics.Configs;
 using thebasics.Utilities.Network;
@@ -29,6 +31,13 @@ public class ChatUiSystem : ModSystem
     private static bool _rpttsInitScheduled = false;
     private static bool _rpttsExplicitModeApplied = false;
 
+    private static TypingIndicatorRenderer _typingIndicatorRenderer;
+    private static readonly HashSet<long> _typingEntityIds = new HashSet<long>();
+    private static bool? _lastSentTypingState;
+    private static bool _lastChatInputHadFocus;
+    private static string _lastChatInputText;
+    private static long _lastChatInputChangeMs;
+
     public override bool ShouldLoad(EnumAppSide side) => side.IsClient();
 
     public override void StartClientSide(ICoreClientAPI api)
@@ -47,6 +56,10 @@ public class ChatUiSystem : ModSystem
         ScheduleRpttsInitialization();
         
         RegisterForServerSideConfig();
+
+        // Renderer is cheap when disabled; keep it always registered.
+        _typingIndicatorRenderer = new TypingIndicatorRenderer(api);
+        api.Event.RegisterRenderer(_typingIndicatorRenderer, EnumRenderStage.Ortho, "thebasics-typingindicator");
 
         
         // Register event handlers
@@ -168,9 +181,10 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
+            .RegisterMessageType<ChatTypingStateMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
-            .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage);
-        // .RegisterMessageType<TheBasicsChatTypingMessage>();
+            .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage)
+            .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
@@ -181,6 +195,49 @@ public class ChatUiSystem : ModSystem
             MaxRetries = 10
         };
         _safeNetworkChannel = new SafeClientNetworkChannel(_clientConfigChannel, _api, config);
+    }
+
+    private static void OnChatTypingStateMessage(ChatTypingStateMessage message)
+    {
+        if (message == null || message.EntityId == 0)
+        {
+            return;
+        }
+
+        if (message.IsTyping)
+        {
+            _typingEntityIds.Add(message.EntityId);
+        }
+        else
+        {
+            _typingEntityIds.Remove(message.EntityId);
+        }
+    }
+
+    internal static bool IsEntityTyping(long entityId)
+    {
+        return _typingEntityIds.Contains(entityId);
+    }
+
+    internal static bool IsTypingIndicatorEnabled()
+    {
+        return _config?.EnableTypingIndicator == true;
+    }
+
+    internal static int GetTypingIndicatorRange()
+    {
+        return _config?.TypingIndicatorMaxRange ?? 0;
+    }
+
+    internal static string GetTypingIndicatorText()
+    {
+        var overrideText = _config?.TypingIndicatorTextOverride;
+        if (!string.IsNullOrWhiteSpace(overrideText))
+        {
+            return overrideText;
+        }
+
+        return Lang.Get("thebasics:typingindicator-typing");
     }
 
     private void OnServerConfigMessage(TheBasicsConfigMessage configMessage)
@@ -497,6 +554,8 @@ public class ChatUiSystem : ModSystem
             if (_api != null)
             {
                 _api.Event.PlayerJoin -= OnPlayerJoin;
+                _typingIndicatorRenderer?.Dispose();
+                _typingIndicatorRenderer = null;
                 _api = null;
             }
             _harmony?.UnpatchAll(Mod.Info.ModID);
@@ -541,13 +600,130 @@ public class ChatUiSystem : ModSystem
      */
     [HarmonyPostfix]
     [HarmonyPatch(typeof(HudDialogChat), "OnFinalizeFrame")]
-    public static void OnFinalizeFrame_RestoreAutoSwitch()
+    public static void OnFinalizeFrame_RestoreAutoSwitch(HudDialogChat __instance, float dt)
     {
         if (_config?.PreventProximityChannelSwitching == true && _originalAutoChatOpenSelectedFinalize.HasValue)
         {
             // Restore the original setting
             ClientSettings.AutoChatOpenSelected = _originalAutoChatOpenSelectedFinalize.Value;
             _originalAutoChatOpenSelectedFinalize = null;
+        }
+
+        UpdateLocalTypingState(__instance);
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(HudDialogChat), "OnGuiClosed")]
+    public static void OnGuiClosed_TypingIndicator(HudDialogChat __instance)
+    {
+        // Ensure we don't leave stale typing state on the server.
+        ForceLocalTypingState(false);
+    }
+
+    private static void UpdateLocalTypingState(HudDialogChat chatDialog)
+    {
+        if (_api == null)
+        {
+            return;
+        }
+
+        if (_config?.EnableTypingIndicator != true)
+        {
+            // Feature disabled (or config not received yet) - ensure local state is off.
+            ForceLocalTypingState(false);
+            return;
+        }
+
+        if (chatDialog == null)
+        {
+            ForceLocalTypingState(false);
+            return;
+        }
+
+        try
+        {
+            if (chatDialog.Composers == null || !chatDialog.Composers.ContainsKey("chat"))
+            {
+                ForceLocalTypingState(false);
+                return;
+            }
+
+            var chatInput = chatDialog.Composers["chat"].GetChatInput("chatinput");
+            if (chatInput == null)
+            {
+                ForceLocalTypingState(false);
+                return;
+            }
+
+            var hasFocus = chatInput.HasFocus;
+            var text = chatInput.GetText() ?? "";
+            var nowMs = _api.ElapsedMilliseconds;
+
+            if (text != _lastChatInputText)
+            {
+                _lastChatInputText = text;
+                _lastChatInputChangeMs = nowMs;
+            }
+
+            // If focus just changed to true, treat as activity so the indicator can appear.
+            if (hasFocus && !_lastChatInputHadFocus)
+            {
+                _lastChatInputChangeMs = nowMs;
+            }
+            _lastChatInputHadFocus = hasFocus;
+
+            bool requireNonEmpty = _config.TypingIndicatorRequireNonEmptyText;
+            if (!hasFocus)
+            {
+                ForceLocalTypingState(false);
+                return;
+            }
+
+            if (requireNonEmpty && text.Length == 0)
+            {
+                ForceLocalTypingState(false);
+                return;
+            }
+
+            float timeoutSeconds = _config.TypingIndicatorTimeoutSeconds;
+            if (timeoutSeconds <= 0)
+            {
+                timeoutSeconds = 5f;
+            }
+
+            bool isTyping = (nowMs - _lastChatInputChangeMs) <= (long)(timeoutSeconds * 1000f);
+            ForceLocalTypingState(isTyping);
+        }
+        catch
+        {
+            // Chat UI is a fragile surface area across VS versions.
+            // Fail closed - never crash the client for a cosmetic feature.
+            ForceLocalTypingState(false);
+        }
+    }
+
+    private static void ForceLocalTypingState(bool isTyping)
+    {
+        if (_lastSentTypingState.HasValue && _lastSentTypingState.Value == isTyping)
+        {
+            return;
+        }
+
+        _lastSentTypingState = isTyping;
+
+        // Best-effort: do not throw or spam retries for an ephemeral state.
+        if (_clientConfigChannel?.Connected != true)
+        {
+            return;
+        }
+
+        try
+        {
+            _clientConfigChannel.SendPacket(new ChatTypingStateMessage { IsTyping = isTyping });
+        }
+        catch
+        {
+            // Ignore.
         }
     }
 }
