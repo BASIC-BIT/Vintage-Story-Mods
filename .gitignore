@@ -17,6 +17,9 @@
 # User files
 **/*.user
 
+# Windows reserved device filename (can appear as a phantom file)
+NUL
+
 # Environment files
 .env
 *.env

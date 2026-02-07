@@ -24,7 +24,29 @@ $modInfo = Get-Content $modInfoFile | ConvertFrom-Json
 $version = $modInfo.version -replace '\.', '_' -replace '-', '_'
 $zipFile = Join-Path $projectRoot "thebasics_$version.zip"
 $logFile = Join-Path $solutionRoot "package.log"
-$envPath = Join-Path $projectRoot ".env"  # Look for .env in the mod folder
+$envPath = Join-Path $projectRoot ".env"  # Default .env in the mod folder
+
+# Allow selecting a specific env file (useful for test vs prod targets).
+# - THEBASICS_ENV_PATH: absolute path, or relative to the mod folder
+if ($env:THEBASICS_ENV_PATH) {
+    $candidate = $env:THEBASICS_ENV_PATH.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+        if (-not (Test-Path $candidate)) {
+            $candidate = Join-Path $projectRoot $candidate
+        }
+
+        if (Test-Path $candidate) {
+            $envPath = $candidate
+        }
+    }
+}
+
+# SFTP upload is intentionally opt-in to avoid accidental deployments.
+$enableSftpUpload = $false
+if ($env:THEBASICS_ENABLE_SFTP_UPLOAD) {
+    $v = $env:THEBASICS_ENABLE_SFTP_UPLOAD.ToLower().Trim()
+    $enableSftpUpload = ($v -eq "1" -or $v -eq "true" -or $v -eq "yes")
+}
 
 # Start logging
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -81,10 +103,27 @@ try {
 }
 
 # Copy to local mods directories
-$localModsDirectories = @(
-    (Join-Path $env:APPDATA "VintagestoryData/Mods"),
-    "D:\Games\VSProfiles\Profile2\Mods"
-)
+#
+# Default targets cover the primary data dir plus one secondary profile directory.
+# You can override with a semicolon-separated list in THEBASICS_LOCAL_MOD_DIRS.
+$localModsDirectories = $null
+
+if ($env:THEBASICS_LOCAL_MOD_DIRS) {
+    $localModsDirectories = @()
+    $env:THEBASICS_LOCAL_MOD_DIRS.Split(';') | ForEach-Object {
+        $p = $_.Trim()
+        if (-not [string]::IsNullOrWhiteSpace($p)) {
+            $localModsDirectories += $p
+        }
+    }
+}
+
+if (-not $localModsDirectories -or $localModsDirectories.Count -eq 0) {
+    $localModsDirectories = @(
+        (Join-Path $env:APPDATA "VintagestoryData/Mods"),
+        "D:\Games\VSProfiles\Profile2\Mods"
+    )
+}
 
 $msg = "Deploying mod to $($localModsDirectories.Count) local directories..."
 Write-Host $msg
@@ -122,12 +161,17 @@ foreach ($localModsDir in $localModsDirectories) {
     }
 }
 
-# Load environment variables from .env file in mod folder
-$msg = "Looking for .env file at: $envPath"
-Write-Host $msg
-"[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+# Load environment variables from .env file in mod folder (only when SFTP upload is enabled)
+if (-not $enableSftpUpload) {
+    $msg = "SFTP upload disabled (set THEBASICS_ENABLE_SFTP_UPLOAD=1 to enable)"
+    Write-Host $msg
+    "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+}
+elseif (Test-Path $envPath) {
+    $msg = "Looking for .env file at: $envPath"
+    Write-Host $msg
+    "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
 
-if (Test-Path $envPath) {
     $msg = "Found .env file, loading environment variables..."
     Write-Host $msg
     "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
