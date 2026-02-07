@@ -6,6 +6,14 @@ Key files:
 - Repo rules: `AGENTS.md`
 - Repo skills: `.opencode/skills/*/SKILL.md`
 
+## Agentic dogfooding toolbox
+
+Reusable agentic tooling/playbooks are being extracted into a dedicated private repo:
+
+- `https://github.com/BASIC-BIT/basics-agentic-dogfooding`
+
+As this consolidates, this mod repo will keep only the pieces that are directly tied to the mod itself.
+
 Optional local context:
 - `AGENTS.local.md` (gitignored)
 - Template: `AGENTS.local.md.example`
