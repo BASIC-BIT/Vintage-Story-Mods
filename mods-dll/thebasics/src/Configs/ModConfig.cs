@@ -328,5 +328,11 @@ namespace thebasics.Configs
         // This is often preferred for RP servers because it signals intent/engagement rather than keystrokes.
         [ProtoMember(74)]
         public bool TypingIndicatorShowWhileChatFocused { get; set; } = false;
+
+        // When true, the server will override the vanilla overhead chat bubble text with the RP-processed
+        // speech text (per-recipient language/obfuscation).
+        // This only affects the floating text above player heads, not the chat log.
+        [ProtoMember(75)]
+        public bool OverrideSpeechBubblesWithRpText { get; set; } = false;
     }
 }

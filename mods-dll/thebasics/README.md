@@ -111,6 +111,17 @@ Practical presets:
 - "Typing" mode: `TypingIndicatorShowWhileChatFocused=false`
 - "Focused" mode: `TypingIndicatorShowWhileChatFocused=true`
 
+## Overhead Speech Bubble Override
+
+Vintage Story shows a short chat bubble above player heads for nearby chat.
+
+When language obfuscation is enabled, it can be useful for RP to have the overhead bubble reflect the
+recipient-specific processed text (rather than the raw typed text).
+
+Config key (in `ModConfig/the_basics.json`):
+
+- `OverrideSpeechBubblesWithRpText`: when true, the server overrides the bubble text (per recipient)
+
 
 
 ## Contributions

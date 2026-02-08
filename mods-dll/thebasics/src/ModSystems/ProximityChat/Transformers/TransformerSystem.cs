@@ -59,6 +59,10 @@ public class TransformerSystem
             // Keep only transformers that need recipient-specific processing
             new LanguageTransformer(_languageSystem, _chatSystem),
             new ObfuscationTransformer(_distanceObfuscationSystem, _chatSystem),
+
+            // Optional: override vanilla overhead bubble (clientData) with RP-processed text
+            new SpeechBubbleClientDataTransformer(_chatSystem),
+
             new DistanceFontSizeTransformer(_chatSystem), // Apply distance-based font sizing
 
             // Finally, format speech for the recipient
