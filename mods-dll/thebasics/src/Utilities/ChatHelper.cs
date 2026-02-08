@@ -158,7 +158,18 @@ namespace thebasics.Utilities
         
         public static string GetMessage(string message)
         {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return string.Empty;
+            }
+
+            // Most server chat lines follow: "<name> > <content>" (with VTML/name formatting).
+            // If parsing fails, fall back to the full string to avoid dropping messages.
             var foundText = new Regex(@".*?> (.+)$").Match(message);
+            if (!foundText.Success)
+            {
+                return message.Trim();
+            }
 
             return foundText.Groups[1].Value.Trim();
         }

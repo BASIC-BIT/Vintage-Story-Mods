@@ -892,6 +892,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
         Vintagestory.API.Datastructures.BoolRef consumed)
     {
+        if (byPlayer == null || consumed == null)
+        {
+            return;
+        }
+
         if(channelId != ProximityChatId)
         {
             return;
@@ -905,26 +910,38 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         consumed.value = true;
 
-        // Extract the content from the full message
-        var content = ChatHelper.GetMessage(message);
-
-        // Create a player chat context
-        var context = new MessageContext
+        try
         {
-            Message = content,
-            SendingPlayer = byPlayer,
-            GroupId = channelId,
-            Metadata =
+            // Extract the content from the full message
+            var content = ChatHelper.GetMessage(message);
+            if (string.IsNullOrWhiteSpace(content))
             {
-                ["clientData"] = data,
-            },
-            Flags =
-            {
-                [MessageContext.IS_PLAYER_CHAT] = true,
+                return;
             }
-        };
 
-        // Process the message through the pipeline
-        TransformerSystem.ProcessMessagePipeline(context);
+            // Create a player chat context
+            var context = new MessageContext
+            {
+                Message = content,
+                SendingPlayer = byPlayer,
+                GroupId = channelId,
+                Metadata =
+                {
+                    ["clientData"] = data,
+                },
+                Flags =
+                {
+                    [MessageContext.IS_PLAYER_CHAT] = true,
+                }
+            };
+
+            // Process the message through the pipeline
+            TransformerSystem?.ProcessMessagePipeline(context);
+        }
+        catch (Exception e)
+        {
+            // Never crash the server on player chat.
+            API.Logger.Error($"THEBASICS - Error processing proxchat message: {e}");
+        }
     }
 }
