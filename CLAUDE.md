@@ -121,6 +121,14 @@ Based on git status, current work involves:
 
 No automated test framework is currently configured. Testing is done manually in-game.
 
+### Test Server Note
+
+This repo is frequently validated against a disposable/test Vintage Story server.
+If you have just built + uploaded a new mod zip to that test server, it is acceptable to restart it to load the new version.
+
+- Test server (Pterodactyl): `8982de16`
+- Typical action after upload: restart the server to apply the new zip
+
 ## Linting/Type Checking
 
 The project uses standard C# compilation for type checking. No additional linting tools are configured.

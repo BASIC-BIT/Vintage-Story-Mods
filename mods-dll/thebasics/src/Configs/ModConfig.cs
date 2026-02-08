@@ -334,5 +334,11 @@ namespace thebasics.Configs
         // This only affects the floating text above player heads, not the chat log.
         [ProtoMember(75)]
         public bool OverrideSpeechBubblesWithRpText { get; set; } = false;
+
+        // When true, clients will render VTML in overhead speech bubbles.
+        // Vanilla overhead bubbles render plain text textures, so VTML tags show literally unless the client is patched.
+        // Requires thebasics to be installed client-side (server auto-download is sufficient).
+        [ProtoMember(76)]
+        public bool RenderSpeechBubblesWithVtml { get; set; } = false;
     }
 }

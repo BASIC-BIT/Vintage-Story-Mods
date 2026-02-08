@@ -41,6 +41,12 @@ The RP Proximity Chat System is a feature-rich chat system designed for role-pla
 
 The system is highly configurable through the mod's configuration file. You can adjust the talking ranges, enable or disable features, and customize message formatting.
 
+Nametags are also configurable (in `ModConfig/the_basics.json`):
+- `ShowNicknameInNametag`: show the RP nickname above heads
+- `ShowPlayerNameInNametag`: show the Vintage Story account name above heads
+- `HideNametagUnlessTargeting`: only show nametags when the player is targeted
+- `NametagRenderRange`: how far away nametags render
+
 ### Example Usage
 
 To set a nickname: `/nick MyNickname`
@@ -120,11 +126,16 @@ recipient-specific processed text (rather than the raw typed text).
 
 Config key (in `ModConfig/the_basics.json`):
 
-- `OverrideSpeechBubblesWithRpText`: when true, the server overrides the bubble text (per recipient)
+ - `OverrideSpeechBubblesWithRpText`: when true, the server overrides the bubble text (per recipient)
+   - Applies to: speech, emotes (`/me` or `*...`), and environmental messages (`/it` or `!...`)
+ - `RenderSpeechBubblesWithVtml`: when true, clients render VTML tags in overhead bubbles (italics, font tags, etc.)
+   - When enabled, emote/environment bubbles also get subtle visual styling (border/background) so they are distinct.
 
-Note:
+Notes:
 
-- Vanilla overhead bubbles render plain text (they do not parse VTML). The BASICs therefore strips VTML tags for the bubble only; the chat log still uses VTML.
+- Vanilla overhead bubbles render plain text (they do not parse VTML).
+- When `RenderSpeechBubblesWithVtml=false`, The BASICs strips VTML tags for the bubble only; the chat log still uses VTML.
+- When `RenderSpeechBubblesWithVtml=true`, the client patches the vanilla bubble renderer to support VTML.
 
 
 

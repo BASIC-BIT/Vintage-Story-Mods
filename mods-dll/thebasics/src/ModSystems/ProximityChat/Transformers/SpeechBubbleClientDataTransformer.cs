@@ -14,7 +14,8 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
     public override bool ShouldTransform(MessageContext context)
     {
-        return _config.OverrideSpeechBubblesWithRpText && context.HasFlag(MessageContext.IS_SPEECH);
+        return _config.OverrideSpeechBubblesWithRpText &&
+            (context.HasFlag(MessageContext.IS_SPEECH) || context.HasFlag(MessageContext.IS_EMOTE) || context.HasFlag(MessageContext.IS_ENVIRONMENTAL));
     }
 
     public override MessageContext Transform(MessageContext context)
@@ -30,19 +31,52 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             return context;
         }
 
-        // Important: vanilla overhead chat bubbles render *plain* text textures.
-        // Any VTML tags will show literally (e.g. "<i>"), so we strip tags for bubble rendering.
+        // Vanilla overhead chat bubbles render plain text textures.
+        // If VTML rendering is enabled client-side, we can send VTML and let the client render it.
+        // Otherwise, strip VTML tags so they don't show literally.
+
         var bubbleTextVtml = (context.Message ?? string.Empty).Trim();
-        var bubbleTextPlain = VtmlUtils.StripVtmlTags(bubbleTextVtml, _chatSystem.API.Logger).Trim();
-        if (bubbleTextPlain.Length == 0)
+
+        // Emotes are rendered above the sender's head, so including the sender name is redundant.
+        // The EmoteTransformer prefixes the formatted name; remove it for bubble display.
+        if (context.HasFlag(MessageContext.IS_EMOTE) && context.TryGetMetadata(MessageContext.FORMATTED_NAME, out string formattedName) && !string.IsNullOrWhiteSpace(formattedName))
+        {
+            var prefix = formattedName + " ";
+            if (bubbleTextVtml.StartsWith(prefix))
+            {
+                bubbleTextVtml = bubbleTextVtml[prefix.Length..].TrimStart();
+            }
+        }
+        var bubbleTextToSend = _config.RenderSpeechBubblesWithVtml
+            ? bubbleTextVtml
+            : VtmlUtils.StripVtmlTags(bubbleTextVtml, _chatSystem.API.Logger);
+
+        bubbleTextToSend = (bubbleTextToSend ?? string.Empty).Trim();
+        if (bubbleTextToSend.Length == 0)
         {
             return context;
         }
 
         // Match vanilla behavior: the data string contains &lt; and &gt; which the client unescapes.
-        bubbleTextPlain = VtmlUtils.EscapeVtml(bubbleTextPlain);
+        bubbleTextToSend = VtmlUtils.EscapeVtml(bubbleTextToSend);
 
-        context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextPlain}");
+        // Add optional kind marker for client-side styling.
+        // Only include when VTML bubble rendering is enabled; vanilla bubbles would show the marker text.
+        if (_config.RenderSpeechBubblesWithVtml)
+        {
+            var kind = context.HasFlag(MessageContext.IS_ENVIRONMENTAL) ? "env" :
+                context.HasFlag(MessageContext.IS_EMOTE) ? "emote" :
+                context.HasFlag(MessageContext.IS_SPEECH) ? "speech" :
+                null;
+
+            if (kind != null)
+            {
+                context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend},kind:{kind}");
+                return context;
+            }
+        }
+
+        context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend}");
         return context;
     }
 }

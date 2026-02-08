@@ -229,6 +229,11 @@ public class ChatUiSystem : ModSystem
         return _config?.TypingIndicatorMaxRange ?? 0;
     }
 
+    internal static bool IsSpeechBubbleVtmlEnabled()
+    {
+        return _config?.RenderSpeechBubblesWithVtml == true;
+    }
+
     internal static string GetTypingIndicatorText()
     {
         var overrideText = _config?.TypingIndicatorTextOverride;
