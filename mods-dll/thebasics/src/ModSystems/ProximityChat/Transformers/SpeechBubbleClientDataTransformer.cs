@@ -60,7 +60,9 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         if (kind != null)
         {
-            context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend},kind:{kind}");
+            // Append kind using a rarely-used separator to avoid collisions with user text.
+            // Client patch will parse `\u001fkind:`.
+            context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend}\u001fkind:{kind}");
             return context;
         }
 

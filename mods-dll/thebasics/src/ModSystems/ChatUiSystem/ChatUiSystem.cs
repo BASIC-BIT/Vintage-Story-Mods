@@ -23,6 +23,7 @@ public class ChatUiSystem : ModSystem
 
     private static IClientNetworkChannel _clientConfigChannel;
     private static SafeClientNetworkChannel _safeNetworkChannel;
+    private static bool _lastClientChannelConnected;
     private static bool _usingRptts = false;
     private static dynamic _rpttsApi = null;
     private static dynamic _rpttsChatSystem = null;
@@ -630,6 +631,11 @@ public class ChatUiSystem : ModSystem
     {
         // Ensure we don't leave stale typing state on the server.
         ForceLocalTypingState(ChatTypingIndicatorState.None);
+
+        // Reset local tracking so reopening chat does not immediately report Typing
+        // based on stale text/timestamps.
+        _lastChatInputText = null;
+        _lastChatInputChangeMs = 0;
     }
 
     private static void UpdateLocalTypingState(HudDialogChat chatDialog)
@@ -712,15 +718,22 @@ public class ChatUiSystem : ModSystem
 
     private static void ForceLocalTypingState(ChatTypingIndicatorState state)
     {
-        if (_lastSentTypingState.HasValue && _lastSentTypingState.Value == state)
+        // Best-effort: do not throw or spam retries for an ephemeral state.
+        var connected = _clientConfigChannel?.Connected == true;
+        if (!connected)
         {
+            _lastClientChannelConnected = false;
             return;
         }
 
-        _lastSentTypingState = state;
+        if (!_lastClientChannelConnected)
+        {
+            // Channel just became connected - force a resend even if the state did not change.
+            _lastClientChannelConnected = true;
+            _lastSentTypingState = null;
+        }
 
-        // Best-effort: do not throw or spam retries for an ephemeral state.
-        if (_clientConfigChannel?.Connected != true)
+        if (_lastSentTypingState.HasValue && _lastSentTypingState.Value == state)
         {
             return;
         }
@@ -732,6 +745,8 @@ public class ChatUiSystem : ModSystem
                 IsTyping = state == ChatTypingIndicatorState.Typing,
                 State = state
             });
+
+            _lastSentTypingState = state;
         }
         catch
         {

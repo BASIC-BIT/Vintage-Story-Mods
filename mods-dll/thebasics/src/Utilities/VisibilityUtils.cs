@@ -11,7 +11,7 @@ public static class VisibilityUtils
     {
         if (world == null || observer == null || target == null)
         {
-            return false;
+            return failOpen;
         }
 
         if (observer.EntityId == target.EntityId)

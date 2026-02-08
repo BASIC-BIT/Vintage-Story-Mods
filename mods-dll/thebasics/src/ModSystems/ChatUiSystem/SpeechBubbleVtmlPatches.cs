@@ -80,13 +80,14 @@ public static class SpeechBubbleVtmlPatches
 
             // Bubble text comes from the data payload.
             // We support an optional metadata suffix (only used when this patch is enabled):
-            //   from:<id>,msg:<text>,kind:<speech|emote|env>
+            //   from:<id>,msg:<text>\u001fkind:<speech|emote|env>
             var rawMsg = parttwo[1];
             string kind = null;
-            var kindIndex = rawMsg.LastIndexOf(",kind:", StringComparison.Ordinal);
+            const string kindMarker = "\u001fkind:";
+            var kindIndex = rawMsg.LastIndexOf(kindMarker, StringComparison.Ordinal);
             if (kindIndex >= 0)
             {
-                kind = rawMsg[(kindIndex + 6)..].Trim();
+                kind = rawMsg[(kindIndex + kindMarker.Length)..].Trim();
                 rawMsg = rawMsg[..kindIndex];
             }
 

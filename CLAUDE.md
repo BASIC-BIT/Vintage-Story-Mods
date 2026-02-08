@@ -138,4 +138,4 @@ Run `dotnet build` to check for compilation errors.
 ## Development Guidance
 
 - **Configuration Management**
-  - This mod is live - ProtoMember attributes for existing config values should not be changed where possible - new config values should recieve the next available sequentially increasing number.
+  - This mod is live - ProtoMember attributes for existing config values should not be changed where possible - new config values should receive the next available sequentially increasing number.
