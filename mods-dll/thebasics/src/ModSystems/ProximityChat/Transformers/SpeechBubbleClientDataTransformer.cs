@@ -30,16 +30,19 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             return context;
         }
 
-        var bubbleText = (context.Message ?? string.Empty).Trim();
-        if (bubbleText.Length == 0)
+        // Important: vanilla overhead chat bubbles render *plain* text textures.
+        // Any VTML tags will show literally (e.g. "<i>"), so we strip tags for bubble rendering.
+        var bubbleTextVtml = (context.Message ?? string.Empty).Trim();
+        var bubbleTextPlain = VtmlUtils.StripVtmlTags(bubbleTextVtml, _chatSystem.API.Logger).Trim();
+        if (bubbleTextPlain.Length == 0)
         {
             return context;
         }
 
         // Match vanilla behavior: the data string contains &lt; and &gt; which the client unescapes.
-        bubbleText = VtmlUtils.EscapeVtml(bubbleText);
+        bubbleTextPlain = VtmlUtils.EscapeVtml(bubbleTextPlain);
 
-        context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleText}");
+        context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextPlain}");
         return context;
     }
 }

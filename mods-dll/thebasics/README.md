@@ -122,6 +122,10 @@ Config key (in `ModConfig/the_basics.json`):
 
 - `OverrideSpeechBubblesWithRpText`: when true, the server overrides the bubble text (per recipient)
 
+Note:
+
+- Vanilla overhead bubbles render plain text (they do not parse VTML). The BASICs therefore strips VTML tags for the bubble only; the chat log still uses VTML.
+
 
 
 ## Contributions
