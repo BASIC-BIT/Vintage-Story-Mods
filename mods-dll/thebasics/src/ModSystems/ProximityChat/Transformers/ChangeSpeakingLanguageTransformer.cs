@@ -96,12 +96,26 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
 
     public override bool ShouldTransform(MessageContext context)
     {
-        // TODO: Is this condition accurate? Should we check for roleplay/player chat flags?
         return true;
     }
 
     public override MessageContext Transform(MessageContext context)
     {
+        // Always populate a default language for downstream formatting.
+        // If the language system is disabled, we intentionally do NOT parse :lang prefixes.
+        var defaultLang = _config.Languages?.FirstOrDefault(l => l.Default) ?? _config.Languages?.FirstOrDefault();
+        if (defaultLang == null)
+        {
+            defaultLang = LanguageSystem.BabbleLang;
+        }
+
+        var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
+        if (!languageEnabled)
+        {
+            context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
+            return context;
+        }
+
         if (TryParseLanguageSpecifier(context.Message, out var languageIdentifier, out var remainder))
         {
             // First try to get the language with allowHidden=true to check if it exists at all
@@ -147,7 +161,14 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                 context.SetMetadata(MessageContext.LANGUAGE, lang);
             }
         } else {
-            context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_config));
+            try
+            {
+                context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_config));
+            }
+            catch
+            {
+                context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
+            }
         }
         
         return context;

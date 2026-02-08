@@ -24,6 +24,7 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
     public override MessageContext Transform(MessageContext context)
     {
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
+        var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
         var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
 
@@ -31,16 +32,18 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
 
         // Add Quotes based on language type
         var delimiters = _config.ChatDelimiters;
-        var quoteDelimiter = lang == LanguageSystem.SignLanguage ? delimiters.SignLanguageQuote : delimiters.Quote;
+        var quoteDelimiter = (languageEnabled && lang == LanguageSystem.SignLanguage) ? delimiters.SignLanguageQuote : delimiters.Quote;
         context.Message = $"{quoteDelimiter.Start}{context.Message}{quoteDelimiter.End}";
         // Add Italics if sign language
-        if(lang == LanguageSystem.SignLanguage){
-            _chatSystem.API.Logger.Debug("Adding italics to sign language");
+        if(languageEnabled && lang == LanguageSystem.SignLanguage){
             context.Message = ChatHelper.Italic(context.Message);
         }
 
         // Add Lang color
-        context.Message = ChatHelper.LangColor(context.Message, lang);
+        if (languageEnabled)
+        {
+            context.Message = ChatHelper.LangColor(context.Message, lang);
+        }
         
         var verb = GetProximityChatVerb(lang, mode);
 
@@ -52,7 +55,7 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
     private string GetProximityChatVerb(Language lang, ProximityChatMode mode)
     {
         // Check for sign language first
-        if (lang == LanguageSystem.SignLanguage)
+        if (_config.EnableLanguageSystem && !_config.DisableRPChat && lang == LanguageSystem.SignLanguage)
         {
             return "signs";
         }
