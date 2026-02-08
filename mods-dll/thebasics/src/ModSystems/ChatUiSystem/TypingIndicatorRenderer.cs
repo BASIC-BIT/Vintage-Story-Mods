@@ -53,11 +53,15 @@ public sealed class TypingIndicatorRenderer : IRenderer
             return;
         }
 
-        var text = ChatUiSystem.GetTypingIndicatorText();
-        if (string.IsNullOrWhiteSpace(text))
+        var typingLabel = ChatUiSystem.GetTypingIndicatorText();
+        if (string.IsNullOrWhiteSpace(typingLabel))
         {
-            text = "Typing...";
+            typingLabel = "Typing...";
         }
+
+        // Resolve these once per frame.
+        var composingLabel = Lang.Get("thebasics:typingindicator-composing");
+        var chatOpenLabel = Lang.Get("thebasics:typingindicator-chatopen");
 
         // Texture is now created per-state (Typing/Composing/Chat open), so don't pre-generate here.
 
@@ -105,7 +109,13 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
             // Lift above the normal nametag position to avoid overlap.
             // Use the target entity here (not local player), otherwise the projection can drift into the nametag.
-            var (label, yWorldOffset) = GetIndicatorLabelAndOffset(state, text);
+            var (label, yWorldOffset) = state switch
+            {
+                ChatTypingIndicatorState.Typing => (typingLabel, 0.25),
+                ChatTypingIndicatorState.ChatOpenComposing => (composingLabel, 0.20),
+                ChatTypingIndicatorState.ChatOpenEmpty => (chatOpenLabel, 0.15),
+                _ => (typingLabel, 0.25)
+            };
             var tex = GetOrCreateTexture(label);
             if (tex == null)
             {
@@ -154,18 +164,6 @@ public sealed class TypingIndicatorRenderer : IRenderer
         }
 
         return entry.canSee;
-    }
-
-    private static (string label, double yWorldOffset) GetIndicatorLabelAndOffset(ChatTypingIndicatorState state, string typingLabel)
-    {
-        // Keep these short. The goal is just to communicate intent at a glance.
-        return state switch
-        {
-            ChatTypingIndicatorState.Typing => (typingLabel, 0.25),
-            ChatTypingIndicatorState.ChatOpenComposing => (Lang.Get("thebasics:typingindicator-composing"), 0.20),
-            ChatTypingIndicatorState.ChatOpenEmpty => (Lang.Get("thebasics:typingindicator-chatopen"), 0.15),
-            _ => (typingLabel, 0.25)
-        };
     }
 
     private LoadedTexture GetOrCreateTexture(string text)
