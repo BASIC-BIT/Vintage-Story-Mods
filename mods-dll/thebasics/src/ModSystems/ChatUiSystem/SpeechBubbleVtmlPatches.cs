@@ -30,6 +30,12 @@ public static class SpeechBubbleVtmlPatches
             return true;
         }
 
+        long startTicks = 0;
+        if (ChatUiSystem.IsDebugModeEnabled())
+        {
+            startTicks = PerfStats.Timestamp();
+        }
+
         try
         {
             Entity entity = __instance.entity;
@@ -143,6 +149,14 @@ public static class SpeechBubbleVtmlPatches
         {
             // Crash-safe: do not break vanilla chat bubbles.
             return true;
+        }
+        finally
+        {
+            if (startTicks != 0)
+            {
+                // This can be expensive when rendering VTML. Only active in DebugMode.
+                PerfStats.Record(__instance?.capi, "EntityShapeRenderer.OnChatMessage (bubble)", startTicks, PerfStats.Timestamp());
+            }
         }
     }
 

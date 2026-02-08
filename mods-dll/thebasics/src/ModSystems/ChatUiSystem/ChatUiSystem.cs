@@ -46,6 +46,11 @@ public class ChatUiSystem : ModSystem
         }
     }
 
+    internal static bool IsDebugModeEnabled()
+    {
+        return _config?.DebugMode == true;
+    }
+
     public override bool ShouldLoad(EnumAppSide side) => side.IsClient();
 
     public override void StartClientSide(ICoreClientAPI api)
@@ -404,8 +409,14 @@ public class ChatUiSystem : ModSystem
      */
     [HarmonyPrefix]
     [HarmonyPatch(typeof(HudDialogChat), "OnNewServerToClientChatLine")]
-    public static void OnNewServerToClientChatLine_PreventAutoSwitch()
+    public static void OnNewServerToClientChatLine_PreventAutoSwitch(ref long __state)
     {
+        __state = 0;
+        if (IsDebugModeEnabled())
+        {
+            __state = PerfStats.Timestamp();
+        }
+
         if (_config?.PreventProximityChannelSwitching == true && _proximityGroupId.HasValue)
         {
             var game = (ClientMain)_api.World;
@@ -427,7 +438,7 @@ public class ChatUiSystem : ModSystem
      */
     [HarmonyPostfix]
     [HarmonyPatch(typeof(HudDialogChat), "OnNewServerToClientChatLine")]
-    public static void OnNewServerToClientChatLine_RestoreAutoSwitch()
+    public static void OnNewServerToClientChatLine_RestoreAutoSwitch(long __state, int groupId, string message, EnumChatType chattype)
     {
         if (_config?.PreventProximityChannelSwitching == true && _originalAutoChatOpenSelected.HasValue)
         {
@@ -436,6 +447,33 @@ public class ChatUiSystem : ModSystem
 
             DebugLog($"[THEBASICS] Restored AutoChatOpenSelected to: {_originalAutoChatOpenSelected.Value}");
             _originalAutoChatOpenSelected = null;
+        }
+
+        if (__state != 0)
+        {
+            PerfStats.Record(_api, "HudDialogChat.OnNewServerToClientChatLine", __state, PerfStats.Timestamp(),
+                $"group={groupId}, type={chattype}, len={(message?.Length ?? 0)}");
+        }
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(HudDialogChat), "UpdateText")]
+    public static void HudDialogChat_UpdateText_Prefix(ref long __state)
+    {
+        __state = 0;
+        if (IsDebugModeEnabled())
+        {
+            __state = PerfStats.Timestamp();
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(HudDialogChat), "UpdateText")]
+    public static void HudDialogChat_UpdateText_Postfix(long __state)
+    {
+        if (__state != 0)
+        {
+            PerfStats.Record(_api, "HudDialogChat.UpdateText", __state, PerfStats.Timestamp());
         }
     }
 
