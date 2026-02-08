@@ -471,7 +471,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        if (!_typingStatesByEntityId.TryGetValue(entityId, out var state) || state != ChatTypingIndicatorState.Typing)
+        if (!_typingStatesByEntityId.TryGetValue(entityId, out var state) || state == ChatTypingIndicatorState.None)
         {
             return;
         }
