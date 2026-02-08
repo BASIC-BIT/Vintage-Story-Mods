@@ -401,11 +401,21 @@ public class ChatUiSystem : ModSystem
         if (_config?.PreventProximityChannelSwitching == true && _proximityGroupId.HasValue)
         {
             var game = (ClientMain)_api.World;
+
+            if (_config.DebugMode)
+            {
+                _api.Logger.Debug($"[THEBASICS] OnNewServerToClientChatLine - Current group: {game.currentGroupid}, Proximity group: {_proximityGroupId.Value}");
+            }
             if (game.currentGroupid == _proximityGroupId.Value)
             {
                 // User is in proximity tab - temporarily disable the client setting that causes auto-switching
                 _originalAutoChatOpenSelected = ClientSettings.AutoChatOpenSelected;
                 ClientSettings.AutoChatOpenSelected = false; // This prevents the auto-switching logic
+
+                if (_config.DebugMode)
+                {
+                    _api.Logger.Debug($"[THEBASICS] Preventing auto-switch - saved original AutoChatOpenSelected: {_originalAutoChatOpenSelected}");
+                }
             }
         }
     }
@@ -421,6 +431,11 @@ public class ChatUiSystem : ModSystem
         {
             // Restore the original setting
             ClientSettings.AutoChatOpenSelected = _originalAutoChatOpenSelected.Value;
+
+            if (_config.DebugMode)
+            {
+                _api.Logger.Debug($"[THEBASICS] Restored AutoChatOpenSelected to: {_originalAutoChatOpenSelected.Value}");
+            }
             _originalAutoChatOpenSelected = null;
         }
     }
