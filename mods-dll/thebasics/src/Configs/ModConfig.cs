@@ -315,20 +315,10 @@ namespace thebasics.Configs
         [ProtoMember(71)]
         public string TypingIndicatorTextOverride { get; set; } = "";
 
-        // ProtoMember(72) - RESERVED (was TypingIndicatorRequireNonEmptyText)
-        // ProtoMember(73) - RESERVED (was TypingIndicatorDebugLogging)
-
-        // When true, indicator is shown whenever the chat input has focus (even if the player is not actively typing).
-        // This is often preferred for RP servers because it signals intent/engagement rather than keystrokes.
-        [ProtoMember(74)]
-        public bool TypingIndicatorShowWhileChatFocused { get; set; } = false;
-
         // When true, the server will override the vanilla overhead chat bubble text with the RP-processed
         // speech text (per-recipient language/obfuscation).
         // This only affects the floating text above player heads, not the chat log.
-        [ProtoMember(75)]
+        [ProtoMember(72)]
         public bool OverrideSpeechBubblesWithRpText { get; set; } = false;
-
-        // ProtoMember(76) - RESERVED (was RenderSpeechBubblesWithVtml)
     }
 }

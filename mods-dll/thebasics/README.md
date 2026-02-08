@@ -107,16 +107,13 @@ Notes:
 Configuration keys (in `ModConfig/the_basics.json`):
 - `EnableTypingIndicator`: master toggle
 - `TypingIndicatorMaxRange`: max range (blocks) to see the indicator
-- `TypingIndicatorTimeoutSeconds`: how long after the last input change the indicator stays on (typing mode)
-- `TypingIndicatorShowWhileChatFocused`: if true, the indicator shows whenever the chat input is focused (RP-friendly)
-- `TypingIndicatorTextOverride`: override the displayed text (otherwise uses lang key `thebasics:typingindicator-typing`)
+ - `TypingIndicatorTimeoutSeconds`: how long after the last input change the indicator stays on
+ - `TypingIndicatorTextOverride`: override the displayed text (otherwise uses lang key `thebasics:typingindicator-typing`)
 
 Notes:
-- When `TypingIndicatorShowWhileChatFocused=false`, the indicator only shows while actively typing (and only when the input has text).
+- The indicator uses multiple states (chat open / composing / actively typing) for a unified UX.
 
-Practical presets:
-- "Typing" mode: `TypingIndicatorShowWhileChatFocused=false`
-- "Focused" mode: `TypingIndicatorShowWhileChatFocused=true`
+
 
 ## Overhead Speech Bubble Override
 

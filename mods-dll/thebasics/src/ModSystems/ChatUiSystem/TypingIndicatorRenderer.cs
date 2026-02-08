@@ -2,6 +2,7 @@ using System;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
+using thebasics.Models;
 
 namespace thebasics.ModSystems.ChatUiSystem;
 
@@ -48,11 +49,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
             text = "Typing...";
         }
 
-        EnsureTexture(text);
-        if (_textTexture == null)
-        {
-            return;
-        }
+        // Texture is now created per-state (Typing/Composing/Chat open), so don't pre-generate here.
 
         var range = ChatUiSystem.GetTypingIndicatorRange();
         if (range <= 0)
@@ -72,7 +69,8 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 continue;
             }
 
-            if (!ChatUiSystem.IsEntityTyping(entity.EntityId))
+            var state = ChatUiSystem.GetEntityTypingIndicatorState(entity.EntityId);
+            if (state == ChatTypingIndicatorState.None)
             {
                 continue;
             }
@@ -89,9 +87,16 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 continue;
             }
 
-            // Lift slightly above the normal nametag position to avoid overlap.
+            // Lift above the normal nametag position to avoid overlap.
             // Use the target entity here (not local player), otherwise the projection can drift into the nametag.
-            var aboveHeadPos = esr.getAboveHeadPosition(entity).Add(0, 0.25, 0);
+            var (label, yWorldOffset) = GetIndicatorLabelAndOffset(state, text);
+            EnsureTexture(label);
+            if (_textTexture == null)
+            {
+                continue;
+            }
+
+            var aboveHeadPos = esr.getAboveHeadPosition(entity).Add(0, yWorldOffset, 0);
             Vec3d pos = MatrixToolsd.Project(aboveHeadPos, rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
             if (pos.Z < 0.0)
             {
@@ -113,6 +118,18 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
             rapi.Render2DTexture(_textTexture.TextureId, posx, posy, cappedScale * _textTexture.Width, cappedScale * _textTexture.Height, 20f);
         }
+    }
+
+    private static (string label, double yWorldOffset) GetIndicatorLabelAndOffset(ChatTypingIndicatorState state, string typingLabel)
+    {
+        // Keep these short. The goal is just to communicate intent at a glance.
+        return state switch
+        {
+            ChatTypingIndicatorState.Typing => (typingLabel, 0.25),
+            ChatTypingIndicatorState.ChatOpenComposing => ("Composing...", 0.20),
+            ChatTypingIndicatorState.ChatOpenEmpty => ("Chat open", 0.15),
+            _ => (typingLabel, 0.25)
+        };
     }
 
     private void EnsureTexture(string text)

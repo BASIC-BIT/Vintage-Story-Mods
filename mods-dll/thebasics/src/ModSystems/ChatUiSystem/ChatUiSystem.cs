@@ -32,9 +32,8 @@ public class ChatUiSystem : ModSystem
     private static bool _rpttsExplicitModeApplied = false;
 
     private static TypingIndicatorRenderer _typingIndicatorRenderer;
-    private static readonly HashSet<long> _typingEntityIds = new HashSet<long>();
-    private static bool? _lastSentTypingState;
-    private static bool _lastChatInputHadFocus;
+    private static readonly Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new Dictionary<long, ChatTypingIndicatorState>();
+    private static ChatTypingIndicatorState? _lastSentTypingState;
     private static string _lastChatInputText;
     private static long _lastChatInputChangeMs;
 
@@ -204,19 +203,31 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        if (message.IsTyping)
+        var state = message.State;
+        if (state == ChatTypingIndicatorState.None)
         {
-            _typingEntityIds.Add(message.EntityId);
+            // Backwards compatibility: older clients/servers only set IsTyping.
+            state = message.IsTyping ? ChatTypingIndicatorState.Typing : ChatTypingIndicatorState.None;
+        }
+
+        if (state == ChatTypingIndicatorState.None)
+        {
+            _typingStatesByEntityId.Remove(message.EntityId);
         }
         else
         {
-            _typingEntityIds.Remove(message.EntityId);
+            _typingStatesByEntityId[message.EntityId] = state;
         }
+    }
+
+    internal static ChatTypingIndicatorState GetEntityTypingIndicatorState(long entityId)
+    {
+        return _typingStatesByEntityId.TryGetValue(entityId, out var state) ? state : ChatTypingIndicatorState.None;
     }
 
     internal static bool IsEntityTyping(long entityId)
     {
-        return _typingEntityIds.Contains(entityId);
+        return GetEntityTypingIndicatorState(entityId) == ChatTypingIndicatorState.Typing;
     }
 
     internal static bool IsTypingIndicatorEnabled()
@@ -623,7 +634,7 @@ public class ChatUiSystem : ModSystem
     public static void OnGuiClosed_TypingIndicator(HudDialogChat __instance)
     {
         // Ensure we don't leave stale typing state on the server.
-        ForceLocalTypingState(false);
+        ForceLocalTypingState(ChatTypingIndicatorState.None);
     }
 
     private static void UpdateLocalTypingState(HudDialogChat chatDialog)
@@ -636,13 +647,13 @@ public class ChatUiSystem : ModSystem
         if (_config?.EnableTypingIndicator != true)
         {
             // Feature disabled (or config not received yet) - ensure local state is off.
-            ForceLocalTypingState(false);
+            ForceLocalTypingState(ChatTypingIndicatorState.None);
             return;
         }
 
         if (chatDialog == null)
         {
-            ForceLocalTypingState(false);
+            ForceLocalTypingState(ChatTypingIndicatorState.None);
             return;
         }
 
@@ -650,14 +661,14 @@ public class ChatUiSystem : ModSystem
         {
             if (chatDialog.Composers == null || !chatDialog.Composers.ContainsKey("chat"))
             {
-                ForceLocalTypingState(false);
+                ForceLocalTypingState(ChatTypingIndicatorState.None);
                 return;
             }
 
             var chatInput = chatDialog.Composers["chat"].GetChatInput("chatinput");
             if (chatInput == null)
             {
-                ForceLocalTypingState(false);
+                ForceLocalTypingState(ChatTypingIndicatorState.None);
                 return;
             }
 
@@ -671,30 +682,19 @@ public class ChatUiSystem : ModSystem
                 _lastChatInputChangeMs = nowMs;
             }
 
-            // If focus just changed to true, treat as activity so the indicator can appear.
-            if (hasFocus && !_lastChatInputHadFocus)
-            {
-                _lastChatInputChangeMs = nowMs;
-            }
-            _lastChatInputHadFocus = hasFocus;
-
             if (!hasFocus)
             {
-                ForceLocalTypingState(false);
+                ForceLocalTypingState(ChatTypingIndicatorState.None);
                 return;
             }
 
-            if (_config.TypingIndicatorShowWhileChatFocused)
-            {
-                // Focus-mode: show indicator as long as the chat input is focused.
-                ForceLocalTypingState(true);
-                return;
-            }
-
-            // Typing-mode: don't show the indicator for an empty input.
+            // Unified UX:
+            // - Chat open, empty input => subtle indicator
+            // - Chat open, has text => composing indicator
+            // - Recent text changes => typing indicator
             if (text.Length == 0)
             {
-                ForceLocalTypingState(false);
+                ForceLocalTypingState(ChatTypingIndicatorState.ChatOpenEmpty);
                 return;
             }
 
@@ -705,24 +705,24 @@ public class ChatUiSystem : ModSystem
             }
 
             bool isTyping = (nowMs - _lastChatInputChangeMs) <= (long)(timeoutSeconds * 1000f);
-            ForceLocalTypingState(isTyping);
+            ForceLocalTypingState(isTyping ? ChatTypingIndicatorState.Typing : ChatTypingIndicatorState.ChatOpenComposing);
         }
         catch
         {
             // Chat UI is a fragile surface area across VS versions.
             // Fail closed - never crash the client for a cosmetic feature.
-            ForceLocalTypingState(false);
+            ForceLocalTypingState(ChatTypingIndicatorState.None);
         }
     }
 
-    private static void ForceLocalTypingState(bool isTyping)
+    private static void ForceLocalTypingState(ChatTypingIndicatorState state)
     {
-        if (_lastSentTypingState.HasValue && _lastSentTypingState.Value == isTyping)
+        if (_lastSentTypingState.HasValue && _lastSentTypingState.Value == state)
         {
             return;
         }
 
-        _lastSentTypingState = isTyping;
+        _lastSentTypingState = state;
 
         // Best-effort: do not throw or spam retries for an ephemeral state.
         if (_clientConfigChannel?.Connected != true)
@@ -732,7 +732,11 @@ public class ChatUiSystem : ModSystem
 
         try
         {
-            _clientConfigChannel.SendPacket(new ChatTypingStateMessage { IsTyping = isTyping });
+            _clientConfigChannel.SendPacket(new ChatTypingStateMessage
+            {
+                IsTyping = state == ChatTypingIndicatorState.Typing,
+                State = state
+            });
         }
         catch
         {

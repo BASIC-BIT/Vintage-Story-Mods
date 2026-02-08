@@ -24,7 +24,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     public TransformerSystem TransformerSystem;
 
     // Ephemeral state; do not persist.
-    private readonly System.Collections.Generic.Dictionary<long, bool> _typingStatesByEntityId = new();
+    private readonly System.Collections.Generic.Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new();
 
     protected override void BasicStartServerSide()
     {
@@ -266,11 +266,26 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        var isTyping = message.IsTyping;
-        _typingStatesByEntityId[entityId] = isTyping;
+        // Prefer the multi-state field; fall back to IsTyping for older clients.
+        var state = message.State;
+        if (state == ChatTypingIndicatorState.None)
+        {
+            state = message.IsTyping ? ChatTypingIndicatorState.Typing : ChatTypingIndicatorState.None;
+        }
 
-        // Server is authoritative for EntityId.
+        if (state == ChatTypingIndicatorState.None)
+        {
+            _typingStatesByEntityId.Remove(entityId);
+        }
+        else
+        {
+            _typingStatesByEntityId[entityId] = state;
+        }
+
+        // Server is authoritative for EntityId and keeps fields consistent.
         message.EntityId = entityId;
+        message.State = state;
+        message.IsTyping = state == ChatTypingIndicatorState.Typing;
 
         // Best-effort broadcast; clients without this message type will silently ignore it.
         _serverConfigChannel?.BroadcastPacket(message, player);
@@ -456,7 +471,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        if (!_typingStatesByEntityId.TryGetValue(entityId, out var wasTyping) || !wasTyping)
+        if (!_typingStatesByEntityId.TryGetValue(entityId, out var state) || state != ChatTypingIndicatorState.Typing)
         {
             return;
         }
@@ -471,7 +486,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _serverConfigChannel?.BroadcastPacket(new ChatTypingStateMessage
         {
             EntityId = entityId,
-            IsTyping = false
+            IsTyping = false,
+            State = ChatTypingIndicatorState.None
         });
     }
 
