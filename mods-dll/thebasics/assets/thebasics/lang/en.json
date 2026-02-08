@@ -1,3 +1,5 @@
 {
-  "typingindicator-typing": "Typing..."
+  "typingindicator-typing": "Typing...",
+  "typingindicator-composing": "Composing...",
+  "typingindicator-chatopen": "Chat open"
 }

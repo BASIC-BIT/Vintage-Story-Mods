@@ -45,6 +45,15 @@ public static class SpeechBubbleVtmlPatches
                 return true;
             }
 
+            // Line-of-sight gating: overhead bubbles should behave like a visual cue.
+            // If the local player cannot see the target entity, don't display the bubble.
+            // (Chat log still receives the message as normal.)
+            var localEntity = capi.World?.Player?.Entity;
+            if (localEntity != null && !VisibilityUtils.HasLineOfSight(capi.World, localEntity, entity))
+            {
+                return false;
+            }
+
             string[] parts = data.Split(new char[1] { ',' }, 2);
             if (parts.Length < 2)
             {

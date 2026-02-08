@@ -1,14 +1,23 @@
 using System;
+using System.Collections.Generic;
+using thebasics.Models;
+using thebasics.Utilities;
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
-using thebasics.Models;
 
 namespace thebasics.ModSystems.ChatUiSystem;
 
 public sealed class TypingIndicatorRenderer : IRenderer
 {
     private readonly ICoreClientAPI _capi;
+
+    // Only raytrace a given target a few times per second.
+    // Keyed by target entity id.
+    private readonly Dictionary<long, (bool canSee, long nextCheckMs)> _losCache = new();
 
     private LoadedTexture _textTexture;
     private string _lastText;
@@ -59,6 +68,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
         var rapi = _capi.Render;
         var maxDistSq = (double)range * range;
+        var nowMs = world.ElapsedMilliseconds;
 
         // Only iterate known players; this feature is cosmetic.
         foreach (var plr in world.AllPlayers)
@@ -77,6 +87,11 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
             var distSq = localPlayerEntity.Pos.SquareDistanceTo(entity.Pos);
             if (distSq > maxDistSq)
+            {
+                continue;
+            }
+
+            if (!CanSeeCached(world, nowMs, localPlayerEntity, entity))
             {
                 continue;
             }
@@ -120,14 +135,34 @@ public sealed class TypingIndicatorRenderer : IRenderer
         }
     }
 
+    private bool CanSeeCached(IWorldAccessor world, long nowMs, Entity observer, Entity target)
+    {
+        if (world == null || observer == null || target == null)
+        {
+            return false;
+        }
+
+        // If the cache is stale or missing, recompute.
+        if (!_losCache.TryGetValue(target.EntityId, out var entry) || nowMs >= entry.nextCheckMs)
+        {
+            var canSee = VisibilityUtils.HasLineOfSight(world, observer, target);
+            // Faster refresh when visible for nicer responsiveness.
+            var refreshMs = canSee ? 250L : 500L;
+            entry = (canSee, nowMs + refreshMs);
+            _losCache[target.EntityId] = entry;
+        }
+
+        return entry.canSee;
+    }
+
     private static (string label, double yWorldOffset) GetIndicatorLabelAndOffset(ChatTypingIndicatorState state, string typingLabel)
     {
         // Keep these short. The goal is just to communicate intent at a glance.
         return state switch
         {
             ChatTypingIndicatorState.Typing => (typingLabel, 0.25),
-            ChatTypingIndicatorState.ChatOpenComposing => ("Composing...", 0.20),
-            ChatTypingIndicatorState.ChatOpenEmpty => ("Chat open", 0.15),
+            ChatTypingIndicatorState.ChatOpenComposing => (Lang.Get("thebasics:typingindicator-composing"), 0.20),
+            ChatTypingIndicatorState.ChatOpenEmpty => (Lang.Get("thebasics:typingindicator-chatopen"), 0.15),
             _ => (typingLabel, 0.25)
         };
     }
@@ -164,5 +199,6 @@ public sealed class TypingIndicatorRenderer : IRenderer
     {
         _textTexture?.Dispose();
         _textTexture = null;
+        _losCache.Clear();
     }
 }
