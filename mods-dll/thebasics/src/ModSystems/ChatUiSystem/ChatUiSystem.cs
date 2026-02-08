@@ -38,6 +38,14 @@ public class ChatUiSystem : ModSystem
     private static string _lastChatInputText;
     private static long _lastChatInputChangeMs;
 
+    private static void DebugLog(string message)
+    {
+        if (_config?.DebugMode == true)
+        {
+            _api?.Logger.Debug(message);
+        }
+    }
+
     public override bool ShouldLoad(EnumAppSide side) => side.IsClient();
 
     public override void StartClientSide(ICoreClientAPI api)
@@ -69,7 +77,7 @@ public class ChatUiSystem : ModSystem
         // Initialize Harmony patches if needed
         if (!Harmony.HasAnyPatches(Mod.Info.ModID))
         {
-            _api.Logger.Debug("[THEBASICS] Applying Harmony patches");
+            DebugLog("[THEBASICS] Applying Harmony patches");
             _harmony = new Harmony(Mod.Info.ModID);
             _harmony.PatchAll();
         }
@@ -137,14 +145,14 @@ public class ChatUiSystem : ModSystem
         {
             // Otherwise queue for later execution
             _pendingConfigActions.Add(action);
-            _api.Logger.Debug("[THEBASICS] Action queued until config is received");
+            DebugLog("[THEBASICS] Action queued until config is received");
         }
     }
 
     // Process all queued actions
     private static void ProcessConfigActionQueue()
     {
-        _api.Logger.Debug($"[THEBASICS] Processing {_pendingConfigActions.Count} queued actions");
+        DebugLog($"[THEBASICS] Processing {_pendingConfigActions.Count} queued actions");
         
         foreach (var action in _pendingConfigActions)
         {
@@ -166,7 +174,7 @@ public class ChatUiSystem : ModSystem
         // Only send ready message when the local player joins, not when any player joins
         if (byPlayer.PlayerUID == _api.World.Player.PlayerUID)
         {
-            _api.Logger.Debug("THEBASICS - Local player joined, attempting to send ready message to server");
+            DebugLog("THEBASICS - Local player joined, attempting to send ready message to server");
             
             // Use safe packet sending with connection checking and retry mechanism
             // The server will only send config after receiving this ready message
@@ -277,8 +285,8 @@ public class ChatUiSystem : ModSystem
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;
             
-            _api.Logger.Debug($"[THEBASICS] Received server config: PreventProximityChannelSwitching={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
-            _api.Logger.Debug($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
+            DebugLog($"[THEBASICS] Received server config: PreventProximityChannelSwitching={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
+            DebugLog($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
             
             // Process any actions that were waiting for config
             if (_pendingConfigActions.Count > 0)
@@ -402,20 +410,14 @@ public class ChatUiSystem : ModSystem
         {
             var game = (ClientMain)_api.World;
 
-            if (_config.DebugMode)
-            {
-                _api.Logger.Debug($"[THEBASICS] OnNewServerToClientChatLine - Current group: {game.currentGroupid}, Proximity group: {_proximityGroupId.Value}");
-            }
+            DebugLog($"[THEBASICS] OnNewServerToClientChatLine - Current group: {game.currentGroupid}, Proximity group: {_proximityGroupId.Value}");
             if (game.currentGroupid == _proximityGroupId.Value)
             {
                 // User is in proximity tab - temporarily disable the client setting that causes auto-switching
                 _originalAutoChatOpenSelected = ClientSettings.AutoChatOpenSelected;
                 ClientSettings.AutoChatOpenSelected = false; // This prevents the auto-switching logic
 
-                if (_config.DebugMode)
-                {
-                    _api.Logger.Debug($"[THEBASICS] Preventing auto-switch - saved original AutoChatOpenSelected: {_originalAutoChatOpenSelected}");
-                }
+                DebugLog($"[THEBASICS] Preventing auto-switch - saved original AutoChatOpenSelected: {_originalAutoChatOpenSelected}");
             }
         }
     }
@@ -432,10 +434,7 @@ public class ChatUiSystem : ModSystem
             // Restore the original setting
             ClientSettings.AutoChatOpenSelected = _originalAutoChatOpenSelected.Value;
 
-            if (_config.DebugMode)
-            {
-                _api.Logger.Debug($"[THEBASICS] Restored AutoChatOpenSelected to: {_originalAutoChatOpenSelected.Value}");
-            }
+            DebugLog($"[THEBASICS] Restored AutoChatOpenSelected to: {_originalAutoChatOpenSelected.Value}");
             _originalAutoChatOpenSelected = null;
         }
     }
@@ -455,7 +454,7 @@ public class ChatUiSystem : ModSystem
         {
             // Queue this action for when config is received
             QueueConfigAction(() => PostfixOnGuiOpened(__instance));
-            _api.Logger.Debug("[THEBASICS] OnGuiOpened queued until config is received");
+            DebugLog("[THEBASICS] OnGuiOpened queued until config is received");
             return;
         }
 
@@ -475,7 +474,7 @@ public class ChatUiSystem : ModSystem
                 {
                     // Set the visual tab state - this will trigger OnTabClicked automatically
                     __instance.Composers["chat"].GetHorizontalTabs("tabs").SetValue(tabIndex, callhandler: true);
-                    _api.Logger.Debug($"[THEBASICS] Set active tab to index {tabIndex} for group {targetGroupId}");
+                    DebugLog($"[THEBASICS] Set active tab to index {tabIndex} for group {targetGroupId}");
                 }
                 else
                 {

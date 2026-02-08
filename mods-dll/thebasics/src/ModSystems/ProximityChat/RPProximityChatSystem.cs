@@ -298,7 +298,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     private void OnClientReady(IServerPlayer player, TheBasicsClientReadyMessage message)
     {
-        API.Logger.Debug($"THEBASICS - Received ready message from {player.PlayerName}, sending config");
+        if (Config.DebugMode)
+        {
+            API.Logger.Debug($"THEBASICS - Received ready message from {player.PlayerName}, sending config");
+        }
         SendClientConfig(player);
     }
 
@@ -406,8 +409,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Config = Config,
             LastSelectedGroupId = byPlayer.GetLastSelectedGroupId()
         }, byPlayer);
-        
-        API.Logger.Debug($"THEBASICS - Sent complete config to client {byPlayer.PlayerName}");
+
+        if (Config.DebugMode)
+        {
+            API.Logger.Debug($"THEBASICS - Sent complete config to client {byPlayer.PlayerName}");
+        }
     }
 
     internal void DispatchSpeechForContext(MessageContext context)
