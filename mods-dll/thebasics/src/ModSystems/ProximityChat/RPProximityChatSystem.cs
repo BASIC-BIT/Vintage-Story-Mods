@@ -497,6 +497,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             ProximityChatId = GlobalConstants.GeneralChatGroup;
             RemoveProximityGroupIfExists();
+
+            API.Logger.Notification("THEBASICS: UseGeneralChannelAsProximityChat=true - the General chat tab is now proximity chat. Set it to false to restore global General chat.");
         }
         if (!Config.UseGeneralChannelAsProximityChat)
         {
