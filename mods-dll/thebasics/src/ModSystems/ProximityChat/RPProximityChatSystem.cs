@@ -564,18 +564,35 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         var behavior = player.Entity.GetBehavior<EntityBehaviorNameTag>();
 
+        if (behavior == null)
+        {
+            return;
+        }
+
+        // Apply visibility/range settings regardless of whether we're overriding the display name.
+        behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
+        behavior.RenderRange = Config.NametagRenderRange;
+
+        // Determine the visible nametag string.
+        string displayName;
         if (Config.ShowNicknameInNametag)
         {
             var nickname = player.GetNickname();
-
-            var displayName = Config.ShowPlayerNameInNametag ? $"{nickname} ({player.PlayerName})" : nickname;
-
-            behavior.SetName(displayName);
-
-            behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
-            behavior.RenderRange = Config.NametagRenderRange;
-            player.Entity.WatchedAttributes.MarkPathDirty("nametag");
+            if (string.IsNullOrWhiteSpace(nickname))
+            {
+                displayName = Config.ShowPlayerNameInNametag ? player.PlayerName : "";
+            }
+            else
+            {
+                displayName = Config.ShowPlayerNameInNametag ? $"{nickname} ({player.PlayerName})" : nickname;
+            }
         }
+        else
+        {
+            displayName = Config.ShowPlayerNameInNametag ? player.PlayerName : "";
+        }
+
+        behavior.SetName(displayName);
     }
 
     private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
