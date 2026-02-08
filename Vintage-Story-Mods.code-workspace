@@ -17,6 +17,9 @@
 		},
 		{
 			"path": "../vs_rptts"
+		},
+		{
+			"path": "../../basics-agentic-dogfooding"
 		}
 	],
 	"settings": {
