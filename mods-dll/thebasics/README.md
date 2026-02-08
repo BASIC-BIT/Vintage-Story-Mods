@@ -108,10 +108,11 @@ Configuration keys (in `ModConfig/the_basics.json`):
 - `EnableTypingIndicator`: master toggle
 - `TypingIndicatorMaxRange`: max range (blocks) to see the indicator
 - `TypingIndicatorTimeoutSeconds`: how long after the last input change the indicator stays on (typing mode)
-- `TypingIndicatorRequireNonEmptyText`: if true, the indicator won't show when the chat input is empty
 - `TypingIndicatorShowWhileChatFocused`: if true, the indicator shows whenever the chat input is focused (RP-friendly)
 - `TypingIndicatorTextOverride`: override the displayed text (otherwise uses lang key `thebasics:typingindicator-typing`)
-- `TypingIndicatorDebugLogging`: emits low-volume debug logs (recommended off outside of diagnosis)
+
+Notes:
+- When `TypingIndicatorShowWhileChatFocused=false`, the indicator only shows while actively typing (and only when the input has text).
 
 Practical presets:
 - "Typing" mode: `TypingIndicatorShowWhileChatFocused=false`
@@ -128,14 +129,13 @@ Config key (in `ModConfig/the_basics.json`):
 
  - `OverrideSpeechBubblesWithRpText`: when true, the server overrides the bubble text (per recipient)
    - Applies to: speech, emotes (`/me` or `*...`), and environmental messages (`/it` or `!...`)
- - `RenderSpeechBubblesWithVtml`: when true, clients render VTML tags in overhead bubbles (italics, font tags, etc.)
-   - When enabled, emote/environment bubbles also get subtle visual styling (border/background) so they are distinct.
+   - When enabled, clients also render VTML in overhead bubbles (italics, font tags, icons).
+   - Emote/environment bubbles get subtle visual styling (border/background) so they are distinct.
 
 Notes:
 
 - Vanilla overhead bubbles render plain text (they do not parse VTML).
-- When `RenderSpeechBubblesWithVtml=false`, The BASICs strips VTML tags for the bubble only; the chat log still uses VTML.
-- When `RenderSpeechBubblesWithVtml=true`, the client patches the vanilla bubble renderer to support VTML.
+- When `OverrideSpeechBubblesWithRpText=true`, the client patches the vanilla bubble renderer to support VTML.
 
 
 

@@ -31,10 +31,6 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             return context;
         }
 
-        // Vanilla overhead chat bubbles render plain text textures.
-        // If VTML rendering is enabled client-side, we can send VTML and let the client render it.
-        // Otherwise, strip VTML tags so they don't show literally.
-
         var bubbleTextVtml = (context.Message ?? string.Empty).Trim();
 
         // Emotes are rendered above the sender's head, so including the sender name is redundant.
@@ -47,11 +43,7 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
                 bubbleTextVtml = bubbleTextVtml[prefix.Length..].TrimStart();
             }
         }
-        var bubbleTextToSend = _config.RenderSpeechBubblesWithVtml
-            ? bubbleTextVtml
-            : VtmlUtils.StripVtmlTags(bubbleTextVtml, _chatSystem.API.Logger);
-
-        bubbleTextToSend = (bubbleTextToSend ?? string.Empty).Trim();
+        var bubbleTextToSend = (bubbleTextVtml ?? string.Empty).Trim();
         if (bubbleTextToSend.Length == 0)
         {
             return context;
@@ -60,20 +52,16 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         // Match vanilla behavior: the data string contains &lt; and &gt; which the client unescapes.
         bubbleTextToSend = VtmlUtils.EscapeVtml(bubbleTextToSend);
 
-        // Add optional kind marker for client-side styling.
-        // Only include when VTML bubble rendering is enabled; vanilla bubbles would show the marker text.
-        if (_config.RenderSpeechBubblesWithVtml)
-        {
-            var kind = context.HasFlag(MessageContext.IS_ENVIRONMENTAL) ? "env" :
-                context.HasFlag(MessageContext.IS_EMOTE) ? "emote" :
-                context.HasFlag(MessageContext.IS_SPEECH) ? "speech" :
-                null;
+        // Add kind marker for client-side styling of emote/env bubbles.
+        // Speech bubbles will render via vanilla unless VTML is present.
+        var kind = context.HasFlag(MessageContext.IS_ENVIRONMENTAL) ? "env" :
+            context.HasFlag(MessageContext.IS_EMOTE) ? "emote" :
+            null;
 
-            if (kind != null)
-            {
-                context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend},kind:{kind}");
-                return context;
-            }
+        if (kind != null)
+        {
+            context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend},kind:{kind}");
+            return context;
         }
 
         context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend}");

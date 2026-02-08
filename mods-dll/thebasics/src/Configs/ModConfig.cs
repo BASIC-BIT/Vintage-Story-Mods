@@ -315,14 +315,8 @@ namespace thebasics.Configs
         [ProtoMember(71)]
         public string TypingIndicatorTextOverride { get; set; } = "";
 
-        // When true, indicator only shows once there is at least 1 character in the chat input.
-        [ProtoMember(72)]
-        public bool TypingIndicatorRequireNonEmptyText { get; set; } = true;
-
-        // When true, emits low-volume debug logs on typing state changes.
-        // Intended for diagnosing packet send/receive without spamming per-frame logs.
-        [ProtoMember(73)]
-        public bool TypingIndicatorDebugLogging { get; set; } = false;
+        // ProtoMember(72) - RESERVED (was TypingIndicatorRequireNonEmptyText)
+        // ProtoMember(73) - RESERVED (was TypingIndicatorDebugLogging)
 
         // When true, indicator is shown whenever the chat input has focus (even if the player is not actively typing).
         // This is often preferred for RP servers because it signals intent/engagement rather than keystrokes.
@@ -335,10 +329,6 @@ namespace thebasics.Configs
         [ProtoMember(75)]
         public bool OverrideSpeechBubblesWithRpText { get; set; } = false;
 
-        // When true, clients will render VTML in overhead speech bubbles.
-        // Vanilla overhead bubbles render plain text textures, so VTML tags show literally unless the client is patched.
-        // Requires thebasics to be installed client-side (server auto-download is sufficient).
-        [ProtoMember(76)]
-        public bool RenderSpeechBubblesWithVtml { get; set; } = false;
+        // ProtoMember(76) - RESERVED (was RenderSpeechBubblesWithVtml)
     }
 }

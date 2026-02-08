@@ -231,7 +231,8 @@ public class ChatUiSystem : ModSystem
 
     internal static bool IsSpeechBubbleVtmlEnabled()
     {
-        return _config?.RenderSpeechBubblesWithVtml == true;
+        // Opinionated: overhead speech bubble VTML rendering is enabled automatically when we override bubble text.
+        return _config?.OverrideSpeechBubblesWithRpText == true;
     }
 
     internal static string GetTypingIndicatorText()
@@ -677,7 +678,6 @@ public class ChatUiSystem : ModSystem
             }
             _lastChatInputHadFocus = hasFocus;
 
-            bool requireNonEmpty = _config.TypingIndicatorRequireNonEmptyText;
             if (!hasFocus)
             {
                 ForceLocalTypingState(false);
@@ -691,7 +691,8 @@ public class ChatUiSystem : ModSystem
                 return;
             }
 
-            if (requireNonEmpty && text.Length == 0)
+            // Typing-mode: don't show the indicator for an empty input.
+            if (text.Length == 0)
             {
                 ForceLocalTypingState(false);
                 return;
