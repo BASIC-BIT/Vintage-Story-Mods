@@ -56,6 +56,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                     "You don't know that language!",
                     EnumChatType.CommandError);
                 context.State = MessageContextState.STOP;
+                return context;
             }
 
             // If the message is empty, set the default language and stop processing
