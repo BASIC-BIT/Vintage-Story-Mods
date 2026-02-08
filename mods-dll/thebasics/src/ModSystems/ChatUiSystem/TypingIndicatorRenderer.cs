@@ -19,8 +19,9 @@ public sealed class TypingIndicatorRenderer : IRenderer
     // Keyed by target entity id.
     private readonly Dictionary<long, (bool canSee, long nextCheckMs)> _losCache = new();
 
-    private LoadedTexture _textTexture;
-    private string _lastText;
+    // Small label set (Typing/Composing/Chat open). Cache textures per label to avoid thrashing
+    // when multiple players are in different states.
+    private readonly Dictionary<string, LoadedTexture> _textTextures = new();
 
     public TypingIndicatorRenderer(ICoreClientAPI capi)
     {
@@ -105,8 +106,8 @@ public sealed class TypingIndicatorRenderer : IRenderer
             // Lift above the normal nametag position to avoid overlap.
             // Use the target entity here (not local player), otherwise the projection can drift into the nametag.
             var (label, yWorldOffset) = GetIndicatorLabelAndOffset(state, text);
-            EnsureTexture(label);
-            if (_textTexture == null)
+            var tex = GetOrCreateTexture(label);
+            if (tex == null)
             {
                 continue;
             }
@@ -125,13 +126,13 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 cappedScale = 0.75f + (cappedScale - 0.75f) / 2f;
             }
 
-            float posx = (float)pos.X - cappedScale * _textTexture.Width / 2f;
+            float posx = (float)pos.X - cappedScale * tex.Width / 2f;
 
             // Small screen-space nudge; most separation comes from the world-space offset above.
             float yOffset = 2f;
-            float posy = (float)rapi.FrameHeight - (float)pos.Y - cappedScale * _textTexture.Height - yOffset;
+            float posy = (float)rapi.FrameHeight - (float)pos.Y - cappedScale * tex.Height - yOffset;
 
-            rapi.Render2DTexture(_textTexture.TextureId, posx, posy, cappedScale * _textTexture.Width, cappedScale * _textTexture.Height, 20f);
+            rapi.Render2DTexture(tex.TextureId, posx, posy, cappedScale * tex.Width, cappedScale * tex.Height, 20f);
         }
     }
 
@@ -167,15 +168,17 @@ public sealed class TypingIndicatorRenderer : IRenderer
         };
     }
 
-    private void EnsureTexture(string text)
+    private LoadedTexture GetOrCreateTexture(string text)
     {
-        if (_textTexture != null && text == _lastText)
+        if (string.IsNullOrWhiteSpace(text))
         {
-            return;
+            return null;
         }
 
-        _lastText = text;
-        _textTexture?.Dispose();
+        if (_textTextures.TryGetValue(text, out var existing) && existing != null)
+        {
+            return existing;
+        }
 
         var bg = new TextBackground
         {
@@ -192,13 +195,22 @@ public sealed class TypingIndicatorRenderer : IRenderer
         };
 
         var font = CairoFont.WhiteSmallText().WithFontSize(14f);
-        _textTexture = _capi.Gui.TextTexture.GenUnscaledTextTexture(text, font, bg);
+        var tex = _capi.Gui.TextTexture.GenUnscaledTextTexture(text, font, bg);
+        if (tex != null)
+        {
+            _textTextures[text] = tex;
+        }
+
+        return tex;
     }
 
     public void Dispose()
     {
-        _textTexture?.Dispose();
-        _textTexture = null;
+        foreach (var kvp in _textTextures)
+        {
+            kvp.Value?.Dispose();
+        }
+        _textTextures.Clear();
         _losCache.Clear();
     }
 }
