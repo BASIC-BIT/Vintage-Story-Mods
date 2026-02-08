@@ -325,5 +325,15 @@ namespace thebasics.Configs
         // Intended for temporary use while investigating reports.
         [ProtoMember(73)]
         public bool DebugMode { get; set; } = false;
+
+        // When true, server save announcements use EnumChatType.Notification (popup-style).
+        // When false, send as a regular chat line (less intrusive).
+        [ProtoMember(74)]
+        public bool ServerSaveAnnouncementAsNotification { get; set; } = true;
+
+        // When true, server save finished announcements use EnumChatType.Notification (popup-style).
+        // When false, send as a regular chat line (less intrusive).
+        [ProtoMember(75)]
+        public bool ServerSaveFinishedAsNotification { get; set; } = true;
     }
 }
