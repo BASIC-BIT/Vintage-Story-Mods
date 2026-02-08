@@ -269,6 +269,9 @@ public class ChatUiSystem : ModSystem
                 _api.Logger.Error("[THEBASICS] Received null config from server!");
                 return;
             }
+
+            // Apply debug mode to networking helpers now that we have config.
+            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
             
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;

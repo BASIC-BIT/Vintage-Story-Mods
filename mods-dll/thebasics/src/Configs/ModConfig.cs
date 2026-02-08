@@ -320,5 +320,10 @@ namespace thebasics.Configs
         // This only affects the floating text above player heads, not the chat log.
         [ProtoMember(72)]
         public bool OverrideSpeechBubblesWithRpText { get; set; } = false;
+
+        // When true, enables verbose debug logging and diagnostic instrumentation.
+        // Intended for temporary use while investigating reports.
+        [ProtoMember(73)]
+        public bool DebugMode { get; set; } = false;
     }
 }

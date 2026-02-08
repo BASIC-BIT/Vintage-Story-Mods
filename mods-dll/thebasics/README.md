@@ -107,8 +107,9 @@ Notes:
 Configuration keys (in `ModConfig/the_basics.json`):
 - `EnableTypingIndicator`: master toggle
 - `TypingIndicatorMaxRange`: max range (blocks) to see the indicator
- - `TypingIndicatorTimeoutSeconds`: how long after the last input change the indicator stays on
- - `TypingIndicatorTextOverride`: override the displayed text (otherwise uses lang key `thebasics:typingindicator-typing`)
+- `TypingIndicatorTimeoutSeconds`: how long after the last input change the indicator stays on
+- `TypingIndicatorTextOverride`: override the displayed text (otherwise uses lang key `thebasics:typingindicator-typing`)
+- `DebugMode`: enables verbose debug logging/diagnostics (recommended off unless troubleshooting)
 
 Notes:
 - The indicator uses multiple states (chat open / composing / actively typing) for a unified UX.
