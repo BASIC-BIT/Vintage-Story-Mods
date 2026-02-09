@@ -48,6 +48,9 @@ public class TransformerSystem
             new AccentTransformer(_chatSystem), // Process accents
             new EnvironmentMessageTransformer(_chatSystem), // Add italics to environment messages
 
+            // Snapshot baseline bubble text for speech (before recipient-specific language/obfuscation).
+            new SpeechBubbleBaseTextTransformer(_chatSystem),
+
             // Recipient determination runs last in the sender phase
             new RecipientDeterminationTransformer(_chatSystem, _proximityCheckUtils),
         };

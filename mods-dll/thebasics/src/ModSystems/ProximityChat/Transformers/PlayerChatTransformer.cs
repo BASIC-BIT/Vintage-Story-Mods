@@ -149,6 +149,9 @@ public class PlayerChatTransformer : MessageTransformerBase
 
             context.SetFlag(MessageContext.IS_GLOBAL_OOC);
             context.UpdateMessage(updated.Trim(), updateSpeech: false);
+
+            // Global OOC is not an in-world "visual cue"; suppress overhead bubbles.
+            context.SetMetadata("clientData", (string)null);
         } else if (isEmote)
         {
             if (hasEmoteStart)

@@ -76,6 +76,10 @@ public class MessageContext
     public static readonly string SPEECH_COLOR = "speechColor";
     public static readonly string SPEECH_TEXT = "speechText";
 
+    // Stores the pre-recipient-phase bubble text for speech messages.
+    // Used when we want to keep overhead bubbles closer to vanilla behavior.
+    public static readonly string BUBBLE_TEXT_BASE = "bubbleTextBase";
+
     public void UpdateMessage(string message, bool updateSpeech = true)
     {
         Message = message;

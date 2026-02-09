@@ -21,6 +21,7 @@ public static class SpeechBubbleVtmlPatches
         AccessTools.FieldRefAccess<EntityShapeRenderer, List<MessageTexture>>("messageTextures");
 
     private const int BubbleMaxTextWidthPx = 350;
+    private const int BubbleBottomMarginPx = 16;
 
     public static bool Prefix(EntityShapeRenderer __instance, int groupId, string message, EnumChatType chattype, string data)
     {
@@ -46,7 +47,13 @@ public static class SpeechBubbleVtmlPatches
                 return true;
             }
 
-            if (data == null || !data.Contains("from:") || !(entity.Pos.SquareDistanceTo(capi.World.Player.Entity.Pos.XYZ) < 400.0) || message.Length <= 0)
+            var localPlayerEntity = capi.World?.Player?.Entity;
+            if (localPlayerEntity == null)
+            {
+                return true;
+            }
+
+            if (data == null || !data.Contains("from:") || entity.Pos.SquareDistanceTo(localPlayerEntity.Pos.XYZ) >= 400.0 || message.Length <= 0)
             {
                 return true;
             }
@@ -78,23 +85,35 @@ public static class SpeechBubbleVtmlPatches
             // Line-of-sight gating: overhead bubbles should behave like a visual cue.
             // If the local player cannot see the target entity, don't display the bubble.
             // (Chat log still receives the message as normal.)
-            var localEntity = capi.World?.Player?.Entity;
-            if (localEntity != null && !VisibilityUtils.HasLineOfSight(capi.World, localEntity, entity))
+            if (!VisibilityUtils.HasLineOfSight(capi.World, localPlayerEntity, entity))
             {
                 return false;
             }
 
             // Bubble text comes from the data payload.
-            // We support an optional metadata suffix (only used when this patch is enabled):
-            //   from:<id>,msg:<text>\u001fkind:<speech|emote|env>
+            // When this patch is enabled, the server may attach an optional kind marker for styling:
+            //   New (preferred): from:<id>,msg\u001fkind=<emote|env>:<text>
+            //   Legacy:          from:<id>,msg:<text>\u001fkind:<emote|env>
             var rawMsg = parttwo[1];
             string kind = null;
-            const string kindMarker = "\u001fkind:";
-            var kindIndex = rawMsg.LastIndexOf(kindMarker, StringComparison.Ordinal);
-            if (kindIndex >= 0)
+
+            // Preferred format: kind marker embedded in the key segment so vanilla clients never display it.
+            const string kindKeyMarker = "\u001fkind=";
+            var keyKindIndex = parttwo[0].LastIndexOf(kindKeyMarker, StringComparison.Ordinal);
+            if (keyKindIndex >= 0)
             {
-                kind = rawMsg[(kindIndex + kindMarker.Length)..].Trim();
-                rawMsg = rawMsg[..kindIndex];
+                kind = parttwo[0][(keyKindIndex + kindKeyMarker.Length)..].Trim();
+            }
+            else
+            {
+                // Legacy suffix format (kept for safety).
+                const string kindValueMarker = "\u001fkind:";
+                var valueKindIndex = rawMsg.LastIndexOf(kindValueMarker, StringComparison.Ordinal);
+                if (valueKindIndex >= 0)
+                {
+                    kind = rawMsg[(valueKindIndex + kindValueMarker.Length)..].Trim();
+                    rawMsg = rawMsg[..valueKindIndex];
+                }
             }
 
             var bubbleVtml = rawMsg;
@@ -116,20 +135,14 @@ public static class SpeechBubbleVtmlPatches
                 Orientation = EnumTextOrientation.Center
             };
 
-            LoadedTexture tex;
-            if (hasVtml)
+            // Always attempt richtext rendering here (even for plain text) so we can apply
+            // consistent sizing and add a small transparent bottom margin to avoid nametag overlap.
+            var tex = RichTextTextureUtils.GenRichTextTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background, extraBottomMarginPx: BubbleBottomMarginPx);
+            if (tex == null)
             {
-                tex = GenRichTextBubbleTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background);
-                if (tex == null)
-                {
-                    // Fallback: strip tags and let vanilla-esque plain rendering handle it.
-                    var plain = VtmlUtils.StripVtmlTags(bubbleVtml, capi.Logger);
-                    tex = capi.Gui.TextTexture.GenTextTexture(plain, baseFont, BubbleMaxTextWidthPx, background, EnumTextOrientation.Center);
-                }
-            }
-            else
-            {
-                tex = capi.Gui.TextTexture.GenTextTexture(bubbleVtml, baseFont, BubbleMaxTextWidthPx, background, EnumTextOrientation.Center);
+                // Fallback: strip tags and let vanilla-esque plain rendering handle it.
+                var plain = VtmlUtils.StripVtmlTags(bubbleVtml, capi.Logger);
+                tex = capi.Gui.TextTexture.GenTextTexture(plain, baseFont, BubbleMaxTextWidthPx, background, EnumTextOrientation.Center);
             }
 
             var plainForTimer = VtmlUtils.StripVtmlTags(bubbleVtml, capi.Logger);
@@ -170,20 +183,16 @@ public static class SpeechBubbleVtmlPatches
             Radius = GuiStyle.ElementBGRadius
         };
 
-        // Add subtle borders for non-speech bubbles.
+        // Keep a consistent vanilla-like look; differentiate kinds via a subtle border.
         if (kind == "env")
         {
-            // Cool, slightly airy background for environmental text.
-            bg.FillColor = ColorUtil.Hex2Doubles("#E7F0FA");
             bg.BorderWidth = 2;
-            bg.BorderColor = ColorUtil.Hex2Doubles("#7AA3C7");
+            bg.BorderColor = ColorUtil.Hex2Doubles("#86AEE6");
         }
         else if (kind == "emote")
         {
-            // Warm parchment background for emotes.
-            bg.FillColor = ColorUtil.Hex2Doubles("#F8F2E6");
             bg.BorderWidth = 2;
-            bg.BorderColor = ColorUtil.Hex2Doubles("#C7B27A");
+            bg.BorderColor = ColorUtil.Hex2Doubles("#E6C686");
         }
 
         return bg;
@@ -191,83 +200,9 @@ public static class SpeechBubbleVtmlPatches
 
     private static double[] GetBubbleFontColor(string kind)
     {
-        // Speech bubbles use vanilla's white text.
-        // Environmental/emote bubbles use lighter backgrounds, so use a dark font for contrast.
-        if (kind == "env" || kind == "emote")
-        {
-            return ColorUtil.Hex2Doubles("#1B1B1B");
-        }
-
+        // Keep vanilla's white text; background stays consistent across kinds.
         return ColorUtil.WhiteArgbDouble;
     }
 
-    private static LoadedTexture GenRichTextBubbleTexture(ICoreClientAPI capi, string vtml, CairoFont baseFont, int maxTextWidthPx, TextBackground background)
-    {
-        if (capi == null || string.IsNullOrWhiteSpace(vtml))
-        {
-            return null;
-        }
-
-        try
-        {
-            var comps = VtmlUtil.Richtextify(capi, vtml, baseFont);
-
-            // Measure with the maximum width.
-            var guiScale = Math.Max(1, RuntimeEnv.GUIScale);
-            var measureBounds = ElementBounds.FixedSize(maxTextWidthPx / (double)guiScale, 600 / (double)guiScale);
-            measureBounds.ParentBounds = ElementBounds.Empty;
-            var measure = new GuiElementRichtext(capi, comps, measureBounds);
-            measure.BeforeCalcBounds();
-
-            var textWidthPx = (int)Math.Min(maxTextWidthPx, Math.Ceiling(measure.MaxLineWidth));
-            var textHeightPx = (int)Math.Ceiling(measure.TotalHeight);
-            textWidthPx = Math.Max(1, textWidthPx);
-            textHeightPx = Math.Max(1, textHeightPx);
-
-            // Reflow/align using the final width for correct centering.
-            var finalBounds = ElementBounds.FixedSize(textWidthPx / (double)guiScale, textHeightPx / (double)guiScale);
-            finalBounds.ParentBounds = ElementBounds.Empty;
-            var rich = new GuiElementRichtext(capi, comps, finalBounds);
-            rich.BeforeCalcBounds();
-
-            var surfaceWidth = textWidthPx + 2 * background.HorPadding;
-            var surfaceHeight = textHeightPx + 2 * background.VerPadding;
-
-            using var surface = new ImageSurface(Format.Argb32, surfaceWidth, surfaceHeight);
-            using var ctx = new Context(surface);
-
-            // Background
-            GuiElement.RoundRectangle(ctx, 0, 0, surfaceWidth, surfaceHeight, background.Radius);
-            ctx.SetSourceRGBA(background.FillColor);
-            if (background.BorderWidth > 0)
-            {
-                ctx.FillPreserve();
-                ctx.LineWidth = background.BorderWidth;
-                ctx.SetSourceRGBA(background.BorderColor);
-                ctx.Stroke();
-            }
-            else
-            {
-                ctx.Fill();
-            }
-
-            // Render richtext at padded offset
-            var offsetBounds = ElementBounds.Fixed(
-                background.HorPadding / (double)guiScale,
-                background.VerPadding / (double)guiScale,
-                textWidthPx / (double)guiScale,
-                textHeightPx / (double)guiScale
-            );
-            offsetBounds.ParentBounds = ElementBounds.Empty;
-            rich.ComposeFor(offsetBounds, ctx, surface);
-
-            var tex = new LoadedTexture(capi);
-            capi.Gui.LoadOrUpdateCairoTexture(surface, linearMag: false, ref tex);
-            return tex;
-        }
-        catch
-        {
-            return null;
-        }
-    }
+    // NOTE: richtext texture rendering lives in RichTextTextureUtils.
 }

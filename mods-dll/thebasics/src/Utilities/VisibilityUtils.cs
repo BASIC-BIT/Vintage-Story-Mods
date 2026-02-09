@@ -29,12 +29,15 @@ public static class VisibilityUtils
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
             var toPos = toBase.AddCopy(target.LocalEyePos);
 
+            // For our purposes, we only want to know if any non-air block blocks the segment
+            // between observer and target.
+            // We intentionally ignore entities as potential blockers.
             var blockSel = new BlockSelection();
             var entitySel = new EntitySelection();
+            world.RayTraceForSelection(fromPos, toPos, ref blockSel, ref entitySel, efilter: _ => false);
 
-            world.RayTraceForSelection(fromPos, toPos, ref blockSel, ref entitySel, efilter: e => e.EntityId != observer.EntityId);
-
-            return entitySel.Entity != null && entitySel.Entity.EntityId == target.EntityId;
+            // If RayTraceForSelection hit a non-air block on the segment, LOS is blocked.
+            return blockSel.Block == null || blockSel.Block.Id == 0;
         }
         catch
         {
@@ -44,7 +47,8 @@ public static class VisibilityUtils
 
     public static bool HasLineOfSight(IWorldAccessor world, Entity observer, Entity target)
     {
-        // Client-side visuals should fail open.
-        return HasLineOfSight(world, observer, target, failOpen: true);
+        // Visual cues should not leak information through terrain.
+        // If LOS checks fail for any reason, prefer to hide the cue.
+        return HasLineOfSight(world, observer, target, failOpen: false);
     }
 }

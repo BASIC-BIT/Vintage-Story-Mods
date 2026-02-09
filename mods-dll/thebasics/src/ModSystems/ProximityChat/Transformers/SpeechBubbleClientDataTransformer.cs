@@ -14,8 +14,9 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
     public override bool ShouldTransform(MessageContext context)
     {
-        return _config.OverrideSpeechBubblesWithRpText &&
-            (context.HasFlag(MessageContext.IS_SPEECH) || context.HasFlag(MessageContext.IS_EMOTE) || context.HasFlag(MessageContext.IS_ENVIRONMENTAL));
+        // Always emit clientData for in-world bubble messages so vanilla bubbles keep working.
+        // The config controls *what* text we place into the bubble, not whether a bubble exists.
+        return context.HasFlag(MessageContext.IS_SPEECH) || context.HasFlag(MessageContext.IS_EMOTE) || context.HasFlag(MessageContext.IS_ENVIRONMENTAL);
     }
 
     public override MessageContext Transform(MessageContext context)
@@ -33,16 +34,22 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         var bubbleTextVtml = (context.Message ?? string.Empty).Trim();
 
-        // Emotes are rendered above the sender's head, so including the sender name is redundant.
-        // The EmoteTransformer prefixes the formatted name; remove it for bubble display.
-        if (context.HasFlag(MessageContext.IS_EMOTE) && context.TryGetMetadata(MessageContext.FORMATTED_NAME, out string formattedName) && !string.IsNullOrWhiteSpace(formattedName))
+        // When not overriding bubbles with per-recipient RP text, keep speech bubbles closer to vanilla:
+        // use the baseline text captured in the sender phase.
+        if (!_config.OverrideSpeechBubblesWithRpText && context.HasFlag(MessageContext.IS_SPEECH))
         {
-            var prefix = formattedName + " ";
-            if (bubbleTextVtml.StartsWith(prefix))
+            if (context.TryGetMetadata(MessageContext.BUBBLE_TEXT_BASE, out string baseText) && !string.IsNullOrWhiteSpace(baseText))
             {
-                bubbleTextVtml = bubbleTextVtml[prefix.Length..].TrimStart();
+                bubbleTextVtml = baseText.Trim();
             }
         }
+
+        // If the client isn't rendering VTML in bubbles, strip tags to avoid showing them literally.
+        if (!_config.OverrideSpeechBubblesWithRpText)
+        {
+            bubbleTextVtml = VtmlUtils.StripVtmlTags(bubbleTextVtml, _chatSystem.API?.Logger);
+        }
+
         var bubbleTextToSend = (bubbleTextVtml ?? string.Empty).Trim();
         if (bubbleTextToSend.Length == 0)
         {
@@ -60,9 +67,10 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         if (kind != null)
         {
-            // Append kind using a rarely-used separator to avoid collisions with user text.
-            // Client patch will parse `\u001fkind:`.
-            context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend}\u001fkind:{kind}");
+            // Encode kind in the key segment (before the first ':') so vanilla clients don't display it,
+            // and so it cannot collide with user text.
+            // Client patch also supports the legacy suffix format for safety.
+            context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg\u001fkind={kind}:{bubbleTextToSend}");
             return context;
         }
 

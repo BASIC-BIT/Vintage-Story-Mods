@@ -116,7 +116,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 ChatTypingIndicatorState.ChatOpenEmpty => (chatOpenLabel, 0.15),
                 _ => (typingLabel, 0.25)
             };
-            var tex = GetOrCreateTexture(label);
+            var tex = GetOrCreateTexture(label, state);
             if (tex == null)
             {
                 continue;
@@ -166,14 +166,16 @@ public sealed class TypingIndicatorRenderer : IRenderer
         return entry.canSee;
     }
 
-    private LoadedTexture GetOrCreateTexture(string text)
+    private LoadedTexture GetOrCreateTexture(string text, ChatTypingIndicatorState state)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
             return null;
         }
 
-        if (_textTextures.TryGetValue(text, out var existing) && existing != null)
+        // Cache includes the state because we style backgrounds per-state.
+        var cacheKey = $"{(byte)state}:{text}";
+        if (_textTextures.TryGetValue(cacheKey, out var existing) && existing != null)
         {
             return existing;
         }
@@ -189,14 +191,37 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 GuiStyle.DialogLightBgColor[2],
                 0.85
             },
-            BorderWidth = 0
+            BorderWidth = state == ChatTypingIndicatorState.ChatOpenEmpty ? 0 : 2,
+            BorderColor = state switch
+            {
+                ChatTypingIndicatorState.Typing => ColorUtil.Hex2Doubles("#E6C686"),
+                ChatTypingIndicatorState.ChatOpenComposing => ColorUtil.Hex2Doubles("#86AEE6"),
+                _ => ColorUtil.Hex2Doubles("#AAAAAA")
+            }
         };
 
         var font = CairoFont.WhiteSmallText().WithFontSize(14f);
-        var tex = _capi.Gui.TextTexture.GenUnscaledTextTexture(text, font, bg);
+        font.Orientation = EnumTextOrientation.Center;
+
+        LoadedTexture tex;
+        var hasVtml = text.Contains('<');
+        if (hasVtml)
+        {
+            // Supports <icon> and other VTML tags.
+            tex = RichTextTextureUtils.GenRichTextTexture(_capi, text, font, maxTextWidthPx: 200, bg);
+            if (tex == null)
+            {
+                var plain = VtmlUtils.StripVtmlTags(text, _capi.Logger);
+                tex = _capi.Gui.TextTexture.GenUnscaledTextTexture(plain, font, bg);
+            }
+        }
+        else
+        {
+            tex = _capi.Gui.TextTexture.GenUnscaledTextTexture(text, font, bg);
+        }
         if (tex != null)
         {
-            _textTextures[text] = tex;
+            _textTextures[cacheKey] = tex;
         }
 
         return tex;

@@ -1,5 +1,5 @@
 {
-  "typingindicator-typing": "Typing...",
-  "typingindicator-composing": "Composing...",
-  "typingindicator-chatopen": "Chat open"
+  "typingindicator-typing": "<font size=\"18\"><icon name=\"handheld\"></icon></font>",
+  "typingindicator-composing": "<font size=\"18\"><icon name=\"paintbrush\"></icon></font>",
+  "typingindicator-chatopen": "<font size=\"18\" opacity=\"0.7\"><icon name=\"wpCircle\"></icon></font>"
 }
