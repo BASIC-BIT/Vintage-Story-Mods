@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using thebasics.Extensions;
 using thebasics.ModSystems.PlayerStats.Definitions;
@@ -172,10 +173,12 @@ namespace thebasics.ModSystems.PlayerStats
             
             if(resolvedStat == null)
             {
+                var statNames = string.Join(", ", StatTypes.Types.Keys.Select(k => k.ToString().ToLowerInvariant()));
+                var statIds = string.Join(", ", StatTypes.Types.Values.Select(v => v.ID));
                 return new TextCommandResult()
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Cannot find stat {statName}.",
+                    StatusMessage = $"Cannot find stat '{statName}'. Valid stats: {statNames}. IDs: {statIds}.",
                 };
             }
             
