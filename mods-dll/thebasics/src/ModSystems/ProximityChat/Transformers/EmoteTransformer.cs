@@ -54,7 +54,7 @@ public class EmoteTransformer : MessageTransformerBase
 
                 if (languageEnabled)
                 {
-                    _languageSystem.ProcessMessage(context.SendingPlayer, ref text, language);
+                    _languageSystem.ProcessMessage(context.ReceivingPlayer, ref text, language);
                 }
 
                 text = $"{quoteDelimiter.Start}{text}{quoteDelimiter.End}";

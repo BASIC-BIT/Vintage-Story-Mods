@@ -241,6 +241,19 @@ Desktop shortcuts also exist at:
 - `D:\Games\VSProfiles\Vintagestory Testing Profile 2.lnk`
 - `D:\Games\VSProfiles\Vintagestory Testing Profile 3.lnk`
 
+**After every server restart**, close existing game windows and relaunch both profiles:
+
+```powershell
+# Kill existing VS instances, then launch both profiles
+Get-Process Vintagestory -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Process 'D:\Games\Vintagestory\Vintagestory.exe' `
+  -ArgumentList '--dataPath "D:\Games\VSProfiles\Profile2" --fullscreen off -c 15.235.75.126:30000' `
+  -WorkingDirectory 'D:\Games\Vintagestory'
+Start-Process 'D:\Games\Vintagestory\Vintagestory.exe' `
+  -ArgumentList '--dataPath "D:\Games\VSProfiles\Profile3" --fullscreen off' `
+  -WorkingDirectory 'D:\Games\Vintagestory'
+```
+
 ## Linting/Type Checking
 
 The project uses standard C# compilation for type checking. No additional linting tools are configured.
