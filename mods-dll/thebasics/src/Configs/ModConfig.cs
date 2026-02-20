@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using ProtoBuf;
+using thebasics.Models;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Configs;
@@ -335,5 +336,10 @@ namespace thebasics.Configs
         // When false, send as a regular chat line (less intrusive).
         [ProtoMember(75)]
         public bool ServerSaveFinishedAsNotification { get; set; } = true;
+
+        // Controls what the typing indicator renders: Icon, Text, or Both.
+        // Disabled entirely when EnableTypingIndicator is false.
+        [ProtoMember(76)]
+        public TypingIndicatorDisplayMode TypingIndicatorDisplayMode { get; set; } = TypingIndicatorDisplayMode.Icon;
     }
 }

@@ -50,6 +50,19 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             bubbleTextVtml = VtmlUtils.StripVtmlTags(bubbleTextVtml, _chatSystem.API?.Logger);
         }
 
+        // Apply language color wrapping for speech bubbles so they match the chatbox formatting.
+        // This runs after LanguageTransformer (which scrambles unknown languages) but before
+        // ICSpeechFormatTransformer (which adds language color to the chatbox line).
+        // We must apply the color here because ICSpeechFormatTransformer runs after us.
+        if (_config.OverrideSpeechBubblesWithRpText && _config.EnableLanguageSystem && !_config.DisableRPChat
+            && context.HasFlag(MessageContext.IS_SPEECH))
+        {
+            if (context.TryGetMetadata(MessageContext.LANGUAGE, out Language lang) && lang != null)
+            {
+                bubbleTextVtml = ChatHelper.LangColor(bubbleTextVtml, lang);
+            }
+        }
+
         var bubbleTextToSend = (bubbleTextVtml ?? string.Empty).Trim();
         if (bubbleTextToSend.Length == 0)
         {

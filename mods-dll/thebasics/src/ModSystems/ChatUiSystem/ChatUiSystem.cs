@@ -260,6 +260,11 @@ public class ChatUiSystem : ModSystem
         return _config?.OverrideSpeechBubblesWithRpText == true;
     }
 
+    internal static Models.TypingIndicatorDisplayMode GetTypingIndicatorDisplayMode()
+    {
+        return _config?.TypingIndicatorDisplayMode ?? Models.TypingIndicatorDisplayMode.Icon;
+    }
+
     internal static string GetTypingIndicatorText()
     {
         var overrideText = _config?.TypingIndicatorTextOverride;
@@ -268,7 +273,7 @@ public class ChatUiSystem : ModSystem
             return overrideText;
         }
 
-        return Lang.Get("thebasics:typingindicator-typing");
+        return Lang.Get("thebasics:typingindicator-typing-text");
     }
 
     private void OnServerConfigMessage(TheBasicsConfigMessage configMessage)

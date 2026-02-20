@@ -32,12 +32,19 @@ public static class VisibilityUtils
             // For our purposes, we only want to know if any non-air block blocks the segment
             // between observer and target.
             // We intentionally ignore entities as potential blockers.
-            var blockSel = new BlockSelection();
-            var entitySel = new EntitySelection();
+            BlockSelection blockSel = null;
+            EntitySelection entitySel = null;
             world.RayTraceForSelection(fromPos, toPos, ref blockSel, ref entitySel, efilter: _ => false);
 
-            // If RayTraceForSelection hit a non-air block on the segment, LOS is blocked.
-            return blockSel.Block == null || blockSel.Block.Id == 0;
+            // RayTraceForSelection sets blockSel to null when no block is hit.
+            // Line of sight is clear when nothing was intersected.
+            if (blockSel?.Block == null)
+            {
+                return true;
+            }
+
+            // If a block was hit, LOS is only clear if it's air (Id 0).
+            return blockSel.Block.Id == 0;
         }
         catch
         {

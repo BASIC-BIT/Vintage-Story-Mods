@@ -9,6 +9,19 @@ public enum ChatTypingIndicatorState : byte
     ChatOpenComposing = 2,
     Typing = 3,
 }
+
+/// <summary>
+/// Controls what the typing indicator displays above player heads.
+/// </summary>
+public enum TypingIndicatorDisplayMode : byte
+{
+    /// <summary>Icon only (default). Uses the VTML icon from lang keys.</summary>
+    Icon = 0,
+    /// <summary>Text label only (e.g. "Typing...", "Composing...", "...").</summary>
+    Text = 1,
+    /// <summary>Both icon and text label side by side.</summary>
+    Both = 2,
+}
  
 [ProtoContract]
 public class ChatTypingStateMessage
