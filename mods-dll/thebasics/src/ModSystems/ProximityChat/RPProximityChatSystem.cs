@@ -127,7 +127,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             API.ChatCommands.GetOrCreate("rptext")
                 .WithDescription(Lang.Get("thebasics:chat-cmd-rptext-desc"))
                 .WithArgs(new BoolArgParser("mode", "on", false))
-                .RequiresPrivilege(Privilege.chat)
+                .RequiresPrivilege(Config.RPTextTogglePermission)
                 .RequiresPlayer()
                 .HandleWith(RpTextEnabled);
 
