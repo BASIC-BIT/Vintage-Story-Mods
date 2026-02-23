@@ -118,6 +118,7 @@
   "chat-ooc-set": "OOC chat mode {0}.",
   "chat-ooc-enabled": "enabled",
   "chat-ooc-disabled-label": "disabled",
+  "chat-gooc-disabled": "Global OOC is disabled on this server.",
 
   "chat-nickreset-notify": "Your nickname '{0}' has been reset because player '{1}' joined the server.",
   "chat-nickrequirement-warning": "You need a nickname to use proximity chat! You can set it with `/nick MyName`",

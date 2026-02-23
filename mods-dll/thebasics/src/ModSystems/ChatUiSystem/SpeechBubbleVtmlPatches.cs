@@ -91,8 +91,8 @@ public static class SpeechBubbleVtmlPatches
 
             // Bubble text comes from the data payload.
             // When this patch is enabled, the server may attach an optional kind marker for styling:
-            //   New (preferred): from:<id>,msg\u001fkind=<emote|env>:<text>
-            //   Legacy:          from:<id>,msg:<text>\u001fkind:<emote|env>
+            //   New (preferred): from:<id>,msg\u001fkind=<emote|env|ooc>:<text>
+            //   Legacy:          from:<id>,msg:<text>\u001fkind:<emote|env|ooc>
             var rawMsg = parttwo[1];
             string kind = null;
 
@@ -194,6 +194,11 @@ public static class SpeechBubbleVtmlPatches
         {
             bg.BorderWidth = 2;
             bg.BorderColor = ColorUtil.Hex2Doubles("#E6C686");
+        }
+        else if (kind == "ooc")
+        {
+            bg.BorderWidth = 2;
+            bg.BorderColor = ColorUtil.Hex2Doubles("#B6D9A2");
         }
 
         return bg;
