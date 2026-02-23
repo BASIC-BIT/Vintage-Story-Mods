@@ -173,7 +173,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
         return displayMode switch
         {
             TypingIndicatorDisplayMode.Text => textLabel,
-            TypingIndicatorDisplayMode.Both => $"{Lang.Get(iconKey)} {textLabel}",
+            TypingIndicatorDisplayMode.Both => $"{Lang.Get(iconKey)}\u2009{textLabel}",
             _ => Lang.Get(iconKey), // Icon (default)
         };
     }
@@ -214,7 +214,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
         var bg = new TextBackground
         {
-            Padding = 3,
+            Padding = 5,
             Radius = GuiStyle.ElementBGRadius,
             FillColor = new[]
             {
@@ -223,13 +223,8 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 GuiStyle.DialogLightBgColor[2],
                 0.85
             },
-            BorderWidth = state == ChatTypingIndicatorState.ChatOpenEmpty ? 0 : 2,
-            BorderColor = state switch
-            {
-                ChatTypingIndicatorState.Typing => ColorUtil.Hex2Doubles("#E6C686"),
-                ChatTypingIndicatorState.ChatOpenComposing => ColorUtil.Hex2Doubles("#A0AAB8"),
-                _ => ColorUtil.Hex2Doubles("#AAAAAA")
-            }
+            BorderWidth = 2,
+            BorderColor = ColorUtil.Hex2Doubles("#CFBA96")
         };
 
         // Use a slightly larger font so icons are clearly visible at distance.
