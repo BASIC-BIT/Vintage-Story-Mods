@@ -124,7 +124,7 @@ namespace thebasics.ModSystems.PlayerStats
                 {
                     Status = EnumCommandStatus.Success,
                     StatusMessage =
-                        $"Are you SURE you want to clear this players stats? Type \"/clearstats {targetName} confirm\" to confirm.",
+                        $"Are you SURE you want to clear this player's stats? Type \"/clearstats {targetName} confirm\" to confirm.",
                 };
             }
             
@@ -188,7 +188,7 @@ namespace thebasics.ModSystems.PlayerStats
                 {
                     Status = EnumCommandStatus.Success,
                     StatusMessage =
-                        $"Are you SURE you want to clear this players stat? Type \"/clearstat {targetName} {statName} confirm\" to confirm.",
+                        $"Are you SURE you want to clear this player's stat? Type \"/clearstat {targetName} {statName} confirm\" to confirm.",
                 };
             }
 

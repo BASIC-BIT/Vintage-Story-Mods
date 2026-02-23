@@ -178,11 +178,23 @@ public sealed class TypingIndicatorRenderer : IRenderer
         };
     }
 
+    // Purge stale LOS cache entries periodically to prevent unbounded growth.
+    private const long PurgeIntervalMs = 10_000;
+    private const long StaleThresholdMs = 5_000;
+    private long _nextPurgeMs;
+
     private bool CanSeeCached(IWorldAccessor world, long nowMs, Entity observer, Entity target)
     {
         if (world == null || observer == null || target == null)
         {
             return false;
+        }
+
+        // Periodic cache cleanup.
+        if (nowMs >= _nextPurgeMs)
+        {
+            _nextPurgeMs = nowMs + PurgeIntervalMs;
+            PurgeStaleEntries(nowMs);
         }
 
         // If the cache is stale or missing, recompute.
@@ -196,6 +208,27 @@ public sealed class TypingIndicatorRenderer : IRenderer
         }
 
         return entry.canSee;
+    }
+
+    private void PurgeStaleEntries(long nowMs)
+    {
+        List<long> toRemove = null;
+        foreach (var kvp in _losCache)
+        {
+            if (nowMs - kvp.Value.nextCheckMs > StaleThresholdMs)
+            {
+                toRemove ??= new List<long>();
+                toRemove.Add(kvp.Key);
+            }
+        }
+
+        if (toRemove != null)
+        {
+            foreach (var key in toRemove)
+            {
+                _losCache.Remove(key);
+            }
+        }
     }
 
     private LoadedTexture GetOrCreateTexture(string text, ChatTypingIndicatorState state, TypingIndicatorDisplayMode displayMode)

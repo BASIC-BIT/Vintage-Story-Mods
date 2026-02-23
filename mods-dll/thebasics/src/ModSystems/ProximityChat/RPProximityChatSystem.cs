@@ -916,8 +916,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        consumed.value = true;
-
         try
         {
             // Extract the content from the full message
@@ -926,6 +924,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
             {
                 return;
             }
+
+            // Only consume after we've validated the message — if our pipeline fails,
+            // vanilla chat handles the message instead of silently swallowing it.
+            consumed.value = true;
 
             // Create a player chat context
             var context = new MessageContext

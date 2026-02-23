@@ -76,6 +76,13 @@ public static class SpeechBubbleVtmlPatches
                 return true;
             }
 
+            // Validate the second segment is a message payload (starts with "msg").
+            // Other payload types (if any) should not be treated as bubble text.
+            if (!parttwo[0].StartsWith("msg", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
             int.TryParse(partone[1], out var entityid);
             if (entity.EntityId != entityid)
             {
@@ -291,11 +298,24 @@ public static class SpeechBubbleLosPatches
         }
     }
 
+    // Purge stale LOS cache entries every ~10 seconds to prevent unbounded growth
+    // when entities despawn or disconnect during long play sessions.
+    private const long PurgeIntervalMs = 10_000;
+    private const long StaleThresholdMs = 5_000;
+    private static long _nextPurgeMs;
+
     private static bool CanSeeCached(IWorldAccessor world, long nowMs, Entity observer, Entity target)
     {
         if (world == null || observer == null || target == null)
         {
             return false;
+        }
+
+        // Periodic cache cleanup.
+        if (nowMs >= _nextPurgeMs)
+        {
+            _nextPurgeMs = nowMs + PurgeIntervalMs;
+            PurgeStaleEntries(nowMs);
         }
 
         if (!_losCache.TryGetValue(target.EntityId, out var entry) || nowMs >= entry.nextCheckMs)
@@ -307,5 +327,27 @@ public static class SpeechBubbleLosPatches
         }
 
         return entry.canSee;
+    }
+
+    private static void PurgeStaleEntries(long nowMs)
+    {
+        List<long> toRemove = null;
+        foreach (var kvp in _losCache)
+        {
+            // An entry is stale if its next-check time has long passed (entity no longer being rendered).
+            if (nowMs - kvp.Value.nextCheckMs > StaleThresholdMs)
+            {
+                toRemove ??= new List<long>();
+                toRemove.Add(kvp.Key);
+            }
+        }
+
+        if (toRemove != null)
+        {
+            foreach (var key in toRemove)
+            {
+                _losCache.Remove(key);
+            }
+        }
     }
 }

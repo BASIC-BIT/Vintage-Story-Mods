@@ -634,6 +634,13 @@ public class ChatUiSystem : ModSystem
             _pendingConfigActions.Clear();
             _safeNetworkChannel?.Dispose();
             _safeNetworkChannel = null;
+
+            // Clear static typing indicator state to prevent stale data on reconnect/world reload.
+            _typingStatesByEntityId.Clear();
+            _lastSentTypingState = null;
+            _lastChatInputText = null;
+            _lastChatInputChangeMs = 0;
+            _lastClientChannelConnected = false;
         }
         catch (System.Exception e)
         {
@@ -776,7 +783,7 @@ public class ChatUiSystem : ModSystem
     private static void ForceLocalTypingState(ChatTypingIndicatorState state)
     {
         // Best-effort: do not throw or spam retries for an ephemeral state.
-        var connected = _clientConfigChannel?.Connected == true;
+        var connected = _clientConfigChannel?.Connected ?? false;
         if (!connected)
         {
             _lastClientChannelConnected = false;
