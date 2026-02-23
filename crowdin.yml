@@ -1,3 +1,11 @@
 files:
   - source: /mods-dll/thebasics/assets/thebasics/lang/en.json
     translation: /mods-dll/thebasics/assets/thebasics/lang/%two_letters_code%.json
+    languages_mapping:
+      two_letters_code:
+        zh-CN: zh-cn
+        zh-TW: zh-tw
+        pt-BR: pt-br
+        pt-PT: pt-pt
+        es-ES: es-es
+        sv-SE: sv-se
