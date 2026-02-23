@@ -164,7 +164,7 @@ namespace thebasics.Utilities
                         
                         // Notify the affected player
                         serverPlayer.SendMessage(GlobalConstants.GeneralChatGroup, 
-                            $"Your nickname '{existingNickname}' has been reset because player '{joiningPlayer.PlayerName}' joined the server.", 
+                            Lang.Get("thebasics:chat-nickreset-notify", existingNickname, joiningPlayer.PlayerName), 
                             EnumChatType.Notification);
                     }
                 }

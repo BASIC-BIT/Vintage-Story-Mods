@@ -9,6 +9,7 @@ using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.PlayerStats
@@ -30,20 +31,20 @@ namespace thebasics.ModSystems.PlayerStats
         {
             API.ChatCommands.GetOrCreate("playerstats")
                 .WithAlias("pstats")
-                .WithDescription("Get your player stats, or another players")
+                .WithDescription(Lang.Get("thebasics:stats-cmd-playerstats-desc"))
                 .RequiresPrivilege(Privilege.chat)
                 .WithArgs(new PlayersArgParser("player", API, false))
                 .HandleWith(GetStats);
 
             API.ChatCommands.GetOrCreate("clearstats")
-                .WithDescription("Clear a players stats")
+                .WithDescription(Lang.Get("thebasics:stats-cmd-clearstats-desc"))
                 .RequiresPrivilege(Config.PlayerStatClearPermission)
                 .WithArgs(new PlayersArgParser("player", API, true),
                     new WordArgParser("confirm", false))
                 .HandleWith(ClearStats);
 
             API.ChatCommands.GetOrCreate("clearstat")
-                .WithDescription("Clear a specific stat on a player")
+                .WithDescription(Lang.Get("thebasics:stats-cmd-clearstat-desc"))
                 .RequiresPrivilege(Config.PlayerStatClearPermission)
                 .WithArgs(new PlayersArgParser("player", API, true),
                     new WordArgParser("statName", true),
@@ -114,7 +115,7 @@ namespace thebasics.ModSystems.PlayerStats
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Cannot clear stats for '{targetName}' - player must be online.",
+                    StatusMessage = Lang.Get("thebasics:stats-error-player-offline", targetName),
                 };
             }
 
@@ -123,8 +124,7 @@ namespace thebasics.ModSystems.PlayerStats
                 return new TextCommandResult()
                 {
                     Status = EnumCommandStatus.Success,
-                    StatusMessage =
-                        $"Are you SURE you want to clear this player's stats? Type \"/clearstats {targetName} confirm\" to confirm.",
+                    StatusMessage = Lang.Get("thebasics:stats-confirm-clearstats", targetName),
                 };
             }
             
@@ -132,7 +132,7 @@ namespace thebasics.ModSystems.PlayerStats
             return new TextCommandResult()
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {targetName} stats cleared.",
+                StatusMessage = Lang.Get("thebasics:stats-success-cleared-all", targetName),
             };
         }
 
@@ -164,7 +164,7 @@ namespace thebasics.ModSystems.PlayerStats
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Cannot clear stats for '{targetName}' - player must be online.",
+                    StatusMessage = Lang.Get("thebasics:stats-error-player-offline", targetName),
                 };
             }
 
@@ -178,7 +178,7 @@ namespace thebasics.ModSystems.PlayerStats
                 return new TextCommandResult()
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Cannot find stat '{statName}'. Valid stats: {statNames}. IDs: {statIds}.",
+                    StatusMessage = Lang.Get("thebasics:stats-error-stat-not-found", statName, statNames, statIds),
                 };
             }
             
@@ -187,8 +187,7 @@ namespace thebasics.ModSystems.PlayerStats
                 return new TextCommandResult()
                 {
                     Status = EnumCommandStatus.Success,
-                    StatusMessage =
-                        $"Are you SURE you want to clear this player's stat? Type \"/clearstat {targetName} {statName} confirm\" to confirm.",
+                    StatusMessage = Lang.Get("thebasics:stats-confirm-clearstat", targetName, statName),
                 };
             }
 
@@ -196,7 +195,7 @@ namespace thebasics.ModSystems.PlayerStats
             return new TextCommandResult()
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {targetName} stat {statName} cleared.",
+                StatusMessage = Lang.Get("thebasics:stats-success-cleared-one", targetName, statName),
             };
         }
 
@@ -211,7 +210,7 @@ namespace thebasics.ModSystems.PlayerStats
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "You must be a player to use this command.",
+                    StatusMessage = Lang.Get("thebasics:stats-error-must-be-player"),
                 };
             }
 
@@ -220,7 +219,7 @@ namespace thebasics.ModSystems.PlayerStats
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Cannot find player.",
+                    StatusMessage = Lang.Get("thebasics:stats-error-player-not-found"),
                 };
             }
             var targetPlayer = isOtherPlayer ? API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid) : player;
@@ -230,20 +229,20 @@ namespace thebasics.ModSystems.PlayerStats
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Cannot find player.",
+                    StatusMessage = Lang.Get("thebasics:stats-error-player-not-found"),
                 };
             }
             
             var message = new StringBuilder();
-            message.Append(isOtherPlayer ? ChatHelper.Build(targetPlayer.PlayerName, "'s") : "Your");
-            message.Append(" Stats:");
+            message.Append(isOtherPlayer ? Lang.Get("thebasics:stats-header-other", targetPlayer.PlayerName) : Lang.Get("thebasics:stats-header-own"));
 
             foreach (var stat in StatTypes.Types)
             {
                 if (Config.PlayerStatEnabled(stat.Key))
                 {
                     var statValue = targetPlayer.GetPlayerStat(stat.Key);
-                    message.Append(ChatHelper.Build("\n", stat.Value.Title, ": ", statValue.ToString()));
+                    var statTitle = stat.Value.LangKey != null ? Lang.Get(stat.Value.LangKey) : stat.Value.Title;
+                    message.Append(ChatHelper.Build("\n", statTitle, ": ", statValue.ToString()));
                 }
             }
 

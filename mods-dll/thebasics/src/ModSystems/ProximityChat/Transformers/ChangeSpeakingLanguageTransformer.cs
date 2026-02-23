@@ -5,6 +5,7 @@ using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
@@ -129,8 +130,8 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
             {
                 context.SendingPlayer.SendMessage(
                     _chatSystem.ProximityChatId,
-                    $"Invalid language specifier \":{languageIdentifier}\".  Valid prefixes include: " + string.Join(", ",
-                        _languageSystem.GetAllLanguages(true, includeHidden: showHidden).Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang))),
+                    Lang.Get("thebasics:lang-error-invalid-with-list", languageIdentifier, string.Join(", ",
+                        _languageSystem.GetAllLanguages(true, includeHidden: showHidden).Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang)))),
                     EnumChatType.CommandError);
                 context.State = MessageContextState.STOP;
                 return context;
@@ -140,7 +141,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
             {
                 context.SendingPlayer.SendMessage(
                     _chatSystem.ProximityChatId,
-                    "You don't know that language!",
+                    Lang.Get("thebasics:lang-error-unknown-language"),
                     EnumChatType.CommandError);
                 context.State = MessageContextState.STOP;
                 return context;
@@ -152,7 +153,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                 context.SendingPlayer.SetDefaultLanguage(lang);
                 context.SendingPlayer.SendMessage(
                     _chatSystem.ProximityChatId,
-                    "You are now speaking " + lang.Name + ".",
+                    Lang.Get("thebasics:lang-success-now-speaking", lang.Name),
                     EnumChatType.CommandSuccess);
                 context.State = MessageContextState.STOP;
             } else {

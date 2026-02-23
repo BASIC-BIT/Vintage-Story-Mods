@@ -25,7 +25,7 @@ public class NicknameRequirementTransformer : MessageTransformerBase
         // Send nickname requirement warning directly to the player
         context.SendingPlayer.SendMessage(
             _chatSystem.ProximityChatId,
-            "You need a nickname to use proximity chat! You can set it with `/nick MyName`",
+            Lang.Get("thebasics:chat-nickrequirement-warning"),
             EnumChatType.CommandError
         );
         

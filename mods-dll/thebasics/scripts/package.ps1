@@ -62,14 +62,36 @@ if (-not (Test-Path $assetsDir)) {
 }
 
 # Create the mod zip file
+# Note: We use System.IO.Compression directly instead of Compress-Archive because
+# Compress-Archive creates zip entries with backslash separators on Windows, which
+# violates the ZIP spec (PKWARE 4.4.17 requires forward slashes). This causes asset
+# loading failures on Linux servers where VS expects forward-slash paths.
 try {
-    # Build list of items to include (only include assets if it exists)
-    $itemsToZip = @($modInfoFile, $dllFile, $pdbFile)
-    if (Test-Path $assetsDir) {
-        $itemsToZip += $assetsDir
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+    if (Test-Path $zipFile) { Remove-Item $zipFile -Force }
+
+    $zip = [System.IO.Compression.ZipFile]::Open($zipFile, [System.IO.Compression.ZipArchiveMode]::Create)
+
+    # Add root-level files
+    foreach ($file in @($modInfoFile, $dllFile, $pdbFile)) {
+        $entryName = [System.IO.Path]::GetFileName($file)
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file, $entryName) | Out-Null
     }
-    
-    Compress-Archive -Force -Path $itemsToZip -DestinationPath $zipFile
+
+    # Add assets directory recursively with forward-slash entry names
+    if (Test-Path $assetsDir) {
+        $assetsDirParent = Split-Path $assetsDir -Parent
+        Get-ChildItem -Path $assetsDir -Recurse -File | ForEach-Object {
+            $relativePath = $_.FullName.Substring($assetsDirParent.Length + 1)
+            $entryName = $relativePath -replace '\\', '/'
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entryName) | Out-Null
+        }
+    }
+
+    $zip.Dispose()
+
     $msg = "Successfully created mod package at $zipFile"
     Write-Host $msg
     "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
