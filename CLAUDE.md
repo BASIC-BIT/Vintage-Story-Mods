@@ -259,6 +259,17 @@ Start-Process 'D:\Games\Vintagestory\Vintagestory.exe' `
 The project uses standard C# compilation for type checking. No additional linting tools are configured.
 Run `dotnet build` to check for compilation errors.
 
+## Pre-Release QA
+
+Manual QA is required before merging PRs that touch client-side rendering, config behavior, Harmony patches, or client-server interactions. The full workflow is defined in `.opencode/skills/human-qa/SKILL.md`. Core principles:
+
+- **Risk-based triggering.** Consider what's robot-testable vs. human-testable, and effort vs. risk. Things that are hard to verify are usually easy to break.
+- **Cards, not vibes.** Every test is a numbered card with concrete steps, expected outcomes, and failure modes. No "does it look right?" — instead "type `hello`, observe a white-text bubble above Player2 that fades in ~4s."
+- **Strict verification.** Never check off a PR checklist item without the human explicitly describing what they observed. Push back on vague answers.
+- **Config-first batching.** Group cards by server config state to minimize restarts. Within a batch, group by feature area to minimize context-switching.
+- **Smart failure recovery.** After fixing a failed card, roll the re-test into the next batch when configs don't conflict, rather than adding an extra restart cycle.
+- **Discovery triage.** Pause after each batch to file GitHub issues for out-of-scope findings. Don't lose QA insights; don't let them block the PR either.
+
 ## Development Guidance
 
 - **Configuration Management**
