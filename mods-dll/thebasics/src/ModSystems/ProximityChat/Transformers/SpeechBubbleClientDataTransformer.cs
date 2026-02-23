@@ -69,8 +69,9 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
                 : delimiters.Quote;
             bubbleTextVtml = $"{quoteDelimiter.Start}{bubbleTextVtml}{quoteDelimiter.End}";
 
-            // Mirror chatbox: sign language speech is italicized.
-            if (languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
+            // Mirror chatbox: sign language speech is italicized (only when VTML override is active,
+            // otherwise vanilla bubbles would show literal <i> tags).
+            if (_config.OverrideSpeechBubblesWithRpText && languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
             {
                 bubbleTextVtml = ChatHelper.Italic(bubbleTextVtml);
             }
