@@ -12,6 +12,7 @@ namespace thebasics.ModSystems.PlayerStats.Definitions
                 {
                     Title = "Deaths",
                     ID = "DEATHS",
+                    LangKey = "thebasics:stats-title-deaths",
                 }
             },
             {
@@ -19,6 +20,7 @@ namespace thebasics.ModSystems.PlayerStats.Definitions
                 {
                     Title = "Player Kills",
                     ID = "KILLS_PLAYER",
+                    LangKey = "thebasics:stats-title-player-kills",
                 }
             },
             {
@@ -26,6 +28,7 @@ namespace thebasics.ModSystems.PlayerStats.Definitions
                 {
                     Title = "NPC Kills",
                     ID = "KILLS_NPC",
+                    LangKey = "thebasics:stats-title-npc-kills",
                 }
             },
             {
@@ -33,6 +36,7 @@ namespace thebasics.ModSystems.PlayerStats.Definitions
                 {
                     Title = "Block Breaks",
                     ID = "BLOCK_BREAKS",
+                    LangKey = "thebasics:stats-title-block-breaks",
                 }
             },
             {
@@ -40,6 +44,7 @@ namespace thebasics.ModSystems.PlayerStats.Definitions
                 {
                     Title = "Distance Travelled",
                     ID = "DISTANCE_TRAVELLED",
+                    LangKey = "thebasics:stats-title-distance-travelled",
                 }
             },
         };

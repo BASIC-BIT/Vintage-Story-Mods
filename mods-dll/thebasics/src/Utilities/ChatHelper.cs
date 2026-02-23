@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
 namespace thebasics.Utilities
@@ -116,7 +117,7 @@ namespace thebasics.Utilities
         
         public static string OnOff(bool value)
         {
-            return value ? "on" : "off";
+            return value ? Lang.Get("thebasics:util-on") : Lang.Get("thebasics:util-off");
         }
 
         public static string Build(params string[] values)

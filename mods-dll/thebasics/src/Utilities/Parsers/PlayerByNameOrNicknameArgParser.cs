@@ -29,7 +29,7 @@ namespace thebasics.Utilities.Parsers
 
         public override string GetSyntaxExplanation(string indent)
         {
-            return indent + GetSyntax() + " is the name, nickname, or uid of an online player.";
+            return Lang.Get("thebasics:parser-syntax-explanation", indent + GetSyntax());
         }
 
         public override object GetValue()
@@ -48,7 +48,7 @@ namespace thebasics.Utilities.Parsers
             
             if (string.IsNullOrEmpty(text))
             {
-                lastErrorMessage = "Missing player name or nickname";
+                lastErrorMessage = Lang.Get("thebasics:parser-error-missing-player");
                 
                 if (onReady != null)
                 {
@@ -84,7 +84,7 @@ namespace thebasics.Utilities.Parsers
                     }
                     else
                     {
-                        lastErrorMessage = "Missing closing quote. If you're trying to search for a player with nickname containing spaces, enclose it in quotes (e.g., \"player nickname\").";
+                        lastErrorMessage = Lang.Get("thebasics:parser-error-missing-quote");
                         
                         if (onReady != null)
                         {
@@ -152,7 +152,7 @@ namespace thebasics.Utilities.Parsers
             }
             
             // If we get here, no player with the given name or nickname was found
-            lastErrorMessage = Lang.Get("No online player with name or nickname '{0}' exists", text);
+            lastErrorMessage = Lang.Get("thebasics:parser-error-player-not-found", text);
             
             if (onReady != null)
             {

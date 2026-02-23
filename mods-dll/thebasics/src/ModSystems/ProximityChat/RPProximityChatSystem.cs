@@ -47,7 +47,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             {
                 API.ChatCommands.GetOrCreate("nickname")
                     .WithAlias("nick", "setnick")
-                    .WithDescription("Get or set your nickname")
+                    .WithDescription(Lang.Get("thebasics:chat-cmd-nickname-desc"))
                     .WithRootAlias("nick")
                     .WithArgs(new StringArgParser("new nickname", false))
                     .RequiresPrivilege(Privilege.chat)
@@ -55,7 +55,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     .HandleWith(SetNickname);
 
                 API.ChatCommands.GetOrCreate("clearnick")
-                    .WithDescription("Clear your nickname")
+                    .WithDescription(Lang.Get("thebasics:chat-cmd-clearnick-desc"))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(ClearNickname);
@@ -65,13 +65,13 @@ public class RPProximityChatSystem : BaseBasicModSystem
             {
                 API.ChatCommands.GetOrCreate("nickcolor")
                     .WithAlias("nicknamecolor", "nickcol")
-                    .WithDescription("Get or set nickname color")
+                    .WithDescription(Lang.Get("thebasics:chat-cmd-nickcolor-desc"))
                     .WithArgs(new ColorArgParser("new nickname color", false))
                     .RequiresPrivilege(Config.ChangeNicknameColorPermission)
                     .RequiresPlayer()
                     .HandleWith(HandleNicknameColor);
                 API.ChatCommands.GetOrCreate("clearnickcolor")
-                    .WithDescription("Clear your nickname color")
+                    .WithDescription(Lang.Get("thebasics:chat-cmd-clearnickcolor-desc"))
                     .RequiresPrivilege(Config.ChangeNicknameColorPermission)
                     .RequiresPlayer()
                     .HandleWith(ClearNicknameColor);
@@ -81,7 +81,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .WithAlias("adminsetnick")
                 .WithAlias("adminnick")
                 .WithAlias("adminnickname")
-                .WithDescription("Admin: Get or set another player's nickname. Use 'force' before the nickname to bypass conflict warnings.")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-adminsetnick-desc"))
                 .WithRootAlias("adminsetnick")
                 .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
                     API.ChatCommands.Parsers.OptionalWordRange("force flag", "force"),
@@ -91,7 +91,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             API.ChatCommands.GetOrCreate("adminsetnicknamecolor")
                 .WithAlias("adminsetnickcolor", "adminsetnickcol")
-                .WithDescription("Admin: Get or set another player's nickname color")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-adminsetnickcolor-desc"))
                 .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
                     new ColorArgParser("new nickname color", false))
                 .RequiresPrivilege(Privilege.commandplayer)
@@ -103,7 +103,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             API.ChatCommands.GetOrCreate("me")
                 .WithAlias("m")
-                .WithDescription("Send a proximity emote message")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-me-desc"))
                 .WithArgs(new StringArgParser("emote", true))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
@@ -111,35 +111,35 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             API.ChatCommands.GetOrCreate("it")
                 .WithAlias("do")
-                .WithDescription("Send a proximity environment message")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-it-desc"))
                 .WithArgs(new StringArgParser("envMessage", true))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(EnvironmentMessage);
 
             API.ChatCommands.GetOrCreate("emotemode")
-                .WithDescription("Turn Emote-only mode on or off")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-emotemode-desc"))
                 .WithArgs(new BoolArgParser("mode", "on", false))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(EmoteMode);
 
             API.ChatCommands.GetOrCreate("rptext")
-                .WithDescription("Turn the whole RP system on or off for your messages")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-rptext-desc"))
                 .WithArgs(new BoolArgParser("mode", "on", false))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(RpTextEnabled);
 
             API.ChatCommands.GetOrCreate("oocToggle")
-                .WithDescription("Toggle Out-Of-Character chat mode")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-ooctoggle-desc"))
                 .WithArgs(new BoolArgParser("mode", "on", false))
                 .RequiresPrivilege(Config.OOCTogglePermission)
                 .RequiresPlayer()
                 .HandleWith(OOCMode);
 
             API.ChatCommands.GetOrCreate("ooc")
-                .WithDescription("Send an Out-Of-Character message")
+                    .WithDescription(Lang.Get("thebasics:chat-cmd-ooc-desc"))
                 .WithArgs(new StringArgParser("message", true))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
@@ -148,7 +148,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             if(Config.EnableGlobalOOC)
             {
                 API.ChatCommands.GetOrCreate("gooc")
-                    .WithDescription("Send a Global Out-Of-Character message")
+                    .WithDescription(Lang.Get("thebasics:chat-cmd-gooc-desc"))
                     .WithArgs(new StringArgParser("message", true))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
@@ -159,7 +159,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // Always register basic chat mode commands
         API.ChatCommands.GetOrCreate("yell")
             .WithAlias("y")
-            .WithDescription("Set your chat mode to Yelling, or yell a single message")
+            .WithDescription(Lang.Get("thebasics:chat-cmd-yell-desc"))
             .WithArgs(new StringArgParser("message", false))
             .RequiresPrivilege(Privilege.chat)
             .RequiresPlayer()
@@ -167,7 +167,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         API.ChatCommands.GetOrCreate("say")
             .WithAlias("s", "normal")
-            .WithDescription("Set your chat mode back to normal, or say a single message")
+            .WithDescription(Lang.Get("thebasics:chat-cmd-say-desc"))
             .WithArgs(new StringArgParser("message", false))
             .RequiresPrivilege(Privilege.chat)
             .RequiresPlayer()
@@ -175,7 +175,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         API.ChatCommands.GetOrCreate("whisper")
             .WithAlias("w")
-            .WithDescription("Set your chat mode to Whispering, or whisper a single message")
+            .WithDescription(Lang.Get("thebasics:chat-cmd-whisper-desc"))
             .WithArgs(new StringArgParser("message", false))
             .RequiresPrivilege(Privilege.chat)
             .RequiresPlayer()
@@ -313,7 +313,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Error,
-                StatusMessage = "Cannot find player.",
+                StatusMessage = Lang.Get("thebasics:chat-error-player-not-found"),
             };
         }
         var oldNicknameColor = attemptTarget.GetNicknameColor();
@@ -325,7 +325,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Player {attemptTarget.PlayerName} does not have a nickname color!  You can set it with `/adminsetnickcolor {attemptTarget.PlayerName} NewColor`",
+                    StatusMessage = Lang.Get("thebasics:chat-nickcolor-admin-none", attemptTarget.PlayerName),
                 };
             }
 
@@ -333,7 +333,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {attemptTarget.PlayerName} nickname color is: {ChatHelper.Color(color, color)}",
+                StatusMessage = Lang.Get("thebasics:chat-nickcolor-admin-current", attemptTarget.PlayerName, ChatHelper.Color(color, color)),
             };
 
         }
@@ -345,7 +345,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Error,
-                StatusMessage = "Invalid color.",
+                StatusMessage = Lang.Get("thebasics:chat-error-invalid-color"),
             };
         }
 
@@ -355,7 +355,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = $"Player {attemptTarget.PlayerName} nickname color has been set to: {newColorHex}.  Old Nickname Color: {oldNicknameColor}",
+            StatusMessage = Lang.Get("thebasics:chat-nickcolor-admin-set", attemptTarget.PlayerName, newColorHex, oldNicknameColor),
         };
     }
 
@@ -369,7 +369,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "You don't have a color set! You can set it with `/nickcolor [color]`",
+                    StatusMessage = Lang.Get("thebasics:chat-nickcolor-none"),
                 };
             }
 
@@ -377,7 +377,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Your color is: {ChatHelper.Color(color, color)}",
+                StatusMessage = Lang.Get("thebasics:chat-nickcolor-current", ChatHelper.Color(color, color)),
             };
         }
 
@@ -388,7 +388,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Error,
-                StatusMessage = "Invalid color.",
+                StatusMessage = Lang.Get("thebasics:chat-error-invalid-color"),
             };
         }
         player.SetNicknameColor(colorHex);
@@ -397,7 +397,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = $"Color set to: {ChatHelper.Color(colorHex, colorHex)}",
+            StatusMessage = Lang.Get("thebasics:chat-nickcolor-set", ChatHelper.Color(colorHex, colorHex)),
         };
     }
 
@@ -613,7 +613,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
-                    StatusMessage = $"Your nickname is: {player.GetNicknameWithColor()}",
+                    StatusMessage = Lang.Get("thebasics:chat-nick-current", player.GetNicknameWithColor()),
                 };
             }
             else
@@ -621,7 +621,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "You don't have a nickname!  You can set it with `/nick MyName`",
+                    StatusMessage = Lang.Get("thebasics:chat-nick-none"),
                 };
             }
         }
@@ -635,7 +635,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"The nickname '{nickname}' is already taken by {conflictingPlayer} (as their {conflictType}). Please choose a different nickname.",
+                    StatusMessage = Lang.Get("thebasics:chat-nick-conflict", nickname, conflictingPlayer, conflictType),
                 };
             }
             
@@ -644,7 +644,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Okay, your nickname is set to {ChatHelper.Quote(VtmlUtils.EscapeVtml(nickname))}",
+                StatusMessage = Lang.Get("thebasics:chat-nick-set", ChatHelper.Quote(VtmlUtils.EscapeVtml(nickname))),
             };
         }
     }
@@ -657,7 +657,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Error,
-                StatusMessage = "Cannot find player.",
+                StatusMessage = Lang.Get("thebasics:chat-error-player-not-found"),
             };
         }
         var oldNickname = attemptTarget.GetNicknameWithColor();
@@ -673,14 +673,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Player {attemptTarget.PlayerName} does not have a nickname! You can set it with `/adminsetnick {attemptTarget.PlayerName} NewNickname`",
+                    StatusMessage = Lang.Get("thebasics:chat-nick-admin-no-nick", attemptTarget.PlayerName),
                 };
             }
 
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {attemptTarget.PlayerName} nickname is: {VtmlUtils.EscapeVtml(oldNickname)}",
+                StatusMessage = Lang.Get("thebasics:chat-nick-admin-current", attemptTarget.PlayerName, VtmlUtils.EscapeVtml(oldNickname)),
             };
         }
         else
@@ -695,9 +695,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     return new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
-                        StatusMessage = $"WARNING: The nickname '{newNickname}' conflicts with {conflictingPlayer} (as their {conflictType}). " +
-                                       $"This can cause confusion and weird behavior. Consider using a different nickname, or " +
-                                       $"if you really want to proceed, use `/adminsetnick {attemptTarget.PlayerName} force {newNickname}` to override this warning.",
+                        StatusMessage = Lang.Get("thebasics:chat-nick-admin-conflict-warn", newNickname, conflictingPlayer, conflictType, attemptTarget.PlayerName),
                     };
                 }
             }
@@ -705,11 +703,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
             attemptTarget.SetNickname(newNickname);
             SwapOutNameTag(attemptTarget);
 
-            string forceMessage = isForced ? " (FORCED - bypassed conflict warnings)" : "";
+            string forceMessage = isForced ? Lang.Get("thebasics:chat-nick-admin-forced") : "";
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {attemptTarget.PlayerName} nickname has been set to: {attemptTarget.GetNicknameWithColor()}.  Old Nickname: {VtmlUtils.EscapeVtml(oldNickname)}{forceMessage}",
+                StatusMessage = Lang.Get("thebasics:chat-nick-admin-set", attemptTarget.PlayerName, attemptTarget.GetNicknameWithColor(), VtmlUtils.EscapeVtml(oldNickname), forceMessage),
             };
         }
     }
@@ -770,7 +768,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = "Your nickname has been cleared.",
+            StatusMessage = Lang.Get("thebasics:chat-nick-cleared"),
         };
     }
 
@@ -782,7 +780,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = "Your color has been cleared.",
+            StatusMessage = Lang.Get("thebasics:chat-nickcolor-cleared"),
         };
     }
 
@@ -825,7 +823,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = $"Chat mode set to: {mode.ToString().ToLower()}",
+            StatusMessage = Lang.Get("thebasics:chat-chatmode-set", mode.ToString().ToLower()),
         };
     }
 
@@ -853,7 +851,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = $"Emote mode is now {ChatHelper.OnOff(emoteMode)}",
+            StatusMessage = Lang.Get("thebasics:chat-emotemode-set", ChatHelper.OnOff(emoteMode)),
         };
     }
 
@@ -866,7 +864,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = $"RP Text is now {ChatHelper.OnOff(rpTextEnabled)} for your messages.",
+            StatusMessage = Lang.Get("thebasics:chat-rptext-set", ChatHelper.OnOff(rpTextEnabled)),
         };
     }
 
@@ -877,7 +875,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Error,
-                StatusMessage = "OOC chat toggle is disabled on this server.",
+                StatusMessage = Lang.Get("thebasics:chat-ooc-disabled"),
             };
         }
 
@@ -888,7 +886,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = $"OOC chat mode {(newMode ? "enabled" : "disabled")}.",
+            StatusMessage = Lang.Get("thebasics:chat-ooc-set", newMode ? Lang.Get("thebasics:chat-ooc-enabled") : Lang.Get("thebasics:chat-ooc-disabled-label")),
         };
     }
 

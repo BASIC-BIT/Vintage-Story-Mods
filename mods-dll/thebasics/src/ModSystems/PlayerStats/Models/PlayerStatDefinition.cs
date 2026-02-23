@@ -4,5 +4,6 @@
     {
         public string Title;
         public string ID;
+        public string LangKey;
     }
 }

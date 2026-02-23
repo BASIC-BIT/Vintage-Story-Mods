@@ -1,6 +1,7 @@
 using System;
 using thebasics.Extensions;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.Repair
@@ -10,7 +11,7 @@ namespace thebasics.ModSystems.Repair
         protected override void BasicStartServerSide()
         {
             API.ChatCommands.GetOrCreate("setdurability")
-                .WithDescription("Sets the durability of the item held in your hand")
+                .WithDescription(Lang.Get("thebasics:repair-cmd-setdurability-desc"))
                 .RequiresPrivilege(Privilege.root)
                 .WithArgs(API.ChatCommands.Parsers.Int("durability"))
                 .RequiresPlayer()
@@ -30,7 +31,7 @@ namespace thebasics.ModSystems.Repair
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Nothing in active hands.",
+                    StatusMessage = Lang.Get("thebasics:repair-error-nothing-in-hand"),
                 };
             }
 
@@ -40,7 +41,7 @@ namespace thebasics.ModSystems.Repair
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Cannot set durability on blocks.",
+                    StatusMessage = Lang.Get("thebasics:repair-error-is-block"),
                 };
             }
 
@@ -50,7 +51,7 @@ namespace thebasics.ModSystems.Repair
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Held item does not have durability.",
+                    StatusMessage = Lang.Get("thebasics:repair-error-no-durability"),
                 };
             }
 
@@ -63,7 +64,7 @@ namespace thebasics.ModSystems.Repair
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Item durability set to {durability}.",
+                StatusMessage = Lang.Get("thebasics:repair-success-set", durability),
             };
         }
     }

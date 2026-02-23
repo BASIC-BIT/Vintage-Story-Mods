@@ -57,11 +57,11 @@ namespace thebasics.ModSystems.TPA
         private string FormatTimeRemaining(TimeSpan time)
         {
             if (time.TotalSeconds <= 0)
-                return "expired";
+                return Lang.Get("thebasics:tpa-time-expired");
                 
             return time.TotalMinutes >= 1 
-                ? $"{(int)time.TotalMinutes}m {time.Seconds}s" 
-                : $"{time.Seconds}s";
+                ? Lang.Get("thebasics:tpa-time-minutes-seconds", (int)time.TotalMinutes, time.Seconds) 
+                : Lang.Get("thebasics:tpa-time-seconds", time.Seconds);
         }
         
         private SimpleParticleProperties GetTpaRequestParticles(IServerPlayer player)
@@ -132,7 +132,7 @@ namespace thebasics.ModSystems.TPA
                 slot.Itemstack = itemStack;
                 slot.MarkDirty();
                 player.SendMessage(GlobalConstants.CurrentChatGroup,
-                    "Your temporal gear has been returned to your hand.",
+                    Lang.Get("thebasics:tpa-notify-gear-returned-hand"),
                     EnumChatType.Notification);
                 return true;
             }
@@ -176,7 +176,7 @@ namespace thebasics.ModSystems.TPA
             // Priority 3: Drop it on the ground as last resort
             API.World.SpawnItemEntity(temporalGearStack, player.Entity.Pos.XYZ);
             player.SendMessage(GlobalConstants.CurrentChatGroup,
-                "Your temporal gear has been dropped on the ground since your inventory and hands are full.",
+                Lang.Get("thebasics:tpa-notify-gear-dropped"),
                 EnumChatType.Notification);
             return true;
         }
@@ -209,7 +209,7 @@ namespace thebasics.ModSystems.TPA
             if (reason == TpaExpireReason.Timeout && targetPlayer != null)
             {
                 targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup,
-                    $"TPA request from {requestingPlayer.PlayerName} has timed out.",
+                    Lang.Get("thebasics:tpa-notify-timeout", requestingPlayer.PlayerName),
                     EnumChatType.Notification);
             }
 
@@ -223,12 +223,12 @@ namespace thebasics.ModSystems.TPA
         {
             string baseMessage = reason switch
             {
-                TpaExpireReason.Timeout => $"Your TPA request to {targetPlayerName} has timed out.",
-                TpaExpireReason.Denied => "Your teleport request has been denied!",
-                TpaExpireReason.Cleared => "Your TPA request was cleared.",
-                TpaExpireReason.PlayerRejoin => "Your temporal gear from a timed-out TPA request has been returned!",
-                TpaExpireReason.Cancelled => $"Your TPA request to {targetPlayerName} has been cancelled.",
-                _ => "Your TPA request has been cancelled."
+                TpaExpireReason.Timeout => Lang.Get("thebasics:tpa-expire-timeout", targetPlayerName),
+                TpaExpireReason.Denied => Lang.Get("thebasics:tpa-expire-denied"),
+                TpaExpireReason.Cleared => Lang.Get("thebasics:tpa-expire-cleared"),
+                TpaExpireReason.PlayerRejoin => Lang.Get("thebasics:tpa-expire-player-rejoin"),
+                TpaExpireReason.Cancelled => Lang.Get("thebasics:tpa-expire-cancelled", targetPlayerName),
+                _ => Lang.Get("thebasics:tpa-expire-default")
             };
 
             // Append gear return status if applicable
@@ -236,11 +236,11 @@ namespace thebasics.ModSystems.TPA
             {
                 if (gearReturned)
                 {
-                    baseMessage += " Your temporal gear has been returned.";
+                    baseMessage += Lang.Get("thebasics:tpa-expire-gear-returned");
                 }
                 else
                 {
-                    baseMessage += " Failed to return your temporal gear. (this is probably a mod bug, report this!)";
+                    baseMessage += Lang.Get("thebasics:tpa-expire-gear-failed");
                 }
             }
 
@@ -293,57 +293,57 @@ namespace thebasics.ModSystems.TPA
             {
                 // Register player join event to return owed temporal gears
                 API.Event.PlayerJoin += OnPlayerJoin;
-                API.Permissions.RegisterPrivilege("tpa", "Ability to use the /tpa and /tpahere commands");
+                API.Permissions.RegisterPrivilege("tpa", Lang.Get("thebasics:tpa-privilege-desc"));
 
                 API.ChatCommands.GetOrCreate("tpa")
-                    .WithDescription("Request a teleport to another player")
+                    .WithDescription(Lang.Get("thebasics:tpa-cmd-tpa-desc"))
                     .RequiresPrivilege(Config.AllowTpaPrivilegeByDefault ? Privilege.chat : "tpa")
                     .WithArgs(new PlayersArgParser("player", API, true))
                     .RequiresPlayer()
                     .HandleWith(HandleTpa);
 
                 API.ChatCommands.GetOrCreate("tpahere")
-                    .WithDescription("Request to teleport another player to you")
+                    .WithDescription(Lang.Get("thebasics:tpa-cmd-tpahere-desc"))
                     .RequiresPrivilege(Config.AllowTpaPrivilegeByDefault ? Privilege.chat : "tpa")
                     .WithArgs(new PlayersArgParser("player", API, true))
                     .RequiresPlayer()
                     .HandleWith(HandleTpaHere);
 
                 API.ChatCommands.GetOrCreate("tpaccept")
-                    .WithDescription("Accept a teleport request. Specify player name/nickname if you have multiple requests")
+                    .WithDescription(Lang.Get("thebasics:tpa-cmd-tpaccept-desc"))
                     .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpAccept);
 
                 API.ChatCommands.GetOrCreate("tpdeny")
-                    .WithDescription("Deny a teleport request. Specify player name/nickname if you have multiple requests")
+                    .WithDescription(Lang.Get("thebasics:tpa-cmd-tpdeny-desc"))
                     .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpDeny);
                     
                 API.ChatCommands.GetOrCreate("tpalist")
-                    .WithDescription("List all incoming teleport requests")
+                    .WithDescription(Lang.Get("thebasics:tpa-cmd-tpalist-desc"))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpaList);
 
                 API.ChatCommands.GetOrCreate("tpallow")
-                    .WithDescription("Allow or deny all teleport requests from other players")
+                    .WithDescription(Lang.Get("thebasics:tpa-cmd-tpallow-desc"))
                     .WithArgs(new BoolArgParser("allow", "on", true))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpAllow);
 
                 API.ChatCommands.GetOrCreate("cleartpa")
-                    .WithDescription("Clear all incoming TPA requests")
+                    .WithDescription(Lang.Get("thebasics:tpa-cmd-cleartpa-desc"))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpaClear);
 
                 API.ChatCommands.GetOrCreate("tpacancel")
-                    .WithDescription("Cancel your outgoing teleport request")
+                    .WithDescription(Lang.Get("thebasics:tpa-cmd-tpacancel-desc"))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpaCancel);
@@ -396,7 +396,7 @@ namespace thebasics.ModSystems.TPA
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Cannot find player.",
+                    StatusMessage = Lang.Get("thebasics:tpa-error-player-not-found"),
                 };
             }
             
@@ -414,8 +414,7 @@ namespace thebasics.ModSystems.TPA
                     return new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
-                        StatusMessage =
-                            "You must hold a temporal gear to initiate a teleport request. (This will consume it)",
+                        StatusMessage = Lang.Get("thebasics:tpa-error-need-temporal-gear"),
                     };
                 }
             }
@@ -428,7 +427,7 @@ namespace thebasics.ModSystems.TPA
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Please wait {hoursString} hours between teleport requests.",
+                    StatusMessage = Lang.Get("thebasics:tpa-error-cooldown", hoursString),
                 };
             }
 
@@ -438,7 +437,7 @@ namespace thebasics.ModSystems.TPA
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "You cannot /tpa to yourself!",
+                    StatusMessage = Lang.Get("thebasics:tpa-error-self-teleport"),
                 };
             }
 
@@ -448,7 +447,7 @@ namespace thebasics.ModSystems.TPA
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Player has teleport requests from other players disabled.",
+                    StatusMessage = Lang.Get("thebasics:tpa-error-target-disabled"),
                 };
             }
 
@@ -466,13 +465,13 @@ namespace thebasics.ModSystems.TPA
                 
                 // Build informative message
                 var requestTypeStr = existingRequest.Type == TpaRequestType.Goto 
-                    ? "teleport to" 
-                    : "bring";
+                    ? Lang.Get("thebasics:tpa-error-existing-request-goto") 
+                    : Lang.Get("thebasics:tpa-error-existing-request-bring");
                     
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"You already have an outgoing request to {requestTypeStr} {existingTargetName} (expires in {timeString}). Use /tpacancel to cancel it.",
+                    StatusMessage = Lang.Get("thebasics:tpa-error-existing-request", requestTypeStr, existingTargetName, timeString),
                 };
             }
 
@@ -484,7 +483,7 @@ namespace thebasics.ModSystems.TPA
                     return new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
-                        StatusMessage = "Failed to consume temporal gear. Please try again.",
+                        StatusMessage = Lang.Get("thebasics:tpa-error-consume-gear-failed"),
                     };
                 }
             }
@@ -493,14 +492,13 @@ namespace thebasics.ModSystems.TPA
 
             var requestMessage = new StringBuilder();
 
-            requestMessage.Append(player.PlayerName);
             if (type == TpaRequestType.Bring)
             {
-                requestMessage.Append(" has requested to bring you to them.");
+                requestMessage.Append(Lang.Get("thebasics:tpa-notify-request-bring", player.PlayerName));
             }
             else if (type == TpaRequestType.Goto)
             {
-                requestMessage.Append(" has requested to teleport to you.");
+                requestMessage.Append(Lang.Get("thebasics:tpa-notify-request-goto", player.PlayerName));
             }
 
             // Check if target has multiple requests to suggest using /tpalist
@@ -508,11 +506,11 @@ namespace thebasics.ModSystems.TPA
             
             if (existingRequests.Count > 0)  // Will be > 0 after this request is stored
             {
-                requestMessage.Append(" Type `/tpalist` to see all requests, `/tpaccept` to accept, or `/tpdeny` to deny.");
+                requestMessage.Append(Lang.Get("thebasics:tpa-notify-request-hint-multiple"));
             }
             else
             {
-                requestMessage.Append(" Type `/tpaccept` to accept, or `/tpdeny` to deny.");
+                requestMessage.Append(Lang.Get("thebasics:tpa-notify-request-hint-single"));
             }
 
             targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup, requestMessage.ToString(),
@@ -535,7 +533,7 @@ namespace thebasics.ModSystems.TPA
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Teleport request has been sent to {targetPlayer.PlayerName}.",
+                StatusMessage = Lang.Get("thebasics:tpa-success-request-sent", targetPlayer.PlayerName),
             };
         }
 
@@ -559,7 +557,7 @@ namespace thebasics.ModSystems.TPA
                     return (null, null, new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
-                        StatusMessage = $"No teleport request from {specifiedPlayerName} to {commandName}!",
+                        StatusMessage = Lang.Get("thebasics:tpa-error-no-request-from", specifiedPlayerName, commandName),
                     });
                 }
                 
@@ -575,7 +573,7 @@ namespace thebasics.ModSystems.TPA
                     return (null, null, new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
-                        StatusMessage = $"No teleport requests to {commandName}!",
+                        StatusMessage = Lang.Get("thebasics:tpa-error-no-requests", commandName),
                     });
                 }
                 else if (allRequests.Count == 1)
@@ -592,7 +590,7 @@ namespace thebasics.ModSystems.TPA
                     return (null, null, new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
-                        StatusMessage = $"You have multiple teleport requests from: {requesters}. Please specify which one to {commandName}: /tp{commandName} [player]",
+                        StatusMessage = Lang.Get("thebasics:tpa-error-multiple-requests", requesters, commandName),
                     });
                 }
             }
@@ -612,7 +610,7 @@ namespace thebasics.ModSystems.TPA
             if (error != null) return error;
 
             // Perform the teleport
-            targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup, "Your teleport request has been accepted!",
+            targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:tpa-notify-accepted"),
                 EnumChatType.CommandSuccess);
 
             if (request.Type == TpaRequestType.Goto)
@@ -632,7 +630,7 @@ namespace thebasics.ModSystems.TPA
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Teleported with {targetPlayer.PlayerName} successfully!",
+                StatusMessage = Lang.Get("thebasics:tpa-success-teleported", targetPlayer.PlayerName),
             };
         }
 
@@ -653,7 +651,7 @@ namespace thebasics.ModSystems.TPA
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"You have denied the teleport request from {targetPlayer.PlayerName}.",
+                StatusMessage = Lang.Get("thebasics:tpa-success-denied", targetPlayer.PlayerName),
             };
         }
 
@@ -666,7 +664,7 @@ namespace thebasics.ModSystems.TPA
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Teleport requests are now {(value ? "allowed" : "disallowed")}).",
+                StatusMessage = value ? Lang.Get("thebasics:tpa-success-allow-on") : Lang.Get("thebasics:tpa-success-allow-off"),
             };
         }
 
@@ -682,7 +680,7 @@ namespace thebasics.ModSystems.TPA
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
-                    StatusMessage = "No teleport requests to clear.",
+                    StatusMessage = Lang.Get("thebasics:tpa-error-no-requests-to-clear"),
                 };
             }
             
@@ -694,8 +692,8 @@ namespace thebasics.ModSystems.TPA
             }
             
             var message = allRequests.Count == 1 
-                ? "Teleport request has been cleared." 
-                : $"{allRequests.Count} teleport requests have been cleared.";
+                ? Lang.Get("thebasics:tpa-success-cleared-one") 
+                : Lang.Get("thebasics:tpa-success-cleared-many", allRequests.Count);
             
             return new TextCommandResult
             {
@@ -717,7 +715,7 @@ namespace thebasics.ModSystems.TPA
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
-                    StatusMessage = "No outgoing teleport request to cancel.",
+                    StatusMessage = Lang.Get("thebasics:tpa-error-no-outgoing"),
                 };
             }
             
@@ -731,14 +729,14 @@ namespace thebasics.ModSystems.TPA
             if (targetPlayer != null)
             {
                 targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup,
-                    $"{GetPlayerDisplayName(player)} has cancelled their teleport request.",
+                    Lang.Get("thebasics:tpa-notify-target-cancelled", GetPlayerDisplayName(player)),
                     EnumChatType.Notification);
             }
             
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = "Your teleport request has been cancelled.",
+                StatusMessage = Lang.Get("thebasics:tpa-success-cancelled"),
             };
         }
         
@@ -754,17 +752,17 @@ namespace thebasics.ModSystems.TPA
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
-                    StatusMessage = "You have no incoming teleport requests.",
+                    StatusMessage = Lang.Get("thebasics:tpa-list-empty"),
                 };
             }
             
             var requestList = new StringBuilder();
-            requestList.AppendLine($"You have {allRequests.Count} incoming teleport request(s):");
+            requestList.AppendLine(Lang.Get("thebasics:tpa-list-header", allRequests.Count));
             
             foreach (var (requester, request) in allRequests)
             {
                 var requesterDisplay = GetPlayerDisplayName(requester);
-                var requestType = request.Type == TpaRequestType.Goto ? "wants to teleport to you" : "wants to bring you to them";
+                var requestType = request.Type == TpaRequestType.Goto ? Lang.Get("thebasics:tpa-list-item-goto") : Lang.Get("thebasics:tpa-list-item-bring");
                 
                 // Calculate time remaining if timeout is enabled
                 if (Config.TpaUseTimeout)
@@ -775,21 +773,21 @@ namespace thebasics.ModSystems.TPA
                     
                     if (timeRemaining.TotalSeconds > 0)
                     {
-                        requestList.AppendLine($"- {requesterDisplay} {requestType} (expires in {timeString})");
+                        requestList.AppendLine(Lang.Get("thebasics:tpa-list-item-expires", requesterDisplay, requestType, timeString));
                     }
                     else
                     {
                         // This shouldn't happen as expired requests are filtered, but just in case
-                        requestList.AppendLine($"- {requesterDisplay} {requestType} ({timeString})");
+                        requestList.AppendLine(Lang.Get("thebasics:tpa-list-item", requesterDisplay, requestType));
                     }
                 }
                 else
                 {
-                    requestList.AppendLine($"- {requesterDisplay} {requestType}");
+                    requestList.AppendLine(Lang.Get("thebasics:tpa-list-item", requesterDisplay, requestType));
                 }
             }
             
-            requestList.AppendLine("Use /tpaccept [player] or /tpdeny [player] to respond.");
+            requestList.AppendLine(Lang.Get("thebasics:tpa-list-footer"));
             
             return new TextCommandResult
             {
