@@ -20,14 +20,26 @@ namespace thebasics.ModSystems.SaveNotifications
 
         private void Event_GameWorldSave()
         {
-            API.SendMessageToGroup(GlobalConstants.GeneralChatGroup, this.Config.TEXT_ServerSaveAnnouncement,
-                EnumChatType.Notification);
+            if (Config.SendServerSaveAnnouncement)
+            {
+                var chatType = Config.ServerSaveAnnouncementAsNotification
+                    ? EnumChatType.Notification
+                    : EnumChatType.OthersMessage;
+
+                API.SendMessageToGroup(GlobalConstants.GeneralChatGroup, Config.TEXT_ServerSaveAnnouncement, chatType);
+            }
         }
 
         private void Event_SaveFinished()
         {
-            API.SendMessageToGroup(GlobalConstants.GeneralChatGroup, this.Config.TEXT_ServerSaveFinished,
-                EnumChatType.Notification);
+            if (Config.SendServerSaveFinishedAnnouncement)
+            {
+                var chatType = Config.ServerSaveFinishedAsNotification
+                    ? EnumChatType.Notification
+                    : EnumChatType.OthersMessage;
+
+                API.SendMessageToGroup(GlobalConstants.GeneralChatGroup, Config.TEXT_ServerSaveFinished, chatType);
+            }
         }
     }
 }

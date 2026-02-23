@@ -1,4 +1,5 @@
-﻿using thebasics.Extensions;
+using System;
+using thebasics.Extensions;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -11,6 +12,7 @@ namespace thebasics.ModSystems.Repair
             API.ChatCommands.GetOrCreate("setdurability")
                 .WithDescription("Sets the durability of the item held in your hand")
                 .RequiresPrivilege(Privilege.root)
+                .WithArgs(API.ChatCommands.Parsers.Int("durability"))
                 .RequiresPlayer()
                 .HandleWith(SetDurabilityCommand);
         }
@@ -18,49 +20,51 @@ namespace thebasics.ModSystems.Repair
         private TextCommandResult SetDurabilityCommand(TextCommandCallingArgs args)
         {
             var player = (IServerPlayer) args.Caller.Player;
-            var durability = (int) args.Parsers[0].GetValue();
-            var item = GetHeldItem(player);
 
-            if (item == null)
+            // Parsed by .WithArgs(Int("durability"))
+            var durability = (int)args[0];
+            var activeSlot = player.InventoryManager?.ActiveHotbarSlot;
+
+            if (activeSlot == null || activeSlot.Empty || activeSlot.Itemstack == null)
             {
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = "Cannot set the durability of your currently held item.",
+                    StatusMessage = "Nothing in active hands.",
                 };
             }
 
-            SetItemDurability(item, durability);
+            var stack = activeSlot.Itemstack;
+            if (stack.Class == EnumItemClass.Block)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Cannot set durability on blocks.",
+                };
+            }
+
+            var maxDurability = stack.Collectible?.GetMaxDurability(stack) ?? 0;
+            if (maxDurability <= 0)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = "Held item does not have durability.",
+                };
+            }
+
+            // Clamp to a sensible range.
+            durability = Math.Max(0, Math.Min(durability, maxDurability));
+
+            stack.Attributes.SetInt("durability", durability);
+            activeSlot.MarkDirty();
 
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = $"Item durability set to {durability}.",
             };
-        }
-
-        private Item GetHeldItem(IServerPlayer player)
-        {
-            var activeSlot = player.InventoryManager.ActiveHotbarSlot;
-
-            if (activeSlot.Empty)
-            {
-                return null;
-            }
-
-            var itemStack = activeSlot.Itemstack;
-
-            if (itemStack.Class == EnumItemClass.Block)
-            {
-                return null;
-            }
-
-            return itemStack.Item;
-        }
-
-        private void SetItemDurability(Item item, int durability)
-        {
-            item.Durability = durability;
         }
     }
 }

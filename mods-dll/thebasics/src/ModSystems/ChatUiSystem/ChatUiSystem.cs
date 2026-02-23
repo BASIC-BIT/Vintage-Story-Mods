@@ -1,4 +1,6 @@
-﻿using HarmonyLib;
+using HarmonyLib;
+using System;
+using System.Collections.Generic;
 using thebasics.Models;
 using thebasics.Configs;
 using thebasics.Utilities.Network;
@@ -21,6 +23,7 @@ public class ChatUiSystem : ModSystem
 
     private static IClientNetworkChannel _clientConfigChannel;
     private static SafeClientNetworkChannel _safeNetworkChannel;
+    private static bool _lastClientChannelConnected;
     private static bool _usingRptts = false;
     private static dynamic _rpttsApi = null;
     private static dynamic _rpttsChatSystem = null;
@@ -28,6 +31,25 @@ public class ChatUiSystem : ModSystem
     private static int _rpttsInitAttempts = 0;
     private static bool _rpttsInitScheduled = false;
     private static bool _rpttsExplicitModeApplied = false;
+
+    private static TypingIndicatorRenderer _typingIndicatorRenderer;
+    private static readonly Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new Dictionary<long, ChatTypingIndicatorState>();
+    private static ChatTypingIndicatorState? _lastSentTypingState;
+    private static string _lastChatInputText;
+    private static long _lastChatInputChangeMs;
+
+    private static void DebugLog(string message)
+    {
+        if (_config?.DebugMode == true)
+        {
+            _api?.Logger.Debug(message);
+        }
+    }
+
+    internal static bool IsDebugModeEnabled()
+    {
+        return _config?.DebugMode == true;
+    }
 
     public override bool ShouldLoad(EnumAppSide side) => side.IsClient();
 
@@ -48,6 +70,10 @@ public class ChatUiSystem : ModSystem
         
         RegisterForServerSideConfig();
 
+        // Renderer is cheap when disabled; keep it always registered.
+        _typingIndicatorRenderer = new TypingIndicatorRenderer(api);
+        api.Event.RegisterRenderer(_typingIndicatorRenderer, EnumRenderStage.Ortho, "thebasics-typingindicator");
+
         
         // Register event handlers
         _api.Event.PlayerJoin += OnPlayerJoin;
@@ -56,7 +82,7 @@ public class ChatUiSystem : ModSystem
         // Initialize Harmony patches if needed
         if (!Harmony.HasAnyPatches(Mod.Info.ModID))
         {
-            _api.Logger.Debug("[THEBASICS] Applying Harmony patches");
+            DebugLog("[THEBASICS] Applying Harmony patches");
             _harmony = new Harmony(Mod.Info.ModID);
             _harmony.PatchAll();
         }
@@ -124,14 +150,14 @@ public class ChatUiSystem : ModSystem
         {
             // Otherwise queue for later execution
             _pendingConfigActions.Add(action);
-            _api.Logger.Debug("[THEBASICS] Action queued until config is received");
+            DebugLog("[THEBASICS] Action queued until config is received");
         }
     }
 
     // Process all queued actions
     private static void ProcessConfigActionQueue()
     {
-        _api.Logger.Debug($"[THEBASICS] Processing {_pendingConfigActions.Count} queued actions");
+        DebugLog($"[THEBASICS] Processing {_pendingConfigActions.Count} queued actions");
         
         foreach (var action in _pendingConfigActions)
         {
@@ -153,7 +179,7 @@ public class ChatUiSystem : ModSystem
         // Only send ready message when the local player joins, not when any player joins
         if (byPlayer.PlayerUID == _api.World.Player.PlayerUID)
         {
-            _api.Logger.Debug("THEBASICS - Local player joined, attempting to send ready message to server");
+            DebugLog("THEBASICS - Local player joined, attempting to send ready message to server");
             
             // Use safe packet sending with connection checking and retry mechanism
             // The server will only send config after receiving this ready message
@@ -168,19 +194,86 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
+            .RegisterMessageType<ChatTypingStateMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
-            .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage);
-        // .RegisterMessageType<TheBasicsChatTypingMessage>();
+            .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage)
+            .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
         {
             LogPrefix = "[THEBASICS]",
-            EnableDebugLogging = true,
+            EnableDebugLogging = false,
             RetryDelayMs = 2000,
             MaxRetries = 10
         };
         _safeNetworkChannel = new SafeClientNetworkChannel(_clientConfigChannel, _api, config);
+    }
+
+    private static void OnChatTypingStateMessage(ChatTypingStateMessage message)
+    {
+        if (message == null || message.EntityId == 0)
+        {
+            return;
+        }
+
+        var state = message.State;
+        if (state == ChatTypingIndicatorState.None)
+        {
+            // Backwards compatibility: older clients/servers only set IsTyping.
+            state = message.IsTyping ? ChatTypingIndicatorState.Typing : ChatTypingIndicatorState.None;
+        }
+
+        if (state == ChatTypingIndicatorState.None)
+        {
+            _typingStatesByEntityId.Remove(message.EntityId);
+        }
+        else
+        {
+            _typingStatesByEntityId[message.EntityId] = state;
+        }
+    }
+
+    internal static ChatTypingIndicatorState GetEntityTypingIndicatorState(long entityId)
+    {
+        return _typingStatesByEntityId.TryGetValue(entityId, out var state) ? state : ChatTypingIndicatorState.None;
+    }
+
+    internal static bool IsEntityTyping(long entityId)
+    {
+        return GetEntityTypingIndicatorState(entityId) == ChatTypingIndicatorState.Typing;
+    }
+
+    internal static bool IsTypingIndicatorEnabled()
+    {
+        return _config?.EnableTypingIndicator == true;
+    }
+
+    internal static int GetTypingIndicatorRange()
+    {
+        return _config?.TypingIndicatorMaxRange ?? 0;
+    }
+
+    internal static bool IsSpeechBubbleVtmlEnabled()
+    {
+        // Opinionated: overhead speech bubble VTML rendering is enabled automatically when we override bubble text.
+        return _config?.OverrideSpeechBubblesWithRpText == true;
+    }
+
+    internal static Models.TypingIndicatorDisplayMode GetTypingIndicatorDisplayMode()
+    {
+        return _config?.TypingIndicatorDisplayMode ?? Models.TypingIndicatorDisplayMode.Icon;
+    }
+
+    internal static string GetTypingIndicatorText()
+    {
+        var overrideText = _config?.TypingIndicatorTextOverride;
+        if (!string.IsNullOrWhiteSpace(overrideText))
+        {
+            return overrideText;
+        }
+
+        return Lang.Get("thebasics:typingindicator-typing-text");
     }
 
     private void OnServerConfigMessage(TheBasicsConfigMessage configMessage)
@@ -195,12 +288,15 @@ public class ChatUiSystem : ModSystem
                 _api.Logger.Error("[THEBASICS] Received null config from server!");
                 return;
             }
+
+            // Apply debug mode to networking helpers now that we have config.
+            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
             
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;
             
-            _api.Logger.Debug($"[THEBASICS] Received server config: PreventProximityChannelSwitching={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
-            _api.Logger.Debug($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
+            DebugLog($"[THEBASICS] Received server config: PreventProximityChannelSwitching={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
+            DebugLog($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
             
             // Process any actions that were waiting for config
             if (_pendingConfigActions.Count > 0)
@@ -318,24 +414,27 @@ public class ChatUiSystem : ModSystem
      */
     [HarmonyPrefix]
     [HarmonyPatch(typeof(HudDialogChat), "OnNewServerToClientChatLine")]
-    public static void OnNewServerToClientChatLine_PreventAutoSwitch()
+    public static void OnNewServerToClientChatLine_PreventAutoSwitch(ref long __state)
     {
+        __state = 0;
+        if (IsDebugModeEnabled())
+        {
+            __state = PerfStats.Timestamp();
+        }
+
         if (_config?.PreventProximityChannelSwitching == true && _proximityGroupId.HasValue)
         {
             var game = (ClientMain)_api.World;
-            _api.Logger.Debug($"[THEBASICS] OnNewServerToClientChatLine - Current group: {game.currentGroupid}, Proximity group: {_proximityGroupId.Value}");
-            
+
+            DebugLog($"[THEBASICS] OnNewServerToClientChatLine - Current group: {game.currentGroupid}, Proximity group: {_proximityGroupId.Value}");
             if (game.currentGroupid == _proximityGroupId.Value)
             {
                 // User is in proximity tab - temporarily disable the client setting that causes auto-switching
                 _originalAutoChatOpenSelected = ClientSettings.AutoChatOpenSelected;
                 ClientSettings.AutoChatOpenSelected = false; // This prevents the auto-switching logic
-                _api.Logger.Debug($"[THEBASICS] Preventing auto-switch - saved original AutoChatOpenSelected: {_originalAutoChatOpenSelected}");
+
+                DebugLog($"[THEBASICS] Preventing auto-switch - saved original AutoChatOpenSelected: {_originalAutoChatOpenSelected}");
             }
-        }
-        else
-        {
-            _api.Logger.Debug($"[THEBASICS] OnNewServerToClientChatLine - Not preventing: config={_config?.PreventProximityChannelSwitching}, proximityId={_proximityGroupId}");
         }
     }
 
@@ -344,14 +443,42 @@ public class ChatUiSystem : ModSystem
      */
     [HarmonyPostfix]
     [HarmonyPatch(typeof(HudDialogChat), "OnNewServerToClientChatLine")]
-    public static void OnNewServerToClientChatLine_RestoreAutoSwitch()
+    public static void OnNewServerToClientChatLine_RestoreAutoSwitch(long __state, int groupId, string message, EnumChatType chattype)
     {
         if (_config?.PreventProximityChannelSwitching == true && _originalAutoChatOpenSelected.HasValue)
         {
             // Restore the original setting
             ClientSettings.AutoChatOpenSelected = _originalAutoChatOpenSelected.Value;
-            _api.Logger.Debug($"[THEBASICS] Restored AutoChatOpenSelected to: {_originalAutoChatOpenSelected.Value}");
+
+            DebugLog($"[THEBASICS] Restored AutoChatOpenSelected to: {_originalAutoChatOpenSelected.Value}");
             _originalAutoChatOpenSelected = null;
+        }
+
+        if (__state != 0)
+        {
+            PerfStats.Record(_api, "HudDialogChat.OnNewServerToClientChatLine", __state, PerfStats.Timestamp(),
+                $"group={groupId}, type={chattype}, len={(message?.Length ?? 0)}");
+        }
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(HudDialogChat), "UpdateText")]
+    public static void HudDialogChat_UpdateText_Prefix(ref long __state)
+    {
+        __state = 0;
+        if (IsDebugModeEnabled())
+        {
+            __state = PerfStats.Timestamp();
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(HudDialogChat), "UpdateText")]
+    public static void HudDialogChat_UpdateText_Postfix(long __state)
+    {
+        if (__state != 0)
+        {
+            PerfStats.Record(_api, "HudDialogChat.UpdateText", __state, PerfStats.Timestamp());
         }
     }
 
@@ -370,7 +497,7 @@ public class ChatUiSystem : ModSystem
         {
             // Queue this action for when config is received
             QueueConfigAction(() => PostfixOnGuiOpened(__instance));
-            _api.Logger.Debug("[THEBASICS] OnGuiOpened queued until config is received");
+            DebugLog("[THEBASICS] OnGuiOpened queued until config is received");
             return;
         }
 
@@ -390,7 +517,7 @@ public class ChatUiSystem : ModSystem
                 {
                     // Set the visual tab state - this will trigger OnTabClicked automatically
                     __instance.Composers["chat"].GetHorizontalTabs("tabs").SetValue(tabIndex, callhandler: true);
-                    _api.Logger.Debug($"[THEBASICS] Set active tab to index {tabIndex} for group {targetGroupId}");
+                    DebugLog($"[THEBASICS] Set active tab to index {tabIndex} for group {targetGroupId}");
                 }
                 else
                 {
@@ -497,6 +624,8 @@ public class ChatUiSystem : ModSystem
             if (_api != null)
             {
                 _api.Event.PlayerJoin -= OnPlayerJoin;
+                _typingIndicatorRenderer?.Dispose();
+                _typingIndicatorRenderer = null;
                 _api = null;
             }
             _harmony?.UnpatchAll(Mod.Info.ModID);
@@ -505,6 +634,13 @@ public class ChatUiSystem : ModSystem
             _pendingConfigActions.Clear();
             _safeNetworkChannel?.Dispose();
             _safeNetworkChannel = null;
+
+            // Clear static typing indicator state to prevent stale data on reconnect/world reload.
+            _typingStatesByEntityId.Clear();
+            _lastSentTypingState = null;
+            _lastChatInputText = null;
+            _lastChatInputChangeMs = 0;
+            _lastClientChannelConnected = false;
         }
         catch (System.Exception e)
         {
@@ -541,13 +677,144 @@ public class ChatUiSystem : ModSystem
      */
     [HarmonyPostfix]
     [HarmonyPatch(typeof(HudDialogChat), "OnFinalizeFrame")]
-    public static void OnFinalizeFrame_RestoreAutoSwitch()
+    public static void OnFinalizeFrame_RestoreAutoSwitch(HudDialogChat __instance, float dt)
     {
         if (_config?.PreventProximityChannelSwitching == true && _originalAutoChatOpenSelectedFinalize.HasValue)
         {
             // Restore the original setting
             ClientSettings.AutoChatOpenSelected = _originalAutoChatOpenSelectedFinalize.Value;
             _originalAutoChatOpenSelectedFinalize = null;
+        }
+
+        UpdateLocalTypingState(__instance);
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(HudDialogChat), "OnGuiClosed")]
+    public static void OnGuiClosed_TypingIndicator(HudDialogChat __instance)
+    {
+        // Ensure we don't leave stale typing state on the server.
+        ForceLocalTypingState(ChatTypingIndicatorState.None);
+
+        // Reset local tracking so reopening chat does not immediately report Typing
+        // based on stale text/timestamps.
+        _lastChatInputText = null;
+        _lastChatInputChangeMs = 0;
+    }
+
+    private static void UpdateLocalTypingState(HudDialogChat chatDialog)
+    {
+        if (_api == null)
+        {
+            return;
+        }
+
+        if (_config?.EnableTypingIndicator != true)
+        {
+            // Feature disabled (or config not received yet) - ensure local state is off.
+            ForceLocalTypingState(ChatTypingIndicatorState.None);
+            return;
+        }
+
+        if (chatDialog == null)
+        {
+            ForceLocalTypingState(ChatTypingIndicatorState.None);
+            return;
+        }
+
+        try
+        {
+            if (chatDialog.Composers == null || !chatDialog.Composers.ContainsKey("chat"))
+            {
+                ForceLocalTypingState(ChatTypingIndicatorState.None);
+                return;
+            }
+
+            var chatInput = chatDialog.Composers["chat"].GetChatInput("chatinput");
+            if (chatInput == null)
+            {
+                ForceLocalTypingState(ChatTypingIndicatorState.None);
+                return;
+            }
+
+            var hasFocus = chatInput.HasFocus;
+            var text = chatInput.GetText() ?? "";
+            var nowMs = _api.ElapsedMilliseconds;
+
+            if (text != _lastChatInputText)
+            {
+                _lastChatInputText = text;
+                _lastChatInputChangeMs = nowMs;
+            }
+
+            if (!hasFocus)
+            {
+                ForceLocalTypingState(ChatTypingIndicatorState.None);
+                return;
+            }
+
+            // Unified UX:
+            // - Chat open, empty input => subtle indicator
+            // - Chat open, has text => composing indicator
+            // - Recent text changes => typing indicator
+            if (text.Length == 0)
+            {
+                ForceLocalTypingState(ChatTypingIndicatorState.ChatOpenEmpty);
+                return;
+            }
+
+            float timeoutSeconds = _config.TypingIndicatorTimeoutSeconds;
+            if (timeoutSeconds <= 0)
+            {
+                timeoutSeconds = 5f;
+            }
+
+            bool isTyping = (nowMs - _lastChatInputChangeMs) <= (long)(timeoutSeconds * 1000f);
+            ForceLocalTypingState(isTyping ? ChatTypingIndicatorState.Typing : ChatTypingIndicatorState.ChatOpenComposing);
+        }
+        catch
+        {
+            // Chat UI is a fragile surface area across VS versions.
+            // Fail closed - never crash the client for a cosmetic feature.
+            ForceLocalTypingState(ChatTypingIndicatorState.None);
+        }
+    }
+
+    private static void ForceLocalTypingState(ChatTypingIndicatorState state)
+    {
+        // Best-effort: do not throw or spam retries for an ephemeral state.
+        var connected = _clientConfigChannel?.Connected ?? false;
+        if (!connected)
+        {
+            _lastClientChannelConnected = false;
+            return;
+        }
+
+        if (!_lastClientChannelConnected)
+        {
+            // Channel just became connected - force a resend even if the state did not change.
+            _lastClientChannelConnected = true;
+            _lastSentTypingState = null;
+        }
+
+        if (_lastSentTypingState.HasValue && _lastSentTypingState.Value == state)
+        {
+            return;
+        }
+
+        try
+        {
+            _clientConfigChannel.SendPacket(new ChatTypingStateMessage
+            {
+                IsTyping = state == ChatTypingIndicatorState.Typing,
+                State = state
+            });
+
+            _lastSentTypingState = state;
+        }
+        catch
+        {
+            // Ignore.
         }
     }
 }

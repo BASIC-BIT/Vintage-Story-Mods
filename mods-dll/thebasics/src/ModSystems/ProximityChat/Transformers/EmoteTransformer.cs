@@ -34,6 +34,8 @@ public class EmoteTransformer : MessageTransformerBase
 
         var language = context.GetMetadata<Language>(MessageContext.LANGUAGE);
         var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+
+        var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
         
         for (var i = 0; i < splitMessage.Length; i++)
         {
@@ -44,23 +46,28 @@ public class EmoteTransformer : MessageTransformerBase
             }
             else
             {
-                // TODO: Find better way of applying language in emotes - ideally this happens in the language transformer
-                // TODO: Cont. but because we don't split out the message, we either apply to apply the language before or after the emote transformer
-                // TODO: Cont. both of which fuck up the messages
                 var text = splitMessage[i];
-                _languageSystem.ProcessMessage(context.SendingPlayer, ref text, language);
 
-                // Process language for the quoted text
-
-                // Add quotes based on language type
+                // Add quotes based on language type (or default quotes when languages are disabled)
                 var delimiters = _config.ChatDelimiters;
-                var quoteDelimiter = language == LanguageSystem.SignLanguage ? delimiters.SignLanguageQuote : delimiters.Quote;
-                text = $"{quoteDelimiter.Start}{text}{quoteDelimiter.End}";
-                text = ChatHelper.LangColor(text, language);
-                if(language == LanguageSystem.SignLanguage)
+                var quoteDelimiter = (languageEnabled && language == LanguageSystem.SignLanguage) ? delimiters.SignLanguageQuote : delimiters.Quote;
+
+                if (languageEnabled)
                 {
-                    text = ChatHelper.Italic(text);
+                    _languageSystem.ProcessMessage(context.ReceivingPlayer, ref text, language);
                 }
+
+                text = $"{quoteDelimiter.Start}{text}{quoteDelimiter.End}";
+
+                if (languageEnabled)
+                {
+                    text = ChatHelper.LangColor(text, language);
+                    if (language == LanguageSystem.SignLanguage)
+                    {
+                        text = ChatHelper.Italic(text);
+                    }
+                }
+
                 builder.Append(text);
             }
         }

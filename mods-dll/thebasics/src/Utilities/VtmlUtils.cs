@@ -1,7 +1,11 @@
 namespace thebasics.Utilities;
+using System.Collections.Generic;
+using System.Text;
+using System.Text.RegularExpressions;
+using Vintagestory.API.Common;
 
 /// <summary>
-/// Utilities for working with VTML (Vintage Story's markup language) and XML/HTML entities
+/// Utilities for working with VTML (Vintage Story's markup language) and XML/HTML entities.
 /// </summary>
 public static class VtmlUtils
 {
@@ -18,6 +22,61 @@ public static class VtmlUtils
         return input
             .Replace("<", "&lt;")   // Less-than
             .Replace(">", "&gt;");   // Greater-than
+    }
+
+    /// <summary>
+    /// Removes VTML tags and returns plain text.
+    ///
+    /// Use this when a rendering surface does not support VTML (e.g. vanilla overhead speech bubbles).
+    /// </summary>
+    public static string StripVtmlTags(string input, ILogger errorLogger = null)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+
+        // Prefer the game's own parser to avoid regex edge cases.
+        // If we don't have a logger, fall back to a conservative regex strip.
+        if (errorLogger == null)
+        {
+            return Regex.Replace(input, "<[^>]+>", string.Empty);
+        }
+
+        try
+        {
+            var tokens = VtmlParser.Tokenize(errorLogger, input);
+            var sb = new StringBuilder(input.Length);
+            AppendPlainText(tokens, sb);
+            return sb.ToString();
+        }
+        catch
+        {
+            return Regex.Replace(input, "<[^>]+>", string.Empty);
+        }
+    }
+
+    private static void AppendPlainText(IEnumerable<VtmlToken> tokens, StringBuilder sb)
+    {
+        foreach (var token in tokens)
+        {
+            if (token is VtmlTextToken text)
+            {
+                sb.Append(text.Text);
+                continue;
+            }
+
+            if (token is VtmlTagToken tag)
+            {
+                if (tag.Name == "br")
+                {
+                    sb.Append('\n');
+                    continue;
+                }
+
+                if (tag.ChildElements != null && tag.ChildElements.Count > 0)
+                {
+                    AppendPlainText(tag.ChildElements, sb);
+                }
+            }
+        }
     }
 
     /// <summary>

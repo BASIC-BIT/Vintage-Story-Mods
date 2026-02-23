@@ -1,6 +1,6 @@
-using System;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Globalization;
+using System.Text;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
@@ -16,21 +16,108 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
     {
         _languageSystem = languageSystem;
     }
-    private static readonly Regex LanguageTalkRegex = new(@"^\s*:(\w+)\s*(.*)$");
+
+    private static bool IsDecoratorChar(char c)
+    {
+        // Handle zalgo-like effects (temporal storm/drunk) that add combining marks.
+        var cat = CharUnicodeInfo.GetUnicodeCategory(c);
+        return cat == UnicodeCategory.NonSpacingMark ||
+            cat == UnicodeCategory.SpacingCombiningMark ||
+            cat == UnicodeCategory.EnclosingMark ||
+            cat == UnicodeCategory.Format;
+    }
+
+    private static bool TryParseLanguageSpecifier(string message, out string languageIdentifier, out string remainder)
+    {
+        languageIdentifier = null;
+        remainder = null;
+
+        if (string.IsNullOrEmpty(message))
+        {
+            return false;
+        }
+
+        var i = 0;
+        // Skip whitespace and any stray combining/format characters.
+        while (i < message.Length && (char.IsWhiteSpace(message[i]) || IsDecoratorChar(message[i])))
+        {
+            i++;
+        }
+
+        if (i >= message.Length || message[i] != ':')
+        {
+            return false;
+        }
+
+        i++;
+        // Skip decorators right after ':' (e.g. zalgo).
+        while (i < message.Length && IsDecoratorChar(message[i]))
+        {
+            i++;
+        }
+
+        // Collect identifier chars, ignoring decorators in-between.
+        var sb = new StringBuilder();
+        while (i < message.Length)
+        {
+            var c = message[i];
+            if (IsDecoratorChar(c))
+            {
+                i++;
+                continue;
+            }
+
+            if (char.IsLetterOrDigit(c) || c == '_')
+            {
+                sb.Append(c);
+                i++;
+                continue;
+            }
+
+            break;
+        }
+
+        if (sb.Length == 0)
+        {
+            return false;
+        }
+
+        languageIdentifier = sb.ToString();
+
+        // Skip whitespace and decorators between identifier and content.
+        while (i < message.Length && (char.IsWhiteSpace(message[i]) || IsDecoratorChar(message[i])))
+        {
+            i++;
+        }
+
+        remainder = i < message.Length ? message[i..] : string.Empty;
+        return true;
+    }
 
     public override bool ShouldTransform(MessageContext context)
     {
-        // TODO: Is this condition accurate? Should we check for roleplay/player chat flags?
         return true;
     }
 
     public override MessageContext Transform(MessageContext context)
     {
-        if (LanguageTalkRegex.IsMatch(context.Message))
+        // Always populate a default language for downstream formatting.
+        // If the language system is disabled, we intentionally do NOT parse :lang prefixes.
+        var defaultLang = _config.Languages?.FirstOrDefault(l => l.Default) ?? _config.Languages?.FirstOrDefault();
+        if (defaultLang == null)
         {
-            var match = LanguageTalkRegex.Match(context.Message);
-            var languageIdentifier = match.Groups[1].Value;
-            
+            defaultLang = LanguageSystem.BabbleLang;
+        }
+
+        var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
+        if (!languageEnabled)
+        {
+            context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
+            return context;
+        }
+
+        if (TryParseLanguageSpecifier(context.Message, out var languageIdentifier, out var remainder))
+        {
             // First try to get the language with allowHidden=true to check if it exists at all
             var lang = _languageSystem.GetLangFromText(languageIdentifier, true, allowHidden: true);
             
@@ -56,10 +143,11 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                     "You don't know that language!",
                     EnumChatType.CommandError);
                 context.State = MessageContextState.STOP;
+                return context;
             }
 
             // If the message is empty, set the default language and stop processing
-            if(!match.Groups[2].Success || string.IsNullOrWhiteSpace(match.Groups[2].Value))
+            if (string.IsNullOrWhiteSpace(remainder))
             {
                 context.SendingPlayer.SetDefaultLanguage(lang);
                 context.SendingPlayer.SendMessage(
@@ -69,11 +157,18 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                 context.State = MessageContextState.STOP;
             } else {
                 // Remove the language identifier and continue processing
-                context.UpdateMessage(match.Groups[2].Value.Trim());
+                context.UpdateMessage(remainder.Trim());
                 context.SetMetadata(MessageContext.LANGUAGE, lang);
             }
         } else {
-            context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_config));
+            try
+            {
+                context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_config));
+            }
+            catch
+            {
+                context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
+            }
         }
         
         return context;

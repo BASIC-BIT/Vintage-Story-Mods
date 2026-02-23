@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using thebasics.Configs;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using thebasics.Utilities;
 
 namespace thebasics.ModSystems.ProximityChat;
 
@@ -14,23 +15,12 @@ public class ProximityCheckUtils : BaseSubSystem
 
     public bool CanSeePlayer(IServerPlayer player1, IServerPlayer player2)
     {
-        // TODO: Implement FOV check to ensure player1 is looking at player2
         if (player1.PlayerUID == player2.PlayerUID)
         {
             return true; // Player can always see themselves
         }
-        var player1Pos = player1.Entity.LocalEyePos;
-        var player2Pos = player2.Entity.LocalEyePos;
-        var direction = player2Pos.SubCopy(player1Pos).Normalize();
-
-        var blockSel = new BlockSelection();
-        var entitySel = new EntitySelection();
-
-        API.World.RayTraceForSelection(player1Pos, direction, ref blockSel, ref entitySel, efilter: (entity) => entity.EntityId != player1.Entity.EntityId);
-
-        var canSee = entitySel.Entity != null && entitySel.Entity.EntityId == player2.Entity.EntityId;
-        API.Logger.Debug($"THEBASICS - Checking if player {player1.PlayerName} can see player {player2.PlayerName} - {canSee}");
-        return canSee;
+        // TODO: Implement FOV check to ensure player1 is looking at player2
+        return VisibilityUtils.HasLineOfSight(API.World, player1.Entity, player2.Entity, failOpen: false);
     }
     
     private int GetFloodFillDistance(IServerPlayer player1, IServerPlayer player2, int maxDistance)

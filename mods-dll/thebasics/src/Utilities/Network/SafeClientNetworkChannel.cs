@@ -68,6 +68,15 @@ namespace thebasics.Utilities.Network
         public bool IsConnected => _channel?.Connected == true;
 
         /// <summary>
+        /// Enables or disables debug logging at runtime.
+        /// Useful when config arrives from server after the wrapper is constructed.
+        /// </summary>
+        public void SetEnableDebugLogging(bool enabled)
+        {
+            _config.EnableDebugLogging = enabled;
+        }
+
+        /// <summary>
         /// Gets the number of pending packet actions in the queue
         /// </summary>
         public int PendingActionCount => _pendingPacketActions.Count;

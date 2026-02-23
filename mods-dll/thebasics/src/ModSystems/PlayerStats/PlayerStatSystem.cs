@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using thebasics.Extensions;
 using thebasics.ModSystems.PlayerStats.Definitions;
@@ -104,7 +105,18 @@ namespace thebasics.ModSystems.PlayerStats
         private TextCommandResult ClearStats(TextCommandCallingArgs args)
         {
             var confirmed = !args.Parsers[1].IsMissing && args.Parsers[1].GetValue().ToString()?.ToLower() == "confirm";
-            var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
+            var target = ((PlayerUidName[])args.Parsers[0].GetValue())[0];
+            var targetPlayer = API.GetPlayerByUID(target.Uid);
+            var targetName = targetPlayer?.PlayerName ?? target.Name ?? target.Uid;
+
+            if (targetPlayer == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"Cannot clear stats for '{targetName}' - player must be online.",
+                };
+            }
 
             if (!confirmed)
             {
@@ -112,7 +124,7 @@ namespace thebasics.ModSystems.PlayerStats
                 {
                     Status = EnumCommandStatus.Success,
                     StatusMessage =
-                        $"Are you SURE you want to clear this players stats? Type \"/clearstats {targetPlayer.PlayerName} confirm\" to confirm.",
+                        $"Are you SURE you want to clear this player's stats? Type \"/clearstats {targetName} confirm\" to confirm.",
                 };
             }
             
@@ -120,7 +132,7 @@ namespace thebasics.ModSystems.PlayerStats
             return new TextCommandResult()
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {targetPlayer.PlayerName} stats cleared.",
+                StatusMessage = $"Player {targetName} stats cleared.",
             };
         }
 
@@ -143,17 +155,30 @@ namespace thebasics.ModSystems.PlayerStats
         {
             var confirmed = !args.Parsers[2].IsMissing && args.Parsers[2].GetValue().ToString()?.ToLower() == "confirm";
             var statName = args.Parsers[1].GetValue().ToString()!.ToLower();
-            var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
+            var target = ((PlayerUidName[])args.Parsers[0].GetValue())[0];
+            var targetPlayer = API.GetPlayerByUID(target.Uid);
+            var targetName = targetPlayer?.PlayerName ?? target.Name ?? target.Uid;
+
+            if (targetPlayer == null)
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = $"Cannot clear stats for '{targetName}' - player must be online.",
+                };
+            }
 
             
             var resolvedStat = ResolveStat(statName);
             
             if(resolvedStat == null)
             {
+                var statNames = string.Join(", ", StatTypes.Types.Keys.Select(k => k.ToString().ToLowerInvariant()));
+                var statIds = string.Join(", ", StatTypes.Types.Values.Select(v => v.ID));
                 return new TextCommandResult()
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = $"Cannot find stat {statName}.",
+                    StatusMessage = $"Cannot find stat '{statName}'. Valid stats: {statNames}. IDs: {statIds}.",
                 };
             }
             
@@ -163,7 +188,7 @@ namespace thebasics.ModSystems.PlayerStats
                 {
                     Status = EnumCommandStatus.Success,
                     StatusMessage =
-                        $"Are you SURE you want to clear this players stats? Type \"/clearstats {targetPlayer.PlayerName} {statName} confirm\" to confirm.",
+                        $"Are you SURE you want to clear this player's stat? Type \"/clearstat {targetName} {statName} confirm\" to confirm.",
                 };
             }
 
@@ -171,7 +196,7 @@ namespace thebasics.ModSystems.PlayerStats
             return new TextCommandResult()
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = $"Player {targetPlayer.PlayerName} stat {statName} cleared.",
+                StatusMessage = $"Player {targetName} stat {statName} cleared.",
             };
         }
 

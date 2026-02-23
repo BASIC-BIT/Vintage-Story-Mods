@@ -121,13 +121,156 @@ Based on git status, current work involves:
 
 No automated test framework is currently configured. Testing is done manually in-game.
 
+### Test Server Operations
+
+This repo is frequently validated against a disposable/test Vintage Story server hosted on Pterodactyl.
+If you have just built + uploaded a new mod zip to that test server, it is acceptable to restart it to load the new version.
+
+- Test server (Pterodactyl): `8982de16`
+- Typical action after upload: restart the server to apply the new zip
+
+#### Server File Paths (inside the Pterodactyl container)
+
+| Path | Purpose |
+|------|---------|
+| `/data/Mods/` | Mod zip files (e.g. `thebasics_5_3_0.zip`) |
+| `/data/ModConfig/the_basics.json` | Runtime config for the thebasics mod |
+| `/data/Logs/server-main.log` | Boot/load log — mod loading, warnings, startup errors |
+| `/data/Logs/server-debug.log` | Runtime debug log — detailed mod activity |
+| `/data/Logs/server-chat.log` | Chat messages |
+| `/data/Logs/server-audit.log` | Admin actions |
+
+#### Build → Deploy → Verify Loop
+
+```powershell
+# 1. Build + package + SFTP upload (all-in-one)
+.\mods-dll\thebasics\scripts\build-and-package.ps1
+
+# 2. Restart the test server (via Pterodactyl API)
+#    Use ptero tools if loaded, or curl:
+curl -s -X POST `
+  -H "Authorization: Bearer $env:PTERO_TOKEN" `
+  -H "Content-Type: application/json" `
+  "https://pt.basicbit.net/api/client/servers/8982de16/power" `
+  -d '{"signal":"restart"}'
+
+# 3. Wait ~25s for server to come back up, then fetch logs
+powershell -NoProfile -ExecutionPolicy Bypass -File mods-dll/thebasics/scripts/fetch-logs.ps1 -LogType all
+
+# 4. Verify clean boot (see "What to look for in logs" below)
+```
+
+#### Pterodactyl API Patterns (direct curl)
+
+Credentials come from `.env` in repo root (`PTERO_BASE_URL`, `PTERO_TOKEN`, `PTERO_SERVER_ID`).
+All endpoints use the Client API (`ptlc_...` token) under `/api/client/servers/{id}/...`.
+
+```
+# List files in a directory
+GET /files/list?directory=/data/Mods
+
+# Read a file's contents
+GET /files/contents?file=/data/ModConfig/the_basics.json
+
+# Delete files
+POST /files/delete  body: {"root":"/data/Mods","files":["old_mod.zip"]}
+
+# Write/overwrite a file (raw body = file content)
+POST /files/write?file=/data/ModConfig/the_basics.json
+
+# Power actions (start/stop/restart/kill)
+POST /power  body: {"signal":"restart"}
+
+# Server resource usage / current state
+GET /resources  → .attributes.current_state ("running"/"stopped"/etc.)
+```
+
+**PowerShell gotcha**: When calling curl/Invoke-RestMethod inline from bash on Windows, PowerShell dollar signs (`$`) get eaten by the shell. Write a `.ps1` script file and execute it instead of using inline PowerShell one-liners with variables.
+
+#### What to Look for in Server Logs
+
+After a restart, check `server-main.log` for:
+
+1. **Mod loaded correctly**: Look for `Mod 'thebasics_X_Y_Z.zip' (thebasics):` followed by all 6 mod systems:
+   - `thebasics.ModSystems.TPA.TpaSystem`
+   - `thebasics.ModSystems.SleepNotifier.SleepNotifierSystem`
+   - `thebasics.ModSystems.SaveNotifications.SaveNotificationsSystem`
+   - `thebasics.ModSystems.Repair.RepairModSystem`
+   - `thebasics.ModSystems.ProximityChat.RPProximityChatSystem`
+   - `thebasics.ModSystems.PlayerStats.PlayerStatSystem`
+
+2. **No duplicate mod warning**: Search for `Multiple mods share the mod ID`. If present, an old zip is still in `/data/Mods/` and needs to be deleted.
+
+3. **No exceptions on startup**: Search for `Exception`, `Error`, `WARNING` (excluding vanilla noise like `ErrorReporter`, worldgen, JSON asset warnings).
+
+4. **Config loaded**: If the mod logs config values on boot, verify key settings match expectations.
+
+#### Key Config Toggles for Testing
+
+These are the most commonly toggled settings in `/data/ModConfig/the_basics.json`:
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `OverrideSpeechBubblesWithRpText` | `false` | When true, overhead bubbles show RP-processed VTML text with kind styling + LOS gating |
+| `EnableTypingIndicator` | `true` | Show typing indicator above players' heads |
+| `SendServerSaveAnnouncement` | `true` | Announce "save started" to players |
+| `SendServerSaveFinishedAnnouncement` | `false` | Announce "save finished" to players |
+| `ServerSaveAnnouncementAsNotification` | `true` | Use notification popup instead of chat line |
+| `EnableGlobalOOC` | `false` | Allow `(( ... ))` global OOC chat |
+| `EnableLanguageSystem` | `true` | Enable language commands and formatting |
+| `DebugMode` | `false` | Enable `[THEBASICS][perf]` and diagnostic logging |
+| `TypingIndicatorDisplayMode` | `2` (Both) | 0=Icon only, 1=Text only, 2=Both icon + text |
+
+#### Launching Test Game Clients
+
+Two VS profiles are set up for multi-client testing:
+
+```powershell
+# Profile 2 — auto-connects to test server on launch
+Start-Process 'D:\Games\Vintagestory\Vintagestory.exe' `
+  -ArgumentList '--dataPath "D:\Games\VSProfiles\Profile2" --fullscreen off -c 15.235.75.126:30000' `
+  -WorkingDirectory 'D:\Games\Vintagestory'
+
+# Profile 3 — launches to main menu (connect manually)
+Start-Process 'D:\Games\Vintagestory\Vintagestory.exe' `
+  -ArgumentList '--dataPath "D:\Games\VSProfiles\Profile3" --fullscreen off' `
+  -WorkingDirectory 'D:\Games\Vintagestory'
+```
+
+Desktop shortcuts also exist at:
+- `D:\Games\VSProfiles\Vintagestory Testing Profile 2.lnk`
+- `D:\Games\VSProfiles\Vintagestory Testing Profile 3.lnk`
+
+**After every server restart**, close existing game windows and relaunch both profiles:
+
+```powershell
+# Kill existing VS instances, then launch both profiles
+Get-Process Vintagestory -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Process 'D:\Games\Vintagestory\Vintagestory.exe' `
+  -ArgumentList '--dataPath "D:\Games\VSProfiles\Profile2" --fullscreen off -c 15.235.75.126:30000' `
+  -WorkingDirectory 'D:\Games\Vintagestory'
+Start-Process 'D:\Games\Vintagestory\Vintagestory.exe' `
+  -ArgumentList '--dataPath "D:\Games\VSProfiles\Profile3" --fullscreen off' `
+  -WorkingDirectory 'D:\Games\Vintagestory'
+```
+
 ## Linting/Type Checking
 
 The project uses standard C# compilation for type checking. No additional linting tools are configured.
 Run `dotnet build` to check for compilation errors.
-```
+
+## Pre-Release QA
+
+Manual QA is required before merging PRs that touch client-side rendering, config behavior, Harmony patches, or client-server interactions. The full workflow is defined in `.opencode/skills/human-qa/SKILL.md`. Core principles:
+
+- **Risk-based triggering.** Consider what's robot-testable vs. human-testable, and effort vs. risk. Things that are hard to verify are usually easy to break.
+- **Cards, not vibes.** Every test is a numbered card with concrete steps, expected outcomes, and failure modes. No "does it look right?" — instead "type `hello`, observe a white-text bubble above Player2 that fades in ~4s."
+- **Strict verification.** Never check off a PR checklist item without the human explicitly describing what they observed. Push back on vague answers.
+- **Config-first batching.** Group cards by server config state to minimize restarts. Within a batch, group by feature area to minimize context-switching.
+- **Smart failure recovery.** After fixing a failed card, roll the re-test into the next batch when configs don't conflict, rather than adding an extra restart cycle.
+- **Discovery triage.** Pause after each batch to file GitHub issues for out-of-scope findings. Don't lose QA insights; don't let them block the PR either.
 
 ## Development Guidance
 
 - **Configuration Management**
-  - This mod is live - ProtoMember attributes for existing config values should not be changed where possible - new config values should recieve the next available sequentially increasing number.
+  - This mod is live - ProtoMember attributes for existing config values should not be changed where possible - new config values should receive the next available sequentially increasing number.

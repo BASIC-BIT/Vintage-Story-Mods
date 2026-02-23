@@ -23,6 +23,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
     public ProximityCheckUtils ProximityCheckUtils;
     public TransformerSystem TransformerSystem;
 
+    // Ephemeral state; do not persist.
+    private readonly System.Collections.Generic.Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new();
+
     protected override void BasicStartServerSide()
     {
         HookEvents();
@@ -238,8 +241,54 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
+            .RegisterMessageType<ChatTypingStateMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
-            .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected);
+            .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
+            .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage);
+    }
+
+    private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
+    {
+        if (player?.Entity == null || message == null)
+        {
+            return;
+        }
+
+        // If the feature is disabled server-side, ignore.
+        if (Config?.EnableTypingIndicator != true)
+        {
+            return;
+        }
+
+        var entityId = player.Entity.EntityId;
+        if (entityId == 0)
+        {
+            return;
+        }
+
+        // Prefer the multi-state field; fall back to IsTyping for older clients.
+        var state = message.State;
+        if (state == ChatTypingIndicatorState.None)
+        {
+            state = message.IsTyping ? ChatTypingIndicatorState.Typing : ChatTypingIndicatorState.None;
+        }
+
+        if (state == ChatTypingIndicatorState.None)
+        {
+            _typingStatesByEntityId.Remove(entityId);
+        }
+        else
+        {
+            _typingStatesByEntityId[entityId] = state;
+        }
+
+        // Server is authoritative for EntityId and keeps fields consistent.
+        message.EntityId = entityId;
+        message.State = state;
+        message.IsTyping = state == ChatTypingIndicatorState.Typing;
+
+        // Best-effort broadcast; clients without this message type will silently ignore it.
+        _serverConfigChannel?.BroadcastPacket(message, player);
     }
 
     private void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)
@@ -249,7 +298,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     private void OnClientReady(IServerPlayer player, TheBasicsClientReadyMessage message)
     {
-        API.Logger.Debug($"THEBASICS - Received ready message from {player.PlayerName}, sending config");
+        if (Config.DebugMode)
+        {
+            API.Logger.Debug($"THEBASICS - Received ready message from {player.PlayerName}, sending config");
+        }
         SendClientConfig(player);
     }
 
@@ -357,8 +409,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Config = Config,
             LastSelectedGroupId = byPlayer.GetLastSelectedGroupId()
         }, byPlayer);
-        
-        API.Logger.Debug($"THEBASICS - Sent complete config to client {byPlayer.PlayerName}");
+
+        if (Config.DebugMode)
+        {
+            API.Logger.Debug($"THEBASICS - Sent complete config to client {byPlayer.PlayerName}");
+        }
     }
 
     internal void DispatchSpeechForContext(MessageContext context)
@@ -406,6 +461,40 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         API.Event.PlayerChat += Event_PlayerChat;
         API.Event.PlayerJoin += Event_PlayerJoin;
+        API.Event.PlayerDisconnect += Event_PlayerDisconnect;
+    }
+
+    private void Event_PlayerDisconnect(IServerPlayer player)
+    {
+        if (player?.Entity == null)
+        {
+            return;
+        }
+
+        var entityId = player.Entity.EntityId;
+        if (entityId == 0)
+        {
+            return;
+        }
+
+        if (!_typingStatesByEntityId.TryGetValue(entityId, out var state) || state == ChatTypingIndicatorState.None)
+        {
+            return;
+        }
+
+        _typingStatesByEntityId.Remove(entityId);
+
+        if (Config?.EnableTypingIndicator != true)
+        {
+            return;
+        }
+
+        _serverConfigChannel?.BroadcastPacket(new ChatTypingStateMessage
+        {
+            EntityId = entityId,
+            IsTyping = false,
+            State = ChatTypingIndicatorState.None
+        });
     }
 
     private void SetupProximityGroup()
@@ -414,6 +503,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             ProximityChatId = GlobalConstants.GeneralChatGroup;
             RemoveProximityGroupIfExists();
+
+            API.Logger.Notification("THEBASICS: UseGeneralChannelAsProximityChat=true - the General chat tab is now proximity chat. Set it to false to restore global General chat.");
         }
         if (!Config.UseGeneralChannelAsProximityChat)
         {
@@ -481,18 +572,35 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         var behavior = player.Entity.GetBehavior<EntityBehaviorNameTag>();
 
+        if (behavior == null)
+        {
+            return;
+        }
+
+        // Apply visibility/range settings regardless of whether we're overriding the display name.
+        behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
+        behavior.RenderRange = Config.NametagRenderRange;
+
+        // Determine the visible nametag string.
+        string displayName;
         if (Config.ShowNicknameInNametag)
         {
             var nickname = player.GetNickname();
-
-            var displayName = Config.ShowPlayerNameInNametag ? $"{nickname} ({player.PlayerName})" : nickname;
-
-            behavior.SetName(displayName);
-
-            behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
-            behavior.RenderRange = Config.NametagRenderRange;
-            player.Entity.WatchedAttributes.MarkPathDirty("nametag");
+            if (string.IsNullOrWhiteSpace(nickname))
+            {
+                displayName = Config.ShowPlayerNameInNametag ? player.PlayerName : "";
+            }
+            else
+            {
+                displayName = Config.ShowPlayerNameInNametag ? $"{nickname} ({player.PlayerName})" : nickname;
+            }
         }
+        else
+        {
+            displayName = Config.ShowPlayerNameInNametag ? player.PlayerName : "";
+        }
+
+        behavior.SetName(displayName);
     }
 
     private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
@@ -792,6 +900,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
         Vintagestory.API.Datastructures.BoolRef consumed)
     {
+        if (byPlayer == null || consumed == null)
+        {
+            return;
+        }
+
         if(channelId != ProximityChatId)
         {
             return;
@@ -803,28 +916,42 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        consumed.value = true;
-
-        // Extract the content from the full message
-        var content = ChatHelper.GetMessage(message);
-
-        // Create a player chat context
-        var context = new MessageContext
+        try
         {
-            Message = content,
-            SendingPlayer = byPlayer,
-            GroupId = channelId,
-            Metadata =
+            // Extract the content from the full message
+            var content = ChatHelper.GetMessage(message);
+            if (string.IsNullOrWhiteSpace(content))
             {
-                ["clientData"] = data,
-            },
-            Flags =
-            {
-                [MessageContext.IS_PLAYER_CHAT] = true,
+                return;
             }
-        };
 
-        // Process the message through the pipeline
-        TransformerSystem.ProcessMessagePipeline(context);
+            // Only consume after we've validated the message — if our pipeline fails,
+            // vanilla chat handles the message instead of silently swallowing it.
+            consumed.value = true;
+
+            // Create a player chat context
+            var context = new MessageContext
+            {
+                Message = content,
+                SendingPlayer = byPlayer,
+                GroupId = channelId,
+                Metadata =
+                {
+                    ["clientData"] = data,
+                },
+                Flags =
+                {
+                    [MessageContext.IS_PLAYER_CHAT] = true,
+                }
+            };
+
+            // Process the message through the pipeline
+            TransformerSystem?.ProcessMessagePipeline(context);
+        }
+        catch (Exception e)
+        {
+            // Never crash the server on player chat.
+            API.Logger.Error($"THEBASICS - Error processing proxchat message: {e}");
+        }
     }
 }

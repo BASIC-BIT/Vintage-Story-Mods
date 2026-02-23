@@ -18,6 +18,12 @@ namespace thebasics.ModSystems.ProximityChat
         public LanguageSystem(BaseBasicModSystem system, ICoreServerAPI api, ModConfig config) : base(system, api,
             config)
         {
+            // Language system is an RP feature. If RP chat or languages are disabled, do not register commands/events.
+            if (!Config.EnableLanguageSystem || Config.DisableRPChat)
+            {
+                return;
+            }
+
             // Player commands
             API.ChatCommands.GetOrCreate("addlang")
                 .WithAlias("addlanguage")

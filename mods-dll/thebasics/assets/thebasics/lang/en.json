@@ -1,0 +1,8 @@
+{
+  "typingindicator-typing-icon": "<icon name=\"handheld\"></icon>",
+  "typingindicator-composing-icon": "<icon name=\"paintbrush\"></icon>",
+  "typingindicator-chatopen-icon": "<icon name=\"wpCircle\"></icon>",
+  "typingindicator-typing-text": "Typing...",
+  "typingindicator-composing-text": "Composing...",
+  "typingindicator-chatopen-text": "..."
+}

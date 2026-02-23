@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using ProtoBuf;
+using thebasics.Models;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Configs;
@@ -300,5 +301,45 @@ namespace thebasics.Configs
         [ProtoMember(67)]
         public IDictionary<ProximityChatMode, float> RPTTS_ModeFalloff { get; set; }
 
+        // ----- Typing Indicator (client-side UI feature, server-configured) ----- //
+
+        [ProtoMember(68)]
+        public bool EnableTypingIndicator { get; set; } = false;
+
+        [ProtoMember(69)]
+        public int TypingIndicatorMaxRange { get; set; } = 50;
+
+        [ProtoMember(70)]
+        public float TypingIndicatorTimeoutSeconds { get; set; } = 5f;
+
+        // If empty/null, client uses lang key `thebasics:typingindicator-typing`.
+        [ProtoMember(71)]
+        public string TypingIndicatorTextOverride { get; set; } = "";
+
+        // When true, the server will override the vanilla overhead chat bubble text with the RP-processed
+        // speech text (per-recipient language/obfuscation).
+        // This only affects the floating text above player heads, not the chat log.
+        [ProtoMember(72)]
+        public bool OverrideSpeechBubblesWithRpText { get; set; } = false;
+
+        // When true, enables verbose debug logging and diagnostic instrumentation.
+        // Intended for temporary use while investigating reports.
+        [ProtoMember(73)]
+        public bool DebugMode { get; set; } = false;
+
+        // When true, server save announcements use EnumChatType.Notification (popup-style).
+        // When false, send as a regular chat line (less intrusive).
+        [ProtoMember(74)]
+        public bool ServerSaveAnnouncementAsNotification { get; set; } = true;
+
+        // When true, server save finished announcements use EnumChatType.Notification (popup-style).
+        // When false, send as a regular chat line (less intrusive).
+        [ProtoMember(75)]
+        public bool ServerSaveFinishedAsNotification { get; set; } = true;
+
+        // Controls what the typing indicator renders: Icon, Text, or Both.
+        // Disabled entirely when EnableTypingIndicator is false.
+        [ProtoMember(76)]
+        public TypingIndicatorDisplayMode TypingIndicatorDisplayMode { get; set; } = TypingIndicatorDisplayMode.Icon;
     }
 }

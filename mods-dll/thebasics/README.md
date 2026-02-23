@@ -41,6 +41,12 @@ The RP Proximity Chat System is a feature-rich chat system designed for role-pla
 
 The system is highly configurable through the mod's configuration file. You can adjust the talking ranges, enable or disable features, and customize message formatting.
 
+Nametags are also configurable (in `ModConfig/the_basics.json`):
+- `ShowNicknameInNametag`: show the RP nickname above heads
+- `ShowPlayerNameInNametag`: show the Vintage Story account name above heads
+- `HideNametagUnlessTargeting`: only show nametags when the player is targeted
+- `NametagRenderRange`: how far away nametags render
+
 ### Example Usage
 
 To set a nickname: `/nick MyNickname`
@@ -89,6 +95,45 @@ Admins can set another players languages via:
 - `/remlangadmin [player] [language]`
 
 The permission required to use the commands can be configured via the config values `ChangeOwnLanguagePermission` and `ChangeOtherLanguagePermission`.
+
+## Typing Indicator
+
+The BASICs can optionally show a small "Typing..." indicator above a player's head.
+
+Notes:
+- It is rendered client-side, but controlled by server config.
+- It shows above other players (you won't see it above yourself).
+
+Configuration keys (in `ModConfig/the_basics.json`):
+- `EnableTypingIndicator`: master toggle
+- `TypingIndicatorMaxRange`: max range (blocks) to see the indicator
+- `TypingIndicatorTimeoutSeconds`: how long after the last input change the indicator stays on
+- `TypingIndicatorTextOverride`: override the displayed text (otherwise uses lang key `thebasics:typingindicator-typing`)
+- `DebugMode`: enables verbose debug logging/diagnostics (recommended off unless troubleshooting)
+
+Notes:
+- The indicator uses multiple states (chat open / composing / actively typing) for a unified UX.
+
+
+
+## Overhead Speech Bubble Override
+
+Vintage Story shows a short chat bubble above player heads for nearby chat.
+
+When language obfuscation is enabled, it can be useful for RP to have the overhead bubble reflect the
+recipient-specific processed text (rather than the raw typed text).
+
+Config key (in `ModConfig/the_basics.json`):
+
+ - `OverrideSpeechBubblesWithRpText`: when true, the server overrides the bubble text (per recipient)
+   - Applies to: speech, emotes (`/me` or `*...`), and environmental messages (`/it` or `!...`)
+   - When enabled, clients also render VTML in overhead bubbles (italics, font tags, icons).
+   - Emote/environment bubbles get subtle visual styling (border/background) so they are distinct.
+
+Notes:
+
+- Vanilla overhead bubbles render plain text (they do not parse VTML).
+- When `OverrideSpeechBubblesWithRpText=true`, the client patches the vanilla bubble renderer to support VTML.
 
 
 
