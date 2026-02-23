@@ -1,0 +1,98 @@
+name: "CodeQL"
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: '25 14 * * 1'
+
+env:
+  VS_VERSION: "1.21.5"
+  DOTNET_VERSION: "8.0.x"
+
+jobs:
+  analyze:
+    name: Analyze C#
+    runs-on: windows-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+        build-mode: manual
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Cache VS Dependencies
+      id: cache-vs-deps
+      uses: actions/cache@v4
+      with:
+        path: |
+          vs-dependencies
+          vs-installation
+        key: vs-deps-${{ env.VS_VERSION }}
+
+    - name: Download VS Dependencies
+      if: steps.cache-vs-deps.outputs.cache-hit != 'true'
+      run: |
+        Write-Host "Downloading VS ${{ env.VS_VERSION }} dependencies..." -ForegroundColor Yellow
+
+        $repoUrl = "https://${{ secrets.VS_DEPS_TOKEN }}@github.com/BASIC-BIT/vs-build-dependencies.git"
+        git clone $repoUrl vs-dependencies-repo
+
+        if (-not (Test-Path "vs-dependencies-repo\${{ env.VS_VERSION }}")) {
+          Write-Host "Error: Version ${{ env.VS_VERSION }} not found in dependencies repository" -ForegroundColor Red
+          exit 1
+        }
+
+        New-Item -ItemType Directory -Path "vs-installation" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-installation\Mods" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-installation\Lib" -Force | Out-Null
+
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\core\*" "vs-installation\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\mods\*" "vs-installation\Mods\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\lib\*" "vs-installation\Lib\" -Force
+
+        New-Item -ItemType Directory -Path "vs-dependencies" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-dependencies\core" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-dependencies\mods" -Force | Out-Null
+        New-Item -ItemType Directory -Path "vs-dependencies\lib" -Force | Out-Null
+
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\core\*" "vs-dependencies\core\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\mods\*" "vs-dependencies\mods\" -Force
+        Copy-Item "vs-dependencies-repo\${{ env.VS_VERSION }}\lib\*" "vs-dependencies\lib\" -Force
+
+        Remove-Item -Path "vs-dependencies-repo" -Recurse -Force
+
+        Write-Host "VS dependencies downloaded successfully" -ForegroundColor Green
+      shell: pwsh
+
+    - name: Set VINTAGE_STORY Environment Variable
+      run: |
+        $vsPath = "$(pwd)\vs-installation"
+        echo "VINTAGE_STORY=$vsPath" >> $env:GITHUB_ENV
+      shell: pwsh
+
+    - name: Build Solution
+      run: |
+        dotnet restore Vintage-Story-Mods.sln
+        dotnet build Vintage-Story-Mods.sln --configuration Release --no-restore
+      shell: pwsh
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:csharp"
