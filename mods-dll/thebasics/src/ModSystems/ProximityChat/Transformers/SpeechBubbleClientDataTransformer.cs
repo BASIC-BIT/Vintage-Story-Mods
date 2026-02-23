@@ -50,16 +50,42 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             bubbleTextVtml = VtmlUtils.StripVtmlTags(bubbleTextVtml, _chatSystem.API?.Logger);
         }
 
+        // Wrap speech in configurable quote delimiters, matching ICSpeechFormatTransformer:
+        // sign language uses SignLanguageQuote (default: single quotes), others use Quote (default: double quotes).
+        // Applied BEFORE the language color tag so the quotes sit inside <font color="...">
+        // and the entire bubble (quotes included) renders in the language color.
+        Language bubbleLang = null;
+        var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
+        if (languageEnabled)
+        {
+            context.TryGetMetadata(MessageContext.LANGUAGE, out bubbleLang);
+        }
+
+        if (context.HasFlag(MessageContext.IS_SPEECH))
+        {
+            var delimiters = _config.ChatDelimiters;
+            var quoteDelimiter = (languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
+                ? delimiters.SignLanguageQuote
+                : delimiters.Quote;
+            bubbleTextVtml = $"{quoteDelimiter.Start}{bubbleTextVtml}{quoteDelimiter.End}";
+
+            // Mirror chatbox: sign language speech is italicized.
+            if (languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
+            {
+                bubbleTextVtml = ChatHelper.Italic(bubbleTextVtml);
+            }
+        }
+
         // Apply language color wrapping for speech bubbles so they match the chatbox formatting.
         // This runs after LanguageTransformer (which scrambles unknown languages) but before
         // ICSpeechFormatTransformer (which adds language color to the chatbox line).
         // We must apply the color here because ICSpeechFormatTransformer runs after us.
-        if (_config.OverrideSpeechBubblesWithRpText && _config.EnableLanguageSystem && !_config.DisableRPChat
+        if (_config.OverrideSpeechBubblesWithRpText && languageEnabled
             && context.HasFlag(MessageContext.IS_SPEECH))
         {
-            if (context.TryGetMetadata(MessageContext.LANGUAGE, out Language lang) && lang != null)
+            if (bubbleLang != null)
             {
-                bubbleTextVtml = ChatHelper.LangColor(bubbleTextVtml, lang);
+                bubbleTextVtml = ChatHelper.LangColor(bubbleTextVtml, bubbleLang);
             }
         }
 

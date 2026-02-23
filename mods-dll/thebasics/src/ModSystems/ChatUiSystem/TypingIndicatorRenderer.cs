@@ -227,7 +227,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
             BorderColor = state switch
             {
                 ChatTypingIndicatorState.Typing => ColorUtil.Hex2Doubles("#E6C686"),
-                ChatTypingIndicatorState.ChatOpenComposing => ColorUtil.Hex2Doubles("#86AEE6"),
+                ChatTypingIndicatorState.ChatOpenComposing => ColorUtil.Hex2Doubles("#A0AAB8"),
                 _ => ColorUtil.Hex2Doubles("#AAAAAA")
             }
         };
