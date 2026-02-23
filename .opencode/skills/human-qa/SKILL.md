@@ -115,20 +115,27 @@ When the human reports back:
 - **For failures:** Record exactly what the human saw. Investigate, propose a fix.
 - **For skips:** Note why and whether it blocks the PR.
 
-### Challenge vague responses — always
+### Challenge vague responses — proportionally
 
-This is the most important part of the workflow. The entire value of manual QA is that someone actually tested it. If responses are vague, push back:
+The value of manual QA is that someone actually tested it. But the level of verification detail you demand should be **proportional to the complexity of what's being tested.**
 
-| Human says | You respond |
-|---|---|
-| "Yeah it all works" | "Which items specifically? Did you test [specific edge case from the card]?" |
-| "Looks good" | "Can you describe what you saw? Did [expected outcome from card] happen?" |
-| "I think so" | "Let's be sure. Can you try [specific repro steps] one more time?" |
-| "Fine" (for multiple cards) | "I want to check these off individually. Let's go through them — for card N, what did you see?" |
+**High-complexity cards** (rendering behavior, timing, multi-step interactions, edge cases with specific failure modes): Push back on vague responses. Ask what they observed. These are the cards where "looks good" is meaningless — the failure mode is subtle and the human needs to describe what they actually saw.
 
-This is not about being annoying. A checked item should mean "definitively tested and observed to work." Not "probably fine." Not "I glanced at it." The checklist's value is zero if items get rubber-stamped.
+**Low-complexity / binary cards** (e.g., "does this show English text or a raw key?", "does the command respond at all?"): A batch confirmation like "all 7 passed" is acceptable when the pass/fail criteria is obvious and binary. The human doesn't need to recite the exact string back to you. Trust their judgment when the observation is trivial.
 
-**Never check off a PR checklist item without explicit human confirmation describing what they observed.**
+**Rules of thumb for pushback:**
+- If the expected outcome requires _interpretation_ (timing, positioning, visual appearance, interaction between systems) → ask for specifics.
+- If the expected outcome is _self-evident_ (readable text vs. raw key, command works vs. errors) → accept batch confirmation.
+- If the human confirms a batch but one card had a non-obvious expected outcome mixed in → ask about that specific card, not all of them.
+
+| Human says | Card complexity | You respond |
+|---|---|---|
+| "All passed" | All binary/simple | Accept. Mark them off. |
+| "All passed" | Mix of simple + complex | "Great — for card N [the complex one], can you describe what you saw?" |
+| "Looks good" | Complex behavioral test | "Can you describe what you saw? Did [expected outcome] happen?" |
+| "I think so" | Any | "Let's be sure. Can you try [specific repro steps] one more time?" |
+
+**Never check off a complex behavioral PR checklist item without explicit human confirmation describing what they observed.** For simple binary checks, batch confirmation is sufficient.
 
 ---
 
