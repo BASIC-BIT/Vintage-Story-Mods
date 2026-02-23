@@ -127,7 +127,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             API.ChatCommands.GetOrCreate("rptext")
                 .WithDescription("Turn the whole RP system on or off for your messages")
                 .WithArgs(new BoolArgParser("mode", "on", false))
-                .RequiresPrivilege(Privilege.chat)
+                .RequiresPrivilege(Config.RPTextTogglePermission)
                 .RequiresPlayer()
                 .HandleWith(RpTextEnabled);
 

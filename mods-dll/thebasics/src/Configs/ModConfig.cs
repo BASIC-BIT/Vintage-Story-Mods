@@ -341,5 +341,9 @@ namespace thebasics.Configs
         // Disabled entirely when EnableTypingIndicator is false.
         [ProtoMember(76)]
         public TypingIndicatorDisplayMode TypingIndicatorDisplayMode { get; set; } = TypingIndicatorDisplayMode.Icon;
+
+        // Permission for the toggling of bypassing proximity chat restrictions entirely, allowing a player to speak globally regardless of distance or mode.
+        [ProtoMember(77)]
+        public string RPTextTogglePermission { get; set; } = "chat";
     }
 }
