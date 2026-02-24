@@ -36,7 +36,7 @@ using Vintagestory.API.Common;
 [assembly: AssemblyVersion("1.0.0.0")]
 
 [assembly: ModInfo( "The BASICs", "thebasics",
-    Version = "5.3.0",
+    Version = "5.4.0",
     Description = "Adds an RP proximity chat system, with configurable talking ranges, nicknames, automatic message formatting, and more! Also adds a server save notification.",
     Authors = new[] { "BASIC" })]
 
