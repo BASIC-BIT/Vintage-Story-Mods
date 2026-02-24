@@ -16,7 +16,10 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
     {
         // Always emit clientData for in-world bubble messages so vanilla bubbles keep working.
         // The config controls *what* text we place into the bubble, not whether a bubble exists.
-        return context.HasFlag(MessageContext.IS_SPEECH) || context.HasFlag(MessageContext.IS_EMOTE) || context.HasFlag(MessageContext.IS_ENVIRONMENTAL);
+        return context.HasFlag(MessageContext.IS_SPEECH)
+            || context.HasFlag(MessageContext.IS_EMOTE)
+            || context.HasFlag(MessageContext.IS_ENVIRONMENTAL)
+            || (context.HasFlag(MessageContext.IS_OOC) && context.HasFlag(MessageContext.IS_PLAYER_CHAT));
     }
 
     public override MessageContext Transform(MessageContext context)
@@ -99,10 +102,11 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         // Match vanilla behavior: the data string contains &lt; and &gt; which the client unescapes.
         bubbleTextToSend = VtmlUtils.EscapeVtml(bubbleTextToSend);
 
-        // Add kind marker for client-side styling of emote/env bubbles.
+        // Add kind marker for client-side styling of non-speech bubbles.
         // Speech bubbles will render via vanilla unless VTML is present.
         var kind = context.HasFlag(MessageContext.IS_ENVIRONMENTAL) ? "env" :
             context.HasFlag(MessageContext.IS_EMOTE) ? "emote" :
+            context.HasFlag(MessageContext.IS_OOC) ? "ooc" :
             null;
 
         if (kind != null)

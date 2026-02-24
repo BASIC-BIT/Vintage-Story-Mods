@@ -1,7 +1,27 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with code in this repository.
 
+## Autonomy and Preference Resolution
+
+- Respect the autonomy level explicitly requested by the current user in the active conversation.
+- Read `AGENTS.local.md` at the start of every session, if present.
+- If autonomy is not specified for a category of action, ask once, then save that preference in `AGENTS.local.md`.
+- Preference precedence is: current conversation instructions > `AGENTS.local.md` > `AGENTS.md`.
+- `AGENTS.local.md` is intended for local/personal preferences and should not be committed.
+- Keep `AGENTS.local.md` focused on operator-specific defaults (autonomy levels, approval gates, workflow preferences), not repository-wide policy.
+- If `AGENTS.local.md` does not exist, create it only when a persistent local preference needs to be recorded.
+- Record preferences by action category (for example: local repo work, contributor-facing GitHub actions, merges, manual QA, destructive operations).
+- Do not include secrets in `AGENTS.local.md`; treat it as local instructions, not secure storage.
+- Update `AGENTS.local.md` when the owner clarifies a lasting preference so it applies to future sessions.
+
+## Sensitive and Contributor-Facing Actions
+
+- Default to high autonomy for local repo work (investigation, code edits, builds, tests, and drafting plans).
+- Require explicit owner approval in the current conversation before any contributor-facing GitHub action (reviews, approvals, merges, comments, replies, labels, assignments, or similar actions).
+- Require explicit owner approval before merge operations.
+- Require explicit owner approval before starting manual QA, and before marking manual QA complete.
+- For contributor PRs, complete code review and local validation first, then present a QA plan and findings before requesting merge approval.
 
 
 ## Build Commands
@@ -110,12 +130,6 @@ _safeChannel.SendPacketSafely(new MyMessage());
 
 ### Configuration
 Mods use JSON configuration files stored in the game's ModConfig directory.
-
-## Current Work Status
-
-Based on git status, current work involves:
-- Refactoring the TPA system for gear integration (`TpaSystem.cs`)
-- Updates to server player extensions (`IServerPlayerExtensions.cs`)
 
 ## Testing
 
@@ -269,6 +283,14 @@ Manual QA is required before merging PRs that touch client-side rendering, confi
 - **Config-first batching.** Group cards by server config state to minimize restarts. Within a batch, group by feature area to minimize context-switching.
 - **Smart failure recovery.** After fixing a failed card, roll the re-test into the next batch when configs don't conflict, rather than adding an extra restart cycle.
 - **Discovery triage.** Pause after each batch to file GitHub issues for out-of-scope findings. Don't lose QA insights; don't let them block the PR either.
+
+For contributor PRs specifically:
+
+- Perform local code review and local validation (build/tests/log checks) before recommending merge.
+- If manual QA is required, present a concrete QA plan and obtain explicit owner approval before starting it.
+- Do not mark manual QA complete until the owner explicitly approves completion in the current conversation.
+
+
 
 ## Development Guidance
 

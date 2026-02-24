@@ -4,6 +4,8 @@ using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
+using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
@@ -127,7 +129,21 @@ public class PlayerChatTransformer : MessageTransformerBase
         var envStartLen = 0;
         var emoteStartLen = 0;
 
-        var hasGlobalOocStart = _config.EnableGlobalOOC && !string.IsNullOrEmpty(delimiters.GlobalOOC.Start) && TryConsumeDelimiterAtStart(content, delimiters.GlobalOOC.Start, out globalOocStartLen);
+        var hasGlobalOocPrefix = !string.IsNullOrEmpty(delimiters.GlobalOOC.Start) && TryConsumeDelimiterAtStart(content, delimiters.GlobalOOC.Start, out globalOocStartLen);
+
+        // Global OOC delimiter was used, but the feature is disabled: deny and explain.
+        if (hasGlobalOocPrefix && !_config.EnableGlobalOOC)
+        {
+            context.SendingPlayer?.SendMessage(
+                _chatSystem.ProximityChatId,
+                Lang.Get("thebasics:chat-gooc-disabled"),
+                EnumChatType.CommandError
+            );
+            context.State = MessageContextState.STOP;
+            return context;
+        }
+
+        var hasGlobalOocStart = _config.EnableGlobalOOC && hasGlobalOocPrefix;
         var hasOocStart = !hasGlobalOocStart && !string.IsNullOrEmpty(delimiters.OOC.Start) && TryConsumeDelimiterAtStart(content, delimiters.OOC.Start, out oocStartLen);
         var hasEnvironmentStart = !string.IsNullOrEmpty(delimiters.Environmental.Start) && TryConsumeDelimiterAtStart(content, delimiters.Environmental.Start, out envStartLen);
         var hasEmoteStart = !string.IsNullOrEmpty(delimiters.Emote.Start) && TryConsumeDelimiterAtStart(content, delimiters.Emote.Start, out emoteStartLen);
