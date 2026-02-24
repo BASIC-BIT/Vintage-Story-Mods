@@ -43,7 +43,38 @@ internal static class RichTextTextureUtils
             textWidthPx = Math.Max(1, textWidthPx);
             textHeightPx = Math.Max(1, textHeightPx);
 
-            // Pass 2: fresh components laid out at the measured tight width.
+            // Pass 2: tighten width using actual laid-out line width at the measured width.
+            // Some mixed VTML runs overestimate width in pass 1 and leave extra right-side gap.
+            var tightMeasureComps = VtmlUtil.Richtextify(capi, vtml, baseFont);
+            var tightMeasureBounds = ElementBounds.FixedSize(textWidthPx / (double)guiScale, 600 / (double)guiScale);
+            tightMeasureBounds.ParentBounds = ElementBounds.Empty;
+            var tightMeasure = new GuiElementRichtext(capi, tightMeasureComps, tightMeasureBounds);
+            tightMeasure.BeforeCalcBounds();
+
+            var tightenedWidthPx = (int)Math.Min(maxTextWidthPx, Math.Ceiling(tightMeasure.MaxLineWidth * guiScale));
+            tightenedWidthPx = Math.Max(1, tightenedWidthPx);
+
+            // Re-layout once if we shrank width materially (can affect wrapping/height).
+            if (tightenedWidthPx + 1 < textWidthPx)
+            {
+                textWidthPx = tightenedWidthPx;
+
+                var reflowComps = VtmlUtil.Richtextify(capi, vtml, baseFont);
+                var reflowBounds = ElementBounds.FixedSize(textWidthPx / (double)guiScale, 600 / (double)guiScale);
+                reflowBounds.ParentBounds = ElementBounds.Empty;
+                var reflow = new GuiElementRichtext(capi, reflowComps, reflowBounds);
+                reflow.BeforeCalcBounds();
+
+                textHeightPx = (int)Math.Ceiling(reflow.TotalHeight * guiScale);
+            }
+            else
+            {
+                textHeightPx = (int)Math.Ceiling(tightMeasure.TotalHeight * guiScale);
+            }
+
+            textHeightPx = Math.Max(1, textHeightPx);
+
+            // Pass 3: fresh components laid out at the final tight width/height.
             // Left alignment avoids the VS centering bug with mixed-font inline components.
             var renderComps = VtmlUtil.Richtextify(capi, vtml, baseFont);
             var finalBounds = ElementBounds.FixedSize(textWidthPx / (double)guiScale, textHeightPx / (double)guiScale);
