@@ -23,6 +23,14 @@ This file provides guidance to coding agents when working with code in this repo
 - Require explicit owner approval before starting manual QA, and before marking manual QA complete.
 - For contributor PRs, complete code review and local validation first, then present a QA plan and findings before requesting merge approval.
 
+## Agent Toolbox
+
+If the toolbox repo is present next to this repo, also read:
+- ../basics-agentic-dogfooding/AGENTS.md
+- ../basics-agentic-dogfooding/docs/agentic/README.md
+- ../basics-agentic-dogfooding/docs/opencode/README.md
+- ../basics-agentic-dogfooding/docs/opencode/toolbox.md
+
 
 ## Build Commands
 

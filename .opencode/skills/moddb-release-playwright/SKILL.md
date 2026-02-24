@@ -1,4 +1,13 @@
-# Skill: moddb-release-playwright
+---
+name: moddb-release-playwright
+description: Automate ModDB release uploads using Playwright browser flow when direct API upload is unavailable.
+compatibility: opencode
+metadata:
+  audience: maintainers
+  domain: release-ops
+---
+
+## Skill: moddb-release-playwright
 
 ## Purpose
 
