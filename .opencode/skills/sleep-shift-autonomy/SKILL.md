@@ -23,8 +23,9 @@ Keep agent output productive during operator off-hours by selecting reliable, hi
 3. Implement fixes in focused commits.
 4. Run local validation (build/tests/log checks as applicable).
 5. Push branch and open PR with clear summary, risks, and verification.
-6. Watch CI/checks and recycle on bot/human feedback until green.
+6. Watch CI/checks and iterate on bot/human feedback until green.
 7. Confirm mergeability and leave merge for operator approval.
+8. After merge/close, clean up the temporary worktree and branch.
 
 ## Guardrails
 
