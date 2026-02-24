@@ -1,5 +1,4 @@
 using System.Linq;
-using System.Globalization;
 using System.Text;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -18,16 +17,6 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         _languageSystem = languageSystem;
     }
 
-    private static bool IsDecoratorChar(char c)
-    {
-        // Handle zalgo-like effects (temporal storm/drunk) that add combining marks.
-        var cat = CharUnicodeInfo.GetUnicodeCategory(c);
-        return cat == UnicodeCategory.NonSpacingMark ||
-            cat == UnicodeCategory.SpacingCombiningMark ||
-            cat == UnicodeCategory.EnclosingMark ||
-            cat == UnicodeCategory.Format;
-    }
-
     private static bool TryParseLanguageSpecifier(string message, out string languageIdentifier, out string remainder)
     {
         languageIdentifier = null;
@@ -40,7 +29,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
 
         var i = 0;
         // Skip whitespace and any stray combining/format characters.
-        while (i < message.Length && (char.IsWhiteSpace(message[i]) || IsDecoratorChar(message[i])))
+        while (i < message.Length && (char.IsWhiteSpace(message[i]) || UnicodeUtils.IsDecoratorChar(message[i])))
         {
             i++;
         }
@@ -52,7 +41,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
 
         i++;
         // Skip decorators right after ':' (e.g. zalgo).
-        while (i < message.Length && IsDecoratorChar(message[i]))
+        while (i < message.Length && UnicodeUtils.IsDecoratorChar(message[i]))
         {
             i++;
         }
@@ -62,7 +51,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         while (i < message.Length)
         {
             var c = message[i];
-            if (IsDecoratorChar(c))
+            if (UnicodeUtils.IsDecoratorChar(c))
             {
                 i++;
                 continue;
@@ -86,7 +75,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         languageIdentifier = sb.ToString();
 
         // Skip whitespace and decorators between identifier and content.
-        while (i < message.Length && (char.IsWhiteSpace(message[i]) || IsDecoratorChar(message[i])))
+        while (i < message.Length && (char.IsWhiteSpace(message[i]) || UnicodeUtils.IsDecoratorChar(message[i])))
         {
             i++;
         }
