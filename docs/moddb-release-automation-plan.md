@@ -6,7 +6,7 @@
   - Title: `[Feature request] API endpoint for CD to upload new versions of the mod`
   - Status: Open
   - Maintainer comment indicates they would accept a PR.
-- In this repo, there is currently no issue that links to that upstream issue.
+- In this repo, tracking issue exists: #84 (`Track ModDB release automation (API + Playwright paths)`).
 
 ## Recommended strategy
 
