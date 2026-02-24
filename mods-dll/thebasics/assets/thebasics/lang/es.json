@@ -120,6 +120,7 @@
   "lang-error-max-languages": "¡No puedes aprender más de {0} idiomas! Elimina uno primero.",
   "lang-error-not-known": "¡No conoces el idioma {0}!",
   "lang-error-unknown-language": "¡No conoces ese idioma!",
+  "lang-error-system-disabled": "Las funciones de idioma están deshabilitadas en este servidor.",
   "lang-error-invalid-with-list": "Especificador de idioma inválido \":{0}\".  Los prefijos válidos incluyen: {1}",
   "lang-error-admin-already-known": "¡{0} ya conoce el idioma {1}!",
   "lang-error-admin-max-languages": "¡{0} no puede aprender más de {1} idiomas! Elimina uno primero.",
