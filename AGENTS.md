@@ -22,6 +22,7 @@ This file provides guidance to coding agents when working with code in this repo
 - Require explicit owner approval before merge operations.
 - Require explicit owner approval before starting manual QA, and before marking manual QA complete.
 - For contributor PRs, complete code review and local validation first, then present a QA plan and findings before requesting merge approval.
+- For AI/bot review recycle loops on PRs, before pushing follow-up recycle commits: react to each addressed review comment, post a concise reply describing the fix, and resolve the corresponding review thread.
 
 
 ## Build Commands

@@ -15,6 +15,8 @@ namespace thebasics.ModSystems.ProximityChat
 {
     public class LanguageSystem : BaseSubSystem
     {
+        public HeritageLanguageSystem? HeritageLanguageSystem { get; }
+
         public LanguageSystem(BaseBasicModSystem system, ICoreServerAPI api, ModConfig config) : base(system, api,
             config)
         {
@@ -72,11 +74,8 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithArgs(new PlayersArgParser("player", API, true))
                 .HandleWith(HandleAdminListLanguagesCommand);
 
-            api.Event.PlayerJoin += player =>
-            {
-                player.InstantiateLanguagesIfNotExist(config);
-                GrantClassLanguages(player);
-            };
+            var playerModelLibEnabled = API.ModLoader.IsModEnabled("playermodellib");
+            HeritageLanguageSystem = new HeritageLanguageSystem(System, API, Config, playerModelLibEnabled);
         }
 
         public static readonly Language BabbleLang = new Language("Babble", "Unintelligible", "babble", ["ba", "ble", "bla", "bal"], "#FF0000", false, true);
@@ -380,74 +379,18 @@ namespace thebasics.ModSystems.ProximityChat
             }
         }
 
-        private void GrantClassLanguages(IServerPlayer player)
+        [Obsolete("Use HeritageLanguageSystem watcher-driven class handling")]
+        public void OnPlayerClassChanged(IServerPlayer player, string oldClass, string newClass)
         {
-            // Get the player's character class
-            string characterClass = player.Entity.WatchedAttributes.GetString("characterClass");
-            if (string.IsNullOrEmpty(characterClass))
+            _ = oldClass;
+            _ = newClass;
+
+            if (player == null)
             {
-                // If no class is set yet, we'll check again when they select one
                 return;
             }
 
-            // Check each language to see if it should be granted to this class
-            foreach (var language in Config.Languages)
-            {
-                if (language.GrantedToClasses != null && language.GrantedToClasses.Length > 0)
-                {
-                    // Check if this class should get this language
-                    if (language.GrantedToClasses.Contains(characterClass))
-                    {
-                        // Only add if they don't already know it
-                        if (!player.KnowsLanguage(language))
-                        {
-                            player.AddLanguage(language);
-                            
-                            // Notify the player
-                            player.SendMessage(
-                                GlobalConstants.CurrentChatGroup, 
-                                Lang.Get("thebasics:lang-notify-class-grant", characterClass, ChatHelper.LangIdentifier(language)), 
-                                EnumChatType.Notification
-                            );
-                            
-                            // If they only know Babble, set this as their default language
-                            if (player.GetDefaultLanguage(Config).Name == BabbleLang.Name)
-                            {
-                                player.SetDefaultLanguage(language);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Method to be called when a player's class changes (for mods that allow class changes)
-        public void OnPlayerClassChanged(IServerPlayer player, string oldClass, string newClass)
-        {
-            // Remove languages from old class (optional - you might want to keep them)
-            if (!string.IsNullOrEmpty(oldClass) && Config.RemoveClassLanguagesOnClassChange)
-            {
-                foreach (var language in Config.Languages)
-                {
-                    if (language.GrantedToClasses != null && 
-                        language.GrantedToClasses.Contains(oldClass) && 
-                        !language.GrantedToClasses.Contains(newClass))
-                    {
-                        if (player.KnowsLanguage(language))
-                        {
-                            player.RemoveLanguage(language);
-                            player.SendMessage(
-                                GlobalConstants.CurrentChatGroup, 
-                                Lang.Get("thebasics:lang-notify-class-revoke", ChatHelper.LangIdentifier(language), oldClass), 
-                                EnumChatType.Notification
-                            );
-                        }
-                    }
-                }
-            }
-            
-            // Grant new languages
-            GrantClassLanguages(player);
+            HeritageLanguageSystem?.ReconcilePlayerClassChange(player);
         }
     }
 }

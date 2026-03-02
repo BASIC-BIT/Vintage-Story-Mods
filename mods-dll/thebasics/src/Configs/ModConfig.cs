@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 using ProtoBuf;
 using thebasics.Models;
 using thebasics.ModSystems.PlayerStats.Models;
@@ -290,10 +291,25 @@ namespace thebasics.Configs
         public bool UseNicknameInOOC { get; set; } = true;
         
         [ProtoMember(64)]
-        public bool RemoveClassLanguagesOnClassChange { get; set; } = false;
+        public bool RemoveGrantedLanguagesOnChange { get; set; }
 
         [ProtoMember(65)]
         public ChatDelimiters ChatDelimiters { get; set; }
+
+        [ProtoIgnore]
+        [JsonProperty("RemoveClassLanguagesOnClassChange", NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Use RemoveGrantedLanguagesOnChange")]
+        public bool? RemoveClassLanguagesOnClassChangeLegacy
+        {
+            get => null;
+            set
+            {
+                if (value == true)
+                {
+                    RemoveGrantedLanguagesOnChange = true;
+                }
+            }
+        }
 
         [ProtoMember(66)]
         public IDictionary<ProximityChatMode, float> RPTTS_ModeGain { get; set; }
