@@ -15,6 +15,8 @@ namespace thebasics.ModSystems.ProximityChat
 {
     public class LanguageSystem : BaseSubSystem
     {
+        public HeritageLanguageSystem? HeritageLanguageSystem { get; }
+
         public LanguageSystem(BaseBasicModSystem system, ICoreServerAPI api, ModConfig config) : base(system, api,
             config)
         {
@@ -72,11 +74,8 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithArgs(new PlayersArgParser("player", API, true))
                 .HandleWith(HandleAdminListLanguagesCommand);
 
-            api.Event.PlayerJoin += player =>
-            {
-                player.InstantiateLanguagesIfNotExist(config);
-                GrantClassLanguages(player);
-            };
+            var playerModelLibEnabled = API.ModLoader.IsModEnabled("playermodellib");
+            HeritageLanguageSystem = new HeritageLanguageSystem(System, API, Config, playerModelLibEnabled);
         }
 
         public static readonly Language BabbleLang = new Language("Babble", "Unintelligible", "babble", ["ba", "ble", "bla", "bal"], "#FF0000", false, true);
@@ -425,7 +424,7 @@ namespace thebasics.ModSystems.ProximityChat
         public void OnPlayerClassChanged(IServerPlayer player, string oldClass, string newClass)
         {
             // Remove languages from old class (optional - you might want to keep them)
-            if (!string.IsNullOrEmpty(oldClass) && Config.RemoveClassLanguagesOnClassChange)
+            if (!string.IsNullOrEmpty(oldClass) && Config.RemoveGrantedLanguagesOnChange)
             {
                 foreach (var language in Config.Languages)
                 {
