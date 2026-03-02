@@ -151,6 +151,11 @@ public class HeritageLanguageSystem : BaseSubSystem
         }
     }
 
+    public void ReconcilePlayerClassChange(IServerPlayer player)
+    {
+        HandleClassChanged(player);
+    }
+
     private void HandleTraitsChanged(IServerPlayer player)
     {
         lock (_mutationLock)
