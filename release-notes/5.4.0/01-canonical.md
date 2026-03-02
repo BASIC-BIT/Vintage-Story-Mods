@@ -13,6 +13,10 @@ This release rolls up all changes since `v5.3.0`.
 - OOC/GOOC behavior got critical polish:
   - `((...))` is now explicitly denied when `EnableGlobalOOC=false`
   - OOC player chat now uses the bubble VTML/styling path consistently
+- Heritage language grants were reintroduced and expanded:
+  - automatic grants by class, class traits, and extra traits
+  - optional PlayerModelLib model/group-based grants
+  - safer revoke behavior when `RemoveGrantedLanguagesOnChange=true`
 
 ## Chat and RP Improvements
 
@@ -20,6 +24,7 @@ This release rolls up all changes since `v5.3.0`.
 - Better language-aware RP bubble formatting
 - Stronger guardrails around language switching and language-disabled mode behavior
 - Improved nametag and indicator behavior in RP chat contexts
+- Heritage watcher flow now keeps language grants in sync on class/trait/model changes
 
 ## Admin and Reliability Improvements
 
@@ -48,7 +53,9 @@ This release rolls up all changes since `v5.3.0`.
 - `#78` Crowdin language mapping
 - `#80` OOC/GOOC behavior fixes
 - `#83` non-English GOOC-disabled translations
+- `#90` heritage language grants for class/trait/model bindings
 
 ## Known Follow-up
 
 - `#82` Speech bubble wrapping edge case for long unbroken words
+- `#91` heritage language class-change notification churn (net-delta UX follow-up)
