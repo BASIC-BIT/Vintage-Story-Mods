@@ -32,6 +32,7 @@ public class HeritageLanguageSystem : BaseSubSystem
     private readonly Dictionary<string, Action> _modelListeners = new();
     private readonly Dictionary<string, Action> _classListeners = new();
     private readonly Dictionary<string, Action> _traitListeners = new();
+    private readonly object _mutationLock = new();
     private readonly bool _playerModelLibEnabled;
     private readonly bool _hasModelBindings;
 
@@ -53,6 +54,7 @@ public class HeritageLanguageSystem : BaseSubSystem
             language.GrantedToModelGroups.Length > 0);
 
         api.Event.PlayerJoin += HandlePlayerJoin;
+        api.Event.PlayerDisconnect += HandlePlayerDisconnect;
     }
 
     private void HandlePlayerJoin(IServerPlayer player)
@@ -91,6 +93,18 @@ public class HeritageLanguageSystem : BaseSubSystem
         }
     }
 
+    private void HandlePlayerDisconnect(IServerPlayer player)
+    {
+        if (string.IsNullOrWhiteSpace(player?.PlayerUID))
+        {
+            return;
+        }
+
+        _classListeners.Remove(player.PlayerUID);
+        _traitListeners.Remove(player.PlayerUID);
+        _modelListeners.Remove(player.PlayerUID);
+    }
+
     private void RegisterAttributeWatcher(IServerPlayer player, string attributeKey, Dictionary<string, Action> registry, Action<IServerPlayer> callback)
     {
         var watchedAttributes = player.Entity?.WatchedAttributes;
@@ -107,37 +121,50 @@ public class HeritageLanguageSystem : BaseSubSystem
 
     private void HandleClassChanged(IServerPlayer player)
     {
-        var previousClass = player.GetModData<string?>(ClassModDataKey, null) ?? string.Empty;
-        var currentClass = GetPlayerClass(player);
-
-        if (!string.Equals(previousClass, currentClass, StringComparison.OrdinalIgnoreCase))
+        lock (_mutationLock)
         {
-            if (!string.IsNullOrWhiteSpace(previousClass))
+            var previousClass = player.GetModData<string?>(ClassModDataKey, null) ?? string.Empty;
+            var currentClass = GetPlayerClass(player);
+
+            if (!string.Equals(previousClass, currentClass, StringComparison.OrdinalIgnoreCase))
             {
-                RemoveClassLanguages(player, previousClass);
+                if (!string.IsNullOrWhiteSpace(previousClass))
+                {
+                    RemoveClassLanguages(player, previousClass);
+                }
+
+                if (!string.IsNullOrWhiteSpace(currentClass))
+                {
+                    GrantClassLanguages(player, currentClass, notify: true);
+                }
             }
 
-            if (!string.IsNullOrWhiteSpace(currentClass))
+            var previousTraits = player.GetModData<string[]?>(TraitsModDataKey, null) ?? Array.Empty<string>();
+            var currentTraits = GetPlayerTraits(player);
+            if (!AreSameCodes(previousTraits, currentTraits))
             {
-                GrantClassLanguages(player, currentClass, notify: true);
+                UpdateTraitLanguages(player, previousTraits, currentTraits, notify: true);
             }
+
+            StorePlayerClass(player, currentClass);
+            StorePlayerTraits(player, currentTraits);
         }
-
-        var previousTraits = player.GetModData<string[]?>(TraitsModDataKey, null) ?? Array.Empty<string>();
-        var currentTraits = GetPlayerTraits(player);
-        UpdateTraitLanguages(player, previousTraits, currentTraits, notify: true);
-
-        StorePlayerClass(player, currentClass);
-        StorePlayerTraits(player, currentTraits);
     }
 
     private void HandleTraitsChanged(IServerPlayer player)
     {
-        var previousTraits = player.GetModData<string[]?>(TraitsModDataKey, null) ?? Array.Empty<string>();
-        var currentTraits = GetPlayerTraits(player);
+        lock (_mutationLock)
+        {
+            var previousTraits = player.GetModData<string[]?>(TraitsModDataKey, null) ?? Array.Empty<string>();
+            var currentTraits = GetPlayerTraits(player);
+            if (AreSameCodes(previousTraits, currentTraits))
+            {
+                return;
+            }
 
-        UpdateTraitLanguages(player, previousTraits, currentTraits, notify: true);
-        StorePlayerTraits(player, currentTraits);
+            UpdateTraitLanguages(player, previousTraits, currentTraits, notify: true);
+            StorePlayerTraits(player, currentTraits);
+        }
     }
 
     private void UpdateTraitLanguages(IServerPlayer player, string[] previousTraits, string[] currentTraits, bool notify)
@@ -178,8 +205,13 @@ public class HeritageLanguageSystem : BaseSubSystem
             return;
         }
 
+        var currentClass = GetPlayerClass(player);
+        var currentTraits = GetPlayerTraits(player);
+        var (currentModelCode, currentModelGroupCode) = GetCurrentModelContext(player);
+
         var toRemove = Config.Languages
             .Where(language => language.GrantedToClasses.Any(bound => string.Equals(bound, classCode, StringComparison.OrdinalIgnoreCase)))
+            .Where(language => !IsLanguageGrantedByHeritage(language, currentClass, currentTraits, currentModelCode, currentModelGroupCode))
             .ToList();
 
         RemoveLanguages(
@@ -210,9 +242,13 @@ public class HeritageLanguageSystem : BaseSubSystem
         }
 
         var traitSet = new HashSet<string>(NormalizeCodes(traitCodes), StringComparer.OrdinalIgnoreCase);
+        var currentClass = GetPlayerClass(player);
+        var currentTraits = GetPlayerTraits(player);
+        var (currentModelCode, currentModelGroupCode) = GetCurrentModelContext(player);
 
         var toRemove = Config.Languages
             .Where(language => language.GrantedToTraits.Any(trait => traitSet.Contains(trait)))
+            .Where(language => !IsLanguageGrantedByHeritage(language, currentClass, currentTraits, currentModelCode, currentModelGroupCode))
             .ToList();
 
         RemoveLanguages(
@@ -247,6 +283,10 @@ public class HeritageLanguageSystem : BaseSubSystem
             return;
         }
 
+        var currentClass = GetPlayerClass(player);
+        var currentTraits = GetPlayerTraits(player);
+        var (currentModelCode, currentModelGroupCode) = GetCurrentModelContext(player);
+
         var modelVariants = ExpandModelCodeVariants(modelCode).ToArray();
         var groupVariants = ExpandModelCodeVariants(modelGroup).ToArray();
 
@@ -254,6 +294,7 @@ public class HeritageLanguageSystem : BaseSubSystem
             .Where(language =>
                 MatchesAny(language.GrantedToModels, modelVariants) ||
                 MatchesAny(language.GrantedToModelGroups, groupVariants))
+            .Where(language => !IsLanguageGrantedByHeritage(language, currentClass, currentTraits, currentModelCode, currentModelGroupCode))
             .ToList();
 
         var descriptor = GetModelDescriptor(modelCode, modelGroup);
@@ -280,28 +321,31 @@ public class HeritageLanguageSystem : BaseSubSystem
 
     private void HandleSkinModelChanged(IServerPlayer player)
     {
-        var newModel = GetPlayerModelCode(player);
-        var newModelGroup = GetModelGroupCode(newModel);
-        var previousModel = player.GetModData<string?>(ModelModDataKey, null) ?? string.Empty;
-        var previousModelGroup = player.GetModData<string?>(ModelGroupModDataKey, null) ?? string.Empty;
-
-        if (string.Equals(previousModel, newModel, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(previousModelGroup, newModelGroup, StringComparison.OrdinalIgnoreCase))
+        lock (_mutationLock)
         {
-            return;
-        }
+            var newModel = GetPlayerModelCode(player);
+            var newModelGroup = GetModelGroupCode(newModel);
+            var previousModel = player.GetModData<string?>(ModelModDataKey, null) ?? string.Empty;
+            var previousModelGroup = player.GetModData<string?>(ModelGroupModDataKey, null) ?? string.Empty;
 
-        if (!string.IsNullOrWhiteSpace(previousModel) || !string.IsNullOrWhiteSpace(previousModelGroup))
-        {
-            RemoveModelLanguages(player, previousModel, previousModelGroup);
-        }
+            if (string.Equals(previousModel, newModel, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(previousModelGroup, newModelGroup, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
 
-        if (!string.IsNullOrWhiteSpace(newModel) || !string.IsNullOrWhiteSpace(newModelGroup))
-        {
-            GrantModelLanguages(player, newModel, newModelGroup, notify: true);
-        }
+            if (!string.IsNullOrWhiteSpace(previousModel) || !string.IsNullOrWhiteSpace(previousModelGroup))
+            {
+                RemoveModelLanguages(player, previousModel, previousModelGroup);
+            }
 
-        StorePlayerAppearance(player, newModel, newModelGroup);
+            if (!string.IsNullOrWhiteSpace(newModel) || !string.IsNullOrWhiteSpace(newModelGroup))
+            {
+                GrantModelLanguages(player, newModel, newModelGroup, notify: true);
+            }
+
+            StorePlayerAppearance(player, newModel, newModelGroup);
+        }
     }
 
     private static string GetPlayerClass(IServerPlayer player)
@@ -369,8 +413,9 @@ public class HeritageLanguageSystem : BaseSubSystem
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            API.Logger.Warning("[thebasics] HeritageLanguageSystem: failed loading class traits from CharacterSystem ({0}), falling back to asset load.", ex.Message);
             // Fall back to asset loading.
         }
 
@@ -390,8 +435,9 @@ public class HeritageLanguageSystem : BaseSubSystem
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            API.Logger.Warning("[thebasics] HeritageLanguageSystem: failed loading class traits from asset fallback ({0}).", ex.Message);
             // No class trait metadata available.
         }
     }
@@ -609,6 +655,51 @@ public class HeritageLanguageSystem : BaseSubSystem
         {
             player.SetModData(TraitsModDataKey, traitCodes);
         }
+    }
+
+    private (string modelCode, string modelGroupCode) GetCurrentModelContext(IServerPlayer player)
+    {
+        if (!_playerModelLibEnabled || !_hasModelBindings)
+        {
+            return (string.Empty, string.Empty);
+        }
+
+        var modelCode = GetPlayerModelCode(player);
+        var modelGroupCode = GetModelGroupCode(modelCode);
+        return (modelCode, modelGroupCode);
+    }
+
+    private bool IsLanguageGrantedByHeritage(Language language, string classCode, IEnumerable<string> traits, string modelCode, string modelGroupCode)
+    {
+        if (!string.IsNullOrWhiteSpace(classCode) && language.GrantedToClasses.Any(bound => string.Equals(bound, classCode, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var traitSet = new HashSet<string>(NormalizeCodes(traits), StringComparer.OrdinalIgnoreCase);
+        if (traitSet.Count > 0 && language.GrantedToTraits.Any(traitSet.Contains))
+        {
+            return true;
+        }
+
+        if (!_playerModelLibEnabled || !_hasModelBindings)
+        {
+            return false;
+        }
+
+        var modelVariants = ExpandModelCodeVariants(modelCode).ToArray();
+        var groupVariants = ExpandModelCodeVariants(modelGroupCode).ToArray();
+        return MatchesAny(language.GrantedToModels, modelVariants) ||
+               MatchesAny(language.GrantedToModelGroups, groupVariants);
+    }
+
+    private static bool AreSameCodes(IEnumerable<string> left, IEnumerable<string> right)
+    {
+        var normalizedLeft = NormalizeCodes(left);
+        var normalizedRight = NormalizeCodes(right);
+
+        return normalizedLeft.Length == normalizedRight.Length &&
+               !normalizedLeft.Except(normalizedRight, StringComparer.OrdinalIgnoreCase).Any();
     }
 
     private static bool MatchesAny(IEnumerable<string> patterns, IEnumerable<string> candidates)
