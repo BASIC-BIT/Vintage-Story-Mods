@@ -120,6 +120,7 @@
   "lang-error-max-languages": "Vous ne pouvez pas apprendre plus de {0} langues ! Retirez-en une d'abord.",
   "lang-error-not-known": "Vous ne connaissez pas la langue {0} !",
   "lang-error-unknown-language": "Vous ne connaissez pas cette langue !",
+  "lang-error-system-disabled": "Les fonctions de langue sont désactivées sur ce serveur.",
   "lang-error-invalid-with-list": "Identifiant de langue invalide \":{0}\".  Préfixes valides : {1}",
   "lang-error-admin-already-known": "{0} connaît déjà la langue {1} !",
   "lang-error-admin-max-languages": "{0} ne peut pas apprendre plus de {1} langues ! Retirez-en une d'abord.",
