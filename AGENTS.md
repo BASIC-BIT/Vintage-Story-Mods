@@ -24,6 +24,14 @@ This file provides guidance to coding agents when working with code in this repo
 - For contributor PRs, complete code review and local validation first, then present a QA plan and findings before requesting merge approval.
 - For AI/bot review recycle loops on PRs, before pushing follow-up recycle commits: react to each addressed review comment, post a concise reply describing the fix, and resolve the corresponding review thread.
 
+## Agent Toolbox
+
+If the toolbox repo is present next to this repo, also read:
+- ../basics-agentic-dogfooding/AGENTS.md
+- ../basics-agentic-dogfooding/docs/agentic/README.md
+- ../basics-agentic-dogfooding/docs/opencode/README.md
+- ../basics-agentic-dogfooding/docs/opencode/toolbox.md
+
 
 ## Build Commands
 
