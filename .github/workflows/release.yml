@@ -12,6 +12,11 @@ on:
         required: false
         type: boolean
         default: false
+      persist_version_commit:
+        description: 'Commit and push version file updates to default branch (requires RELEASE_PUSH_TOKEN bypass token)'
+        required: false
+        type: boolean
+        default: false
       release_notes:
         description: 'Release notes (optional - will use auto-generated if empty)'
         required: false
@@ -129,6 +134,39 @@ jobs:
         } else {
           Write-Host "Version files updated in workflow workspace for packaging/release; no branch push attempted." -ForegroundColor Yellow
         }
+
+    - name: Optionally commit and push version changes
+      if: ${{ github.event.inputs.persist_version_commit == 'true' }}
+      shell: pwsh
+      run: |
+        if (-not "${{ secrets.RELEASE_PUSH_TOKEN }}") {
+          Write-Host "Error: persist_version_commit=true requires RELEASE_PUSH_TOKEN secret." -ForegroundColor Red
+          exit 1
+        }
+
+        $newVersion = "${{ github.event.inputs.new_version }}"
+        $defaultBranch = "${{ github.event.repository.default_branch }}"
+        $versionFiles = @(
+          "mods-dll/thebasics/modinfo.json",
+          "mods-dll/thebasics/Properties/AssemblyInfo.cs"
+        )
+
+        git diff --quiet -- $versionFiles
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "No version file changes to commit; skipping push." -ForegroundColor Green
+          exit 0
+        }
+
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        git add -- $versionFiles
+        git commit -m "Release v$newVersion - Update version numbers"
+
+        git remote set-url origin "https://x-access-token:${{ secrets.RELEASE_PUSH_TOKEN }}@github.com/${{ github.repository }}.git"
+        git push origin "HEAD:$defaultBranch"
+
+        Write-Host "Version update committed and pushed to $defaultBranch" -ForegroundColor Green
         
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
