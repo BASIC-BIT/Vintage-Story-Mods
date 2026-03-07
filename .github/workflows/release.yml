@@ -129,32 +129,40 @@ jobs:
         git status --short -- $versionFiles
 
         git diff --quiet -- $versionFiles
-        if ($LASTEXITCODE -eq 0) {
+        $diffExitCode = $LASTEXITCODE
+        if ($diffExitCode -eq 0) {
           Write-Host "Version files already matched requested version; continuing without a commit." -ForegroundColor Green
-        } else {
+        } elseif ($diffExitCode -eq 1) {
           Write-Host "Version files updated in workflow workspace for packaging/release; no branch push attempted." -ForegroundColor Yellow
+        } else {
+          Write-Host "Error: Failed to inspect version file changes (exit code $diffExitCode)." -ForegroundColor Red
+          exit $diffExitCode
         }
+        exit 0
 
-    - name: Optionally commit and push version changes
-      if: ${{ github.event.inputs.persist_version_commit == 'true' }}
+    - name: Create release source commit for version files
+      id: version_source_commit
       shell: pwsh
       run: |
-        if (-not "${{ secrets.RELEASE_PUSH_TOKEN }}") {
-          Write-Host "Error: persist_version_commit=true requires RELEASE_PUSH_TOKEN secret." -ForegroundColor Red
-          exit 1
-        }
-
         $newVersion = "${{ github.event.inputs.new_version }}"
-        $defaultBranch = "${{ github.event.repository.default_branch }}"
         $versionFiles = @(
           "mods-dll/thebasics/modinfo.json",
           "mods-dll/thebasics/Properties/AssemblyInfo.cs"
         )
 
         git diff --quiet -- $versionFiles
-        if ($LASTEXITCODE -eq 0) {
-          Write-Host "No version file changes to commit; skipping push." -ForegroundColor Green
+        $diffExitCode = $LASTEXITCODE
+        if ($diffExitCode -eq 0) {
+          $headSha = git rev-parse HEAD
+          echo "created=false" >> $env:GITHUB_OUTPUT
+          echo "sha=$headSha" >> $env:GITHUB_OUTPUT
+          Write-Host "No version file commit needed; using existing HEAD $headSha" -ForegroundColor Green
           exit 0
+        }
+
+        if ($diffExitCode -ne 1) {
+          Write-Host "Error: Failed to inspect version file changes (exit code $diffExitCode)." -ForegroundColor Red
+          exit $diffExitCode
         }
 
         git config user.name "github-actions[bot]"
@@ -163,7 +171,26 @@ jobs:
         git add -- $versionFiles
         git commit -m "Release v$newVersion - Update version numbers"
 
-        git remote set-url origin "https://x-access-token:${{ secrets.RELEASE_PUSH_TOKEN }}@github.com/${{ github.repository }}.git"
+        $commitSha = git rev-parse HEAD
+        echo "created=true" >> $env:GITHUB_OUTPUT
+        echo "sha=$commitSha" >> $env:GITHUB_OUTPUT
+        Write-Host "Created local release source commit: $commitSha" -ForegroundColor Green
+        exit 0
+
+    - name: Optionally commit and push version changes
+      if: ${{ github.event.inputs.persist_version_commit == 'true' && steps.version_source_commit.outputs.created == 'true' }}
+      shell: pwsh
+      env:
+        RELEASE_PUSH_TOKEN: ${{ secrets.RELEASE_PUSH_TOKEN }}
+      run: |
+        if (-not $env:RELEASE_PUSH_TOKEN) {
+          Write-Host "Error: persist_version_commit=true requires RELEASE_PUSH_TOKEN secret." -ForegroundColor Red
+          exit 1
+        }
+
+        $defaultBranch = "${{ github.event.repository.default_branch }}"
+
+        git remote set-url origin "https://x-access-token:$env:RELEASE_PUSH_TOKEN@github.com/${{ github.repository }}.git"
         git push origin "HEAD:$defaultBranch"
 
         Write-Host "Version update committed and pushed to $defaultBranch" -ForegroundColor Green
@@ -342,16 +369,25 @@ jobs:
       run: |
         $newVersion = "${{ github.event.inputs.new_version }}"
         $tagName = "V$newVersion"
+        $sourceCommit = "${{ steps.version_source_commit.outputs.sha }}"
+
+        if (-not $sourceCommit) {
+          $sourceCommit = git rev-parse HEAD
+        }
         
         Write-Host "Ensuring git tag exists: $tagName" -ForegroundColor Yellow
 
         git ls-remote --exit-code --tags origin "refs/tags/$tagName" *> $null
-        if ($LASTEXITCODE -eq 0) {
+        $lsExitCode = $LASTEXITCODE
+        if ($lsExitCode -eq 0) {
           Write-Host "Tag already exists on origin; skipping tag creation." -ForegroundColor Green
-        } else {
-          git tag $tagName
-          git push origin $tagName
+        } elseif ($lsExitCode -eq 1) {
+          git tag $tagName $sourceCommit
+          git push origin "refs/tags/$tagName"
           Write-Host "Tag created and pushed successfully" -ForegroundColor Green
+        } else {
+          Write-Host "Error: git ls-remote failed with exit code $lsExitCode" -ForegroundColor Red
+          exit $lsExitCode
         }
         
     - name: Create GitHub Release
