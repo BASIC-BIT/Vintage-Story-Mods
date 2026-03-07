@@ -55,19 +55,21 @@ jobs:
     - name: Get previous GitHub release version
       id: previous_release
       shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $repo = "${{ github.repository }}"
         $newTag = "V${{ github.event.inputs.new_version }}"
 
         $headers = @{
-          Authorization = "Bearer ${{ secrets.GITHUB_TOKEN }}"
+          Authorization = "Bearer $env:GH_TOKEN"
           Accept = "application/vnd.github+json"
           "X-GitHub-Api-Version" = "2022-11-28"
           "User-Agent" = "github-actions"
         }
 
         $uri = "https://api.github.com/repos/$repo/releases?per_page=100"
-        $releases = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get
+        $releases = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get -ErrorAction Stop
 
         $previousRelease = $releases |
           Where-Object { -not $_.draft -and $_.tag_name -ne $newTag } |
