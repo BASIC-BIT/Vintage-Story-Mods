@@ -72,7 +72,7 @@ jobs:
         $releases = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get -ErrorAction Stop
 
         $previousRelease = $releases |
-          Where-Object { -not $_.draft -and $_.tag_name -ne $newTag } |
+          Where-Object { -not $_.draft -and -not $_.prerelease -and $_.tag_name -ne $newTag } |
           Select-Object -First 1
 
         if ($null -eq $previousRelease) {
