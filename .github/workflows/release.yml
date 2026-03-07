@@ -171,7 +171,7 @@ jobs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
         git add -- $versionFiles
-        git commit -m "Release v$newVersion - Update version numbers"
+        git commit -m "Release v$newVersion - Update version numbers [skip ci]"
 
         $commitSha = git rev-parse HEAD
         echo "created=true" >> $env:GITHUB_OUTPUT
