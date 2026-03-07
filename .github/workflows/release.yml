@@ -12,6 +12,11 @@ on:
         required: false
         type: boolean
         default: false
+      persist_version_commit:
+        description: 'Commit and push version file updates to default branch (requires RELEASE_PUSH_TOKEN bypass token)'
+        required: false
+        type: boolean
+        default: false
       release_notes:
         description: 'Release notes (optional - will use auto-generated if empty)'
         required: false
@@ -32,8 +37,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        ref: master
+        ref: ${{ github.event.repository.default_branch }}
         token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+        fetch-tags: true
         
     - name: Validate version format
       shell: pwsh
@@ -45,15 +52,45 @@ jobs:
         }
         Write-Host "Version format is valid: $version" -ForegroundColor Green
         
-    - name: Get current version
-      id: current_version
+    - name: Get previous GitHub release version
+      id: previous_release
       shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        $modInfoPath = "mods-dll/thebasics/modinfo.json"
-        $modInfo = Get-Content $modInfoPath | ConvertFrom-Json
-        $currentVersion = $modInfo.version
-        Write-Host "Current version: $currentVersion"
-        echo "current=$currentVersion" >> $env:GITHUB_OUTPUT
+        $repo = "${{ github.repository }}"
+        $newTag = "V${{ github.event.inputs.new_version }}"
+
+        $headers = @{
+          Authorization = "Bearer $env:GH_TOKEN"
+          Accept = "application/vnd.github+json"
+          "X-GitHub-Api-Version" = "2022-11-28"
+          "User-Agent" = "github-actions"
+        }
+
+        $uri = "https://api.github.com/repos/$repo/releases?per_page=100"
+        $releases = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get -ErrorAction Stop
+
+        $previousRelease = $releases |
+          Where-Object { -not $_.draft -and -not $_.prerelease -and $_.tag_name -ne $newTag } |
+          Select-Object -First 1
+
+        if ($null -eq $previousRelease) {
+          Write-Host "No previous published release found." -ForegroundColor Yellow
+          echo "tag=" >> $env:GITHUB_OUTPUT
+          echo "version=" >> $env:GITHUB_OUTPUT
+        } else {
+          $previousTag = [string]$previousRelease.tag_name
+          if ($previousTag -match '^V(.+)$') {
+            $previousVersion = $Matches[1]
+          } else {
+            $previousVersion = $previousTag
+          }
+
+          Write-Host "Previous release: $previousTag" -ForegroundColor Green
+          echo "tag=$previousTag" >> $env:GITHUB_OUTPUT
+          echo "version=$previousVersion" >> $env:GITHUB_OUTPUT
+        }
         
     - name: Update modinfo.json version
       shell: pwsh
@@ -83,24 +120,82 @@ jobs:
         
         Write-Host "Updated AssemblyInfo.cs successfully" -ForegroundColor Green
         
-    - name: Configure Git
+    - name: Report version file changes
       shell: pwsh
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        
-    - name: Commit version changes
+        $versionFiles = @(
+          "mods-dll/thebasics/modinfo.json",
+          "mods-dll/thebasics/Properties/AssemblyInfo.cs"
+        )
+
+        git status --short -- $versionFiles
+
+        git diff --quiet -- $versionFiles
+        $diffExitCode = $LASTEXITCODE
+        if ($diffExitCode -eq 0) {
+          Write-Host "Version files already matched requested version; continuing without a commit." -ForegroundColor Green
+        } elseif ($diffExitCode -eq 1) {
+          Write-Host "Version files updated in workflow workspace for packaging/release; no branch push attempted." -ForegroundColor Yellow
+        } else {
+          Write-Host "Error: Failed to inspect version file changes (exit code $diffExitCode)." -ForegroundColor Red
+          exit $diffExitCode
+        }
+        exit 0
+
+    - name: Create release source commit for version files
+      id: version_source_commit
       shell: pwsh
       run: |
         $newVersion = "${{ github.event.inputs.new_version }}"
-        
-        git add mods-dll/thebasics/modinfo.json
-        git add mods-dll/thebasics/Properties/AssemblyInfo.cs
-        
-        git commit -m "Release v$newVersion - Update version numbers"
-        git push origin master
-        
-        Write-Host "Version update committed and pushed" -ForegroundColor Green
+        $versionFiles = @(
+          "mods-dll/thebasics/modinfo.json",
+          "mods-dll/thebasics/Properties/AssemblyInfo.cs"
+        )
+
+        git diff --quiet -- $versionFiles
+        $diffExitCode = $LASTEXITCODE
+        if ($diffExitCode -eq 0) {
+          $headSha = git rev-parse HEAD
+          echo "created=false" >> $env:GITHUB_OUTPUT
+          echo "sha=$headSha" >> $env:GITHUB_OUTPUT
+          Write-Host "No version file commit needed; using existing HEAD $headSha" -ForegroundColor Green
+          exit 0
+        }
+
+        if ($diffExitCode -ne 1) {
+          Write-Host "Error: Failed to inspect version file changes (exit code $diffExitCode)." -ForegroundColor Red
+          exit $diffExitCode
+        }
+
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        git add -- $versionFiles
+        git commit -m "Release v$newVersion - Update version numbers [skip ci]"
+
+        $commitSha = git rev-parse HEAD
+        echo "created=true" >> $env:GITHUB_OUTPUT
+        echo "sha=$commitSha" >> $env:GITHUB_OUTPUT
+        Write-Host "Created local release source commit: $commitSha" -ForegroundColor Green
+        exit 0
+
+    - name: Optionally commit and push version changes
+      if: ${{ github.event.inputs.persist_version_commit == 'true' && steps.version_source_commit.outputs.created == 'true' }}
+      shell: pwsh
+      env:
+        RELEASE_PUSH_TOKEN: ${{ secrets.RELEASE_PUSH_TOKEN }}
+      run: |
+        if (-not $env:RELEASE_PUSH_TOKEN) {
+          Write-Host "Error: persist_version_commit=true requires RELEASE_PUSH_TOKEN secret." -ForegroundColor Red
+          exit 1
+        }
+
+        $defaultBranch = "${{ github.event.repository.default_branch }}"
+
+        git remote set-url origin "https://x-access-token:$env:RELEASE_PUSH_TOKEN@github.com/${{ github.repository }}.git"
+        git push origin "HEAD:$defaultBranch"
+
+        Write-Host "Version update committed and pushed to $defaultBranch" -ForegroundColor Green
         
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -236,26 +331,36 @@ jobs:
       shell: pwsh
       run: |
         $newVersion = "${{ github.event.inputs.new_version }}"
-        $currentVersion = "${{ steps.current_version.outputs.current }}"
+        $previousVersion = "${{ steps.previous_release.outputs.version }}"
+        $previousTag = "${{ steps.previous_release.outputs.tag }}"
         $customNotes = "${{ github.event.inputs.release_notes }}"
+        $newTag = "V$newVersion"
         
-                 if ($customNotes -and $customNotes.Trim()) {
+         if ($customNotes -and $customNotes.Trim()) {
            $releaseNotes = $customNotes
          } else {
-           # Generate basic release notes
-           $releaseNotes = "# The BASICs v$newVersion`n`n"
-           $releaseNotes += "## What's Changed`n"
-           $releaseNotes += "This release updates The BASICs mod from v$currentVersion to v$newVersion.`n`n"
-           $releaseNotes += "## Installation`n"
-           $releaseNotes += "1. Download the ``thebasics-v$newVersion.zip`` file below`n"
-           $releaseNotes += "2. Place it in your Vintage Story mods folder`n"
-           $releaseNotes += "3. Restart your server/client`n`n"
-           $releaseNotes += "## Support`n"
-           $releaseNotes += "- Join our [Discord](https://discord.gg/PYKTaJ5Ett) for support`n"
-           $releaseNotes += "- Visit the [ModDB page](https://mods.vintagestory.at/thebasics) for more information`n"
-           $releaseNotes += "- Report issues on [GitHub](https://github.com/BASIC-BIT/Vintage-Story-Mods/issues)`n`n"
-           $releaseNotes += "**Full Changelog**: https://github.com/BASIC-BIT/Vintage-Story-Mods/compare/V$currentVersion...V$newVersion"
-         }
+            # Generate basic release notes
+            $releaseNotes = "# The BASICs v$newVersion`n`n"
+            $releaseNotes += "## What's Changed`n"
+            if ($previousVersion) {
+              $releaseNotes += "This release updates The BASICs mod from v$previousVersion to v$newVersion.`n`n"
+            } else {
+              $releaseNotes += "This release publishes The BASICs v$newVersion with packaged release assets.`n`n"
+            }
+            $releaseNotes += "## Installation`n"
+            $releaseNotes += "1. Download the ``thebasics-v$newVersion.zip`` file below`n"
+            $releaseNotes += "2. Place it in your Vintage Story mods folder`n"
+            $releaseNotes += "3. Restart your server/client`n`n"
+            $releaseNotes += "## Support`n"
+            $releaseNotes += "- Join our [Discord](https://discord.gg/PYKTaJ5Ett) for support`n"
+            $releaseNotes += "- Visit the [ModDB page](https://mods.vintagestory.at/thebasics) for more information`n"
+            $releaseNotes += "- Report issues on [GitHub](https://github.com/BASIC-BIT/Vintage-Story-Mods/issues)`n`n"
+            if ($previousTag) {
+              $releaseNotes += "**Full Changelog**: https://github.com/BASIC-BIT/Vintage-Story-Mods/compare/$previousTag...$newTag"
+            } else {
+              $releaseNotes += "**Full Changelog**: https://github.com/BASIC-BIT/Vintage-Story-Mods/commits/$newTag"
+            }
+          }
         
         # Save to file for the release action
         $releaseNotes | Out-File -FilePath "release-notes.md" -Encoding UTF8
@@ -266,13 +371,26 @@ jobs:
       run: |
         $newVersion = "${{ github.event.inputs.new_version }}"
         $tagName = "V$newVersion"
+        $sourceCommit = "${{ steps.version_source_commit.outputs.sha }}"
+
+        if (-not $sourceCommit) {
+          $sourceCommit = git rev-parse HEAD
+        }
         
-        Write-Host "Creating git tag: $tagName" -ForegroundColor Yellow
-        
-        git tag $tagName
-        git push origin $tagName
-        
-        Write-Host "Tag created and pushed successfully" -ForegroundColor Green
+        Write-Host "Ensuring git tag exists: $tagName" -ForegroundColor Yellow
+
+        git ls-remote --exit-code --tags origin "refs/tags/$tagName" *> $null
+        $lsExitCode = $LASTEXITCODE
+        if ($lsExitCode -eq 0) {
+          Write-Host "Tag already exists on origin; skipping tag creation." -ForegroundColor Green
+        } elseif ($lsExitCode -eq 1) {
+          git tag $tagName $sourceCommit
+          git push origin "refs/tags/$tagName"
+          Write-Host "Tag created and pushed successfully" -ForegroundColor Green
+        } else {
+          Write-Host "Error: git ls-remote failed with exit code $lsExitCode" -ForegroundColor Red
+          exit $lsExitCode
+        }
         
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1
@@ -282,6 +400,8 @@ jobs:
         bodyFile: "release-notes.md"
         draft: false
         prerelease: ${{ github.event.inputs.prerelease }}
+        allowUpdates: true
+        replacesArtifacts: true
         artifacts: "${{ steps.prepare_assets.outputs.asset_path }}"
         token: ${{ secrets.GITHUB_TOKEN }}
         
@@ -289,10 +409,14 @@ jobs:
       shell: pwsh
       run: |
         $newVersion = "${{ github.event.inputs.new_version }}"
-        $currentVersion = "${{ steps.current_version.outputs.current }}"
+        $previousVersion = "${{ steps.previous_release.outputs.version }}"
         
         Write-Host "🎉 Release completed successfully!" -ForegroundColor Green
-        Write-Host "   Version: $currentVersion → $newVersion" -ForegroundColor Cyan
+        if ($previousVersion) {
+          Write-Host "   Version: $previousVersion → $newVersion" -ForegroundColor Cyan
+        } else {
+          Write-Host "   Version: $newVersion" -ForegroundColor Cyan
+        }
         Write-Host "   Tag: V$newVersion" -ForegroundColor Cyan
         Write-Host "   Asset: thebasics-v$newVersion.zip" -ForegroundColor Cyan
         Write-Host "   Release URL: https://github.com/BASIC-BIT/Vintage-Story-Mods/releases/tag/V$newVersion" -ForegroundColor Cyan 
