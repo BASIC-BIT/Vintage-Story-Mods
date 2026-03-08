@@ -102,6 +102,18 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
         if (!languageEnabled)
         {
+            // Detect :lang-prefixed syntax even when language features are disabled,
+            // so players get clear feedback instead of sending the selector literally.
+            if (TryParseLanguageSpecifier(context.Message, out _, out _))
+            {
+                context.SendingPlayer.SendMessage(
+                    _chatSystem.ProximityChatId,
+                    Lang.Get("thebasics:lang-error-system-disabled"),
+                    EnumChatType.CommandError);
+                context.State = MessageContextState.STOP;
+                return context;
+            }
+
             context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
             return context;
         }

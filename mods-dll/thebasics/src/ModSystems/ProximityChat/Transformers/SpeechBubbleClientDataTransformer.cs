@@ -8,8 +8,61 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 // not the final chat line string.
 public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 {
+    private const int SoftBreakRunLength = 12;
+
     public SpeechBubbleClientDataTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
+    }
+
+    private static string InsertSoftBreaksForLongRuns(string vtml, int runLength)
+    {
+        if (string.IsNullOrEmpty(vtml) || runLength <= 0)
+        {
+            return vtml;
+        }
+
+        var insideTag = false;
+        var runCount = 0;
+        var result = new System.Text.StringBuilder(vtml.Length + 8);
+
+        foreach (var c in vtml)
+        {
+            if (insideTag)
+            {
+                result.Append(c);
+                if (c == '>')
+                {
+                    insideTag = false;
+                }
+                continue;
+            }
+
+            if (c == '<')
+            {
+                insideTag = true;
+                runCount = 0;
+                result.Append(c);
+                continue;
+            }
+
+            if (char.IsLetterOrDigit(c))
+            {
+                runCount++;
+                result.Append(c);
+                if (runCount >= runLength)
+                {
+                    // Zero-width soft break opportunity for long unbroken runs.
+                    result.Append('\u200B');
+                    runCount = 0;
+                }
+                continue;
+            }
+
+            runCount = 0;
+            result.Append(c);
+        }
+
+        return result.ToString();
     }
 
     public override bool ShouldTransform(MessageContext context)
@@ -97,6 +150,13 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         if (bubbleTextToSend.Length == 0)
         {
             return context;
+        }
+
+        // Improve wrapping for very long no-whitespace runs (single long words)
+        // in the VTML bubble path without changing visible text content.
+        if (_config.OverrideSpeechBubblesWithRpText)
+        {
+            bubbleTextToSend = InsertSoftBreaksForLongRuns(bubbleTextToSend, SoftBreakRunLength);
         }
 
         // Match vanilla behavior: the data string contains &lt; and &gt; which the client unescapes.

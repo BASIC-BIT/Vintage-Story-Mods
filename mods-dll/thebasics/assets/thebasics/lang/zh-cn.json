@@ -120,6 +120,7 @@
   "lang-error-max-languages": "你最多只能学习 {0} 种语言！请先移除一种。",
   "lang-error-not-known": "你不会 {0}！",
   "lang-error-unknown-language": "你不会那种语言！",
+  "lang-error-system-disabled": "此服务器已禁用语言功能。",
   "lang-error-invalid-with-list": "无效的语言标识 \":{0}\"。  可用前缀包括：{1}",
   "lang-error-admin-already-known": "{0} 已经会 {1} 了！",
   "lang-error-admin-max-languages": "{0} 最多只能学习 {1} 种语言！请先移除一种。",

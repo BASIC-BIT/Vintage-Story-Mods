@@ -120,6 +120,7 @@
   "lang-error-max-languages": "Вы не можете выучить больше чем {0} языков! Сначала удалите один.",
   "lang-error-not-known": "Вы не знаете язык {0}!",
   "lang-error-unknown-language": "Вы не знаете этот язык!",
+  "lang-error-system-disabled": "Языковые функции отключены на этом сервере.",
   "lang-error-invalid-with-list": "Неверный идентификатор языка \":{0}\".  Допустимые префиксы: {1}",
   "lang-error-admin-already-known": "{0} уже знает язык {1}!",
   "lang-error-admin-max-languages": "{0} не может выучить больше чем {1} языков! Сначала удалите один.",

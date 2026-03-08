@@ -11,6 +11,18 @@ namespace thebasics.ModSystems.ProximityChat
     {
         public static string ScrambleMessage(string message, Language language)
         {
+            if (string.IsNullOrEmpty(message) || language == null)
+            {
+                return message;
+            }
+
+            // Sign language (and any language configured without syllables) should not
+            // attempt syllable scrambling. Preserve rough message length/shape instead.
+            if (language.Syllables == null || language.Syllables.Length == 0)
+            {
+                return ObfuscateWithoutSyllables(message);
+            }
+
             var wordRegex = new Regex(@"\w+");
             return wordRegex.Replace(message, match =>
             {
@@ -30,6 +42,20 @@ namespace thebasics.ModSystems.ProximityChat
 
                 return garbledText;
             });
+        }
+
+        private static string ObfuscateWithoutSyllables(string message)
+        {
+            var chars = message.ToCharArray();
+            for (var i = 0; i < chars.Length; i++)
+            {
+                if (!char.IsWhiteSpace(chars[i]))
+                {
+                    chars[i] = '.';
+                }
+            }
+
+            return new string(chars);
         }
 
         private static int GetSyllableCount(string word, Random random)

@@ -120,6 +120,7 @@
   "lang-error-max-languages": "Du kannst nicht mehr als {0} Sprachen lernen! Entferne zuerst eine.",
   "lang-error-not-known": "Du kennst die Sprache {0} nicht!",
   "lang-error-unknown-language": "Du kennst diese Sprache nicht!",
+  "lang-error-system-disabled": "Sprachfunktionen sind auf diesem Server deaktiviert.",
   "lang-error-invalid-with-list": "Ungültiger Sprachbezeichner \":{0}\".  Gültige Präfixe sind: {1}",
   "lang-error-admin-already-known": "{0} kennt die Sprache {1} bereits!",
   "lang-error-admin-max-languages": "{0} kann nicht mehr als {1} Sprachen lernen! Entferne zuerst eine.",
