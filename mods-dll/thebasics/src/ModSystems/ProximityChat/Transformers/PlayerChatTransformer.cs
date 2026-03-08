@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Globalization;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -24,15 +23,6 @@ public class PlayerChatTransformer : MessageTransformerBase
     {   
         var content = context.Message;
 
-        static bool IsDecoratorChar(char c)
-        {
-            var cat = CharUnicodeInfo.GetUnicodeCategory(c);
-            return cat == UnicodeCategory.NonSpacingMark ||
-                cat == UnicodeCategory.SpacingCombiningMark ||
-                cat == UnicodeCategory.EnclosingMark ||
-                cat == UnicodeCategory.Format;
-        }
-
         static bool TryConsumeDelimiterAtStart(string text, string delimiter, out int consumeLength)
         {
             consumeLength = 0;
@@ -44,7 +34,7 @@ public class PlayerChatTransformer : MessageTransformerBase
 
             var i = 0;
             // Ignore leading combining/format characters; they can appear under temporal/drunk effects.
-            while (i < text.Length && IsDecoratorChar(text[i]))
+            while (i < text.Length && UnicodeUtils.IsDecoratorChar(text[i]))
             {
                 i++;
             }
@@ -58,7 +48,7 @@ public class PlayerChatTransformer : MessageTransformerBase
                 i++;
 
                 // Consume any decorators right after this delimiter character.
-                while (i < text.Length && IsDecoratorChar(text[i]))
+                while (i < text.Length && UnicodeUtils.IsDecoratorChar(text[i]))
                 {
                     i++;
                 }
@@ -79,7 +69,7 @@ public class PlayerChatTransformer : MessageTransformerBase
 
             var i = text.Length - 1;
             // Skip trailing decorators (keep them if delimiter doesn't match).
-            while (i >= 0 && IsDecoratorChar(text[i]))
+            while (i >= 0 && UnicodeUtils.IsDecoratorChar(text[i]))
             {
                 i--;
             }
@@ -97,7 +87,7 @@ public class PlayerChatTransformer : MessageTransformerBase
                     return false;
                 }
                 i--;
-                while (i >= 0 && IsDecoratorChar(text[i]))
+                while (i >= 0 && UnicodeUtils.IsDecoratorChar(text[i]))
                 {
                     i--;
                 }

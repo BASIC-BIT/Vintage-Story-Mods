@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using thebasics.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Client;
@@ -14,6 +15,8 @@ namespace thebasics.ModSystems.ChatUiSystem;
 public sealed class TypingIndicatorRenderer : IRenderer
 {
     private readonly ICoreClientAPI _capi;
+    private static readonly FieldInfo MessageTexturesField =
+        typeof(EntityShapeRenderer).GetField("messageTextures", BindingFlags.Instance | BindingFlags.NonPublic);
 
     // Only raytrace a given target a few times per second.
     // Keyed by target entity id.
@@ -102,6 +105,12 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
             // Use the game's own above-head logic for correct mount offsets.
             if (entity.Properties?.Client?.Renderer is not EntityShapeRenderer esr)
+            {
+                continue;
+            }
+
+            // When a speech bubble is active, suppress typing indicators to avoid vertical overlap.
+            if (HasActiveSpeechBubble(esr))
             {
                 continue;
             }
@@ -238,6 +247,8 @@ public sealed class TypingIndicatorRenderer : IRenderer
             return null;
         }
 
+        var iconOnlyMode = displayMode == TypingIndicatorDisplayMode.Icon && state != ChatTypingIndicatorState.ChatOpenEmpty;
+
         // Cache includes the state and display mode.
         var cacheKey = $"{(byte)displayMode}:{(byte)state}:{text}";
         if (_textTextures.TryGetValue(cacheKey, out var existing) && existing != null)
@@ -245,9 +256,12 @@ public sealed class TypingIndicatorRenderer : IRenderer
             return existing;
         }
 
+        var padding = iconOnlyMode ? 11 : 5;
+        var borderWidth = iconOnlyMode ? 3 : 2;
+
         var bg = new TextBackground
         {
-            Padding = 5,
+            Padding = padding,
             Radius = GuiStyle.ElementBGRadius,
             FillColor = new[]
             {
@@ -256,20 +270,20 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 GuiStyle.DialogLightBgColor[2],
                 0.85
             },
-            BorderWidth = 2,
+            BorderWidth = borderWidth,
             BorderColor = ColorUtil.Hex2Doubles("#CFBA96")
         };
 
-        // Use a slightly larger font so icons are clearly visible at distance.
-        var font = CairoFont.WhiteSmallText().WithFontSize(18f);
-        font.Orientation = EnumTextOrientation.Center;
+        // In icon-only mode, use a much larger icon and bubble for readability at distance.
+        var font = CairoFont.WhiteSmallText().WithFontSize(iconOnlyMode ? 34f : 18f);
+        font.Orientation = iconOnlyMode ? EnumTextOrientation.Left : EnumTextOrientation.Center;
 
         LoadedTexture tex;
         var hasVtml = text.Contains('<');
         if (hasVtml)
         {
             // Supports <icon> and other VTML tags.
-            tex = RichTextTextureUtils.GenRichTextTexture(_capi, text, font, maxTextWidthPx: 250, bg);
+            tex = RichTextTextureUtils.GenRichTextTexture(_capi, text, font, maxTextWidthPx: iconOnlyMode ? 320 : 250, bg);
             if (tex == null)
             {
                 var plain = VtmlUtils.StripVtmlTags(text, _capi.Logger);
@@ -286,6 +300,28 @@ public sealed class TypingIndicatorRenderer : IRenderer
         }
 
         return tex;
+    }
+
+    private static bool HasActiveSpeechBubble(EntityShapeRenderer renderer)
+    {
+        if (renderer == null || MessageTexturesField == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (MessageTexturesField.GetValue(renderer) is List<MessageTexture> messageTextures)
+            {
+                return messageTextures.Count > 0;
+            }
+        }
+        catch
+        {
+            // Best-effort only.
+        }
+
+        return false;
     }
 
     private void FlushTextureCache()
