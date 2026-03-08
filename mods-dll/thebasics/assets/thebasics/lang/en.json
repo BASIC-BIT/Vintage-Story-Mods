@@ -136,6 +136,7 @@
   "lang-error-max-languages": "You cannot learn more than {0} languages! Remove one first.",
   "lang-error-not-known": "You don't know the language {0}!",
   "lang-error-unknown-language": "You don't know that language!",
+  "lang-error-system-disabled": "Language features are disabled on this server.",
   "lang-error-invalid-with-list": "Invalid language specifier \":{0}\".  Valid prefixes include: {1}",
   "lang-error-admin-already-known": "{0} already knows the language {1}!",
   "lang-error-admin-max-languages": "{0} cannot learn more than {1} languages! Remove one first.",
