@@ -291,7 +291,7 @@ namespace thebasics.Configs
         public bool UseNicknameInOOC { get; set; } = true;
         
         [ProtoMember(64)]
-        public bool RemoveGrantedLanguagesOnChange { get; set; }
+        public bool RemoveGrantedLanguagesOnChange { get; set; } = true;
 
         [ProtoMember(65)]
         public ChatDelimiters ChatDelimiters { get; set; }
@@ -320,7 +320,7 @@ namespace thebasics.Configs
         // ----- Typing Indicator (client-side UI feature, server-configured) ----- //
 
         [ProtoMember(68)]
-        public bool EnableTypingIndicator { get; set; } = false;
+        public bool EnableTypingIndicator { get; set; } = true;
 
         [ProtoMember(69)]
         public int TypingIndicatorMaxRange { get; set; } = 50;
@@ -336,7 +336,7 @@ namespace thebasics.Configs
         // speech text (per-recipient language/obfuscation).
         // This only affects the floating text above player heads, not the chat log.
         [ProtoMember(72)]
-        public bool OverrideSpeechBubblesWithRpText { get; set; } = false;
+        public bool OverrideSpeechBubblesWithRpText { get; set; } = true;
 
         // When true, enables verbose debug logging and diagnostic instrumentation.
         // Intended for temporary use while investigating reports.
@@ -356,7 +356,7 @@ namespace thebasics.Configs
         // Controls what the typing indicator renders: Icon, Text, or Both.
         // Disabled entirely when EnableTypingIndicator is false.
         [ProtoMember(76)]
-        public TypingIndicatorDisplayMode TypingIndicatorDisplayMode { get; set; } = TypingIndicatorDisplayMode.Icon;
+        public TypingIndicatorDisplayMode TypingIndicatorDisplayMode { get; set; } = TypingIndicatorDisplayMode.Both;
 
         // Permission for the toggling of bypassing proximity chat restrictions entirely, allowing a player to speak globally regardless of distance or mode.
         [ProtoMember(77)]
