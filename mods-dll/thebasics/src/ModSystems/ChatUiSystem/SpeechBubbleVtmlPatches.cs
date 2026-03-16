@@ -20,8 +20,8 @@ public static class SpeechBubbleVtmlPatches
     internal static readonly AccessTools.FieldRef<EntityShapeRenderer, List<MessageTexture>> MessageTexturesRef =
         AccessTools.FieldRefAccess<EntityShapeRenderer, List<MessageTexture>>("messageTextures");
 
-    private const int BubbleMaxTextWidthPx = 350;
-    private const int BubbleBottomMarginPx = 40;
+    private const int BubbleMaxTextWidthPx = 280;
+    private const int BubbleBottomMarginPx = 15;
 
     public static bool Prefix(EntityShapeRenderer __instance, int groupId, string message, EnumChatType chattype, string data)
     {
@@ -53,7 +53,10 @@ public static class SpeechBubbleVtmlPatches
                 return true;
             }
 
-            if (data == null || !data.Contains("from:") || entity.Pos.SquareDistanceTo(localPlayerEntity.Pos.XYZ) >= 400.0 || message.Length <= 0)
+            // Vanilla uses 400 sq (20 blocks). We raise to 10000 sq (100 blocks) so bubbles
+            // can appear at the full yell range (90 blocks). The server already gates by chat
+            // range, so this is just a safety cap.
+            if (data == null || !data.Contains("from:") || entity.Pos.SquareDistanceTo(localPlayerEntity.Pos.XYZ) >= 10000.0 || message.Length <= 0)
             {
                 return true;
             }
@@ -132,8 +135,8 @@ public static class SpeechBubbleVtmlPatches
             var baseFontSize = 25.0;
             var fontSizeMultiplier = mode switch
             {
-                "yell" => 1.15,
-                "whisper" => 0.85,
+                "yell" => 1.3,
+                "whisper" => 0.75,
                 _ => 1.0
             };
             var fontSize = baseFontSize * fontSizeMultiplier;

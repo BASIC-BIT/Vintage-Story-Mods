@@ -374,6 +374,15 @@ namespace thebasics.ModSystems.ProximityChat
         {
             if (Config.EnableLanguageSystem && !receivingPlayer.KnowsLanguage(lang))
             {
+                // Visual/gestural languages (like sign language) have no syllables to
+                // scramble into. If the receiver can't understand it, show a description
+                // instead of crashing the scrambler on an empty syllables array.
+                if (lang.Syllables == null || lang.Syllables.Length == 0)
+                {
+                    message = ChatHelper.Italic("*makes unintelligible gestures*");
+                    return;
+                }
+
                 var scrambledMessage = LanguageScrambler.ScrambleMessage(message, lang);
                 message = ChatHelper.Italic(scrambledMessage);
             }

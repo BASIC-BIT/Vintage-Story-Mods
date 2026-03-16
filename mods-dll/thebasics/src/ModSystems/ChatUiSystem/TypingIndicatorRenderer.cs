@@ -122,7 +122,9 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 continue;
             }
 
-            float scale = 4f / Math.Max(1f, (float)pos.Z);
+            // Dampened distance scaling matching speech bubbles (4/Z^0.6).
+            var dampenedZ = (float)Math.Pow(Math.Max(1.0, pos.Z), 0.6);
+            float scale = 4f / dampenedZ;
             float cappedScale = Math.Min(1f, scale);
             if (cappedScale > 0.75f)
             {
@@ -141,39 +143,31 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
     /// <summary>
     /// Builds the display string for the given state and display mode.
+    /// ChatOpenEmpty is treated the same as ChatOpenComposing ("Thinking...") —
+    /// there's no value in distinguishing "chat open but empty" from "idle with text".
     /// </summary>
     private static string GetLabelForState(ChatTypingIndicatorState state, TypingIndicatorDisplayMode displayMode)
     {
-        // Resolve text and icon lang keys per state.
-        var (iconKey, textKey) = state switch
-        {
-            ChatTypingIndicatorState.Typing => ("thebasics:typingindicator-typing-icon", "thebasics:typingindicator-typing-text"),
-            ChatTypingIndicatorState.ChatOpenComposing => ("thebasics:typingindicator-composing-icon", "thebasics:typingindicator-composing-text"),
-            ChatTypingIndicatorState.ChatOpenEmpty => ("thebasics:typingindicator-chatopen-icon", "thebasics:typingindicator-chatopen-text"),
-            _ => ("thebasics:typingindicator-typing-icon", "thebasics:typingindicator-typing-text"),
-        };
-
-        // For "Typing" state, respect the server-side text override if configured.
+        // Typing = actively pressing keys, everything else = thinking/idle.
+        var isTyping = state == ChatTypingIndicatorState.Typing;
+        var iconKey = isTyping
+            ? "thebasics:typingindicator-typing-icon"
+            : "thebasics:typingindicator-composing-icon";
         string textLabel;
-        if (state == ChatTypingIndicatorState.Typing)
+        if (isTyping)
         {
             textLabel = ChatUiSystem.GetTypingIndicatorText();
         }
         else
         {
-            textLabel = Lang.Get(textKey);
-        }
-
-        // ChatOpenEmpty is always text-only ("...") — no icon regardless of mode.
-        if (state == ChatTypingIndicatorState.ChatOpenEmpty)
-        {
-            return textLabel;
+            textLabel = Lang.Get("thebasics:typingindicator-composing-text");
         }
 
         return displayMode switch
         {
             TypingIndicatorDisplayMode.Text => textLabel,
-            TypingIndicatorDisplayMode.Both => $"{Lang.Get(iconKey)} {textLabel}",
+            // Use \u200A (hair space) for a tighter icon-text gap than a full space.
+            TypingIndicatorDisplayMode.Both => $"{Lang.Get(iconKey)}\u200A{textLabel}",
             _ => Lang.Get(iconKey), // Icon (default)
         };
     }
