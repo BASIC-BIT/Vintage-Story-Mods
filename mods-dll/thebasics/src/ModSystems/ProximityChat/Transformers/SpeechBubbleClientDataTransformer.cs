@@ -84,23 +84,34 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         // Match vanilla behavior: the data string contains &lt; and &gt; which the client unescapes.
         bubbleTextToSend = VtmlUtils.EscapeVtml(bubbleTextToSend);
 
-        // Add kind marker for client-side styling of non-speech bubbles.
-        // Speech bubbles will render via vanilla unless VTML is present.
+        // Build marker segment for client-side styling.
+        // Kind marker: differentiates emote/env/OOC for border color styling.
+        // Mode marker: carries yell/whisper for speech bubble size scaling.
         var kind = context.HasFlag(MessageContext.IS_ENVIRONMENTAL) ? "env" :
             context.HasFlag(MessageContext.IS_EMOTE) ? "emote" :
             context.HasFlag(MessageContext.IS_OOC) ? "ooc" :
             null;
 
-        if (kind != null)
+        // For speech messages, include the chat mode so the client can scale the bubble.
+        string mode = null;
+        if (context.HasFlag(MessageContext.IS_SPEECH) &&
+            context.TryGetMetadata(MessageContext.CHAT_MODE, out ProximityChatMode chatMode))
         {
-            // Encode kind in the key segment (before the first ':') so vanilla clients don't display it,
-            // and so it cannot collide with user text.
-            // Client patch also supports the legacy suffix format for safety.
-            context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg\u001fkind={kind}:{bubbleTextToSend}");
-            return context;
+            mode = chatMode switch
+            {
+                ProximityChatMode.Yell => "yell",
+                ProximityChatMode.Whisper => "whisper",
+                _ => null // Normal is the default — no marker needed.
+            };
         }
 
-        context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend}");
+        // Encode markers in the key segment (before the first ':') using unit separator
+        // so vanilla clients don't display them and they can't collide with user text.
+        var markers = "";
+        if (kind != null) markers += $"\u001fkind={kind}";
+        if (mode != null) markers += $"\u001fmode={mode}";
+
+        context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg{markers}:{bubbleTextToSend}");
         return context;
     }
 }
