@@ -208,7 +208,7 @@ jobs:
       with:
         reports: '**/TestResults/**/coverage.cobertura.xml'
         targetdir: coveragereport
-        reporttypes: 'HtmlInline;Cobertura'
+        reporttypes: 'HtmlInline;MarkdownSummary;Cobertura'
 
     - name: Coverage Threshold Check
       if: always()
@@ -256,11 +256,11 @@ jobs:
     - name: Comment PR with Coverage
       if: github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && always()
       run: |
-        if (Test-Path "coveragereport/SummaryGithub.md") {
+        if (Test-Path "coveragereport/Summary.md") {
           # Prepend a marker so --edit-last targets the coverage comment
           # specifically, not an unrelated bot comment from another workflow.
           $marker = "<!-- coverage-report -->"
-          $body = "$marker`n$(Get-Content coveragereport/SummaryGithub.md -Raw)"
+          $body = "$marker`n$(Get-Content coveragereport/Summary.md -Raw)"
           $tmpFile = New-TemporaryFile
           Set-Content -Path $tmpFile -Value $body
           gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body-file $tmpFile

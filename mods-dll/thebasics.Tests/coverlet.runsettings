@@ -9,27 +9,8 @@
           <Exclude>[thebasics.Tests]*</Exclude>
 
           <!-- Exclude untestable code: rendering, Harmony patches, UI dialogs,
-               ModSystem lifecycle, and network infrastructure.
-               Comma-separated glob patterns relative to source root. -->
-          <ExcludeByFile>
-            **/RichTextTextureUtils.cs,
-            **/TypingIndicatorRenderer.cs,
-            **/RpTextEntityPlayerShapeRenderer.cs,
-            **/PerfStats.cs,
-            **/SpeechBubbleVtmlPatches.cs,
-            **/NameTagRenderRangePatches.cs,
-            **/ChatUiSystem.cs,
-            **/CharacterBioDialog.cs,
-            **/BaseBasicModSystem.cs,
-            **/BaseSubSystem.cs,
-            **/RPProximityChatSystem.cs,
-            **/PlayerStatSystem.cs,
-            **/TpaSystem.cs,
-            **/SleepNotifierSystem.cs,
-            **/SaveNotificationsSystem.cs,
-            **/RepairModSystem.cs,
-            **/SafeClientNetworkChannel.cs
-          </ExcludeByFile>
+               ModSystem lifecycle, and network infrastructure. -->
+          <ExcludeByFile>**/RichTextTextureUtils.cs,**/TypingIndicatorRenderer.cs,**/RpTextEntityPlayerShapeRenderer.cs,**/PerfStats.cs,**/SpeechBubbleVtmlPatches.cs,**/NameTagRenderRangePatches.cs,**/ChatUiSystem.cs,**/CharacterBioDialog.cs,**/BaseBasicModSystem.cs,**/BaseSubSystem.cs,**/RPProximityChatSystem.cs,**/PlayerStatSystem.cs,**/TpaSystem.cs,**/SleepNotifierSystem.cs,**/SaveNotificationsSystem.cs,**/RepairModSystem.cs,**/SafeClientNetworkChannel.cs</ExcludeByFile>
 
           <IncludeTestAssembly>false</IncludeTestAssembly>
           <SingleHit>false</SingleHit>
