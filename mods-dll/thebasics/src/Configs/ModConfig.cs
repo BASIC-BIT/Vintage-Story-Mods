@@ -332,10 +332,12 @@ namespace thebasics.Configs
         [ProtoMember(71)]
         public string TypingIndicatorTextOverride { get; set; } = "";
 
-        // When true, the server will override the vanilla overhead chat bubble text with the RP-processed
-        // speech text (per-recipient language/obfuscation).
-        // This only affects the floating text above player heads, not the chat log.
+        // DEPRECATED: VTML speech bubbles are now always active when RP chat is enabled
+        // (i.e., when DisableRPChat is false). This property is retained only for
+        // protobuf deserialization compatibility with existing config files on disk.
+        // It is no longer read by any runtime code.
         [ProtoMember(72)]
+        [Obsolete("VTML bubbles are now gated by DisableRPChat. This property is ignored.")]
         public bool OverrideSpeechBubblesWithRpText { get; set; } = true;
 
         // When true, enables verbose debug logging and diagnostic instrumentation.

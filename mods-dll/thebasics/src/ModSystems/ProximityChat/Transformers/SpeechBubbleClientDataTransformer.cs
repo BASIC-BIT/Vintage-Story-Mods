@@ -37,22 +37,6 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         var bubbleTextVtml = (context.Message ?? string.Empty).Trim();
 
-        // When not overriding bubbles with per-recipient RP text, keep speech bubbles closer to vanilla:
-        // use the baseline text captured in the sender phase.
-        if (!_config.OverrideSpeechBubblesWithRpText && context.HasFlag(MessageContext.IS_SPEECH))
-        {
-            if (context.TryGetMetadata(MessageContext.BUBBLE_TEXT_BASE, out string baseText) && !string.IsNullOrWhiteSpace(baseText))
-            {
-                bubbleTextVtml = baseText.Trim();
-            }
-        }
-
-        // If the client isn't rendering VTML in bubbles, strip tags to avoid showing them literally.
-        if (!_config.OverrideSpeechBubblesWithRpText)
-        {
-            bubbleTextVtml = VtmlUtils.StripVtmlTags(bubbleTextVtml, _chatSystem.API?.Logger);
-        }
-
         // Wrap speech in configurable quote delimiters, matching ICSpeechFormatTransformer:
         // sign language uses SignLanguageQuote (default: single quotes), others use Quote (default: double quotes).
         // Applied BEFORE the language color tag so the quotes sit inside <font color="...">
@@ -72,9 +56,8 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
                 : delimiters.Quote;
             bubbleTextVtml = $"{quoteDelimiter.Start}{bubbleTextVtml}{quoteDelimiter.End}";
 
-            // Mirror chatbox: sign language speech is italicized (only when VTML override is active,
-            // otherwise vanilla bubbles would show literal <i> tags).
-            if (_config.OverrideSpeechBubblesWithRpText && languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
+            // Mirror chatbox: sign language speech is italicized in bubbles.
+            if (languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
             {
                 bubbleTextVtml = ChatHelper.Italic(bubbleTextVtml);
             }
@@ -84,8 +67,7 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         // This runs after LanguageTransformer (which scrambles unknown languages) but before
         // ICSpeechFormatTransformer (which adds language color to the chatbox line).
         // We must apply the color here because ICSpeechFormatTransformer runs after us.
-        if (_config.OverrideSpeechBubblesWithRpText && languageEnabled
-            && context.HasFlag(MessageContext.IS_SPEECH))
+        if (languageEnabled && context.HasFlag(MessageContext.IS_SPEECH))
         {
             if (bubbleLang != null)
             {

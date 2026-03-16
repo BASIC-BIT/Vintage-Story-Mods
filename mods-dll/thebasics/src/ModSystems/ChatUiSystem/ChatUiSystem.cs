@@ -256,8 +256,10 @@ public class ChatUiSystem : ModSystem
 
     internal static bool IsSpeechBubbleVtmlEnabled()
     {
-        // Opinionated: overhead speech bubble VTML rendering is enabled automatically when we override bubble text.
-        return _config?.OverrideSpeechBubblesWithRpText == true;
+        // VTML speech bubbles are always active when RP chat is enabled.
+        // The old OverrideSpeechBubblesWithRpText toggle has been removed — vanilla
+        // bubbles are strictly worse and there's no reason to fall back to them.
+        return _config != null && !_config.DisableRPChat;
     }
 
     internal static Models.TypingIndicatorDisplayMode GetTypingIndicatorDisplayMode()
