@@ -261,7 +261,10 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
         // Slightly larger font for icon visibility at distance.
         var font = CairoFont.WhiteSmallText().WithFontSize(20f);
-        font.Orientation = EnumTextOrientation.Center;
+        // Use Left orientation to match GenRichTextTexture's contract — VS has a
+        // centering bug at inline tag boundaries (icon-to-text transitions).
+        // GenRichTextTexture centers the rendered block manually via hPad/vPad.
+        font.Orientation = EnumTextOrientation.Left;
 
         LoadedTexture tex;
         var hasVtml = text.Contains('<');
