@@ -189,7 +189,7 @@ namespace thebasics.ModSystems.ProximityChat
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var known = GetPlayerLanguages(player);
-            var knownNames = new HashSet<string>(known.Select(l => l.Name));
+            var knownNames = new HashSet<string>(known.Select(l => l.Name), StringComparer.OrdinalIgnoreCase);
             var unknown = GetAllLanguages(false, includeHidden: false)
                 .Where(l => !knownNames.Contains(l.Name))
                 .ToList();
