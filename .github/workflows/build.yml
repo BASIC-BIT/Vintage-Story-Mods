@@ -214,9 +214,6 @@ jobs:
     - name: Coverage Threshold Check
       if: always()
       run: |
-        # Parse cobertura XML and enforce minimum line coverage.
-        # Thresholds: fail at 3%, warn at 5% (just below current ~9.7% baseline).
-        # Ratchet up as tests are added.  See docs/coverage-thresholds.md.
         $failThreshold = 3
         $warnThreshold = 5
 
@@ -227,34 +224,32 @@ jobs:
         }
 
         [xml]$xml = Get-Content $coberturaFile.FullName
-        $lineRate = [math]::Round([double]$xml.coverage.'line-rate' * 100, 1)
+        $lineRate   = [math]::Round([double]$xml.coverage.'line-rate' * 100, 1)
         $branchRate = [math]::Round([double]$xml.coverage.'branch-rate' * 100, 1)
-        $linesCovered = $xml.coverage.'lines-covered'
-        $linesValid = $xml.coverage.'lines-valid'
+        $covered    = $xml.coverage.'lines-covered'
+        $total      = $xml.coverage.'lines-valid'
+        $brCovered  = $xml.coverage.'branches-covered'
+        $brTotal    = $xml.coverage.'branches-valid'
 
-        Write-Host "Line coverage:   $lineRate% ($linesCovered / $linesValid lines)"
-        Write-Host "Branch coverage: $branchRate%"
-
-        # Write job summary
-        $summary = @"
+        # Job summary — just the numbers
+        @"
         ## Code Coverage
-
-        | Metric | Value |
-        |--------|-------|
-        | Line coverage | **$lineRate%** ($linesCovered / $linesValid) |
-        | Branch coverage | **$branchRate%** |
-        | Fail threshold | $failThreshold% |
-        | Warn threshold | $warnThreshold% |
-        "@
-        $summary >> $env:GITHUB_STEP_SUMMARY
+        | Metric | Rate | Covered |
+        |--------|------|---------|
+        | Lines | **$lineRate%** | $covered / $total |
+        | Branches | **$branchRate%** | $brCovered / $brTotal |
+        | | | |
+        | Fail threshold | $failThreshold% | |
+        | Warn threshold | $warnThreshold% | |
+        "@ >> $env:GITHUB_STEP_SUMMARY
 
         if ($lineRate -lt $failThreshold) {
-          Write-Host "::error::Line coverage $lineRate% is below minimum threshold of $failThreshold%"
+          Write-Host "::error::Line coverage $lineRate% is below fail threshold ($failThreshold%)"
           exit 1
         } elseif ($lineRate -lt $warnThreshold) {
-          Write-Host "::warning::Line coverage $lineRate% is below warning threshold of $warnThreshold%"
+          Write-Host "::warning::Line coverage $lineRate% is below warn threshold ($warnThreshold%)"
         } else {
-          Write-Host "Coverage OK ($lineRate% >= $warnThreshold%)"
+          Write-Host "Coverage: $lineRate% lines, $branchRate% branches"
         }
       shell: pwsh
 
