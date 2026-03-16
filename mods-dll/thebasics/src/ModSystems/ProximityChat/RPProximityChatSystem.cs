@@ -473,13 +473,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        // Only chatter for speech messages — skip emotes, OOC, environment
-        if (!context.HasFlag(MessageContext.IS_SPEECH))
-        {
-            return;
-        }
+        var isSpeech = context.HasFlag(MessageContext.IS_SPEECH);
+        var isEmote = context.HasFlag(MessageContext.IS_EMOTE);
 
-        if (!context.TryGetSpeechText(out var speechText) || string.IsNullOrWhiteSpace(speechText))
+        // Only chatter for speech messages and emotes with quoted speech
+        if (!isSpeech && !isEmote)
         {
             return;
         }
@@ -488,6 +486,34 @@ public class RPProximityChatSystem : BaseBasicModSystem
         if (context.TryGetMetadata(MessageContext.LANGUAGE, out Language lang) && lang == LanguageSystem.SignLanguage)
         {
             return;
+        }
+
+        // Determine the speech length for note count calculation
+        int speechLength;
+        if (isSpeech)
+        {
+            // Regular speech — use the full speech text
+            if (!context.TryGetSpeechText(out var speechText) || string.IsNullOrWhiteSpace(speechText))
+            {
+                return;
+            }
+            speechLength = speechText.Length;
+        }
+        else
+        {
+            // Emote — extract quoted speech portions (same split logic as EmoteTransformer)
+            var segments = context.Message.Split('"');
+            speechLength = 0;
+            for (var i = 1; i < segments.Length; i += 2)
+            {
+                speechLength += segments[i].Length;
+            }
+
+            // Pure narration emote (no quoted speech) — no chatter
+            if (speechLength == 0)
+            {
+                return;
+            }
         }
 
         var player = context.SendingPlayer;
@@ -507,7 +533,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         // Logarithmic scaling: diminishing returns on longer messages.
         // "hi" (2) -> ~4, "hello there" (11) -> ~7, full sentence (32) -> ~10, novel (150+) -> ~15
-        var noteCount = 3 + (int)(3.0 * Math.Log(speechText.Length + 1));
+        var noteCount = 3 + (int)(3.0 * Math.Log(speechLength + 1));
 
         var message = new ChatterSoundMessage
         {
