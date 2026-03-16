@@ -401,7 +401,7 @@ namespace thebasics.ModSystems.ProximityChat
             return wordRegex.Replace(message, match =>
             {
                 var word = match.Groups[0].Value;
-                var hash = word.Select(c => (int)c).Aggregate((a, b) => a + b);
+                var hash = word.Select((c, i) => (int)c * (i + 1)).Aggregate((a, b) => a + b);
                 var rng = new Random(hash);
                 var len = Math.Max(1, (word.Length + 1) / 2); // roughly half the word length
                 var symbols = new char[len];

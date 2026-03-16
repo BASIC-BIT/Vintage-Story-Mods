@@ -349,7 +349,7 @@ public static class SpeechBubbleRenderPatches
             for (var i = 0; i < textures.Count; i++)
             {
                 var mt = textures[i];
-                offY += mt.tex.Height * cappedScale + 4f;
+                offY += mt.tex.Height * cappedScale + 4f * cappedScale;
                 var posx = (float)pos.X - cappedScale * mt.tex.Width / 2f;
                 var posy = (float)rapi.FrameHeight - ((float)pos.Y + offY);
 
