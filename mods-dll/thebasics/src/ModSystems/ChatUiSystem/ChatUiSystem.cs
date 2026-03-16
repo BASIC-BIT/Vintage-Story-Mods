@@ -195,6 +195,7 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
             .RegisterMessageType<ChatTypingStateMessage>()
+            .RegisterMessageType<ChatterSoundMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage);
@@ -408,6 +409,12 @@ public class ChatUiSystem : ModSystem
             _api.Logger.Warning($"[THEBASICS] Failed to dispatch RPTTS speech: {ex}");
         }
     }
+
+    // Chatter sound handling: The server sends vanilla entity talk packets (id 1231)
+    // directly via API.Network.SendEntityPacket(), which the client's EntityTalkUtil
+    // handles automatically. No custom client handler needed.
+    // The ChatterSoundMessage type is registered on the channel to keep server/client
+    // message type registration in sync, but is reserved for future use (e.g. volume/pitch control).
 
     /*
      * Prevent automatic chat channel switching when user is in proximity tab

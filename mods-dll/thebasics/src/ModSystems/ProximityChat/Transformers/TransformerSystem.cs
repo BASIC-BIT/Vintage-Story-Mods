@@ -139,6 +139,7 @@ public class TransformerSystem
         }
 
         _chatSystem.DispatchSpeechForContext(context);
+        _chatSystem.DispatchChatterForContext(context);
 
         LogChatMessage(context);
 
