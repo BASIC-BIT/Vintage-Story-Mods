@@ -195,7 +195,7 @@ namespace thebasics.ModSystems.ProximityChat
                 .ToList();
 
             var knownList = string.Join("\n  ", known.Select(ChatHelper.LangIdentifierWithDescription));
-            var message = Lang.Get("thebasics:lang-list-known", "\n  " + knownList);
+            var message = Lang.Get("thebasics:lang-list-known", known.Count > 0 ? "\n  " + knownList : knownList);
 
             if (unknown.Count > 0)
             {
