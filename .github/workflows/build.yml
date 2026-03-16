@@ -208,7 +208,15 @@ jobs:
       with:
         reports: '**/TestResults/**/coverage.cobertura.xml'
         targetdir: coveragereport
-        reporttypes: 'HtmlInline;MarkdownSummary;Cobertura'
+        reporttypes: 'HtmlInline;Cobertura'
+
+    - name: Download Base Coverage
+      if: always()
+      uses: actions/download-artifact@v4
+      with:
+        name: coverage-baseline
+        path: base-coverage
+      continue-on-error: true  # No baseline on first run or new branches
 
     - name: Coverage Threshold Check
       if: always()
@@ -216,6 +224,8 @@ jobs:
         $failThreshold = 3
         $warnThreshold = 5
 
+        # Assumes single test project. If adding more, merge cobertura
+        # files first (ReportGenerator can do this).
         $coberturaFile = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
         if (-not $coberturaFile) {
           Write-Host "::warning::No coverage.cobertura.xml found — skipping threshold check (tests may have failed)"
@@ -230,18 +240,47 @@ jobs:
         $brCovered  = $xml.coverage.'branches-covered'
         $brTotal    = $xml.coverage.'branches-valid'
 
+        # Compare with base branch if available
+        $baseLine = "—"
+        $baseBranch = "—"
+        $lineDelta = ""
+        $branchDelta = ""
+        $baseFile = "base-coverage/coverage.json"
+        if (Test-Path $baseFile) {
+          $base = Get-Content $baseFile | ConvertFrom-Json
+          $baseLine = "$($base.lineRate)%"
+          $baseBranch = "$($base.branchRate)%"
+          $ld = [math]::Round($lineRate - $base.lineRate, 1)
+          $bd = [math]::Round($branchRate - $base.branchRate, 1)
+          $lineDelta = if ($ld -gt 0) { " (+$ld)" } elseif ($ld -lt 0) { " ($ld)" } else { " (=)" }
+          $branchDelta = if ($bd -gt 0) { " (+$bd)" } elseif ($bd -lt 0) { " ($bd)" } else { " (=)" }
+        }
+
+        # Save current coverage for future comparisons
+        @{ lineRate = $lineRate; branchRate = $branchRate } | ConvertTo-Json | Set-Content "coverage.json"
+
         # Job summary
         $summary = @(
           "## Code Coverage"
-          "| Metric | Rate | Covered |"
-          "|--------|------|---------|"
-          "| Lines | **$lineRate%** | $covered / $total |"
-          "| Branches | **$branchRate%** | $brCovered / $brTotal |"
-          "| | | |"
-          "| Fail threshold | $failThreshold% | |"
-          "| Warn threshold | $warnThreshold% | |"
+          "| Metric | This PR | Base | Threshold |"
+          "|--------|---------|------|-----------|"
+          "| Lines | **$lineRate%**$lineDelta | $baseLine | $failThreshold% fail / $warnThreshold% warn |"
+          "| Branches | **$branchRate%**$branchDelta | $baseBranch | — |"
         ) -join "`n"
         $summary >> $env:GITHUB_STEP_SUMMARY
+
+        # Also write a PR comment file
+        $comment = @(
+          "<!-- coverage-report -->"
+          "## Code Coverage"
+          "| Metric | This PR | Base | Delta |"
+          "|--------|---------|------|-------|"
+          "| Lines | **$lineRate%** ($covered/$total) | $baseLine | $lineDelta |"
+          "| Branches | **$branchRate%** ($brCovered/$brTotal) | $baseBranch | $branchDelta |"
+          ""
+          "_Thresholds: $failThreshold% fail / $warnThreshold% warn_"
+        ) -join "`n"
+        Set-Content -Path "coverage-comment.md" -Value $comment
 
         if ($lineRate -lt $failThreshold) {
           Write-Host "::error::Line coverage $lineRate% is below fail threshold ($failThreshold%)"
@@ -253,20 +292,22 @@ jobs:
         }
       shell: pwsh
 
+    - name: Save Coverage Baseline
+      if: github.ref == 'refs/heads/main' && always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-baseline
+        path: coverage.json
+        overwrite: true
+        retention-days: 90
+
     - name: Comment PR with Coverage
       if: github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && always()
       run: |
-        if (Test-Path "coveragereport/Summary.md") {
-          # Prepend a marker so --edit-last targets the coverage comment
-          # specifically, not an unrelated bot comment from another workflow.
-          $marker = "<!-- coverage-report -->"
-          $body = "$marker`n$(Get-Content coveragereport/Summary.md -Raw)"
-          $tmpFile = New-TemporaryFile
-          Set-Content -Path $tmpFile -Value $body
-          gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body-file $tmpFile
-          Remove-Item $tmpFile
+        if (Test-Path "coverage-comment.md") {
+          gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body-file coverage-comment.md
         } else {
-          Write-Host "Coverage summary not found — skipping PR comment" -ForegroundColor Yellow
+          Write-Host "Coverage comment file not found — skipping PR comment" -ForegroundColor Yellow
         }
       shell: pwsh
       env:
@@ -281,12 +322,14 @@ jobs:
         retention-days: 30
 
     - name: Code Complexity Check
+      if: always()
       run: |
         pip install lizard
         lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/
       shell: bash
 
     - name: Test Build Output
+      if: always()
       run: |
         Write-Host "Checking build outputs..." -ForegroundColor Yellow
         
