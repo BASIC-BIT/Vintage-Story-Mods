@@ -1,8 +1,11 @@
 using System.Collections.Generic;
 using thebasics.Configs;
 using thebasics.Extensions;
+using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.Utilities;
 using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
@@ -33,6 +36,7 @@ public class TransformerSystem
         {
             // Validation transformers
             new PlayerChatTransformer(_chatSystem), // If player chat, process special modifiers
+            new PlacedEnvironmentTransformer(_chatSystem), // Raycast for !! / /envhere, falls back to standard env on miss
             new CommandMessageEscapeTransformer(_chatSystem), // Escape XML special characters in command messages
             new RoleplayTransformer(_chatSystem), // Add roleplay metadata
             new NicknameRequirementTransformer(_chatSystem), // Require nickname if we're in RP chat
@@ -179,6 +183,22 @@ public class TransformerSystem
 
             // Send the message to this recipient
             recipient.SendMessage(_chatSystem.ProximityChatId, recipientContext.Message, chatType, data);
+
+            // For placed environmental messages, also send the position packet
+            // so the client can render the bubble at a world position.
+            if (recipientContext.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL) &&
+                recipientContext.TryGetMetadata(MessageContext.PLACED_POSITION, out Vec3d placedPos))
+            {
+                // Source bubble text from BUBBLE_TEXT_BASE (the sender-phase snapshot before
+                // per-recipient transforms like language/obfuscation), matching the standard
+                // env bubble path in SpeechBubbleClientDataTransformer. Fall back to Message
+                // if the base text isn't available.
+                var bubbleText = recipientContext.TryGetMetadata(MessageContext.BUBBLE_TEXT_BASE, out string baseText)
+                    && !string.IsNullOrEmpty(baseText)
+                    ? baseText
+                    : recipientContext.Message ?? "";
+                _chatSystem.SendPlacedEnvironmentPacket(recipient, placedPos, bubbleText);
+            }
         }
     }
 }

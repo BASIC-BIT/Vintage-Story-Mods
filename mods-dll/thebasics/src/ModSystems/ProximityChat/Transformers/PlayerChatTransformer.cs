@@ -126,6 +126,7 @@ public class PlayerChatTransformer : MessageTransformerBase
         var delimiters = _config.ChatDelimiters;
         var globalOocStartLen = 0;
         var oocStartLen = 0;
+        var placedEnvStartLen = 0;
         var envStartLen = 0;
         var emoteStartLen = 0;
 
@@ -145,13 +146,16 @@ public class PlayerChatTransformer : MessageTransformerBase
 
         var hasGlobalOocStart = _config.EnableGlobalOOC && hasGlobalOocPrefix;
         var hasOocStart = !hasGlobalOocStart && !string.IsNullOrEmpty(delimiters.OOC.Start) && TryConsumeDelimiterAtStart(content, delimiters.OOC.Start, out oocStartLen);
-        var hasEnvironmentStart = !string.IsNullOrEmpty(delimiters.Environmental.Start) && TryConsumeDelimiterAtStart(content, delimiters.Environmental.Start, out envStartLen);
+        // Check placed environmental (!!) BEFORE standard environmental (!) so the longer delimiter wins.
+        var hasPlacedEnvStart = !string.IsNullOrEmpty(delimiters.PlacedEnvironmental?.Start) && TryConsumeDelimiterAtStart(content, delimiters.PlacedEnvironmental.Start, out placedEnvStartLen);
+        var hasEnvironmentStart = !hasPlacedEnvStart && !string.IsNullOrEmpty(delimiters.Environmental.Start) && TryConsumeDelimiterAtStart(content, delimiters.Environmental.Start, out envStartLen);
         var hasEmoteStart = !string.IsNullOrEmpty(delimiters.Emote.Start) && TryConsumeDelimiterAtStart(content, delimiters.Emote.Start, out emoteStartLen);
 
         var isGlobalOoc = hasGlobalOocStart;
         var isOOC = hasOocStart;
+        var isPlacedEnvironmentMessage = hasPlacedEnvStart;
         var isEnvironmentMessage = hasEnvironmentStart;
-        var isEmote = hasEmoteStart || (context.SendingPlayer.GetEmoteMode() && !isOOC && !isGlobalOoc && !isEnvironmentMessage);
+        var isEmote = hasEmoteStart || (context.SendingPlayer.GetEmoteMode() && !isOOC && !isGlobalOoc && !isEnvironmentMessage && !isPlacedEnvironmentMessage);
 
         // Handle Global OOC - this will be processed normally by the server
         if (isGlobalOoc)
@@ -198,6 +202,23 @@ public class PlayerChatTransformer : MessageTransformerBase
                 updated = updated[..newLen];
             }
             context.SetFlag(MessageContext.IS_OOC);
+            context.UpdateMessage(updated.Trim(), updateSpeech: false);
+        }
+        else if (isPlacedEnvironmentMessage)
+        {
+            var updated = content[placedEnvStartLen..]; // Remove the "!!" delimiter
+
+            if (!string.IsNullOrEmpty(delimiters.PlacedEnvironmental?.End))
+            {
+                updated = StripTrailingAll(updated, delimiters.PlacedEnvironmental.End);
+            }
+            else if (!string.IsNullOrEmpty(delimiters.PlacedEnvironmental?.Start))
+            {
+                updated = StripTrailingAll(updated, delimiters.PlacedEnvironmental.Start);
+            }
+
+            context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
+            context.SetFlag(MessageContext.IS_PLACED_ENVIRONMENTAL);
             context.UpdateMessage(updated.Trim(), updateSpeech: false);
         }
         else if (isEnvironmentMessage)
