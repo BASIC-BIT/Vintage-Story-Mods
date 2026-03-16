@@ -8,21 +8,21 @@ public class ChatTypeTransformer : MessageTransformerBase
     public ChatTypeTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
     }
-    
+
     public override bool ShouldTransform(MessageContext context)
     {
         return true;
     }
-    
+
     public override MessageContext Transform(MessageContext context)
     {
-        
+
         // Environmental messages use Notification chat type
         if (context.HasFlag(MessageContext.IS_ENVIRONMENTAL))
         {
             context.SetMetadata(MessageContext.CHAT_TYPE, EnumChatType.Notification);
         }
-        
+
         // Emotes always use OthersMessage
         if (context.HasFlag(MessageContext.IS_EMOTE))
         {
@@ -34,7 +34,7 @@ public class ChatTypeTransformer : MessageTransformerBase
         {
             context.SetMetadata(MessageContext.CHAT_TYPE, EnumChatType.OthersMessage);
         }
-        
+
         return context;
     }
-} 
+}

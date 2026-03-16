@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using thebasics.Extensions;
@@ -21,7 +21,7 @@ namespace thebasics.ModSystems.ProximityChat
 
                 var garbledText = string.Join("",
                     syllableCount.DoTimes(_ => language.Syllables.GetRandomElement(random)));
-                
+
                 //Capitalize first letter if input word is capitalized
                 if (char.IsUpper(word[0]))
                 {
@@ -46,26 +46,6 @@ namespace thebasics.ModSystems.ProximityChat
             return word.Select(character => (int)character)
                 .Aggregate((acc, cur) =>
                     acc + cur);
-        }
-
-        //Unused
-        private static char RandomChar(char original, Random random)
-        {
-            if (ChatHelper.IsPunctuation(original))
-            {
-                return original;
-            }
-
-            // ascii ranges of usable characters is 33 to 126, so random mod 94 plus 33
-            var asciiValue = random.Next(94) + 33;
-            char value = (char)asciiValue;
-            return value;
-        }
-
-        //Unimplemented
-        private static string AddRandomCharactersToWords(string message)
-        {
-            return message;
         }
     }
 }

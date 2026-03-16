@@ -7,7 +7,8 @@ namespace thebasics.ModSystems.ProximityChat.Transformers
     // Set the isRoleplay flag for future transformers
     public class RoleplayTransformer : MessageTransformerBase
     {
-        public RoleplayTransformer(RPProximityChatSystem chatSystem) : base(chatSystem) {
+        public RoleplayTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
+        {
 
         }
 

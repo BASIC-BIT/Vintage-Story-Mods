@@ -1,4 +1,4 @@
-﻿namespace thebasics.ModSystems.PlayerStats.Models
+namespace thebasics.ModSystems.PlayerStats.Models
 {
     public class PlayerStatDefinition
     {

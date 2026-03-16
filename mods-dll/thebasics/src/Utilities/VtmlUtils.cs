@@ -1,4 +1,5 @@
 namespace thebasics.Utilities;
+
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -98,7 +99,7 @@ public static class VtmlUtils
     public static bool ContainsVtmlSpecialChars(string input)
     {
         if (string.IsNullOrEmpty(input)) return false;
-        
+
         return input.Contains('<') || input.Contains('>');
     }
 

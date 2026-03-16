@@ -6,4 +6,4 @@ namespace thebasics.Models;
 public class TheBasicsClientReadyMessage
 {
     // No data needed, just a ping to indicate client is ready
-} 
+}

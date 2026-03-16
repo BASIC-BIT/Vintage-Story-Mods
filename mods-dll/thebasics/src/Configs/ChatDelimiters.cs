@@ -34,8 +34,9 @@ namespace thebasics.Configs
         }
 
         private void DefaultChatDelimiterIfUsingDefaultValues(ChatDelimiter delimiter, string start, string end)
-        { 
-            if(string.IsNullOrEmpty(delimiter.Start) && string.IsNullOrEmpty(delimiter.End)) {
+        {
+            if (string.IsNullOrEmpty(delimiter.Start) && string.IsNullOrEmpty(delimiter.End))
+            {
                 delimiter.Start = start;
                 delimiter.End = end;
             }

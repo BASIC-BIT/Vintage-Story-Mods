@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using thebasics.Extensions;
@@ -114,7 +114,7 @@ namespace thebasics.Utilities
             Start,
             End,
         }
-        
+
         public static string OnOff(bool value)
         {
             return value ? Lang.Get("thebasics:util-on") : Lang.Get("thebasics:util-off");
@@ -135,10 +135,10 @@ namespace thebasics.Utilities
         {
             if (string.IsNullOrEmpty(color))
                 return message;
-                
+
             return $"<font color=\"{color}\">{message}</font>";
         }
-        
+
         public static string LangColor(string message, Language lang)
         {
             return Color(message, lang.Color);
@@ -167,7 +167,7 @@ namespace thebasics.Utilities
 
             return $"{identifier} — {EscapeMarkup(lang.Description)}";
         }
-        
+
         public static string GetMessage(string message)
         {
             if (string.IsNullOrWhiteSpace(message))

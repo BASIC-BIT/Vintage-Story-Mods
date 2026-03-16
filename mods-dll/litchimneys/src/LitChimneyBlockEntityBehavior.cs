@@ -1,4 +1,4 @@
-﻿using Vintagestory.API.Common;
+using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
@@ -14,7 +14,7 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
         base.Initialize(api, properties);
         this.listenerId = api.Event.RegisterGameTickListener(Check, 3000);
     }
-    
+
     public override void OnBlockRemoved()
     {
         base.OnBlockRemoved();
@@ -25,7 +25,7 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
     {
         var shouldBeLit = ShouldBeLit();
         var isLit = IsLit();
-        
+
         if (shouldBeLit != isLit)
         {
             SetLit(shouldBeLit);
@@ -37,7 +37,7 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
         Block newBlock = Api.World.BlockAccessor.GetBlock(Block.CodeWithVariant("state", lit ? "lit" : "unlit"));
 
         Api.World.BlockAccessor.ExchangeBlock(newBlock.Id, this.Pos);
-        
+
         //Fix particles because of new block
         Blockentity.Initialize(Api);
     }
@@ -54,7 +54,7 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
                 Y = height,
                 Z = Pos.Z,
             };
-            
+
             // Get the block entity and check if it implements IFirePit
             var blockEntity = Api.World.BlockAccessor.GetBlockEntity(searchPos);
             var foundFirepit = blockEntity as IFirePit;

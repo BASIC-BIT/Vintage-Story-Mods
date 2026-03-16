@@ -1,0 +1,90 @@
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{csproj,props,targets,json,yml,yaml}]
+indent_size = 2
+
+[*.cs]
+#### .NET Coding Conventions ####
+
+# Organize usings
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# this. preferences
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+# Language keywords vs BCL types
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+dotnet_style_predefined_type_for_member_access = true:suggestion
+
+# var preferences
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# Expression-bodied members
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_accessors = true:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+
+# Braces
+csharp_prefer_braces = true:suggestion
+
+# Null checking
+csharp_style_throw_expression = true:suggestion
+dotnet_style_coalesce_expression = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+
+# Pattern matching
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+
+#### C# Formatting Rules ####
+
+# New lines
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+
+# Indentation
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+
+# Spacing
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+
+#### Analyzer Severity ####
+
+# Microsoft.CodeAnalysis.NetAnalyzers (CA rules, built into SDK)
+dotnet_analyzer_diagnostic.category-Security.severity = error
+dotnet_analyzer_diagnostic.category-Performance.severity = suggestion
+
+# SonarAnalyzer.CSharp
+dotnet_diagnostic.S3776.severity = warning   # Cognitive complexity too high
+dotnet_diagnostic.S1541.severity = warning   # Cyclomatic complexity too high
+dotnet_diagnostic.S107.severity = warning    # Too many parameters
+dotnet_diagnostic.S1481.severity = warning   # Unused local variable
+dotnet_diagnostic.S1144.severity = warning   # Unused private member
+dotnet_diagnostic.S1135.severity = suggestion # TODO comments
+
+# Disable noisy rules that conflict with project conventions
+dotnet_diagnostic.S1128.severity = none      # Unused usings (let IDE handle)
+dotnet_diagnostic.S3925.severity = none      # ISerializable pattern (not relevant for game mods)
+dotnet_diagnostic.S927.severity = none       # Parameter name should match base (too strict for overrides)
+dotnet_diagnostic.S2094.severity = none      # Empty class (legitimate for mod systems)

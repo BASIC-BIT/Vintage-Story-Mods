@@ -1,0 +1,21 @@
+# Pre-existing complex functions that exceed Lizard thresholds.
+# These should be refactored over time (see issue #115).
+# Format: function_name at file_path
+
+# CCN=52, 205 lines - needs Phase 5 refactor to extract local functions
+PlayerChatTransformer::Transform
+
+# CCN=20, 107 lines - rendering callback with many branches
+TypingIndicatorRenderer::OnRenderFrame
+
+# CCN=6 but 154 lines - long command registration (not actually complex)
+RPProximityChatSystem::RegisterCommands
+
+# CCN=15, 133 lines - complex request handling with many validation branches
+TpaSystem::HandleTpaRequest
+
+# CCN=17, 120 lines - argument parser with many match conditions
+PlayerByNameOrNicknameArgParser::TryProcess
+
+# CCN=27, 163 lines - Harmony prefix patch with many conditional branches
+SpeechBubbleVtmlPatches::Prefix

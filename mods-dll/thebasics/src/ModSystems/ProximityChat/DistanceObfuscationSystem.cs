@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Linq;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
-using Vintagestory.API.Server;
 using Vintagestory.API.Common;
+using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.ProximityChat;
 

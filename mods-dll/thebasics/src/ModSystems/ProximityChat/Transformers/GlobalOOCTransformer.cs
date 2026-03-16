@@ -8,7 +8,7 @@ public class GlobalOOCTransformer : MessageTransformerBase
     public GlobalOOCTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
     }
-    
+
     public override bool ShouldTransform(MessageContext context)
     {
         return context.HasFlag(MessageContext.IS_GLOBAL_OOC);
@@ -20,4 +20,4 @@ public class GlobalOOCTransformer : MessageTransformerBase
 
         return context;
     }
-} 
+}

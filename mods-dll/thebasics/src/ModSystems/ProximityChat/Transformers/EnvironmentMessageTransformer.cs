@@ -19,7 +19,7 @@ public class EnvironmentMessageTransformer : MessageTransformerBase
     {
         // Apply italic formatting
         context.Message = ChatHelper.Italic(context.Message);
-        
+
         return context;
     }
-} 
+}

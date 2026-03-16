@@ -23,6 +23,11 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Setup Python (for Lizard complexity analysis)
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
         
     - name: Cache VS Dependencies
       id: cache-vs-deps
@@ -178,7 +183,22 @@ jobs:
         Write-Host "Building Vintage Story Mods solution..." -ForegroundColor Yellow
         dotnet build Vintage-Story-Mods.sln --configuration Release --no-restore --verbosity normal
       shell: pwsh
-      
+
+    - name: Check Formatting
+      run: dotnet format whitespace Vintage-Story-Mods.sln --verify-no-changes --exclude mods/
+      continue-on-error: false
+
+    - name: Run Tests
+      run: |
+        dotnet test mods-dll/thebasics.Tests/thebasics.Tests.csproj --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory TestResults
+      shell: pwsh
+
+    - name: Code Complexity Check
+      run: |
+        pip install lizard
+        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/
+      shell: bash
+
     - name: Test Build Output
       run: |
         Write-Host "Checking build outputs..." -ForegroundColor Yellow

@@ -16,7 +16,7 @@ namespace thebasics.Utilities.Network
         private readonly ICoreClientAPI _api;
         private readonly Queue<Action> _pendingPacketActions;
         private readonly SafeNetworkChannelConfig _config;
-        
+
         private bool _connectionRetryInProgress;
         private int _connectionRetryCount;
 
@@ -29,17 +29,17 @@ namespace thebasics.Utilities.Network
             /// Delay between connection retry attempts in milliseconds
             /// </summary>
             public int RetryDelayMs { get; set; } = 2000;
-            
+
             /// <summary>
             /// Maximum number of connection retry attempts before giving up
             /// </summary>
             public int MaxRetries { get; set; } = 10;
-            
+
             /// <summary>
             /// Whether to log debug information about packet sending and retries
             /// </summary>
             public bool EnableDebugLogging { get; set; } = true;
-            
+
             /// <summary>
             /// Prefix for log messages to identify the source
             /// </summary>
@@ -118,7 +118,7 @@ namespace thebasics.Utilities.Network
         {
             // Always queue the action first to ensure consistent behavior
             _pendingPacketActions.Enqueue(action);
-            
+
             if (IsConnected)
             {
                 // Process the queue immediately if connected
@@ -130,7 +130,7 @@ namespace thebasics.Utilities.Network
                 {
                     _api.Logger.Debug($"{_config.LogPrefix} Packet action queued until channel is connected");
                 }
-                
+
                 // Start retry mechanism if not already in progress
                 if (!_connectionRetryInProgress)
                 {
@@ -148,7 +148,7 @@ namespace thebasics.Utilities.Network
             {
                 _api.Logger.Debug($"{_config.LogPrefix} Processing {_pendingPacketActions.Count} queued packet actions");
             }
-            
+
             while (_pendingPacketActions.Count > 0)
             {
                 var action = _pendingPacketActions.Dequeue();
@@ -180,12 +180,12 @@ namespace thebasics.Utilities.Network
 
             _connectionRetryInProgress = true;
             _connectionRetryCount++;
-            
+
             if (_config.EnableDebugLogging)
             {
                 _api.Logger.Debug($"{_config.LogPrefix} Starting connection retry {_connectionRetryCount}/{_config.MaxRetries} in {_config.RetryDelayMs}ms");
             }
-            
+
             _api.Event.RegisterCallback(dt =>
             {
                 CheckConnectionAndProcessQueue();
@@ -198,7 +198,7 @@ namespace thebasics.Utilities.Network
         private void CheckConnectionAndProcessQueue()
         {
             _connectionRetryInProgress = false;
-            
+
             if (IsConnected)
             {
                 if (_config.EnableDebugLogging)

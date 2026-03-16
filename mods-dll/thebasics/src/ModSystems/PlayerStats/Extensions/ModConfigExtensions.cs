@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using thebasics.Configs;
 using thebasics.ModSystems.PlayerStats.Models;
@@ -15,7 +15,7 @@ namespace thebasics.ModSystems.PlayerStats.Extensions
         {
             return types.Any(config.PlayerStatEnabled);
         }
-        
+
         public static bool PlayerStatEnabled(this ModConfig config, PlayerStatType type)
         {
             return config.PlayerStatToggles[type];

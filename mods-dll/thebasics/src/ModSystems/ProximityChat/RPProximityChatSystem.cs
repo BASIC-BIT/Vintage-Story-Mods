@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using thebasics.Extensions;
 using thebasics.Models;
@@ -146,7 +146,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .RequiresPlayer()
                 .HandleWith(SendOOCMessage);
 
-            if(Config.EnableGlobalOOC)
+            if (Config.EnableGlobalOOC)
             {
                 API.ChatCommands.GetOrCreate("gooc")
                     .WithDescription(Lang.Get("thebasics:chat-cmd-gooc-desc"))
@@ -205,12 +205,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = message,
             SendingPlayer = player,
             GroupId = groupId,
-            Flags = { 
+            Flags = {
                 [MessageContext.IS_GLOBAL_OOC] = true,
                 [MessageContext.IS_FROM_COMMAND] = true
             }
         };
-        
+
         TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
 
         return new TextCommandResult
@@ -230,12 +230,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = message,
             SendingPlayer = player,
             GroupId = groupId,
-            Flags = { 
+            Flags = {
                 [MessageContext.IS_OOC] = true,
                 [MessageContext.IS_FROM_COMMAND] = true
             },
         };
-        
+
         TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
 
         return new TextCommandResult
@@ -659,7 +659,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 };
                 byPlayer.ServerData.PlayerGroupMemberships.Add(proximityGroup.Uid, newMembership);
                 proximityGroup.OnlinePlayers.Add(byPlayer);
-            } else if (playerProximityGroup.Level == EnumPlayerGroupMemberShip.None)
+            }
+            else if (playerProximityGroup.Level == EnumPlayerGroupMemberShip.None)
             {
                 playerProximityGroup.Level = EnumPlayerGroupMemberShip.Member;
             }
@@ -737,7 +738,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         else
         {
             var nickname = (string)fullArgs.Parsers[0].GetValue();
-            
+
             // Validate nickname against conflicts - always enforced
             if (!NicknameValidationUtils.ValidateNickname(player, nickname, API, out string conflictingPlayer, out string conflictType))
             {
@@ -747,7 +748,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     StatusMessage = Lang.Get("thebasics:chat-nick-conflict", nickname, conflictingPlayer, conflictType),
                 };
             }
-            
+
             player.SetNickname(nickname);
             SwapOutNameTag(player);
             return new TextCommandResult
@@ -773,7 +774,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         // Check if we have a force flag (parser[1])
         bool isForced = !fullArgs.Parsers[1].IsMissing && ((string)fullArgs.Parsers[1].GetValue())?.ToLowerInvariant() == "force";
-        
+
         // If nickname argument is missing (parser[2])
         if (fullArgs.Parsers[2].IsMissing)
         {
@@ -795,7 +796,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         else
         {
             var newNickname = (string)fullArgs.Parsers[2].GetValue();
-            
+
             // Validate nickname against conflicts and show warning to admin - always enforced unless forced
             if (!isForced)
             {
@@ -830,7 +831,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
             GroupId = ProximityChatId,
-            Flags = { 
+            Flags = {
                 [MessageContext.IS_EMOTE] = true,
                 [MessageContext.IS_FROM_COMMAND] = true
             }
@@ -854,7 +855,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = (string)args.Parsers[0].GetValue(),
             SendingPlayer = player,
             GroupId = ProximityChatId,
-            Flags = { 
+            Flags = {
                 [MessageContext.IS_ENVIRONMENTAL] = true,
                 [MessageContext.IS_FROM_COMMAND] = true
             }
@@ -1033,13 +1034,13 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        if(channelId != ProximityChatId)
+        if (channelId != ProximityChatId)
         {
             return;
         }
 
         // Short circuit if RP text is disabled
-        if(!byPlayer.GetRpTextEnabled())
+        if (!byPlayer.GetRpTextEnabled())
         {
             return;
         }

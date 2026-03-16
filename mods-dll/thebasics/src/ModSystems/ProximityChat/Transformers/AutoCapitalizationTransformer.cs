@@ -8,17 +8,17 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 public class AutoCapitalizationTransformer : MessageTransformerBase
 {
     private static readonly Regex AutoCapitalizationRegex = new Regex(@"^([\s+|]*)(.)(.*)$");
-    
+
     public AutoCapitalizationTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
     }
-    
+
     public override bool ShouldTransform(MessageContext context)
     {
         return context.HasFlag(MessageContext.IS_SPEECH) ||
             context.HasFlag(MessageContext.IS_ENVIRONMENTAL);
     }
-    
+
     public override MessageContext Transform(MessageContext context)
     {
         context.UpdateMessage(AutoCapitalizationRegex.Replace(context.Message, match =>
@@ -26,7 +26,7 @@ public class AutoCapitalizationTransformer : MessageTransformerBase
             var firstLetter = match.Groups[2].Value;
             return $"{match.Groups[1].Value}{firstLetter.ToUpper()}{match.Groups[3].Value}";
         }));
-        
+
         return context;
     }
 }

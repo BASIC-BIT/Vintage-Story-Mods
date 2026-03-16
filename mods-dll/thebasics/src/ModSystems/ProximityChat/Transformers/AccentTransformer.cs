@@ -5,16 +5,16 @@ using thebasics.ModSystems.ProximityChat.Models;
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 public class AccentTransformer : MessageTransformerBase
-{   
+{
     public AccentTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
     }
-    
+
     public override bool ShouldTransform(MessageContext context)
     {
         return true;
     }
-    
+
     public override MessageContext Transform(MessageContext context)
     {
         var delimiters = _config.ChatDelimiters;

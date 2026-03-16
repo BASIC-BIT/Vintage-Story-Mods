@@ -1,4 +1,4 @@
-﻿using thebasics.Configs;
+using thebasics.Configs;
 using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems

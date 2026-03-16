@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 
 namespace thebasics.Extensions;
@@ -6,7 +6,7 @@ namespace thebasics.Extensions;
 public static class ArrayExtensions
 {
     static Random random = new Random();
-    
+
     public static T GetRandomElement<T>(this T[] items, Random customRandom)
     {
         if (items.Length == 0)
