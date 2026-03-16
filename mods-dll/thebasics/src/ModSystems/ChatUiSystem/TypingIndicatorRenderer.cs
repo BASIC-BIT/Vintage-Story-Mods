@@ -241,7 +241,9 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
         var bg = new TextBackground
         {
-            Padding = 3,
+            Padding = 3,       // base (overridden below)
+            HorPadding = 5,    // more horizontal breathing room (icon needs left margin)
+            VerPadding = 2,    // tighter vertical fit
             Radius = GuiStyle.ElementBGRadius,
             FillColor = new[]
             {
