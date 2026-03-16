@@ -128,7 +128,7 @@ public static class SpeechBubbleVtmlPatches
 
             var background = GetBubbleBackground(kind);
 
-            var fontColor = GetBubbleFontColor(kind);
+            var fontColor = GetBubbleFontColor();
 
             // Scale bubble font size by chat mode: yell is larger, whisper is smaller.
             var baseFontSize = 25.0;

@@ -4,23 +4,23 @@ namespace thebasics.ModSystems.TPA.Models
 {
     public class TpaRequest : IEquatable<TpaRequest>
     {
-        public readonly TpaRequestType Type;
+        public TpaRequestType Type { get; init; }
 
-        public readonly string RequestPlayerUID;
+        public string RequestPlayerUID { get; init; }
 
-        public readonly string TargetPlayerUID;
+        public string TargetPlayerUID { get; init; }
 
-        public readonly double RequestTimeHours;
+        public double RequestTimeHours { get; init; }
 
         /// <summary>
         /// Real-time timestamp when the request was made (DateTime.UtcNow.Ticks)
         /// </summary>
-        public readonly long RequestTimeRealTicks;
+        public long RequestTimeRealTicks { get; init; }
 
         /// <summary>
         /// Whether a temporal gear was consumed when this request was made
         /// </summary>
-        public readonly bool TemporalGearConsumed;
+        public bool TemporalGearConsumed { get; init; }
 
         public bool Equals(TpaRequest other)
         {
