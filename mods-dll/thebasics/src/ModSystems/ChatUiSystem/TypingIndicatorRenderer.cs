@@ -122,9 +122,12 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 continue;
             }
 
-            // Dampened distance scaling matching speech bubbles (4/Z^0.6).
-            var dampenedZ = (float)Math.Pow(Math.Max(1.0, pos.Z), 0.6);
-            float scale = 4f / dampenedZ;
+            // Gentler dampening than speech bubbles — typing indicator is a subtle
+            // status badge, not content to read. Uses 3/Z^0.8 (vs bubbles' 4/Z^0.6)
+            // so it shrinks faster with distance while still being smoother than
+            // vanilla's linear 4/Z.
+            var dampenedZ = (float)Math.Pow(Math.Max(1.0, pos.Z), 0.8);
+            float scale = 3f / dampenedZ;
             float cappedScale = Math.Min(1f, scale);
             if (cappedScale > 0.75f)
             {
@@ -243,7 +246,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
         {
             Padding = 3,       // base (overridden below)
             HorPadding = 5,    // more horizontal breathing room (icon needs left margin)
-            VerPadding = 2,    // tighter vertical fit
+            VerPadding = 3,    // balanced vertical fit
             Radius = GuiStyle.ElementBGRadius,
             FillColor = new[]
             {
