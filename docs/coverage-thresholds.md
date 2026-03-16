@@ -8,7 +8,7 @@
 | Branch | —    | —    | ~6.4%                  |
 
 Thresholds are configured in two places:
-- **CI enforcement**: `.github/workflows/build.yml` → `CodeCoverageSummary` step (`thresholds` parameter)
+- **CI enforcement**: `.github/workflows/build.yml` → `Coverage Threshold Check` step (`$failThreshold` / `$warnThreshold`)
 - **Exclusions**: `mods-dll/thebasics.Tests/coverlet.runsettings` → `ExcludeByFile` list
 
 ## Excluded Files

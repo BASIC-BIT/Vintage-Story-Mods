@@ -211,29 +211,55 @@ jobs:
         targetdir: coveragereport
         reporttypes: 'HtmlInline;MarkdownSummaryGithub;Cobertura'
 
-    - name: Coverage Summary
-      if: always()
-      uses: irongut/CodeCoverageSummary@v1.3.0
-      with:
-        filename: '**/TestResults/**/coverage.cobertura.xml'
-        badge: true
-        fail_below_min: true
-        format: markdown
-        output: both
-        # Thresholds: warn at 5%, fail at 3% (just below current ~9.7% baseline).
-        # Ratchet up as tests are added.  See docs/coverage-thresholds.md.
-        thresholds: '5 3'
-
-    - name: Write Coverage to Job Summary
+    - name: Coverage Threshold Check
       if: always()
       run: |
-        if (Test-Path "code-coverage-results.md") {
-          Get-Content "code-coverage-results.md" >> $env:GITHUB_STEP_SUMMARY
+        # Parse cobertura XML and enforce minimum line coverage.
+        # Thresholds: fail at 3%, warn at 5% (just below current ~9.7% baseline).
+        # Ratchet up as tests are added.  See docs/coverage-thresholds.md.
+        $failThreshold = 3
+        $warnThreshold = 5
+
+        $coberturaFile = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse | Select-Object -First 1
+        if (-not $coberturaFile) {
+          Write-Host "::error::No coverage.cobertura.xml found"
+          exit 1
+        }
+
+        [xml]$xml = Get-Content $coberturaFile.FullName
+        $lineRate = [math]::Round([double]$xml.coverage.'line-rate' * 100, 1)
+        $branchRate = [math]::Round([double]$xml.coverage.'branch-rate' * 100, 1)
+        $linesCovered = $xml.coverage.'lines-covered'
+        $linesValid = $xml.coverage.'lines-valid'
+
+        Write-Host "Line coverage:   $lineRate% ($linesCovered / $linesValid lines)"
+        Write-Host "Branch coverage: $branchRate%"
+
+        # Write job summary
+        $summary = @"
+        ## Code Coverage
+
+        | Metric | Value |
+        |--------|-------|
+        | Line coverage | **$lineRate%** ($linesCovered / $linesValid) |
+        | Branch coverage | **$branchRate%** |
+        | Fail threshold | $failThreshold% |
+        | Warn threshold | $warnThreshold% |
+        "@
+        $summary >> $env:GITHUB_STEP_SUMMARY
+
+        if ($lineRate -lt $failThreshold) {
+          Write-Host "::error::Line coverage $lineRate% is below minimum threshold of $failThreshold%"
+          exit 1
+        } elseif ($lineRate -lt $warnThreshold) {
+          Write-Host "::warning::Line coverage $lineRate% is below warning threshold of $warnThreshold%"
+        } else {
+          Write-Host "Coverage OK ($lineRate% >= $warnThreshold%)"
         }
       shell: pwsh
 
     - name: Comment PR with Coverage
-      if: github.event_name == 'pull_request' && always()
+      if: github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && always()
       run: |
         if (Test-Path "coveragereport/SummaryGithub.md") {
           gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body-file coveragereport/SummaryGithub.md
