@@ -202,6 +202,10 @@
   "parser-syntax-explanation": "{0} is the name, nickname, or uid of an online player.",
   "parser-error-player-not-found": "No online player with name or nickname '{0}' exists",
 
+  "chat-cmd-chatter-desc": "Toggle character voice chatter on or off when players speak",
+  "chat-chatter-disabled": "Character chatter is disabled on this server.",
+  "chat-chatter-set": "Character chatter is now {0}.",
+
   "util-on": "on",
   "util-off": "off"
 }

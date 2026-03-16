@@ -1,13 +1,16 @@
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using thebasics.Models;
 using thebasics.Configs;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Util;
 using Vintagestory.Client.NoObf;
 using Vintagestory.API.Config;
+using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.ChatUiSystem;
 
@@ -195,9 +198,11 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
             .RegisterMessageType<ChatTypingStateMessage>()
+            .RegisterMessageType<ChatterSoundMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage)
-            .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage);
+            .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
+            .SetMessageHandler<ChatterSoundMessage>(OnChatterSoundMessage);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
@@ -406,6 +411,92 @@ public class ChatUiSystem : ModSystem
         catch (System.Exception ex)
         {
             _api.Logger.Warning($"[THEBASICS] Failed to dispatch RPTTS speech: {ex}");
+        }
+    }
+
+    // Cached reflection fields for EntityTalkUtil (protected fields we need to override)
+    private static FieldInfo _lettersLeftToTalkField;
+    private static FieldInfo _totalLettersToTalkField;
+    private static bool _talkUtilFieldsResolved;
+
+    private static void ResolveTalkUtilFields()
+    {
+        if (_talkUtilFieldsResolved) return;
+
+        try
+        {
+            var talkUtilType = typeof(EntityTalkUtil);
+            _lettersLeftToTalkField = talkUtilType.GetField("lettersLeftToTalk",
+                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+            _totalLettersToTalkField = talkUtilType.GetField("totalLettersToTalk",
+                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+
+            if (_lettersLeftToTalkField == null || _totalLettersToTalkField == null)
+            {
+                _api?.Logger.Warning("[THEBASICS] Could not resolve EntityTalkUtil fields for chatter note count override. Chatter will use default note counts.");
+            }
+
+            // Only mark resolved after successful attempt (even if fields were not found)
+            // so that exceptions during GetField allow a retry on the next message
+            _talkUtilFieldsResolved = true;
+        }
+        catch (Exception ex)
+        {
+            _api?.Logger.Warning($"[THEBASICS] Failed to resolve EntityTalkUtil fields: {ex.Message}");
+        }
+    }
+
+    private static void OnChatterSoundMessage(ChatterSoundMessage message)
+    {
+        if (message == null || _api == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var entity = _api.World.GetEntityById(message.EntityId);
+            if (entity == null)
+            {
+                return;
+            }
+
+            // Access TalkUtil via the ITalkUtil interface (implemented by game-side entity classes)
+            var talkUtilHolder = entity as ITalkUtil;
+            var talkUtil = talkUtilHolder?.TalkUtil;
+            if (talkUtil == null)
+            {
+                return;
+            }
+
+            // Apply volume and pitch modifiers for this chatter event
+            talkUtil.SetModifiers(1f, message.Pitch, message.Volume);
+
+            // Trigger the chatter — this sets lettersLeftToTalk internally.
+            // VS defers note processing to subsequent game-loop ticks, so the reflection
+            // override below is guaranteed to take effect before any note plays.
+            var talkType = (EnumTalkType)message.TalkType;
+            talkUtil.Talk(talkType);
+
+            // Override the randomized note count with our logarithmically-scaled value.
+            // These fields are protected, so we use cached reflection.
+            ResolveTalkUtilFields();
+            if (_lettersLeftToTalkField != null && _totalLettersToTalkField != null)
+            {
+                try
+                {
+                    _lettersLeftToTalkField.SetValue(talkUtil, message.NoteCount);
+                    _totalLettersToTalkField.SetValue(talkUtil, message.NoteCount);
+                }
+                catch (Exception setEx)
+                {
+                    _api?.Logger.Warning($"[THEBASICS] Note count override failed (TalkUtil may not be EntityTalkUtil): {setEx.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _api.Logger.Warning($"[THEBASICS] Failed to play chatter sound: {ex}");
         }
     }
 

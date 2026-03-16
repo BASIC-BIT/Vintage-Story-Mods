@@ -10,6 +10,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.ProximityChat;
@@ -156,6 +157,15 @@ public class RPProximityChatSystem : BaseBasicModSystem
             }
         }
 
+        // Chatter opt-out is always available (not gated behind DisableRPChat)
+        // so players can toggle it even when RP chat formatting is disabled
+        API.ChatCommands.GetOrCreate("chatter")
+            .WithDescription(Lang.Get("thebasics:chat-cmd-chatter-desc"))
+            .WithArgs(new BoolArgParser("mode", "on", false))
+            .RequiresPrivilege(Privilege.chat)
+            .RequiresPlayer()
+            .HandleWith(ChatterToggle);
+
         // Always register basic chat mode commands
         API.ChatCommands.GetOrCreate("yell")
             .WithAlias("y")
@@ -242,6 +252,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
             .RegisterMessageType<ChatTypingStateMessage>()
+            .RegisterMessageType<ChatterSoundMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage);
@@ -455,6 +466,104 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var falloff = Config.RPTTS_ModeFalloff[mode];
 
         return (gain, falloff);
+    }
+
+    internal void DispatchChatterForContext(MessageContext context)
+    {
+        if (_serverConfigChannel == null || !Config.EnableChatter)
+        {
+            return;
+        }
+
+        var isSpeech = context.HasFlag(MessageContext.IS_SPEECH);
+        var isEmote = context.HasFlag(MessageContext.IS_EMOTE);
+
+        // Only chatter for speech messages and emotes with quoted speech
+        if (!isSpeech && !isEmote)
+        {
+            return;
+        }
+
+        // Sign language is silent — no chatter
+        if (context.TryGetMetadata(MessageContext.LANGUAGE, out Language lang) && lang == LanguageSystem.SignLanguage)
+        {
+            return;
+        }
+
+        // Determine the speech length for note count calculation
+        // Determine the speech length for note count calculation.
+        // Note: for emotes, Phase 1 transformers (auto-capitalization, auto-punctuation) may
+        // have added a character or two to quoted segments. The logarithmic scaling absorbs
+        // this negligible difference.
+        int speechLength;
+        if (isSpeech)
+        {
+            // Regular speech — use the full speech text
+            if (!context.TryGetSpeechText(out var speechText) || string.IsNullOrWhiteSpace(speechText))
+            {
+                return;
+            }
+            speechLength = speechText.Length;
+        }
+        else if (isEmote)
+        {
+            // Emote — extract quoted speech portions (same split logic as EmoteTransformer)
+            var segments = context.Message.Split('"');
+            speechLength = 0;
+            for (var i = 1; i < segments.Length; i += 2)
+            {
+                speechLength += segments[i].Length;
+            }
+
+            // Pure narration emote (no quoted speech) — no chatter
+            if (speechLength == 0)
+            {
+                return;
+            }
+        }
+        else
+        {
+            return;
+        }
+
+        var player = context.SendingPlayer;
+        if (player?.Entity == null || context.Recipients == null)
+        {
+            return;
+        }
+
+        var mode = context.GetMetadata(MessageContext.CHAT_MODE, player.GetChatMode());
+        var volume = Config.ChatterModeVolume.TryGetValue(mode, out var vol) ? vol : 0.8f;
+        var pitch = Config.ChatterModePitch.TryGetValue(mode, out var p) ? p : 1.0f;
+
+        // Use IdleShort for whisper, Idle for normal/yell
+        var talkType = mode == ProximityChatMode.Whisper
+            ? (int)Vintagestory.API.Util.EnumTalkType.IdleShort
+            : (int)Vintagestory.API.Util.EnumTalkType.Idle;
+
+        // Logarithmic scaling (natural log): diminishing returns on longer messages.
+        // "hi" (2) -> 6, "hello there" (11) -> 10, full sentence (32) -> 13, novel (150+) -> 18
+        var noteCount = Math.Min(3 + (int)(3.0 * Math.Log(speechLength + 1)), 20);
+
+        var message = new ChatterSoundMessage
+        {
+            EntityId = player.Entity.EntityId,
+            TalkType = talkType,
+            NoteCount = noteCount,
+            Volume = volume,
+            Pitch = pitch,
+        };
+
+        foreach (var recipient in context.Recipients)
+        {
+            // Skip recipients who have opted out of chatter
+            if (!recipient.GetChatterEnabled())
+            {
+                continue;
+            }
+
+            _serverConfigChannel.SendPacket(message, recipient);
+        }
     }
 
     private void HookEvents()
@@ -887,6 +996,27 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             Status = EnumCommandStatus.Success,
             StatusMessage = Lang.Get("thebasics:chat-ooc-set", newMode ? Lang.Get("thebasics:chat-ooc-enabled") : Lang.Get("thebasics:chat-ooc-disabled-label")),
+        };
+    }
+
+    private TextCommandResult ChatterToggle(TextCommandCallingArgs args)
+    {
+        if (!Config.EnableChatter)
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = Lang.Get("thebasics:chat-chatter-disabled"),
+            };
+        }
+
+        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+        var enabled = args.Parsers[0].IsMissing ? !player.GetChatterEnabled() : (bool)args.Parsers[0].GetValue();
+        player.SetChatterEnabled(enabled);
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = Lang.Get("thebasics:chat-chatter-set", ChatHelper.OnOff(enabled)),
         };
     }
 

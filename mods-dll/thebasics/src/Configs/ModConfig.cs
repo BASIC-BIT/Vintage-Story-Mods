@@ -94,6 +94,20 @@ namespace thebasics.Configs
                     "#D4A96A", false, false)
             ];
 
+            ChatterModeVolume ??= new Dictionary<ProximityChatMode, float>
+            {
+                { ProximityChatMode.Yell, 1.4f },
+                { ProximityChatMode.Normal, 0.8f },
+                { ProximityChatMode.Whisper, 0.4f }
+            };
+
+            ChatterModePitch ??= new Dictionary<ProximityChatMode, float>
+            {
+                { ProximityChatMode.Yell, 1.1f },
+                { ProximityChatMode.Normal, 1.0f },
+                { ProximityChatMode.Whisper, 0.95f }
+            };
+
             // Initialize chat delimiters and ensure nested defaults even for legacy configs
             ChatDelimiters ??= new ChatDelimiters();
             ChatDelimiters.InitializeDefaultsIfNeeded();
@@ -361,5 +375,21 @@ namespace thebasics.Configs
         // Permission for the toggling of bypassing proximity chat restrictions entirely, allowing a player to speak globally regardless of distance or mode.
         [ProtoMember(77)]
         public string RPTextTogglePermission { get; set; } = "chat";
+
+        // ----- Chatter (seraph voice sounds on chat) ----- //
+
+        // When true, characters play their seraph instrument voice when sending speech messages.
+        // Players can individually opt out with /chatter off.
+        [ProtoMember(78)]
+        public bool EnableChatter { get; set; } = false;
+
+        // Volume modifier per chat mode for chatter sounds.
+        // Defaults lean quiet — chatter is ambient flavor, not a notification.
+        [ProtoMember(79)]
+        public IDictionary<ProximityChatMode, float> ChatterModeVolume { get; set; }
+
+        // Pitch modifier per chat mode for chatter sounds.
+        [ProtoMember(80)]
+        public IDictionary<ProximityChatMode, float> ChatterModePitch { get; set; }
     }
 }

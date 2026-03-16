@@ -38,6 +38,7 @@ namespace thebasics.Extensions
         private const string TpaPrivilege = "tpa";
 
         private const string ModDataLastSelectedGroupId = "BASIC_LAST_SELECTED_GROUP_ID";
+        private const string ModDataChatterEnabled = "BASIC_CHATTER_ENABLED";
 
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
         {
@@ -380,6 +381,16 @@ namespace thebasics.Extensions
         public static bool GetOOCEnabled(this IServerPlayer player)
         {
             return GetModData(player, ModDataOOCEnabled, false);
+        }
+
+        public static void SetChatterEnabled(this IServerPlayer player, bool enabled)
+        {
+            SetModData(player, ModDataChatterEnabled, enabled);
+        }
+
+        public static bool GetChatterEnabled(this IServerPlayer player)
+        {
+            return GetModData(player, ModDataChatterEnabled, true);
         }
         
         public static double GetDistance(this IServerPlayer sendingPlayer, IServerPlayer receivingPlayer) =>
