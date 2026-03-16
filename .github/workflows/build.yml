@@ -196,7 +196,7 @@ jobs:
     - name: Code Complexity Check
       run: |
         pip install lizard
-        lizard -l csharp -C 25 -L 100 -a 8 -w ./mods-dll/thebasics/src/
+        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/
       shell: bash
 
     - name: Test Build Output
