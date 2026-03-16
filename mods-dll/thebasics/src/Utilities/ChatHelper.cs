@@ -165,7 +165,7 @@ namespace thebasics.Utilities
                 return identifier;
             }
 
-            return $"{identifier} — {lang.Description}";
+            return $"{identifier} — {EscapeMarkup(lang.Description)}";
         }
         
         public static string GetMessage(string message)

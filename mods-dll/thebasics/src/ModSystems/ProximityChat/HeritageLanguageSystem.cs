@@ -561,7 +561,7 @@ public class HeritageLanguageSystem : BaseSubSystem
             return GetModelDescriptor(string.Empty, modelGroupCode);
         }
 
-        // Matched both — fall back to the default priority (group > model).
+        // Matched both, or matched neither (defensive fallback) — default priority: group > model.
         return GetModelDescriptor(modelCode, modelGroupCode);
     }
 
