@@ -73,16 +73,33 @@ internal static class RichTextTextureUtils
                 ctx.Fill();
             }
 
-            // Render at padded offset. Vanilla's bubble renderer centers the
-            // entire texture above the player, giving a centered appearance.
+            // Render text at a centered offset within the bubble.
+            // Horizontal: center the text block within the surface width.
+            // Vertical: center the text block within the bubble height (excluding bottom margin).
+            // We use Left alignment in the font to avoid a VS centering bug at inline
+            // tag boundaries, but manually center the rendered block within the surface.
+            var hPad = (surfaceWidth - textWidthPx) / 2.0;
+            var vPad = (bubbleHeight - textHeightPx) / 2.0;
             var offsetBounds = ElementBounds.Fixed(
-                background.HorPadding / (double)guiScale,
-                background.VerPadding / (double)guiScale,
+                hPad / guiScale,
+                vPad / guiScale,
                 textWidthPx / (double)guiScale,
                 textHeightPx / (double)guiScale
             );
             offsetBounds.ParentBounds = ElementBounds.Empty;
             rich.ComposeFor(offsetBounds, ctx, surface);
+
+            // Explicitly clear the bottom margin region so no rendering artifacts
+            // (from ComposeFor overflow or Cairo anti-aliasing) leak into the
+            // transparent spacing that separates the bubble from the nametag.
+            if (extraBottomMarginPx > 0)
+            {
+                ctx.Save();
+                ctx.Operator = Operator.Clear;
+                ctx.Rectangle(0, bubbleHeight, surfaceWidth, extraBottomMarginPx);
+                ctx.Fill();
+                ctx.Restore();
+            }
 
             var tex = new LoadedTexture(capi);
             capi.Gui.LoadOrUpdateCairoTexture(surface, linearMag: false, ref tex);

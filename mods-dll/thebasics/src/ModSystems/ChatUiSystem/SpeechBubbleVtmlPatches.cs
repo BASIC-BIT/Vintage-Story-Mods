@@ -180,7 +180,7 @@ public static class SpeechBubbleVtmlPatches
         var bg = new TextBackground
         {
             FillColor = GuiStyle.DialogLightBgColor,
-            Padding = 3,
+            Padding = 5,
             Radius = GuiStyle.ElementBGRadius
         };
 
