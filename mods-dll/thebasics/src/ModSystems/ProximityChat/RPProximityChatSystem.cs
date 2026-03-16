@@ -468,7 +468,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     internal void DispatchChatterForContext(MessageContext context)
     {
-        if (!Config.EnableChatter)
+        if (_serverConfigChannel == null || !Config.EnableChatter)
         {
             return;
         }
@@ -497,16 +497,26 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
 
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, player.GetChatMode());
+        var volume = Config.ChatterModeVolume.TryGetValue(mode, out var vol) ? vol : 0.8f;
+        var pitch = Config.ChatterModePitch.TryGetValue(mode, out var p) ? p : 1.0f;
 
-        // Use IdleShort for whisper, Idle for normal/yell.
-        // EnumTalkType: Idle = 2, IdleShort = 9
+        // Use IdleShort for whisper, Idle for normal/yell
         var talkType = mode == ProximityChatMode.Whisper
-            ? Vintagestory.API.Util.EnumTalkType.IdleShort
-            : Vintagestory.API.Util.EnumTalkType.Idle;
+            ? (int)Vintagestory.API.Util.EnumTalkType.IdleShort
+            : (int)Vintagestory.API.Util.EnumTalkType.Idle;
 
-        // Serialize the talk type for the vanilla entity packet system
-        var talkData = SerializerUtil.Serialize(talkType);
-        var entityId = player.Entity.EntityId;
+        // Logarithmic scaling: diminishing returns on longer messages.
+        // "hi" (2) -> ~4, "hello there" (11) -> ~7, full sentence (32) -> ~10, novel (150+) -> ~15
+        var noteCount = 3 + (int)(3.0 * Math.Log(speechText.Length + 1));
+
+        var message = new ChatterSoundMessage
+        {
+            EntityId = player.Entity.EntityId,
+            TalkType = talkType,
+            NoteCount = noteCount,
+            Volume = volume,
+            Pitch = pitch,
+        };
 
         foreach (var recipient in context.Recipients)
         {
@@ -516,11 +526,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 continue;
             }
 
-            // Send a vanilla entity talk packet directly to this recipient.
-            // The client's EntityTalkUtil handles packet id 1231 and triggers
-            // the character's instrument voice with 3D positioning.
-            API.Network.SendEntityPacket(recipient, entityId,
-                Vintagestory.API.Util.EntityTalkUtil.TalkPacketId, talkData);
+            _serverConfigChannel.SendPacket(message, recipient);
         }
     }
 
