@@ -305,7 +305,7 @@ namespace thebasics.Configs
         public bool UseNicknameInOOC { get; set; } = true;
         
         [ProtoMember(64)]
-        public bool RemoveGrantedLanguagesOnChange { get; set; }
+        public bool RemoveGrantedLanguagesOnChange { get; set; } = true;
 
         [ProtoMember(65)]
         public ChatDelimiters ChatDelimiters { get; set; }
@@ -334,7 +334,7 @@ namespace thebasics.Configs
         // ----- Typing Indicator (client-side UI feature, server-configured) ----- //
 
         [ProtoMember(68)]
-        public bool EnableTypingIndicator { get; set; } = false;
+        public bool EnableTypingIndicator { get; set; } = true;
 
         [ProtoMember(69)]
         public int TypingIndicatorMaxRange { get; set; } = 50;
@@ -346,11 +346,13 @@ namespace thebasics.Configs
         [ProtoMember(71)]
         public string TypingIndicatorTextOverride { get; set; } = "";
 
-        // When true, the server will override the vanilla overhead chat bubble text with the RP-processed
-        // speech text (per-recipient language/obfuscation).
-        // This only affects the floating text above player heads, not the chat log.
+        // DEPRECATED: VTML speech bubbles are now always active when RP chat is enabled
+        // (i.e., when DisableRPChat is false). This property is retained only for
+        // protobuf deserialization compatibility with existing config files on disk.
+        // It is no longer read by any runtime code.
         [ProtoMember(72)]
-        public bool OverrideSpeechBubblesWithRpText { get; set; } = false;
+        [Obsolete("VTML bubbles are now gated by DisableRPChat. This property is ignored.")]
+        public bool OverrideSpeechBubblesWithRpText { get; set; } = true;
 
         // When true, enables verbose debug logging and diagnostic instrumentation.
         // Intended for temporary use while investigating reports.
@@ -370,7 +372,7 @@ namespace thebasics.Configs
         // Controls what the typing indicator renders: Icon, Text, or Both.
         // Disabled entirely when EnableTypingIndicator is false.
         [ProtoMember(76)]
-        public TypingIndicatorDisplayMode TypingIndicatorDisplayMode { get; set; } = TypingIndicatorDisplayMode.Icon;
+        public TypingIndicatorDisplayMode TypingIndicatorDisplayMode { get; set; } = TypingIndicatorDisplayMode.Both;
 
         // Permission for the toggling of bypassing proximity chat restrictions entirely, allowing a player to speak globally regardless of distance or mode.
         [ProtoMember(77)]

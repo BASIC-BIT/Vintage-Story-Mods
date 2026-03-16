@@ -386,9 +386,43 @@ namespace thebasics.ModSystems.ProximityChat
         {
             if (Config.EnableLanguageSystem && !receivingPlayer.KnowsLanguage(lang))
             {
+                // Visual/gestural languages (like sign language) have no syllables to
+                // scramble into. Replace each word with random ASCII gesture symbols,
+                // mirroring the syllable-based scrambling for spoken languages.
+                if (lang.Syllables == null || lang.Syllables.Length == 0)
+                {
+                    message = ChatHelper.Italic(ScrambleAsGestures(message));
+                    return;
+                }
+
                 var scrambledMessage = LanguageScrambler.ScrambleMessage(message, lang);
                 message = ChatHelper.Italic(scrambledMessage);
             }
+        }
+
+        /// <summary>
+        /// Replaces each word with random ASCII gesture symbols, deterministically seeded
+        /// by the word content (same word always produces the same symbols, matching the
+        /// spoken-language scrambler's consistency). Shorter and more playful than a
+        /// verbose description like "makes unintelligible gestures".
+        /// </summary>
+        private static readonly char[] GestureSymbols = { '*', '-', '.', '~', '#', '+', '?' };
+        private static string ScrambleAsGestures(string message)
+        {
+            var wordRegex = new Regex(@"\w+");
+            return wordRegex.Replace(message, match =>
+            {
+                var word = match.Groups[0].Value;
+                var hash = word.Select((c, i) => (int)c * (i + 1)).Aggregate((a, b) => a + b);
+                var rng = new Random(hash);
+                var len = Math.Max(1, (word.Length + 1) / 2); // roughly half the word length
+                var symbols = new char[len];
+                for (var i = 0; i < len; i++)
+                {
+                    symbols[i] = GestureSymbols[rng.Next(GestureSymbols.Length)];
+                }
+                return new string(symbols);
+            });
         }
 
         [Obsolete("Use HeritageLanguageSystem watcher-driven class handling")]

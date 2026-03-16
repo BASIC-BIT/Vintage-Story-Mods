@@ -20,8 +20,7 @@ public static class SpeechBubbleVtmlPatches
     internal static readonly AccessTools.FieldRef<EntityShapeRenderer, List<MessageTexture>> MessageTexturesRef =
         AccessTools.FieldRefAccess<EntityShapeRenderer, List<MessageTexture>>("messageTextures");
 
-    private const int BubbleMaxTextWidthPx = 350;
-    private const int BubbleBottomMarginPx = 40;
+    private const int BubbleMaxTextWidthPx = 280;
 
     public static bool Prefix(EntityShapeRenderer __instance, int groupId, string message, EnumChatType chattype, string data)
     {
@@ -53,7 +52,10 @@ public static class SpeechBubbleVtmlPatches
                 return true;
             }
 
-            if (data == null || !data.Contains("from:") || entity.Pos.SquareDistanceTo(localPlayerEntity.Pos.XYZ) >= 400.0 || message.Length <= 0)
+            // Vanilla uses 400 sq (20 blocks). We raise to 10000 sq (100 blocks) so bubbles
+            // can appear at the full yell range (90 blocks). The server already gates by chat
+            // range, so this is just a safety cap.
+            if (data == null || !data.Contains("from:") || entity.Pos.SquareDistanceTo(localPlayerEntity.Pos.XYZ) >= 10000.0 || message.Length <= 0)
             {
                 return true;
             }
@@ -90,22 +92,21 @@ public static class SpeechBubbleVtmlPatches
             }
 
             // Bubble text comes from the data payload.
-            // When this patch is enabled, the server may attach an optional kind marker for styling:
-            //   New (preferred): from:<id>,msg\u001fkind=<emote|env|ooc>:<text>
-            //   Legacy:          from:<id>,msg:<text>\u001fkind:<emote|env|ooc>
+            // The server encodes markers in the key segment (before ':') using unit separator:
+            //   from:<id>,msg\u001fkind=<emote|env|ooc>\u001fmode=<yell|whisper>:<text>
+            // Legacy suffix format in the value is also supported for kind.
             var rawMsg = parttwo[1];
             string kind = null;
+            string mode = null;
 
-            // Preferred format: kind marker embedded in the key segment so vanilla clients never display it.
-            const string kindKeyMarker = "\u001fkind=";
-            var keyKindIndex = parttwo[0].LastIndexOf(kindKeyMarker, StringComparison.Ordinal);
-            if (keyKindIndex >= 0)
+            // Parse markers from the key segment (preferred format).
+            var keySegment = parttwo[0];
+            kind = ExtractMarker(keySegment, "\u001fkind=");
+            mode = ExtractMarker(keySegment, "\u001fmode=");
+
+            // Legacy suffix format for kind (kept for safety).
+            if (kind == null)
             {
-                kind = parttwo[0][(keyKindIndex + kindKeyMarker.Length)..].Trim();
-            }
-            else
-            {
-                // Legacy suffix format (kept for safety).
                 const string kindValueMarker = "\u001fkind:";
                 var valueKindIndex = rawMsg.LastIndexOf(kindValueMarker, StringComparison.Ordinal);
                 if (valueKindIndex >= 0)
@@ -119,8 +120,8 @@ public static class SpeechBubbleVtmlPatches
             bubbleVtml = bubbleVtml.Replace("&lt;", "<").Replace("&gt;", ">");
 
             var hasVtml = bubbleVtml.Contains('<');
-            // If there are no tags and no kind marker, vanilla rendering is fine.
-            if (!hasVtml && kind == null)
+            // If there are no tags, no kind, and no mode marker, vanilla rendering is fine.
+            if (!hasVtml && kind == null && mode == null)
             {
                 return true;
             }
@@ -129,7 +130,17 @@ public static class SpeechBubbleVtmlPatches
 
             var fontColor = GetBubbleFontColor(kind);
 
-            var baseFont = new CairoFont(25.0, GuiStyle.StandardFontName, fontColor)
+            // Scale bubble font size by chat mode: yell is larger, whisper is smaller.
+            var baseFontSize = 25.0;
+            var fontSizeMultiplier = mode switch
+            {
+                "yell" => 1.3,
+                "whisper" => 0.75,
+                _ => 1.0
+            };
+            var fontSize = baseFontSize * fontSizeMultiplier;
+
+            var baseFont = new CairoFont(fontSize, GuiStyle.StandardFontName, fontColor)
             {
                 // Left-align to avoid GuiElementRichtext positioning errors at inline
                 // tag boundaries (bold/color transitions) that occur with Center alignment.
@@ -137,8 +148,9 @@ public static class SpeechBubbleVtmlPatches
             };
 
             // Always attempt richtext rendering here (even for plain text) so we can apply
-            // consistent sizing and add a small transparent bottom margin to avoid nametag overlap.
-            var tex = RichTextTextureUtils.GenRichTextTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background, extraBottomMarginPx: BubbleBottomMarginPx);
+            // consistent sizing. Nametag spacing is handled at render time by
+            // SpeechBubbleRenderPatches (no transparent margin baked into the texture).
+            var tex = RichTextTextureUtils.GenRichTextTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background);
             if (tex == null)
             {
                 // Fallback: strip tags and let vanilla-esque plain rendering handle it.
@@ -180,7 +192,7 @@ public static class SpeechBubbleVtmlPatches
         var bg = new TextBackground
         {
             FillColor = GuiStyle.DialogLightBgColor,
-            Padding = 3,
+            Padding = 5,
             Radius = GuiStyle.ElementBGRadius
         };
 
@@ -210,32 +222,59 @@ public static class SpeechBubbleVtmlPatches
         return ColorUtil.WhiteArgbDouble;
     }
 
+    /// <summary>
+    /// Extracts a marker value from a key segment string.
+    /// Markers are encoded as <c>\u001fkey=value</c> and may be followed by another marker.
+    /// </summary>
+    private static string ExtractMarker(string keySegment, string markerPrefix)
+    {
+        var idx = keySegment.IndexOf(markerPrefix, StringComparison.Ordinal);
+        if (idx < 0) return null;
+
+        var valueStart = idx + markerPrefix.Length;
+        // Value ends at the next unit separator or end of string.
+        var nextSep = keySegment.IndexOf('\u001f', valueStart);
+        var value = nextSep >= 0
+            ? keySegment[valueStart..nextSep]
+            : keySegment[valueStart..];
+        return value.Trim();
+    }
+
     // NOTE: richtext texture rendering lives in RichTextTextureUtils.
 }
 
 /// <summary>
-/// Per-frame LOS gating for overhead speech bubbles.
-/// Vanilla's <c>DoRender2D</c> renders all <c>messageTextures</c> unconditionally.
-/// This patch temporarily hides them when the local player cannot see the entity,
-/// using a cached LOS check (same pattern as <see cref="TypingIndicatorRenderer"/>).
-/// Bubbles reappear as soon as LOS is restored.
+/// Per-frame rendering patch for overhead speech bubbles.
+/// Takes over vanilla's bubble rendering to provide:
+/// <list type="bullet">
+///   <item>LOS gating — hides bubbles when the local player can't see the entity</item>
+///   <item>Dampened distance scaling — bubbles shrink more subtly with distance, staying
+///         legible even at long range instead of vanilla's linear 1/distance falloff</item>
+/// </list>
+/// When the patch is active, vanilla's own bubble loop is skipped (textures hidden via
+/// the Prefix/Postfix stash pattern) and we render them ourselves.
 /// </summary>
 [HarmonyPatch(typeof(EntityShapeRenderer), "DoRender2D")]
-public static class SpeechBubbleLosPatches
+public static class SpeechBubbleRenderPatches
 {
+    // Dampening exponent for distance scaling. Vanilla uses 1.0 (linear: 4/Z).
+    // Values < 1.0 make shrinkage more gradual (e.g., 0.6 → 4/Z^0.6).
+    // At exponent 0.6:  Z=10 → scale≈1.0,  Z=20 → 0.63,  Z=35 → 0.46
+    // Vanilla linear:   Z=10 → 0.40,        Z=20 → 0.20,  Z=35 → 0.11
+    private const double DistanceDampeningExponent = 0.6;
+
     // Cached LOS per entity. Keyed by target entity id.
     // Asymmetric refresh: 250ms when visible, 500ms when hidden for smooth reveal without expensive raytracing every frame.
     private static readonly Dictionary<long, (bool canSee, long nextCheckMs)> _losCache = new();
 
-    // Shared empty list to avoid per-frame allocations when hiding bubbles.
+    // Shared empty list to avoid per-frame allocations when hiding bubbles from vanilla.
     private static readonly List<MessageTexture> EmptyList = new();
 
     /// <summary>
-    /// Before vanilla renders bubbles, check cached LOS.
-    /// If the entity is not visible, stash the messageTextures list and replace it with
-    /// an empty list so vanilla skips bubble rendering. The Postfix restores it.
+    /// Before vanilla renders bubbles: if the feature is active, render them ourselves
+    /// with dampened distance scaling and LOS gating, then hide them from vanilla.
     /// </summary>
-    public static void Prefix(EntityShapeRenderer __instance, ref List<MessageTexture> __state)
+    public static void Prefix(EntityShapeRenderer __instance, float dt, ref List<MessageTexture> __state)
     {
         __state = null;
 
@@ -254,29 +293,79 @@ public static class SpeechBubbleLosPatches
             }
 
             var localPlayerEntity = capi.World?.Player?.Entity;
-            if (localPlayerEntity == null || localPlayerEntity.EntityId == entity.EntityId)
+            if (localPlayerEntity == null)
             {
-                return; // Always see your own bubbles.
+                return;
             }
 
             var textures = SpeechBubbleVtmlPatches.MessageTexturesRef(__instance);
             if (textures == null || textures.Count == 0)
             {
-                return; // Nothing to hide.
+                return; // Nothing to render or hide.
             }
 
-            var nowMs = capi.World.ElapsedMilliseconds;
-            if (!CanSeeCached(capi.World, nowMs, localPlayerEntity, entity))
+            // Skip LOS check for own entity — always see your own bubbles.
+            // (Distance scaling still applies for third-person cameras, but Z is usually tiny.)
+            var isOwnEntity = localPlayerEntity.EntityId == entity.EntityId;
+
+            // LOS check.
+            if (!isOwnEntity)
             {
-                // Temporarily replace the list with a shared empty one.
-                // Vanilla will see no bubbles to render.
+                var nowMs = capi.World.ElapsedMilliseconds;
+                if (!CanSeeCached(capi.World, nowMs, localPlayerEntity, entity))
+                {
+                    // Hide from vanilla, don't render ourselves.
+                    __state = textures;
+                    SpeechBubbleVtmlPatches.MessageTexturesRef(__instance) = EmptyList;
+                    return;
+                }
+            }
+
+            // Render bubbles ourselves with dampened distance scaling.
+            var rapi = capi.Render;
+            var aboveHeadPos = __instance.getAboveHeadPosition(localPlayerEntity);
+            var pos = MatrixToolsd.Project(aboveHeadPos, rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
+            if (pos.Z < 0.0)
+            {
+                // Behind the camera — hide from vanilla but don't render.
                 __state = textures;
                 SpeechBubbleVtmlPatches.MessageTexturesRef(__instance) = EmptyList;
+                return;
             }
+
+            // Dampened distance scaling: 4 / Z^exponent instead of vanilla's 4 / Z.
+            // This makes bubbles shrink much more gradually with distance.
+            var dampenedZ = Math.Pow(Math.Max(1.0, pos.Z), DistanceDampeningExponent);
+            var scale = (float)(4.0 / dampenedZ);
+            var cappedScale = Math.Min(1f, scale);
+            if (cappedScale > 0.75f)
+            {
+                cappedScale = 0.75f + (cappedScale - 0.75f) / 2f;
+            }
+
+            // Stack bubbles upward from the projected position (replicates vanilla stacking).
+            // Start with a small base offset (in screen-space pixels) to separate the
+            // first bubble from the nametag. This replaces the old transparent-margin
+            // approach that baked spacing into the texture (which caused a dark bar artifact).
+            var offY = 10f * cappedScale;
+            for (var i = 0; i < textures.Count; i++)
+            {
+                var mt = textures[i];
+                offY += mt.tex.Height * cappedScale + 4f * cappedScale;
+                var posx = (float)pos.X - cappedScale * mt.tex.Width / 2f;
+                var posy = (float)rapi.FrameHeight - ((float)pos.Y + offY);
+
+                rapi.Render2DTexture(mt.tex.TextureId, posx, posy,
+                    cappedScale * mt.tex.Width, cappedScale * mt.tex.Height, 20f);
+            }
+
+            // Hide textures from vanilla so it doesn't render them again.
+            __state = textures;
+            SpeechBubbleVtmlPatches.MessageTexturesRef(__instance) = EmptyList;
         }
         catch
         {
-            // Crash-safe: never break vanilla rendering.
+            // Crash-safe: if anything fails, let vanilla handle rendering normally.
         }
     }
 
@@ -290,7 +379,6 @@ public static class SpeechBubbleLosPatches
             try
             {
                 SpeechBubbleVtmlPatches.MessageTexturesRef(__instance) = __state;
-                // Safety: clear the shared empty list in case vanilla somehow added to it.
                 if (EmptyList.Count > 0)
                 {
                     EmptyList.Clear();
@@ -339,7 +427,6 @@ public static class SpeechBubbleLosPatches
         List<long> toRemove = null;
         foreach (var kvp in _losCache)
         {
-            // An entry is stale if its next-check time has long passed (entity no longer being rendered).
             if (nowMs - kvp.Value.nextCheckMs > StaleThresholdMs)
             {
                 toRemove ??= new List<long>();

@@ -37,22 +37,6 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         var bubbleTextVtml = (context.Message ?? string.Empty).Trim();
 
-        // When not overriding bubbles with per-recipient RP text, keep speech bubbles closer to vanilla:
-        // use the baseline text captured in the sender phase.
-        if (!_config.OverrideSpeechBubblesWithRpText && context.HasFlag(MessageContext.IS_SPEECH))
-        {
-            if (context.TryGetMetadata(MessageContext.BUBBLE_TEXT_BASE, out string baseText) && !string.IsNullOrWhiteSpace(baseText))
-            {
-                bubbleTextVtml = baseText.Trim();
-            }
-        }
-
-        // If the client isn't rendering VTML in bubbles, strip tags to avoid showing them literally.
-        if (!_config.OverrideSpeechBubblesWithRpText)
-        {
-            bubbleTextVtml = VtmlUtils.StripVtmlTags(bubbleTextVtml, _chatSystem.API?.Logger);
-        }
-
         // Wrap speech in configurable quote delimiters, matching ICSpeechFormatTransformer:
         // sign language uses SignLanguageQuote (default: single quotes), others use Quote (default: double quotes).
         // Applied BEFORE the language color tag so the quotes sit inside <font color="...">
@@ -72,9 +56,8 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
                 : delimiters.Quote;
             bubbleTextVtml = $"{quoteDelimiter.Start}{bubbleTextVtml}{quoteDelimiter.End}";
 
-            // Mirror chatbox: sign language speech is italicized (only when VTML override is active,
-            // otherwise vanilla bubbles would show literal <i> tags).
-            if (_config.OverrideSpeechBubblesWithRpText && languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
+            // Mirror chatbox: sign language speech is italicized in bubbles.
+            if (languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
             {
                 bubbleTextVtml = ChatHelper.Italic(bubbleTextVtml);
             }
@@ -84,8 +67,7 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         // This runs after LanguageTransformer (which scrambles unknown languages) but before
         // ICSpeechFormatTransformer (which adds language color to the chatbox line).
         // We must apply the color here because ICSpeechFormatTransformer runs after us.
-        if (_config.OverrideSpeechBubblesWithRpText && languageEnabled
-            && context.HasFlag(MessageContext.IS_SPEECH))
+        if (languageEnabled && context.HasFlag(MessageContext.IS_SPEECH))
         {
             if (bubbleLang != null)
             {
@@ -102,23 +84,34 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         // Match vanilla behavior: the data string contains &lt; and &gt; which the client unescapes.
         bubbleTextToSend = VtmlUtils.EscapeVtml(bubbleTextToSend);
 
-        // Add kind marker for client-side styling of non-speech bubbles.
-        // Speech bubbles will render via vanilla unless VTML is present.
+        // Build marker segment for client-side styling.
+        // Kind marker: differentiates emote/env/OOC for border color styling.
+        // Mode marker: carries yell/whisper for speech bubble size scaling.
         var kind = context.HasFlag(MessageContext.IS_ENVIRONMENTAL) ? "env" :
             context.HasFlag(MessageContext.IS_EMOTE) ? "emote" :
             context.HasFlag(MessageContext.IS_OOC) ? "ooc" :
             null;
 
-        if (kind != null)
+        // For speech messages, include the chat mode so the client can scale the bubble.
+        string mode = null;
+        if (context.HasFlag(MessageContext.IS_SPEECH) &&
+            context.TryGetMetadata(MessageContext.CHAT_MODE, out ProximityChatMode chatMode))
         {
-            // Encode kind in the key segment (before the first ':') so vanilla clients don't display it,
-            // and so it cannot collide with user text.
-            // Client patch also supports the legacy suffix format for safety.
-            context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg\u001fkind={kind}:{bubbleTextToSend}");
-            return context;
+            mode = chatMode switch
+            {
+                ProximityChatMode.Yell => "yell",
+                ProximityChatMode.Whisper => "whisper",
+                _ => null // Normal is the default — no marker needed.
+            };
         }
 
-        context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{bubbleTextToSend}");
+        // Encode markers in the key segment (before the first ':') using unit separator
+        // so vanilla clients don't display them and they can't collide with user text.
+        var markers = "";
+        if (kind != null) markers += $"\u001fkind={kind}";
+        if (mode != null) markers += $"\u001fmode={mode}";
+
+        context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg{markers}:{bubbleTextToSend}");
         return context;
     }
 }
