@@ -11,6 +11,10 @@ env:
   VS_VERSION: "1.21.5"
   DOTNET_VERSION: "8.0.x"
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -188,10 +192,63 @@ jobs:
       run: dotnet format whitespace Vintage-Story-Mods.sln --verify-no-changes --exclude mods/
       continue-on-error: false
 
-    - name: Run Tests
+    - name: Run Tests with Coverage
       run: |
-        dotnet test mods-dll/thebasics.Tests/thebasics.Tests.csproj --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory TestResults
+        dotnet test mods-dll/thebasics.Tests/thebasics.Tests.csproj `
+          --configuration Release `
+          --no-build `
+          --verbosity normal `
+          --settings mods-dll/thebasics.Tests/coverlet.runsettings `
+          --collect:"XPlat Code Coverage" `
+          --results-directory TestResults
       shell: pwsh
+
+    - name: Generate Coverage Report
+      if: always()
+      uses: danielpalme/ReportGenerator-GitHub-Action@5
+      with:
+        reports: '**/TestResults/**/coverage.cobertura.xml'
+        targetdir: coveragereport
+        reporttypes: 'HtmlInline;MarkdownSummaryGithub;Cobertura'
+
+    - name: Coverage Summary
+      if: always()
+      uses: irongut/CodeCoverageSummary@v1.3.0
+      with:
+        filename: '**/TestResults/**/coverage.cobertura.xml'
+        badge: true
+        fail_below_min: true
+        format: markdown
+        output: both
+        # Thresholds: warn at 5%, fail at 3% (just below current ~9.7% baseline).
+        # Ratchet up as tests are added.  See docs/coverage-thresholds.md.
+        thresholds: '5 3'
+
+    - name: Write Coverage to Job Summary
+      if: always()
+      run: |
+        if (Test-Path "code-coverage-results.md") {
+          Get-Content "code-coverage-results.md" >> $env:GITHUB_STEP_SUMMARY
+        }
+      shell: pwsh
+
+    - name: Comment PR with Coverage
+      if: github.event_name == 'pull_request' && always()
+      run: |
+        if (Test-Path "coveragereport/SummaryGithub.md") {
+          gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body-file coveragereport/SummaryGithub.md
+        }
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Coverage Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: CoverageReport
+        path: coveragereport
+        retention-days: 30
 
     - name: Code Complexity Check
       run: |
