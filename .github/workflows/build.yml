@@ -208,7 +208,7 @@ jobs:
       with:
         reports: '**/TestResults/**/coverage.cobertura.xml'
         targetdir: coveragereport
-        reporttypes: 'HtmlInline;MarkdownSummaryGithub;Cobertura'
+        reporttypes: 'HtmlInline;Cobertura'
 
     - name: Coverage Threshold Check
       if: always()
