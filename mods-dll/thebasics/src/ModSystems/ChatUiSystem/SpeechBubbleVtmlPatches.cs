@@ -21,7 +21,6 @@ public static class SpeechBubbleVtmlPatches
         AccessTools.FieldRefAccess<EntityShapeRenderer, List<MessageTexture>>("messageTextures");
 
     private const int BubbleMaxTextWidthPx = 280;
-    private const int BubbleBottomMarginPx = 15;
 
     public static bool Prefix(EntityShapeRenderer __instance, int groupId, string message, EnumChatType chattype, string data)
     {
@@ -149,8 +148,9 @@ public static class SpeechBubbleVtmlPatches
             };
 
             // Always attempt richtext rendering here (even for plain text) so we can apply
-            // consistent sizing and add a small transparent bottom margin to avoid nametag overlap.
-            var tex = RichTextTextureUtils.GenRichTextTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background, extraBottomMarginPx: BubbleBottomMarginPx);
+            // consistent sizing. Nametag spacing is handled at render time by
+            // SpeechBubbleRenderPatches (no transparent margin baked into the texture).
+            var tex = RichTextTextureUtils.GenRichTextTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background);
             if (tex == null)
             {
                 // Fallback: strip tags and let vanilla-esque plain rendering handle it.
@@ -342,7 +342,10 @@ public static class SpeechBubbleRenderPatches
             }
 
             // Stack bubbles upward from the projected position (replicates vanilla stacking).
-            var offY = 0f;
+            // Start with a small base offset (in screen-space pixels) to separate the
+            // first bubble from the nametag. This replaces the old transparent-margin
+            // approach that baked spacing into the texture (which caused a dark bar artifact).
+            var offY = 10f * cappedScale;
             for (var i = 0; i < textures.Count; i++)
             {
                 var mt = textures[i];
