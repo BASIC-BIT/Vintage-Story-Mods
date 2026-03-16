@@ -491,6 +491,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
 
         // Determine the speech length for note count calculation
+        // Determine the speech length for note count calculation.
+        // Note: for emotes, Phase 1 transformers (auto-capitalization, auto-punctuation) may
+        // have added a character or two to quoted segments. The logarithmic scaling absorbs
+        // this negligible difference.
         int speechLength;
         if (isSpeech)
         {
@@ -501,7 +505,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             }
             speechLength = speechText.Length;
         }
-        else
+        else if (isEmote)
         {
             // Emote — extract quoted speech portions (same split logic as EmoteTransformer)
             var segments = context.Message.Split('"');
@@ -516,6 +520,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
             {
                 return;
             }
+        }
+        else
+        {
+            return;
         }
 
         var player = context.SendingPlayer;

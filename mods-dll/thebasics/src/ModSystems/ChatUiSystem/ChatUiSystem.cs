@@ -472,7 +472,9 @@ public class ChatUiSystem : ModSystem
             // Apply volume and pitch modifiers for this chatter event
             talkUtil.SetModifiers(1f, message.Pitch, message.Volume);
 
-            // Trigger the chatter
+            // Trigger the chatter — this sets lettersLeftToTalk internally.
+            // VS defers note processing to subsequent game-loop ticks, so the reflection
+            // override below is guaranteed to take effect before any note plays.
             var talkType = (EnumTalkType)message.TalkType;
             talkUtil.Talk(talkType);
 
