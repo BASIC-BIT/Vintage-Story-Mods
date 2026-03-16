@@ -36,6 +36,7 @@ public class ChatUiSystem : ModSystem
     private static bool _rpttsExplicitModeApplied = false;
 
     private static TypingIndicatorRenderer _typingIndicatorRenderer;
+    private static PlacedBubbleRenderer _placedBubbleRenderer;
     private static readonly Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new Dictionary<long, ChatTypingIndicatorState>();
     private static ChatTypingIndicatorState? _lastSentTypingState;
     private static string _lastChatInputText;
@@ -77,6 +78,8 @@ public class ChatUiSystem : ModSystem
         _typingIndicatorRenderer = new TypingIndicatorRenderer(api);
         api.Event.RegisterRenderer(_typingIndicatorRenderer, EnumRenderStage.Ortho, "thebasics-typingindicator");
 
+        _placedBubbleRenderer = new PlacedBubbleRenderer(api);
+        api.Event.RegisterRenderer(_placedBubbleRenderer, EnumRenderStage.Ortho, "thebasics-placedbubbles");
 
         // Register event handlers
         _api.Event.PlayerJoin += OnPlayerJoin;
@@ -199,10 +202,12 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<ProximitySpeechMessage>()
             .RegisterMessageType<ChatTypingStateMessage>()
             .RegisterMessageType<ChatterSoundMessage>()
+            .RegisterMessageType<PlacedEnvironmentMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
-            .SetMessageHandler<ChatterSoundMessage>(OnChatterSoundMessage);
+            .SetMessageHandler<ChatterSoundMessage>(OnChatterSoundMessage)
+            .SetMessageHandler<PlacedEnvironmentMessage>(OnPlacedEnvironmentMessage);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
@@ -237,6 +242,17 @@ public class ChatUiSystem : ModSystem
         {
             _typingStatesByEntityId[message.EntityId] = state;
         }
+    }
+
+    private static void OnPlacedEnvironmentMessage(PlacedEnvironmentMessage message)
+    {
+        if (message == null || string.IsNullOrWhiteSpace(message.BubbleText))
+        {
+            return;
+        }
+
+        var worldPos = new Vintagestory.API.MathTools.Vec3d(message.X, message.Y, message.Z);
+        _placedBubbleRenderer?.AddBubble(worldPos, message.BubbleText);
     }
 
     internal static ChatTypingIndicatorState GetEntityTypingIndicatorState(long entityId)
@@ -719,6 +735,8 @@ public class ChatUiSystem : ModSystem
                 _api.Event.PlayerJoin -= OnPlayerJoin;
                 _typingIndicatorRenderer?.Dispose();
                 _typingIndicatorRenderer = null;
+                _placedBubbleRenderer?.Dispose();
+                _placedBubbleRenderer = null;
                 _api = null;
             }
             _harmony?.UnpatchAll(Mod.Info.ModID);

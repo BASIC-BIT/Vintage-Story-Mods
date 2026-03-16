@@ -14,6 +14,13 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
     public override bool ShouldTransform(MessageContext context)
     {
+        // Placed environmental messages use a dedicated network packet (PlacedEnvironmentMessage)
+        // instead of clientData, so skip them here.
+        if (context.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL))
+        {
+            return false;
+        }
+
         // Always emit clientData for in-world bubble messages so vanilla bubbles keep working.
         // The config controls *what* text we place into the bubble, not whether a bubble exists.
         return context.HasFlag(MessageContext.IS_SPEECH)

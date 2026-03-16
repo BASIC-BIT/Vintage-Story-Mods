@@ -35,6 +35,22 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         // Determine communication range based on chat mode and language
         var range = GetCommunicationRange(context);
 
+        // For placed environmental messages, use the hit position as the proximity origin
+        // so recipients are determined by distance to the bubble, not the sender.
+        BlockPos originPos;
+        if (context.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL) &&
+            context.TryGetMetadata(MessageContext.PLACED_POSITION, out Vec3d placedPos))
+        {
+            originPos = new BlockPos(
+                (int)System.Math.Floor(placedPos.X),
+                (int)System.Math.Floor(placedPos.Y),
+                (int)System.Math.Floor(placedPos.Z));
+        }
+        else
+        {
+            originPos = context.SendingPlayer.Entity.Pos.AsBlockPos;
+        }
+
         // Find players within range
         var allPlayers = _chatSystem.API.World.AllOnlinePlayers;
         var nearbyPlayers = allPlayers.Where(player =>
@@ -42,8 +58,7 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
             var serverPlayer = player as IServerPlayer;
             if (serverPlayer == null) return false;
 
-            bool inRange = player.Entity.Pos.AsBlockPos.ManhattenDistance(
-                context.SendingPlayer.Entity.Pos.AsBlockPos) < range;
+            bool inRange = player.Entity.Pos.AsBlockPos.ManhattenDistance(originPos) < range;
 
             var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
             // Special check for sign language - must be within line of sight
@@ -54,6 +69,14 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
 
             return inRange;
         }).Cast<IServerPlayer>().ToList();
+
+        // For placed environmental messages, always include the sender so they see their
+        // own bubble even if they're farther from the placement point than the chat range.
+        if (context.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL) &&
+            !nearbyPlayers.Contains(context.SendingPlayer))
+        {
+            nearbyPlayers.Add(context.SendingPlayer);
+        }
 
         // Add players to context
         context.Recipients = nearbyPlayers;

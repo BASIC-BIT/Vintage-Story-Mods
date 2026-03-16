@@ -77,6 +77,7 @@
   "chat-cmd-adminsetnickcolor-desc": "Admin: Get or set another player's nickname color",
   "chat-cmd-me-desc": "Send a proximity emote message",
   "chat-cmd-it-desc": "Send a proximity environment message",
+  "chat-cmd-envhere-desc": "Send an environment message placed where you are looking",
   "chat-cmd-emotemode-desc": "Turn Emote-only mode on or off",
   "chat-cmd-rptext-desc": "Turn the whole RP system on or off for your messages",
   "chat-cmd-ooctoggle-desc": "Toggle Out-Of-Character chat mode",
@@ -88,6 +89,7 @@
 
   "chat-error-player-not-found": "Cannot find player.",
   "chat-error-invalid-color": "Invalid color.",
+  "chat-env-placement-fallback": "No surface found in that direction \u2014 message placed above your head instead.",
 
   "chat-nick-current": "Your nickname is: {0}",
   "chat-nick-none": "You don't have a nickname!  You can set it with `/nick MyName`",

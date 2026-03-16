@@ -118,6 +118,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .RequiresPlayer()
                 .HandleWith(EnvironmentMessage);
 
+            API.ChatCommands.GetOrCreate("envhere")
+                .WithAlias("dohere", "ithere")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-envhere-desc"))
+                .WithArgs(new StringArgParser("envMessage", true))
+                .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
+                .HandleWith(PlacedEnvironmentMessage);
+
             API.ChatCommands.GetOrCreate("emotemode")
                 .WithDescription(Lang.Get("thebasics:chat-cmd-emotemode-desc"))
                 .WithArgs(new BoolArgParser("mode", "on", false))
@@ -253,6 +261,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<ProximitySpeechMessage>()
             .RegisterMessageType<ChatTypingStateMessage>()
             .RegisterMessageType<ChatterSoundMessage>()
+            .RegisterMessageType<PlacedEnvironmentMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage);
@@ -870,6 +879,33 @@ public class RPProximityChatSystem : BaseBasicModSystem
         };
     }
 
+    private TextCommandResult PlacedEnvironmentMessage(TextCommandCallingArgs args)
+    {
+        var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+
+        var context = new MessageContext
+        {
+            Message = (string)args.Parsers[0].GetValue(),
+            SendingPlayer = player,
+            GroupId = ProximityChatId,
+            Flags =
+            {
+                [MessageContext.IS_ENVIRONMENTAL] = true,
+                [MessageContext.IS_PLACED_ENVIRONMENTAL] = true,
+                [MessageContext.IS_FROM_COMMAND] = true
+            }
+        };
+
+        // Process the entire pipeline — PlacedEnvironmentTransformer will raycast and
+        // either store the position or fall back to standard env.
+        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.Notification);
+
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+        };
+    }
+
     private TextCommandResult ClearNickname(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
@@ -1082,5 +1118,20 @@ public class RPProximityChatSystem : BaseBasicModSystem
             // Never crash the server on player chat.
             API.Logger.Error($"THEBASICS - Error processing proxchat message: {e}");
         }
+    }
+
+    /// <summary>
+    /// Sends a <see cref="PlacedEnvironmentMessage"/> packet to a specific recipient.
+    /// Called by the transformer pipeline for placed environmental messages.
+    /// </summary>
+    public void SendPlacedEnvironmentPacket(IServerPlayer recipient, Vec3d position, string bubbleText)
+    {
+        _serverConfigChannel?.SendPacket(new PlacedEnvironmentMessage
+        {
+            X = position.X,
+            Y = position.Y,
+            Z = position.Z,
+            BubbleText = bubbleText,
+        }, recipient);
     }
 }

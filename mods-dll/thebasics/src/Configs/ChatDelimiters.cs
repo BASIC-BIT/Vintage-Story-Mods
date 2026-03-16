@@ -18,6 +18,7 @@ namespace thebasics.Configs
             Italic ??= new ChatDelimiter();
             Emote ??= new ChatDelimiter();
             Environmental ??= new ChatDelimiter();
+            PlacedEnvironmental ??= new ChatDelimiter();
             OOC ??= new ChatDelimiter();
             GlobalOOC ??= new ChatDelimiter();
             Quote ??= new ChatDelimiter();
@@ -27,6 +28,7 @@ namespace thebasics.Configs
             DefaultChatDelimiterIfUsingDefaultValues(Italic, "|", "|");
             DefaultChatDelimiterIfUsingDefaultValues(Emote, "*", "");
             DefaultChatDelimiterIfUsingDefaultValues(Environmental, "!", "");
+            DefaultChatDelimiterIfUsingDefaultValues(PlacedEnvironmental, "!!", "");
             DefaultChatDelimiterIfUsingDefaultValues(OOC, "(", ")");
             DefaultChatDelimiterIfUsingDefaultValues(GlobalOOC, "((", "))");
             DefaultChatDelimiterIfUsingDefaultValues(Quote, "\"", "\"");
@@ -53,6 +55,9 @@ namespace thebasics.Configs
 
         [ProtoMember(4)]
         public ChatDelimiter Environmental { get; set; }
+
+        [ProtoMember(9)]
+        public ChatDelimiter PlacedEnvironmental { get; set; }
 
         [ProtoMember(5)]
         public ChatDelimiter OOC { get; set; }

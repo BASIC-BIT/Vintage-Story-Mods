@@ -89,6 +89,9 @@ public class MessageContext
     // Used when we want to keep overhead bubbles closer to vanilla behavior.
     public static readonly string BUBBLE_TEXT_BASE = "bubbleTextBase";
 
+    public static readonly string IS_PLACED_ENVIRONMENTAL = "isPlacedEnvironmental";
+    public static readonly string PLACED_POSITION = "placedPosition";
+
     public void UpdateMessage(string message, bool updateSpeech = true)
     {
         Message = message;

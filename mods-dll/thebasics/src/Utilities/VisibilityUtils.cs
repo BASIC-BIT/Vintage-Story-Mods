@@ -58,4 +58,38 @@ public static class VisibilityUtils
         // If LOS checks fail for any reason, prefer to hide the cue.
         return HasLineOfSight(world, observer, target, failOpen: false);
     }
+
+    /// <summary>
+    /// Checks line of sight from an observer entity to an arbitrary world position.
+    /// Used for placed environmental bubbles where the target is a point, not an entity.
+    /// </summary>
+    public static bool HasLineOfSight(IWorldAccessor world, Entity observer, Vec3d targetPos, bool failOpen = false)
+    {
+        if (world == null || observer == null || targetPos == null)
+        {
+            return failOpen;
+        }
+
+        try
+        {
+            var fromBase = world.Side == EnumAppSide.Server ? observer.ServerPos.XYZ : observer.Pos.XYZ;
+            var fromPos = fromBase.AddCopy(observer.LocalEyePos);
+
+            BlockSelection blockSel = null;
+            EntitySelection entitySel = null;
+            world.RayTraceForSelection(fromPos, targetPos, ref blockSel, ref entitySel, efilter: _ => false);
+
+            if (blockSel?.Block == null)
+            {
+                return true;
+            }
+
+            return blockSel.Block.Id == 0;
+        }
+        catch (System.Exception ex)
+        {
+            world.Logger?.Debug("THEBASICS VisibilityUtils: LOS raytrace to Vec3d threw: {0}", ex.Message);
+            return failOpen;
+        }
+    }
 }

@@ -393,5 +393,11 @@ namespace thebasics.Configs
         // Pitch modifier per chat mode for chatter sounds.
         [ProtoMember(80)]
         public IDictionary<ProximityChatMode, float> ChatterModePitch { get; set; }
+
+        // Maximum raycast distance (in blocks) for placed environmental messages (!! prefix / /envhere).
+        // If the raycast hits nothing within this distance, the message falls back to a
+        // standard environmental message above the sender's head.
+        [ProtoMember(81)]
+        public double MaxEnvironmentPlacementDistance { get; set; } = 30.0;
     }
 }
