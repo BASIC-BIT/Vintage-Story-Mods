@@ -165,6 +165,7 @@
   "heritage.model.unknownDescriptor": "unknown heritage",
 
   "lang-list-known": "You know: {0}",
+  "lang-list-unknown": "Unknown languages: {0}",
   "lang-list-all": "All languages: {0}",
   "lang-list-admin-known": "{0} knows: {1}",
 

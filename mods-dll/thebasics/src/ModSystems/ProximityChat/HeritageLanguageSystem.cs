@@ -273,12 +273,10 @@ public class HeritageLanguageSystem : BaseSubSystem
                 MatchesAny(language.GrantedToModelGroups, groupVariants))
             .ToList();
 
-        var descriptor = GetModelDescriptor(modelCode, modelGroup);
-
         GrantLanguages(
             player,
             toGrant,
-            notify ? language => L(ModelGainKey, descriptor, ChatHelper.LangIdentifier(language)) : null);
+            notify ? language => L(ModelGainKey, GetDescriptorForLanguage(language, modelCode, modelGroup, modelVariants, groupVariants), ChatHelper.LangIdentifier(language)) : null);
     }
 
     private void RemoveModelLanguages(IServerPlayer player, string modelCode, string modelGroup)
@@ -302,12 +300,10 @@ public class HeritageLanguageSystem : BaseSubSystem
             .Where(language => !IsLanguageGrantedByHeritage(language, currentClass, currentTraits, currentModelCode, currentModelGroupCode))
             .ToList();
 
-        var descriptor = GetModelDescriptor(modelCode, modelGroup);
-
         RemoveLanguages(
             player,
             toRemove,
-            language => L(ModelLossKey, descriptor, ChatHelper.LangIdentifier(language)));
+            language => L(ModelLossKey, GetDescriptorForLanguage(language, modelCode, modelGroup, modelVariants, groupVariants), ChatHelper.LangIdentifier(language)));
     }
 
     private void RegisterModelWatcher(IServerPlayer player)
@@ -543,6 +539,30 @@ public class HeritageLanguageSystem : BaseSubSystem
         }
 
         return Lang.Get("thebasics:heritage.model.unknownDescriptor");
+    }
+
+    /// <summary>
+    /// Returns the appropriate descriptor for a language based on whether it matched
+    /// via GrantedToModels (model-specific) or GrantedToModelGroups (group-level).
+    /// Prefers the model-specific descriptor when the language matched on the model directly.
+    /// </summary>
+    private string GetDescriptorForLanguage(Language language, string modelCode, string modelGroupCode, string[] modelVariants, string[] groupVariants)
+    {
+        var matchesModel = MatchesAny(language.GrantedToModels, modelVariants);
+        var matchesGroup = MatchesAny(language.GrantedToModelGroups, groupVariants);
+
+        if (matchesModel && !matchesGroup)
+        {
+            return GetModelDescriptor(modelCode, string.Empty);
+        }
+
+        if (matchesGroup && !matchesModel)
+        {
+            return GetModelDescriptor(string.Empty, modelGroupCode);
+        }
+
+        // Matched both — fall back to the default priority (group > model).
+        return GetModelDescriptor(modelCode, modelGroupCode);
     }
 
     private static string GetPlayerModelCode(IServerPlayer player)
