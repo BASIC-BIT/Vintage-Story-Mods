@@ -422,7 +422,6 @@ public class ChatUiSystem : ModSystem
     private static void ResolveTalkUtilFields()
     {
         if (_talkUtilFieldsResolved) return;
-        _talkUtilFieldsResolved = true;
 
         try
         {
@@ -436,6 +435,10 @@ public class ChatUiSystem : ModSystem
             {
                 _api?.Logger.Warning("[THEBASICS] Could not resolve EntityTalkUtil fields for chatter note count override. Chatter will use default note counts.");
             }
+
+            // Only mark resolved after successful attempt (even if fields were not found)
+            // so that exceptions during GetField allow a retry on the next message
+            _talkUtilFieldsResolved = true;
         }
         catch (Exception ex)
         {

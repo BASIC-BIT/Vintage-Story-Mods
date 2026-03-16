@@ -139,13 +139,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .RequiresPlayer()
                 .HandleWith(OOCMode);
 
-            API.ChatCommands.GetOrCreate("chatter")
-                .WithDescription(Lang.Get("thebasics:chat-cmd-chatter-desc"))
-                .WithArgs(new BoolArgParser("mode", "on", false))
-                .RequiresPrivilege(Privilege.chat)
-                .RequiresPlayer()
-                .HandleWith(ChatterToggle);
-
             API.ChatCommands.GetOrCreate("ooc")
                     .WithDescription(Lang.Get("thebasics:chat-cmd-ooc-desc"))
                 .WithArgs(new StringArgParser("message", true))
@@ -163,6 +156,15 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     .HandleWith(SendGlobalOOCMessage);
             }
         }
+
+        // Chatter opt-out is always available (not gated behind DisableRPChat)
+        // so players can toggle it even when RP chat formatting is disabled
+        API.ChatCommands.GetOrCreate("chatter")
+            .WithDescription(Lang.Get("thebasics:chat-cmd-chatter-desc"))
+            .WithArgs(new BoolArgParser("mode", "on", false))
+            .RequiresPrivilege(Privilege.chat)
+            .RequiresPlayer()
+            .HandleWith(ChatterToggle);
 
         // Always register basic chat mode commands
         API.ChatCommands.GetOrCreate("yell")
@@ -531,8 +533,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
             ? (int)Vintagestory.API.Util.EnumTalkType.IdleShort
             : (int)Vintagestory.API.Util.EnumTalkType.Idle;
 
-        // Logarithmic scaling: diminishing returns on longer messages.
-        // "hi" (2) -> ~4, "hello there" (11) -> ~7, full sentence (32) -> ~10, novel (150+) -> ~15
+        // Logarithmic scaling (natural log): diminishing returns on longer messages.
+        // "hi" (2) -> 6, "hello there" (11) -> 10, full sentence (32) -> 13, novel (150+) -> 18
         var noteCount = 3 + (int)(3.0 * Math.Log(speechLength + 1));
 
         var message = new ChatterSoundMessage
