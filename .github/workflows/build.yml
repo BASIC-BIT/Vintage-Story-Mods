@@ -11,13 +11,12 @@ env:
   VS_VERSION: "1.21.5"
   DOTNET_VERSION: "8.0.x"
 
-permissions:
-  contents: read
-  pull-requests: write
-
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: read
+      pull-requests: write
     
     steps:
     - name: Checkout repository
@@ -217,7 +216,7 @@ jobs:
         $failThreshold = 3
         $warnThreshold = 5
 
-        $coberturaFile = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse | Select-Object -First 1
+        $coberturaFile = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
         if (-not $coberturaFile) {
           Write-Host "::error::No coverage.cobertura.xml found"
           exit 1
@@ -231,17 +230,18 @@ jobs:
         $brCovered  = $xml.coverage.'branches-covered'
         $brTotal    = $xml.coverage.'branches-valid'
 
-        # Job summary — just the numbers
-        @"
-        ## Code Coverage
-        | Metric | Rate | Covered |
-        |--------|------|---------|
-        | Lines | **$lineRate%** | $covered / $total |
-        | Branches | **$branchRate%** | $brCovered / $brTotal |
-        | | | |
-        | Fail threshold | $failThreshold% | |
-        | Warn threshold | $warnThreshold% | |
-        "@ >> $env:GITHUB_STEP_SUMMARY
+        # Job summary
+        $summary = @(
+          "## Code Coverage"
+          "| Metric | Rate | Covered |"
+          "|--------|------|---------|"
+          "| Lines | **$lineRate%** | $covered / $total |"
+          "| Branches | **$branchRate%** | $brCovered / $brTotal |"
+          "| | | |"
+          "| Fail threshold | $failThreshold% | |"
+          "| Warn threshold | $warnThreshold% | |"
+        ) -join "`n"
+        $summary >> $env:GITHUB_STEP_SUMMARY
 
         if ($lineRate -lt $failThreshold) {
           Write-Host "::error::Line coverage $lineRate% is below fail threshold ($failThreshold%)"
