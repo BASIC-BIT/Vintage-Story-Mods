@@ -156,6 +156,17 @@ namespace thebasics.Utilities
         {
             return LangColor($"{lang.Name} (:{lang.Prefix})", lang);
         }
+
+        public static string LangIdentifierWithDescription(Language lang)
+        {
+            var identifier = LangIdentifier(lang);
+            if (string.IsNullOrWhiteSpace(lang.Description))
+            {
+                return identifier;
+            }
+
+            return $"{identifier} — {EscapeMarkup(lang.Description)}";
+        }
         
         public static string GetMessage(string message)
         {

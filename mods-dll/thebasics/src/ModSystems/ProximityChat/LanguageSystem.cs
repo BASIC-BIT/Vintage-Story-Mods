@@ -188,13 +188,25 @@ namespace thebasics.ModSystems.ProximityChat
         private TextCommandResult HandleListLanguagesCommand(TextCommandCallingArgs args)
         {
             var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-            var languages = GetPlayerLanguages(player);
+            var known = GetPlayerLanguages(player);
+            var knownNames = new HashSet<string>(known.Select(l => l.Name), StringComparer.OrdinalIgnoreCase);
+            var unknown = GetAllLanguages(false, includeHidden: false)
+                .Where(l => !knownNames.Contains(l.Name))
+                .ToList();
+
+            var knownList = string.Join("\n  ", known.Select(ChatHelper.LangIdentifierWithDescription));
+            var message = Lang.Get("thebasics:lang-list-known", known.Count > 0 ? "\n  " + knownList : knownList);
+
+            if (unknown.Count > 0)
+            {
+                var unknownList = string.Join("\n  ", unknown.Select(ChatHelper.LangIdentifierWithDescription));
+                message += "\n" + Lang.Get("thebasics:lang-list-unknown", "\n  " + unknownList);
+            }
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = Lang.Get("thebasics:lang-list-known", string.Join(", ", languages.Select(ChatHelper.LangIdentifier))) +
-                                "\n" +
-                                Lang.Get("thebasics:lang-list-all", string.Join(", ", GetAllLanguages(false, includeHidden: false).Select(ChatHelper.LangIdentifier))),
+                StatusMessage = message,
             };
         }
 
