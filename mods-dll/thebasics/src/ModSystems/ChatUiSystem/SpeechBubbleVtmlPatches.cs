@@ -216,7 +216,7 @@ public static class SpeechBubbleVtmlPatches
         return bg;
     }
 
-    private static double[] GetBubbleFontColor(string kind)
+    private static double[] GetBubbleFontColor()
     {
         // Keep vanilla's white text; background stays consistent across kinds.
         return ColorUtil.WhiteArgbDouble;

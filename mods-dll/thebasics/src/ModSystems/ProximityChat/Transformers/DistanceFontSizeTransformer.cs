@@ -30,7 +30,7 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
 
         return context;
     }
-    
+
 
     public int GetFontSize(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer,
         ProximityChatMode chatMode)
@@ -42,7 +42,7 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
         var defaultSize = _config.ProximityChatDefaultFontSize[chatMode];
 
         var minFontSize = _config.ProximityChatClampFontSizes.Min();
-        
+
         var unclampedSize = ((defaultSize - minFontSize) * (1.0d - (distance / maxRange))) + minFontSize;
 
         var clampedSize = GetClampedFontSize(unclampedSize);

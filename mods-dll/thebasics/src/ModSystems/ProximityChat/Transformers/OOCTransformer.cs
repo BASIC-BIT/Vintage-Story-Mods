@@ -8,7 +8,7 @@ public class OOCTransformer : MessageTransformerBase
     public OOCTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
     }
-    
+
     public override bool ShouldTransform(MessageContext context)
     {
         return context.HasFlag(MessageContext.IS_OOC);
@@ -20,4 +20,4 @@ public class OOCTransformer : MessageTransformerBase
 
         return context;
     }
-} 
+}

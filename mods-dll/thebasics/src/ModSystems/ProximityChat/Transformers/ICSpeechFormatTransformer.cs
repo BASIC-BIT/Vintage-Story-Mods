@@ -35,7 +35,8 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         var quoteDelimiter = (languageEnabled && lang == LanguageSystem.SignLanguage) ? delimiters.SignLanguageQuote : delimiters.Quote;
         context.Message = $"{quoteDelimiter.Start}{context.Message}{quoteDelimiter.End}";
         // Add Italics if sign language
-        if(languageEnabled && lang == LanguageSystem.SignLanguage){
+        if (languageEnabled && lang == LanguageSystem.SignLanguage)
+        {
             context.Message = ChatHelper.Italic(context.Message);
         }
 
@@ -44,7 +45,7 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         {
             context.Message = ChatHelper.LangColor(context.Message, lang);
         }
-        
+
         var verb = GetProximityChatVerb(lang, mode);
 
         context.Message = $"{nickname} {verb} {context.Message}";

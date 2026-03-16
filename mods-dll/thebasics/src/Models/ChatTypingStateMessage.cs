@@ -22,7 +22,7 @@ public enum TypingIndicatorDisplayMode : byte
     /// <summary>Both icon and text label side by side.</summary>
     Both = 2,
 }
- 
+
 [ProtoContract]
 public class ChatTypingStateMessage
 {

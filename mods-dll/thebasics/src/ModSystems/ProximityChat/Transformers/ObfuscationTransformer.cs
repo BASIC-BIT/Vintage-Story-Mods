@@ -6,7 +6,7 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 public class ObfuscationTransformer : MessageTransformerBase
 {
     private readonly DistanceObfuscationSystem _distanceObfuscationSystem;
-    
+
     public ObfuscationTransformer(DistanceObfuscationSystem distanceObfuscationSystem, RPProximityChatSystem chatSystem) : base(chatSystem)
     {
         _distanceObfuscationSystem = distanceObfuscationSystem;
@@ -23,8 +23,8 @@ public class ObfuscationTransformer : MessageTransformerBase
         var content = context.Message;
 
         _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref content);
-        
+
         context.Message = content;
         return context;
     }
-} 
+}

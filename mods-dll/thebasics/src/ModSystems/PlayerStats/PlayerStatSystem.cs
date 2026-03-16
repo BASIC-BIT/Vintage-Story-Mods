@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -25,7 +25,7 @@ namespace thebasics.ModSystems.PlayerStats
             }
         }
 
-        private IDictionary<string, EntityPos> _prevPlayerPositions = new Dictionary<string, EntityPos>();
+        private readonly IDictionary<string, EntityPos> _prevPlayerPositions = new Dictionary<string, EntityPos>();
 
         private void SetupCommands()
         {
@@ -54,7 +54,7 @@ namespace thebasics.ModSystems.PlayerStats
 
         private void SubscribeToEvents()
         {
-            if (Config.AnyPlayerStatEnabled(PlayerStatType.Deaths,PlayerStatType.PlayerKills))
+            if (Config.AnyPlayerStatEnabled(PlayerStatType.Deaths, PlayerStatType.PlayerKills))
             {
                 API.Event.PlayerDeath += OnPlayerDeath;
             }
@@ -80,7 +80,7 @@ namespace thebasics.ModSystems.PlayerStats
                 var newPos = player.Entity.Pos;
                 if (_prevPlayerPositions.TryGetValue(player.PlayerUID, out EntityPos prevPos))
                 {
-                    var movement = (int) Math.Round(newPos.DistanceTo(prevPos));
+                    var movement = (int)Math.Round(newPos.DistanceTo(prevPos));
                     // only track if current game mode is survival
                     if (player.WorldData.CurrentGameMode == EnumGameMode.Survival)
                     {
@@ -127,7 +127,7 @@ namespace thebasics.ModSystems.PlayerStats
                     StatusMessage = Lang.Get("thebasics:stats-confirm-clearstats", targetName),
                 };
             }
-            
+
             targetPlayer.ClearPlayerStats();
             return new TextCommandResult()
             {
@@ -168,10 +168,10 @@ namespace thebasics.ModSystems.PlayerStats
                 };
             }
 
-            
+
             var resolvedStat = ResolveStat(statName);
-            
-            if(resolvedStat == null)
+
+            if (resolvedStat == null)
             {
                 var statNames = string.Join(", ", StatTypes.Types.Keys.Select(k => k.ToString().ToLowerInvariant()));
                 var statIds = string.Join(", ", StatTypes.Types.Values.Select(v => v.ID));
@@ -181,7 +181,7 @@ namespace thebasics.ModSystems.PlayerStats
                     StatusMessage = Lang.Get("thebasics:stats-error-stat-not-found", statName, statNames, statIds),
                 };
             }
-            
+
             if (!confirmed)
             {
                 return new TextCommandResult()
@@ -223,7 +223,7 @@ namespace thebasics.ModSystems.PlayerStats
                 };
             }
             var targetPlayer = isOtherPlayer ? API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid) : player;
-            
+
             if (targetPlayer == null)
             {
                 return new TextCommandResult
@@ -232,7 +232,7 @@ namespace thebasics.ModSystems.PlayerStats
                     StatusMessage = Lang.Get("thebasics:stats-error-player-not-found"),
                 };
             }
-            
+
             var message = new StringBuilder();
             message.Append(isOtherPlayer ? Lang.Get("thebasics:stats-header-other", targetPlayer.PlayerName) : Lang.Get("thebasics:stats-header-own"));
 

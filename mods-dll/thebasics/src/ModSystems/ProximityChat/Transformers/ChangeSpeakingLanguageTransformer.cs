@@ -1,5 +1,5 @@
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -121,10 +121,10 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         {
             // First try to get the language with allowHidden=true to check if it exists at all
             var lang = _languageSystem.GetLangFromText(languageIdentifier, true, allowHidden: true);
-            
+
             // Determine if we should show hidden languages in the error message
             bool showHidden = context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission);
-            
+
             // If the language doesn't exist, or it's hidden and player can't use it, show error
             if (lang == null || (lang.Hidden && !context.SendingPlayer.KnowsLanguage(lang) && !showHidden))
             {
@@ -156,12 +156,16 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                     Lang.Get("thebasics:lang-success-now-speaking", lang.Name),
                     EnumChatType.CommandSuccess);
                 context.State = MessageContextState.STOP;
-            } else {
+            }
+            else
+            {
                 // Remove the language identifier and continue processing
                 context.UpdateMessage(remainder.Trim());
                 context.SetMetadata(MessageContext.LANGUAGE, lang);
             }
-        } else {
+        }
+        else
+        {
             try
             {
                 context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_config));
@@ -171,7 +175,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                 context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
             }
         }
-        
+
         return context;
     }
 }

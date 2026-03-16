@@ -26,7 +26,7 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
     public override MessageContext Transform(MessageContext context)
     {
         // Short circuit for global OOC and send to all players
-        if(context.HasFlag(MessageContext.IS_GLOBAL_OOC))
+        if (context.HasFlag(MessageContext.IS_GLOBAL_OOC))
         {
             context.Recipients = _chatSystem.API.World.AllOnlinePlayers.Cast<IServerPlayer>().ToList();
             return context;

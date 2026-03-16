@@ -146,7 +146,7 @@ namespace thebasics.Utilities
         public static List<string> HandleNicknameConflictsOnJoin(IServerPlayer joiningPlayer, ICoreServerAPI sapi)
         {
             var resetPlayers = new List<string>();
-            
+
             // Check all online players for nickname conflicts with the joining player's username
             foreach (IPlayer onlinePlayer in sapi.World.AllOnlinePlayers)
             {
@@ -161,16 +161,16 @@ namespace thebasics.Utilities
                         // Reset conflicting nickname
                         serverPlayer.ClearNickname();
                         resetPlayers.Add(serverPlayer.PlayerName);
-                        
+
                         // Notify the affected player
-                        serverPlayer.SendMessage(GlobalConstants.GeneralChatGroup, 
-                            Lang.Get("thebasics:chat-nickreset-notify", existingNickname, joiningPlayer.PlayerName), 
+                        serverPlayer.SendMessage(GlobalConstants.GeneralChatGroup,
+                            Lang.Get("thebasics:chat-nickreset-notify", existingNickname, joiningPlayer.PlayerName),
                             EnumChatType.Notification);
                     }
                 }
             }
-            
+
             return resetPlayers;
         }
     }
-} 
+}

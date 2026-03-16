@@ -98,7 +98,7 @@ public static class VtmlUtils
     public static bool ContainsVtmlSpecialChars(string input)
     {
         if (string.IsNullOrEmpty(input)) return false;
-        
+
         return input.Contains('<') || input.Contains('>');
     }
 

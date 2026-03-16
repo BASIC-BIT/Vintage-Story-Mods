@@ -18,38 +18,46 @@ public class MessageContext
     public Dictionary<string, object> Metadata { get; set; } = [];
     public Dictionary<string, bool> Flags { get; set; } = [];
     public MessageContextState State { get; set; } = MessageContextState.CONTINUE;
-    
+
     /// <summary>
     /// The players who should receive this message (populated during recipient determination)
     /// </summary>
     public List<IServerPlayer> Recipients { get; set; }
     public string ErrorMessage { get; set; }
 
-    public bool HasFlag(string flag) {
+    public bool HasFlag(string flag)
+    {
         return Flags.ContainsKey(flag) && Flags[flag];
     }
 
-    public void SetFlag(string flag, bool value = true) {
+    public void SetFlag(string flag, bool value = true)
+    {
         Flags[flag] = value;
     }
 
-    public T GetMetadata<T>(string key) {
+    public T GetMetadata<T>(string key)
+    {
         return (T)Metadata[key];
     }
 
-    public T GetMetadata<T>(string key, T defaultValue) {
-        if(Metadata.ContainsKey(key)) {
+    public T GetMetadata<T>(string key, T defaultValue)
+    {
+        if (Metadata.ContainsKey(key))
+        {
             return (T)Metadata[key];
         }
         return defaultValue;
     }
-    
-    public bool HasMetadata(string key) {
+
+    public bool HasMetadata(string key)
+    {
         return Metadata.ContainsKey(key);
     }
 
-    public bool TryGetMetadata<T>(string key, out T value) {
-        if(Metadata.TryGetValue(key, out var obj) && obj is T typedValue) {
+    public bool TryGetMetadata<T>(string key, out T value)
+    {
+        if (Metadata.TryGetValue(key, out var obj) && obj is T typedValue)
+        {
             value = typedValue;
             return true;
         }
@@ -57,7 +65,8 @@ public class MessageContext
         return false;
     }
 
-    public void SetMetadata<T>(string key, T value) {
+    public void SetMetadata<T>(string key, T value)
+    {
         Metadata[key] = value;
     }
 

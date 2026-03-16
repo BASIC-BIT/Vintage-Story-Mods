@@ -1,4 +1,4 @@
-﻿
+
 using ProtoBuf;
 
 namespace thebasics.Models;

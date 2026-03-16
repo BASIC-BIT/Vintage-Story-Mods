@@ -1,0 +1,8 @@
+<Project>
+  <!-- Only apply modern analyzer settings to .NET 8+ SDK-style projects -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+</Project>

@@ -35,9 +35,9 @@ using Vintagestory.API.Common;
 // by using the '*' as shown below:
 [assembly: AssemblyVersion("1.0.*")]
 
-[assembly: ModInfo( "litchimneys", "litchimneys",
+[assembly: ModInfo("litchimneys", "litchimneys",
     Version = "1.0.0",
     Description = "To be added",
     Authors = new[] { "Unkown" })]
 
- [assembly: ModDependency("game")]
+[assembly: ModDependency("game")]

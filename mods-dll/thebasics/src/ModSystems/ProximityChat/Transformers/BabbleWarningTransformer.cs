@@ -20,7 +20,7 @@ public class BabbleWarningTransformer : MessageTransformerBase
     }
 
     public override MessageContext Transform(MessageContext context)
-    {   
+    {
         // Send babble warning directly to the player
         context.SendingPlayer.SendMessage(
             _chatSystem.ProximityChatId,

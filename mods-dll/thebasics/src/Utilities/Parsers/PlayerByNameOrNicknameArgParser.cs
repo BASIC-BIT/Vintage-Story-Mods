@@ -45,53 +45,53 @@ namespace thebasics.Utilities.Parsers
         public override EnumParseResult TryProcess(TextCommandCallingArgs args, Action<AsyncParseResults> onReady = null)
         {
             var text = args.RawArgs.PopWord();
-            
+
             if (string.IsNullOrEmpty(text))
             {
                 lastErrorMessage = Lang.Get("thebasics:parser-error-missing-player");
-                
+
                 if (onReady != null)
                 {
                     onReady(new AsyncParseResults { Status = EnumParseResultStatus.Error });
                     return EnumParseResult.Deferred;
                 }
-                
+
                 return EnumParseResult.Bad;
             }
-            
+
             // Process quoted text if present
-            if (text.StartsWith("\""))
+            if (text.StartsWith('"'))
             {
                 text = text[1..]; // Remove opening quote
-                
+
                 // If it's already a complete quoted string (e.g. "nickname")
-                if (text.EndsWith("\""))
+                if (text.EndsWith('"'))
                 {
                     text = text[..^1]; // Remove closing quote
                 }
                 else
                 {
                     // Keep consuming words until we find the closing quote
-                    while (!text.EndsWith("\"") && args.RawArgs.Length > 0)
+                    while (!text.EndsWith('"') && args.RawArgs.Length > 0)
                     {
                         text += " " + args.RawArgs.PopWord();
                     }
-                    
+
                     // If we found a closing quote, remove it
-                    if (text.EndsWith("\""))
+                    if (text.EndsWith('"'))
                     {
                         text = text[..^1]; // Remove closing quote
                     }
                     else
                     {
                         lastErrorMessage = Lang.Get("thebasics:parser-error-missing-quote");
-                        
+
                         if (onReady != null)
                         {
                             onReady(new AsyncParseResults { Status = EnumParseResultStatus.Error });
                             return EnumParseResult.Deferred;
                         }
-                        
+
                         return EnumParseResult.Bad;
                     }
                 }
@@ -100,13 +100,13 @@ namespace thebasics.Utilities.Parsers
             text = text.Trim();
 
             // First, check if any online player matches by name or UID
-            foreach (IServerPlayer player in api.World.AllOnlinePlayers)
+            foreach (IServerPlayer player in api.World.AllOnlinePlayers.OfType<IServerPlayer>())
             {
                 if (player.PlayerName.Equals(text, StringComparison.OrdinalIgnoreCase) ||
                     player.PlayerUID.Equals(text, StringComparison.OrdinalIgnoreCase))
                 {
                     players = new PlayerUidName[] { new PlayerUidName(player.PlayerUID, player.PlayerName) };
-                    
+
                     if (onReady != null)
                     {
                         onReady(new AsyncParseResults
@@ -116,15 +116,15 @@ namespace thebasics.Utilities.Parsers
                         });
                         return EnumParseResult.Deferred;
                     }
-                    
+
                     return EnumParseResult.Good;
                 }
             }
-            
+
             // If no match by name, check by nickname
             var matchedPlayers = new List<PlayerUidName>();
-            
-            foreach (IServerPlayer player in api.World.AllOnlinePlayers)
+
+            foreach (IServerPlayer player in api.World.AllOnlinePlayers.OfType<IServerPlayer>())
             {
                 var playerNickname = player.GetNickname();
                 if (playerNickname != null && playerNickname.Equals(text, StringComparison.OrdinalIgnoreCase))
@@ -132,12 +132,12 @@ namespace thebasics.Utilities.Parsers
                     matchedPlayers.Add(new PlayerUidName(player.PlayerUID, player.PlayerName));
                 }
             }
-            
+
             // If we found players matching the nickname, use them
             if (matchedPlayers.Count > 0)
             {
                 players = matchedPlayers.ToArray();
-                
+
                 if (onReady != null)
                 {
                     onReady(new AsyncParseResults
@@ -147,20 +147,20 @@ namespace thebasics.Utilities.Parsers
                     });
                     return EnumParseResult.Deferred;
                 }
-                
+
                 return EnumParseResult.Good;
             }
-            
+
             // If we get here, no player with the given name or nickname was found
             lastErrorMessage = Lang.Get("thebasics:parser-error-player-not-found", text);
-            
+
             if (onReady != null)
             {
                 onReady(new AsyncParseResults { Status = EnumParseResultStatus.Error });
                 return EnumParseResult.Deferred;
             }
-            
+
             return EnumParseResult.Bad;
         }
     }
-} 
+}

@@ -1,5 +1,5 @@
-﻿using ProtoBuf;
 using System.Runtime.Serialization;
+using ProtoBuf;
 namespace thebasics.ModSystems.PlayerStats.Models
 {
     [ProtoContract]

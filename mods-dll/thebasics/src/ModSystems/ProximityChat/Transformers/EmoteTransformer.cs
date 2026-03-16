@@ -8,26 +8,26 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 public class EmoteTransformer : MessageTransformerBase
 {
-    private LanguageSystem _languageSystem;
+    private readonly LanguageSystem _languageSystem;
     public EmoteTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem) : base(chatSystem)
     {
         _languageSystem = languageSystem;
     }
-    
+
     public override bool ShouldTransform(MessageContext context)
     {
         return context.HasFlag(MessageContext.IS_EMOTE);
     }
-    
+
     public override MessageContext Transform(MessageContext context)
-    {   
+    {
         var content = context.Message;
         var builder = new StringBuilder();
-        
+
         var formattedName = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         builder.Append(formattedName);
         builder.Append(" ");
-        
+
         // Process the emote content
         var trimmedMessage = content.Trim();
         var splitMessage = trimmedMessage.Split('"');
@@ -36,7 +36,7 @@ public class EmoteTransformer : MessageTransformerBase
         var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
 
         var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
-        
+
         for (var i = 0; i < splitMessage.Length; i++)
         {
             if (i % 2 == 0)
@@ -71,9 +71,9 @@ public class EmoteTransformer : MessageTransformerBase
                 builder.Append(text);
             }
         }
-        
+
         context.Message = builder.ToString();
         return context;
     }
 
-} 
+}

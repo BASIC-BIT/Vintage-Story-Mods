@@ -1,15 +1,15 @@
-using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using thebasics.Models;
+using HarmonyLib;
 using thebasics.Configs;
+using thebasics.Models;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Util;
 using Vintagestory.Client.NoObf;
-using Vintagestory.API.Config;
 using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.ChatUiSystem;
@@ -70,18 +70,18 @@ public class ChatUiSystem : ModSystem
         _rpttsInitScheduled = false;
         _rpttsExplicitModeApplied = false;
         ScheduleRpttsInitialization();
-        
+
         RegisterForServerSideConfig();
 
         // Renderer is cheap when disabled; keep it always registered.
         _typingIndicatorRenderer = new TypingIndicatorRenderer(api);
         api.Event.RegisterRenderer(_typingIndicatorRenderer, EnumRenderStage.Ortho, "thebasics-typingindicator");
 
-        
+
         // Register event handlers
         _api.Event.PlayerJoin += OnPlayerJoin;
         // _api.Event.PlayerLeave += OnPlayerLeave;
-        
+
         // Initialize Harmony patches if needed
         if (!Harmony.HasAnyPatches(Mod.Info.ModID))
         {
@@ -89,7 +89,7 @@ public class ChatUiSystem : ModSystem
             _harmony = new Harmony(Mod.Info.ModID);
             _harmony.PatchAll();
         }
-        
+
     }
 
     // private void Dlg_ComposeExtraGuis()
@@ -161,7 +161,7 @@ public class ChatUiSystem : ModSystem
     private static void ProcessConfigActionQueue()
     {
         DebugLog($"[THEBASICS] Processing {_pendingConfigActions.Count} queued actions");
-        
+
         foreach (var action in _pendingConfigActions)
         {
             try
@@ -173,7 +173,7 @@ public class ChatUiSystem : ModSystem
                 _api.Logger.Error($"[THEBASICS] Error executing queued action: {e}");
             }
         }
-        
+
         _pendingConfigActions.Clear();
     }
 
@@ -183,7 +183,7 @@ public class ChatUiSystem : ModSystem
         if (byPlayer.PlayerUID == _api.World.Player.PlayerUID)
         {
             DebugLog("THEBASICS - Local player joined, attempting to send ready message to server");
-            
+
             // Use safe packet sending with connection checking and retry mechanism
             // The server will only send config after receiving this ready message
             _safeNetworkChannel?.SendPacketSafely(new TheBasicsClientReadyMessage());
@@ -289,7 +289,7 @@ public class ChatUiSystem : ModSystem
         {
             // Store the received config
             _config = configMessage.Config;
-            
+
             if (_config == null)
             {
                 _api.Logger.Error("[THEBASICS] Received null config from server!");
@@ -298,13 +298,13 @@ public class ChatUiSystem : ModSystem
 
             // Apply debug mode to networking helpers now that we have config.
             _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
-            
+
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;
-            
+
             DebugLog($"[THEBASICS] Received server config: PreventProximityChannelSwitching={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
             DebugLog($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
-            
+
             // Process any actions that were waiting for config
             if (_pendingConfigActions.Count > 0)
             {
@@ -351,23 +351,23 @@ public class ChatUiSystem : ModSystem
 
         try
         {
-        if (!_api.ModLoader.IsModSystemEnabled("RPTTS.RPTTSAPI"))
-        {
-            return false;
-        }
+            if (!_api.ModLoader.IsModSystemEnabled("RPTTS.RPTTSAPI"))
+            {
+                return false;
+            }
 
-        var detectedApi = _api.ModLoader.GetModSystem("RPTTS.RPTTSAPI");
-        if (detectedApi == null)
-        {
-            _api.Logger.Warning("[THEBASICS] RPTTS reported enabled but API instance unavailable after delayed initialization.");
-            return false;
-        }
+            var detectedApi = _api.ModLoader.GetModSystem("RPTTS.RPTTSAPI");
+            if (detectedApi == null)
+            {
+                _api.Logger.Warning("[THEBASICS] RPTTS reported enabled but API instance unavailable after delayed initialization.");
+                return false;
+            }
 
-        _rpttsApi = detectedApi;
-        _rpttsChatSystem = _api.ModLoader.GetModSystem("RPTTS.TTSChatSystem");
-        _usingRptts = true;
-        ApplyRpttsExplicitMode();
-        return true;
+            _rpttsApi = detectedApi;
+            _rpttsChatSystem = _api.ModLoader.GetModSystem("RPTTS.TTSChatSystem");
+            _usingRptts = true;
+            ApplyRpttsExplicitMode();
+            return true;
         }
         catch (System.Exception ex)
         {
@@ -585,7 +585,7 @@ public class ChatUiSystem : ModSystem
     public static void PostfixOnGuiOpened(HudDialogChat __instance)
     {
         if (_api == null) return;
-        
+
         if (_config == null)
         {
             // Queue this action for when config is received
@@ -600,9 +600,9 @@ public class ChatUiSystem : ModSystem
             (_config.ProximityChatAsDefault && _proximityGroupId != null) ? _proximityGroupId.Value : GlobalConstants.GeneralChatGroup;
 
             // Get the tab index for the target group
-            System.Reflection.MethodInfo tabIndexMethod = typeof(HudDialogChat).GetMethod("tabIndexByGroupId", 
+            System.Reflection.MethodInfo tabIndexMethod = typeof(HudDialogChat).GetMethod("tabIndexByGroupId",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            
+
             if (tabIndexMethod != null)
             {
                 int tabIndex = (int)tabIndexMethod.Invoke(__instance, [targetGroupId]);
@@ -637,7 +637,7 @@ public class ChatUiSystem : ModSystem
             // Can't process this yet, but it's not important enough to queue
             return;
         }
-        
+
         if (!_config.PreserveDefaultChatChoice) return;
 
         try
@@ -647,7 +647,7 @@ public class ChatUiSystem : ModSystem
 
             // Store the selected channel
             _lastSelectedGroupId = groupId;
-            
+
             // Use safe packet sending with connection checking and retry mechanism
             _safeNetworkChannel?.SendPacketSafely(new ChannelSelectedMessage() { GroupId = _lastSelectedGroupId });
         }

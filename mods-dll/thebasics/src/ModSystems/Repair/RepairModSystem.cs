@@ -20,7 +20,7 @@ namespace thebasics.ModSystems.Repair
 
         private TextCommandResult SetDurabilityCommand(TextCommandCallingArgs args)
         {
-            var player = (IServerPlayer) args.Caller.Player;
+            var player = (IServerPlayer)args.Caller.Player;
 
             // Parsed by .WithArgs(Int("durability"))
             var durability = (int)args[0];

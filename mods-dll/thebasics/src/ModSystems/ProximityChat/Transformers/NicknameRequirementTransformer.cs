@@ -8,27 +8,27 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 // Require nicknames if we're doing RP chat
 public class NicknameRequirementTransformer : MessageTransformerBase
-{   
+{
     public NicknameRequirementTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
     }
 
     public override bool ShouldTransform(MessageContext context)
     {
-        return !_config.DisableNicknames && 
+        return !_config.DisableNicknames &&
             context.HasFlag(MessageContext.IS_ROLEPLAY) &&
             !context.SendingPlayer.HasNickname();
     }
 
     public override MessageContext Transform(MessageContext context)
-    {   
+    {
         // Send nickname requirement warning directly to the player
         context.SendingPlayer.SendMessage(
             _chatSystem.ProximityChatId,
             Lang.Get("thebasics:chat-nickrequirement-warning"),
             EnumChatType.CommandError
         );
-        
+
         // Stop processing this message
         context.State = MessageContextState.STOP;
 

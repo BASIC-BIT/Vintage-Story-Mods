@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
@@ -34,8 +34,6 @@ namespace thebasics.Extensions
 
         private const string ModDataLanguages = "BASIC_LANGUAGES";
         private const string ModDataDefaultLanguage = "BASIC_DEFAULT_LANGUAGE";
-
-        private const string TpaPrivilege = "tpa";
 
         private const string ModDataLastSelectedGroupId = "BASIC_LAST_SELECTED_GROUP_ID";
         private const string ModDataChatterEnabled = "BASIC_CHATTER_ENABLED";
@@ -196,14 +194,14 @@ namespace thebasics.Extensions
         #region Languages
         public static void InstantiateLanguagesIfNotExist(this IServerPlayer player, ModConfig config)
         {
-            if(player.GetModdata(ModDataLanguages) == null)
+            if (player.GetModdata(ModDataLanguages) == null)
             {
                 SetModData(player, ModDataLanguages, config.Languages
                     .Where(lang => lang.Default)
                     .Select(lang => lang.Name)
                     .ToList());
             }
-            if(player.GetModdata(ModDataDefaultLanguage) == null)
+            if (player.GetModdata(ModDataDefaultLanguage) == null)
             {
                 var defaultLang = config.Languages
                     .Where(lang => lang.Default)
@@ -232,7 +230,7 @@ namespace thebasics.Extensions
             }
             SetModData(player, ModDataLanguages, currentLanguages);
         }
-        
+
         public static void RemoveLanguage(this IServerPlayer player, Language lang)
         {
             var currentLanguages = player.GetLanguages().ToList();
@@ -264,7 +262,7 @@ namespace thebasics.Extensions
             }
             return languages;
         }
-        
+
         public static void SetDefaultLanguage(this IServerPlayer player, Language lang)
         {
             SetModData(player, ModDataDefaultLanguage, lang.Name);
@@ -308,7 +306,7 @@ namespace thebasics.Extensions
         {
             var data = GetModData<string>(player, ModDataOutgoingTpaRequest, null);
             if (string.IsNullOrEmpty(data)) return null;
-            
+
             try
             {
                 return JsonConvert.DeserializeObject<TpaRequest>(data);
@@ -336,7 +334,7 @@ namespace thebasics.Extensions
         public static List<(IServerPlayer requester, TpaRequest request)> FindAllIncomingTpaRequests(this IServerPlayer targetPlayer, TpaSystem tpaSystem)
         {
             var incomingRequests = new List<(IServerPlayer, TpaRequest)>();
-            
+
             // Find all online players who have outgoing requests targeting this player
             foreach (var player in tpaSystem.API.World.AllOnlinePlayers)
             {
@@ -344,31 +342,31 @@ namespace thebasics.Extensions
                 if (serverPlayer == null) continue;
 
                 var outgoingRequest = serverPlayer.GetOutgoingTpaRequest();
-                if (outgoingRequest != null && 
+                if (outgoingRequest != null &&
                     outgoingRequest.TargetPlayerUID == targetPlayer.PlayerUID &&
                     !tpaSystem.IsRequestExpired(outgoingRequest))
                 {
                     incomingRequests.Add((serverPlayer, outgoingRequest));
                 }
             }
-            
+
             return incomingRequests;
         }
-        
+
         public static TpaRequest FindIncomingTpaRequestFrom(this IServerPlayer targetPlayer, string requesterUID, TpaSystem tpaSystem)
         {
             // Find a specific player's outgoing request targeting this player
             var requester = tpaSystem.API.GetPlayerByUID(requesterUID);
             if (requester == null) return null;
-            
+
             var outgoingRequest = requester.GetOutgoingTpaRequest();
-            if (outgoingRequest != null && 
+            if (outgoingRequest != null &&
                 outgoingRequest.TargetPlayerUID == targetPlayer.PlayerUID &&
                 !tpaSystem.IsRequestExpired(outgoingRequest))
             {
                 return outgoingRequest;
             }
-            
+
             return null;
         }
         #endregion
@@ -392,7 +390,7 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataChatterEnabled, true);
         }
-        
+
         public static double GetDistance(this IServerPlayer sendingPlayer, IServerPlayer receivingPlayer) =>
             sendingPlayer.Entity.ServerPos.DistanceTo(receivingPlayer.Entity.ServerPos);
     }

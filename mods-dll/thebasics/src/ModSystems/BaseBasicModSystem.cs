@@ -1,6 +1,6 @@
-﻿using System;
-using thebasics.Configs;
+using System;
 using Newtonsoft.Json;
+using thebasics.Configs;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -47,7 +47,7 @@ namespace thebasics.ModSystems
                 try
                 {
                     var maybeJsonString = API.LoadModConfig<string>(ConfigName);
-                    if (!string.IsNullOrWhiteSpace(maybeJsonString) && maybeJsonString.TrimStart().StartsWith("{"))
+                    if (!string.IsNullOrWhiteSpace(maybeJsonString) && maybeJsonString.TrimStart().StartsWith('{'))
                     {
                         var repaired = JsonConvert.DeserializeObject<ModConfig>(maybeJsonString);
                         if (repaired != null)

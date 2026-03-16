@@ -1,5 +1,5 @@
-using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Configs;
+using thebasics.ModSystems.ProximityChat.Models;
 namespace thebasics.ModSystems.ProximityChat;
 
 public abstract class MessageTransformerBase : IMessageTransformer
@@ -16,4 +16,4 @@ public abstract class MessageTransformerBase : IMessageTransformer
     public abstract bool ShouldTransform(MessageContext context);
 
     public abstract MessageContext Transform(MessageContext context);
-} 
+}

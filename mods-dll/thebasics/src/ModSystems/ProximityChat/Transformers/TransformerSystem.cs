@@ -11,10 +11,10 @@ public class TransformerSystem
     private List<MessageTransformerBase> _senderPhaseTransformers;
     private List<MessageTransformerBase> _recipientPhaseTransformers;
 
-    private RPProximityChatSystem _chatSystem;
-    private LanguageSystem _languageSystem;
-    private DistanceObfuscationSystem _distanceObfuscationSystem;
-    private ProximityCheckUtils _proximityCheckUtils;
+    private readonly RPProximityChatSystem _chatSystem;
+    private readonly LanguageSystem _languageSystem;
+    private readonly DistanceObfuscationSystem _distanceObfuscationSystem;
+    private readonly ProximityCheckUtils _proximityCheckUtils;
 
     public TransformerSystem(RPProximityChatSystem chatSystem, LanguageSystem languageSystem, DistanceObfuscationSystem distanceObfuscationSystem, ProximityCheckUtils proximityCheckUtils)
     {
@@ -77,7 +77,7 @@ public class TransformerSystem
     {
         foreach (var transformer in transformers)
         {
-            if(transformer.ShouldTransform(context))
+            if (transformer.ShouldTransform(context))
             {
                 context = transformer.Transform(context);
                 if (context.State != MessageContextState.CONTINUE)
@@ -105,11 +105,12 @@ public class TransformerSystem
     }
 
     // TODO: Refactor common usage with ICSpeechFormatTransformer
-    private void LogChatMessage(MessageContext context) {
+    private void LogChatMessage(MessageContext context)
+    {
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
         var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
-        
+
         // Add quotes based on language type
         var delimiters = _chatSystem.Config.ChatDelimiters;
         var quoteDelimiter = lang == LanguageSystem.SignLanguage ? delimiters.SignLanguageQuote : delimiters.Quote;

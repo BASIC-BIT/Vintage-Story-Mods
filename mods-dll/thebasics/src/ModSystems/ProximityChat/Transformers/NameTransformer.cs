@@ -9,7 +9,7 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 // Update name formatting (real name or nickname, bold, colorized) for use in later transformers
 public class NameTransformer : MessageTransformerBase
 {
-    
+
     public NameTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
     }
@@ -25,26 +25,28 @@ public class NameTransformer : MessageTransformerBase
             context.HasFlag(MessageContext.IS_EMOTE) ||
             (context.HasFlag(MessageContext.IS_OOC) && _config.UseNicknameInOOC) ||
             (context.HasFlag(MessageContext.IS_GLOBAL_OOC) && _config.UseNicknameInGlobalOOC);
-        
+
         context.SetMetadata(MessageContext.FORMATTED_NAME, GetFormattedName(context.SendingPlayer, isIC, _config));
         return context;
     }
-    
+
     public string GetFormattedName(IServerPlayer player, bool isIC, ModConfig config)
     {
         string name = isIC ? player.GetNickname() : player.PlayerName;
 
         // Escape user-supplied name to prevent VTML injection
         name = ChatHelper.EscapeMarkup(name);
-        
+
         string color = player.GetNicknameColor();
         bool applyColor = !string.IsNullOrEmpty(color) && (isIC ? config.ApplyColorsToNicknames : config.ApplyColorsToPlayerNames);
-        
-        if(config.BoldNicknames){
+
+        if (config.BoldNicknames)
+        {
             name = ChatHelper.Strong(name);
         }
 
-        if(applyColor){
+        if (applyColor)
+        {
             name = ChatHelper.Color(name, color);
         }
         return name;

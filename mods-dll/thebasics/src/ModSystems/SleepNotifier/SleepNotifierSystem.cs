@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
@@ -44,7 +44,7 @@ namespace thebasics.ModSystems.SleepNotifier
 
         public bool IsAboveSleepingThreshold(int curSleepingCount, int totalPlayers)
         {
-            return ((double) curSleepingCount / (double) totalPlayers) >= Config.SleepNotificationThreshold;
+            return ((double)curSleepingCount / (double)totalPlayers) >= Config.SleepNotificationThreshold;
         }
 
         private int GetSleepingCount()

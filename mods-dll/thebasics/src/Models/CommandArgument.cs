@@ -1,4 +1,4 @@
-﻿namespace thebasics.Models
+namespace thebasics.Models
 {
     public abstract class BaseCommandArgument
     {

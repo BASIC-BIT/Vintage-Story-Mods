@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -120,7 +120,7 @@ namespace thebasics.ModSystems.ProximityChat
             player.AddLanguage(lang);
 
             // Set players default language if their current language is babble
-            if(player.GetDefaultLanguage(Config).Name == BabbleLang.Name)
+            if (player.GetDefaultLanguage(Config).Name == BabbleLang.Name)
             {
                 player.SetDefaultLanguage(lang);
             }
@@ -251,7 +251,7 @@ namespace thebasics.ModSystems.ProximityChat
 
             // Set players default language if their current language is babble
             var defaultLang = targetPlayer.GetDefaultLanguage(Config);
-            if(defaultLang == null || defaultLang.Name == BabbleLang.Name)
+            if (defaultLang == null || defaultLang.Name == BabbleLang.Name)
             {
                 targetPlayer.SetDefaultLanguage(lang);
             }
@@ -360,7 +360,7 @@ namespace thebasics.ModSystems.ProximityChat
         public List<Language> GetAllLanguages(bool allowBabble, bool includeHidden = true)
         {
             List<Language> languages = new();
-            
+
             if (includeHidden)
             {
                 languages.AddRange(Config.Languages);

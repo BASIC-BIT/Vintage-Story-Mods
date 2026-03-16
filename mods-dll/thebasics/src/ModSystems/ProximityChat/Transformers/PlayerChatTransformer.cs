@@ -14,14 +14,14 @@ public class PlayerChatTransformer : MessageTransformerBase
     public PlayerChatTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
     }
-    
+
     public override bool ShouldTransform(MessageContext context)
     {
         return context.HasFlag(MessageContext.IS_PLAYER_CHAT);
     }
 
     public override MessageContext Transform(MessageContext context)
-    {   
+    {
         var content = context.Message;
 
         static bool IsDecoratorChar(char c)
@@ -152,7 +152,7 @@ public class PlayerChatTransformer : MessageTransformerBase
         var isOOC = hasOocStart;
         var isEnvironmentMessage = hasEnvironmentStart;
         var isEmote = hasEmoteStart || (context.SendingPlayer.GetEmoteMode() && !isOOC && !isGlobalOoc && !isEnvironmentMessage);
-        
+
         // Handle Global OOC - this will be processed normally by the server
         if (isGlobalOoc)
         {
@@ -168,7 +168,8 @@ public class PlayerChatTransformer : MessageTransformerBase
 
             // Global OOC is not an in-world "visual cue"; suppress overhead bubbles.
             context.SetMetadata("clientData", (string)null);
-        } else if (isEmote)
+        }
+        else if (isEmote)
         {
             if (hasEmoteStart)
             {
@@ -187,7 +188,8 @@ public class PlayerChatTransformer : MessageTransformerBase
             }
             context.SetFlag(MessageContext.IS_EMOTE);
             context.UpdateMessage(content.Trim(), updateSpeech: false);
-        } else if (isOOC)
+        }
+        else if (isOOC)
         {
             var updated = content[oocStartLen..]; // Remove the leading delimiter
             if (!string.IsNullOrEmpty(delimiters.OOC.End) && TryConsumeDelimiterAtEnd(updated, delimiters.OOC.End, out var newLen))
@@ -197,7 +199,8 @@ public class PlayerChatTransformer : MessageTransformerBase
             }
             context.SetFlag(MessageContext.IS_OOC);
             context.UpdateMessage(updated.Trim(), updateSpeech: false);
-        } else if (isEnvironmentMessage)
+        }
+        else if (isEnvironmentMessage)
         {
             var updated = content[envStartLen..]; // Remove the delimiter
 
@@ -213,11 +216,13 @@ public class PlayerChatTransformer : MessageTransformerBase
 
             context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
             context.UpdateMessage(updated.Trim(), updateSpeech: false);
-        } else {
+        }
+        else
+        {
             context.SetFlag(MessageContext.IS_SPEECH);
             context.UpdateMessage(content.Trim());
         }
-        
+
         return context;
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using thebasics.ModSystems.PlayerStats.Models;
 
 namespace thebasics.ModSystems.PlayerStats.Definitions
