@@ -173,7 +173,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
         return displayMode switch
         {
             TypingIndicatorDisplayMode.Text => textLabel,
-            TypingIndicatorDisplayMode.Both => $"{Lang.Get(iconKey)}\u2009{textLabel}",
+            TypingIndicatorDisplayMode.Both => $"{Lang.Get(iconKey)} {textLabel}",
             _ => Lang.Get(iconKey), // Icon (default)
         };
     }
@@ -247,7 +247,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
         var bg = new TextBackground
         {
-            Padding = 5,
+            Padding = 3,
             Radius = GuiStyle.ElementBGRadius,
             FillColor = new[]
             {
@@ -260,16 +260,16 @@ public sealed class TypingIndicatorRenderer : IRenderer
             BorderColor = ColorUtil.Hex2Doubles("#CFBA96")
         };
 
-        // Use a slightly larger font so icons are clearly visible at distance.
-        var font = CairoFont.WhiteSmallText().WithFontSize(18f);
+        // Slightly larger font for icon visibility at distance.
+        var font = CairoFont.WhiteSmallText().WithFontSize(20f);
         font.Orientation = EnumTextOrientation.Center;
 
         LoadedTexture tex;
         var hasVtml = text.Contains('<');
         if (hasVtml)
         {
-            // Supports <icon> and other VTML tags.
-            tex = RichTextTextureUtils.GenRichTextTexture(_capi, text, font, maxTextWidthPx: 250, bg);
+            // Supports <icon> and other VTML tags. Keep max width compact.
+            tex = RichTextTextureUtils.GenRichTextTexture(_capi, text, font, maxTextWidthPx: 180, bg);
             if (tex == null)
             {
                 var plain = VtmlUtils.StripVtmlTags(text, _capi.Logger);

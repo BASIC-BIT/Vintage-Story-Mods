@@ -1,9 +1,9 @@
 {
-  "typingindicator-typing-icon": "<icon name=\"handheld\"></icon>",
+  "typingindicator-typing-icon": "<icon name=\"paintbrush\"></icon>",
   "typingindicator-composing-icon": "<icon name=\"paintbrush\"></icon>",
   "typingindicator-chatopen-icon": "<icon name=\"wpCircle\"></icon>",
   "typingindicator-typing-text": "Typing...",
-  "typingindicator-composing-text": "Composing...",
+  "typingindicator-composing-text": "Thinking...",
   "typingindicator-chatopen-text": "...",
 
   "tpa-cmd-tpa-desc": "Request a teleport to another player",
