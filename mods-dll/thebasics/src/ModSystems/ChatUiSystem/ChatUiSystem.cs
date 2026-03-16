@@ -483,8 +483,15 @@ public class ChatUiSystem : ModSystem
             ResolveTalkUtilFields();
             if (_lettersLeftToTalkField != null && _totalLettersToTalkField != null)
             {
-                _lettersLeftToTalkField.SetValue(talkUtil, message.NoteCount);
-                _totalLettersToTalkField.SetValue(talkUtil, message.NoteCount);
+                try
+                {
+                    _lettersLeftToTalkField.SetValue(talkUtil, message.NoteCount);
+                    _totalLettersToTalkField.SetValue(talkUtil, message.NoteCount);
+                }
+                catch (Exception setEx)
+                {
+                    _api?.Logger.Warning($"[THEBASICS] Note count override failed (TalkUtil may not be EntityTalkUtil): {setEx.Message}");
+                }
             }
         }
         catch (Exception ex)

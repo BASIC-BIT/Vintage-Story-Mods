@@ -543,7 +543,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         // Logarithmic scaling (natural log): diminishing returns on longer messages.
         // "hi" (2) -> 6, "hello there" (11) -> 10, full sentence (32) -> 13, novel (150+) -> 18
-        var noteCount = 3 + (int)(3.0 * Math.Log(speechLength + 1));
+        var noteCount = Math.Min(3 + (int)(3.0 * Math.Log(speechLength + 1)), 20);
 
         var message = new ChatterSoundMessage
         {
