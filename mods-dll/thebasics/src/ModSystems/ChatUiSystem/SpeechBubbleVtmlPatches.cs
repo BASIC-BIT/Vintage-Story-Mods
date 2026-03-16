@@ -304,9 +304,11 @@ public static class SpeechBubbleRenderPatches
                 return; // Nothing to render or hide.
             }
 
+            // Skip LOS check for own entity — always see your own bubbles.
+            // (Distance scaling still applies for third-person cameras, but Z is usually tiny.)
             var isOwnEntity = localPlayerEntity.EntityId == entity.EntityId;
 
-            // LOS check (skip for own entity — always see your own bubbles).
+            // LOS check.
             if (!isOwnEntity)
             {
                 var nowMs = capi.World.ElapsedMilliseconds;
