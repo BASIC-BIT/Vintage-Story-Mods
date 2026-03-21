@@ -22,6 +22,12 @@ AGENTS.local.md
 .env
 *.env
 
+# Test results and coverage artifacts
+TestResults/
+coveragereport/
+**/coverage.cobertura.xml
+code-coverage-results.md
+
 # Repomix output files
 .repomix-output.txt
 **/*.repomix-output.*

@@ -14,6 +14,10 @@ env:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
     
     steps:
     - name: Checkout repository
@@ -188,18 +192,169 @@ jobs:
       run: dotnet format whitespace Vintage-Story-Mods.sln --verify-no-changes --exclude mods/
       continue-on-error: false
 
-    - name: Run Tests
+    - name: Run Tests with Coverage
       run: |
-        dotnet test mods-dll/thebasics.Tests/thebasics.Tests.csproj --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory TestResults
+        dotnet test mods-dll/thebasics.Tests/thebasics.Tests.csproj `
+          --configuration Release `
+          --no-build `
+          --verbosity normal `
+          --settings mods-dll/thebasics.Tests/coverlet.runsettings `
+          --collect:"XPlat Code Coverage" `
+          --results-directory TestResults
       shell: pwsh
 
+    - name: Generate Coverage Report
+      if: always()
+      uses: danielpalme/ReportGenerator-GitHub-Action@5.4.4
+      with:
+        reports: '**/TestResults/**/coverage.cobertura.xml'
+        targetdir: coveragereport
+        reporttypes: 'HtmlInline;Cobertura'
+
+    - name: Download Base Coverage
+      if: always()
+      run: |
+        New-Item -ItemType Directory -Force -Path base-coverage | Out-Null
+
+        $runs = gh run list --workflow build.yml --branch main --json databaseId,conclusion --limit 20 | ConvertFrom-Json
+        $run = $runs | Where-Object { $_.conclusion -eq 'success' } | Select-Object -First 1
+
+        if (-not $run) {
+          Write-Host "No successful main build found for coverage baseline" -ForegroundColor Yellow
+          exit 0
+        }
+
+        gh run download $run.databaseId --name coverage-baseline --dir base-coverage 2>$null
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "Coverage baseline artifact missing in main run $($run.databaseId)" -ForegroundColor Yellow
+          exit 0
+        }
+
+        if (-not (Test-Path "base-coverage/coverage.json")) {
+          Write-Host "Coverage baseline artifact missing in main run $($run.databaseId)" -ForegroundColor Yellow
+        }
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Coverage Threshold Check
+      if: always()
+      run: |
+        $failThreshold = 3
+        $warnThreshold = 5
+
+        # Assumes single test project. If adding more, merge cobertura
+        # files first (ReportGenerator can do this).
+        $coberturaFile = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $coberturaFile) {
+          Write-Host "::warning::No coverage.cobertura.xml found — skipping threshold check (tests may have failed)"
+          exit 0
+        }
+
+        [xml]$xml = Get-Content $coberturaFile.FullName
+        $lineRate   = [math]::Round([double]$xml.coverage.'line-rate' * 100, 1)
+        $branchRate = [math]::Round([double]$xml.coverage.'branch-rate' * 100, 1)
+        $covered    = $xml.coverage.'lines-covered'
+        $total      = $xml.coverage.'lines-valid'
+        $brCovered  = $xml.coverage.'branches-covered'
+        $brTotal    = $xml.coverage.'branches-valid'
+
+        # Compare with base branch if available
+        $baseLine = "—"
+        $baseBranch = "—"
+        $lineDelta = ""
+        $branchDelta = ""
+        $baseFile = "base-coverage/coverage.json"
+        if (Test-Path $baseFile) {
+          $base = Get-Content $baseFile | ConvertFrom-Json
+          $baseLine = "$($base.lineRate)%"
+          $baseBranch = "$($base.branchRate)%"
+          $ld = [math]::Round($lineRate - $base.lineRate, 1)
+          $bd = [math]::Round($branchRate - $base.branchRate, 1)
+          $lineDelta = if ($ld -gt 0) { " (+$ld)" } elseif ($ld -lt 0) { " ($ld)" } else { " (=)" }
+          $branchDelta = if ($bd -gt 0) { " (+$bd)" } elseif ($bd -lt 0) { " ($bd)" } else { " (=)" }
+        }
+
+        # Save current coverage for future comparisons
+        @{ lineRate = $lineRate; branchRate = $branchRate } | ConvertTo-Json | Set-Content "coverage.json"
+
+        # Job summary
+        $summary = @(
+          "## Code Coverage"
+          "| Metric | This PR | Base | Threshold |"
+          "|--------|---------|------|-----------|"
+          "| Lines | **$lineRate%**$lineDelta | $baseLine | $failThreshold% fail / $warnThreshold% warn |"
+          "| Branches | **$branchRate%**$branchDelta | $baseBranch | — |"
+        ) -join "`n"
+        $summary >> $env:GITHUB_STEP_SUMMARY
+
+        # Also write a PR comment file
+        $comment = @(
+          "<!-- coverage-report -->"
+          "## Code Coverage"
+          "| Metric | This PR | Base | Delta |"
+          "|--------|---------|------|-------|"
+          "| Lines | **$lineRate%** ($covered/$total) | $baseLine | $lineDelta |"
+          "| Branches | **$branchRate%** ($brCovered/$brTotal) | $baseBranch | $branchDelta |"
+          ""
+          "_Thresholds: $failThreshold% fail / $warnThreshold% warn_"
+        ) -join "`n"
+        Set-Content -Path "coverage-comment.md" -Value $comment
+
+        if ($lineRate -lt $failThreshold) {
+          Write-Host "::error::Line coverage $lineRate% is below fail threshold ($failThreshold%)"
+          exit 1
+        } elseif ($lineRate -lt $warnThreshold) {
+          Write-Host "::warning::Line coverage $lineRate% is below warn threshold ($warnThreshold%)"
+        } else {
+          Write-Host "Coverage: $lineRate% lines, $branchRate% branches"
+        }
+      shell: pwsh
+
+    - name: Save Coverage Baseline
+      if: github.ref == 'refs/heads/main' && success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-baseline
+        path: coverage.json
+        retention-days: 90
+
+    - name: Comment PR with Coverage
+      if: github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && always()
+      run: |
+        if (Test-Path "coverage-comment.md") {
+          $commentBody = Get-Content "coverage-comment.md" -Raw
+          $existingCommentId = gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --paginate --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- coverage-report -->"))) | .id' | Select-Object -First 1
+
+          if ($existingCommentId) {
+            gh api --method PATCH repos/${{ github.repository }}/issues/comments/$existingCommentId --raw-field body="$commentBody" | Out-Null
+          } else {
+            gh pr comment ${{ github.event.pull_request.number }} --body-file coverage-comment.md
+          }
+        } else {
+          Write-Host "Coverage comment file not found — skipping PR comment" -ForegroundColor Yellow
+        }
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Coverage Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: CoverageReport
+        path: coveragereport
+        retention-days: 30
+
     - name: Code Complexity Check
+      if: always()
       run: |
         pip install lizard
         lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/
       shell: bash
 
     - name: Test Build Output
+      if: always()
       run: |
         Write-Host "Checking build outputs..." -ForegroundColor Yellow
         
