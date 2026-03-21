@@ -15,6 +15,7 @@ jobs:
   build:
     runs-on: windows-latest
     permissions:
+      actions: read
       contents: read
       pull-requests: write
     
@@ -210,13 +211,31 @@ jobs:
         targetdir: coveragereport
         reporttypes: 'HtmlInline;Cobertura'
 
-    - name: Restore Base Coverage
+    - name: Download Base Coverage
       if: always()
-      uses: actions/cache/restore@v4
-      with:
-        path: base-coverage/coverage.json
-        key: coverage-baseline-main
-      # Cache miss is expected on first run or new repos — not an error.
+      run: |
+        New-Item -ItemType Directory -Force -Path base-coverage | Out-Null
+
+        $runs = gh run list --workflow build.yml --branch main --json databaseId,conclusion --limit 20 | ConvertFrom-Json
+        $run = $runs | Where-Object { $_.conclusion -eq 'success' } | Select-Object -First 1
+
+        if (-not $run) {
+          Write-Host "No successful main build found for coverage baseline" -ForegroundColor Yellow
+          exit 0
+        }
+
+        gh run download $run.databaseId --name coverage-baseline --dir base-coverage 2>$null
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "Coverage baseline artifact missing in main run $($run.databaseId)" -ForegroundColor Yellow
+          exit 0
+        }
+
+        if (-not (Test-Path "base-coverage/coverage.json")) {
+          Write-Host "Coverage baseline artifact missing in main run $($run.databaseId)" -ForegroundColor Yellow
+        }
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Coverage Threshold Check
       if: always()
@@ -293,18 +312,25 @@ jobs:
       shell: pwsh
 
     - name: Save Coverage Baseline
-      if: github.ref == 'refs/heads/main' && always()
-      uses: actions/cache/save@v4
+      if: github.ref == 'refs/heads/main' && success()
+      uses: actions/upload-artifact@v4
       with:
+        name: coverage-baseline
         path: coverage.json
-        key: coverage-baseline-main
-      continue-on-error: true  # Cache key already exists is fine
+        retention-days: 90
 
     - name: Comment PR with Coverage
       if: github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && always()
       run: |
         if (Test-Path "coverage-comment.md") {
-          gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body-file coverage-comment.md
+          $commentBody = Get-Content "coverage-comment.md" -Raw
+          $existingCommentId = gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --paginate --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- coverage-report -->"))) | .id' | Select-Object -First 1
+
+          if ($existingCommentId) {
+            gh api --method PATCH repos/${{ github.repository }}/issues/comments/$existingCommentId --raw-field body="$commentBody" | Out-Null
+          } else {
+            gh pr comment ${{ github.event.pull_request.number }} --body-file coverage-comment.md
+          }
         } else {
           Write-Host "Coverage comment file not found — skipping PR comment" -ForegroundColor Yellow
         }
