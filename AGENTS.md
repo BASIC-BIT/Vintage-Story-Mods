@@ -32,6 +32,10 @@ If the toolbox repo is present next to this repo, also read:
 - ../basics-agentic-dogfooding/docs/opencode/README.md
 - ../basics-agentic-dogfooding/docs/opencode/toolbox.md
 
+## Repository Skills
+
+OpenCode skills under `.opencode/skills/` are first-class workflow assets for this repository. When a task matches a skill, follow it and update it in the same PR as workflow changes.
+
 
 ## Build Commands
 
