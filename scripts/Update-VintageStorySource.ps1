@@ -14,13 +14,20 @@ function Get-DefaultWorkspaceRoot {
         return $env:VS_WORKSPACE_ROOT
     }
 
-    $canonicalRoot = "C:\bench\vs"
-    if (Test-Path $canonicalRoot) {
-        return $canonicalRoot
+    foreach ($canonicalRoot in @("D:\bench\vs", "C:\bench\vs")) {
+        if (Test-Path $canonicalRoot) {
+            return $canonicalRoot
+        }
     }
 
     $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-    return Split-Path -Parent $repoRoot
+    $workspaceRoot = Split-Path -Parent $repoRoot
+
+    if ((Split-Path -Leaf $workspaceRoot) -eq "work") {
+        return Split-Path -Parent $workspaceRoot
+    }
+
+    return $workspaceRoot
 }
 
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
@@ -35,6 +42,14 @@ $metadata = Invoke-RestMethod -Uri $metadataUrl
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $latest = $metadata.PSObject.Properties |
         Where-Object { $_.Value.windowsserver -and $_.Value.windowsserver.latest -eq 1 } |
+        Sort-Object {
+            $parsedVersion = $null
+            if ([System.Version]::TryParse([string]$_.Name, [ref]$parsedVersion)) {
+                $parsedVersion
+            } else {
+                [System.Version]"0.0.0.0"
+            }
+        } -Descending |
         Select-Object -First 1
 
     if (-not $latest) {
@@ -72,21 +87,23 @@ if ($ForceDownload -or -not (Test-Path $zipPath)) {
 
 $actualMd5 = (Get-FileHash -Path $zipPath -Algorithm MD5).Hash.ToLowerInvariant()
 $expectedMd5 = [string]$server.md5
-if ($expectedMd5 -and $actualMd5 -ne $expectedMd5.ToLowerInvariant()) {
+if (-not $expectedMd5) {
+    Write-Warning "No MD5 provided by API for $($server.filename); skipping integrity check"
+} elseif ($actualMd5 -ne $expectedMd5.ToLowerInvariant()) {
     throw "MD5 mismatch for $zipPath. Expected $expectedMd5, got $actualMd5"
 }
 
 $binHasFiles = Test-Path (Join-Path $binDir "VintagestoryServer.dll")
 if ($ForceExtract -or -not $binHasFiles) {
     if ($ForceExtract -and (Test-Path $binDir)) {
-        Remove-Item -Path (Join-Path $binDir "*") -Recurse -Force
+        Get-ChildItem -LiteralPath $binDir -Force | Remove-Item -Recurse -Force
     }
 
     Write-Host "Extracting $zipPath to $binDir"
     Expand-Archive -Path $zipPath -DestinationPath $binDir -Force
 }
 
-$ilspy = Get-Command ilspycmd -ErrorAction SilentlyContinue
+$ilspy = Get-Command ilspycmd -CommandType Application -ErrorAction SilentlyContinue
 if (-not $ilspy) {
     throw "ilspycmd is required. Install it with: dotnet tool install -g ilspycmd"
 }
@@ -135,7 +152,7 @@ foreach ($assembly in $assemblies) {
     $arguments += $dllPath
 
     Write-Host "Decompiling $assemblyName"
-    & $ilspy.Source @arguments
+    & $ilspy.Path @arguments
     if ($LASTEXITCODE -ne 0) {
         throw "ilspycmd failed while decompiling $dllPath"
     }

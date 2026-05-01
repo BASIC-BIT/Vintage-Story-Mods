@@ -3,16 +3,34 @@ $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project 
 $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
 $releaseDir = Join-Path $projectRoot "bin/Release"
 $outputDir = $null
+$projectFile = Join-Path $projectRoot "thebasics.csproj"
+$targetFramework = $null
 
-if (Test-Path $releaseDir) {
-    $tfmDir = Get-ChildItem -Path $releaseDir -Directory | Sort-Object Name -Descending | Select-Object -First 1
+if (Test-Path $projectFile) {
+    [xml]$projectXml = Get-Content -LiteralPath $projectFile -Raw
+    $targetFramework = $projectXml.Project.PropertyGroup |
+        ForEach-Object {
+            if ($_.TargetFramework) {
+                $_.TargetFramework
+            } elseif ($_.TargetFrameworks) {
+                ($_.TargetFrameworks -split ';') | Select-Object -First 1
+            }
+        } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -First 1
+}
+
+if ($targetFramework) {
+    $outputDir = Join-Path $releaseDir $targetFramework
+} elseif (Test-Path $releaseDir) {
+    $tfmDir = Get-ChildItem -LiteralPath $releaseDir -Directory | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
     if ($tfmDir) {
         $outputDir = $tfmDir.FullName
     }
 }
 
 if (-not $outputDir) {
-    $outputDir = Join-Path $projectRoot "bin/Release/net8.0"
+    throw "Could not determine build output directory from $projectFile or $releaseDir"
 }
 $assetsDir = Join-Path $projectRoot "assets"
 $modInfoFile = Join-Path $projectRoot "modinfo.json"

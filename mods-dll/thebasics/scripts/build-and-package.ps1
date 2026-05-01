@@ -3,6 +3,13 @@
 
 # Get absolute paths
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project root
+$repoRoot = Resolve-Path (Join-Path $projectRoot "..\..")
+$workspaceRoot = Split-Path -Parent $repoRoot
+if ((Split-Path -Leaf $workspaceRoot) -eq "work") {
+    $workspaceRoot = Split-Path -Parent $workspaceRoot
+}
+$workspaceDotnet = Join-Path $workspaceRoot ".dotnet\dotnet.exe"
+$dotnet = if ($env:DOTNET_EXE) { $env:DOTNET_EXE } elseif (Test-Path $workspaceDotnet) { $workspaceDotnet } else { "dotnet" }
 
 Write-Host "Building The BASICs mod..."
 
@@ -15,7 +22,7 @@ if (Test-Path $binDir) {
 
 # Build the project using standard MSBuild output location
 Write-Host "Compiling project..."
-$buildResult = dotnet build "$projectRoot/thebasics.csproj" --configuration Release
+$buildResult = & $dotnet build "$projectRoot/thebasics.csproj" --configuration Release /p:SkipPostBuildPackage=true
 Write-Host $buildResult
 
 if ($LASTEXITCODE -ne 0) {

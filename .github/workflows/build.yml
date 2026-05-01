@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  VS_VERSION: "1.21.5"
-  DOTNET_VERSION: "8.0.x"
+  VS_VERSION: "1.22.1"
+  DOTNET_VERSION: "10.0.x"
 
 jobs:
   build:
@@ -180,16 +180,16 @@ jobs:
       shell: pwsh
       
     - name: Restore Dependencies
-      run: dotnet restore Vintage-Story-Mods.sln
+      run: dotnet restore mods-dll/thebasics.Tests/thebasics.Tests.csproj
       
-    - name: Build Solution
+    - name: Build The BASICs
       run: |
-        Write-Host "Building Vintage Story Mods solution..." -ForegroundColor Yellow
-        dotnet build Vintage-Story-Mods.sln --configuration Release --no-restore --verbosity normal
+        Write-Host "Building The BASICs mod and tests..." -ForegroundColor Yellow
+        dotnet build mods-dll/thebasics.Tests/thebasics.Tests.csproj --configuration Release --no-restore --verbosity normal
       shell: pwsh
 
     - name: Check Formatting
-      run: dotnet format whitespace Vintage-Story-Mods.sln --verify-no-changes --exclude mods/
+      run: dotnet format whitespace mods-dll/thebasics.Tests/thebasics.Tests.csproj --verify-no-changes
       continue-on-error: false
 
     - name: Run Tests with Coverage
@@ -359,7 +359,7 @@ jobs:
         Write-Host "Checking build outputs..." -ForegroundColor Yellow
         
         # Check main production mod
-        $dllPath = "mods-dll\thebasics\bin\Release\net8.0\thebasics.dll"
+        $dllPath = "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll"
         if (Test-Path $dllPath) {
           Write-Host "thebasics.dll built successfully" -ForegroundColor Green
           $size = (Get-Item $dllPath).Length
@@ -369,16 +369,6 @@ jobs:
           exit 1
         }
         
-        # Check legacy mods  
-        $legacyMods = @("makersmark", "forensicstory", "DummyTranslocator", "autorun", "thaumstory")
-        foreach ($mod in $legacyMods) {
-          $dllPath = "mods\$mod\bin\Release\net48\$mod.dll"
-          if (Test-Path $dllPath) {
-            Write-Host "Legacy mod built: $mod" -ForegroundColor Green
-          } else {
-            Write-Host "Legacy mod missing: $mod" -ForegroundColor Yellow
-          }
-        }
       shell: pwsh
       
 

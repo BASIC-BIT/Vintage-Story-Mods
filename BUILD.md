@@ -39,8 +39,8 @@ The build system requires these VS DLLs:
 
 3. **Build locally:**
    ```powershell
-   dotnet restore Vintage-Story-Mods.sln
-   dotnet build Vintage-Story-Mods.sln --configuration Release
+   dotnet restore mods-dll/thebasics.Tests/thebasics.Tests.csproj
+   dotnet build mods-dll/thebasics.Tests/thebasics.Tests.csproj --configuration Release
    ```
 
 ## CI/CD Setup
@@ -72,8 +72,8 @@ The CI workflow:
 1. **Downloads VS dependencies** from the vs-build-dependencies repository
 2. **Caches dependencies** to speed up subsequent builds
 3. **Sets up the build environment** with the correct VINTAGE_STORY path
-4. **Builds all mods** in the solution
-5. **Packages mods** and uploads as artifacts
+4. **Builds The BASICs mod and test project**
+5. **Packages The BASICs** and uploads it as an artifact
 
 ## Scripts
 
@@ -82,11 +82,11 @@ Uploads VS DLLs from your local installation to the vs-build-dependencies reposi
 
 **Parameters:**
 - `-VsInstallPath` - Override VS installation path
-- `-VsVersion` - Version string for the upload (default: "1.20.12")
+- `-VsVersion` - Version string for the upload (default: "1.22.1")
 
 **Example:**
 ```powershell
-.\scripts\upload-vs-dependencies.ps1 -VsVersion "1.20.13"
+.\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.1"
 ```
 
 ### `scripts/update-project-references.ps1`
@@ -135,13 +135,13 @@ Updates project files to use CI-compatible DLL paths.
 
 ```
 vs-build-dependencies/
-├── 1.20.12/           # Version directory
+├── 1.22.1/            # Version directory
 │   ├── core/          # Core VS DLLs
 │   ├── mods/          # Mod DLLs  
 │   ├── lib/           # Library DLLs
 │   ├── README.md      # Version-specific info
 │   └── version-info.json
-├── 1.20.13/           # Future versions...
+├── 1.22.2/            # Future versions...
 └── README.md
 ```
 
@@ -151,13 +151,13 @@ When Vintage Story updates:
 
 1. **Upload new dependencies:**
    ```powershell
-   .\scripts\upload-vs-dependencies.ps1 -VsVersion "1.20.13"
+   .\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.1"
    ```
 
 2. **Update workflow file** (`.github/workflows/build.yml`):
    ```yaml
    env:
-     VS_VERSION: "1.20.13"  # Update this line
+      VS_VERSION: "1.22.1"  # Update this line
    ```
 
 3. **Test the build** with the new version
@@ -166,4 +166,4 @@ When Vintage Story updates:
 
 ## Legal Notice
 
-The VS DLLs in the vs-build-dependencies repository are proprietary to Anego Studios and are used solely for mod development purposes. They should not be redistributed outside of this controlled environment. 
+The VS DLLs in the vs-build-dependencies repository are proprietary to Anego Studios and are used solely for mod development purposes. They should not be redistributed outside of this controlled environment.

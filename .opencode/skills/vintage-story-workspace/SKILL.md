@@ -13,7 +13,11 @@ Keep Vintage Story development work repeatable by using a predictable workspace 
 
 ## Workspace Layout
 
-Default workspace root: `C:\bench\vs`.
+Default workspace root discovery:
+
+- `VS_WORKSPACE_ROOT`, when set.
+- Existing maintainer workspace roots such as `D:\bench\vs` or `C:\bench\vs`.
+- The parent directory of the active repository, or the parent of `work\` when the repository is a worktree under `work\`.
 
 Use `-WorkspaceRoot` or `VS_WORKSPACE_ROOT` when working somewhere else.
 
@@ -41,13 +45,13 @@ Use `scripts\Update-VintageStorySource.ps1` from this repository instead of manu
 
 ```powershell
 # Latest stable Windows server package
-.\scripts\Update-VintageStorySource.ps1 -WorkspaceRoot C:\bench\vs
+.\scripts\Update-VintageStorySource.ps1
 
 # Specific version
-.\scripts\Update-VintageStorySource.ps1 -Version 1.22.0 -WorkspaceRoot C:\bench\vs
+.\scripts\Update-VintageStorySource.ps1 -Version 1.22.0
 
 # Recreate extracted/decompiled output
-.\scripts\Update-VintageStorySource.ps1 -Version 1.22.0 -WorkspaceRoot C:\bench\vs -ForceExtract -ForceDecompile
+.\scripts\Update-VintageStorySource.ps1 -Version 1.22.0 -ForceExtract -ForceDecompile
 ```
 
 The script reads `https://api.vintagestory.at/stable.json`, downloads the `windowsserver` package, verifies MD5, extracts it, and decompiles the key VS assemblies with `ilspycmd`.

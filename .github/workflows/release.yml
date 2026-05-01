@@ -23,8 +23,8 @@ on:
         type: string
 
 env:
-  VS_VERSION: "1.21.5"
-  DOTNET_VERSION: "8.0.x"
+  VS_VERSION: "1.22.1"
+  DOTNET_VERSION: "10.0.x"
 
 jobs:
   release:
@@ -266,12 +266,12 @@ jobs:
       shell: pwsh
       
     - name: Restore Dependencies
-      run: dotnet restore Vintage-Story-Mods.sln
+      run: dotnet restore mods-dll/thebasics/thebasics.csproj
       
-    - name: Build Solution
+    - name: Build The BASICs
       run: |
-        Write-Host "Building Vintage Story Mods solution for release..." -ForegroundColor Yellow
-        dotnet build Vintage-Story-Mods.sln --configuration Release --no-restore --verbosity normal
+        Write-Host "Building The BASICs mod for release..." -ForegroundColor Yellow
+        dotnet build mods-dll/thebasics/thebasics.csproj --configuration Release --no-restore --verbosity normal
       shell: pwsh
       
     - name: Package Main Mod
@@ -279,7 +279,7 @@ jobs:
         Write-Host "Creating distribution packages..." -ForegroundColor Yellow
         
         # Check if thebasics was built
-        $dllPath = "mods-dll\thebasics\bin\Release\net8.0\thebasics.dll"
+        $dllPath = "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll"
         if (Test-Path $dllPath) {
           # Run the existing package script for thebasics
           Push-Location "mods-dll\thebasics"
