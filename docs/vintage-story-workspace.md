@@ -22,26 +22,32 @@ This repository expects local Vintage Story work to stay separated by source typ
   Vintage-Story-Mods\ Active local repository/worktree.
 ```
 
-The default maintainer workspace root is `C:\bench\vs`. Use `VS_WORKSPACE_ROOT` or pass `-WorkspaceRoot` to scripts when using another location.
+The source-refresh script discovers the workspace root in this order:
+
+1. `VS_WORKSPACE_ROOT`, when set.
+2. Existing maintainer workspace roots such as `D:\bench\vs` or `C:\bench\vs`.
+3. The parent directory of the active repository, or the parent of `work\` when the repository is a worktree under `work\`.
+
+Use `VS_WORKSPACE_ROOT` or pass `-WorkspaceRoot` when using another location.
 
 ## Refreshing Vintage Story Source
 
 Use the repository script rather than manually downloading and decompiling game DLLs:
 
 ```powershell
-.\scripts\Update-VintageStorySource.ps1 -WorkspaceRoot C:\bench\vs
+.\scripts\Update-VintageStorySource.ps1
 ```
 
 For a specific version:
 
 ```powershell
-.\scripts\Update-VintageStorySource.ps1 -Version 1.22.0 -WorkspaceRoot C:\bench\vs
+.\scripts\Update-VintageStorySource.ps1 -Version 1.22.0
 ```
 
 To force regeneration:
 
 ```powershell
-.\scripts\Update-VintageStorySource.ps1 -Version 1.22.0 -WorkspaceRoot C:\bench\vs -ForceExtract -ForceDecompile
+.\scripts\Update-VintageStorySource.ps1 -Version 1.22.0 -ForceExtract -ForceDecompile
 ```
 
 The script downloads the official `windowsserver` package from Vintage Story's stable metadata, verifies the MD5 checksum, extracts it to `source\vintagestory\<version>\bin`, and decompiles these assemblies to `source\vintagestory\<version>\decompiled`:
@@ -55,7 +61,7 @@ The script downloads the official `windowsserver` package from Vintage Story's s
 
 ## Agent Skill
 
-The workspace procedure is also captured as an OpenCode skill at `.opencode\skills\vintage-story-workspace\SKILL.md`. Treat skills as first-class repository workflow assets: update the skill when the workflow changes, and include those changes in normal PR review.
+The workspace procedure is also captured as an OpenCode skill at `.opencode/skills/vintage-story-workspace/SKILL.md`. Treat skills as first-class repository workflow assets: update the skill when the workflow changes, and include those changes in normal PR review.
 
 ## Guardrails
 

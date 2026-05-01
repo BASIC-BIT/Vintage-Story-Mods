@@ -3,16 +3,25 @@ $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project 
 $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
 $releaseDir = Join-Path $projectRoot "bin/Release"
 $outputDir = $null
+$projectFile = Join-Path $projectRoot "thebasics.csproj"
+$targetFramework = $null
 
-if (Test-Path $releaseDir) {
-    $tfmDir = Get-ChildItem -Path $releaseDir -Directory | Sort-Object Name -Descending | Select-Object -First 1
-    if ($tfmDir) {
-        $outputDir = $tfmDir.FullName
+if (Test-Path $projectFile) {
+    [xml]$projectXml = Get-Content $projectFile
+    $targetFramework = $projectXml.Project.PropertyGroup.TargetFramework |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -First 1
+}
+
+if ($targetFramework) {
+    $targetFrameworkDir = Join-Path $releaseDir $targetFramework
+    if (Test-Path $targetFrameworkDir) {
+        $outputDir = $targetFrameworkDir
     }
 }
 
 if (-not $outputDir) {
-    $outputDir = Join-Path $projectRoot "bin/Release/net8.0"
+    $outputDir = Join-Path $projectRoot "bin/Release/net10.0"
 }
 $assetsDir = Join-Path $projectRoot "assets"
 $modInfoFile = Join-Path $projectRoot "modinfo.json"
