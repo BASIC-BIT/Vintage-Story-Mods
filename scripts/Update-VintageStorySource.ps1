@@ -42,7 +42,14 @@ $metadata = Invoke-RestMethod -Uri $metadataUrl
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $latest = $metadata.PSObject.Properties |
         Where-Object { $_.Value.windowsserver -and $_.Value.windowsserver.latest -eq 1 } |
-        Sort-Object { [System.Version]$_.Name } -Descending |
+        Sort-Object {
+            $parsedVersion = $null
+            if ([System.Version]::TryParse([string]$_.Name, [ref]$parsedVersion)) {
+                $parsedVersion
+            } else {
+                [System.Version]"0.0.0.0"
+            }
+        } -Descending |
         Select-Object -First 1
 
     if (-not $latest) {
