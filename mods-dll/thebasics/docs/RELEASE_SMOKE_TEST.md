@@ -43,10 +43,10 @@ Use this checklist for compatibility releases and before publishing a new ModDB/
    - Watch for: fallback to normal env when target is valid, wrong placement, no bubble.
 
 6. **Typing Indicator** (P1)
-   - Config: `EnableTypingIndicator=true`, `TypingIndicatorRequiresLineOfSight=true`.
+   - Config: `EnableTypingIndicator=true`.
    - Do: Open chat on one client, type and pause, then close chat.
    - Expect: Other client sees chat-open/composing/typing states and timeout/clear behavior.
-   - Watch for: stale indicator after close/disconnect, indicator above self, or indicators through walls when LOS is required.
+   - Watch for: stale indicator after close/disconnect, indicator above self, or indicators through walls.
 
 7. **Nametag Behavior** (P2)
    - Config: current server nametag settings.

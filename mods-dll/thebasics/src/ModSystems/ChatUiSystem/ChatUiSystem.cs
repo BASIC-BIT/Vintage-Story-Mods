@@ -280,11 +280,6 @@ public class ChatUiSystem : ModSystem
         return _config?.NametagRequiresLineOfSight == true;
     }
 
-    internal static bool DoesTypingIndicatorRequireLineOfSight()
-    {
-        return _config?.TypingIndicatorRequiresLineOfSight == true;
-    }
-
     internal static bool IsSpeechBubbleVtmlEnabled()
     {
         return _config != null && !_config.DisableRPChat && !_config.DisableRpOverheadBubbles;

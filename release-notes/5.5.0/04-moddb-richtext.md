@@ -22,7 +22,6 @@ The generated/default config is now more feature-forward for RP servers. Existin
 - `TpaRequestPrivilege=chat` and `TpaRequireTemporalGear=true`
 - `RequireLineOfSightForSignLanguage=true`
 - `NametagRequiresLineOfSight=true`
-- `TypingIndicatorRequiresLineOfSight=true`
 - `DisableRpOverheadBubbles=false`
 - `TpaRequestPrivilege=chat`
 
@@ -35,8 +34,8 @@ Smoke-QA fixes
 - Kept `/chatter off` as a receive-only opt-out.
 - Reapplied nametag range/visibility attributes for online players on startup and join.
 - Added LOS gating for nametags and sign-language delivery.
-- Added explicit config for typing indicator LOS.
-- Added `DisableRpOverheadBubbles` as the inverse replacement for deprecated `OverrideSpeechBubblesWithRpText`.
+- Kept typing indicators LOS-gated to avoid leaking player presence through walls.
+- Added `DisableRpOverheadBubbles` as the inverse replacement for deprecated `OverrideSpeechBubblesWithRpText`; disabling it falls back to vanilla speech bubbles.
 - Replaced confusing `AllowTpaPrivilegeByDefault` with explicit `TpaRequestPrivilege`; old configs migrate `true` to `chat` and `false` to `tpa`.
 - Confirmed TPA's default posture: enabled, available to normal players, and still protected from free fast-travel spam by `TpaRequireTemporalGear=true`.
 - Moved default proximity chat name, babble verb, and sign verb text into lang keys while preserving config overrides.

@@ -95,8 +95,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 continue;
             }
 
-            if (ChatUiSystem.DoesTypingIndicatorRequireLineOfSight() &&
-                !CanSeeCached(world, nowMs, localPlayerEntity, entity))
+            if (!CanSeeCached(world, nowMs, localPlayerEntity, entity))
             {
                 continue;
             }

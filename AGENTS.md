@@ -248,8 +248,7 @@ These are the most commonly toggled settings in `/data/ModConfig/the_basics.json
 | `EnableChatter` | `true` | Play seraph voice chatter for speech messages |
 | `DebugMode` | `false` | Enable `[THEBASICS][perf]` and diagnostic logging |
 | `TypingIndicatorDisplayMode` | `2` (Both) | 0=Icon only, 1=Text only, 2=Both icon + text |
-| `TypingIndicatorRequiresLineOfSight` | `true` | Hide typing indicators through walls |
-| `DisableRpOverheadBubbles` | `false` | Opt out of RP overhead/world bubble rendering |
+| `DisableRpOverheadBubbles` | `false` | Opt out of RP-processed bubbles and fall back to vanilla speech bubbles |
 | `TpaRequestPrivilege` | `chat` | Privilege required to initiate `/tpa` and `/tpahere` |
 
 #### Launching Test Game Clients

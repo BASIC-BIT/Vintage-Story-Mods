@@ -27,7 +27,6 @@ Version 5.5.0 shifts the generated/default config toward showcasing RP-server fe
 - `TpaRequireTemporalGear=true`
 - `RequireLineOfSightForSignLanguage=true`
 - `NametagRequiresLineOfSight=true`
-- `TypingIndicatorRequiresLineOfSight=true`
 - `DisableRpOverheadBubbles=false`
 
 ## RP Proximity Chat
@@ -199,10 +198,9 @@ Primary config areas:
 - `TypingIndicatorTimeoutSeconds`
 - `TypingIndicatorTextOverride`
 - `TypingIndicatorDisplayMode`
-- `TypingIndicatorRequiresLineOfSight`
 - `DisableRpOverheadBubbles`
 - `DebugMode`
-- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles` to opt out of RP overhead/world bubble rendering.
+- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles` to opt out of RP-processed overhead/world bubble rendering and fall back to vanilla speech bubbles.
 
 ## TPA
 

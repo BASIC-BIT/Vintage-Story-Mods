@@ -128,7 +128,6 @@ Configuration keys (in `ModConfig/the_basics.json`):
 - `TypingIndicatorTimeoutSeconds`: how long after the last input change the indicator stays on
 - `TypingIndicatorTextOverride`: override the displayed text (otherwise uses lang key `thebasics:typingindicator-typing-text`)
 - `TypingIndicatorDisplayMode`: show icon only, text only, or both
-- `TypingIndicatorRequiresLineOfSight`: require line of sight before drawing another player's typing indicator
 - `DebugMode`: enables verbose debug logging/diagnostics (recommended off unless troubleshooting)
 
 Notes:
@@ -154,7 +153,7 @@ Clients render VTML in overhead bubbles, including italics, font tags, icons, an
 Notes:
 
 - Vanilla overhead bubbles render plain text (they do not parse VTML).
-- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles=true` to opt out of RP overhead/world bubble rendering.
+- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles=true` to opt out of RP-processed overhead/world bubble rendering and fall back to vanilla speech bubbles.
 
 
 

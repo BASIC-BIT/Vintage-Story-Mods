@@ -22,7 +22,6 @@ The generated/default config is now more feature-forward for RP servers. Existin
 - `TpaRequestPrivilege=chat` and `TpaRequireTemporalGear=true` so TPA works out of the box but still costs a temporal gear.
 - `RequireLineOfSightForSignLanguage=true` so sign language cannot be read through walls by default.
 - `NametagRequiresLineOfSight=true` so nametags are not visible through walls by default.
-- `TypingIndicatorRequiresLineOfSight=true` so typing indicators are not visible through walls by default.
 - `DisableRpOverheadBubbles=false` so RP overhead/world bubbles are enabled by default, with an explicit opt-out.
 - `TpaRequestPrivilege=chat` so TPA is actually usable by normal players when enabled, while temporal gear still provides friction.
 
@@ -36,8 +35,8 @@ Server operators should review `ModConfig/the_basics.json` after upgrading if th
 - Reapplied nametag range/visibility attributes for online players on startup and join, reducing stale client nametag state.
 - Added `NametagRequiresLineOfSight` to gate client-side nametag rendering by LOS.
 - Added `RequireLineOfSightForSignLanguage` to control sign-language delivery through walls.
-- Added `TypingIndicatorRequiresLineOfSight` to make typing indicator LOS an explicit server config.
-- Added `DisableRpOverheadBubbles` as the inverse replacement for deprecated `OverrideSpeechBubblesWithRpText`.
+- Kept typing indicators line-of-sight gated to avoid leaking player presence through walls.
+- Added `DisableRpOverheadBubbles` as the inverse replacement for deprecated `OverrideSpeechBubblesWithRpText`; disabling it falls back to vanilla speech bubbles.
 - Replaced confusing `AllowTpaPrivilegeByDefault` with explicit `TpaRequestPrivilege`; old configs migrate `true` to `chat` and `false` to `tpa`.
 - Confirmed TPA's default posture: enabled, available to normal players, and still protected from free fast-travel spam by `TpaRequireTemporalGear=true`.
 - Moved default proximity chat name, babble verb, and sign verb text into lang keys while preserving config overrides.
@@ -61,7 +60,6 @@ Server operators should review `ModConfig/the_basics.json` after upgrading if th
 - `MaxEnvironmentPlacementDistance`
 - `RequireLineOfSightForSignLanguage`
 - `NametagRequiresLineOfSight`
-- `TypingIndicatorRequiresLineOfSight`
 - `DisableRpOverheadBubbles`
 - `TpaRequestPrivilege`
 

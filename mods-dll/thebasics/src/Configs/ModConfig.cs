@@ -433,17 +433,13 @@ namespace thebasics.Configs
         [ProtoMember(84)]
         public bool NametagRequiresLineOfSight { get; set; } = true;
 
-        // When true, client-side typing indicator rendering requires line of sight.
-        [ProtoMember(85)]
-        public bool TypingIndicatorRequiresLineOfSight { get; set; } = true;
-
         // When true, disables RP-processed overhead/world bubble rendering while leaving chat text intact.
-        [ProtoMember(86)]
+        [ProtoMember(85)]
         public bool DisableRpOverheadBubbles { get; set; } = false;
 
         // Privilege required to initiate /tpa and /tpahere. Use "chat" for all normal players,
         // or "tpa" to require explicitly granted access.
-        [ProtoMember(87)]
+        [ProtoMember(86)]
         public string TpaRequestPrivilege { get; set; } = "chat";
     }
 }
