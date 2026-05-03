@@ -697,9 +697,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
             API.Logger.Notification($"THEBASICS: Player '{byPlayer.PlayerName}' joined and caused {resetPlayers.Count} nickname conflicts to be reset: {string.Join(", ", resetPlayers)}");
         }
 
-        // Config will be sent when client indicates it's ready. Re-apply all tags so
-        // existing clients receive consistent watched attributes for newly joined players.
-        RefreshAllNameTags();
+        // Config will be sent when client indicates it's ready.
+        SwapOutNameTag(byPlayer);
     }
 
     private void RefreshAllNameTags()
@@ -1090,9 +1089,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     private string GetConfiguredProximityChatName()
     {
-        return string.IsNullOrWhiteSpace(Config.ProximityChatName) || Config.ProximityChatName == "Proximity"
-            ? Lang.Get("thebasics:chat-default-proximity-name")
-            : Config.ProximityChatName;
+        return string.IsNullOrWhiteSpace(Config.ProximityChatName) ? "Proximity" : Config.ProximityChatName;
     }
 
     private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,

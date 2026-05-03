@@ -153,7 +153,7 @@ Clients render VTML in overhead bubbles, including italics, font tags, icons, an
 Notes:
 
 - Vanilla overhead bubbles render plain text (they do not parse VTML).
-- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles=true` to opt out of RP-processed overhead/world bubble rendering and fall back to vanilla speech bubbles.
+- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles=true` to opt out of RP-processed overhead speech bubbles and fall back to vanilla speech bubbles.
 
 
 

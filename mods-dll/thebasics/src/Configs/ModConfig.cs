@@ -433,7 +433,7 @@ namespace thebasics.Configs
         [ProtoMember(84)]
         public bool NametagRequiresLineOfSight { get; set; } = true;
 
-        // When true, disables RP-processed overhead/world bubble rendering while leaving chat text intact.
+        // When true, disables RP-processed overhead speech bubbles while leaving chat text intact.
         [ProtoMember(85)]
         public bool DisableRpOverheadBubbles { get; set; } = false;
 

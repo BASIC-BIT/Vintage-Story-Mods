@@ -22,8 +22,7 @@ The generated/default config is now more feature-forward for RP servers. Existin
 - `TpaRequestPrivilege=chat` and `TpaRequireTemporalGear=true` so TPA works out of the box but still costs a temporal gear.
 - `RequireLineOfSightForSignLanguage=true` so sign language cannot be read through walls by default.
 - `NametagRequiresLineOfSight=true` so nametags are not visible through walls by default.
-- `DisableRpOverheadBubbles=false` so RP overhead/world bubbles are enabled by default, with an explicit opt-out.
-- `TpaRequestPrivilege=chat` so TPA is actually usable by normal players when enabled, while temporal gear still provides friction.
+- `DisableRpOverheadBubbles=false` so RP-processed overhead speech bubbles are enabled by default, with an explicit opt-out.
 
 Server operators should review `ModConfig/the_basics.json` after upgrading if they prefer quieter or more conservative defaults.
 
@@ -39,7 +38,7 @@ Server operators should review `ModConfig/the_basics.json` after upgrading if th
 - Added `DisableRpOverheadBubbles` as the inverse replacement for deprecated `OverrideSpeechBubblesWithRpText`; disabling it falls back to vanilla speech bubbles.
 - Replaced confusing `AllowTpaPrivilegeByDefault` with explicit `TpaRequestPrivilege`; old configs migrate `true` to `chat` and `false` to `tpa`.
 - Confirmed TPA's default posture: enabled, available to normal players, and still protected from free fast-travel spam by `TpaRequireTemporalGear=true`.
-- Moved default proximity chat name, babble verb, and sign verb text into lang keys while preserving config overrides.
+- Moved babble and sign verb text into lang keys while preserving config overrides.
 - Rejected unknown `:prefix message` language syntax instead of letting it pass through as normal speech.
 - Improved over-limit admin language grants so admins can bypass the player language cap while receiving a warning.
 - Improved default-language removal copy and valid-language list formatting.
@@ -47,7 +46,7 @@ Server operators should review `ModConfig/the_basics.json` after upgrading if th
 ## Compatibility And Tooling
 
 - The BASICs package/build path now targets the current Vintage Story runtime and deployment layout.
-- Local packaging now deploys to all local `D:\Games\VSProfiles\Profile*\Mods` folders by default when that profile directory exists.
+- Local packaging now deploys to all `VS_PROFILES_DIR\Profile*\Mods` folders when `VS_PROFILES_DIR` is set.
 - Added `docs/FEATURES.md` as a maintained feature/config inventory.
 - Added `docs/RELEASE_SMOKE_TEST.md` as the broad compatibility smoke-test checklist.
 

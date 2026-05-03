@@ -23,7 +23,6 @@ The generated/default config is now more feature-forward for RP servers. Existin
 - `RequireLineOfSightForSignLanguage=true`
 - `NametagRequiresLineOfSight=true`
 - `DisableRpOverheadBubbles=false`
-- `TpaRequestPrivilege=chat`
 
 Server operators should review `ModConfig/the_basics.json` after upgrading if they prefer quieter or more conservative defaults.
 
@@ -38,14 +37,14 @@ Smoke-QA fixes
 - Added `DisableRpOverheadBubbles` as the inverse replacement for deprecated `OverrideSpeechBubblesWithRpText`; disabling it falls back to vanilla speech bubbles.
 - Replaced confusing `AllowTpaPrivilegeByDefault` with explicit `TpaRequestPrivilege`; old configs migrate `true` to `chat` and `false` to `tpa`.
 - Confirmed TPA's default posture: enabled, available to normal players, and still protected from free fast-travel spam by `TpaRequireTemporalGear=true`.
-- Moved default proximity chat name, babble verb, and sign verb text into lang keys while preserving config overrides.
+- Moved babble and sign verb text into lang keys while preserving config overrides.
 - Rejected unknown `:prefix message` language syntax instead of letting it pass through as normal speech.
 - Improved over-limit admin language grants, default-language removal copy, and valid-language list formatting.
 
 Compatibility and tooling
 
 - The BASICs package/build path now targets the current Vintage Story runtime and deployment layout.
-- Local packaging now deploys to all local `D:\Games\VSProfiles\Profile*\Mods` folders by default when that profile directory exists.
+- Local packaging now deploys to all `VS_PROFILES_DIR\Profile*\Mods` folders when `VS_PROFILES_DIR` is set.
 - Added `docs/FEATURES.md` and `docs/RELEASE_SMOKE_TEST.md` for release readiness.
 
 Known follow-up

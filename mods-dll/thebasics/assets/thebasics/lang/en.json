@@ -112,7 +112,6 @@
   "chat-nickcolor-admin-set": "Player {0} nickname color has been set to: {1}.  Old Nickname Color: {2}",
 
   "chat-chatmode-set": "Chat mode set to: {0}",
-  "chat-default-proximity-name": "Proximity",
   "chat-babble-verb": "babbles",
   "chat-sign-verb": "signs",
   "chat-emotemode-set": "Emote mode is now {0}",

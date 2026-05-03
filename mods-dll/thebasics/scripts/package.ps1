@@ -142,19 +142,14 @@ if (-not $localModsDirectories -or $localModsDirectories.Count -eq 0) {
     # Always deploy to the primary data dir.
     $localModsDirectories += (Join-Path $env:APPDATA "VintagestoryData/Mods")
 
-    # Deploy to all Profile*/Mods folders. VS_PROFILES_DIR can override the default local path.
-    # This supports multi-account setups (e.g. Profile2 + Profile3) without per-profile hardcoding.
-    $profilesDir = if ($env:VS_PROFILES_DIR) { $env:VS_PROFILES_DIR } else { "D:\Games\VSProfiles" }
-    if (Test-Path $profilesDir) {
-        Get-ChildItem -Path $profilesDir -Directory -Filter "Profile*" -ErrorAction SilentlyContinue |
+    # If VS_PROFILES_DIR is set, deploy to all Profile*/Mods folders.
+    # This supports multi-account setups (e.g. Profile2 + Profile3) without committing local paths.
+    if ($env:VS_PROFILES_DIR -and (Test-Path $env:VS_PROFILES_DIR)) {
+        Get-ChildItem -Path $env:VS_PROFILES_DIR -Directory -Filter "Profile*" -ErrorAction SilentlyContinue |
             Sort-Object Name |
             ForEach-Object {
                 $localModsDirectories += (Join-Path $_.FullName "Mods")
             }
-    }
-    else {
-        # Backward-compatible fallback.
-        $localModsDirectories += "D:\Games\VSProfiles\Profile2\Mods"
     }
 }
 
@@ -279,23 +274,8 @@ if (Test-Path $envPath) {
                 Write-Host $msg
                 "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
 
-                # Remove old remote versions before uploading to avoid duplicate mod-id warnings.
                 $remoteModsDirectory = "/data/Mods"
                 $currentZipName = Split-Path $zipFile -Leaf
-                $remoteMods = $session.ListDirectory($remoteModsDirectory)
-                foreach ($remoteFile in $remoteMods.Files) {
-                    if ($remoteFile.IsDirectory) {
-                        continue
-                    }
-
-                    if ($remoteFile.Name -like "thebasics*.zip" -and $remoteFile.Name -ne $currentZipName) {
-                        $remotePath = "$remoteModsDirectory/$($remoteFile.Name)"
-                        $session.RemoveFiles($remotePath).Check()
-                        $msg = "Removed old remote version: $($remoteFile.Name)"
-                        Write-Host $msg
-                        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
-                    }
-                }
 
                 # Now attempt the file transfer
                 $ftpDestinationFile = "$remoteModsDirectory/$currentZipName"
@@ -313,6 +293,23 @@ if (Test-Path $envPath) {
                     $msg = "Successfully uploaded mod to SFTP server at $($transfer.FileName)"
                     Write-Host $msg
                     "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+                }
+
+                # Remove old remote versions after a successful upload to avoid duplicate mod-id warnings
+                # without leaving the server modless if the upload fails.
+                $remoteMods = $session.ListDirectory($remoteModsDirectory)
+                foreach ($remoteFile in $remoteMods.Files) {
+                    if ($remoteFile.IsDirectory) {
+                        continue
+                    }
+
+                    if ($remoteFile.Name -like "thebasics*.zip" -and $remoteFile.Name -ne $currentZipName) {
+                        $remotePath = "$remoteModsDirectory/$($remoteFile.Name)"
+                        $session.RemoveFiles($remotePath).Check()
+                        $msg = "Removed old remote version: $($remoteFile.Name)"
+                        Write-Host $msg
+                        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+                    }
                 }
             } catch {
                 $msg = "SFTP Error: $($_.Exception.Message)"

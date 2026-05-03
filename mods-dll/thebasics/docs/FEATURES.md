@@ -94,7 +94,7 @@ Primary config areas:
 - `ProximityChatClampFontSizes`
 - `ProximityChatModeVerbs`
 - `ProximityChatModePunctuation`
-- `ProximityChatName` defaults to lang key `thebasics:chat-default-proximity-name` when unset or left as `Proximity`.
+- `ProximityChatName` defaults to the stable persisted group name `Proximity` when unset.
 - `ProximityChatModeBabbleVerb` is a legacy/custom override; default babble text uses lang key `thebasics:chat-babble-verb`.
 - `ChatDelimiters`
 - `EnableGlobalOOC`
@@ -200,7 +200,7 @@ Primary config areas:
 - `TypingIndicatorDisplayMode`
 - `DisableRpOverheadBubbles`
 - `DebugMode`
-- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles` to opt out of RP-processed overhead/world bubble rendering and fall back to vanilla speech bubbles.
+- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles` to opt out of RP-processed overhead speech bubbles and fall back to vanilla speech bubbles.
 
 ## TPA
 
