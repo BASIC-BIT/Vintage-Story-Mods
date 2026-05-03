@@ -37,6 +37,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         DistanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
         ProximityCheckUtils = new ProximityCheckUtils(this, API, Config);
         TransformerSystem = new TransformerSystem(this, LanguageSystem, DistanceObfuscationSystem, ProximityCheckUtils);
+        RefreshAllNameTags();
     }
 
     private void RegisterCommands()
@@ -571,7 +572,20 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 continue;
             }
 
-            _serverConfigChannel.SendPacket(message, recipient);
+            var recipientMessage = message;
+            if (recipient.PlayerUID == player.PlayerUID)
+            {
+                recipientMessage = new ChatterSoundMessage
+                {
+                    EntityId = message.EntityId,
+                    TalkType = message.TalkType,
+                    NoteCount = message.NoteCount,
+                    Volume = message.Volume * Config.ChatterSelfVolumeMultiplier,
+                    Pitch = message.Pitch,
+                };
+            }
+
+            _serverConfigChannel.SendPacket(recipientMessage, recipient);
         }
     }
 
@@ -631,7 +645,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             {
                 proximityGroup = new PlayerGroup()
                 {
-                    Name = Config.ProximityChatName,
+                    Name = GetConfiguredProximityChatName(),
                     OwnerUID = null
                 };
                 API.Groups.AddPlayerGroup(proximityGroup);
@@ -683,8 +697,19 @@ public class RPProximityChatSystem : BaseBasicModSystem
             API.Logger.Notification($"THEBASICS: Player '{byPlayer.PlayerName}' joined and caused {resetPlayers.Count} nickname conflicts to be reset: {string.Join(", ", resetPlayers)}");
         }
 
-        // Config will be sent when client indicates it's ready
+        // Config will be sent when client indicates it's ready.
         SwapOutNameTag(byPlayer);
+    }
+
+    private void RefreshAllNameTags()
+    {
+        foreach (var onlinePlayer in API.World.AllOnlinePlayers)
+        {
+            if (onlinePlayer is IServerPlayer serverPlayer)
+            {
+                SwapOutNameTag(serverPlayer);
+            }
+        }
     }
 
     private void SwapOutNameTag(IServerPlayer player)
@@ -1059,7 +1084,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     private PlayerGroup GetProximityGroup()
     {
-        return API.Groups.GetPlayerGroupByName(Config.ProximityChatName);
+        return API.Groups.GetPlayerGroupByName(GetConfiguredProximityChatName());
+    }
+
+    private string GetConfiguredProximityChatName()
+    {
+        return string.IsNullOrWhiteSpace(Config.ProximityChatName) ? "Proximity" : Config.ProximityChatName;
     }
 
     private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,

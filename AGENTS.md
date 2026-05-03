@@ -32,6 +32,10 @@ If the toolbox repo is present next to this repo, also read:
 - ../basics-agentic-dogfooding/docs/opencode/README.md
 - ../basics-agentic-dogfooding/docs/opencode/toolbox.md
 
+## Repository Skills
+
+OpenCode skills under `.opencode/skills/` are first-class workflow assets for this repository. When a task matches a skill, follow it and update it in the same PR as workflow changes.
+
 
 ## Build Commands
 
@@ -55,7 +59,7 @@ The `VINTAGE_STORY` environment variable must point to your Vintage Story instal
 
 ### Build Output
 All builds output to standard MSBuild locations:
-- `mods-dll/thebasics/bin/Release/net8.0/thebasics.dll`
+- `mods-dll/thebasics/bin/Release/net10.0/thebasics.dll`
 - Packaged mods: `mods-dll/thebasics/thebasics_VERSION.zip`
 
 ## High-Level Architecture
@@ -237,12 +241,15 @@ These are the most commonly toggled settings in `/data/ModConfig/the_basics.json
 | `OverrideSpeechBubblesWithRpText` | `false` | When true, overhead bubbles show RP-processed VTML text with kind styling + LOS gating |
 | `EnableTypingIndicator` | `true` | Show typing indicator above players' heads |
 | `SendServerSaveAnnouncement` | `true` | Announce "save started" to players |
-| `SendServerSaveFinishedAnnouncement` | `false` | Announce "save finished" to players |
+| `SendServerSaveFinishedAnnouncement` | `true` | Announce "save finished" to players |
 | `ServerSaveAnnouncementAsNotification` | `true` | Use notification popup instead of chat line |
-| `EnableGlobalOOC` | `false` | Allow `(( ... ))` global OOC chat |
+| `EnableGlobalOOC` | `true` | Allow `(( ... ))` global OOC chat |
 | `EnableLanguageSystem` | `true` | Enable language commands and formatting |
+| `EnableChatter` | `true` | Play seraph voice chatter for speech messages |
 | `DebugMode` | `false` | Enable `[THEBASICS][perf]` and diagnostic logging |
 | `TypingIndicatorDisplayMode` | `2` (Both) | 0=Icon only, 1=Text only, 2=Both icon + text |
+| `DisableRpOverheadBubbles` | `false` | Opt out of RP-processed bubbles and fall back to vanilla speech bubbles |
+| `TpaRequestPrivilege` | `chat` | Privilege required to initiate `/tpa` and `/tpahere` |
 
 #### Launching Test Game Clients
 

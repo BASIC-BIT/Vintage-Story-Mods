@@ -5,6 +5,7 @@ using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
@@ -67,7 +68,7 @@ public class TransformerSystem
             new LanguageTransformer(_languageSystem, _chatSystem),
             new ObfuscationTransformer(_distanceObfuscationSystem, _chatSystem),
 
-            // Optional: override vanilla overhead bubble (clientData) with RP-processed text
+            // Optional: override vanilla overhead bubble (clientData) with RP-processed text.
             new SpeechBubbleClientDataTransformer(_chatSystem),
 
             new DistanceFontSizeTransformer(_chatSystem), // Apply distance-based font sizing
@@ -99,7 +100,14 @@ public class TransformerSystem
         // Check for sign language first
         if (lang == LanguageSystem.SignLanguage)
         {
-            return "signs";
+            return Lang.Get("thebasics:chat-sign-verb");
+        }
+
+        if (lang == LanguageSystem.BabbleLang)
+        {
+            return string.IsNullOrWhiteSpace(_chatSystem.Config.ProximityChatModeBabbleVerb) || _chatSystem.Config.ProximityChatModeBabbleVerb == "babbles"
+                ? Lang.Get("thebasics:chat-babble-verb")
+                : _chatSystem.Config.ProximityChatModeBabbleVerb;
         }
 
         // Use the verbs from config

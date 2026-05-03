@@ -1,4 +1,9 @@
+using System.Collections.Generic;
 using HarmonyLib;
+using thebasics.Utilities;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.ChatUiSystem;
@@ -16,7 +21,12 @@ public static class NameTagRenderRangePatches
     private static readonly AccessTools.FieldRef<EntityBehaviorNameTag, int> RenderRangeFieldRef =
         AccessTools.FieldRefAccess<EntityBehaviorNameTag, int>("renderRange");
 
-    public static void Prefix(EntityBehaviorNameTag __instance)
+    private const long PurgeIntervalMs = 10_000;
+    private const long StaleThresholdMs = 5_000;
+    private static readonly Dictionary<long, (bool canSee, long nextCheckMs)> LosCache = new();
+    private static long _nextPurgeMs;
+
+    public static bool Prefix(EntityBehaviorNameTag __instance, Entity ___entity)
     {
         try
         {
@@ -27,10 +37,71 @@ public static class NameTagRenderRangePatches
             {
                 RenderRangeFieldRef(__instance) = configuredRange;
             }
+
+            if (ChatUiSystem.DoNametagsRequireLineOfSight())
+            {
+                var capi = ___entity?.World?.Api as ICoreClientAPI;
+                var localPlayerEntity = capi?.World?.Player?.Entity;
+                if (localPlayerEntity != null && ___entity != null && localPlayerEntity.EntityId != ___entity.EntityId &&
+                    !CanSeeCached(___entity.World, localPlayerEntity, ___entity))
+                {
+                    return false;
+                }
+            }
         }
         catch
         {
             // Crash-safe: never break nametag rendering.
+        }
+
+        return true;
+    }
+
+    private static bool CanSeeCached(IWorldAccessor world, Entity observer, Entity target)
+    {
+        if (world == null || observer == null || target == null)
+        {
+            return false;
+        }
+
+        var nowMs = world.ElapsedMilliseconds;
+        if (nowMs >= _nextPurgeMs)
+        {
+            _nextPurgeMs = nowMs + PurgeIntervalMs;
+            PurgeStaleEntries(nowMs);
+        }
+
+        if (!LosCache.TryGetValue(target.EntityId, out var entry) || nowMs >= entry.nextCheckMs)
+        {
+            var canSee = VisibilityUtils.HasLineOfSight(world, observer, target);
+            var refreshMs = canSee ? 250L : 500L;
+            entry = (canSee, nowMs + refreshMs);
+            LosCache[target.EntityId] = entry;
+        }
+
+        return entry.canSee;
+    }
+
+    private static void PurgeStaleEntries(long nowMs)
+    {
+        List<long> toRemove = null;
+        foreach (var kvp in LosCache)
+        {
+            if (nowMs - kvp.Value.nextCheckMs > StaleThresholdMs)
+            {
+                toRemove ??= new List<long>();
+                toRemove.Add(kvp.Key);
+            }
+        }
+
+        if (toRemove == null)
+        {
+            return;
+        }
+
+        foreach (var entityId in toRemove)
+        {
+            LosCache.Remove(entityId);
         }
     }
 }

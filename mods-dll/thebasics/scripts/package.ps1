@@ -3,16 +3,34 @@ $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project 
 $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
 $releaseDir = Join-Path $projectRoot "bin/Release"
 $outputDir = $null
+$projectFile = Join-Path $projectRoot "thebasics.csproj"
+$targetFramework = $null
 
-if (Test-Path $releaseDir) {
-    $tfmDir = Get-ChildItem -Path $releaseDir -Directory | Sort-Object Name -Descending | Select-Object -First 1
+if (Test-Path $projectFile) {
+    [xml]$projectXml = Get-Content -LiteralPath $projectFile -Raw
+    $targetFramework = $projectXml.Project.PropertyGroup |
+        ForEach-Object {
+            if ($_.TargetFramework) {
+                $_.TargetFramework
+            } elseif ($_.TargetFrameworks) {
+                ($_.TargetFrameworks -split ';') | Select-Object -First 1
+            }
+        } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -First 1
+}
+
+if ($targetFramework) {
+    $outputDir = Join-Path $releaseDir $targetFramework
+} elseif (Test-Path $releaseDir) {
+    $tfmDir = Get-ChildItem -LiteralPath $releaseDir -Directory | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
     if ($tfmDir) {
         $outputDir = $tfmDir.FullName
     }
 }
 
 if (-not $outputDir) {
-    $outputDir = Join-Path $projectRoot "bin/Release/net8.0"
+    throw "Could not determine build output directory from $projectFile or $releaseDir"
 }
 $assetsDir = Join-Path $projectRoot "assets"
 $modInfoFile = Join-Path $projectRoot "modinfo.json"
@@ -125,17 +143,13 @@ if (-not $localModsDirectories -or $localModsDirectories.Count -eq 0) {
     $localModsDirectories += (Join-Path $env:APPDATA "VintagestoryData/Mods")
 
     # If VS_PROFILES_DIR is set, deploy to all Profile*/Mods folders.
-    # This supports multi-account setups (e.g. Profile2 + Profile3) without hardcoding paths.
+    # This supports multi-account setups (e.g. Profile2 + Profile3) without committing local paths.
     if ($env:VS_PROFILES_DIR -and (Test-Path $env:VS_PROFILES_DIR)) {
         Get-ChildItem -Path $env:VS_PROFILES_DIR -Directory -Filter "Profile*" -ErrorAction SilentlyContinue |
             Sort-Object Name |
             ForEach-Object {
                 $localModsDirectories += (Join-Path $_.FullName "Mods")
             }
-    }
-    else {
-        # Backward-compatible fallback.
-        $localModsDirectories += "D:\Games\VSProfiles\Profile2\Mods"
     }
 }
 
@@ -260,8 +274,11 @@ if (Test-Path $envPath) {
                 Write-Host $msg
                 "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
 
+                $remoteModsDirectory = "/data/Mods"
+                $currentZipName = Split-Path $zipFile -Leaf
+
                 # Now attempt the file transfer
-                $ftpDestinationFile = "/data/Mods/$(Split-Path $zipFile -Leaf)"
+                $ftpDestinationFile = "$remoteModsDirectory/$currentZipName"
                 $transferOptions = New-Object WinSCP.TransferOptions
                 $transferOptions.TransferMode = [WinSCP.TransferMode]::Binary
 
@@ -276,6 +293,23 @@ if (Test-Path $envPath) {
                     $msg = "Successfully uploaded mod to SFTP server at $($transfer.FileName)"
                     Write-Host $msg
                     "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+                }
+
+                # Remove old remote versions after a successful upload to avoid duplicate mod-id warnings
+                # without leaving the server modless if the upload fails.
+                $remoteMods = $session.ListDirectory($remoteModsDirectory)
+                foreach ($remoteFile in $remoteMods.Files) {
+                    if ($remoteFile.IsDirectory) {
+                        continue
+                    }
+
+                    if ($remoteFile.Name -like "thebasics*.zip" -and $remoteFile.Name -ne $currentZipName) {
+                        $remotePath = "$remoteModsDirectory/$($remoteFile.Name)"
+                        $session.RemoveFiles($remotePath).Check()
+                        $msg = "Removed old remote version: $($remoteFile.Name)"
+                        Write-Host $msg
+                        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+                    }
                 }
             } catch {
                 $msg = "SFTP Error: $($_.Exception.Message)"

@@ -173,7 +173,7 @@ namespace thebasics.ModSystems.ProximityChat
                 {
                     var newDefaultIdentifier = newPlayerLanguages.First();
                     var newDefault = GetLangFromText(newDefaultIdentifier, false);
-                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-new-default", ChatHelper.LangIdentifier(newDefault)), EnumChatType.Notification);
+                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-new-default", ChatHelper.LangIdentifier(language), ChatHelper.LangIdentifier(newDefault)), EnumChatType.Notification);
                     player.SetDefaultLanguage(newDefault);
                 }
             }
@@ -236,16 +236,9 @@ namespace thebasics.ModSystems.ProximityChat
                 };
             }
 
-            // Check language limit
+            // Player self-add respects the configured language limit; admin add can bypass it.
             var currentLanguages = targetPlayer.GetLanguages();
-            if (Config.MaxLanguagesPerPlayer >= 0 && currentLanguages.Count >= Config.MaxLanguagesPerPlayer)
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:lang-error-admin-max-languages", targetPlayer.PlayerName, Config.MaxLanguagesPerPlayer),
-                };
-            }
+            var exceedsConfiguredLimit = Config.MaxLanguagesPerPlayer >= 0 && currentLanguages.Count >= Config.MaxLanguagesPerPlayer;
 
             targetPlayer.AddLanguage(lang);
 
@@ -256,10 +249,16 @@ namespace thebasics.ModSystems.ProximityChat
                 targetPlayer.SetDefaultLanguage(lang);
             }
 
+            var statusMessage = Lang.Get("thebasics:lang-success-admin-added", ChatHelper.LangIdentifier(lang), targetPlayer.PlayerName);
+            if (exceedsConfiguredLimit)
+            {
+                statusMessage += "\n" + Lang.Get("thebasics:lang-warning-admin-over-max-languages", targetPlayer.PlayerName, targetPlayer.GetLanguages().Count, Config.MaxLanguagesPerPlayer);
+            }
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = Lang.Get("thebasics:lang-success-admin-added", ChatHelper.LangIdentifier(lang), targetPlayer.PlayerName),
+                StatusMessage = statusMessage,
             };
         }
 
@@ -313,7 +312,7 @@ namespace thebasics.ModSystems.ProximityChat
                     }
                     else
                     {
-                        player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-new-default", targetPlayer.PlayerName, ChatHelper.LangColor(newDefault.Name, newDefault)), EnumChatType.Notification);
+                        player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-new-default", targetPlayer.PlayerName, ChatHelper.LangIdentifier(language), ChatHelper.LangColor(newDefault.Name, newDefault)), EnumChatType.Notification);
                         targetPlayer.SetDefaultLanguage(newDefault);
                     }
                 }

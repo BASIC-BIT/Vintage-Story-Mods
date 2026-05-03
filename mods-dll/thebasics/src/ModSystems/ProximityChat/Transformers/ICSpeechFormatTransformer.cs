@@ -58,7 +58,14 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         // Check for sign language first
         if (_config.EnableLanguageSystem && !_config.DisableRPChat && lang == LanguageSystem.SignLanguage)
         {
-            return "signs";
+            return Lang.Get("thebasics:chat-sign-verb");
+        }
+
+        if (_config.EnableLanguageSystem && !_config.DisableRPChat && lang == LanguageSystem.BabbleLang)
+        {
+            return string.IsNullOrWhiteSpace(_config.ProximityChatModeBabbleVerb) || _config.ProximityChatModeBabbleVerb == "babbles"
+                ? Lang.Get("thebasics:chat-babble-verb")
+                : _config.ProximityChatModeBabbleVerb;
         }
 
         // Use the verbs from config

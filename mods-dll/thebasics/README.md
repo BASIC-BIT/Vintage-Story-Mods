@@ -6,10 +6,17 @@
 
 ## Features
 
- * RP Proximity chat system, with configurable talking ranges, nicknames, automatic message formatting, and more!
- * Server save notification
- * Player stat tracking, currently including deaths, player kills, and mob kills
- * TPA (Teleport request) system, configurable with cooldowns and privileges
+The maintained feature inventory lives in [`docs/FEATURES.md`](docs/FEATURES.md). The release smoke-test matrix lives in [`docs/RELEASE_SMOKE_TEST.md`](docs/RELEASE_SMOKE_TEST.md).
+
+High-level systems:
+
+ * RP proximity chat with configurable talking ranges, nicknames, language support, emotes, environment messages, OOC, global OOC, placed environmental bubbles, RPTTS dispatch, and optional character chatter sounds.
+ * Client-side RP UX: VTML overhead bubbles, bubble line-of-sight gating, typing indicators, nametag behavior, chat tab persistence, and placed environmental bubble rendering.
+ * Server save notifications.
+ * Sleep notifications.
+ * Player stat tracking for deaths, player kills, NPC kills, block breaks, and distance travelled.
+ * TPA (teleport request) system with optional temporal gear cost, cooldowns, timeouts, and privileges.
+ * Admin repair utility for setting item durability.
 
 All features can be toggled.  If you want more granularity in any feature toggles, feel free to suggest it.
 
@@ -22,7 +29,9 @@ The RP Proximity Chat System is a feature-rich chat system designed for role-pla
 - **Nicknames**: Players can set and clear their own nicknames
 - **Dynamic talking ranges**: Four different chat ranges (whisper, "normal", yelling, and signing)
 - **Emote and environment messages**: Add additional flavor to roleplay
-- **Language System**: Custom configurable language system, players can only speak and understand languages they know
+- **Language System**: Custom configurable language system; players can only fully understand languages they know
+- **Placed Environment Messages**: Aim at a block and use `!!message` or `/envhere message` to place an environmental bubble in the world
+- **Character Chatter**: Seraph voice/instrument chatter when players speak, with per-player opt-out
 
 ### Commands
 
@@ -35,11 +44,18 @@ The RP Proximity Chat System is a feature-rich chat system designed for role-pla
 - **/whisper [message]**: Whisper a message or set chat mode to whispering.
 - **/emotemode [on/off]**: Turn emote-only mode on or off.
 - **/rptext [on/off]**: Turn RP text on or off for your messages.
-- **/hands [message]**: Sign a message or set chat mode to sign language.
+- **/ooc [message]**: Send local OOC.
+- **/gooc [message]**: Send global OOC when enabled.
+- **/chatter [on/off]**: Toggle whether you hear character chatter sounds.
+- **/envhere [message]**: Place an environmental message at the targeted block.
 
 ### Configuration
 
 The system is highly configurable through the mod's configuration file. You can adjust the talking ranges, enable or disable features, and customize message formatting.
+
+Version 5.5.0 makes the default generated config more feature-forward for RP servers: proximity chat opens by default, global OOC is enabled, server save completion announcements are enabled, chatter sounds are enabled, and LOS-gated nametags/sign language are enabled. Existing explicit config values are respected, so review `ModConfig/the_basics.json` after upgrading if you want quieter or more conservative defaults.
+
+TPA is also enabled and usable by default in 5.5.0 via `TpaRequestPrivilege=chat`, while `TpaRequireTemporalGear=true` keeps teleport requests from becoming free fast travel.
 
 Nametags are also configurable (in `ModConfig/the_basics.json`):
 - `ShowNicknameInNametag`: show the RP nickname above heads
@@ -81,7 +97,7 @@ Languages are defined via the config:
   ]
 }
 ```
-Language prefixes are used to set your current speaking language.  This can either be set as your "defaul"
+Language prefixes are used to set your current speaking language for future messages, or to speak a single message in that language.
 
 The language system can be completely disabled if desired via the config flag `EnableLanguageSystem`
 
@@ -89,10 +105,12 @@ The language system can be completely disabled if desired via the config flag `E
 Players can add and remove languages via:
 - `/addlang [language]`
 - `/remlang [language]`
+- `/listlang`
 
 Admins can set another players languages via:
-- `/addlangadmin [player] [language]`
-- `/remlangadmin [player] [language]`
+- `/adminaddlang [player] [language]`
+- `/adminremovelang [player] [language]`
+- `/adminlistlang [player]`
 
 The permission required to use the commands can be configured via the config values `ChangeOwnLanguagePermission` and `ChangeOtherLanguagePermission`.
 
@@ -108,7 +126,8 @@ Configuration keys (in `ModConfig/the_basics.json`):
 - `EnableTypingIndicator`: master toggle
 - `TypingIndicatorMaxRange`: max range (blocks) to see the indicator
 - `TypingIndicatorTimeoutSeconds`: how long after the last input change the indicator stays on
-- `TypingIndicatorTextOverride`: override the displayed text (otherwise uses lang key `thebasics:typingindicator-typing`)
+- `TypingIndicatorTextOverride`: override the displayed text (otherwise uses lang key `thebasics:typingindicator-typing-text`)
+- `TypingIndicatorDisplayMode`: show icon only, text only, or both
 - `DebugMode`: enables verbose debug logging/diagnostics (recommended off unless troubleshooting)
 
 Notes:
@@ -120,20 +139,21 @@ Notes:
 
 Vintage Story shows a short chat bubble above player heads for nearby chat.
 
-When language obfuscation is enabled, it can be useful for RP to have the overhead bubble reflect the
-recipient-specific processed text (rather than the raw typed text).
+The BASICs overrides RP speech bubbles while RP chat is enabled so the bubble can reflect processed RP text rather than raw typed text.
 
-Config key (in `ModConfig/the_basics.json`):
+Applies to:
 
- - `OverrideSpeechBubblesWithRpText`: when true, the server overrides the bubble text (per recipient)
-   - Applies to: speech, emotes (`/me` or `*...`), and environmental messages (`/it` or `!...`)
-   - When enabled, clients also render VTML in overhead bubbles (italics, font tags, icons).
-   - Emote/environment bubbles get subtle visual styling (border/background) so they are distinct.
+- speech
+- emotes (`/me` or `*...`)
+- environmental messages (`/it` or `!...`)
+- placed environmental messages (`/envhere` or `!!...`)
+
+Clients render VTML in overhead bubbles, including italics, font tags, icons, and subtle kind-specific styling.
 
 Notes:
 
 - Vanilla overhead bubbles render plain text (they do not parse VTML).
-- When `OverrideSpeechBubblesWithRpText=true`, the client patches the vanilla bubble renderer to support VTML.
+- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles=true` to opt out of RP-processed overhead speech bubbles and fall back to vanilla speech bubbles.
 
 
 
