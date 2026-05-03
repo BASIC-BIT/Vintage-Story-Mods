@@ -95,6 +95,31 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         return true;
     }
 
+    private static bool StartsWithLanguagePrefixSyntax(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            return false;
+        }
+
+        var i = 0;
+        while (i < message.Length && (char.IsWhiteSpace(message[i]) || IsDecoratorChar(message[i])))
+        {
+            i++;
+        }
+
+        return i < message.Length && message[i] == ':';
+    }
+
+    private string BuildValidLanguageList(bool includeHidden)
+    {
+        var languages = _languageSystem.GetAllLanguages(true, includeHidden: includeHidden)
+            .Where(lang => includeHidden || !lang.Hidden)
+            .Select(ChatHelper.LangIdentifierWithDescription);
+
+        return "\n  " + string.Join("\n  ", languages);
+    }
+
     public override bool ShouldTransform(MessageContext context)
     {
         return true;
@@ -130,8 +155,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
             {
                 context.SendingPlayer.SendMessage(
                     _chatSystem.ProximityChatId,
-                    Lang.Get("thebasics:lang-error-invalid-with-list", languageIdentifier, string.Join(", ",
-                        _languageSystem.GetAllLanguages(true, includeHidden: showHidden).Select(listLang => ChatHelper.LangColor(":" + listLang.Prefix + " (" + listLang.Name + ")", listLang)))),
+                    Lang.Get("thebasics:lang-error-invalid-with-list", languageIdentifier, BuildValidLanguageList(showHidden)),
                     EnumChatType.CommandError);
                 context.State = MessageContextState.STOP;
                 return context;
@@ -163,6 +187,16 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
                 context.UpdateMessage(remainder.Trim());
                 context.SetMetadata(MessageContext.LANGUAGE, lang);
             }
+        }
+        else if (StartsWithLanguagePrefixSyntax(context.Message))
+        {
+            var showHidden = context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission);
+            context.SendingPlayer.SendMessage(
+                _chatSystem.ProximityChatId,
+                Lang.Get("thebasics:lang-error-invalid-prefix-with-list", BuildValidLanguageList(showHidden)),
+                EnumChatType.CommandError);
+            context.State = MessageContextState.STOP;
+            return context;
         }
         else
         {

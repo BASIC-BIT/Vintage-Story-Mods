@@ -21,8 +21,12 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             return false;
         }
 
-        // Always emit clientData for in-world bubble messages so vanilla bubbles keep working.
-        // The config controls *what* text we place into the bubble, not whether a bubble exists.
+        if (_config.DisableRpOverheadBubbles)
+        {
+            return false;
+        }
+
+        // Emit clientData for in-world bubble messages so enhanced RP bubbles can render processed text.
         return context.HasFlag(MessageContext.IS_SPEECH)
             || context.HasFlag(MessageContext.IS_EMOTE)
             || context.HasFlag(MessageContext.IS_ENVIRONMENTAL)

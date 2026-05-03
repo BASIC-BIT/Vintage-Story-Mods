@@ -23,6 +23,8 @@ namespace thebasics.Configs
         // Helper method to initialize default values only if not already set
         public void InitializeDefaultsIfNeeded()
         {
+            TpaRequestPrivilege = string.IsNullOrWhiteSpace(TpaRequestPrivilege) ? "chat" : TpaRequestPrivilege;
+
             // Initialize dictionaries only if they're null
             ProximityChatModeDistances ??= new Dictionary<ProximityChatMode, int>
             {
@@ -177,7 +179,7 @@ namespace thebasics.Configs
         public bool UseGeneralChannelAsProximityChat { get; set; } = false;
 
         [ProtoMember(22)]
-        public bool EnableGlobalOOC { get; set; } = false;
+        public bool EnableGlobalOOC { get; set; } = true;
 
         [ProtoMember(23)]
         public bool AllowOOCToggle { get; set; } = true;
@@ -186,7 +188,7 @@ namespace thebasics.Configs
         public string OOCTogglePermission { get; set; } = "chat";
 
         [ProtoMember(25)]
-        public bool ProximityChatAsDefault { get; set; } = false;
+        public bool ProximityChatAsDefault { get; set; } = true;
 
         [ProtoMember(26)]
         public bool PreserveDefaultChatChoice { get; set; } = true;
@@ -195,7 +197,7 @@ namespace thebasics.Configs
         public bool SendServerSaveAnnouncement { get; set; } = true;
 
         [ProtoMember(28)]
-        public bool SendServerSaveFinishedAnnouncement { get; set; } = false;
+        public bool SendServerSaveFinishedAnnouncement { get; set; } = true;
 
         [ProtoMember(29)]
         public string TEXT_ServerSaveAnnouncement { get; set; } = "Server save has started - expect lag for a few seconds.";
@@ -218,8 +220,27 @@ namespace thebasics.Configs
         [ProtoMember(35)]
         public bool AllowPlayerTpa { get; set; } = true;
 
+        // ProtoMember(36) - RESERVED/DEPRECATED - Previously AllowTpaPrivilegeByDefault.
+        // Do not reuse this number to avoid deserialization issues with existing config/network payloads.
         [ProtoMember(36)]
-        public bool AllowTpaPrivilegeByDefault { get; set; } = false;
+        [JsonIgnore]
+        [Obsolete("Use TpaRequestPrivilege. This property is ignored.")]
+        public bool AllowTpaPrivilegeByDefaultReserved { get; set; } = true;
+
+        [ProtoIgnore]
+        [JsonProperty("AllowTpaPrivilegeByDefault", NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Use TpaRequestPrivilege.")]
+        public bool? AllowTpaPrivilegeByDefaultLegacy
+        {
+            get => null;
+            set
+            {
+                if (value.HasValue)
+                {
+                    TpaRequestPrivilege = value.Value ? "chat" : "tpa";
+                }
+            }
+        }
 
         [ProtoMember(37)]
         public bool TpaRequireTemporalGear { get; set; } = true;
@@ -346,12 +367,11 @@ namespace thebasics.Configs
         [ProtoMember(71)]
         public string TypingIndicatorTextOverride { get; set; } = "";
 
-        // DEPRECATED: VTML speech bubbles are now always active when RP chat is enabled
-        // (i.e., when DisableRPChat is false). This property is retained only for
-        // protobuf deserialization compatibility with existing config files on disk.
+        // DEPRECATED: Use DisableRpOverheadBubbles instead. This property is retained only
+        // for protobuf deserialization compatibility with existing config files on disk.
         // It is no longer read by any runtime code.
         [ProtoMember(72)]
-        [Obsolete("VTML bubbles are now gated by DisableRPChat. This property is ignored.")]
+        [Obsolete("Use DisableRpOverheadBubbles. This property is ignored.")]
         public bool OverrideSpeechBubblesWithRpText { get; set; } = true;
 
         // When true, enables verbose debug logging and diagnostic instrumentation.
@@ -383,7 +403,7 @@ namespace thebasics.Configs
         // When true, characters play their seraph instrument voice when sending speech messages.
         // Players can individually opt out with /chatter off.
         [ProtoMember(78)]
-        public bool EnableChatter { get; set; } = false;
+        public bool EnableChatter { get; set; } = true;
 
         // Volume modifier per chat mode for chatter sounds.
         // Defaults lean quiet — chatter is ambient flavor, not a notification.
@@ -399,5 +419,31 @@ namespace thebasics.Configs
         // standard environmental message above the sender's head.
         [ProtoMember(81)]
         public double MaxEnvironmentPlacementDistance { get; set; } = 30.0;
+
+        // Multiplier applied only when sending chatter back to the speaking player.
+        // Other listeners receive the normal mode volume.
+        [ProtoMember(82)]
+        public float ChatterSelfVolumeMultiplier { get; set; } = 0.4f;
+
+        // When true, sign language requires line of sight at send time.
+        [ProtoMember(83)]
+        public bool RequireLineOfSightForSignLanguage { get; set; } = true;
+
+        // When true, client-side nametag rendering requires line of sight.
+        [ProtoMember(84)]
+        public bool NametagRequiresLineOfSight { get; set; } = true;
+
+        // When true, client-side typing indicator rendering requires line of sight.
+        [ProtoMember(85)]
+        public bool TypingIndicatorRequiresLineOfSight { get; set; } = true;
+
+        // When true, disables RP-processed overhead/world bubble rendering while leaving chat text intact.
+        [ProtoMember(86)]
+        public bool DisableRpOverheadBubbles { get; set; } = false;
+
+        // Privilege required to initiate /tpa and /tpahere. Use "chat" for all normal players,
+        // or "tpa" to require explicitly granted access.
+        [ProtoMember(87)]
+        public string TpaRequestPrivilege { get; set; } = "chat";
     }
 }

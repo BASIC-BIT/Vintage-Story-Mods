@@ -1,4 +1,8 @@
 using HarmonyLib;
+using thebasics.Utilities;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.ChatUiSystem;
@@ -16,7 +20,7 @@ public static class NameTagRenderRangePatches
     private static readonly AccessTools.FieldRef<EntityBehaviorNameTag, int> RenderRangeFieldRef =
         AccessTools.FieldRefAccess<EntityBehaviorNameTag, int>("renderRange");
 
-    public static void Prefix(EntityBehaviorNameTag __instance)
+    public static bool Prefix(EntityBehaviorNameTag __instance, Entity ___entity)
     {
         try
         {
@@ -27,10 +31,23 @@ public static class NameTagRenderRangePatches
             {
                 RenderRangeFieldRef(__instance) = configuredRange;
             }
+
+            if (ChatUiSystem.DoNametagsRequireLineOfSight())
+            {
+                var capi = ___entity?.World?.Api as ICoreClientAPI;
+                var localPlayerEntity = capi?.World?.Player?.Entity;
+                if (localPlayerEntity != null && ___entity != null && localPlayerEntity.EntityId != ___entity.EntityId &&
+                    !VisibilityUtils.HasLineOfSight(___entity.World, localPlayerEntity, ___entity))
+                {
+                    return false;
+                }
+            }
         }
         catch
         {
             // Crash-safe: never break nametag rendering.
         }
+
+        return true;
     }
 }

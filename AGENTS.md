@@ -241,12 +241,16 @@ These are the most commonly toggled settings in `/data/ModConfig/the_basics.json
 | `OverrideSpeechBubblesWithRpText` | `false` | When true, overhead bubbles show RP-processed VTML text with kind styling + LOS gating |
 | `EnableTypingIndicator` | `true` | Show typing indicator above players' heads |
 | `SendServerSaveAnnouncement` | `true` | Announce "save started" to players |
-| `SendServerSaveFinishedAnnouncement` | `false` | Announce "save finished" to players |
+| `SendServerSaveFinishedAnnouncement` | `true` | Announce "save finished" to players |
 | `ServerSaveAnnouncementAsNotification` | `true` | Use notification popup instead of chat line |
-| `EnableGlobalOOC` | `false` | Allow `(( ... ))` global OOC chat |
+| `EnableGlobalOOC` | `true` | Allow `(( ... ))` global OOC chat |
 | `EnableLanguageSystem` | `true` | Enable language commands and formatting |
+| `EnableChatter` | `true` | Play seraph voice chatter for speech messages |
 | `DebugMode` | `false` | Enable `[THEBASICS][perf]` and diagnostic logging |
 | `TypingIndicatorDisplayMode` | `2` (Both) | 0=Icon only, 1=Text only, 2=Both icon + text |
+| `TypingIndicatorRequiresLineOfSight` | `true` | Hide typing indicators through walls |
+| `DisableRpOverheadBubbles` | `false` | Opt out of RP overhead/world bubble rendering |
+| `TpaRequestPrivilege` | `chat` | Privilege required to initiate `/tpa` and `/tpahere` |
 
 #### Launching Test Game Clients
 

@@ -62,7 +62,7 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
 
             var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
             // Special check for sign language - must be within line of sight
-            if (inRange && lang == LanguageSystem.SignLanguage)
+            if (inRange && lang == LanguageSystem.SignLanguage && _config.RequireLineOfSightForSignLanguage)
             {
                 return _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, serverPlayer);
             }

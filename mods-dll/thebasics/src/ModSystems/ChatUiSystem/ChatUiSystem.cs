@@ -275,12 +275,19 @@ public class ChatUiSystem : ModSystem
         return _config?.TypingIndicatorMaxRange ?? 0;
     }
 
+    internal static bool DoNametagsRequireLineOfSight()
+    {
+        return _config?.NametagRequiresLineOfSight == true;
+    }
+
+    internal static bool DoesTypingIndicatorRequireLineOfSight()
+    {
+        return _config?.TypingIndicatorRequiresLineOfSight == true;
+    }
+
     internal static bool IsSpeechBubbleVtmlEnabled()
     {
-        // VTML speech bubbles are always active when RP chat is enabled.
-        // The old OverrideSpeechBubblesWithRpText toggle has been removed — vanilla
-        // bubbles are strictly worse and there's no reason to fall back to them.
-        return _config != null && !_config.DisableRPChat;
+        return _config != null && !_config.DisableRPChat && !_config.DisableRpOverheadBubbles;
     }
 
     internal static Models.TypingIndicatorDisplayMode GetTypingIndicatorDisplayMode()
@@ -479,9 +486,13 @@ public class ChatUiSystem : ModSystem
                 return;
             }
 
-            // Access TalkUtil via the ITalkUtil interface (implemented by game-side entity classes)
+            // NPCs expose TalkUtil via ITalkUtil; player entities expose the same utility directly.
             var talkUtilHolder = entity as ITalkUtil;
             var talkUtil = talkUtilHolder?.TalkUtil;
+            if (talkUtil == null && entity is EntityPlayer entityPlayer)
+            {
+                talkUtil = entityPlayer.talkUtil;
+            }
             if (talkUtil == null)
             {
                 return;

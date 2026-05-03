@@ -181,6 +181,11 @@ namespace thebasics.ModSystems.TPA
             return true;
         }
 
+        private string GetTpaRequestPrivilege()
+        {
+            return string.IsNullOrWhiteSpace(Config.TpaRequestPrivilege) ? Privilege.chat : Config.TpaRequestPrivilege;
+        }
+
         private bool ExpireOrCancelTpaRequest(IServerPlayer requestingPlayer, TpaRequest request, TpaExpireReason reason, IServerPlayer targetPlayer = null)
         {
             // Null checks
@@ -297,14 +302,14 @@ namespace thebasics.ModSystems.TPA
 
                 API.ChatCommands.GetOrCreate("tpa")
                     .WithDescription(Lang.Get("thebasics:tpa-cmd-tpa-desc"))
-                    .RequiresPrivilege(Config.AllowTpaPrivilegeByDefault ? Privilege.chat : "tpa")
+                    .RequiresPrivilege(GetTpaRequestPrivilege())
                     .WithArgs(new PlayersArgParser("player", API, true))
                     .RequiresPlayer()
                     .HandleWith(HandleTpa);
 
                 API.ChatCommands.GetOrCreate("tpahere")
                     .WithDescription(Lang.Get("thebasics:tpa-cmd-tpahere-desc"))
-                    .RequiresPrivilege(Config.AllowTpaPrivilegeByDefault ? Privilege.chat : "tpa")
+                    .RequiresPrivilege(GetTpaRequestPrivilege())
                     .WithArgs(new PlayersArgParser("player", API, true))
                     .RequiresPlayer()
                     .HandleWith(HandleTpaHere);

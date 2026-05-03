@@ -95,7 +95,8 @@ public sealed class TypingIndicatorRenderer : IRenderer
                 continue;
             }
 
-            if (!CanSeeCached(world, nowMs, localPlayerEntity, entity))
+            if (ChatUiSystem.DoesTypingIndicatorRequireLineOfSight() &&
+                !CanSeeCached(world, nowMs, localPlayerEntity, entity))
             {
                 continue;
             }
@@ -169,8 +170,8 @@ public sealed class TypingIndicatorRenderer : IRenderer
         return displayMode switch
         {
             TypingIndicatorDisplayMode.Text => textLabel,
-            // Use \u200A (hair space) for a tighter icon-text gap than a full space.
-            TypingIndicatorDisplayMode.Both => $"{Lang.Get(iconKey)}\u200A{textLabel}",
+            // Use \u2009 (thin space) for a small but readable icon-text gap.
+            TypingIndicatorDisplayMode.Both => $"{Lang.Get(iconKey)}\u2009{textLabel}",
             _ => Lang.Get(iconKey), // Icon (default)
         };
     }
