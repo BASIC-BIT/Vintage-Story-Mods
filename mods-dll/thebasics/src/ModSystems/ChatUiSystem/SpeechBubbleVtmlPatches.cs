@@ -20,7 +20,11 @@ public static class SpeechBubbleVtmlPatches
     internal static readonly AccessTools.FieldRef<EntityShapeRenderer, List<MessageTexture>> MessageTexturesRef =
         AccessTools.FieldRefAccess<EntityShapeRenderer, List<MessageTexture>>("messageTextures");
 
-    private const int BubbleMaxTextWidthPx = 280;
+    internal static readonly AccessTools.FieldRef<EntityShapeRenderer, LoadedTexture> DebugTagTextureRef =
+        AccessTools.FieldRefAccess<EntityShapeRenderer, LoadedTexture>("debugTagTexture");
+
+    // Match vanilla speech bubbles so normal sentences do not wrap punctuation onto orphan lines.
+    private const int BubbleMaxTextWidthPx = 350;
 
     public static bool Prefix(EntityShapeRenderer __instance, int groupId, string message, EnumChatType chattype, string data)
     {
@@ -343,11 +347,11 @@ public static class SpeechBubbleRenderPatches
                 cappedScale = 0.75f + (cappedScale - 0.75f) / 2f;
             }
 
-            // Stack bubbles upward from the projected position (replicates vanilla stacking).
-            // Start with a small base offset (in screen-space pixels) to separate the
-            // first bubble from the nametag. This replaces the old transparent-margin
-            // approach that baked spacing into the texture (which caused a dark bar artifact).
-            var offY = 10f * cappedScale;
+            // Stack bubbles upward from the projected position. Vanilla renders the
+            // nametag first, then starts bubbles above it; reserve that height here
+            // because we hide vanilla's bubble list and render our own.
+            var nametagHeight = SpeechBubbleVtmlPatches.DebugTagTextureRef(__instance)?.Height ?? 0;
+            var offY = (nametagHeight + 8f) * cappedScale;
             for (var i = 0; i < textures.Count; i++)
             {
                 var mt = textures[i];

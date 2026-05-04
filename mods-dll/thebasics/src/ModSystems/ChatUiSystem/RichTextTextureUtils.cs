@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Cairo;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -8,6 +9,9 @@ namespace thebasics.ModSystems.ChatUiSystem;
 
 internal static class RichTextTextureUtils
 {
+    private const int LayoutSlackPx = 2;
+    private const int MeasureHeightPx = 600;
+
     /// <summary>
     /// Renders VTML into a Cairo texture, including &lt;icon&gt; tags.
     /// Returns null if rendering fails.
@@ -29,30 +33,47 @@ internal static class RichTextTextureUtils
 
         try
         {
-            var guiScale = Math.Max(1, RuntimeEnv.GUIScale);
+            var guiScale = RuntimeEnv.GUIScale > 0 ? RuntimeEnv.GUIScale : 1;
+            var maxTextWidthAtScalePx = GetScaledLengthPx(maxTextWidthPx, guiScale);
+            var measureHeightAtScalePx = GetScaledLengthPx(MeasureHeightPx, guiScale);
 
             // Pass 1: measure at max width to get actual text dimensions.
             var measureComps = VtmlUtil.Richtextify(capi, vtml, baseFont);
-            var measureBounds = ElementBounds.FixedSize(maxTextWidthPx / (double)guiScale, 600 / (double)guiScale);
+            var measureBounds = ElementBounds.FixedSize(maxTextWidthAtScalePx / (double)guiScale, measureHeightAtScalePx / (double)guiScale);
             measureBounds.ParentBounds = ElementBounds.Empty;
             var measure = new GuiElementRichtext(capi, measureComps, measureBounds);
             measure.BeforeCalcBounds();
 
-            var textWidthPx = (int)Math.Min(maxTextWidthPx, Math.Ceiling(measure.MaxLineWidth * guiScale));
-            var textHeightPx = (int)Math.Ceiling(measure.TotalHeight * guiScale);
+            var wrapped = UsesMultipleVisualLines(measureComps);
+            var textWidthPx = wrapped
+                ? maxTextWidthAtScalePx
+                : GetUnwrappedTextureWidthPx(measure.MaxLineWidth, maxTextWidthAtScalePx);
+            var textHeightPx = (int)Math.Ceiling(measure.TotalHeight);
             textWidthPx = Math.Max(1, textWidthPx);
             textHeightPx = Math.Max(1, textHeightPx);
 
-            // Pass 2: fresh components laid out at the measured tight width.
+            // Pass 2: fresh components laid out at a safe width.
             // Left alignment avoids the VS centering bug with mixed-font inline components.
+            // If pass 1 wrapped, keep the original max width during layout so pass 2
+            // cannot reflow into more lines than were measured. We shrink the texture
+            // after layout using the actual widest visual line.
             var renderComps = VtmlUtil.Richtextify(capi, vtml, baseFont);
-            var finalBounds = ElementBounds.FixedSize(textWidthPx / (double)guiScale, textHeightPx / (double)guiScale);
+            var layoutWidthPx = wrapped ? maxTextWidthAtScalePx : textWidthPx;
+            var finalBounds = ElementBounds.FixedSize(layoutWidthPx / (double)guiScale, textHeightPx / (double)guiScale);
             finalBounds.ParentBounds = ElementBounds.Empty;
             var rich = new GuiElementRichtext(capi, renderComps, finalBounds);
             rich.BeforeCalcBounds();
+            textHeightPx = Math.Max(1, (int)Math.Ceiling(rich.TotalHeight));
+            if (wrapped)
+            {
+                textWidthPx = GetWrappedTextureWidthPx(renderComps, maxTextWidthAtScalePx);
+            }
+            CenterVisualLines(renderComps, textWidthPx);
 
-            var surfaceWidth = textWidthPx + 2 * background.HorPadding;
-            var bubbleHeight = textHeightPx + 2 * background.VerPadding;
+            var hPad = GetScaledLengthPx(background.HorPadding, guiScale);
+            var verPad = GetScaledLengthPx(background.VerPadding, guiScale);
+            var surfaceWidth = textWidthPx + 2 * hPad;
+            var bubbleHeight = textHeightPx + 2 * verPad;
             var surfaceHeight = bubbleHeight + Math.Max(0, extraBottomMarginPx);
 
             using var surface = new ImageSurface(Format.Argb32, surfaceWidth, surfaceHeight);
@@ -74,11 +95,10 @@ internal static class RichTextTextureUtils
             }
 
             // Render text at a centered offset within the bubble.
-            // Horizontal: center the text block within the surface width.
+            // Horizontal: use the bubble padding as the text area's origin; individual
+            // visual lines are centered after richtext layout so wrapped lines do not
+            // stay left-aligned inside a wide bubble.
             // Vertical: center the text block within the bubble height (excluding bottom margin).
-            // We use Left alignment in the font to avoid a VS centering bug at inline
-            // tag boundaries, but manually center the rendered block within the surface.
-            var hPad = (surfaceWidth - textWidthPx) / 2.0;
             var vPad = (bubbleHeight - textHeightPx) / 2.0;
             var offsetBounds = ElementBounds.Fixed(
                 hPad / guiScale,
@@ -108,6 +128,184 @@ internal static class RichTextTextureUtils
         catch
         {
             return null;
+        }
+    }
+
+    private static bool UsesMultipleVisualLines(RichTextComponentBase[] components)
+    {
+        if (components == null)
+        {
+            return false;
+        }
+
+        var hasFirstLineY = false;
+        double firstLineY = 0;
+
+        for (var componentIndex = 0; componentIndex < components.Length; componentIndex++)
+        {
+            var boundsPerLine = components[componentIndex]?.BoundsPerLine;
+            if (boundsPerLine == null)
+            {
+                continue;
+            }
+
+            for (var boundsIndex = 0; boundsIndex < boundsPerLine.Length; boundsIndex++)
+            {
+                var bounds = boundsPerLine[boundsIndex];
+                if (!hasFirstLineY)
+                {
+                    hasFirstLineY = true;
+                    firstLineY = bounds.Y;
+                    continue;
+                }
+
+                if (Math.Abs(bounds.Y - firstLineY) > 0.5)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static int GetUnwrappedTextureWidthPx(double measuredWidthPx, int maxTextWidthPx)
+    {
+        // VS lineizes with width >= available, so a second pass at exactly the
+        // measured width can orphan a trailing quote/punctuation on a new line.
+        return (int)Math.Min(maxTextWidthPx, Math.Ceiling(measuredWidthPx) + LayoutSlackPx);
+    }
+
+    private static int GetScaledLengthPx(int unscaledLengthPx, double guiScale)
+    {
+        return Math.Max(1, (int)Math.Ceiling(unscaledLengthPx * guiScale));
+    }
+
+    private static int GetWrappedTextureWidthPx(RichTextComponentBase[] components, int maxTextWidthPx)
+    {
+        var maxLineWidth = 0.0;
+        var lines = GetVisualLines(components);
+        for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+        {
+            var line = lines[lineIndex];
+            maxLineWidth = Math.Max(maxLineWidth, line.MaxX - line.MinX);
+        }
+
+        if (maxLineWidth <= 0)
+        {
+            return maxTextWidthPx;
+        }
+
+        return Math.Max(1, (int)Math.Min(maxTextWidthPx, Math.Ceiling(maxLineWidth) + LayoutSlackPx));
+    }
+
+    private static void CenterVisualLines(RichTextComponentBase[] components, double textWidthPx)
+    {
+        if (components == null || textWidthPx <= 0)
+        {
+            return;
+        }
+
+        var lines = GetVisualLines(components);
+        for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+        {
+            var line = lines[lineIndex];
+            var lineWidth = line.MaxX - line.MinX;
+            if (lineWidth <= 0 || lineWidth >= textWidthPx)
+            {
+                continue;
+            }
+
+            var targetX = (textWidthPx - lineWidth) / 2.0;
+            var deltaX = targetX - line.MinX;
+            if (Math.Abs(deltaX) <= 0.5)
+            {
+                continue;
+            }
+
+            ShiftVisualLine(components, line.Y, deltaX);
+        }
+    }
+
+    private static List<VisualLine> GetVisualLines(RichTextComponentBase[] components)
+    {
+        var lines = new List<VisualLine>();
+        for (var componentIndex = 0; componentIndex < components.Length; componentIndex++)
+        {
+            var boundsPerLine = components[componentIndex]?.BoundsPerLine;
+            if (boundsPerLine == null)
+            {
+                continue;
+            }
+
+            for (var boundsIndex = 0; boundsIndex < boundsPerLine.Length; boundsIndex++)
+            {
+                var bounds = boundsPerLine[boundsIndex];
+                if (bounds.Width <= 0)
+                {
+                    continue;
+                }
+
+                var line = FindVisualLine(lines, bounds.Y);
+                if (line == null)
+                {
+                    lines.Add(new VisualLine(bounds.Y, bounds.X, bounds.X + bounds.Width));
+                    continue;
+                }
+
+                line.MinX = Math.Min(line.MinX, bounds.X);
+                line.MaxX = Math.Max(line.MaxX, bounds.X + bounds.Width);
+            }
+        }
+
+        return lines;
+    }
+
+    private static VisualLine FindVisualLine(List<VisualLine> lines, double y)
+    {
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (Math.Abs(lines[i].Y - y) <= 0.5)
+            {
+                return lines[i];
+            }
+        }
+
+        return null;
+    }
+
+    private static void ShiftVisualLine(RichTextComponentBase[] components, double y, double deltaX)
+    {
+        for (var componentIndex = 0; componentIndex < components.Length; componentIndex++)
+        {
+            var boundsPerLine = components[componentIndex]?.BoundsPerLine;
+            if (boundsPerLine == null)
+            {
+                continue;
+            }
+
+            for (var boundsIndex = 0; boundsIndex < boundsPerLine.Length; boundsIndex++)
+            {
+                var bounds = boundsPerLine[boundsIndex];
+                if (Math.Abs(bounds.Y - y) <= 0.5)
+                {
+                    bounds.X += deltaX;
+                }
+            }
+        }
+    }
+
+    private sealed class VisualLine
+    {
+        public double Y { get; }
+        public double MinX { get; set; }
+        public double MaxX { get; set; }
+
+        public VisualLine(double y, double minX, double maxX)
+        {
+            Y = y;
+            MinX = minX;
+            MaxX = maxX;
         }
     }
 }
