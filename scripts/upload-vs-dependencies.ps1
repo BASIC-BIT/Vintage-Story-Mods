@@ -5,7 +5,7 @@ param(
     [string]$VsInstallPath = $env:VINTAGE_STORY,
     [string]$TargetRepo = "git@github.com:BASIC-BIT/vs-build-dependencies.git",
     [string]$WorkDir = ".\temp-vs-deps",
-    [string]$VsVersion = "1.22.1"  # Update this when VS version changes
+    [string]$VsVersion = "1.22.2"  # Update this when VS version changes
 )
 
 # Validate VS installation path
