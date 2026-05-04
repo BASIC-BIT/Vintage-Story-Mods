@@ -74,6 +74,60 @@ public class VtmlUtilsTests
         }
     }
 
+    public class StripUserVtmlTags
+    {
+        [Theory]
+        [InlineData("<b>bold</b>", "bold")]
+        [InlineData("<strong>bold</strong>", "bold")]
+        [InlineData("<foo>Hi</foo>", "Hi")]
+        [InlineData("&lt;b&gt;bold&lt;/b&gt;", "bold")]
+        [InlineData("&lt;foo&gt;Hi&lt;/foo&gt;", "Hi")]
+        [InlineData("a < b > c", "a < b > c")]
+        [InlineData("a &lt; b &gt; c", "a &lt; b &gt; c")]
+        public void RemovesRawAndEscapedTagsOnly(string input, string expected)
+        {
+            VtmlUtils.StripUserVtmlTags(input).Should().Be(expected);
+        }
+    }
+
+    public class UnescapeRenderableVtmlTags
+    {
+        [Theory]
+        [InlineData("&lt;font color=\"#fff\"&gt;Hi&lt;/font&gt;", "<font color=\"#fff\">Hi</font>")]
+        [InlineData("&lt;i&gt;Hi&lt;/i&gt;", "<i>Hi</i>")]
+        [InlineData("&lt;strong&gt;Hi&lt;/strong&gt;", "<strong>Hi</strong>")]
+        [InlineData("&lt;b&gt;Hi&lt;/b&gt;", "&lt;b&gt;Hi&lt;/b&gt;")]
+        [InlineData("a &lt; b &gt; c", "a &lt; b &gt; c")]
+        public void UnescapesOnlyTrustedRenderableTags(string input, string expected)
+        {
+            VtmlUtils.UnescapeRenderableVtmlTags(input).Should().Be(expected);
+        }
+    }
+
+    public class NormalizeVtmlForRendering
+    {
+        [Theory]
+        [InlineData("<b>bold</b>", "bold")]
+        [InlineData("<B>bold</B>", "bold")]
+        [InlineData("<foo>bold</foo>", "bold")]
+        [InlineData("<strong>bold</strong>", "<strong>bold</strong>")]
+        [InlineData("<FONT color=\"#fff\">bold</FONT>", "<font color=\"#fff\">bold</font>")]
+        [InlineData("<br>", "<br>")]
+        [InlineData("<box>bold</box>", "bold")]
+        public void KeepsOnlySupportedRendererTags(string input, string expected)
+        {
+            VtmlUtils.NormalizeVtmlForRendering(input).Should().Be(expected);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        public void ReturnsInputWhenNullOrEmpty(string? input)
+        {
+            VtmlUtils.NormalizeVtmlForRendering(input!).Should().Be(input);
+        }
+    }
+
     public class ContainsVtmlSpecialChars
     {
         [Theory]

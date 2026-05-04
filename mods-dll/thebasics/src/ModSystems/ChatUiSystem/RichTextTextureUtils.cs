@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cairo;
+using thebasics.Utilities;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -33,6 +34,8 @@ internal static class RichTextTextureUtils
 
         try
         {
+            vtml = VtmlUtils.NormalizeVtmlForRendering(vtml);
+
             var guiScale = RuntimeEnv.GUIScale > 0 ? RuntimeEnv.GUIScale : 1;
             var maxTextWidthAtScalePx = GetScaledLengthPx(maxTextWidthPx, guiScale);
             var measureHeightAtScalePx = GetScaledLengthPx(MeasureHeightPx, guiScale);

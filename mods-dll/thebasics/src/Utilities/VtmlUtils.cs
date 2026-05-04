@@ -1,5 +1,6 @@
 namespace thebasics.Utilities;
 
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -10,6 +11,23 @@ using Vintagestory.API.Common;
 /// </summary>
 public static class VtmlUtils
 {
+    private static readonly Regex RawTagRegex = new(@"<(/?)([A-Za-z][A-Za-z0-9:_-]*)([^<>]*)>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex EscapedTagRegex = new(@"&lt;(/?)([A-Za-z][A-Za-z0-9:_-]*)((?:(?!&gt;).)*)&gt;", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly HashSet<string> RenderableTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "a",
+        "br",
+        "clear",
+        "code",
+        "font",
+        "hk",
+        "hotkey",
+        "i",
+        "icon",
+        "itemstack",
+        "strong",
+    };
+
     /// <summary>
     /// Escapes XML/HTML special characters to prevent VTML injection
     /// Note: Vintage Story only escapes < and > in practice, not & " '
@@ -91,6 +109,60 @@ public static class VtmlUtils
             .Replace("&lt;", "<")
             .Replace("&gt;", ">")
             .Replace("&nbsp;", " ");  // VS also handles non-breaking space
+    }
+
+    /// <summary>
+    /// Removes tag-shaped user input before The BASICs adds its own trusted VTML formatting.
+    /// </summary>
+    public static string StripUserVtmlTags(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+
+        var stripped = EscapedTagRegex.Replace(input, string.Empty);
+        return RawTagRegex.Replace(stripped, string.Empty);
+    }
+
+    /// <summary>
+    /// Unescapes only the known VTML tags that The BASICs emits for bubble rendering.
+    /// </summary>
+    public static string UnescapeRenderableVtmlTags(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+
+        return EscapedTagRegex.Replace(input, match =>
+        {
+            var tagName = match.Groups[2].Value;
+            if (!RenderableTags.Contains(tagName))
+            {
+                return match.Value;
+            }
+
+            return BuildRawTag(match.Groups[1].Value, tagName, match.Groups[3].Value);
+        });
+    }
+
+    /// <summary>
+    /// Keeps only VTML tags supported by Vintage Story's richtext renderer.
+    /// </summary>
+    public static string NormalizeVtmlForRendering(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+
+        return RawTagRegex.Replace(input, match =>
+        {
+            var tagName = match.Groups[2].Value;
+            if (!RenderableTags.Contains(tagName))
+            {
+                return string.Empty;
+            }
+
+            return BuildRawTag(match.Groups[1].Value, tagName, match.Groups[3].Value);
+        });
+    }
+
+    private static string BuildRawTag(string slash, string tagName, string attributes)
+    {
+        return $"<{slash}{tagName.ToLowerInvariant()}{attributes}>";
     }
 
     /// <summary>

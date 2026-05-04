@@ -38,6 +38,7 @@ public class TransformerSystem
             // Validation transformers
             new PlayerChatTransformer(_chatSystem), // If player chat, process special modifiers
             new PlacedEnvironmentTransformer(_chatSystem), // Raycast for !! / /envhere, falls back to standard env on miss
+            new UserMarkupSanitizerTransformer(_chatSystem), // Strip player-authored VTML before trusted formatting is added
             new CommandMessageEscapeTransformer(_chatSystem), // Escape XML special characters in command messages
             new RoleplayTransformer(_chatSystem), // Add roleplay metadata
             new NicknameRequirementTransformer(_chatSystem), // Require nickname if we're in RP chat

@@ -107,7 +107,7 @@ namespace thebasics.ModSystems.ProximityChat
             }
 
             // Check language limit
-            var currentLanguages = player.GetLanguages();
+            var currentLanguages = GetPlayerLanguages(player);
             if (Config.MaxLanguagesPerPlayer >= 0 && currentLanguages.Count >= Config.MaxLanguagesPerPlayer)
             {
                 return new TextCommandResult
@@ -161,7 +161,7 @@ namespace thebasics.ModSystems.ProximityChat
             // If they just removed their default language, set it to the first language they know
             if (player.GetDefaultLanguage(Config).Name == language.Name)
             {
-                var newPlayerLanguages = player.GetLanguages();
+                var newPlayerLanguages = GetPlayerLanguages(player);
 
                 // If the player now knows no languages, set their default to babble
                 if (newPlayerLanguages.Count == 0)
@@ -171,8 +171,7 @@ namespace thebasics.ModSystems.ProximityChat
                 }
                 else
                 {
-                    var newDefaultIdentifier = newPlayerLanguages.First();
-                    var newDefault = GetLangFromText(newDefaultIdentifier, false);
+                    var newDefault = newPlayerLanguages.First();
                     player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-new-default", ChatHelper.LangIdentifier(language), ChatHelper.LangIdentifier(newDefault)), EnumChatType.Notification);
                     player.SetDefaultLanguage(newDefault);
                 }
@@ -237,7 +236,7 @@ namespace thebasics.ModSystems.ProximityChat
             }
 
             // Player self-add respects the configured language limit; admin add can bypass it.
-            var currentLanguages = targetPlayer.GetLanguages();
+            var currentLanguages = GetPlayerLanguages(targetPlayer);
             var exceedsConfiguredLimit = Config.MaxLanguagesPerPlayer >= 0 && currentLanguages.Count >= Config.MaxLanguagesPerPlayer;
 
             targetPlayer.AddLanguage(lang);
@@ -293,7 +292,7 @@ namespace thebasics.ModSystems.ProximityChat
             var defaultLang = targetPlayer.GetDefaultLanguage(Config);
             if (defaultLang == null || defaultLang.Name == language.Name)
             {
-                var newPlayerLanguages = targetPlayer.GetLanguages();
+                var newPlayerLanguages = GetPlayerLanguages(targetPlayer);
 
                 // If the player now knows no languages, set their default to babble
                 if (newPlayerLanguages.Count == 0)
@@ -303,18 +302,9 @@ namespace thebasics.ModSystems.ProximityChat
                 }
                 else
                 {
-                    var newDefaultIdentifier = newPlayerLanguages.First();
-                    var newDefault = GetLangFromText(newDefaultIdentifier, false);
-                    if (newDefault == null)
-                    {
-                        player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-no-valid-default", targetPlayer.PlayerName), EnumChatType.Notification);
-                        targetPlayer.SetDefaultLanguage(BabbleLang);
-                    }
-                    else
-                    {
-                        player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-new-default", targetPlayer.PlayerName, ChatHelper.LangIdentifier(language), ChatHelper.LangColor(newDefault.Name, newDefault)), EnumChatType.Notification);
-                        targetPlayer.SetDefaultLanguage(newDefault);
-                    }
+                    var newDefault = newPlayerLanguages.First();
+                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-new-default", targetPlayer.PlayerName, ChatHelper.LangIdentifier(language), ChatHelper.LangColor(newDefault.Name, newDefault)), EnumChatType.Notification);
+                    targetPlayer.SetDefaultLanguage(newDefault);
                 }
             }
 
@@ -340,11 +330,45 @@ namespace thebasics.ModSystems.ProximityChat
 
         private List<Language> GetPlayerLanguages(IServerPlayer player)
         {
+            PruneUnknownPlayerLanguages(player);
+
             return player.GetLanguages()
                 .Select(lang => GetLangFromText(lang, false, allowHidden: true))
                 .Where(lang => lang != null)
                 .Cast<Language>()  // Cast after filtering out nulls
                 .ToList();
+        }
+
+        private void PruneUnknownPlayerLanguages(IServerPlayer player)
+        {
+            var currentNames = player.GetLanguages();
+            var validNames = new HashSet<string>(
+                GetAllLanguages(false, includeHidden: true).Select(lang => lang.Name),
+                StringComparer.OrdinalIgnoreCase);
+
+            var prunedNames = currentNames
+                .Where(validNames.Contains)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (!currentNames.SequenceEqual(prunedNames, StringComparer.OrdinalIgnoreCase))
+            {
+                player.SetLanguages(prunedNames);
+            }
+
+            var defaultLanguageName = player.GetDefaultLanguageName();
+            var defaultIsKnown = string.Equals(defaultLanguageName, BabbleLang.Name, StringComparison.OrdinalIgnoreCase) ||
+                prunedNames.Contains(defaultLanguageName, StringComparer.OrdinalIgnoreCase);
+            if (defaultIsKnown)
+            {
+                return;
+            }
+
+            var newDefaultName = prunedNames.FirstOrDefault();
+            var newDefault = newDefaultName == null
+                ? BabbleLang
+                : GetLangFromText(newDefaultName, false, allowHidden: true) ?? BabbleLang;
+            player.SetDefaultLanguage(newDefault);
         }
 
 

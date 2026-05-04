@@ -5,9 +5,11 @@ namespace thebasics.ModSystems.SaveNotifications
 {
     public class SaveNotificationsSystem : BaseBasicModSystem
     {
+        private bool _saveInProgress;
+
         protected override void BasicStartServerSide()
         {
-            if (Config.SendServerSaveAnnouncement)
+            if (Config.SendServerSaveAnnouncement || Config.SendServerSaveFinishedAnnouncement)
             {
                 API.Event.GameWorldSave += Event_GameWorldSave;
             }
@@ -20,6 +22,8 @@ namespace thebasics.ModSystems.SaveNotifications
 
         private void Event_GameWorldSave()
         {
+            _saveInProgress = Config.SendServerSaveFinishedAnnouncement;
+
             if (Config.SendServerSaveAnnouncement)
             {
                 var chatType = Config.ServerSaveAnnouncementAsNotification
@@ -31,6 +35,17 @@ namespace thebasics.ModSystems.SaveNotifications
         }
 
         private void Event_SaveFinished()
+        {
+            if (!_saveInProgress || !Config.SendServerSaveFinishedAnnouncement)
+            {
+                return;
+            }
+
+            _saveInProgress = false;
+            API.Event.RegisterCallback(_ => SendSaveFinishedAnnouncement(), 100, true);
+        }
+
+        private void SendSaveFinishedAnnouncement()
         {
             if (Config.SendServerSaveFinishedAnnouncement)
             {

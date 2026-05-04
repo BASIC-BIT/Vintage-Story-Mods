@@ -551,9 +551,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
             ? (int)Vintagestory.API.Util.EnumTalkType.IdleShort
             : (int)Vintagestory.API.Util.EnumTalkType.Idle;
 
-        // Logarithmic scaling (natural log): diminishing returns on longer messages.
-        // "hi" (2) -> 6, "hello there" (11) -> 10, full sentence (32) -> 13, novel (150+) -> 18
-        var noteCount = Math.Min(3 + (int)(3.0 * Math.Log(speechLength + 1)), 20);
+        // Keep chatter as a short ambient cue, not a second voice line.
+        // "hi" (2) -> 2, "hello there" (11) -> 2, full sentence (32) -> 3, long messages cap at 4.
+        var noteCount = speechLength switch
+        {
+            <= 24 => 2,
+            <= 80 => 3,
+            _ => 4,
+        };
 
         var message = new ChatterSoundMessage
         {

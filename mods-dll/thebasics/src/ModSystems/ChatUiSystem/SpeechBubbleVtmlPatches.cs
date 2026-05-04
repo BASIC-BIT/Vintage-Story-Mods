@@ -121,7 +121,7 @@ public static class SpeechBubbleVtmlPatches
             }
 
             var bubbleVtml = rawMsg;
-            bubbleVtml = bubbleVtml.Replace("&lt;", "<").Replace("&gt;", ">");
+            bubbleVtml = VtmlUtils.UnescapeRenderableVtmlTags(bubbleVtml);
 
             var hasVtml = bubbleVtml.Contains('<');
             // If there are no tags, no kind, and no mode marker, vanilla rendering is fine.
