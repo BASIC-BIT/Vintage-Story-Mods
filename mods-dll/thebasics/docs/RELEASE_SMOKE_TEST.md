@@ -10,6 +10,30 @@ Use this checklist for compatibility releases and before publishing a new ModDB/
 - Confirm `server-main.log` shows Vintage Story version, `.NET` runtime, The BASICs loaded once, all six server mod systems, no duplicate mod warning, and no The BASICs startup exceptions.
 - Relaunch both test clients after every server restart.
 
+## Post-Publish ModDB Download Check
+
+Run this after the ModDB release is published. It verifies the player-facing install path, not just the local build artifact.
+
+1. **Put The ModDB Zip On The Test Server** (P0)
+   - Do: Download the published ModDB file and place that exact zip in `/data/Mods/` on the test server.
+   - Do: Remove any other `thebasics*.zip` files from `/data/Mods/`.
+   - Expect: `/data/Mods/` contains only the published release zip, for example `thebasics_5_5_0.zip`.
+   - Watch for: accidentally testing a freshly built local zip instead of the public ModDB artifact.
+
+2. **Force A Client-Side ModDB Fetch** (P0)
+   - Do: Close all Vintage Story clients.
+   - Do: Delete local client copies from `Mods` and the server-specific `ModsByServer` folder for the test profile, for example:
+     - `D:\Games\VSProfiles\Profile2\Mods\thebasics*.zip`
+     - `D:\Games\VSProfiles\Profile2\ModsByServer\15.235.75.126-30000\thebasics*.zip`
+   - Do: Restart the server, then launch the test client and connect to the server.
+   - Expect: The first connection reports `lacking mods` for `thebasics@<version>`, requests `v2/mods/install-information`, downloads the ModDB release, reconnects, and loads from `ModsByServer\<host-port>\thebasics_<version>.zip`.
+   - Watch for: no ModDB install-information request, wrong version downloaded, manual local `Mods` copy being used, or client-side The BASICs load errors.
+
+3. **Confirm Client Join** (P0)
+   - Do: Check the active `client-main.log` after reconnect.
+   - Expect: The client log shows `Mod 'thebasics_<version>.zip' (thebasics)`, receives server assets, and reaches level finalize.
+   - Watch for: client crash log updates, The BASICs assembly load errors, or disconnect loops.
+
 ## Batch 1: Default/Production-Like Config
 
 1. **Clean Boot** (P0)

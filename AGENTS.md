@@ -36,6 +36,12 @@ If the toolbox repo is present next to this repo, also read:
 
 OpenCode skills under `.opencode/skills/` are first-class workflow assets for this repository. When a task matches a skill, follow it and update it in the same PR as workflow changes.
 
+## Context Management
+
+- Keep `AGENTS.md` durable: repository policy, stable workflows, architecture, build/test commands, and long-lived safety rules.
+- Do not put transient release state, current bug reports, session summaries, or active handoff notes in `AGENTS.md`.
+- For current work handoff, use a dated kickoff packet under `docs/agent-context/` with objective, scope, issue links, constraints, likely code areas, verification steps, and a retirement condition.
+- `AGENTS.local.md` remains for local operator preferences and machine-specific paths; do not use it for shared project state.
 
 ## Build Commands
 
@@ -95,7 +101,7 @@ The main mod (`thebasics`) is a comprehensive roleplay and server management mod
 
 3. **TPA System** (`src/ModSystems/TPA/`)
    - Teleport request functionality
-   - Currently being refactored for gear system integration
+   - Uses configurable request privilege and optional temporal gear requirement
    - Uses safe network communication utilities
 
 4. **Save Notifications** (`src/ModSystems/SaveListener/`)
@@ -238,7 +244,7 @@ These are the most commonly toggled settings in `/data/ModConfig/the_basics.json
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `OverrideSpeechBubblesWithRpText` | `false` | When true, overhead bubbles show RP-processed VTML text with kind styling + LOS gating |
+| `DisableRpOverheadBubbles` | `false` | Opt out of RP-processed overhead bubbles and fall back to vanilla speech bubbles |
 | `EnableTypingIndicator` | `true` | Show typing indicator above players' heads |
 | `SendServerSaveAnnouncement` | `true` | Announce "save started" to players |
 | `SendServerSaveFinishedAnnouncement` | `true` | Announce "save finished" to players |
@@ -248,7 +254,6 @@ These are the most commonly toggled settings in `/data/ModConfig/the_basics.json
 | `EnableChatter` | `true` | Play seraph voice chatter for speech messages |
 | `DebugMode` | `false` | Enable `[THEBASICS][perf]` and diagnostic logging |
 | `TypingIndicatorDisplayMode` | `2` (Both) | 0=Icon only, 1=Text only, 2=Both icon + text |
-| `DisableRpOverheadBubbles` | `false` | Opt out of RP-processed bubbles and fall back to vanilla speech bubbles |
 | `TpaRequestPrivilege` | `chat` | Privilege required to initiate `/tpa` and `/tpahere` |
 
 #### Launching Test Game Clients
