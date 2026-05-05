@@ -35,10 +35,11 @@ public static class NameTagRenderRangePatches
             var configuredRange = __instance.RenderRange;
             if (configuredRange >= 0)
             {
+                // Vanilla defaults this to 999; 0 is an intentional hide-all configuration.
                 RenderRangeFieldRef(__instance) = configuredRange;
             }
 
-            if (ShouldSuppressNametag(__instance, ___entity))
+            if (ShouldSuppressNametag(__instance, ___entity, configuredRange))
             {
                 return false;
             }
@@ -51,7 +52,7 @@ public static class NameTagRenderRangePatches
         return true;
     }
 
-    private static bool ShouldSuppressNametag(EntityBehaviorNameTag instance, Entity entity)
+    private static bool ShouldSuppressNametag(EntityBehaviorNameTag instance, Entity entity, int configuredRange)
     {
         if (!TryGetRemoteNametagContext(entity, out var capi, out var localPlayerEntity))
         {
@@ -59,7 +60,7 @@ public static class NameTagRenderRangePatches
         }
 
         return IsMissingRequiredTarget(instance, capi, entity) ||
-               IsOutsideRenderRange(instance, localPlayerEntity, entity) ||
+               IsOutsideRenderRange(configuredRange, localPlayerEntity, entity) ||
                IsMissingRequiredLineOfSight(localPlayerEntity, entity);
     }
 
@@ -75,9 +76,8 @@ public static class NameTagRenderRangePatches
         return instance.ShowOnlyWhenTargeted && capi.World.Player.CurrentEntitySelection?.Entity != target;
     }
 
-    private static bool IsOutsideRenderRange(EntityBehaviorNameTag instance, Entity localPlayerEntity, Entity target)
+    private static bool IsOutsideRenderRange(int renderRange, Entity localPlayerEntity, Entity target)
     {
-        var renderRange = instance.RenderRange;
         return renderRange >= 0 && localPlayerEntity.Pos.SquareDistanceTo(target.Pos) >= (double)renderRange * renderRange;
     }
 
