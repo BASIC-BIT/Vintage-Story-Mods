@@ -84,6 +84,7 @@ public class MessageContext
     public static readonly string IS_SPEECH = "isSpeech";
     public static readonly string SPEECH_COLOR = "speechColor";
     public static readonly string SPEECH_TEXT = "speechText";
+    public static readonly string PENDING_SIGN_LANGUAGE_RECIPIENTS = "pendingSignLanguageRecipients";
 
     // Stores the pre-recipient-phase bubble text for speech messages.
     // Used when we want to keep overhead bubbles closer to vanilla behavior.

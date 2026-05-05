@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using thebasics.Extensions;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -13,7 +14,7 @@ namespace thebasics.ModSystems.Repair
             API.ChatCommands.GetOrCreate("setdurability")
                 .WithDescription(Lang.Get("thebasics:repair-cmd-setdurability-desc"))
                 .RequiresPrivilege(Privilege.root)
-                .WithArgs(API.ChatCommands.Parsers.Int("durability"))
+                .WithArgs(new WordArgParser("durability", true))
                 .RequiresPlayer()
                 .HandleWith(SetDurabilityCommand);
         }
@@ -22,8 +23,7 @@ namespace thebasics.ModSystems.Repair
         {
             var player = (IServerPlayer)args.Caller.Player;
 
-            // Parsed by .WithArgs(Int("durability"))
-            var durability = (int)args[0];
+            var durabilityInput = (string)args[0];
             var activeSlot = player.InventoryManager?.ActiveHotbarSlot;
 
             if (activeSlot == null || activeSlot.Empty || activeSlot.Itemstack == null)
@@ -55,17 +55,106 @@ namespace thebasics.ModSystems.Repair
                 };
             }
 
-            // Clamp to a sensible range.
-            durability = Math.Max(0, Math.Min(durability, maxDurability));
+            if (!TryParseDurabilityInput(durabilityInput, maxDurability, out var durability, out var error, out var showPercentHint))
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = error == DurabilityInputError.Negative
+                        ? Lang.Get("thebasics:repair-error-negative-durability")
+                        : Lang.Get("thebasics:repair-error-invalid-durability"),
+                };
+            }
 
             stack.Attributes.SetInt("durability", durability);
             activeSlot.MarkDirty();
 
+            var message = Lang.Get("thebasics:repair-success-set", durability, maxDurability);
+            if (showPercentHint)
+            {
+                message += " " + Lang.Get("thebasics:repair-hint-use-full-percent");
+            }
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = Lang.Get("thebasics:repair-success-set", durability),
+                StatusMessage = message,
             };
+        }
+
+        public static bool TryParseDurabilityInput(
+            string input,
+            int maxDurability,
+            out int durability,
+            out DurabilityInputError error,
+            out bool showPercentHint)
+        {
+            durability = 0;
+            error = DurabilityInputError.None;
+            showPercentHint = false;
+
+            if (string.IsNullOrWhiteSpace(input) || maxDurability <= 0)
+            {
+                error = DurabilityInputError.Invalid;
+                return false;
+            }
+
+            var trimmed = input.Trim();
+            if (trimmed.EndsWith("%", StringComparison.Ordinal))
+            {
+                return TryParsePercentDurability(trimmed, maxDurability, out durability, out error);
+            }
+
+            if (!int.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var absoluteDurability))
+            {
+                error = DurabilityInputError.Invalid;
+                return false;
+            }
+
+            if (absoluteDurability < 0)
+            {
+                error = DurabilityInputError.Negative;
+                return false;
+            }
+
+            durability = Math.Min(absoluteDurability, maxDurability);
+            showPercentHint = absoluteDurability == 100 && maxDurability > 100;
+            return true;
+        }
+
+        private static bool TryParsePercentDurability(
+            string trimmed,
+            int maxDurability,
+            out int durability,
+            out DurabilityInputError error)
+        {
+            durability = 0;
+            error = DurabilityInputError.None;
+
+            var percentText = trimmed[..^1];
+            if (!double.TryParse(percentText, NumberStyles.Float, CultureInfo.InvariantCulture, out var percent) ||
+                !double.IsFinite(percent))
+            {
+                error = DurabilityInputError.Invalid;
+                return false;
+            }
+
+            if (percent < 0)
+            {
+                error = DurabilityInputError.Negative;
+                return false;
+            }
+
+            var requested = (int)Math.Round(maxDurability * percent / 100d, MidpointRounding.AwayFromZero);
+            durability = Math.Max(0, Math.Min(requested, maxDurability));
+            return true;
+        }
+
+        public enum DurabilityInputError
+        {
+            None,
+            Invalid,
+            Negative
         }
     }
 }

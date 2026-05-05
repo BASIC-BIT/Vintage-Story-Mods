@@ -77,6 +77,18 @@ public class LanguageScramblerTests
     }
 
     [Fact]
+    public void ScrambleMessage_PreservesConfiguredNameWords()
+    {
+        var result = LanguageScrambler.ScrambleMessage(
+            "Hello Steve, can you hear me?",
+            TestLanguage,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "steve" });
+
+        result.Should().Contain("Steve");
+        result.Should().NotContain("Hello");
+    }
+
+    [Fact]
     public void ScrambleMessage_EmptyMessage_ReturnsEmpty()
     {
         var result = LanguageScrambler.ScrambleMessage("", TestLanguage);

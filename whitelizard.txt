@@ -19,3 +19,9 @@ PlayerByNameOrNicknameArgParser::TryProcess
 
 # CCN=27, 163 lines - Harmony prefix patch with many conditional branches
 SpeechBubbleVtmlPatches::Prefix
+
+# CCN=10 but 108 lines - texture generation setup with resource management
+RichTextTextureUtils::GenRichTextTexture
+
+# CCN=22, 121 lines - chatter dispatch mixes audio selection and emission
+RPProximityChatSystem::DispatchChatterForContext

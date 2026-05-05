@@ -1,4 +1,7 @@
+#nullable enable
+
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using thebasics.Extensions;
@@ -9,12 +12,17 @@ namespace thebasics.ModSystems.ProximityChat
 {
     public static class LanguageScrambler
     {
-        public static string ScrambleMessage(string message, Language language)
+        public static string ScrambleMessage(string message, Language language, ISet<string>? preservedWords = null)
         {
             var wordRegex = new Regex(@"\w+");
             return wordRegex.Replace(message, match =>
             {
                 var word = match.Groups[0].Value;
+                if (preservedWords?.Contains(word) == true)
+                {
+                    return word;
+                }
+
                 var random = new Random(GetWordHash(word));
 
                 var syllableCount = GetSyllableCount(word, random);

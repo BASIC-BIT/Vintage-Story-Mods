@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -33,7 +34,12 @@ public static class VisibilityUtils
         return true; // Opaque — ray stops here.
     };
 
-    public static bool HasLineOfSight(IWorldAccessor world, Entity observer, Entity target, bool failOpen)
+    public static bool HasLineOfSight(
+        IWorldAccessor world,
+        Entity observer,
+        Entity target,
+        bool failOpen,
+        bool useMultiPointTargets = false)
     {
         if (world == null || observer == null || target == null)
         {
@@ -53,27 +59,16 @@ public static class VisibilityUtils
             var toBase = world.Side == EnumAppSide.Server ? target.ServerPos.XYZ : target.Pos.XYZ;
 
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
-            var toPos = toBase.AddCopy(target.LocalEyePos);
 
-            // For our purposes, we only want to know if any opaque block blocks the segment
-            // between observer and target. Visually transparent blocks (glass, leaves, water)
-            // are skipped so LOS matches what the player can actually see.
-            // We intentionally ignore entities as potential blockers.
-            BlockSelection blockSel = null;
-            EntitySelection entitySel = null;
-            world.RayTraceForSelection(fromPos, toPos, ref blockSel, ref entitySel,
-                bfilter: LosBlockFilter, efilter: _ => false);
-
-            // RayTraceForSelection sets blockSel to null when no block is hit.
-            // Line of sight is clear when nothing was intersected.
-            if (blockSel?.Block == null)
+            foreach (var targetPos in GetEntityLineOfSightTargetPositions(toBase, target, useMultiPointTargets))
             {
-                return true;
+                if (IsRayClear(world, fromPos, targetPos, failOpen))
+                {
+                    return true;
+                }
             }
 
-            // If a block was hit (and passed the filter), it's opaque — LOS blocked.
-            // The Id == 0 check is a safety net; air should already be filtered out.
-            return blockSel.Block.Id == 0;
+            return false;
         }
         catch
         {
@@ -104,21 +99,63 @@ public static class VisibilityUtils
             var fromBase = world.Side == EnumAppSide.Server ? observer.ServerPos.XYZ : observer.Pos.XYZ;
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
 
+            return IsRayClear(world, fromPos, targetPos, failOpen);
+        }
+        catch (Exception ex)
+        {
+            world.Logger?.Debug("THEBASICS VisibilityUtils: LOS raytrace to Vec3d threw: {0}", ex.Message);
+            return failOpen;
+        }
+    }
+
+    private static IEnumerable<Vec3d> GetEntityLineOfSightTargetPositions(
+        Vec3d targetBase,
+        Entity target,
+        bool useMultiPointTargets)
+    {
+        yield return targetBase.AddCopy(target.LocalEyePos);
+
+        if (!useMultiPointTargets)
+        {
+            yield break;
+        }
+
+        var height = GetEntityHeight(target);
+        if (height <= 0)
+        {
+            yield break;
+        }
+
+        yield return targetBase.AddCopy(0, height * 0.55, 0);
+        yield return targetBase.AddCopy(0, height * 0.2, 0);
+    }
+
+    private static double GetEntityHeight(Entity target)
+    {
+        var height = target.CollisionBox?.YSize ?? target.SelectionBox?.YSize ?? 0;
+        if (height > 0)
+        {
+            return height;
+        }
+
+        return target.LocalEyePos?.Y * 1.2 ?? 0;
+    }
+
+    private static bool IsRayClear(IWorldAccessor world, Vec3d fromPos, Vec3d targetPos, bool failOpen)
+    {
+        try
+        {
+            // For our purposes, we only want to know if any opaque block blocks the segment.
+            // Visually transparent blocks are skipped and entities are ignored as blockers.
             BlockSelection blockSel = null;
             EntitySelection entitySel = null;
             world.RayTraceForSelection(fromPos, targetPos, ref blockSel, ref entitySel,
                 bfilter: LosBlockFilter, efilter: _ => false);
 
-            if (blockSel?.Block == null)
-            {
-                return true;
-            }
-
-            return blockSel.Block.Id == 0;
+            return blockSel?.Block == null || blockSel.Block.Id == 0;
         }
-        catch (Exception ex)
+        catch
         {
-            world.Logger?.Debug("THEBASICS VisibilityUtils: LOS raytrace to Vec3d threw: {0}", ex.Message);
             return failOpen;
         }
     }
