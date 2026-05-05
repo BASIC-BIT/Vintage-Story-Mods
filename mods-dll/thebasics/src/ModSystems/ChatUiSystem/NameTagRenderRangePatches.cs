@@ -12,8 +12,8 @@ namespace thebasics.ModSystems.ChatUiSystem;
 /// Workaround for a vanilla VS bug: <c>EntityBehaviorNameTag.OnRenderFrame</c> checks the
 /// <c>renderRange</c> field (hardcoded to 999, never updated) instead of the <c>RenderRange</c>
 /// property (which reads from synced <c>WatchedAttributes</c>).
-/// This patch syncs the field from the property before each render frame so that
-/// server-configured <c>NametagRenderRange</c> actually takes effect.
+/// This patch syncs the field from the property before each render frame and
+/// explicitly suppresses rendering when target-only, range, or LOS checks fail.
 /// </summary>
 [HarmonyPatch(typeof(EntityBehaviorNameTag), "OnRenderFrame")]
 public static class NameTagRenderRangePatches
@@ -33,20 +33,14 @@ public static class NameTagRenderRangePatches
             // Sync the field from the WatchedAttributes-backed property so the
             // vanilla distance check uses the server-configured value.
             var configuredRange = __instance.RenderRange;
-            if (configuredRange > 0)
+            if (configuredRange >= 0)
             {
                 RenderRangeFieldRef(__instance) = configuredRange;
             }
 
-            if (ChatUiSystem.DoNametagsRequireLineOfSight())
+            if (ShouldSuppressNametag(__instance, ___entity))
             {
-                var capi = ___entity?.World?.Api as ICoreClientAPI;
-                var localPlayerEntity = capi?.World?.Player?.Entity;
-                if (localPlayerEntity != null && ___entity != null && localPlayerEntity.EntityId != ___entity.EntityId &&
-                    !CanSeeCached(___entity.World, localPlayerEntity, ___entity))
-                {
-                    return false;
-                }
+                return false;
             }
         }
         catch
@@ -55,6 +49,42 @@ public static class NameTagRenderRangePatches
         }
 
         return true;
+    }
+
+    private static bool ShouldSuppressNametag(EntityBehaviorNameTag instance, Entity entity)
+    {
+        if (!TryGetRemoteNametagContext(entity, out var capi, out var localPlayerEntity))
+        {
+            return false;
+        }
+
+        return IsMissingRequiredTarget(instance, capi, entity) ||
+               IsOutsideRenderRange(instance, localPlayerEntity, entity) ||
+               IsMissingRequiredLineOfSight(localPlayerEntity, entity);
+    }
+
+    private static bool TryGetRemoteNametagContext(Entity entity, out ICoreClientAPI capi, out Entity localPlayerEntity)
+    {
+        capi = entity?.World?.Api as ICoreClientAPI;
+        localPlayerEntity = capi?.World?.Player?.Entity;
+        return capi != null && localPlayerEntity != null && entity != null && localPlayerEntity.EntityId != entity.EntityId;
+    }
+
+    private static bool IsMissingRequiredTarget(EntityBehaviorNameTag instance, ICoreClientAPI capi, Entity target)
+    {
+        return instance.ShowOnlyWhenTargeted && capi.World.Player.CurrentEntitySelection?.Entity != target;
+    }
+
+    private static bool IsOutsideRenderRange(EntityBehaviorNameTag instance, Entity localPlayerEntity, Entity target)
+    {
+        var renderRange = instance.RenderRange;
+        return renderRange >= 0 && localPlayerEntity.Pos.SquareDistanceTo(target.Pos) >= (double)renderRange * renderRange;
+    }
+
+    private static bool IsMissingRequiredLineOfSight(Entity localPlayerEntity, Entity target)
+    {
+        return ChatUiSystem.DoNametagsRequireLineOfSight() &&
+               !CanSeeCached(target.World, localPlayerEntity, target);
     }
 
     private static bool CanSeeCached(IWorldAccessor world, Entity observer, Entity target)
@@ -73,7 +103,7 @@ public static class NameTagRenderRangePatches
 
         if (!LosCache.TryGetValue(target.EntityId, out var entry) || nowMs >= entry.nextCheckMs)
         {
-            var canSee = VisibilityUtils.HasLineOfSight(world, observer, target);
+            var canSee = VisibilityUtils.HasLineOfSight(world, observer, target, failOpen: false, useMultiPointTargets: true);
             var refreshMs = canSee ? 250L : 500L;
             entry = (canSee, nowMs + refreshMs);
             LosCache[target.EntityId] = entry;

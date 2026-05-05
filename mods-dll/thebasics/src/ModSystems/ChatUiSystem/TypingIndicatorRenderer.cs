@@ -197,7 +197,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
         // If the cache is stale or missing, recompute.
         if (!_losCache.TryGetValue(target.EntityId, out var entry) || nowMs >= entry.nextCheckMs)
         {
-            var canSee = VisibilityUtils.HasLineOfSight(world, observer, target);
+            var canSee = VisibilityUtils.HasLineOfSight(world, observer, target, failOpen: false, useMultiPointTargets: true);
             // Faster refresh when visible for nicer responsiveness.
             var refreshMs = canSee ? 250L : 500L;
             entry = (canSee, nowMs + refreshMs);
