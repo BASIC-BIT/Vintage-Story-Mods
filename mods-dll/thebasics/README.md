@@ -63,6 +63,14 @@ Nametags are also configurable (in `ModConfig/the_basics.json`):
 - `HideNametagUnlessTargeting`: only show nametags when the player is targeted
 - `NametagRenderRange`: how far away nametags render
 
+RP speech formatting can be relaxed for servers that prefer player-authored casing and punctuation:
+- `ProximityChatPresentationMode`: controls chat/bubble presentation. Allowed values are `StandardRoleplay`, `SimpleSpeech`, `PlainProximity`, and `Prose`.
+  `Prose` treats unquoted text as narration and only quoted segments as spoken language, including language color and chatter sounds.
+- `ProseNicknameToken`: in Prose mode, this standalone token is replaced with the sender's formatted RP nickname. Default: `@`. Set to an empty string to disable.
+- `AttributeFreeformMessagesToPlayerName`: when true, Prose and environmental messages are prefixed with the account name in brackets, for example `[PlayerName]`. Default: `false`.
+- `NormalizeProximityChatText`: when true, automatically capitalizes and punctuates RP speech/emotes/environmental messages. When false, typed casing and punctuation are preserved.
+- `OverheadChatBubbleMode`: controls overhead bubbles. Allowed values are `RpText`, `Vanilla`, and `Off`.
+
 ### Example Usage
 
 To set a nickname: `/nick MyNickname`
@@ -153,7 +161,8 @@ Clients render VTML in overhead bubbles, including italics, font tags, icons, an
 Notes:
 
 - Vanilla overhead bubbles render plain text (they do not parse VTML).
-- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles=true` to opt out of RP-processed overhead speech bubbles and fall back to vanilla speech bubbles.
+- `OverrideSpeechBubblesWithRpText` is deprecated and ignored.
+- `DisableRpOverheadBubbles` is deprecated; use `OverheadChatBubbleMode=Vanilla` to fall back to vanilla speech bubbles or `OverheadChatBubbleMode=Off` to suppress overhead chat bubbles entirely.
 
 
 

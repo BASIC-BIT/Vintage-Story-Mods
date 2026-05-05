@@ -1,3 +1,4 @@
+using thebasics.Configs;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 
@@ -15,7 +16,8 @@ public class ObfuscationTransformer : MessageTransformerBase
     public override bool ShouldTransform(MessageContext context)
     {
         // TODO: Does this same logic need to be applied in the EmoteTransformer?
-        return context.HasFlag(MessageContext.IS_SPEECH);
+        return context.HasFlag(MessageContext.IS_SPEECH) &&
+               ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode) != ProximityChatPresentationModes.Prose;
     }
 
     public override MessageContext Transform(MessageContext context)

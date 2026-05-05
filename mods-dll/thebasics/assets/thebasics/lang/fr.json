@@ -122,6 +122,7 @@
   "lang-error-max-languages": "Vous ne pouvez pas apprendre plus de {0} langues ! Retirez-en une d'abord.",
   "lang-error-not-known": "Vous ne connaissez pas la langue {0} !",
   "lang-error-unknown-language": "Vous ne connaissez pas cette langue !",
+  "lang-error-system-disabled": "The language system is disabled on this server.",
   "lang-error-invalid-with-list": "Invalid language specifier \":{0}\". Valid languages:{1}",
   "lang-error-invalid-prefix-with-list": "Invalid language prefix. Valid languages:{0}",
   "lang-error-admin-already-known": "{0} connaît déjà la langue {1} !",

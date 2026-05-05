@@ -194,7 +194,7 @@ public class HeritageLanguageSystem : BaseSubSystem
     private void GrantClassLanguages(IServerPlayer player, string classCode, bool notify)
     {
         var toGrant = Config.Languages
-            .Where(language => language.GrantedToClasses.Any(bound => string.Equals(bound, classCode, StringComparison.OrdinalIgnoreCase)))
+            .Where(language => IsLanguageGrantedByClass(language, classCode))
             .ToList();
 
         GrantLanguages(
@@ -214,10 +214,14 @@ public class HeritageLanguageSystem : BaseSubSystem
         var currentTraits = GetPlayerTraits(player);
         var (currentModelCode, currentModelGroupCode) = GetCurrentModelContext(player);
 
-        var toRemove = Config.Languages
-            .Where(language => language.GrantedToClasses.Any(bound => string.Equals(bound, classCode, StringComparison.OrdinalIgnoreCase)))
-            .Where(language => !IsLanguageGrantedByHeritage(language, currentClass, currentTraits, currentModelCode, currentModelGroupCode))
-            .ToList();
+        var toRemove = GetClassLanguagesToRemove(
+            Config.Languages,
+            classCode,
+            currentClass,
+            currentTraits,
+            currentModelCode,
+            currentModelGroupCode,
+            _playerModelLibEnabled && _hasModelBindings);
 
         RemoveLanguages(
             player,
@@ -696,7 +700,45 @@ public class HeritageLanguageSystem : BaseSubSystem
 
     private bool IsLanguageGrantedByHeritage(Language language, string classCode, IEnumerable<string> traits, string modelCode, string modelGroupCode)
     {
-        if (!string.IsNullOrWhiteSpace(classCode) && language.GrantedToClasses.Any(bound => string.Equals(bound, classCode, StringComparison.OrdinalIgnoreCase)))
+        return IsLanguageGrantedByHeritage(
+            language,
+            classCode,
+            traits,
+            modelCode,
+            modelGroupCode,
+            _playerModelLibEnabled && _hasModelBindings);
+    }
+
+    internal static IReadOnlyList<Language> GetClassLanguagesToRemove(
+        IEnumerable<Language> languages,
+        string previousClassCode,
+        string currentClassCode,
+        IEnumerable<string> currentTraits,
+        string currentModelCode,
+        string currentModelGroupCode,
+        bool includeModelBindings)
+    {
+        return languages
+            .Where(language => IsLanguageGrantedByClass(language, previousClassCode))
+            .Where(language => !IsLanguageGrantedByHeritage(
+                language,
+                currentClassCode,
+                currentTraits,
+                currentModelCode,
+                currentModelGroupCode,
+                includeModelBindings))
+            .ToList();
+    }
+
+    internal static bool IsLanguageGrantedByHeritage(
+        Language language,
+        string classCode,
+        IEnumerable<string> traits,
+        string modelCode,
+        string modelGroupCode,
+        bool includeModelBindings)
+    {
+        if (IsLanguageGrantedByClass(language, classCode))
         {
             return true;
         }
@@ -707,15 +749,20 @@ public class HeritageLanguageSystem : BaseSubSystem
             return true;
         }
 
-        if (!_playerModelLibEnabled || !_hasModelBindings)
+        if (!includeModelBindings)
         {
             return false;
         }
 
-        var modelVariants = ExpandModelCodeVariants(modelCode).ToArray();
-        var groupVariants = ExpandModelCodeVariants(modelGroupCode).ToArray();
+        var modelVariants = ExpandCodeVariants(modelCode).ToArray();
+        var groupVariants = ExpandCodeVariants(modelGroupCode).ToArray();
         return MatchesAny(language.GrantedToModels, modelVariants) ||
                MatchesAny(language.GrantedToModelGroups, groupVariants);
+    }
+
+    internal static bool IsLanguageGrantedByClass(Language language, string classCode)
+    {
+        return MatchesAny(language.GrantedToClasses, ExpandCodeVariants(classCode));
     }
 
     private static bool AreSameCodes(IEnumerable<string> left, IEnumerable<string> right)
@@ -752,6 +799,11 @@ public class HeritageLanguageSystem : BaseSubSystem
     }
 
     private static IEnumerable<string> ExpandModelCodeVariants(string code)
+    {
+        return ExpandCodeVariants(code);
+    }
+
+    private static IEnumerable<string> ExpandCodeVariants(string code)
     {
         if (string.IsNullOrWhiteSpace(code))
         {

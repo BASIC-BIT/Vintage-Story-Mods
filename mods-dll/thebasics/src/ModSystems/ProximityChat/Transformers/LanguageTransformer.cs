@@ -1,3 +1,4 @@
+using thebasics.Configs;
 using thebasics.ModSystems.ProximityChat.Models;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
@@ -14,7 +15,11 @@ public class LanguageTransformer : MessageTransformerBase
     public override bool ShouldTransform(MessageContext context)
     {
         // Emotes language is handled by the EmoteTransformer
-        return context.HasFlag(MessageContext.IS_SPEECH) && _config.EnableLanguageSystem && !_config.DisableRPChat;
+        // Prose treats only quoted segments as speech and handles those during formatting.
+        return context.HasFlag(MessageContext.IS_SPEECH) &&
+               ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode) != ProximityChatPresentationModes.Prose &&
+               _config.EnableLanguageSystem &&
+               !_config.DisableRPChat;
     }
 
     public override MessageContext Transform(MessageContext context)

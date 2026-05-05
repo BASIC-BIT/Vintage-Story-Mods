@@ -163,13 +163,18 @@ public static class SpeechBubbleVtmlPatches
             }
 
             var plainForTimer = VtmlUtils.StripVtmlTags(bubbleVtml, capi.Logger);
+            var nowMs = capi.World.ElapsedMilliseconds;
+            var receivedTime = CalculateReceivedTimeForMinimumDuration(
+                nowMs,
+                plainForTimer.Length,
+                ChatUiSystem.GetSpeechBubbleMinimumDisplayMilliseconds());
 
             var list = MessageTexturesRef(__instance);
             list.Insert(0, new MessageTexture
             {
                 tex = tex,
                 message = plainForTimer,
-                receivedTime = capi.World.ElapsedMilliseconds
+                receivedTime = receivedTime
             });
 
             // We handled it.
@@ -224,6 +229,13 @@ public static class SpeechBubbleVtmlPatches
     {
         // Keep vanilla's white text; background stays consistent across kinds.
         return ColorUtil.WhiteArgbDouble;
+    }
+
+    internal static long CalculateReceivedTimeForMinimumDuration(long nowMs, int messageLength, int minimumDurationMs)
+    {
+        var vanillaDurationMs = 3500 + 100 * (messageLength - 10);
+        var effectiveDurationMs = Math.Max(vanillaDurationMs, Math.Max(0, minimumDurationMs));
+        return nowMs - vanillaDurationMs + effectiveDurationMs;
     }
 
     /// <summary>

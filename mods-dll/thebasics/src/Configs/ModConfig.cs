@@ -113,6 +113,10 @@ namespace thebasics.Configs
             // Initialize chat delimiters and ensure nested defaults even for legacy configs
             ChatDelimiters ??= new ChatDelimiters();
             ChatDelimiters.InitializeDefaultsIfNeeded();
+
+            ProximityChatPresentationMode = ProximityChatPresentationModes.Normalize(ProximityChatPresentationMode);
+            OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
+            ProseNicknameToken ??= "@";
         }
 
         [ProtoMember(1)]
@@ -367,11 +371,11 @@ namespace thebasics.Configs
         [ProtoMember(71)]
         public string TypingIndicatorTextOverride { get; set; } = "";
 
-        // DEPRECATED: Use DisableRpOverheadBubbles instead. This property is retained only
+        // DEPRECATED: Use OverheadChatBubbleMode instead. This property is retained only
         // for protobuf deserialization compatibility with existing config files on disk.
         // It is no longer read by any runtime code.
         [ProtoMember(72)]
-        [Obsolete("Use DisableRpOverheadBubbles. This property is ignored.")]
+        [Obsolete("Use OverheadChatBubbleMode. This property is ignored.")]
         public bool OverrideSpeechBubblesWithRpText { get; set; } = true;
 
         // When true, enables verbose debug logging and diagnostic instrumentation.
@@ -433,7 +437,8 @@ namespace thebasics.Configs
         [ProtoMember(84)]
         public bool NametagRequiresLineOfSight { get; set; } = true;
 
-        // When true, disables RP-processed overhead speech bubbles while leaving chat text intact.
+        // DEPRECATED: Use OverheadChatBubbleMode="Vanilla" instead.
+        // Still honored only when OverheadChatBubbleMode is missing/empty.
         [ProtoMember(85)]
         public bool DisableRpOverheadBubbles { get; set; } = false;
 
@@ -441,5 +446,34 @@ namespace thebasics.Configs
         // or "tpa" to require explicitly granted access.
         [ProtoMember(86)]
         public string TpaRequestPrivilege { get; set; } = "chat";
+
+        // Minimum overhead speech bubble lifetime in milliseconds. Vanilla can show very short
+        // messages for less than this because duration is based on message length.
+        [ProtoMember(87)]
+        public int SpeechBubbleMinimumDisplayMilliseconds { get; set; } = 3500;
+
+        // How speech is presented in the chat window and overhead bubbles.
+        // Allowed: StandardRoleplay, SimpleSpeech, PlainProximity, Prose.
+        [ProtoMember(88)]
+        public string ProximityChatPresentationMode { get; set; } = string.Empty;
+
+        // When true, RP speech, emotes, and environmental messages receive automatic
+        // capitalization/punctuation. When false, typed casing/punctuation are preserved.
+        [ProtoMember(89)]
+        public bool NormalizeProximityChatText { get; set; } = true;
+
+        // Controls overhead chat bubbles. Allowed: RpText, Vanilla, Off.
+        [ProtoMember(90)]
+        public string OverheadChatBubbleMode { get; set; } = string.Empty;
+
+        // In Prose mode, this standalone token is replaced with the sender's formatted RP nickname.
+        // Set to empty to disable nickname substitution.
+        [ProtoMember(91)]
+        public string ProseNicknameToken { get; set; } = "@";
+
+        // When true, Prose and environmental messages are prefixed with the account name in brackets.
+        // This is a moderation/auditability aid for servers that allow freeform unattributed text.
+        [ProtoMember(92)]
+        public bool AttributeFreeformMessagesToPlayerName { get; set; } = false;
     }
 }

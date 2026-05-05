@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -11,9 +12,11 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 public class ICSpeechFormatTransformer : MessageTransformerBase
 {
+    private readonly LanguageSystem _languageSystem;
 
-    public ICSpeechFormatTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
+    public ICSpeechFormatTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem = null) : base(chatSystem)
     {
+        _languageSystem = languageSystem;
     }
 
     public override bool ShouldTransform(MessageContext context)
@@ -27,13 +30,51 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
         var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+        var presentationMode = ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode);
 
         // Note: content is escaped earlier in the pipeline for speech
 
-        // Add Quotes based on language type
-        var delimiters = _config.ChatDelimiters;
-        var quoteDelimiter = (languageEnabled && lang == LanguageSystem.SignLanguage) ? delimiters.SignLanguageQuote : delimiters.Quote;
-        context.Message = $"{quoteDelimiter.Start}{context.Message}{quoteDelimiter.End}";
+        if (presentationMode == ProximityChatPresentationModes.Prose)
+        {
+            var messageToFormat = context.Message;
+            var hasDistanceFontSize = TryUnwrapDistanceFontSize(messageToFormat, out var unwrappedMessage, out var distanceFontSize);
+            if (hasDistanceFontSize)
+            {
+                messageToFormat = unwrappedMessage;
+            }
+
+            context.Message = ChatHelper.FormatProseMessage(
+                messageToFormat,
+                lang,
+                _config,
+                languageEnabled,
+                text =>
+                {
+                    if (!languageEnabled || _languageSystem == null)
+                    {
+                        return text;
+                    }
+
+                    var processed = text;
+                    _languageSystem.ProcessMessage(context.ReceivingPlayer, ref processed, lang);
+                    return processed;
+                },
+                nickname);
+
+            context.Message = ChatHelper.ApplyFreeformAttribution(context.Message, context.SendingPlayer, _config);
+            if (hasDistanceFontSize)
+            {
+                context.Message = $"<font size=\"{distanceFontSize}\">{context.Message}</font>";
+            }
+
+            return context;
+        }
+
+        if (ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode))
+        {
+            context.Message = ChatHelper.WrapSpeechQuotes(context.Message, lang, _config, languageEnabled);
+        }
+
         // Add Italics if sign language
         if (languageEnabled && lang == LanguageSystem.SignLanguage)
         {
@@ -48,7 +89,13 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
 
         var verb = GetProximityChatVerb(lang, mode);
 
-        context.Message = $"{nickname} {verb} {context.Message}";
+        context.Message = presentationMode switch
+        {
+            ProximityChatPresentationModes.SimpleSpeech => $"{nickname}: {context.Message}",
+            ProximityChatPresentationModes.PlainProximity => $"{nickname}: {context.Message}",
+            ProximityChatPresentationModes.Prose => context.Message,
+            _ => $"{nickname} {verb} {context.Message}"
+        };
 
         return context;
     }
@@ -72,5 +119,26 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         var verbs = _config.ProximityChatModeVerbs[mode];
 
         return verbs.GetRandomElement();
+    }
+
+    private static bool TryUnwrapDistanceFontSize(string message, out string innerMessage, out string fontSize)
+    {
+        innerMessage = message;
+        fontSize = null;
+
+        if (string.IsNullOrEmpty(message))
+        {
+            return false;
+        }
+
+        var match = Regex.Match(message, "^<font size=\"([^\"]+)\">(.*)</font>$", RegexOptions.Singleline);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        fontSize = match.Groups[1].Value;
+        innerMessage = match.Groups[2].Value;
+        return true;
     }
 }

@@ -15,7 +15,8 @@ public class AutoPunctuationTransformer : MessageTransformerBase
 
     public override bool ShouldTransform(MessageContext context)
     {
-        return context.HasFlag(MessageContext.IS_ROLEPLAY) &&
+        return _config.NormalizeProximityChatText &&
+            context.HasFlag(MessageContext.IS_ROLEPLAY) &&
             ChatHelper.DoesMessageNeedPunctuation(context.Message);
     }
 

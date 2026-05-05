@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -500,7 +501,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        // Determine the speech length for note count calculation
         // Determine the speech length for note count calculation.
         // Note: for emotes, Phase 1 transformers (auto-capitalization, auto-punctuation) may
         // have added a character or two to quoted segments. The logarithmic scaling absorbs
@@ -508,22 +508,29 @@ public class RPProximityChatSystem : BaseBasicModSystem
         int speechLength;
         if (isSpeech)
         {
-            // Regular speech — use the full speech text
             if (!context.TryGetSpeechText(out var speechText) || string.IsNullOrWhiteSpace(speechText))
             {
                 return;
             }
-            speechLength = speechText.Length;
+
+            if (ProximityChatPresentationModes.Normalize(Config.ProximityChatPresentationMode) == ProximityChatPresentationModes.Prose)
+            {
+                speechLength = CountQuotedSpeechLength(speechText);
+                if (speechLength == 0)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                // Regular speech — use the full speech text
+                speechLength = speechText.Length;
+            }
         }
         else if (isEmote)
         {
             // Emote — extract quoted speech portions (same split logic as EmoteTransformer)
-            var segments = context.Message.Split('"');
-            speechLength = 0;
-            for (var i = 1; i < segments.Length; i += 2)
-            {
-                speechLength += segments[i].Length;
-            }
+            speechLength = CountQuotedSpeechLength(context.Message);
 
             // Pure narration emote (no quoted speech) — no chatter
             if (speechLength == 0)
@@ -592,6 +599,23 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             _serverConfigChannel.SendPacket(recipientMessage, recipient);
         }
+    }
+
+    internal static int CountQuotedSpeechLength(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            return 0;
+        }
+
+        var segments = message.Split('"');
+        var speechLength = 0;
+        for (var i = 1; i < segments.Length; i += 2)
+        {
+            speechLength += segments[i].Length;
+        }
+
+        return speechLength;
     }
 
     private void HookEvents()

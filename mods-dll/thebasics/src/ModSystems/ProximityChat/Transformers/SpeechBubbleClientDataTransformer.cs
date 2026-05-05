@@ -1,3 +1,4 @@
+using thebasics.Configs;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 
@@ -8,8 +9,11 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 // not the final chat line string.
 public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 {
-    public SpeechBubbleClientDataTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
+    private readonly LanguageSystem _languageSystem;
+
+    public SpeechBubbleClientDataTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem = null) : base(chatSystem)
     {
+        _languageSystem = languageSystem;
     }
 
     public override bool ShouldTransform(MessageContext context)
@@ -21,7 +25,13 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             return false;
         }
 
-        if (_config.DisableRpOverheadBubbles)
+        var bubbleMode = OverheadChatBubbleModes.Normalize(_config.OverheadChatBubbleMode, _config.DisableRpOverheadBubbles);
+        if (bubbleMode == OverheadChatBubbleModes.Off)
+        {
+            return true;
+        }
+
+        if (bubbleMode == OverheadChatBubbleModes.Vanilla)
         {
             return false;
         }
@@ -35,6 +45,13 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
+        var bubbleMode = OverheadChatBubbleModes.Normalize(_config.OverheadChatBubbleMode, _config.DisableRpOverheadBubbles);
+        if (bubbleMode == OverheadChatBubbleModes.Off)
+        {
+            context.Metadata.Remove("clientData");
+            return context;
+        }
+
         var entity = context.SendingPlayer?.Entity;
         if (entity == null)
         {
@@ -47,6 +64,12 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         }
 
         var bubbleTextVtml = (context.Message ?? string.Empty).Trim();
+        if (context.HasFlag(MessageContext.IS_ENVIRONMENTAL) &&
+            context.TryGetMetadata(MessageContext.BUBBLE_TEXT_BASE, out string baseBubbleText) &&
+            !string.IsNullOrWhiteSpace(baseBubbleText))
+        {
+            bubbleTextVtml = baseBubbleText.Trim();
+        }
 
         // Wrap speech in configurable quote delimiters, matching ICSpeechFormatTransformer:
         // sign language uses SignLanguageQuote (default: single quotes), others use Quote (default: double quotes).
@@ -61,16 +84,41 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         if (context.HasFlag(MessageContext.IS_SPEECH))
         {
-            var delimiters = _config.ChatDelimiters;
-            var quoteDelimiter = (languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
-                ? delimiters.SignLanguageQuote
-                : delimiters.Quote;
-            bubbleTextVtml = $"{quoteDelimiter.Start}{bubbleTextVtml}{quoteDelimiter.End}";
-
-            // Mirror chatbox: sign language speech is italicized in bubbles.
-            if (languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
+            var presentationMode = ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode);
+            if (presentationMode == ProximityChatPresentationModes.Prose)
             {
-                bubbleTextVtml = ChatHelper.Italic(bubbleTextVtml);
+                bubbleTextVtml = ChatHelper.FormatProseMessage(
+                    bubbleTextVtml,
+                    bubbleLang,
+                    _config,
+                    languageEnabled,
+                    text =>
+                    {
+                        if (!languageEnabled || _languageSystem == null)
+                        {
+                            return text;
+                        }
+
+                        var processed = text;
+                        _languageSystem.ProcessMessage(context.ReceivingPlayer, ref processed, bubbleLang);
+                        return processed;
+                    },
+                    context.GetMetadata<string>(MessageContext.FORMATTED_NAME));
+
+            }
+            else
+            {
+                if (ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode))
+                {
+                    bubbleTextVtml = ChatHelper.WrapSpeechQuotes(bubbleTextVtml, bubbleLang, _config, languageEnabled);
+                }
+
+                // Mirror chatbox: sign language speech is italicized in bubbles.
+                if (languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
+                {
+                    bubbleTextVtml = ChatHelper.Italic(bubbleTextVtml);
+                }
+
             }
         }
 
@@ -78,7 +126,9 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         // This runs after LanguageTransformer (which scrambles unknown languages) but before
         // ICSpeechFormatTransformer (which adds language color to the chatbox line).
         // We must apply the color here because ICSpeechFormatTransformer runs after us.
-        if (languageEnabled && context.HasFlag(MessageContext.IS_SPEECH))
+        if (languageEnabled &&
+            context.HasFlag(MessageContext.IS_SPEECH) &&
+            ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode) != ProximityChatPresentationModes.Prose)
         {
             if (bubbleLang != null)
             {

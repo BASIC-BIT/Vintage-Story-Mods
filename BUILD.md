@@ -82,11 +82,11 @@ Uploads VS DLLs from your local installation to the vs-build-dependencies reposi
 
 **Parameters:**
 - `-VsInstallPath` - Override VS installation path
-- `-VsVersion` - Version string for the upload (default: "1.22.1")
+- `-VsVersion` - Version string for the upload (default: "1.22.2")
 
 **Example:**
 ```powershell
-.\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.1"
+.\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.2"
 ```
 
 ### `scripts/update-project-references.ps1`
@@ -135,13 +135,13 @@ Updates project files to use CI-compatible DLL paths.
 
 ```
 vs-build-dependencies/
-├── 1.22.1/            # Version directory
+├── 1.22.2/            # Version directory
 │   ├── core/          # Core VS DLLs
 │   ├── mods/          # Mod DLLs  
 │   ├── lib/           # Library DLLs
 │   ├── README.md      # Version-specific info
 │   └── version-info.json
-├── 1.22.2/            # Future versions...
+├── 1.22.3/            # Future versions...
 └── README.md
 ```
 
@@ -151,13 +151,13 @@ When Vintage Story updates:
 
 1. **Upload new dependencies:**
    ```powershell
-   .\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.1"
+   .\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.2"
    ```
 
 2. **Update workflow file** (`.github/workflows/build.yml`):
    ```yaml
    env:
-      VS_VERSION: "1.22.1"  # Update this line
+      VS_VERSION: "1.22.2"  # Update this line
    ```
 
 3. **Test the build** with the new version

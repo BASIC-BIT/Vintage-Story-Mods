@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Linq;
 using System.Text;
 using thebasics.Extensions;
@@ -18,16 +17,6 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         _languageSystem = languageSystem;
     }
 
-    private static bool IsDecoratorChar(char c)
-    {
-        // Handle zalgo-like effects (temporal storm/drunk) that add combining marks.
-        var cat = CharUnicodeInfo.GetUnicodeCategory(c);
-        return cat == UnicodeCategory.NonSpacingMark ||
-            cat == UnicodeCategory.SpacingCombiningMark ||
-            cat == UnicodeCategory.EnclosingMark ||
-            cat == UnicodeCategory.Format;
-    }
-
     private static bool TryParseLanguageSpecifier(string message, out string languageIdentifier, out string remainder)
     {
         languageIdentifier = null;
@@ -40,7 +29,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
 
         var i = 0;
         // Skip whitespace and any stray combining/format characters.
-        while (i < message.Length && (char.IsWhiteSpace(message[i]) || IsDecoratorChar(message[i])))
+        while (i < message.Length && (char.IsWhiteSpace(message[i]) || ChatHelper.IsDecoratorChar(message[i])))
         {
             i++;
         }
@@ -52,7 +41,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
 
         i++;
         // Skip decorators right after ':' (e.g. zalgo).
-        while (i < message.Length && IsDecoratorChar(message[i]))
+        while (i < message.Length && ChatHelper.IsDecoratorChar(message[i]))
         {
             i++;
         }
@@ -62,7 +51,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         while (i < message.Length)
         {
             var c = message[i];
-            if (IsDecoratorChar(c))
+            if (ChatHelper.IsDecoratorChar(c))
             {
                 i++;
                 continue;
@@ -86,7 +75,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         languageIdentifier = sb.ToString();
 
         // Skip whitespace and decorators between identifier and content.
-        while (i < message.Length && (char.IsWhiteSpace(message[i]) || IsDecoratorChar(message[i])))
+        while (i < message.Length && (char.IsWhiteSpace(message[i]) || ChatHelper.IsDecoratorChar(message[i])))
         {
             i++;
         }
@@ -103,7 +92,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         }
 
         var i = 0;
-        while (i < message.Length && (char.IsWhiteSpace(message[i]) || IsDecoratorChar(message[i])))
+        while (i < message.Length && (char.IsWhiteSpace(message[i]) || ChatHelper.IsDecoratorChar(message[i])))
         {
             i++;
         }
@@ -139,6 +128,15 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         if (!languageEnabled)
         {
             context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
+            if (TryParseLanguageSpecifier(context.Message, out _, out _))
+            {
+                context.SendingPlayer.SendMessage(
+                    _chatSystem.ProximityChatId,
+                    Lang.Get("thebasics:lang-error-system-disabled"),
+                    EnumChatType.CommandError);
+                context.State = MessageContextState.STOP;
+            }
+
             return context;
         }
 

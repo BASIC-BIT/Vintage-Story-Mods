@@ -1,4 +1,5 @@
 using FluentAssertions;
+using thebasics.Configs;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using static thebasics.Utilities.ChatHelper;
@@ -198,6 +199,68 @@ public class ChatHelperTests
             result.Should().Contain("Elvish");
             result.Should().Contain(":elv");
             result.Should().Contain("#00ff00");
+        }
+
+        [Fact]
+        public void MarksHiddenLanguages()
+        {
+            var lang = new Language("Secret", "Hidden tongue", "sec",
+                new[] { "la", "el" }, "#00ff00", Hidden: true);
+
+            ChatHelper.LangIdentifier(lang).Should().Contain("[hidden]");
+        }
+    }
+
+    public class FormatProseMessageTests
+    {
+        [Fact]
+        public void ColorsNarrativeAndQuotedSpeechSeparately()
+        {
+            var config = CreateConfig();
+            var lang = config.Languages[0] with { Color = "#00AAFF" };
+
+            ChatHelper.FormatProseMessage("walks over \"hello\" quietly", lang, config, languageEnabled: true)
+                .Should().Be("<font color=\"#FF55FF\">walks over </font><font color=\"#00AAFF\">\"hello\"</font><font color=\"#FF55FF\"> quietly</font>");
+        }
+
+        [Fact]
+        public void ProcessesOnlyQuotedSpeech()
+        {
+            var config = CreateConfig();
+            var lang = config.Languages[0] with { Color = "#00AAFF" };
+
+            ChatHelper.FormatProseMessage("waves \"hello\"", lang, config, languageEnabled: true, processQuotedText: text => text.ToUpperInvariant())
+                .Should().Be("<font color=\"#FF55FF\">waves </font><font color=\"#00AAFF\">\"HELLO\"</font>");
+        }
+
+        [Fact]
+        public void ReplacesStandaloneNicknameTokenOnlyInNarrativeSegments()
+        {
+            var config = CreateConfig();
+            var lang = config.Languages[0] with { Color = "#00AAFF" };
+
+            ChatHelper.FormatProseMessage("email a@b.com @ says \"@ stays\"", lang, config, languageEnabled: true, nicknameReplacement: "Alice")
+                .Should().Be("<font color=\"#FF55FF\">email a@b.com </font>Alice<font color=\"#FF55FF\"> says </font><font color=\"#00AAFF\">\"@ stays\"</font>");
+        }
+
+        private static ModConfig CreateConfig()
+        {
+            var config = new ModConfig { EmoteColor = "#FF55FF" };
+            config.InitializeDefaultsIfNeeded();
+            return config;
+        }
+    }
+
+    public class IsDecoratorCharTests
+    {
+        [Theory]
+        [InlineData('\u0301', true)]
+        [InlineData('\u200D', true)]
+        [InlineData('a', false)]
+        [InlineData(':', false)]
+        public void IdentifiesCombiningAndFormatCharacters(char input, bool expected)
+        {
+            ChatHelper.IsDecoratorChar(input).Should().Be(expected);
         }
     }
 

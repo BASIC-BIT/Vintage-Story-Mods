@@ -282,7 +282,14 @@ public class ChatUiSystem : ModSystem
 
     internal static bool IsSpeechBubbleVtmlEnabled()
     {
-        return _config != null && !_config.DisableRPChat && !_config.DisableRpOverheadBubbles;
+        return _config != null &&
+               !_config.DisableRPChat &&
+               OverheadChatBubbleModes.Normalize(_config.OverheadChatBubbleMode, _config.DisableRpOverheadBubbles) == OverheadChatBubbleModes.RpText;
+    }
+
+    internal static int GetSpeechBubbleMinimumDisplayMilliseconds()
+    {
+        return Math.Max(0, _config?.SpeechBubbleMinimumDisplayMilliseconds ?? 3500);
     }
 
     internal static Models.TypingIndicatorDisplayMode GetTypingIndicatorDisplayMode()

@@ -15,8 +15,9 @@ public class AutoCapitalizationTransformer : MessageTransformerBase
 
     public override bool ShouldTransform(MessageContext context)
     {
-        return context.HasFlag(MessageContext.IS_SPEECH) ||
-            context.HasFlag(MessageContext.IS_ENVIRONMENTAL);
+        return _config.NormalizeProximityChatText &&
+            (context.HasFlag(MessageContext.IS_SPEECH) ||
+            context.HasFlag(MessageContext.IS_ENVIRONMENTAL));
     }
 
     public override MessageContext Transform(MessageContext context)

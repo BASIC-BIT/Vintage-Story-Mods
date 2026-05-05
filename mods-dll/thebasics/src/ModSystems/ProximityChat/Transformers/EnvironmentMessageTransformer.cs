@@ -17,8 +17,10 @@ public class EnvironmentMessageTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        // Apply italic formatting
-        context.Message = ChatHelper.Italic(context.Message);
+        var formattedMessage = ChatHelper.Italic(context.Message);
+        context.SetMetadata(MessageContext.BUBBLE_TEXT_BASE, formattedMessage);
+
+        context.Message = ChatHelper.ApplyFreeformAttribution(formattedMessage, context.SendingPlayer, _config);
 
         return context;
     }

@@ -70,12 +70,12 @@ public class TransformerSystem
             new ObfuscationTransformer(_distanceObfuscationSystem, _chatSystem),
 
             // Optional: override vanilla overhead bubble (clientData) with RP-processed text.
-            new SpeechBubbleClientDataTransformer(_chatSystem),
+            new SpeechBubbleClientDataTransformer(_chatSystem, _languageSystem),
 
             new DistanceFontSizeTransformer(_chatSystem), // Apply distance-based font sizing
 
             // Finally, format speech for the recipient
-            new ICSpeechFormatTransformer(_chatSystem)
+            new ICSpeechFormatTransformer(_chatSystem, _languageSystem)
         };
     }
 
@@ -123,16 +123,29 @@ public class TransformerSystem
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
         var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+        var presentationMode = ProximityChatPresentationModes.Normalize(_chatSystem.Config.ProximityChatPresentationMode);
 
-        // Add quotes based on language type
-        var delimiters = _chatSystem.Config.ChatDelimiters;
-        var quoteDelimiter = lang == LanguageSystem.SignLanguage ? delimiters.SignLanguageQuote : delimiters.Quote;
         var outputMessage = context.Message;
-        outputMessage = $"{quoteDelimiter.Start}{outputMessage}{quoteDelimiter.End}";
+        var languageEnabled = _chatSystem.Config.EnableLanguageSystem && !_chatSystem.Config.DisableRPChat;
+        if (presentationMode == ProximityChatPresentationModes.Prose)
+        {
+            outputMessage = ChatHelper.FormatProseMessage(outputMessage, lang, _chatSystem.Config, languageEnabled, nicknameReplacement: nickname);
+            outputMessage = ChatHelper.ApplyFreeformAttribution(outputMessage, context.SendingPlayer, _chatSystem.Config);
+        }
+        else if (ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode))
+        {
+            outputMessage = ChatHelper.WrapSpeechQuotes(outputMessage, lang, _chatSystem.Config, languageEnabled);
+        }
 
         var verb = GetProximityChatVerb(lang, mode);
 
-        outputMessage = $"{nickname} {verb} {outputMessage}";
+        outputMessage = presentationMode switch
+        {
+            ProximityChatPresentationModes.SimpleSpeech => $"{nickname}: {outputMessage}",
+            ProximityChatPresentationModes.PlainProximity => $"{nickname}: {outputMessage}",
+            ProximityChatPresentationModes.Prose => outputMessage,
+            _ => $"{nickname} {verb} {outputMessage}"
+        };
 
         // log message
         _chatSystem.API.Logger.Chat(outputMessage);

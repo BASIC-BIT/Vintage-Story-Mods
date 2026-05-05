@@ -1,7 +1,10 @@
 using System.Linq;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using thebasics.Configs;
 using thebasics.Extensions;
+using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -54,6 +57,15 @@ namespace thebasics.Utilities
             var lastCharacter = input[^1];
 
             return !IsPunctuation(lastCharacter);
+        }
+
+        public static bool IsDecoratorChar(char character)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(character);
+            return category == UnicodeCategory.NonSpacingMark ||
+                   category == UnicodeCategory.SpacingCombiningMark ||
+                   category == UnicodeCategory.EnclosingMark ||
+                   category == UnicodeCategory.Format;
         }
 
         public static string Strong(string input)
@@ -144,6 +156,115 @@ namespace thebasics.Utilities
             return Color(message, lang.Color);
         }
 
+        public static string WrapSpeechQuotes(string message, Language language, ModConfig config, bool languageEnabled)
+        {
+            if (config == null || string.IsNullOrEmpty(message))
+            {
+                return message;
+            }
+
+            var delimiters = config.ChatDelimiters;
+            var quoteDelimiter = (languageEnabled && language == LanguageSystem.SignLanguage)
+                ? delimiters.SignLanguageQuote
+                : delimiters.Quote;
+
+            return $"{quoteDelimiter.Start}{message}{quoteDelimiter.End}";
+        }
+
+        public static string FormatProseMessage(
+            string message,
+            Language language,
+            ModConfig config,
+            bool languageEnabled,
+            Func<string, string> processQuotedText = null,
+            string nicknameReplacement = null)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                return message;
+            }
+
+            var builder = new StringBuilder();
+            var splitMessage = message.Trim().Split('"');
+            var canUseLanguage = languageEnabled && language != null;
+
+            for (var i = 0; i < splitMessage.Length; i++)
+            {
+                if (i % 2 == 0)
+                {
+                    var narrative = splitMessage[i];
+                    if (!string.IsNullOrEmpty(narrative))
+                    {
+                        AppendProseNarrative(builder, narrative, config, nicknameReplacement);
+                    }
+                }
+                else
+                {
+                    var text = splitMessage[i];
+                    if (canUseLanguage && processQuotedText != null)
+                    {
+                        text = processQuotedText(text);
+                    }
+
+                    text = WrapSpeechQuotes(text, language, config, canUseLanguage);
+
+                    if (canUseLanguage)
+                    {
+                        text = LangColor(text, language);
+                        if (language == LanguageSystem.SignLanguage)
+                        {
+                            text = Italic(text);
+                        }
+                    }
+
+                    builder.Append(text);
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        public static string ApplyFreeformAttribution(string message, IServerPlayer player, ModConfig config)
+        {
+            if (config?.AttributeFreeformMessagesToPlayerName != true || player == null)
+            {
+                return message;
+            }
+
+            var playerName = EscapeMarkup(player.PlayerName);
+            return string.IsNullOrWhiteSpace(playerName)
+                ? message
+                : $"[{playerName}] {message}";
+        }
+
+        private static void AppendProseNarrative(StringBuilder builder, string narrative, ModConfig config, string nicknameReplacement)
+        {
+            var token = config.ProseNicknameToken;
+            if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(nicknameReplacement))
+            {
+                builder.Append(Color(narrative, config.EmoteColor));
+                return;
+            }
+
+            var tokenPattern = $@"(?<!\S){Regex.Escape(token)}(?!\S)";
+            var lastIndex = 0;
+            foreach (Match match in Regex.Matches(narrative, tokenPattern))
+            {
+                if (match.Index > lastIndex)
+                {
+                    builder.Append(Color(narrative[lastIndex..match.Index], config.EmoteColor));
+                }
+
+                builder.Append(nicknameReplacement);
+                lastIndex = match.Index + match.Length;
+            }
+
+            if (lastIndex < narrative.Length)
+            {
+                builder.Append(Color(narrative[lastIndex..], config.EmoteColor));
+            }
+        }
+
         // Escape user-provided nicknames to prevent VTML injection
         // Uses HTML entities so that players can still use < > & in their nicknames
         // These will be properly displayed in chat but won't break VTML parsing
@@ -154,7 +275,8 @@ namespace thebasics.Utilities
 
         public static string LangIdentifier(Language lang)
         {
-            return LangColor($"{lang.Name} (:{lang.Prefix})", lang);
+            var hiddenMarker = lang.Hidden ? " [hidden]" : string.Empty;
+            return LangColor($"{lang.Name} (:{lang.Prefix}){hiddenMarker}", lang);
         }
 
         public static string LangIdentifierWithDescription(Language lang)

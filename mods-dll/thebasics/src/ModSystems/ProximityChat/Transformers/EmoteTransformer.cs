@@ -26,15 +26,13 @@ public class EmoteTransformer : MessageTransformerBase
 
         var formattedName = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         builder.Append(formattedName);
-        builder.Append(" ");
+        var needsNameSeparator = !string.IsNullOrEmpty(formattedName);
 
         // Process the emote content
         var trimmedMessage = content.Trim();
         var splitMessage = trimmedMessage.Split('"');
 
         var language = context.GetMetadata<Language>(MessageContext.LANGUAGE);
-        var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
-
         var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
 
         for (var i = 0; i < splitMessage.Length; i++)
@@ -42,7 +40,17 @@ public class EmoteTransformer : MessageTransformerBase
             if (i % 2 == 0)
             {
                 // Narrative parts outside quotes
-                builder.Append(splitMessage[i]);
+                var narrative = splitMessage[i];
+                if (!string.IsNullOrEmpty(narrative))
+                {
+                    if (needsNameSeparator)
+                    {
+                        narrative = " " + narrative;
+                        needsNameSeparator = false;
+                    }
+
+                    builder.Append(ChatHelper.Color(narrative, _config.EmoteColor));
+                }
             }
             else
             {
@@ -58,6 +66,12 @@ public class EmoteTransformer : MessageTransformerBase
                 }
 
                 text = $"{quoteDelimiter.Start}{text}{quoteDelimiter.End}";
+
+                if (needsNameSeparator)
+                {
+                    text = " " + text;
+                    needsNameSeparator = false;
+                }
 
                 if (languageEnabled)
                 {

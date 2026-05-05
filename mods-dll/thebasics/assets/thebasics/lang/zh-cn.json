@@ -122,6 +122,7 @@
   "lang-error-max-languages": "你最多只能学习 {0} 种语言！请先移除一种。",
   "lang-error-not-known": "你不会 {0}！",
   "lang-error-unknown-language": "你不会那种语言！",
+  "lang-error-system-disabled": "The language system is disabled on this server.",
   "lang-error-invalid-with-list": "Invalid language specifier \":{0}\". Valid languages:{1}",
   "lang-error-invalid-prefix-with-list": "Invalid language prefix. Valid languages:{0}",
   "lang-error-admin-already-known": "{0} 已经会 {1} 了！",
