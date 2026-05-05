@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using ProtoBuf;
 using thebasics.Configs;
 using thebasics.Models;
+using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 
@@ -117,6 +118,54 @@ namespace thebasics.Configs
             ProximityChatPresentationMode = ProximityChatPresentationModes.Normalize(ProximityChatPresentationMode);
             OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
             ProseNicknameToken ??= "@";
+
+            CharacterSheetSetPermission = string.IsNullOrWhiteSpace(CharacterSheetSetPermission) ? "chat" : CharacterSheetSetPermission;
+            CharacterSheetAdminPermission = string.IsNullOrWhiteSpace(CharacterSheetAdminPermission) ? "commandplayer" : CharacterSheetAdminPermission;
+            CharacterSheetFields ??=
+            [
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "nickname",
+                    Label = "Nickname",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = false,
+                    BindTo = "thebasics.nickname",
+                    MaxLength = 100
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "pronouns",
+                    Label = "Pronouns",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = true,
+                    MaxLength = 64
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "appearance",
+                    Label = "Appearance",
+                    Type = CharacterSheetFieldTypes.LongString,
+                    Optional = true,
+                    MaxLength = 1000
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "background",
+                    Label = "Background",
+                    Type = CharacterSheetFieldTypes.LongString,
+                    Optional = true,
+                    MaxLength = 1000
+                }
+            ];
+
+            foreach (var field in CharacterSheetFields)
+            {
+                field.Id ??= string.Empty;
+                field.Label ??= field.Id;
+                field.Type = string.IsNullOrWhiteSpace(field.Type) ? CharacterSheetFieldTypes.String : field.Type.ToLowerInvariant();
+                field.Options ??= new List<string>();
+                field.BindTo ??= string.Empty;
+            }
         }
 
         [ProtoMember(1)]
@@ -475,5 +524,17 @@ namespace thebasics.Configs
         // This is a moderation/auditability aid for servers that allow freeform unattributed text.
         [ProtoMember(92)]
         public bool AttributeFreeformMessagesToPlayerName { get; set; } = false;
+
+        [ProtoMember(93)]
+        public bool EnableCharacterSheets { get; set; } = true;
+
+        [ProtoMember(94)]
+        public string CharacterSheetSetPermission { get; set; } = "chat";
+
+        [ProtoMember(95)]
+        public string CharacterSheetAdminPermission { get; set; } = "commandplayer";
+
+        [ProtoMember(96)]
+        public IList<CharacterSheetFieldDefinition> CharacterSheetFields { get; set; }
     }
 }
