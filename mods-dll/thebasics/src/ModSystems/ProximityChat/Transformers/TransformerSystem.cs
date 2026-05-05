@@ -15,7 +15,7 @@ public class TransformerSystem
 {
     private const string ChatMessageLoggedMetadataKey = "chatMessageLogged";
     private const int SignLanguageLineOfSightRetryIntervalMs = 250;
-    private const int SignLanguageLineOfSightRetryWindowMs = 1500;
+    private const int SignLanguageLineOfSightRetryWindowMs = 3000;
 
     private List<MessageTransformerBase> _senderPhaseTransformers;
     private List<MessageTransformerBase> _recipientPhaseTransformers;
