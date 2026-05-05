@@ -42,6 +42,7 @@ $modInfo = Get-Content $modInfoFile | ConvertFrom-Json
 $version = $modInfo.version -replace '\.', '_' -replace '-', '_'
 $zipFile = Join-Path $projectRoot "thebasics_$version.zip"
 $logFile = Join-Path $solutionRoot "package.log"
+$rootEnvPath = Join-Path $solutionRoot ".env"
 $envPath = Join-Path $projectRoot ".env"  # Look for .env in the mod folder
 
 # Start logging
@@ -53,6 +54,19 @@ $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
 Write-Host "Building mod package..."
 "[$timestamp] Building mod package..." | Out-File -FilePath $logFile -Append
+
+# Load root-level environment before local deployment so VS_PROFILES_DIR and
+# THEBASICS_LOCAL_MOD_DIRS can direct profile-specific client installs.
+if (Test-Path $rootEnvPath) {
+    Get-Content $rootEnvPath | ForEach-Object {
+        if ($_ -match '^\s*([^#=\s]+)\s*=\s*(.*)\s*$') {
+            $name = $matches[1]
+            $value = $matches[2].Trim().Trim('"').Trim("'")
+            Set-Item -Path "Env:$name" -Value $value
+            "[$timestamp] Loaded root environment variable: $name" | Out-File -FilePath $logFile -Append
+        }
+    }
+}
 
 # Verify required files exist
 if (-not (Test-Path $modInfoFile)) {

@@ -362,7 +362,7 @@ namespace thebasics.Configs
         public bool EnableTypingIndicator { get; set; } = true;
 
         [ProtoMember(69)]
-        public int TypingIndicatorMaxRange { get; set; } = 50;
+        public int TypingIndicatorMaxRange { get; set; } = 30;
 
         [ProtoMember(70)]
         public float TypingIndicatorTimeoutSeconds { get; set; } = 5f;

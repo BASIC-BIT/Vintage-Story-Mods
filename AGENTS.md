@@ -197,6 +197,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mods-dll/thebasics/scripts/f
 
 Credentials come from `.env` in repo root (`PTERO_BASE_URL`, `PTERO_TOKEN`, `PTERO_SERVER_ID`).
 All endpoints use the Client API (`ptlc_...` token) under `/api/client/servers/{id}/...`.
+If the current shell has `PTERO_TOKEN` set to an application token (`ptla_...`), reload `PTERO_TOKEN` from repo-root `.env`; `PTERO_TOKEN_APPLICATION` is not valid for Client API power/file endpoints.
 
 ```
 # List files in a directory
@@ -219,6 +220,8 @@ GET /resources  → .attributes.current_state ("running"/"stopped"/etc.)
 ```
 
 **PowerShell gotcha**: When calling curl/Invoke-RestMethod inline from bash on Windows, PowerShell dollar signs (`$`) get eaten by the shell. Write a `.ps1` script file and execute it instead of using inline PowerShell one-liners with variables.
+
+**Client profile gotcha**: Test profiles load local mods from `D:\Games\VSProfiles\Profile2\Mods` and `D:\Games\VSProfiles\Profile3\Mods`. After packaging, verify those `thebasics_*.zip` files have the same hash as the freshly built zip; stale same-version zips make client-side QA appear to fail even when the server has the new build.
 
 #### What to Look for in Server Logs
 

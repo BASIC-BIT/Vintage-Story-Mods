@@ -272,7 +272,19 @@ public class ChatUiSystem : ModSystem
 
     internal static int GetTypingIndicatorRange()
     {
-        return _config?.TypingIndicatorMaxRange ?? 0;
+        return GetEffectiveTypingIndicatorRange(_config);
+    }
+
+    internal static int GetEffectiveTypingIndicatorRange(ModConfig config)
+    {
+        if (config == null)
+        {
+            return 0;
+        }
+
+        return Math.Min(
+            Math.Max(0, config.TypingIndicatorMaxRange),
+            Math.Max(0, config.NametagRenderRange));
     }
 
     internal static bool DoNametagsRequireLineOfSight()

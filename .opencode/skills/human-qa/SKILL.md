@@ -100,7 +100,12 @@ Before presenting cards to the human, handle all environment setup yourself:
 2. Build and deploy the mod
 3. Restart the server
 4. Wait for clean boot — verify logs (all mod systems loaded, no exceptions, no duplicate mod warnings)
-5. Tell the human to relaunch game clients
+5. Verify local test client profile mod zips match the freshly built package hash
+6. Relaunch game clients
+
+For this repository's Pterodactyl test server, Client API operations require the repo-root `.env` `PTERO_TOKEN` value (`ptlc_...`). If the current shell has `PTERO_TOKEN` set to `ptla_...`, it is the application token and will fail Client API power/file endpoints with 403; reload the client token from repo-root `.env` without printing it.
+
+For local client QA, verify Profile2/Profile3 mod zips before asking the human to test. The profiles can contain stale same-version `thebasics_*.zip` files under `D:\Games\VSProfiles\Profile2\Mods` and `D:\Games\VSProfiles\Profile3\Mods`; compare SHA256 against the freshly built package and replace stale copies before relaunching clients.
 
 Do NOT repeat connection details, IPs, or other setup the human already knows. Keep it to: "Server is back up with [config changes]. Please relaunch both clients."
 
