@@ -244,7 +244,7 @@ These are the most commonly toggled settings in `/data/ModConfig/the_basics.json
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `DisableRpOverheadBubbles` | `false` | Opt out of RP-processed overhead bubbles and fall back to vanilla speech bubbles |
+| `OverheadChatBubbleMode` | `RpText` | Overhead bubble mode: `RpText`, `Vanilla`, or `Off` |
 | `EnableTypingIndicator` | `true` | Show typing indicator above players' heads |
 | `SendServerSaveAnnouncement` | `true` | Announce "save started" to players |
 | `SendServerSaveFinishedAnnouncement` | `true` | Announce "save finished" to players |

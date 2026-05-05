@@ -13,10 +13,15 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 public class ICSpeechFormatTransformer : MessageTransformerBase
 {
     private readonly LanguageSystem _languageSystem;
+    private readonly DistanceObfuscationSystem _distanceObfuscationSystem;
 
-    public ICSpeechFormatTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem = null) : base(chatSystem)
+    public ICSpeechFormatTransformer(
+        RPProximityChatSystem chatSystem,
+        LanguageSystem languageSystem = null,
+        DistanceObfuscationSystem distanceObfuscationSystem = null) : base(chatSystem)
     {
         _languageSystem = languageSystem;
+        _distanceObfuscationSystem = distanceObfuscationSystem;
     }
 
     public override bool ShouldTransform(MessageContext context)
@@ -48,17 +53,7 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
                 lang,
                 _config,
                 languageEnabled,
-                text =>
-                {
-                    if (!languageEnabled || _languageSystem == null)
-                    {
-                        return text;
-                    }
-
-                    var processed = text;
-                    _languageSystem.ProcessMessage(context.ReceivingPlayer, ref processed, lang);
-                    return processed;
-                },
+                text => ProcessProseQuotedText(context, text, lang, languageEnabled),
                 nickname);
 
             context.Message = ChatHelper.ApplyFreeformAttribution(context.Message, context.SendingPlayer, _config);
@@ -119,6 +114,23 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         var verbs = _config.ProximityChatModeVerbs[mode];
 
         return verbs.GetRandomElement();
+    }
+
+    private string ProcessProseQuotedText(MessageContext context, string text, Language lang, bool languageEnabled)
+    {
+        var processed = text;
+
+        if (languageEnabled && _languageSystem != null)
+        {
+            _languageSystem.ProcessMessage(context.ReceivingPlayer, ref processed, lang);
+        }
+
+        if (_distanceObfuscationSystem != null && context.SendingPlayer != null && context.ReceivingPlayer != null)
+        {
+            _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed);
+        }
+
+        return processed;
     }
 
     private static bool TryUnwrapDistanceFontSize(string message, out string innerMessage, out string fontSize)

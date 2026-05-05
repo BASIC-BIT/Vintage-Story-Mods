@@ -10,10 +10,15 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 {
     private readonly LanguageSystem _languageSystem;
+    private readonly DistanceObfuscationSystem _distanceObfuscationSystem;
 
-    public SpeechBubbleClientDataTransformer(RPProximityChatSystem chatSystem, LanguageSystem languageSystem = null) : base(chatSystem)
+    public SpeechBubbleClientDataTransformer(
+        RPProximityChatSystem chatSystem,
+        LanguageSystem languageSystem = null,
+        DistanceObfuscationSystem distanceObfuscationSystem = null) : base(chatSystem)
     {
         _languageSystem = languageSystem;
+        _distanceObfuscationSystem = distanceObfuscationSystem;
     }
 
     public override bool ShouldTransform(MessageContext context)
@@ -31,12 +36,8 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             return true;
         }
 
-        if (bubbleMode == OverheadChatBubbleModes.Vanilla)
-        {
-            return false;
-        }
-
-        // Emit clientData for in-world bubble messages so enhanced RP bubbles can render processed text.
+        // Emit clientData for in-world bubble messages. RpText uses enhanced VTML payloads;
+        // Vanilla uses a plain payload so the base renderer can still show a bubble.
         return context.HasFlag(MessageContext.IS_SPEECH)
             || context.HasFlag(MessageContext.IS_EMOTE)
             || context.HasFlag(MessageContext.IS_ENVIRONMENTAL)
@@ -63,18 +64,25 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             return context;
         }
 
-        var bubbleTextVtml = (context.Message ?? string.Empty).Trim();
-        if (context.HasFlag(MessageContext.IS_ENVIRONMENTAL) &&
-            context.TryGetMetadata(MessageContext.BUBBLE_TEXT_BASE, out string baseBubbleText) &&
-            !string.IsNullOrWhiteSpace(baseBubbleText))
+        var bubbleTextVtml = GetBubbleText(context);
+
+        if (bubbleMode == OverheadChatBubbleModes.Vanilla)
         {
-            bubbleTextVtml = baseBubbleText.Trim();
+            var vanillaText = VtmlUtils.StripVtmlTags(bubbleTextVtml).Trim();
+            if (vanillaText.Length > 0)
+            {
+                context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{VtmlUtils.EscapeVtml(vanillaText)}");
+            }
+
+            return context;
         }
 
-        // Wrap speech in configurable quote delimiters, matching ICSpeechFormatTransformer:
-        // sign language uses SignLanguageQuote (default: single quotes), others use Quote (default: double quotes).
-        // Applied BEFORE the language color tag so the quotes sit inside <font color="...">
-        // and the entire bubble (quotes included) renders in the language color.
+        bubbleTextVtml = bubbleTextVtml.Trim();
+        if (bubbleTextVtml.Length == 0)
+        {
+            return context;
+        }
+
         Language bubbleLang = null;
         var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
         if (languageEnabled)
@@ -92,17 +100,7 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
                     bubbleLang,
                     _config,
                     languageEnabled,
-                    text =>
-                    {
-                        if (!languageEnabled || _languageSystem == null)
-                        {
-                            return text;
-                        }
-
-                        var processed = text;
-                        _languageSystem.ProcessMessage(context.ReceivingPlayer, ref processed, bubbleLang);
-                        return processed;
-                    },
+                    text => ProcessProseQuotedText(context, text, bubbleLang, languageEnabled),
                     context.GetMetadata<string>(MessageContext.FORMATTED_NAME));
 
             }
@@ -174,5 +172,35 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg{markers}:{bubbleTextToSend}");
         return context;
+    }
+
+    private string ProcessProseQuotedText(MessageContext context, string text, Language bubbleLang, bool languageEnabled)
+    {
+        var processed = text;
+
+        if (languageEnabled && _languageSystem != null)
+        {
+            _languageSystem.ProcessMessage(context.ReceivingPlayer, ref processed, bubbleLang);
+        }
+
+        if (_distanceObfuscationSystem != null && context.SendingPlayer != null && context.ReceivingPlayer != null)
+        {
+            _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed);
+        }
+
+        return processed;
+    }
+
+    private static string GetBubbleText(MessageContext context)
+    {
+        var bubbleTextVtml = (context.Message ?? string.Empty).Trim();
+        if (context.HasFlag(MessageContext.IS_ENVIRONMENTAL) &&
+            context.TryGetMetadata(MessageContext.BUBBLE_TEXT_BASE, out string baseBubbleText) &&
+            !string.IsNullOrWhiteSpace(baseBubbleText))
+        {
+            bubbleTextVtml = baseBubbleText.Trim();
+        }
+
+        return bubbleTextVtml;
     }
 }

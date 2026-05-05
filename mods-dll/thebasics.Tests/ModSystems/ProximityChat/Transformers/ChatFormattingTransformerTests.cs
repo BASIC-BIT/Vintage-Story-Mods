@@ -6,6 +6,7 @@ using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Server;
 
 namespace thebasics.Tests.ModSystems.ProximityChat.Transformers;
@@ -129,6 +130,32 @@ public class ChatFormattingTransformerTests
     }
 
     [Fact]
+    public void ICSpeechFormatTransformer_ObfuscatesQuotedProseTextByDistance()
+    {
+        var config = CreateConfig();
+        config.EmoteColor = "#FF55FF";
+        config.Languages[0] = config.Languages[0] with { Color = "#00AAFF" };
+        config.ProximityChatPresentationMode = ProximityChatPresentationModes.Prose;
+        config.ProximityChatModeDistances[ProximityChatMode.Normal] = 10;
+        config.ProximityChatModeObfuscationRanges[ProximityChatMode.Normal] = 0;
+
+        var transformer = new ICSpeechFormatTransformer(
+            CreateChatSystem(config),
+            distanceObfuscationSystem: CreateDistanceObfuscationSystem(config));
+        var context = CreateSpeechContext("walks over \"hello there!\"");
+        context.SendingPlayer.Entity.Returns(CreateEntityPlayer(1, x: 0));
+        context.ReceivingPlayer = Substitute.For<IServerPlayer>();
+        context.ReceivingPlayer.Entity.Returns(CreateEntityPlayer(2, x: 10));
+        context.SetMetadata(MessageContext.FORMATTED_NAME, "Alice");
+        context.SetMetadata(MessageContext.LANGUAGE, config.Languages[0]);
+        context.SetMetadata(MessageContext.CHAT_MODE, ProximityChatMode.Normal);
+
+        transformer.Transform(context);
+
+        context.Message.Should().Be("<font color=\"#FF55FF\">walks over </font><font color=\"#00AAFF\">\"***** *****!\"</font>");
+    }
+
+    [Fact]
     public void EnvironmentMessageTransformer_AttributesToPlayerName_WhenConfigured()
     {
         var config = CreateConfig();
@@ -185,6 +212,35 @@ public class ChatFormattingTransformerTests
     }
 
     [Fact]
+    public void SpeechBubbleClientDataTransformer_ObfuscatesQuotedProseTextByDistance()
+    {
+        var config = CreateConfig();
+        config.EmoteColor = "#FF55FF";
+        config.Languages[0] = config.Languages[0] with { Color = "#00AAFF" };
+        config.ProximityChatPresentationMode = ProximityChatPresentationModes.Prose;
+        config.ProximityChatModeDistances[ProximityChatMode.Normal] = 10;
+        config.ProximityChatModeObfuscationRanges[ProximityChatMode.Normal] = 0;
+
+        var transformer = new SpeechBubbleClientDataTransformer(
+            CreateChatSystem(config),
+            distanceObfuscationSystem: CreateDistanceObfuscationSystem(config));
+        var context = CreateSpeechContext("walks over \"hello there!\"");
+        context.SendingPlayer.Entity.Returns(CreateEntityPlayer(1, x: 0));
+        context.ReceivingPlayer = Substitute.For<IServerPlayer>();
+        context.ReceivingPlayer.Entity.Returns(CreateEntityPlayer(2, x: 10));
+        context.SetMetadata(MessageContext.FORMATTED_NAME, "Alice");
+        context.SetMetadata(MessageContext.LANGUAGE, config.Languages[0]);
+        context.SetMetadata(MessageContext.CHAT_MODE, ProximityChatMode.Normal);
+
+        transformer.Transform(context);
+
+        var clientData = context.GetMetadata<string>("clientData");
+        clientData.Should().Contain("walks over");
+        clientData.Should().Contain("***** *****!");
+        clientData.Should().NotContain("hello there");
+    }
+
+    [Fact]
     public void SpeechBubbleClientDataTransformer_UsesUnattributedEnvironmentBubbleBase()
     {
         var config = CreateConfig();
@@ -204,15 +260,19 @@ public class ChatFormattingTransformerTests
     }
 
     [Fact]
-    public void SpeechBubbleClientDataTransformer_ShouldNotTransform_WhenBubbleModeIsVanilla()
+    public void SpeechBubbleClientDataTransformer_EmitsPlainPayload_WhenBubbleModeIsVanilla()
     {
         var transformer = new SpeechBubbleClientDataTransformer(CreateChatSystem(new ModConfig
         {
             OverheadChatBubbleMode = OverheadChatBubbleModes.Vanilla
         }));
-        var context = CreateSpeechContext("hello");
+        var context = CreateSpeechContext("<font color=\"#00AAFF\">hello</font>");
+        context.SendingPlayer.Entity.Returns(CreateEntityPlayer(42));
 
-        transformer.ShouldTransform(context).Should().BeFalse();
+        transformer.ShouldTransform(context).Should().BeTrue();
+        transformer.Transform(context);
+
+        context.GetMetadata<string>("clientData").Should().Be("from:42,msg:hello");
     }
 
     [Fact]
@@ -251,6 +311,11 @@ public class ChatFormattingTransformerTests
         return config;
     }
 
+    private static DistanceObfuscationSystem CreateDistanceObfuscationSystem(ModConfig config)
+    {
+        return new DistanceObfuscationSystem(null, null, config);
+    }
+
     private static MessageContext CreateSpeechContext(string message)
     {
         var player = Substitute.For<IServerPlayer>();
@@ -278,10 +343,12 @@ public class ChatFormattingTransformerTests
         return context;
     }
 
-    private static EntityPlayer CreateEntityPlayer(long entityId)
+    private static EntityPlayer CreateEntityPlayer(long entityId, double x = 0, double y = 0, double z = 0)
     {
         var entity = (EntityPlayer)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(EntityPlayer));
         entity.EntityId = entityId;
+        var posField = typeof(Entity).GetField("<Pos>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        posField!.SetValue(entity, new EntityPos(x, y, z));
         return entity;
     }
 }

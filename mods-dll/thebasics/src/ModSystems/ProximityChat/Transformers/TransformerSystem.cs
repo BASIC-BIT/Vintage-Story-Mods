@@ -70,12 +70,12 @@ public class TransformerSystem
             new ObfuscationTransformer(_distanceObfuscationSystem, _chatSystem),
 
             // Optional: override vanilla overhead bubble (clientData) with RP-processed text.
-            new SpeechBubbleClientDataTransformer(_chatSystem, _languageSystem),
+            new SpeechBubbleClientDataTransformer(_chatSystem, _languageSystem, _distanceObfuscationSystem),
 
             new DistanceFontSizeTransformer(_chatSystem), // Apply distance-based font sizing
 
             // Finally, format speech for the recipient
-            new ICSpeechFormatTransformer(_chatSystem, _languageSystem)
+            new ICSpeechFormatTransformer(_chatSystem, _languageSystem, _distanceObfuscationSystem)
         };
     }
 

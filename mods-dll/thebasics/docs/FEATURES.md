@@ -27,7 +27,7 @@ Version 5.5.0 shifts the generated/default config toward showcasing RP-server fe
 - `TpaRequireTemporalGear=true`
 - `RequireLineOfSightForSignLanguage=true`
 - `NametagRequiresLineOfSight=true`
-- `DisableRpOverheadBubbles=false`
+- `OverheadChatBubbleMode=RpText`
 
 ## RP Proximity Chat
 
@@ -180,7 +180,8 @@ Features:
 - Safe client network send wrapper for early-join timing.
 - Proximity chat tab persistence and default tab behavior.
 - Prevention of unwanted chat tab auto-switching while in the proximity tab.
-- VTML-capable overhead speech bubbles when RP chat is enabled.
+- Configurable overhead chat bubble modes: RP VTML text, vanilla plain text, or off.
+- VTML-capable overhead speech bubbles when `OverheadChatBubbleMode=RpText`.
 - Bubble styling for speech, emote, OOC, and environmental messages.
 - Bubble scaling for yell and whisper.
 - Line-of-sight gating for RP speech bubbles.
@@ -198,9 +199,10 @@ Primary config areas:
 - `TypingIndicatorTimeoutSeconds`
 - `TypingIndicatorTextOverride`
 - `TypingIndicatorDisplayMode`
-- `DisableRpOverheadBubbles`
+- `OverheadChatBubbleMode`
 - `DebugMode`
-- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `DisableRpOverheadBubbles` to opt out of RP-processed overhead speech bubbles and fall back to vanilla speech bubbles.
+- `DisableRpOverheadBubbles` is deprecated and only used as a legacy fallback when `OverheadChatBubbleMode` is missing or empty.
+- `OverrideSpeechBubblesWithRpText` is deprecated and ignored; use `OverheadChatBubbleMode=Vanilla` to fall back to vanilla plain-text bubbles or `OverheadChatBubbleMode=Off` to suppress overhead chat bubbles entirely.
 
 ## TPA
 
