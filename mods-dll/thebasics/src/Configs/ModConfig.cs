@@ -119,9 +119,34 @@ namespace thebasics.Configs
             OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
             ProseNicknameToken ??= "@";
 
+            InitializeCharacterSheetDefaults();
+        }
+
+        private void InitializeCharacterSheetDefaults()
+        {
             CharacterSheetSetPermission = string.IsNullOrWhiteSpace(CharacterSheetSetPermission) ? "chat" : CharacterSheetSetPermission;
             CharacterSheetAdminPermission = string.IsNullOrWhiteSpace(CharacterSheetAdminPermission) ? "commandplayer" : CharacterSheetAdminPermission;
-            CharacterSheetFields ??=
+            CharacterSheetFields ??= CreateDefaultCharacterSheetFields();
+
+            foreach (var field in CharacterSheetFields)
+            {
+                NormalizeCharacterSheetField(field);
+            }
+        }
+
+        private static void NormalizeCharacterSheetField(CharacterSheetFieldDefinition field)
+        {
+            field.Id ??= string.Empty;
+            field.Label ??= field.Id;
+            field.Type = string.IsNullOrWhiteSpace(field.Type) ? CharacterSheetFieldTypes.String : field.Type.ToLowerInvariant();
+            field.Options ??= new List<string>();
+            field.BindTo ??= string.Empty;
+            field.Visibility = string.IsNullOrWhiteSpace(field.Visibility) ? CharacterSheetFieldVisibilities.Public : field.Visibility.ToLowerInvariant();
+        }
+
+        private static IList<CharacterSheetFieldDefinition> CreateDefaultCharacterSheetFields()
+        {
+            return
             [
                 new CharacterSheetFieldDefinition
                 {
@@ -130,7 +155,17 @@ namespace thebasics.Configs
                     Type = CharacterSheetFieldTypes.String,
                     Optional = false,
                     BindTo = "thebasics.nickname",
-                    MaxLength = 100
+                    MaxLength = 100,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "summary",
+                    Label = "First Impression",
+                    Type = CharacterSheetFieldTypes.LongString,
+                    Optional = true,
+                    MaxLength = 240,
+                    Visibility = CharacterSheetFieldVisibilities.Nearby
                 },
                 new CharacterSheetFieldDefinition
                 {
@@ -138,7 +173,26 @@ namespace thebasics.Configs
                     Label = "Pronouns",
                     Type = CharacterSheetFieldTypes.String,
                     Optional = true,
-                    MaxLength = 64
+                    MaxLength = 64,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "apparentAge",
+                    Label = "Apparent Age",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = true,
+                    MaxLength = 64,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "species",
+                    Label = "Species / Heritage",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = true,
+                    MaxLength = 100,
+                    Visibility = CharacterSheetFieldVisibilities.Public
                 },
                 new CharacterSheetFieldDefinition
                 {
@@ -146,7 +200,17 @@ namespace thebasics.Configs
                     Label = "Appearance",
                     Type = CharacterSheetFieldTypes.LongString,
                     Optional = true,
-                    MaxLength = 1000
+                    MaxLength = 1000,
+                    Visibility = CharacterSheetFieldVisibilities.Nearby
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "mannerisms",
+                    Label = "Mannerisms",
+                    Type = CharacterSheetFieldTypes.LongString,
+                    Optional = true,
+                    MaxLength = 500,
+                    Visibility = CharacterSheetFieldVisibilities.Nearby
                 },
                 new CharacterSheetFieldDefinition
                 {
@@ -154,18 +218,11 @@ namespace thebasics.Configs
                     Label = "Background",
                     Type = CharacterSheetFieldTypes.LongString,
                     Optional = true,
-                    MaxLength = 1000
+                    MaxLength = 1500,
+                    Visibility = CharacterSheetFieldVisibilities.Self,
+                    ShowInLook = false
                 }
             ];
-
-            foreach (var field in CharacterSheetFields)
-            {
-                field.Id ??= string.Empty;
-                field.Label ??= field.Id;
-                field.Type = string.IsNullOrWhiteSpace(field.Type) ? CharacterSheetFieldTypes.String : field.Type.ToLowerInvariant();
-                field.Options ??= new List<string>();
-                field.BindTo ??= string.Empty;
-            }
         }
 
         [ProtoMember(1)]
@@ -536,5 +593,14 @@ namespace thebasics.Configs
 
         [ProtoMember(96)]
         public IList<CharacterSheetFieldDefinition> CharacterSheetFields { get; set; }
+
+        [ProtoMember(97)]
+        public double CharacterSheetLookRange { get; set; } = 12.0;
+
+        [ProtoMember(98)]
+        public bool CharacterSheetLookRequiresLineOfSight { get; set; } = true;
+
+        [ProtoMember(99)]
+        public bool CharacterSheetRequireRequiredFieldsForRoleplay { get; set; } = true;
     }
 }

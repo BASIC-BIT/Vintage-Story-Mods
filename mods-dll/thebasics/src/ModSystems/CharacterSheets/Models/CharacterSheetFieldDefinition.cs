@@ -26,4 +26,10 @@ public class CharacterSheetFieldDefinition
 
     [ProtoMember(7)]
     public int MaxLength { get; set; }
+
+    [ProtoMember(8)]
+    public string Visibility { get; set; } = CharacterSheetFieldVisibilities.Public;
+
+    [ProtoMember(9)]
+    public bool ShowInLook { get; set; } = true;
 }
