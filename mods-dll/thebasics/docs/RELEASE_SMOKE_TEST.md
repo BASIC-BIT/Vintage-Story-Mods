@@ -94,15 +94,15 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 
 2. **Unknown Language Scrambling** (P1)
    - Config: two clients with different known languages.
-   - Do: Have one client speak a language the other does not know.
-   - Expect: Speaker sees intended text; listener sees deterministic scrambled text.
-   - Watch for: listener seeing raw text, blank text, or unstable scrambling.
+   - Do: Have one client speak a language the other does not know, including the listener's account name or nickname in the sentence.
+   - Expect: Speaker sees intended text; listener sees deterministic scrambled text, with their own name word still readable.
+   - Watch for: listener seeing raw text, blank text, unstable scrambling, or their own name getting scrambled.
 
 3. **Sign Language LOS** (P1)
    - Config: sign language available.
-   - Do: Use sign language while visible, then behind a wall or outside range.
-   - Expect: Visible/in-range recipient receives sign output; blocked/out-of-range recipient does not.
-   - Watch for: signs through opaque walls or missing signs with clear line of sight.
+   - Do: Use sign language while visible, partly visible, briefly hidden before stepping back into view, then fully behind a wall or outside range.
+   - Expect: Visible/partly visible recipients receive sign output; briefly hidden recipients receive it if they regain line of sight quickly; blocked/out-of-range recipients do not.
+   - Watch for: signs through opaque walls, missing signs with partial clear visibility, or late delivery after the retry window.
 
 4. **Speech Bubble LOS** (P1)
    - Config: RP bubbles enabled through RP chat.
@@ -178,7 +178,7 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 
 3. **Set Durability** (P2)
    - Config: root/admin client.
-   - Do: Hold a durability item and run `/setdurability 1`, then test empty hand/non-durability item.
+   - Do: Hold a durability item and run `/setdurability 1` and `/setdurability 100%`, then test negative input, empty hand, and non-durability item.
    - Expect: Valid item updates; invalid cases produce readable errors.
    - Watch for: crashes or block/non-item mutation.
 

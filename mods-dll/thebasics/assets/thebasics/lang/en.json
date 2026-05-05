@@ -200,7 +200,10 @@
   "repair-error-nothing-in-hand": "Nothing in active hands.",
   "repair-error-is-block": "Cannot set durability on blocks.",
   "repair-error-no-durability": "Held item does not have durability.",
-  "repair-success-set": "Item durability set to {0}.",
+  "repair-error-negative-durability": "Durability cannot be negative.",
+  "repair-error-invalid-durability": "Durability must be a number or percentage such as 100%.",
+  "repair-success-set": "Item durability set to {0} / {1}.",
+  "repair-hint-use-full-percent": "Use 100% to set full durability.",
 
   "parser-error-missing-player": "Missing player name or nickname",
   "parser-error-missing-quote": "Missing closing quote. If you're trying to search for a player with nickname containing spaces, enclose it in quotes (e.g., \"player nickname\").",

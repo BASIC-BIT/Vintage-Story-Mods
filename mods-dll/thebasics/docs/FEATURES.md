@@ -36,6 +36,7 @@ Features:
 - Dedicated proximity chat group, or optional General-chat replacement via `UseGeneralChannelAsProximityChat`.
 - Whisper, normal, yell, and sign-language ranges.
 - Recipient filtering by distance, sign-language line of sight, and chat mode.
+- Sign-language line-of-sight checks use multiple target points and can deliver shortly after send if line of sight is acquired within the retry window.
 - Automatic IC formatting with configurable verbs, punctuation, delimiters, nicknames, nickname colors, OOC styling, and optional global OOC.
 - Distance obfuscation and distance-based font-size changes.
 - RP text opt-out with `/rptext`.
@@ -119,8 +120,8 @@ Features:
 - Config-defined languages with name, prefix, description, syllables, color, default flag, and hidden flag.
 - Built-in pseudo-languages for babble and sign language.
 - Prefix-based speaking language selection, including default-language selection.
-- Unknown spoken language scrambling using configured syllables.
-- Unknown sign language rendering as deterministic gesture-symbol text.
+- Unknown spoken language scrambling using configured syllables while preserving words that match the listener's account name or nickname.
+- Unknown sign language rendering as deterministic gesture-symbol text while preserving listener name words.
 - Language grants from character class, class traits, extra traits, PlayerModelLib model, and PlayerModelLib model group.
 - Optional removal of auto-granted languages when the source class, trait, or model changes.
 
@@ -301,14 +302,16 @@ Primary config areas:
 
 Command:
 
-- `/setdurability <durability>`
+- `/setdurability <durability>` where durability is an absolute value (`250`) or percentage (`100%`).
 
 Behavior:
 
 - Requires root privilege.
 - Requires an item in the active hotbar slot.
 - Rejects blocks and non-durability items.
-- Clamps durability to the valid range.
+- Clamps over-max durability to the item's maximum.
+- Rejects negative and invalid values with a clear error.
+- Reports the result as current durability over maximum durability.
 
 ## Network Messages
 

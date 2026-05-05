@@ -80,6 +80,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         public static readonly Language BabbleLang = new Language("Babble", "Unintelligible", "babble", ["ba", "ble", "bla", "bal"], "#FF0000", false, true);
         public static readonly Language SignLanguage = new Language("Sign", "A visual language using hand gestures and movements", "sign", [], "#A0A0A0", false, false);
+        private const int MinimumRecognizableNameLength = 3;
 
         private TextCommandResult HandleAddLanguageCommand(TextCommandCallingArgs args)
         {
@@ -211,7 +212,6 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult HandleAdminAddLanguageCommand(TextCommandCallingArgs args)
         {
-            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
             var languageIdentifier = (string)args.Parsers[1].GetValue();
             var lang = GetLangFromText(languageIdentifier, true, allowHidden: true);
@@ -409,17 +409,46 @@ namespace thebasics.ModSystems.ProximityChat
         {
             if (Config.EnableLanguageSystem && !receivingPlayer.KnowsLanguage(lang))
             {
+                var preservedWords = string.Equals(lang.Name, BabbleLang.Name, StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : GetRecognizableNameWords(receivingPlayer);
+
                 // Visual/gestural languages (like sign language) have no syllables to
                 // scramble into. Replace each word with random ASCII gesture symbols,
                 // mirroring the syllable-based scrambling for spoken languages.
                 if (lang.Syllables == null || lang.Syllables.Length == 0)
                 {
-                    message = ChatHelper.Italic(ScrambleAsGestures(message));
+                    message = ChatHelper.Italic(ScrambleAsGestures(message, preservedWords));
                     return;
                 }
 
-                var scrambledMessage = LanguageScrambler.ScrambleMessage(message, lang);
+                var scrambledMessage = LanguageScrambler.ScrambleMessage(message, lang, preservedWords);
                 message = ChatHelper.Italic(scrambledMessage);
+            }
+        }
+
+        private static ISet<string> GetRecognizableNameWords(IServerPlayer receivingPlayer)
+        {
+            var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            AddRecognizableNameWords(words, receivingPlayer.PlayerName);
+            AddRecognizableNameWords(words, receivingPlayer.GetNickname());
+            return words;
+        }
+
+        private static void AddRecognizableNameWords(ISet<string> words, string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return;
+            }
+
+            foreach (Match match in Regex.Matches(name, @"\w+"))
+            {
+                var word = match.Value;
+                if (word.Length >= MinimumRecognizableNameLength)
+                {
+                    words.Add(word);
+                }
             }
         }
 
@@ -430,12 +459,17 @@ namespace thebasics.ModSystems.ProximityChat
         /// verbose description like "makes unintelligible gestures".
         /// </summary>
         private static readonly char[] GestureSymbols = { '*', '-', '.', '~', '#', '+', '?' };
-        private static string ScrambleAsGestures(string message)
+        private static string ScrambleAsGestures(string message, ISet<string>? preservedWords)
         {
             var wordRegex = new Regex(@"\w+");
             return wordRegex.Replace(message, match =>
             {
                 var word = match.Groups[0].Value;
+                if (preservedWords?.Contains(word) == true)
+                {
+                    return word;
+                }
+
                 var hash = word.Select((c, i) => (int)c * (i + 1)).Aggregate((a, b) => a + b);
                 var rng = new Random(hash);
                 var len = Math.Max(1, (word.Length + 1) / 2); // roughly half the word length

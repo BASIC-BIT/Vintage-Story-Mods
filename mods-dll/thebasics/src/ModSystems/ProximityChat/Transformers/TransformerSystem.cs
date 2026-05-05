@@ -7,11 +7,16 @@ using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 public class TransformerSystem
 {
+    private const string ChatMessageLoggedMetadataKey = "chatMessageLogged";
+    private const int SignLanguageLineOfSightRetryIntervalMs = 250;
+    private const int SignLanguageLineOfSightRetryWindowMs = 1500;
+
     private List<MessageTransformerBase> _senderPhaseTransformers;
     private List<MessageTransformerBase> _recipientPhaseTransformers;
 
@@ -159,68 +164,144 @@ public class TransformerSystem
         // ----- PHASE 1: Process sender context (validation and recipient determination) -----
         var context = ExecuteTransformers(initialContext, _senderPhaseTransformers);
 
-        // If processing was stopped or no recipients were determined, we're done
-        if (context.State != MessageContextState.CONTINUE || context.Recipients == null || context.Recipients.Count == 0)
+        var hasImmediateRecipients = context.Recipients != null && context.Recipients.Count > 0;
+        var hasPendingSignLanguageRecipients = HasPendingSignLanguageRecipients(context);
+
+        // If processing was stopped or no current/pending recipients were determined, we're done
+        if (context.State != MessageContextState.CONTINUE || (!hasImmediateRecipients && !hasPendingSignLanguageRecipients))
         {
             return;
         }
 
-        _chatSystem.DispatchSpeechForContext(context);
-        _chatSystem.DispatchChatterForContext(context);
-
-        LogChatMessage(context);
-
-        // ----- PHASE 2: Process for each recipient (content transformation) -----
-        foreach (var recipient in context.Recipients)
+        if (hasImmediateRecipients)
         {
-            // Create a fresh context for this recipient
-            var recipientContext = new MessageContext
+            _chatSystem.DispatchSpeechForContext(context);
+            _chatSystem.DispatchChatterForContext(context);
+
+            LogChatMessageOnce(context);
+
+            // ----- PHASE 2: Process for each recipient (content transformation) -----
+            foreach (var recipient in context.Recipients)
             {
-                Message = context.Message,
-                SendingPlayer = context.SendingPlayer,
-                ReceivingPlayer = recipient,
-                GroupId = context.GroupId,
-                Metadata = new Dictionary<string, object>(context.Metadata),
-                Flags = new Dictionary<string, bool>(context.Flags)
-            };
-
-            // Process only the recipient-phase transformers
-            recipientContext = ExecuteTransformers(recipientContext, _recipientPhaseTransformers);
-
-            // Skip sending if processing was stopped for this recipient
-            if (recipientContext.State != MessageContextState.CONTINUE)
-            {
-                continue;
-            }
-
-            // Get the chat type from the context metadata or use the provided default
-            var chatType = recipientContext.GetMetadata(MessageContext.CHAT_TYPE, defaultChatType);
-
-            // Get client data if available
-            string data = null;
-            if (recipientContext.TryGetMetadata("clientData", out string clientData))
-            {
-                data = clientData;
-            }
-
-            // Send the message to this recipient
-            recipient.SendMessage(_chatSystem.ProximityChatId, recipientContext.Message, chatType, data);
-
-            // For placed environmental messages, also send the position packet
-            // so the client can render the bubble at a world position.
-            if (recipientContext.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL) &&
-                recipientContext.TryGetMetadata(MessageContext.PLACED_POSITION, out Vec3d placedPos))
-            {
-                // Source bubble text from BUBBLE_TEXT_BASE (the sender-phase snapshot before
-                // per-recipient transforms like language/obfuscation), matching the standard
-                // env bubble path in SpeechBubbleClientDataTransformer. Fall back to Message
-                // if the base text isn't available.
-                var bubbleText = recipientContext.TryGetMetadata(MessageContext.BUBBLE_TEXT_BASE, out string baseText)
-                    && !string.IsNullOrEmpty(baseText)
-                    ? baseText
-                    : recipientContext.Message ?? "";
-                _chatSystem.SendPlacedEnvironmentPacket(recipient, placedPos, bubbleText);
+                _ = SendToRecipient(context, recipient, defaultChatType);
             }
         }
+
+        SchedulePendingSignLanguageDeliveries(context, defaultChatType);
+    }
+
+    private static bool HasPendingSignLanguageRecipients(MessageContext context)
+    {
+        return context.TryGetMetadata(MessageContext.PENDING_SIGN_LANGUAGE_RECIPIENTS, out List<IServerPlayer> pendingRecipients) &&
+               pendingRecipients.Count > 0;
+    }
+
+    private void LogChatMessageOnce(MessageContext context)
+    {
+        if (context.GetMetadata(ChatMessageLoggedMetadataKey, false))
+        {
+            return;
+        }
+
+        LogChatMessage(context);
+        context.SetMetadata(ChatMessageLoggedMetadataKey, true);
+    }
+
+    private bool SendToRecipient(MessageContext context, IServerPlayer recipient, EnumChatType defaultChatType)
+    {
+        var recipientContext = new MessageContext
+        {
+            Message = context.Message,
+            SendingPlayer = context.SendingPlayer,
+            ReceivingPlayer = recipient,
+            GroupId = context.GroupId,
+            Metadata = new Dictionary<string, object>(context.Metadata),
+            Flags = new Dictionary<string, bool>(context.Flags)
+        };
+
+        recipientContext = ExecuteTransformers(recipientContext, _recipientPhaseTransformers);
+        if (recipientContext.State != MessageContextState.CONTINUE)
+        {
+            return false;
+        }
+
+        var chatType = recipientContext.GetMetadata(MessageContext.CHAT_TYPE, defaultChatType);
+        recipientContext.TryGetMetadata("clientData", out string clientData);
+        recipient.SendMessage(_chatSystem.ProximityChatId, recipientContext.Message, chatType, clientData);
+
+        SendPlacedEnvironmentPacketIfNeeded(recipientContext, recipient);
+        return true;
+    }
+
+    private void SendPlacedEnvironmentPacketIfNeeded(MessageContext recipientContext, IServerPlayer recipient)
+    {
+        if (!recipientContext.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL) ||
+            !recipientContext.TryGetMetadata(MessageContext.PLACED_POSITION, out Vec3d placedPos))
+        {
+            return;
+        }
+
+        var bubbleText = recipientContext.TryGetMetadata(MessageContext.BUBBLE_TEXT_BASE, out string baseText)
+            && !string.IsNullOrEmpty(baseText)
+            ? baseText
+            : recipientContext.Message ?? "";
+
+        _chatSystem.SendPlacedEnvironmentPacket(recipient, placedPos, bubbleText);
+    }
+
+    private void SchedulePendingSignLanguageDeliveries(MessageContext context, EnumChatType defaultChatType)
+    {
+        if (!context.TryGetMetadata(MessageContext.PENDING_SIGN_LANGUAGE_RECIPIENTS, out List<IServerPlayer> pendingRecipients))
+        {
+            return;
+        }
+
+        foreach (var pendingRecipient in pendingRecipients)
+        {
+            SchedulePendingSignLanguageDelivery(context, pendingRecipient, defaultChatType, SignLanguageLineOfSightRetryWindowMs);
+        }
+    }
+
+    private void SchedulePendingSignLanguageDelivery(
+        MessageContext context,
+        IServerPlayer recipient,
+        EnumChatType defaultChatType,
+        int remainingMs)
+    {
+        if (remainingMs <= 0)
+        {
+            return;
+        }
+
+        _chatSystem.API.Event.RegisterCallback(_ =>
+        {
+            if (CanReceivePendingSignLanguage(context, recipient))
+            {
+                if (SendToRecipient(context, recipient, defaultChatType))
+                {
+                    LogChatMessageOnce(context);
+                }
+
+                return;
+            }
+
+            SchedulePendingSignLanguageDelivery(
+                context,
+                recipient,
+                defaultChatType,
+                remainingMs - SignLanguageLineOfSightRetryIntervalMs);
+        }, SignLanguageLineOfSightRetryIntervalMs);
+    }
+
+    private bool CanReceivePendingSignLanguage(MessageContext context, IServerPlayer recipient)
+    {
+        if (context.SendingPlayer?.Entity == null || recipient?.Entity == null)
+        {
+            return false;
+        }
+
+        var distance = recipient.Entity.Pos.AsBlockPos.ManhattanDistance(context.SendingPlayer.Entity.Pos.AsBlockPos);
+        return distance < _chatSystem.Config.SignLanguageRange &&
+               _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, recipient);
     }
 }

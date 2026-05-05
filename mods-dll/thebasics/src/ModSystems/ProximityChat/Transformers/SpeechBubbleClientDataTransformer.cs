@@ -36,8 +36,6 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             return true;
         }
 
-        // Emit clientData for in-world bubble messages. RpText uses enhanced VTML payloads;
-        // Vanilla uses a plain payload so the base renderer can still show a bubble.
         return context.HasFlag(MessageContext.IS_SPEECH)
             || context.HasFlag(MessageContext.IS_EMOTE)
             || context.HasFlag(MessageContext.IS_ENVIRONMENTAL)
@@ -53,34 +51,66 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
             return context;
         }
 
-        var entity = context.SendingPlayer?.Entity;
-        if (entity == null)
-        {
-            return context;
-        }
-
-        if (entity.EntityId <= 0 || entity.EntityId > int.MaxValue)
+        if (!TryGetValidEntityId(context, out var entityId))
         {
             return context;
         }
 
         var bubbleTextVtml = GetBubbleText(context);
-
         if (bubbleMode == OverheadChatBubbleModes.Vanilla)
         {
-            var vanillaText = VtmlUtils.StripVtmlTags(bubbleTextVtml).Trim();
-            if (vanillaText.Length > 0)
-            {
-                context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg:{VtmlUtils.EscapeVtml(vanillaText)}");
-            }
+            return SetVanillaClientData(context, entityId, bubbleTextVtml);
+        }
 
+        return SetRpTextClientData(context, entityId, bubbleTextVtml);
+    }
+
+    private static bool TryGetValidEntityId(MessageContext context, out int entityId)
+    {
+        entityId = 0;
+        var entity = context.SendingPlayer?.Entity;
+        if (entity == null || entity.EntityId <= 0 || entity.EntityId > int.MaxValue)
+        {
+            return false;
+        }
+
+        entityId = (int)entity.EntityId;
+        return true;
+    }
+
+    private static MessageContext SetVanillaClientData(MessageContext context, int entityId, string bubbleTextVtml)
+    {
+        var vanillaText = VtmlUtils.StripVtmlTags(bubbleTextVtml).Trim();
+        if (vanillaText.Length > 0)
+        {
+            context.SetMetadata("clientData", $"from:{entityId},msg:{VtmlUtils.EscapeVtml(vanillaText)}");
+        }
+
+        return context;
+    }
+
+    private MessageContext SetRpTextClientData(MessageContext context, int entityId, string bubbleTextVtml)
+    {
+        var bubbleTextToSend = FormatRpBubbleText(context, bubbleTextVtml);
+        if (bubbleTextToSend.Length == 0)
+        {
             return context;
         }
 
-        bubbleTextVtml = bubbleTextVtml.Trim();
-        if (bubbleTextVtml.Length == 0)
+        // Match vanilla behavior: the data string contains &lt; and &gt; which the client unescapes.
+        bubbleTextToSend = VtmlUtils.EscapeVtml(bubbleTextToSend);
+
+        var markers = BuildMarkers(context);
+        context.SetMetadata("clientData", $"from:{entityId},msg{markers}:{bubbleTextToSend}");
+        return context;
+    }
+
+    private string FormatRpBubbleText(MessageContext context, string bubbleTextVtml)
+    {
+        var bubbleText = (bubbleTextVtml ?? string.Empty).Trim();
+        if (bubbleText.Length == 0)
         {
-            return context;
+            return string.Empty;
         }
 
         Language bubbleLang = null;
@@ -92,86 +122,88 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         if (context.HasFlag(MessageContext.IS_SPEECH))
         {
-            var presentationMode = ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode);
-            if (presentationMode == ProximityChatPresentationModes.Prose)
-            {
-                bubbleTextVtml = ChatHelper.FormatProseMessage(
-                    bubbleTextVtml,
-                    bubbleLang,
-                    _config,
-                    languageEnabled,
-                    text => ProcessProseQuotedText(context, text, bubbleLang, languageEnabled),
-                    context.GetMetadata<string>(MessageContext.FORMATTED_NAME));
-
-            }
-            else
-            {
-                if (ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode))
-                {
-                    bubbleTextVtml = ChatHelper.WrapSpeechQuotes(bubbleTextVtml, bubbleLang, _config, languageEnabled);
-                }
-
-                // Mirror chatbox: sign language speech is italicized in bubbles.
-                if (languageEnabled && bubbleLang == LanguageSystem.SignLanguage)
-                {
-                    bubbleTextVtml = ChatHelper.Italic(bubbleTextVtml);
-                }
-
-            }
+            bubbleText = FormatSpeechBubbleText(context, bubbleText, bubbleLang, languageEnabled);
         }
 
+        return ApplySpeechLanguageColor(context, bubbleText, bubbleLang, languageEnabled).Trim();
+    }
+
+    private string FormatSpeechBubbleText(MessageContext context, string bubbleText, Language bubbleLang, bool languageEnabled)
+    {
+        var presentationMode = ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode);
+        if (presentationMode == ProximityChatPresentationModes.Prose)
+        {
+            return ChatHelper.FormatProseMessage(
+                bubbleText,
+                bubbleLang,
+                _config,
+                languageEnabled,
+                text => ProcessProseQuotedText(context, text, bubbleLang, languageEnabled),
+                context.GetMetadata<string>(MessageContext.FORMATTED_NAME));
+        }
+
+        if (ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode))
+        {
+            bubbleText = ChatHelper.WrapSpeechQuotes(bubbleText, bubbleLang, _config, languageEnabled);
+        }
+
+        // Mirror chatbox: sign language speech is italicized in bubbles.
+        return languageEnabled && bubbleLang == LanguageSystem.SignLanguage
+            ? ChatHelper.Italic(bubbleText)
+            : bubbleText;
+    }
+
+    private string ApplySpeechLanguageColor(MessageContext context, string bubbleText, Language bubbleLang, bool languageEnabled)
+    {
         // Apply language color wrapping for speech bubbles so they match the chatbox formatting.
         // This runs after LanguageTransformer (which scrambles unknown languages) but before
         // ICSpeechFormatTransformer (which adds language color to the chatbox line).
-        // We must apply the color here because ICSpeechFormatTransformer runs after us.
-        if (languageEnabled &&
-            context.HasFlag(MessageContext.IS_SPEECH) &&
-            ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode) != ProximityChatPresentationModes.Prose)
+        if (!languageEnabled || !context.HasFlag(MessageContext.IS_SPEECH) || bubbleLang == null)
         {
-            if (bubbleLang != null)
-            {
-                bubbleTextVtml = ChatHelper.LangColor(bubbleTextVtml, bubbleLang);
-            }
+            return bubbleText;
         }
 
-        var bubbleTextToSend = (bubbleTextVtml ?? string.Empty).Trim();
-        if (bubbleTextToSend.Length == 0)
-        {
-            return context;
-        }
+        return ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode) == ProximityChatPresentationModes.Prose
+            ? bubbleText
+            : ChatHelper.LangColor(bubbleText, bubbleLang);
+    }
 
-        // Match vanilla behavior: the data string contains &lt; and &gt; which the client unescapes.
-        bubbleTextToSend = VtmlUtils.EscapeVtml(bubbleTextToSend);
+    private static string BuildMarkers(MessageContext context)
+    {
+        var kind = GetKindMarker(context);
+        var mode = GetModeMarker(context);
 
-        // Build marker segment for client-side styling.
-        // Kind marker: differentiates emote/env/OOC for border color styling.
-        // Mode marker: carries yell/whisper for speech bubble size scaling.
-        var kind = context.HasFlag(MessageContext.IS_ENVIRONMENTAL) ? "env" :
-            context.HasFlag(MessageContext.IS_EMOTE) ? "emote" :
-            context.HasFlag(MessageContext.IS_OOC) ? "ooc" :
-            null;
-
-        // For speech messages, include the chat mode so the client can scale the bubble.
-        string mode = null;
-        if (context.HasFlag(MessageContext.IS_SPEECH) &&
-            context.TryGetMetadata(MessageContext.CHAT_MODE, out ProximityChatMode chatMode))
-        {
-            mode = chatMode switch
-            {
-                ProximityChatMode.Yell => "yell",
-                ProximityChatMode.Whisper => "whisper",
-                _ => null // Normal is the default — no marker needed.
-            };
-        }
-
-        // Encode markers in the key segment (before the first ':') using unit separator
-        // so vanilla clients don't display them and they can't collide with user text.
         var markers = "";
         if (kind != null) markers += $"\u001fkind={kind}";
         if (mode != null) markers += $"\u001fmode={mode}";
 
-        context.SetMetadata("clientData", $"from:{(int)entity.EntityId},msg{markers}:{bubbleTextToSend}");
-        return context;
+        return markers;
+    }
+
+    private static string GetKindMarker(MessageContext context)
+    {
+        if (context.HasFlag(MessageContext.IS_ENVIRONMENTAL)) return "env";
+        if (context.HasFlag(MessageContext.IS_EMOTE)) return "emote";
+        if (context.HasFlag(MessageContext.IS_OOC)) return "ooc";
+
+        return null;
+    }
+
+    private static string GetModeMarker(MessageContext context)
+    {
+        // For speech messages, include the chat mode so the client can scale the bubble.
+        if (!context.HasFlag(MessageContext.IS_SPEECH) ||
+            !context.TryGetMetadata(MessageContext.CHAT_MODE, out ProximityChatMode chatMode))
+        {
+            return null;
+        }
+
+        return chatMode switch
+        {
+            ProximityChatMode.Yell => "yell",
+            ProximityChatMode.Whisper => "whisper",
+            _ => null // Normal is the default; no marker needed.
+        };
     }
 
     private string ProcessProseQuotedText(MessageContext context, string text, Language bubbleLang, bool languageEnabled)

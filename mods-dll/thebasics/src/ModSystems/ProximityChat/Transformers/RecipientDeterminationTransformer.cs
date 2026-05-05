@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Collections.Generic;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.MathTools;
@@ -53,22 +54,36 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
 
         // Find players within range
         var allPlayers = _chatSystem.API.World.AllOnlinePlayers;
+        context.TryGetMetadata<Language>(MessageContext.LANGUAGE, out var lang);
+        var requiresSignLineOfSight = lang == LanguageSystem.SignLanguage && _config.RequireLineOfSightForSignLanguage;
+        var pendingSignLanguageRecipients = new List<IServerPlayer>();
+
         var nearbyPlayers = allPlayers.Where(player =>
         {
             var serverPlayer = player as IServerPlayer;
             if (serverPlayer == null) return false;
 
-            bool inRange = player.Entity.Pos.AsBlockPos.ManhattenDistance(originPos) < range;
+            bool inRange = player.Entity.Pos.AsBlockPos.ManhattanDistance(originPos) < range;
 
-            var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
             // Special check for sign language - must be within line of sight
-            if (inRange && lang == LanguageSystem.SignLanguage && _config.RequireLineOfSightForSignLanguage)
+            if (inRange && requiresSignLineOfSight)
             {
-                return _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, serverPlayer);
+                var canSee = _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, serverPlayer);
+                if (!canSee)
+                {
+                    pendingSignLanguageRecipients.Add(serverPlayer);
+                }
+
+                return canSee;
             }
 
             return inRange;
         }).Cast<IServerPlayer>().ToList();
+
+        if (pendingSignLanguageRecipients.Count > 0)
+        {
+            context.SetMetadata(MessageContext.PENDING_SIGN_LANGUAGE_RECIPIENTS, pendingSignLanguageRecipients);
+        }
 
         // For placed environmental messages, always include the sender so they see their
         // own bubble even if they're farther from the placement point than the chat range.
