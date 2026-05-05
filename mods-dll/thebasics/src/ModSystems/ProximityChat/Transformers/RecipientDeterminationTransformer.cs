@@ -68,7 +68,10 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
             // Special check for sign language - must be within line of sight
             if (inRange && requiresSignLineOfSight)
             {
-                var canSee = _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, serverPlayer);
+                var canSee = _proximityCheckUtils.CanSeePlayer(
+                    context.SendingPlayer,
+                    serverPlayer,
+                    useMultiPointTargets: true);
                 if (!canSee)
                 {
                     pendingSignLanguageRecipients.Add(serverPlayer);

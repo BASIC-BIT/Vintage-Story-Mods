@@ -50,6 +50,9 @@ public class RepairModSystemTests
     [InlineData("")]
     [InlineData("abc")]
     [InlineData("50 percent")]
+    [InlineData("NaN%")]
+    [InlineData("Infinity%")]
+    [InlineData("-Infinity%")]
     public void TryParseDurabilityInput_RejectsInvalidValues(string input)
     {
         var result = RepairModSystem.TryParseDurabilityInput(

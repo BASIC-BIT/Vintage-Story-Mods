@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +12,7 @@ namespace thebasics.ModSystems.ProximityChat
 {
     public static class LanguageScrambler
     {
-        public static string ScrambleMessage(string message, Language language, ISet<string> preservedWords = null)
+        public static string ScrambleMessage(string message, Language language, ISet<string>? preservedWords = null)
         {
             var wordRegex = new Regex(@"\w+");
             return wordRegex.Replace(message, match =>

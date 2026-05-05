@@ -9,8 +9,6 @@ namespace thebasics.Utilities;
 
 public static class VisibilityUtils
 {
-    private static readonly bool UseMultiPointEntityLineOfSight = true;
-
     /// <summary>
     /// Block filter for LOS raycasts that allows rays to pass through visually transparent
     /// blocks (glass, leaves, water, fences, etc.). Returns true for blocks that should
@@ -36,7 +34,12 @@ public static class VisibilityUtils
         return true; // Opaque — ray stops here.
     };
 
-    public static bool HasLineOfSight(IWorldAccessor world, Entity observer, Entity target, bool failOpen)
+    public static bool HasLineOfSight(
+        IWorldAccessor world,
+        Entity observer,
+        Entity target,
+        bool failOpen,
+        bool useMultiPointTargets = false)
     {
         if (world == null || observer == null || target == null)
         {
@@ -57,7 +60,7 @@ public static class VisibilityUtils
 
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
 
-            foreach (var targetPos in GetEntityLineOfSightTargetPositions(toBase, target))
+            foreach (var targetPos in GetEntityLineOfSightTargetPositions(toBase, target, useMultiPointTargets))
             {
                 if (IsRayClear(world, fromPos, targetPos, failOpen))
                 {
@@ -105,11 +108,14 @@ public static class VisibilityUtils
         }
     }
 
-    private static IEnumerable<Vec3d> GetEntityLineOfSightTargetPositions(Vec3d targetBase, Entity target)
+    private static IEnumerable<Vec3d> GetEntityLineOfSightTargetPositions(
+        Vec3d targetBase,
+        Entity target,
+        bool useMultiPointTargets)
     {
         yield return targetBase.AddCopy(target.LocalEyePos);
 
-        if (!UseMultiPointEntityLineOfSight)
+        if (!useMultiPointTargets)
         {
             yield break;
         }

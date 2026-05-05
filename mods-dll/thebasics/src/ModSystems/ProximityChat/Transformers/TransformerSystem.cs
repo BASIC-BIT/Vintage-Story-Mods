@@ -196,6 +196,11 @@ public class TransformerSystem
                pendingRecipients.Count > 0;
     }
 
+    internal static bool IsWithinSignLanguageRetryWindow(int elapsedMs)
+    {
+        return elapsedMs <= SignLanguageLineOfSightRetryWindowMs;
+    }
+
     private void LogChatMessageOnce(MessageContext context)
     {
         if (context.GetMetadata(ChatMessageLoggedMetadataKey, false))
@@ -256,40 +261,42 @@ public class TransformerSystem
             return;
         }
 
-        foreach (var pendingRecipient in pendingRecipients)
-        {
-            SchedulePendingSignLanguageDelivery(context, pendingRecipient, defaultChatType, SignLanguageLineOfSightRetryWindowMs);
-        }
+        SchedulePendingSignLanguageDeliveries(
+            context,
+            pendingRecipients,
+            defaultChatType,
+            SignLanguageLineOfSightRetryIntervalMs);
     }
 
-    private void SchedulePendingSignLanguageDelivery(
+    private void SchedulePendingSignLanguageDeliveries(
         MessageContext context,
-        IServerPlayer recipient,
+        List<IServerPlayer> pendingRecipients,
         EnumChatType defaultChatType,
-        int remainingMs)
+        int nextCheckElapsedMs)
     {
-        if (remainingMs <= 0)
+        if (pendingRecipients.Count == 0 || !IsWithinSignLanguageRetryWindow(nextCheckElapsedMs))
         {
             return;
         }
 
         _chatSystem.API.Event.RegisterCallback(_ =>
         {
-            if (CanReceivePendingSignLanguage(context, recipient))
+            for (var i = pendingRecipients.Count - 1; i >= 0; i--)
             {
-                if (SendToRecipient(context, recipient, defaultChatType))
+                var recipient = pendingRecipients[i];
+                if (CanReceivePendingSignLanguage(context, recipient) &&
+                    SendToRecipient(context, recipient, defaultChatType))
                 {
                     LogChatMessageOnce(context);
+                    pendingRecipients.RemoveAt(i);
                 }
-
-                return;
             }
 
-            SchedulePendingSignLanguageDelivery(
+            SchedulePendingSignLanguageDeliveries(
                 context,
-                recipient,
+                pendingRecipients,
                 defaultChatType,
-                remainingMs - SignLanguageLineOfSightRetryIntervalMs);
+                nextCheckElapsedMs + SignLanguageLineOfSightRetryIntervalMs);
         }, SignLanguageLineOfSightRetryIntervalMs);
     }
 
@@ -300,8 +307,22 @@ public class TransformerSystem
             return false;
         }
 
-        var distance = recipient.Entity.Pos.AsBlockPos.ManhattanDistance(context.SendingPlayer.Entity.Pos.AsBlockPos);
+        var distance = recipient.Entity.Pos.AsBlockPos.ManhattanDistance(GetPendingSignLanguageOrigin(context));
         return distance < _chatSystem.Config.SignLanguageRange &&
-               _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, recipient);
+               _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, recipient, useMultiPointTargets: true);
+    }
+
+    private static BlockPos GetPendingSignLanguageOrigin(MessageContext context)
+    {
+        if (context.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL) &&
+            context.TryGetMetadata(MessageContext.PLACED_POSITION, out Vec3d placedPos))
+        {
+            return new BlockPos(
+                (int)System.Math.Floor(placedPos.X),
+                (int)System.Math.Floor(placedPos.Y),
+                (int)System.Math.Floor(placedPos.Z));
+        }
+
+        return context.SendingPlayer.Entity.Pos.AsBlockPos;
     }
 }

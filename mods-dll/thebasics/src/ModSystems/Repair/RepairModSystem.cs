@@ -132,7 +132,8 @@ namespace thebasics.ModSystems.Repair
             error = DurabilityInputError.None;
 
             var percentText = trimmed[..^1];
-            if (!double.TryParse(percentText, NumberStyles.Float, CultureInfo.InvariantCulture, out var percent))
+            if (!double.TryParse(percentText, NumberStyles.Float, CultureInfo.InvariantCulture, out var percent) ||
+                !double.IsFinite(percent))
             {
                 error = DurabilityInputError.Invalid;
                 return false;
