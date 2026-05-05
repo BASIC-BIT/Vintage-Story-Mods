@@ -191,7 +191,7 @@ Features:
 - Typing indicators above other players with chat-open, composing, and actively-typing states.
 - Typing indicator range and multi-point line-of-sight gating.
 - Typing indicator display modes: icon, text, or both.
-- Nametag render-range patch.
+- Client-side nametag range/target sync.
 - Debug/perf logging when `DebugMode=true`.
 
 Primary config areas:

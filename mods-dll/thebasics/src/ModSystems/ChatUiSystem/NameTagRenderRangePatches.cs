@@ -9,11 +9,8 @@ using Vintagestory.GameContent;
 namespace thebasics.ModSystems.ChatUiSystem;
 
 /// <summary>
-/// Workaround for a vanilla VS bug: <c>EntityBehaviorNameTag.OnRenderFrame</c> checks the
-/// <c>renderRange</c> field (hardcoded to 999, never updated) instead of the <c>RenderRange</c>
-/// property (which reads from synced <c>WatchedAttributes</c>).
-/// This patch syncs the field from the property before each render frame and
-/// explicitly suppresses rendering when target-only, range, or LOS checks fail.
+/// Adds configurable line-of-sight gating to vanilla nametag rendering.
+/// Range and target-only settings are applied when player entities are loaded or spawned.
 /// </summary>
 [HarmonyPatch(typeof(EntityBehaviorNameTag), "OnRenderFrame")]
 public static class NameTagRenderRangePatches
@@ -26,20 +23,11 @@ public static class NameTagRenderRangePatches
     private static readonly Dictionary<long, (bool canSee, long nextCheckMs)> LosCache = new();
     private static long _nextPurgeMs;
 
-    public static bool Prefix(EntityBehaviorNameTag __instance, Entity ___entity)
+    public static bool Prefix(Entity ___entity)
     {
         try
         {
-            // Sync the field from the WatchedAttributes-backed property so the
-            // vanilla distance check uses the server-configured value.
-            var configuredRange = __instance.RenderRange;
-            if (configuredRange >= 0)
-            {
-                // Vanilla defaults this to 999; 0 is an intentional hide-all configuration.
-                RenderRangeFieldRef(__instance) = configuredRange;
-            }
-
-            if (ShouldSuppressNametag(__instance, ___entity, configuredRange))
+            if (ShouldSuppressNametag(___entity))
             {
                 return false;
             }
@@ -52,16 +40,37 @@ public static class NameTagRenderRangePatches
         return true;
     }
 
-    private static bool ShouldSuppressNametag(EntityBehaviorNameTag instance, Entity entity, int configuredRange)
+    internal static void ApplyConfiguredNametagSettings(Entity entity, bool showOnlyWhenTargeted, int renderRange)
     {
-        if (!TryGetRemoteNametagContext(entity, out var capi, out var localPlayerEntity))
+        var behavior = entity?.GetBehavior<EntityBehaviorNameTag>();
+        if (behavior == null)
+        {
+            return;
+        }
+
+        behavior.ShowOnlyWhenTargeted = showOnlyWhenTargeted;
+        behavior.RenderRange = renderRange;
+
+        if (renderRange >= 0)
+        {
+            // Vanilla's render loop checks this private field, not the watched-attribute property.
+            RenderRangeFieldRef(behavior) = renderRange;
+        }
+    }
+
+    private static bool ShouldSuppressNametag(Entity entity)
+    {
+        if (!ChatUiSystem.DoNametagsRequireLineOfSight())
         {
             return false;
         }
 
-        return IsMissingRequiredTarget(instance, capi, entity) ||
-               IsOutsideRenderRange(configuredRange, localPlayerEntity, entity) ||
-               IsMissingRequiredLineOfSight(localPlayerEntity, entity);
+        if (!TryGetRemoteNametagContext(entity, out _, out var localPlayerEntity))
+        {
+            return false;
+        }
+
+        return !CanSeeCached(entity.World, localPlayerEntity, entity);
     }
 
     private static bool TryGetRemoteNametagContext(Entity entity, out ICoreClientAPI capi, out Entity localPlayerEntity)
@@ -69,22 +78,6 @@ public static class NameTagRenderRangePatches
         capi = entity?.World?.Api as ICoreClientAPI;
         localPlayerEntity = capi?.World?.Player?.Entity;
         return capi != null && localPlayerEntity != null && entity != null && localPlayerEntity.EntityId != entity.EntityId;
-    }
-
-    private static bool IsMissingRequiredTarget(EntityBehaviorNameTag instance, ICoreClientAPI capi, Entity target)
-    {
-        return instance.ShowOnlyWhenTargeted && capi.World.Player.CurrentEntitySelection?.Entity != target;
-    }
-
-    private static bool IsOutsideRenderRange(int renderRange, Entity localPlayerEntity, Entity target)
-    {
-        return renderRange >= 0 && localPlayerEntity.Pos.SquareDistanceTo(target.Pos) >= (double)renderRange * renderRange;
-    }
-
-    private static bool IsMissingRequiredLineOfSight(Entity localPlayerEntity, Entity target)
-    {
-        return ChatUiSystem.DoNametagsRequireLineOfSight() &&
-               !CanSeeCached(target.World, localPlayerEntity, target);
     }
 
     private static bool CanSeeCached(IWorldAccessor world, Entity observer, Entity target)
@@ -110,6 +103,12 @@ public static class NameTagRenderRangePatches
         }
 
         return entry.canSee;
+    }
+
+    internal static void ClearCache()
+    {
+        LosCache.Clear();
+        _nextPurgeMs = 0;
     }
 
     private static void PurgeStaleEntries(long nowMs)
