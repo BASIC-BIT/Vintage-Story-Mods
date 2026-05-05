@@ -7,11 +7,11 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 public class ChatUiSystemTests
 {
     [Theory]
-    [InlineData(50, 30, 30)]
+    [InlineData(50, 30, 50)]
     [InlineData(20, 30, 20)]
-    [InlineData(30, 0, 0)]
+    [InlineData(30, 0, 30)]
     [InlineData(-1, 30, 0)]
-    public void GetEffectiveTypingIndicatorRange_CapsAtNametagRange(
+    public void GetEffectiveTypingIndicatorRange_UsesConfiguredTypingRange(
         int typingRange,
         int nametagRange,
         int expectedRange)

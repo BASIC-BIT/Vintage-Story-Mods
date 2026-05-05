@@ -282,9 +282,7 @@ public class ChatUiSystem : ModSystem
             return 0;
         }
 
-        return Math.Min(
-            Math.Max(0, config.TypingIndicatorMaxRange),
-            Math.Max(0, config.NametagRenderRange));
+        return Math.Max(0, config.TypingIndicatorMaxRange);
     }
 
     internal static bool DoNametagsRequireLineOfSight()
