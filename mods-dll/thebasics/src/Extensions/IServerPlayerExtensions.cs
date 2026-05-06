@@ -91,12 +91,6 @@ namespace thebasics.Extensions
             return GetModData<string>(player, ModDataNickname, null) != null;
         }
 
-        public static string GetCharacterSheetFullName(this IServerPlayer player)
-        {
-            var data = GetModData(player, ModDataCharacterSheet, new CharacterSheetData());
-            return data?.Fields?.FirstOrDefault(field => field.FieldId.Equals(CharacterSheetFullNameField, StringComparison.OrdinalIgnoreCase))?.Value;
-        }
-
         public static string GetCharacterSheetFullName(this IServerPlayer player, ModConfig config)
         {
             var data = GetModData(player, ModDataCharacterSheet, new CharacterSheetData());
