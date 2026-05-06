@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using thebasics.Configs;
 using thebasics.Extensions;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -90,7 +91,7 @@ namespace thebasics.Utilities
         /// <param name="conflictingPlayer">The name of the conflicting player if any</param>
         /// <param name="conflictType">The type of conflict (username or nickname)</param>
         /// <returns>True if nickname is valid, false if it conflicts</returns>
-        public static bool ValidateNickname(IServerPlayer player, string nickname, ICoreServerAPI sapi, out string conflictingPlayer, out string conflictType)
+        public static bool ValidateNickname(IServerPlayer player, string nickname, ICoreServerAPI sapi, ModConfig config, out string conflictingPlayer, out string conflictType)
         {
             conflictingPlayer = null;
             conflictType = null;
@@ -108,8 +109,8 @@ namespace thebasics.Utilities
                 var serverPlayer = onlinePlayer as IServerPlayer;
                 if (serverPlayer != null)
                 {
-                    var existingNickname = serverPlayer.GetNickname();
-                    if (existingNickname.Equals(nickname, StringComparison.OrdinalIgnoreCase))
+                    var existingNickname = serverPlayer.GetNickname(config);
+                    if (serverPlayer.HasNickname(config) && existingNickname.Equals(nickname, StringComparison.OrdinalIgnoreCase))
                     {
                         conflictingPlayer = serverPlayer.PlayerName;
                         conflictType = "nickname";
@@ -143,7 +144,7 @@ namespace thebasics.Utilities
         /// <param name="joiningPlayer">The player who just joined</param>
         /// <param name="sapi">The server API instance</param>
         /// <returns>List of players whose nicknames were reset</returns>
-        public static List<string> HandleNicknameConflictsOnJoin(IServerPlayer joiningPlayer, ICoreServerAPI sapi)
+        public static List<string> HandleNicknameConflictsOnJoin(IServerPlayer joiningPlayer, ICoreServerAPI sapi, ModConfig config)
         {
             var resetPlayers = new List<string>();
 
@@ -153,13 +154,13 @@ namespace thebasics.Utilities
                 if (onlinePlayer.PlayerUID == joiningPlayer.PlayerUID) continue; // Skip the joining player themselves
 
                 var serverPlayer = onlinePlayer as IServerPlayer;
-                if (serverPlayer != null && serverPlayer.HasNickname())
+                if (serverPlayer != null && serverPlayer.HasNickname(config))
                 {
-                    var existingNickname = serverPlayer.GetNickname();
+                    var existingNickname = serverPlayer.GetNickname(config);
                     if (existingNickname.Equals(joiningPlayer.PlayerName, StringComparison.OrdinalIgnoreCase))
                     {
                         // Reset conflicting nickname
-                        serverPlayer.ClearNickname();
+                        serverPlayer.ClearNickname(config);
                         resetPlayers.Add(serverPlayer.PlayerName);
 
                         // Notify the affected player

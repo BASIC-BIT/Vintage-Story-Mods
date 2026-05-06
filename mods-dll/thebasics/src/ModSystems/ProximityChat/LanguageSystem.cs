@@ -427,11 +427,11 @@ namespace thebasics.ModSystems.ProximityChat
             }
         }
 
-        private static ISet<string> GetRecognizableNameWords(IServerPlayer receivingPlayer)
+        private ISet<string> GetRecognizableNameWords(IServerPlayer receivingPlayer)
         {
             var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             AddRecognizableNameWords(words, receivingPlayer.PlayerName);
-            AddRecognizableNameWords(words, receivingPlayer.GetNickname());
+            AddRecognizableNameWords(words, receivingPlayer.GetNickname(Config));
             return words;
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using thebasics.Configs;
 using thebasics.Extensions;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -16,11 +17,18 @@ namespace thebasics.Utilities.Parsers
     {
         protected ICoreServerAPI api;
         private PlayerUidName[] players;
+        private readonly ModConfig config;
 
         public PlayerByNameOrNicknameArgParser(string argName, ICoreAPI api, bool isMandatoryArg)
+            : this(argName, api, isMandatoryArg, null)
+        {
+        }
+
+        public PlayerByNameOrNicknameArgParser(string argName, ICoreAPI api, bool isMandatoryArg, ModConfig config)
             : base(argName, isMandatoryArg)
         {
             this.api = api as ICoreServerAPI;
+            this.config = config;
             if (api.Side != EnumAppSide.Server)
             {
                 throw new InvalidOperationException("PlayerByNameOrNicknameArgParser is only available server side");
@@ -126,8 +134,9 @@ namespace thebasics.Utilities.Parsers
 
             foreach (IServerPlayer player in api.World.AllOnlinePlayers.OfType<IServerPlayer>())
             {
-                var playerNickname = player.GetNickname();
-                if (playerNickname != null && playerNickname.Equals(text, StringComparison.OrdinalIgnoreCase))
+                var playerNickname = config == null ? player.GetNickname() : player.GetNickname(config);
+                var hasNickname = config == null ? player.HasNickname() : player.HasNickname(config);
+                if (hasNickname && playerNickname != null && playerNickname.Equals(text, StringComparison.OrdinalIgnoreCase))
                 {
                     matchedPlayers.Add(new PlayerUidName(player.PlayerUID, player.PlayerName));
                 }
