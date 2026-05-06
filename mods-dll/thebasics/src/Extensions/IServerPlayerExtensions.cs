@@ -21,7 +21,8 @@ namespace thebasics.Extensions
     {
         private const string ModDataNickname = "BASIC_NICKNAME";
         private const string ModDataCharacterSheet = "BASIC_CHARACTER_SHEET";
-        private const string CharacterSheetFullNameField = "fullname";
+        private const string CharacterSheetFullNameBind = "thebasics.fullName";
+        private const string CharacterSheetFullNameField = "fullName";
         private const string ModDataNicknameColor = "BASIC_NICKNAME_COLOR";
         private const string ModDataChatMode = "BASIC_CHATMODE";
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
@@ -94,6 +95,21 @@ namespace thebasics.Extensions
         {
             var data = GetModData(player, ModDataCharacterSheet, new CharacterSheetData());
             return data?.Fields?.FirstOrDefault(field => field.FieldId.Equals(CharacterSheetFullNameField, StringComparison.OrdinalIgnoreCase))?.Value;
+        }
+
+        public static string GetCharacterSheetFullName(this IServerPlayer player, ModConfig config)
+        {
+            var data = GetModData(player, ModDataCharacterSheet, new CharacterSheetData());
+            var fieldId = config?.CharacterSheetFields?
+                .FirstOrDefault(field => field.BindTo?.Equals(CharacterSheetFullNameBind, StringComparison.OrdinalIgnoreCase) == true)
+                ?.Id;
+
+            if (string.IsNullOrWhiteSpace(fieldId))
+            {
+                fieldId = CharacterSheetFullNameField;
+            }
+
+            return data?.Fields?.FirstOrDefault(field => field.FieldId.Equals(fieldId, StringComparison.OrdinalIgnoreCase))?.Value;
         }
 
         public static void ClearNickname(this IServerPlayer player)

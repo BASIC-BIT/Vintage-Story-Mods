@@ -155,6 +155,7 @@ namespace thebasics.Configs
                     Label = "Full Name",
                     Type = CharacterSheetFieldTypes.String,
                     Optional = false,
+                    BindTo = "thebasics.fullName",
                     MaxLength = 100,
                     Visibility = CharacterSheetFieldVisibilities.Public
                 },

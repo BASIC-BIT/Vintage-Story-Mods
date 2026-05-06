@@ -7,6 +7,7 @@ using thebasics.Models;
 using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.ProximityChat;
+using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -46,6 +47,18 @@ public class CharacterSheetSystemTests
                 Visibility = CharacterSheetFieldVisibilities.Admin
             }
         );
+
+        var missingFields = CharacterSheetSystem.GetMissingRequiredFieldLabels(player, config);
+
+        missingFields.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetMissingRequiredFieldLabels_WhenRoleplayRequirementDisabled_ReturnsEmpty()
+    {
+        var player = CreatePlayer();
+        var config = CreateConfig(new CharacterSheetFieldDefinition { Id = "summary", Label = "First Impression", Optional = false });
+        config.CharacterSheetRequireRequiredFieldsForRoleplay = false;
 
         var missingFields = CharacterSheetSystem.GetMissingRequiredFieldLabels(player, config);
 
@@ -194,6 +207,21 @@ public class CharacterSheetSystemTests
     }
 
     [Fact]
+    public void NameTransformer_ForRoleplayName_UsesConfiguredFullNameBinding()
+    {
+        EnsureLangInitialized();
+        var player = CreatePlayer("player-1", "Alice");
+        var config = CreateConfig(new CharacterSheetFieldDefinition { Id = "legalName", Label = "Legal Name", BindTo = "thebasics.fullName" });
+        var system = CreateSystem(player, config);
+        system.SaveClientFields(player, CreateSaveRequest("legalName", "Dame Alice"));
+        var transformer = new NameTransformer(new RPProximityChatSystem { Config = config });
+
+        var formattedName = transformer.GetFormattedName(player, isIC: true, config);
+
+        formattedName.Should().Be("Dame Alice");
+    }
+
+    [Fact]
     public void BuildNametagDisplayName_UsesFullNameWhenNicknameIsMissing()
     {
         EnsureLangInitialized();
@@ -207,6 +235,22 @@ public class CharacterSheetSystemTests
             ShowNicknameInNametag = true,
             ShowPlayerNameInNametag = true
         });
+
+        displayName.Should().Be("Dame Alice (Alice)");
+    }
+
+    [Fact]
+    public void BuildNametagDisplayName_UsesConfiguredFullNameBinding()
+    {
+        EnsureLangInitialized();
+        var player = CreatePlayer("player-1", "Alice");
+        var config = CreateConfig(new CharacterSheetFieldDefinition { Id = "legalName", Label = "Legal Name", BindTo = "thebasics.fullName" });
+        var system = CreateSystem(player, config);
+        system.SaveClientFields(player, CreateSaveRequest("legalName", "Dame Alice"));
+        config.ShowNicknameInNametag = true;
+        config.ShowPlayerNameInNametag = true;
+
+        var displayName = CharacterSheetSystem.BuildNametagDisplayName(player, config);
 
         displayName.Should().Be("Dame Alice (Alice)");
     }
@@ -289,6 +333,57 @@ public class CharacterSheetSystemTests
         view.Success.Should().BeFalse();
         view.IsErrorResponse.Should().BeTrue();
         GetStoredSheetData(player).Fields.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SaveClientFields_ForOptionalOption_WithEmptyValue_ClearsStoredValue()
+    {
+        EnsureLangInitialized();
+        var player = CreatePlayer("player-1", "Alice");
+        var system = CreateSystem(player, CreateConfig(new CharacterSheetFieldDefinition
+        {
+            Id = "demeanor",
+            Label = "Demeanor",
+            Type = CharacterSheetFieldTypes.Option,
+            Optional = true,
+            Options = ["Calm", "Guarded"]
+        }));
+        system.SaveClientFields(player, CreateSaveRequest("demeanor", "Calm"));
+
+        var view = system.SaveClientFields(player, CreateSaveRequest("demeanor", ""));
+
+        view.Success.Should().BeTrue();
+        GetStoredSheetData(player).Fields.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NicknameRequirementTransformer_WhenCharacterSheetRequiredFieldIsMissing_StopsRoleplayMessage()
+    {
+        EnsureLangInitialized();
+        var player = CreatePlayer("player-1", "Alice");
+        var config = CreateConfig(new CharacterSheetFieldDefinition { Id = "summary", Label = "First Impression", Optional = false });
+        var transformer = new NicknameRequirementTransformer(new RPProximityChatSystem { Config = config });
+        var context = new MessageContext { SendingPlayer = player };
+        context.SetFlag(MessageContext.IS_ROLEPLAY);
+
+        transformer.ShouldTransform(context).Should().BeTrue();
+        var transformedContext = transformer.Transform(context);
+
+        transformedContext.State.Should().Be(MessageContextState.STOP);
+        player.Received(1).SendMessage(Arg.Any<int>(), "thebasics:charsheet-required-warning", EnumChatType.CommandError);
+    }
+
+    [Fact]
+    public void NicknameRequirementTransformer_WhenCharacterSheetRequirementDisabled_DoesNotRequireNickname()
+    {
+        var player = CreatePlayer("player-1", "Alice");
+        var config = CreateConfig(new CharacterSheetFieldDefinition { Id = "summary", Label = "First Impression", Optional = false });
+        config.CharacterSheetRequireRequiredFieldsForRoleplay = false;
+        var transformer = new NicknameRequirementTransformer(new RPProximityChatSystem { Config = config });
+        var context = new MessageContext { SendingPlayer = player };
+        context.SetFlag(MessageContext.IS_ROLEPLAY);
+
+        transformer.ShouldTransform(context).Should().BeFalse();
     }
 
     [Fact]

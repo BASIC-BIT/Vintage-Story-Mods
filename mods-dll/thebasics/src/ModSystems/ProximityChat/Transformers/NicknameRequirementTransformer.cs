@@ -1,4 +1,5 @@
 using thebasics.Extensions;
+using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -20,11 +21,29 @@ public class NicknameRequirementTransformer : MessageTransformerBase
             return false;
         }
 
-        return !_config.EnableCharacterSheets && !_config.DisableNicknames && !context.SendingPlayer.HasNickname();
+        if (_config.EnableCharacterSheets)
+        {
+            return _config.CharacterSheetRequireRequiredFieldsForRoleplay && CharacterSheetSystem.GetMissingRequiredFieldLabels(context.SendingPlayer, _config).Length > 0;
+        }
+
+        return !_config.DisableNicknames && !context.SendingPlayer.HasNickname();
     }
 
     public override MessageContext Transform(MessageContext context)
     {
+        var missingFields = CharacterSheetSystem.GetMissingRequiredFieldLabels(context.SendingPlayer, _config);
+        if (_config.EnableCharacterSheets && missingFields.Length > 0)
+        {
+            context.SendingPlayer.SendMessage(
+                _chatSystem.ProximityChatId,
+                Lang.Get("thebasics:charsheet-required-warning", string.Join(", ", missingFields)),
+                EnumChatType.CommandError
+            );
+
+            context.State = MessageContextState.STOP;
+            return context;
+        }
+
         // Send nickname requirement warning directly to the player
         context.SendingPlayer.SendMessage(
             _chatSystem.ProximityChatId,

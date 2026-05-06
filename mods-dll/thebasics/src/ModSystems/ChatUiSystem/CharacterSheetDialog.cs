@@ -153,9 +153,12 @@ public class CharacterSheetDialog : GuiDialog
         var inputBounds = row.FlatCopy().WithFixedHeight(GetEditControlHeight(field));
         if (field.Type == CharacterSheetFieldTypes.Option && field.Options?.Count > 0)
         {
-            var options = field.Options.ToArray();
-            var selectedIndex = Math.Max(0, Array.FindIndex(options, option => option.Equals(field.Value, StringComparison.OrdinalIgnoreCase)));
-            var dropDown = new GuiElementDropDown(capi, options, options, selectedIndex, null, inputBounds, CairoFont.WhiteSmallText(), multiSelect: false);
+            var values = field.Optional ? new[] { string.Empty }.Concat(field.Options).ToArray() : field.Options.ToArray();
+            var displayValues = field.Optional ? new[] { Lang.Get("thebasics:charsheet-unset") }.Concat(field.Options).ToArray() : values;
+            var selectedIndex = string.IsNullOrWhiteSpace(field.Value) && field.Optional
+                ? 0
+                : Math.Max(0, Array.FindIndex(values, option => option.Equals(field.Value, StringComparison.OrdinalIgnoreCase)));
+            var dropDown = new GuiElementDropDown(capi, values, displayValues, selectedIndex, null, inputBounds, CairoFont.WhiteSmallText(), multiSelect: false);
             _dropDowns[index] = dropDown;
             container.Add(dropDown);
         }
@@ -175,7 +178,7 @@ public class CharacterSheetDialog : GuiDialog
             _textAreaInitialValues[index] = field.Value ?? string.Empty;
             container.Add(textArea);
         }
-        else
+        else if (field.Type is CharacterSheetFieldTypes.String or CharacterSheetFieldTypes.Number)
         {
             var textInput = new ScrollClippedTextInput(capi, inputBounds, null, CairoFont.TextInput());
             textInput.SetValue(field.Value ?? string.Empty);
@@ -184,6 +187,13 @@ public class CharacterSheetDialog : GuiDialog
                 textInput.SetMaxLength(field.MaxLength);
             }
 
+            _textInputs[index] = textInput;
+            container.Add(textInput);
+        }
+        else
+        {
+            var textInput = new ScrollClippedTextInput(capi, inputBounds, null, CairoFont.TextInput());
+            textInput.SetValue(field.Value ?? string.Empty);
             _textInputs[index] = textInput;
             container.Add(textInput);
         }
@@ -238,15 +248,15 @@ public class CharacterSheetDialog : GuiDialog
     {
         if (field.Type == CharacterSheetFieldTypes.Option && field.Options?.Count > 0)
         {
-            return _dropDowns[index].SelectedValue;
+            return _dropDowns.TryGetValue(index, out var dropDown) ? dropDown.SelectedValue : string.Empty;
         }
 
         if (field.Type == CharacterSheetFieldTypes.LongString)
         {
-            return _textAreas[index].GetText();
+            return _textAreas.TryGetValue(index, out var textArea) ? textArea.GetText() : string.Empty;
         }
 
-        return _textInputs[index].GetText();
+        return _textInputs.TryGetValue(index, out var textInput) ? textInput.GetText() : string.Empty;
     }
 
     private void OnNewScrollbarValue(float value)

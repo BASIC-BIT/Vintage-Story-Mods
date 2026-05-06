@@ -21,6 +21,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
 {
     private const string ModDataKey = "BASIC_CHARACTER_SHEET";
     private const string NicknameBind = "thebasics.nickname";
+    private const string FullNameBind = "thebasics.fullName";
 
     protected override void BasicStartServerSide()
     {
@@ -50,11 +51,10 @@ public class CharacterSheetSystem : BaseBasicModSystem
             .HandleWith(LookAtPlayer);
 
         API.ChatCommands.GetOrCreate("bio")
-            .WithDescription(Lang.Get("thebasics:charsheet-cmd-look-desc"))
+            .WithDescription(Lang.Get("thebasics:charsheet-cmd-view-desc"))
             .RequiresPrivilege(Privilege.chat)
-            .RequiresPlayer()
             .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
-            .HandleWith(LookAtPlayer);
+            .HandleWith(ViewSheet);
 
         API.ChatCommands.GetOrCreate("charsheetfields")
             .WithAlias("sheetfields", "biofields")
@@ -338,7 +338,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
     private CharacterSheetViewMessage BuildSheetViewMessage(IServerPlayer viewer, IServerPlayer target, CharacterSheetViewMode mode, bool includeEmpty, bool canEdit, bool isAdminView)
     {
         var data = GetSheetData(target);
-        var displayName = GetCharacterDisplayName(target, data);
+        var displayName = GetCharacterDisplayName(target);
         var view = new CharacterSheetViewMessage
         {
             Title = GetSheetTitle(viewer, target, mode, displayName),
@@ -407,7 +407,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
     {
         var isOwnSheet = viewer != null && viewer.PlayerUID == target.PlayerUID;
         var data = GetSheetData(target);
-        var displayName = GetCharacterDisplayName(target, data);
+        var displayName = GetCharacterDisplayName(target);
         var header = Lang.Get("thebasics:charsheet-header-other", VtmlUtils.EscapeVtml(displayName));
         if (mode == CharacterSheetViewMode.Look)
         {
@@ -475,6 +475,10 @@ public class CharacterSheetSystem : BaseBasicModSystem
             {
                 message.Append(", nickname");
             }
+            if (IsFullNameField(field))
+            {
+                message.Append(", full name");
+            }
             if (IsOptionField(field))
             {
                 message.Append(", options: ");
@@ -489,13 +493,13 @@ public class CharacterSheetSystem : BaseBasicModSystem
     private TextCommandResult SetOwnField(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
-        return SetField(player, args.Parsers[0].GetValue()?.ToString(), args.Parsers[1].GetValue()?.ToString(), isAdminAction: false);
+        return SetField(player, player, args.Parsers[0].GetValue()?.ToString(), args.Parsers[1].GetValue()?.ToString(), isAdminAction: false);
     }
 
     private TextCommandResult ClearOwnField(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
-        return ClearField(player, args.Parsers[0].IsMissing ? null : args.Parsers[0].GetValue()?.ToString());
+        return ClearField(player, player, args.Parsers[0].IsMissing ? null : args.Parsers[0].GetValue()?.ToString(), isAdminAction: false);
     }
 
     private TextCommandResult SetAdminField(TextCommandCallingArgs args)
@@ -506,7 +510,8 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return Error(Lang.Get("thebasics:charsheet-error-player-not-found"));
         }
 
-        return SetField(target, args.Parsers[1].GetValue()?.ToString(), args.Parsers[2].GetValue()?.ToString(), isAdminAction: true);
+        var editor = args.Caller.Type == EnumCallerType.Player ? args.Caller.Player as IServerPlayer : null;
+        return SetField(editor, target, args.Parsers[1].GetValue()?.ToString(), args.Parsers[2].GetValue()?.ToString(), isAdminAction: true);
     }
 
     private TextCommandResult ClearAdminField(TextCommandCallingArgs args)
@@ -517,15 +522,21 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return Error(Lang.Get("thebasics:charsheet-error-player-not-found"));
         }
 
-        return ClearField(target, args.Parsers[1].IsMissing ? null : args.Parsers[1].GetValue()?.ToString());
+        var editor = args.Caller.Type == EnumCallerType.Player ? args.Caller.Player as IServerPlayer : null;
+        return ClearField(editor, target, args.Parsers[1].IsMissing ? null : args.Parsers[1].GetValue()?.ToString(), isAdminAction: true);
     }
 
-    private TextCommandResult SetField(IServerPlayer player, string fieldName, string value, bool isAdminAction)
+    private TextCommandResult SetField(IServerPlayer editor, IServerPlayer player, string fieldName, string value, bool isAdminAction)
     {
         var field = ResolveField(fieldName);
         if (field == null)
         {
             return Error(Lang.Get("thebasics:charsheet-error-field-not-found", fieldName, GetValidFieldList()));
+        }
+
+        if (!CanEditField(editor, player, field, isAdminAction))
+        {
+            return Error(Lang.Get("thebasics:charsheet-error-field-readonly", GetFieldLabel(field)));
         }
 
         value = (value ?? string.Empty).Trim();
@@ -543,19 +554,14 @@ public class CharacterSheetSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:charsheet-success-set", VtmlUtils.EscapeVtml(GetFieldLabel(field)), VtmlUtils.EscapeVtml(player.PlayerName)));
     }
 
-    private TextCommandResult ClearField(IServerPlayer player, string fieldName)
+    private TextCommandResult ClearField(IServerPlayer editor, IServerPlayer player, string fieldName, bool isAdminAction)
     {
         if (string.IsNullOrWhiteSpace(fieldName))
         {
-            var data = GetSheetData(player);
-            data.Fields.Clear();
-            SaveSheetData(player, data);
-
-            foreach (var field in Config.CharacterSheetFields.Where(IsNicknameField))
+            foreach (var field in Config.CharacterSheetFields.Where(field => CanEditField(editor, player, field, isAdminAction)).ToArray())
             {
-                player.ClearNickname();
+                ClearFieldValue(player, field);
             }
-            RefreshNameTag(player);
 
             API.Logger.Audit($"Character sheet cleared for {player.PlayerName}.");
             return Success(Lang.Get("thebasics:charsheet-success-cleared-all", VtmlUtils.EscapeVtml(player.PlayerName)));
@@ -565,6 +571,11 @@ public class CharacterSheetSystem : BaseBasicModSystem
         if (resolvedField == null)
         {
             return Error(Lang.Get("thebasics:charsheet-error-field-not-found", fieldName, GetValidFieldList()));
+        }
+
+        if (!CanEditField(editor, player, resolvedField, isAdminAction))
+        {
+            return Error(Lang.Get("thebasics:charsheet-error-field-readonly", GetFieldLabel(resolvedField)));
         }
 
         ClearFieldValue(player, resolvedField);
@@ -593,6 +604,10 @@ public class CharacterSheetSystem : BaseBasicModSystem
         var data = GetSheetData(player);
         SetStoredFieldValue(data, GetFieldId(field), normalizedValue);
         SaveSheetData(player, data);
+        if (IsFullNameField(field))
+        {
+            RefreshNameTag(player);
+        }
         return true;
     }
 
@@ -608,6 +623,10 @@ public class CharacterSheetSystem : BaseBasicModSystem
         var data = GetSheetData(player);
         RemoveStoredField(data, GetFieldId(field));
         SaveSheetData(player, data);
+        if (IsFullNameField(field))
+        {
+            RefreshNameTag(player);
+        }
     }
 
     private bool TryNormalizeValue(CharacterSheetFieldDefinition field, string value, out string normalizedValue, out string errorMessage)
@@ -812,9 +831,9 @@ public class CharacterSheetSystem : BaseBasicModSystem
         return data.Fields.FirstOrDefault(storedField => storedField.FieldId.Equals(GetFieldId(field), StringComparison.OrdinalIgnoreCase))?.Value ?? string.Empty;
     }
 
-    private static string GetCharacterDisplayName(IServerPlayer player, CharacterSheetData data)
+    private string GetCharacterDisplayName(IServerPlayer player)
     {
-        var fullName = data.Fields.FirstOrDefault(storedField => storedField.FieldId.Equals("fullName", StringComparison.OrdinalIgnoreCase))?.Value?.Trim();
+        var fullName = player.GetCharacterSheetFullName(Config)?.Trim();
         var nickname = player.HasNickname() ? player.GetNickname()?.Trim() : string.Empty;
 
         if (!string.IsNullOrWhiteSpace(fullName) && !string.IsNullOrWhiteSpace(nickname) && !fullName.Equals(nickname, StringComparison.OrdinalIgnoreCase))
@@ -908,6 +927,11 @@ public class CharacterSheetSystem : BaseBasicModSystem
         return field.BindTo?.Equals(NicknameBind, StringComparison.OrdinalIgnoreCase) == true;
     }
 
+    private static bool IsFullNameField(CharacterSheetFieldDefinition field)
+    {
+        return field.BindTo?.Equals(FullNameBind, StringComparison.OrdinalIgnoreCase) == true;
+    }
+
     private static bool IsNumberField(CharacterSheetFieldDefinition field)
     {
         return GetFieldType(field) == CharacterSheetFieldTypes.Number;
@@ -920,7 +944,17 @@ public class CharacterSheetSystem : BaseBasicModSystem
 
     private void RefreshNameTag(IServerPlayer player)
     {
-        var behavior = player.Entity?.GetBehavior<EntityBehaviorNameTag>();
+        if (player.Entity == null)
+        {
+            return;
+        }
+
+        RefreshEntityNameTag(player);
+    }
+
+    private void RefreshEntityNameTag(IServerPlayer player)
+    {
+        var behavior = player.Entity.GetBehavior<EntityBehaviorNameTag>();
         if (behavior == null)
         {
             return;
@@ -943,7 +977,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return config.ShowPlayerNameInNametag ? player.PlayerName : string.Empty;
         }
 
-        var displayName = player.HasNickname() ? player.GetNickname()?.Trim() : player.GetCharacterSheetFullName()?.Trim();
+        var displayName = player.HasNickname() ? player.GetNickname()?.Trim() : player.GetCharacterSheetFullName(config)?.Trim();
         if (string.IsNullOrWhiteSpace(displayName))
         {
             return config.ShowPlayerNameInNametag ? player.PlayerName : string.Empty;

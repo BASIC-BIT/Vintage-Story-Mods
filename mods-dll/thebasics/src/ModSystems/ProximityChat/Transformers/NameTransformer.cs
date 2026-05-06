@@ -32,7 +32,7 @@ public class NameTransformer : MessageTransformerBase
 
     public string GetFormattedName(IServerPlayer player, bool isIC, ModConfig config)
     {
-        string name = isIC ? GetRoleplayName(player) : player.PlayerName;
+        string name = isIC ? GetRoleplayName(player, config) : player.PlayerName;
 
         // Escape user-supplied name to prevent VTML injection
         name = ChatHelper.EscapeMarkup(name);
@@ -52,14 +52,14 @@ public class NameTransformer : MessageTransformerBase
         return name;
     }
 
-    private static string GetRoleplayName(IServerPlayer player)
+    private static string GetRoleplayName(IServerPlayer player, ModConfig config)
     {
         if (player.HasNickname())
         {
             return player.GetNickname();
         }
 
-        var fullName = player.GetCharacterSheetFullName();
+        var fullName = config.EnableCharacterSheets ? player.GetCharacterSheetFullName(config) : null;
         return string.IsNullOrWhiteSpace(fullName) ? player.PlayerName : fullName;
     }
 }
