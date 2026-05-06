@@ -155,6 +155,7 @@ Features:
 - Configurable nickname length limits and change permissions.
 - Configurable nametag content and range.
 - Optional hide-unless-targeting nametags.
+- Multi-point line-of-sight gating for nametags when LOS is required.
 
 Primary config areas:
 
@@ -185,12 +186,12 @@ Features:
 - VTML-capable overhead speech bubbles when `OverheadChatBubbleMode=RpText`.
 - Bubble styling for speech, emote, OOC, and environmental messages.
 - Bubble scaling for yell and whisper.
-- Line-of-sight gating for RP speech bubbles.
+- Multi-point line-of-sight gating for RP speech bubbles.
 - Raycast-placed environmental bubbles at world positions.
 - Typing indicators above other players with chat-open, composing, and actively-typing states.
-- Typing indicator range and line-of-sight gating.
+- Typing indicator range and multi-point line-of-sight gating.
 - Typing indicator display modes: icon, text, or both.
-- Nametag render-range patch.
+- Client-side nametag range/target sync.
 - Debug/perf logging when `DebugMode=true`.
 
 Primary config areas:

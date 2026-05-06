@@ -7,6 +7,7 @@ using thebasics.Models;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.Util;
 using Vintagestory.Client.NoObf;
@@ -83,6 +84,7 @@ public class ChatUiSystem : ModSystem
 
         // Register event handlers
         _api.Event.PlayerJoin += OnPlayerJoin;
+        _api.Event.PlayerEntitySpawn += OnPlayerEntitySpawn;
         // _api.Event.PlayerLeave += OnPlayerLeave;
 
         // Initialize Harmony patches if needed
@@ -193,6 +195,11 @@ public class ChatUiSystem : ModSystem
         }
     }
 
+    private static void OnPlayerEntitySpawn(IClientPlayer byPlayer)
+    {
+        ApplyClientNametagSettings(byPlayer?.Entity);
+    }
+
     private void RegisterForServerSideConfig()
     {
         _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
@@ -272,7 +279,17 @@ public class ChatUiSystem : ModSystem
 
     internal static int GetTypingIndicatorRange()
     {
-        return _config?.TypingIndicatorMaxRange ?? 0;
+        return GetEffectiveTypingIndicatorRange(_config);
+    }
+
+    internal static int GetEffectiveTypingIndicatorRange(ModConfig config)
+    {
+        if (config == null)
+        {
+            return 0;
+        }
+
+        return Math.Max(0, config.TypingIndicatorMaxRange);
     }
 
     internal static bool DoNametagsRequireLineOfSight()
@@ -329,17 +346,46 @@ public class ChatUiSystem : ModSystem
 
             DebugLog($"[THEBASICS] Received server config: PreventProximityChannelSwitching={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
             DebugLog($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
+            NameTagRenderRangePatches.ClearCache();
 
             // Process any actions that were waiting for config
             if (_pendingConfigActions.Count > 0)
             {
                 ProcessConfigActionQueue();
             }
+
+            ApplyClientNametagSettingsToLoadedPlayers();
         }
         catch (System.Exception e)
         {
             _api.Logger.Error($"[THEBASICS] Error processing server config message: {e}");
         }
+    }
+
+    private static void ApplyClientNametagSettingsToLoadedPlayers()
+    {
+        if (_api?.World?.LoadedEntities == null || _config == null)
+        {
+            return;
+        }
+
+        foreach (var entity in _api.World.LoadedEntities.Values)
+        {
+            ApplyClientNametagSettings(entity);
+        }
+    }
+
+    private static void ApplyClientNametagSettings(Entity entity)
+    {
+        if (_config == null || entity is not EntityPlayer)
+        {
+            return;
+        }
+
+        NameTagRenderRangePatches.ApplyConfiguredNametagSettings(
+            entity,
+            _config.HideNametagUnlessTargeting,
+            _config.NametagRenderRange);
     }
 
     private static void ScheduleRpttsInitialization()
@@ -746,6 +792,7 @@ public class ChatUiSystem : ModSystem
             if (_api != null)
             {
                 _api.Event.PlayerJoin -= OnPlayerJoin;
+                _api.Event.PlayerEntitySpawn -= OnPlayerEntitySpawn;
                 _typingIndicatorRenderer?.Dispose();
                 _typingIndicatorRenderer = null;
                 _placedBubbleRenderer?.Dispose();
@@ -765,6 +812,7 @@ public class ChatUiSystem : ModSystem
             _lastChatInputText = null;
             _lastChatInputChangeMs = 0;
             _lastClientChannelConnected = false;
+            NameTagRenderRangePatches.ClearCache();
         }
         catch (System.Exception e)
         {

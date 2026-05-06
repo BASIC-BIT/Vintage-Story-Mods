@@ -263,7 +263,7 @@ public static class SpeechBubbleVtmlPatches
 /// Per-frame rendering patch for overhead speech bubbles.
 /// Takes over vanilla's bubble rendering to provide:
 /// <list type="bullet">
-///   <item>LOS gating — hides bubbles when the local player can't see the entity</item>
+///   <item>Multi-point LOS gating — hides bubbles when the local player can't see the entity</item>
 ///   <item>Dampened distance scaling — bubbles shrink more subtly with distance, staying
 ///         legible even at long range instead of vanilla's linear 1/distance falloff</item>
 /// </list>
@@ -429,7 +429,7 @@ public static class SpeechBubbleRenderPatches
 
         if (!_losCache.TryGetValue(target.EntityId, out var entry) || nowMs >= entry.nextCheckMs)
         {
-            var canSee = VisibilityUtils.HasLineOfSight(world, observer, target);
+            var canSee = VisibilityUtils.HasLineOfSight(world, observer, target, failOpen: false, useMultiPointTargets: true);
             var refreshMs = canSee ? 250L : 500L;
             entry = (canSee, nowMs + refreshMs);
             _losCache[target.EntityId] = entry;
