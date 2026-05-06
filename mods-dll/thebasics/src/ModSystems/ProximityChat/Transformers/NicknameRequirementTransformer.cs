@@ -26,7 +26,7 @@ public class NicknameRequirementTransformer : MessageTransformerBase
             return _config.CharacterSheetRequireRequiredFieldsForRoleplay && CharacterSheetSystem.GetMissingRequiredFieldLabels(context.SendingPlayer, _config).Length > 0;
         }
 
-        return !_config.DisableNicknames && !context.SendingPlayer.HasNickname();
+        return !_config.DisableNicknames && !context.SendingPlayer.HasNickname(_config);
     }
 
     public override MessageContext Transform(MessageContext context)

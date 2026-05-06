@@ -39,7 +39,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
             .WithAlias("sheet")
             .WithDescription(Lang.Get("thebasics:charsheet-cmd-view-desc"))
             .RequiresPrivilege(Privilege.chat)
-            .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
+            .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false, Config))
             .HandleWith(ViewSheet);
 
         API.ChatCommands.GetOrCreate("look")
@@ -47,13 +47,13 @@ public class CharacterSheetSystem : BaseBasicModSystem
             .WithDescription(Lang.Get("thebasics:charsheet-cmd-look-desc"))
             .RequiresPrivilege(Privilege.chat)
             .RequiresPlayer()
-            .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
+            .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false, Config))
             .HandleWith(LookAtPlayer);
 
         API.ChatCommands.GetOrCreate("bio")
             .WithDescription(Lang.Get("thebasics:charsheet-cmd-view-desc"))
             .RequiresPrivilege(Privilege.chat)
-            .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
+            .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false, Config))
             .HandleWith(ViewSheet);
 
         API.ChatCommands.GetOrCreate("charsheetfields")
@@ -200,7 +200,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return false;
         }
 
-        if (IsNicknameField(field) && !NicknameValidationUtils.ValidateNickname(target, normalizedValue, API, out var conflictingPlayer, out var conflictType))
+        if (IsNicknameField(field) && !NicknameValidationUtils.ValidateNickname(target, normalizedValue, API, Config, out var conflictingPlayer, out var conflictType))
         {
             errorMessage = Lang.Get("thebasics:chat-nick-conflict", normalizedValue, conflictingPlayer, conflictType);
             return false;
@@ -357,7 +357,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
                 continue;
             }
 
-            var value = GetFieldValue(target, data, field);
+            var value = GetFieldValue(target, data, field, Config);
             if (!includeEmpty && string.IsNullOrWhiteSpace(value) && field.Optional)
             {
                 continue;
@@ -441,7 +441,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
                 continue;
             }
 
-            var value = GetFieldValue(target, data, field);
+            var value = GetFieldValue(target, data, field, Config);
             if (!includeEmpty && string.IsNullOrWhiteSpace(value) && field.Optional)
             {
                 continue;
@@ -590,13 +590,13 @@ public class CharacterSheetSystem : BaseBasicModSystem
 
         if (IsNicknameField(field))
         {
-            if (!NicknameValidationUtils.ValidateNickname(player, normalizedValue, API, out var conflictingPlayer, out var conflictType))
+            if (!NicknameValidationUtils.ValidateNickname(player, normalizedValue, API, Config, out var conflictingPlayer, out var conflictType))
             {
                 errorMessage = Lang.Get("thebasics:chat-nick-conflict", normalizedValue, conflictingPlayer, conflictType);
                 return false;
             }
 
-            player.SetNickname(normalizedValue);
+            player.SetNickname(normalizedValue, Config);
             RefreshNameTag(player);
             return true;
         }
@@ -615,7 +615,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
     {
         if (IsNicknameField(field))
         {
-            player.ClearNickname();
+            player.ClearNickname(Config);
             RefreshNameTag(player);
             return;
         }
@@ -728,7 +728,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
         {
             if (player.PlayerName.Equals(targetName, StringComparison.OrdinalIgnoreCase) ||
                 player.PlayerUID.Equals(targetName, StringComparison.OrdinalIgnoreCase) ||
-                player.GetNickname().Equals(targetName, StringComparison.OrdinalIgnoreCase))
+                player.GetNickname(Config).Equals(targetName, StringComparison.OrdinalIgnoreCase))
             {
                 return player;
             }
@@ -789,7 +789,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
 
         return config.CharacterSheetFields?
             .Where(field => FieldCanBeRequiredForRoleplay(field, config))
-            .Where(field => string.IsNullOrWhiteSpace(GetFieldValue(player, GetSheetData(player), field)))
+            .Where(field => string.IsNullOrWhiteSpace(GetFieldValue(player, GetSheetData(player), field, config)))
             .Select(GetFieldLabel)
             .ToArray() ?? Array.Empty<string>();
     }
@@ -821,11 +821,11 @@ public class CharacterSheetSystem : BaseBasicModSystem
         IServerPlayerExtensions.SetModData(player, ModDataKey, data);
     }
 
-    private static string GetFieldValue(IServerPlayer player, CharacterSheetData data, CharacterSheetFieldDefinition field)
+    private static string GetFieldValue(IServerPlayer player, CharacterSheetData data, CharacterSheetFieldDefinition field, ModConfig config)
     {
         if (IsNicknameField(field))
         {
-            return player.HasNickname() ? player.GetNickname() : string.Empty;
+            return player.HasNickname(config) ? player.GetNickname(config) : string.Empty;
         }
 
         return data.Fields.FirstOrDefault(storedField => storedField.FieldId.Equals(GetFieldId(field), StringComparison.OrdinalIgnoreCase))?.Value ?? string.Empty;
@@ -834,7 +834,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
     private string GetCharacterDisplayName(IServerPlayer player)
     {
         var fullName = player.GetCharacterSheetFullName(Config)?.Trim();
-        var nickname = player.HasNickname() ? player.GetNickname()?.Trim() : string.Empty;
+        var nickname = player.HasNickname(Config) ? player.GetNickname(Config)?.Trim() : string.Empty;
 
         if (!string.IsNullOrWhiteSpace(fullName) && !string.IsNullOrWhiteSpace(nickname) && !fullName.Equals(nickname, StringComparison.OrdinalIgnoreCase))
         {
@@ -977,7 +977,16 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return config.ShowPlayerNameInNametag ? player.PlayerName : string.Empty;
         }
 
-        var displayName = player.HasNickname() ? player.GetNickname()?.Trim() : player.GetCharacterSheetFullName(config)?.Trim();
+        string displayName = null;
+        if (player.HasNickname(config))
+        {
+            displayName = player.GetNickname(config)?.Trim();
+        }
+        else if (config.EnableCharacterSheets)
+        {
+            displayName = player.GetCharacterSheetFullName(config)?.Trim();
+        }
+
         if (string.IsNullOrWhiteSpace(displayName))
         {
             return config.ShowPlayerNameInNametag ? player.PlayerName : string.Empty;

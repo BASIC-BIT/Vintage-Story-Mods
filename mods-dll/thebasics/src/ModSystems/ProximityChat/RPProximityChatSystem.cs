@@ -87,7 +87,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .WithAlias("adminnickname")
                 .WithDescription(Lang.Get("thebasics:chat-cmd-adminsetnick-desc"))
                 .WithRootAlias("adminsetnick")
-                .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
+                .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true, Config),
                     API.ChatCommands.Parsers.OptionalWordRange("force flag", "force"),
                     new StringArgParser("new nickname", false))
                 .RequiresPrivilege(Privilege.commandplayer)
@@ -96,7 +96,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             API.ChatCommands.GetOrCreate("adminsetnicknamecolor")
                 .WithAlias("adminsetnickcolor", "adminsetnickcol")
                 .WithDescription(Lang.Get("thebasics:chat-cmd-adminsetnickcolor-desc"))
-                .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true),
+                .WithArgs(new PlayerByNameOrNicknameArgParser("target player", API, true, Config),
                     new ColorArgParser("new nickname color", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameColorAdmin);
@@ -747,7 +747,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
 
         // Handle nickname conflicts when player joins - always enforced
-        var resetPlayers = NicknameValidationUtils.HandleNicknameConflictsOnJoin(byPlayer, API);
+        var resetPlayers = NicknameValidationUtils.HandleNicknameConflictsOnJoin(byPlayer, API, Config);
         if (resetPlayers.Count > 0)
         {
             // Log the conflicts that were resolved
@@ -782,26 +782,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
         behavior.RenderRange = Config.NametagRenderRange;
 
-        // Determine the visible nametag string.
-        string displayName;
-        if (Config.ShowNicknameInNametag)
-        {
-            var nickname = player.GetNickname();
-            if (string.IsNullOrWhiteSpace(nickname))
-            {
-                displayName = Config.ShowPlayerNameInNametag ? player.PlayerName : "";
-            }
-            else
-            {
-                displayName = Config.ShowPlayerNameInNametag ? $"{nickname} ({player.PlayerName})" : nickname;
-            }
-        }
-        else
-        {
-            displayName = Config.ShowPlayerNameInNametag ? player.PlayerName : "";
-        }
-
-        behavior.SetName(displayName);
+        behavior.SetName(CharacterSheetSystem.BuildNametagDisplayName(player, Config));
     }
 
     private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
@@ -809,12 +790,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var player = (IServerPlayer)fullArgs.Caller.Player;
         if (fullArgs.Parsers[0].IsMissing)
         {
-            if (player.HasNickname())
+            if (player.HasNickname(Config))
             {
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
-                    StatusMessage = Lang.Get("thebasics:chat-nick-current", player.GetNicknameWithColor()),
+                    StatusMessage = Lang.Get("thebasics:chat-nick-current", player.GetNicknameWithColor(Config)),
                 };
             }
             else
@@ -831,7 +812,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             var nickname = (string)fullArgs.Parsers[0].GetValue();
 
             // Validate nickname against conflicts - always enforced
-            if (!NicknameValidationUtils.ValidateNickname(player, nickname, API, out string conflictingPlayer, out string conflictType))
+            if (!NicknameValidationUtils.ValidateNickname(player, nickname, API, Config, out string conflictingPlayer, out string conflictType))
             {
                 return new TextCommandResult
                 {
@@ -840,7 +821,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 };
             }
 
-            player.SetNickname(nickname);
+            player.SetNickname(nickname, Config);
             SwapOutNameTag(player);
             return new TextCommandResult
             {
@@ -861,7 +842,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 StatusMessage = Lang.Get("thebasics:chat-error-player-not-found"),
             };
         }
-        var oldNickname = attemptTarget.GetNicknameWithColor();
+        var oldNickname = attemptTarget.GetNicknameWithColor(Config);
 
         // Check if we have a force flag (parser[1])
         bool isForced = !fullArgs.Parsers[1].IsMissing && ((string)fullArgs.Parsers[1].GetValue())?.ToLowerInvariant() == "force";
@@ -869,7 +850,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // If nickname argument is missing (parser[2])
         if (fullArgs.Parsers[2].IsMissing)
         {
-            if (!attemptTarget.HasNickname())
+            if (!attemptTarget.HasNickname(Config))
             {
                 return new TextCommandResult
                 {
@@ -891,7 +872,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             // Validate nickname against conflicts and show warning to admin - always enforced unless forced
             if (!isForced)
             {
-                if (!NicknameValidationUtils.ValidateNickname(attemptTarget, newNickname, API, out string conflictingPlayer, out string conflictType))
+                if (!NicknameValidationUtils.ValidateNickname(attemptTarget, newNickname, API, Config, out string conflictingPlayer, out string conflictType))
                 {
                     return new TextCommandResult
                     {
@@ -901,14 +882,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 }
             }
 
-            attemptTarget.SetNickname(newNickname);
+            attemptTarget.SetNickname(newNickname, Config);
             SwapOutNameTag(attemptTarget);
 
             string forceMessage = isForced ? Lang.Get("thebasics:chat-nick-admin-forced") : "";
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = Lang.Get("thebasics:chat-nick-admin-set", attemptTarget.PlayerName, attemptTarget.GetNicknameWithColor(), VtmlUtils.EscapeVtml(oldNickname), forceMessage),
+                StatusMessage = Lang.Get("thebasics:chat-nick-admin-set", attemptTarget.PlayerName, attemptTarget.GetNicknameWithColor(Config), VtmlUtils.EscapeVtml(oldNickname), forceMessage),
             };
         }
     }
@@ -991,7 +972,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private TextCommandResult ClearNickname(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
-        player.ClearNickname();
+        player.ClearNickname(Config);
         SwapOutNameTag(player);
         return new TextCommandResult
         {

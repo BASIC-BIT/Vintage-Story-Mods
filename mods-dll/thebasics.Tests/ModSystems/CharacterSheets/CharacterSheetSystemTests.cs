@@ -207,6 +207,54 @@ public class CharacterSheetSystemTests
     }
 
     [Fact]
+    public void NameTransformer_ForRoleplayName_UsesSheetBackedNicknameBeforeFullName()
+    {
+        EnsureLangInitialized();
+        var player = CreatePlayer("player-1", "Alice");
+        var config = CreateConfig(
+            new CharacterSheetFieldDefinition { Id = "fullName", Label = "Full Name", BindTo = "thebasics.fullName" },
+            new CharacterSheetFieldDefinition { Id = "nickname", Label = "Nickname", BindTo = "thebasics.nickname" }
+        );
+        var system = CreateSystem(player, config);
+        system.SaveClientFields(player, CreateSaveRequest("fullName", "Dame Alice"));
+        system.SaveClientFields(player, CreateSaveRequest("nickname", "Ally"));
+        var transformer = new NameTransformer(new RPProximityChatSystem { Config = config });
+
+        var formattedName = transformer.GetFormattedName(player, isIC: true, config);
+
+        formattedName.Should().Be("Ally");
+        GetStoredSheetData(player).Fields.Should().Contain(field => field.FieldId == "nickname" && field.Value == "Ally");
+    }
+
+    [Fact]
+    public void NameTransformer_ForRoleplayName_FallsBackToLegacyNickname()
+    {
+        EnsureLangInitialized();
+        var player = CreatePlayer("player-1", "Alice");
+        var config = CreateConfig(new CharacterSheetFieldDefinition { Id = "nickname", Label = "Nickname", BindTo = "thebasics.nickname" });
+        player.SetNickname("Legacy Ally");
+        var transformer = new NameTransformer(new RPProximityChatSystem { Config = config });
+
+        var formattedName = transformer.GetFormattedName(player, isIC: true, config);
+
+        formattedName.Should().Be("Legacy Ally");
+    }
+
+    [Fact]
+    public void SetNickname_WithCharacterSheetsEnabled_StoresNicknameInSheetAndClearsLegacyValue()
+    {
+        var player = CreatePlayer("player-1", "Alice");
+        var config = CreateConfig(new CharacterSheetFieldDefinition { Id = "nickname", Label = "Nickname", BindTo = "thebasics.nickname" });
+        player.SetNickname("Legacy Ally");
+
+        player.SetNickname("Sheet Ally", config);
+
+        player.GetNickname(config).Should().Be("Sheet Ally");
+        player.GetNickname().Should().Be("Alice");
+        GetStoredSheetData(player).Fields.Should().ContainSingle(field => field.FieldId == "nickname" && field.Value == "Sheet Ally");
+    }
+
+    [Fact]
     public void NameTransformer_ForRoleplayName_UsesConfiguredFullNameBinding()
     {
         EnsureLangInitialized();
@@ -445,6 +493,8 @@ public class CharacterSheetSystemTests
         player.GetModdata(Arg.Any<string>()).Returns(call => modData.TryGetValue(call.Arg<string>(), out var value) ? value : null);
         player.When(call => call.SetModdata(Arg.Any<string>(), Arg.Any<byte[]>()))
             .Do(call => modData[call.ArgAt<string>(0)] = call.ArgAt<byte[]>(1));
+        player.When(call => call.RemoveModdata(Arg.Any<string>()))
+            .Do(call => modData.Remove(call.ArgAt<string>(0)));
         return player;
     }
 
@@ -466,8 +516,11 @@ public class CharacterSheetSystemTests
     {
         var api = Substitute.For<ICoreServerAPI>();
         var server = Substitute.For<IServerAPI>();
+        var playerData = Substitute.For<IPlayerDataManager>();
         server.Players.Returns(players);
         api.Server.Returns(server);
+        api.PlayerData.Returns(playerData);
+        playerData.PlayerDataByUid.Returns(new Dictionary<string, IServerPlayerData>());
         api.Logger.Returns(Substitute.For<ILogger>());
         return api;
     }

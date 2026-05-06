@@ -54,9 +54,9 @@ public class NameTransformer : MessageTransformerBase
 
     private static string GetRoleplayName(IServerPlayer player, ModConfig config)
     {
-        if (player.HasNickname())
+        if (player.HasNickname(config))
         {
-            return player.GetNickname();
+            return player.GetNickname(config);
         }
 
         var fullName = config.EnableCharacterSheets ? player.GetCharacterSheetFullName(config) : null;

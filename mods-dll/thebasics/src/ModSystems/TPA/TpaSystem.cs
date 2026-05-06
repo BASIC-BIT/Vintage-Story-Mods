@@ -33,8 +33,7 @@ namespace thebasics.ModSystems.TPA
 
         private string GetPlayerDisplayName(IServerPlayer player)
         {
-            var nickname = player.GetNickname();
-            return nickname != null ? $"{player.PlayerName} ({nickname})" : player.PlayerName;
+            return player.HasNickname(Config) ? $"{player.PlayerName} ({player.GetNickname(Config)})" : player.PlayerName;
         }
 
         private void SpawnTeleportParticles(params IServerPlayer[] players)
@@ -316,14 +315,14 @@ namespace thebasics.ModSystems.TPA
 
                 API.ChatCommands.GetOrCreate("tpaccept")
                     .WithDescription(Lang.Get("thebasics:tpa-cmd-tpaccept-desc"))
-                    .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
+                    .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false, Config))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpAccept);
 
                 API.ChatCommands.GetOrCreate("tpdeny")
                     .WithDescription(Lang.Get("thebasics:tpa-cmd-tpdeny-desc"))
-                    .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
+                    .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false, Config))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(HandleTpDeny);
