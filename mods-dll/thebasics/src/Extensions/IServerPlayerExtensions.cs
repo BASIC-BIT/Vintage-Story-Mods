@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using thebasics.Configs;
+using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat;
@@ -19,6 +20,8 @@ namespace thebasics.Extensions
     public static class IServerPlayerExtensions
     {
         private const string ModDataNickname = "BASIC_NICKNAME";
+        private const string ModDataCharacterSheet = "BASIC_CHARACTER_SHEET";
+        private const string CharacterSheetFullNameField = "fullname";
         private const string ModDataNicknameColor = "BASIC_NICKNAME_COLOR";
         private const string ModDataChatMode = "BASIC_CHATMODE";
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
@@ -85,6 +88,12 @@ namespace thebasics.Extensions
         public static bool HasNickname(this IServerPlayer player)
         {
             return GetModData<string>(player, ModDataNickname, null) != null;
+        }
+
+        public static string GetCharacterSheetFullName(this IServerPlayer player)
+        {
+            var data = GetModData(player, ModDataCharacterSheet, new CharacterSheetData());
+            return data?.Fields?.FirstOrDefault(field => field.FieldId.Equals(CharacterSheetFullNameField, StringComparison.OrdinalIgnoreCase))?.Value;
         }
 
         public static void ClearNickname(this IServerPlayer player)

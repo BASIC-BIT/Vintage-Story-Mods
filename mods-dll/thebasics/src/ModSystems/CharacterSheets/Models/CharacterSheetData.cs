@@ -7,5 +7,15 @@ namespace thebasics.ModSystems.CharacterSheets.Models;
 public class CharacterSheetData
 {
     [ProtoMember(1)]
-    public IDictionary<string, string> Fields { get; set; } = new Dictionary<string, string>();
+    public List<CharacterSheetStoredField> Fields { get; set; } = new List<CharacterSheetStoredField>();
+}
+
+[ProtoContract]
+public class CharacterSheetStoredField
+{
+    [ProtoMember(1)]
+    public string FieldId { get; set; } = string.Empty;
+
+    [ProtoMember(2)]
+    public string Value { get; set; } = string.Empty;
 }

@@ -32,4 +32,7 @@ public class CharacterSheetFieldDefinition
 
     [ProtoMember(9)]
     public bool ShowInLook { get; set; } = true;
+
+    [ProtoMember(10)]
+    public int EditorRows { get; set; }
 }

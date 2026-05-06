@@ -142,6 +142,7 @@ namespace thebasics.Configs
             field.Options ??= new List<string>();
             field.BindTo ??= string.Empty;
             field.Visibility = string.IsNullOrWhiteSpace(field.Visibility) ? CharacterSheetFieldVisibilities.Public : field.Visibility.ToLowerInvariant();
+            field.EditorRows = field.EditorRows < 0 ? 0 : field.EditorRows;
         }
 
         private static IList<CharacterSheetFieldDefinition> CreateDefaultCharacterSheetFields()
@@ -150,36 +151,27 @@ namespace thebasics.Configs
             [
                 new CharacterSheetFieldDefinition
                 {
+                    Id = "fullName",
+                    Label = "Full Name",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = false,
+                    MaxLength = 100,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
                     Id = "nickname",
                     Label = "Nickname",
                     Type = CharacterSheetFieldTypes.String,
-                    Optional = false,
+                    Optional = true,
                     BindTo = "thebasics.nickname",
                     MaxLength = 100,
                     Visibility = CharacterSheetFieldVisibilities.Public
                 },
                 new CharacterSheetFieldDefinition
                 {
-                    Id = "summary",
-                    Label = "First Impression",
-                    Type = CharacterSheetFieldTypes.LongString,
-                    Optional = true,
-                    MaxLength = 240,
-                    Visibility = CharacterSheetFieldVisibilities.Nearby
-                },
-                new CharacterSheetFieldDefinition
-                {
                     Id = "pronouns",
                     Label = "Pronouns",
-                    Type = CharacterSheetFieldTypes.String,
-                    Optional = true,
-                    MaxLength = 64,
-                    Visibility = CharacterSheetFieldVisibilities.Public
-                },
-                new CharacterSheetFieldDefinition
-                {
-                    Id = "apparentAge",
-                    Label = "Apparent Age",
                     Type = CharacterSheetFieldTypes.String,
                     Optional = true,
                     MaxLength = 64,
@@ -196,21 +188,22 @@ namespace thebasics.Configs
                 },
                 new CharacterSheetFieldDefinition
                 {
+                    Id = "age",
+                    Label = "Age",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = true,
+                    MaxLength = 64,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
                     Id = "appearance",
                     Label = "Appearance",
                     Type = CharacterSheetFieldTypes.LongString,
                     Optional = true,
-                    MaxLength = 1000,
-                    Visibility = CharacterSheetFieldVisibilities.Nearby
-                },
-                new CharacterSheetFieldDefinition
-                {
-                    Id = "mannerisms",
-                    Label = "Mannerisms",
-                    Type = CharacterSheetFieldTypes.LongString,
-                    Optional = true,
-                    MaxLength = 500,
-                    Visibility = CharacterSheetFieldVisibilities.Nearby
+                    MaxLength = 600,
+                    Visibility = CharacterSheetFieldVisibilities.Nearby,
+                    EditorRows = 4
                 },
                 new CharacterSheetFieldDefinition
                 {
@@ -220,7 +213,8 @@ namespace thebasics.Configs
                     Optional = true,
                     MaxLength = 1500,
                     Visibility = CharacterSheetFieldVisibilities.Self,
-                    ShowInLook = false
+                    ShowInLook = false,
+                    EditorRows = 8
                 }
             ];
         }
@@ -601,6 +595,6 @@ namespace thebasics.Configs
         public bool CharacterSheetLookRequiresLineOfSight { get; set; } = true;
 
         [ProtoMember(99)]
-        public bool CharacterSheetRequireRequiredFieldsForRoleplay { get; set; } = true;
+        public bool CharacterSheetRequireRequiredFieldsForRoleplay { get; set; } = false;
     }
 }

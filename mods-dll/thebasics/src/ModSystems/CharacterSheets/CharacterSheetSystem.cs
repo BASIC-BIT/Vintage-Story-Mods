@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
 using thebasics.Configs;
 using thebasics.Extensions;
+using thebasics.Models;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.Utilities;
 using thebasics.Utilities.Parsers;
@@ -33,7 +35,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
     private void RegisterCommands()
     {
         API.ChatCommands.GetOrCreate("charsheet")
-            .WithAlias("sheet", "bio")
+            .WithAlias("sheet")
             .WithDescription(Lang.Get("thebasics:charsheet-cmd-view-desc"))
             .RequiresPrivilege(Privilege.chat)
             .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
@@ -41,6 +43,13 @@ public class CharacterSheetSystem : BaseBasicModSystem
 
         API.ChatCommands.GetOrCreate("look")
             .WithAlias("inspect")
+            .WithDescription(Lang.Get("thebasics:charsheet-cmd-look-desc"))
+            .RequiresPrivilege(Privilege.chat)
+            .RequiresPlayer()
+            .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false))
+            .HandleWith(LookAtPlayer);
+
+        API.ChatCommands.GetOrCreate("bio")
             .WithDescription(Lang.Get("thebasics:charsheet-cmd-look-desc"))
             .RequiresPrivilege(Privilege.chat)
             .RequiresPlayer()
@@ -90,6 +99,138 @@ public class CharacterSheetSystem : BaseBasicModSystem
             .WithArgs(new PlayersArgParser("player", API, true), new WordArgParser("field", false))
             .HandleWith(ClearAdminField);
     }
+
+    internal CharacterSheetViewMessage BuildClientView(IServerPlayer viewer, CharacterSheetOpenRequest request)
+    {
+        if (!Config.EnableCharacterSheets)
+        {
+            return CreateErrorView(Lang.Get("thebasics:charsheet-gui-disabled"));
+        }
+
+        var mode = (request?.Mode ?? CharacterSheetOpenRequest.ModeOwn).Trim().ToLowerInvariant();
+        return mode switch
+        {
+            CharacterSheetOpenRequest.ModeLook => BuildLookClientView(viewer, request),
+            CharacterSheetOpenRequest.ModeAdmin => BuildAdminClientView(viewer, request),
+            CharacterSheetOpenRequest.ModeView => BuildRegularClientView(viewer, request),
+            _ => BuildSheetViewMessage(viewer, viewer, CharacterSheetViewMode.Full, includeEmpty: true, canEdit: true, isAdminView: false)
+        };
+    }
+
+    internal CharacterSheetViewMessage SaveClientFields(IServerPlayer editor, CharacterSheetSaveRequest request)
+    {
+        if (!Config.EnableCharacterSheets)
+        {
+            return CreateErrorView(Lang.Get("thebasics:charsheet-gui-disabled"));
+        }
+
+        var isAdminAction = request?.IsAdminAction == true;
+        if (isAdminAction && !editor.HasPrivilege(Config.CharacterSheetAdminPermission))
+        {
+            return CreateErrorView(Lang.Get("thebasics:charsheet-error-admin-privilege"));
+        }
+
+        var target = isAdminAction ? API.GetPlayerByUID(request.TargetPlayerUid) : editor;
+        if (target == null)
+        {
+            return CreateErrorView(Lang.Get("thebasics:charsheet-error-player-not-found"));
+        }
+
+        if (!TryBuildClientFieldChanges(editor, target, request, isAdminAction, out var changes, out var errorMessage))
+        {
+            return CreateErrorView(errorMessage);
+        }
+
+        if (!ApplyClientFieldChanges(target, changes, out errorMessage))
+        {
+            return CreateErrorView(errorMessage);
+        }
+
+        API.Logger.Audit($"{(isAdminAction ? "Admin" : "Player")} saved character sheet for {target.PlayerName}.");
+        var response = BuildSheetViewMessage(editor, target, isAdminAction ? CharacterSheetViewMode.Admin : CharacterSheetViewMode.Full, includeEmpty: true, canEdit: true, isAdminView: isAdminAction);
+        response.Message = Lang.Get("thebasics:charsheet-gui-saved", VtmlUtils.EscapeVtml(response.DisplayName));
+        response.IsSaveResponse = true;
+        return response;
+    }
+
+    private bool TryBuildClientFieldChanges(IServerPlayer editor, IServerPlayer target, CharacterSheetSaveRequest request, bool isAdminAction, out List<CharacterSheetFieldChange> changes, out string errorMessage)
+    {
+        changes = new List<CharacterSheetFieldChange>();
+        errorMessage = string.Empty;
+
+        foreach (var submittedField in request?.Fields ?? Array.Empty<CharacterSheetFieldValueMessage>())
+        {
+            if (!TryCreateClientFieldChange(editor, target, submittedField, isAdminAction, out var change, out errorMessage))
+            {
+                return false;
+            }
+
+            changes.Add(change);
+        }
+
+        return true;
+    }
+
+    private bool TryCreateClientFieldChange(IServerPlayer editor, IServerPlayer target, CharacterSheetFieldValueMessage submittedField, bool isAdminAction, out CharacterSheetFieldChange change, out string errorMessage)
+    {
+        change = null;
+        var field = ResolveField(submittedField.FieldId);
+        if (field == null)
+        {
+            errorMessage = Lang.Get("thebasics:charsheet-error-field-not-found", submittedField.FieldId, GetValidFieldList());
+            return false;
+        }
+
+        if (!CanEditField(editor, target, field, isAdminAction))
+        {
+            errorMessage = Lang.Get("thebasics:charsheet-error-field-readonly", GetFieldLabel(field));
+            return false;
+        }
+
+        var value = (submittedField.Value ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(value) && field.Optional)
+        {
+            change = new CharacterSheetFieldChange(field, string.Empty, Clear: true);
+            errorMessage = string.Empty;
+            return true;
+        }
+
+        if (!TryNormalizeValue(field, value, out var normalizedValue, out errorMessage))
+        {
+            return false;
+        }
+
+        if (IsNicknameField(field) && !NicknameValidationUtils.ValidateNickname(target, normalizedValue, API, out var conflictingPlayer, out var conflictType))
+        {
+            errorMessage = Lang.Get("thebasics:chat-nick-conflict", normalizedValue, conflictingPlayer, conflictType);
+            return false;
+        }
+
+        change = new CharacterSheetFieldChange(field, normalizedValue, Clear: false);
+        return true;
+    }
+
+    private bool ApplyClientFieldChanges(IServerPlayer target, IEnumerable<CharacterSheetFieldChange> changes, out string errorMessage)
+    {
+        errorMessage = string.Empty;
+        foreach (var change in changes)
+        {
+            if (change.Clear)
+            {
+                ClearFieldValue(target, change.Field);
+                continue;
+            }
+
+            if (!TrySetFieldValue(target, change.Field, change.Value, out errorMessage))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private sealed record CharacterSheetFieldChange(CharacterSheetFieldDefinition Field, string Value, bool Clear);
 
     private TextCommandResult ViewSheet(TextCommandCallingArgs args)
     {
@@ -142,18 +283,139 @@ public class CharacterSheetSystem : BaseBasicModSystem
         return Success(RenderSheet(viewer, target, CharacterSheetViewMode.Look, includeEmpty: false));
     }
 
+    private CharacterSheetViewMessage BuildRegularClientView(IServerPlayer viewer, CharacterSheetOpenRequest request)
+    {
+        var target = ResolveNetworkTarget(request);
+        if (target == null)
+        {
+            return CreateErrorView(Lang.Get("thebasics:charsheet-error-view-target"));
+        }
+
+        var isOwnSheet = target.PlayerUID == viewer.PlayerUID;
+        return BuildSheetViewMessage(viewer, target, CharacterSheetViewMode.Full, includeEmpty: isOwnSheet, canEdit: isOwnSheet, isAdminView: false);
+    }
+
+    private CharacterSheetViewMessage BuildAdminClientView(IServerPlayer viewer, CharacterSheetOpenRequest request)
+    {
+        if (!viewer.HasPrivilege(Config.CharacterSheetAdminPermission))
+        {
+            return CreateErrorView(Lang.Get("thebasics:charsheet-error-admin-privilege"));
+        }
+
+        var target = ResolveNetworkTarget(request);
+        return target == null
+            ? CreateErrorView(Lang.Get("thebasics:charsheet-error-player-not-found"))
+            : BuildSheetViewMessage(viewer, target, CharacterSheetViewMode.Admin, includeEmpty: true, canEdit: true, isAdminView: true);
+    }
+
+    private CharacterSheetViewMessage BuildLookClientView(IServerPlayer viewer, CharacterSheetOpenRequest request)
+    {
+        var target = ResolveNetworkTarget(request) ?? ResolveSelectedPlayer(viewer);
+        if (target == null)
+        {
+            return CreateErrorView(Lang.Get("thebasics:charsheet-error-look-target"));
+        }
+
+        if (target.PlayerUID == viewer.PlayerUID)
+        {
+            return BuildSheetViewMessage(viewer, target, CharacterSheetViewMode.Full, includeEmpty: true, canEdit: true, isAdminView: false);
+        }
+
+        var distance = viewer.Entity.Pos.DistanceTo(target.Entity.Pos);
+        if (distance > Config.CharacterSheetLookRange)
+        {
+            return CreateErrorView(Lang.Get("thebasics:charsheet-error-look-range", Config.CharacterSheetLookRange));
+        }
+
+        if (Config.CharacterSheetLookRequiresLineOfSight && !VisibilityUtils.HasLineOfSight(API.World, viewer.Entity, target.Entity))
+        {
+            return CreateErrorView(Lang.Get("thebasics:charsheet-error-look-los"));
+        }
+
+        return BuildSheetViewMessage(viewer, target, CharacterSheetViewMode.Look, includeEmpty: false, canEdit: false, isAdminView: false);
+    }
+
+    private CharacterSheetViewMessage BuildSheetViewMessage(IServerPlayer viewer, IServerPlayer target, CharacterSheetViewMode mode, bool includeEmpty, bool canEdit, bool isAdminView)
+    {
+        var data = GetSheetData(target);
+        var displayName = GetCharacterDisplayName(target, data);
+        var view = new CharacterSheetViewMessage
+        {
+            Title = GetSheetTitle(viewer, target, mode, displayName),
+            TargetPlayerUid = target.PlayerUID,
+            TargetPlayerName = target.PlayerName,
+            DisplayName = displayName,
+            CanEdit = canEdit,
+            IsAdminView = isAdminView,
+            IsLookView = mode == CharacterSheetViewMode.Look
+        };
+
+        foreach (var field in Config.CharacterSheetFields)
+        {
+            if (!CanViewField(viewer, target, field, mode))
+            {
+                continue;
+            }
+
+            var value = GetFieldValue(target, data, field);
+            if (!includeEmpty && string.IsNullOrWhiteSpace(value) && field.Optional)
+            {
+                continue;
+            }
+
+            view.Fields.Add(CreateFieldView(viewer, target, field, value, canEdit, isAdminView));
+        }
+
+        if (view.Fields.Count == 0)
+        {
+            view.Message = mode == CharacterSheetViewMode.Look ? Lang.Get("thebasics:charsheet-look-empty") : Lang.Get("thebasics:charsheet-empty");
+        }
+
+        return view;
+    }
+
+    private CharacterSheetFieldViewMessage CreateFieldView(IServerPlayer viewer, IServerPlayer target, CharacterSheetFieldDefinition field, string value, bool canEdit, bool isAdminView)
+    {
+        return new CharacterSheetFieldViewMessage
+        {
+            FieldId = GetFieldId(field),
+            Label = GetFieldLabel(field),
+            Type = GetFieldType(field),
+            Value = value,
+            Optional = field.Optional,
+            MaxLength = GetMaxLength(field),
+            Options = field.Options?.ToList() ?? new List<string>(),
+            CanEdit = canEdit && CanEditField(viewer, target, field, isAdminView),
+            Visibility = GetFieldVisibility(field),
+            EditorRows = GetEditorRows(field)
+        };
+    }
+
+    private string GetSheetTitle(IServerPlayer viewer, IServerPlayer target, CharacterSheetViewMode mode, string displayName)
+    {
+        if (mode == CharacterSheetViewMode.Look)
+        {
+            return Lang.Get("thebasics:charsheet-look-header", displayName);
+        }
+
+        return viewer != null && viewer.PlayerUID == target.PlayerUID
+            ? Lang.Get("thebasics:charsheet-header-own", displayName)
+            : Lang.Get("thebasics:charsheet-header-other", displayName);
+    }
+
     private string RenderSheet(IServerPlayer viewer, IServerPlayer target, CharacterSheetViewMode mode, bool includeEmpty)
     {
         var isOwnSheet = viewer != null && viewer.PlayerUID == target.PlayerUID;
         var data = GetSheetData(target);
-        var header = Lang.Get("thebasics:charsheet-header-other", VtmlUtils.EscapeVtml(target.PlayerName));
+        var displayName = GetCharacterDisplayName(target, data);
+        var header = Lang.Get("thebasics:charsheet-header-other", VtmlUtils.EscapeVtml(displayName));
         if (mode == CharacterSheetViewMode.Look)
         {
-            header = Lang.Get("thebasics:charsheet-look-header", VtmlUtils.EscapeVtml(target.PlayerName));
+            header = Lang.Get("thebasics:charsheet-look-header", VtmlUtils.EscapeVtml(displayName));
         }
         else if (isOwnSheet)
         {
-            header = Lang.Get("thebasics:charsheet-header-own");
+            header = Lang.Get("thebasics:charsheet-header-own", VtmlUtils.EscapeVtml(displayName));
         }
 
         var message = new StringBuilder(header);
@@ -272,21 +534,9 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return Error(errorMessage);
         }
 
-        if (IsNicknameField(field))
+        if (!TrySetFieldValue(player, field, normalizedValue, out errorMessage))
         {
-            if (!NicknameValidationUtils.ValidateNickname(player, normalizedValue, API, out var conflictingPlayer, out var conflictType))
-            {
-                return Error(Lang.Get("thebasics:chat-nick-conflict", normalizedValue, conflictingPlayer, conflictType));
-            }
-
-            player.SetNickname(normalizedValue);
-            RefreshNameTag(player);
-        }
-        else
-        {
-            var data = GetSheetData(player);
-            data.Fields[GetFieldId(field)] = normalizedValue;
-            SaveSheetData(player, data);
+            return Error(errorMessage);
         }
 
         API.Logger.Audit($"{(isAdminAction ? "Admin" : "Player")} updated character sheet field '{GetFieldId(field)}' for {player.PlayerName}.");
@@ -317,20 +567,47 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return Error(Lang.Get("thebasics:charsheet-error-field-not-found", fieldName, GetValidFieldList()));
         }
 
-        if (IsNicknameField(resolvedField))
-        {
-            player.ClearNickname();
-            RefreshNameTag(player);
-        }
-        else
-        {
-            var data = GetSheetData(player);
-            data.Fields.Remove(GetFieldId(resolvedField));
-            SaveSheetData(player, data);
-        }
+        ClearFieldValue(player, resolvedField);
 
         API.Logger.Audit($"Character sheet field '{GetFieldId(resolvedField)}' cleared for {player.PlayerName}.");
         return Success(Lang.Get("thebasics:charsheet-success-cleared-field", VtmlUtils.EscapeVtml(GetFieldLabel(resolvedField)), VtmlUtils.EscapeVtml(player.PlayerName)));
+    }
+
+    private bool TrySetFieldValue(IServerPlayer player, CharacterSheetFieldDefinition field, string normalizedValue, out string errorMessage)
+    {
+        errorMessage = string.Empty;
+
+        if (IsNicknameField(field))
+        {
+            if (!NicknameValidationUtils.ValidateNickname(player, normalizedValue, API, out var conflictingPlayer, out var conflictType))
+            {
+                errorMessage = Lang.Get("thebasics:chat-nick-conflict", normalizedValue, conflictingPlayer, conflictType);
+                return false;
+            }
+
+            player.SetNickname(normalizedValue);
+            RefreshNameTag(player);
+            return true;
+        }
+
+        var data = GetSheetData(player);
+        SetStoredFieldValue(data, GetFieldId(field), normalizedValue);
+        SaveSheetData(player, data);
+        return true;
+    }
+
+    private void ClearFieldValue(IServerPlayer player, CharacterSheetFieldDefinition field)
+    {
+        if (IsNicknameField(field))
+        {
+            player.ClearNickname();
+            RefreshNameTag(player);
+            return;
+        }
+
+        var data = GetSheetData(player);
+        RemoveStoredField(data, GetFieldId(field));
+        SaveSheetData(player, data);
     }
 
     private bool TryNormalizeValue(CharacterSheetFieldDefinition field, string value, out string normalizedValue, out string errorMessage)
@@ -342,6 +619,11 @@ public class CharacterSheetSystem : BaseBasicModSystem
         {
             errorMessage = Lang.Get("thebasics:charsheet-error-required", GetFieldLabel(field));
             return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
         }
 
         var maxLength = GetMaxLength(field);
@@ -397,12 +679,43 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return ResolveTarget(args, 0, allowSelfFallback: false);
         }
 
+        return ResolveSelectedPlayer(viewer);
+    }
+
+    private IServerPlayer ResolveSelectedPlayer(IServerPlayer viewer)
+    {
         if (viewer.CurrentEntitySelection?.Entity is not EntityPlayer selectedPlayer)
         {
             return null;
         }
 
         return API.World.PlayerByUid(selectedPlayer.PlayerUID) as IServerPlayer;
+    }
+
+    private IServerPlayer ResolveNetworkTarget(CharacterSheetOpenRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(request?.TargetPlayerUid))
+        {
+            return API.GetPlayerByUID(request.TargetPlayerUid);
+        }
+
+        if (string.IsNullOrWhiteSpace(request?.TargetPlayerName))
+        {
+            return null;
+        }
+
+        var targetName = request.TargetPlayerName.Trim();
+        foreach (IServerPlayer player in API.World.AllOnlinePlayers.OfType<IServerPlayer>())
+        {
+            if (player.PlayerName.Equals(targetName, StringComparison.OrdinalIgnoreCase) ||
+                player.PlayerUID.Equals(targetName, StringComparison.OrdinalIgnoreCase) ||
+                player.GetNickname().Equals(targetName, StringComparison.OrdinalIgnoreCase))
+            {
+                return player;
+            }
+        }
+
+        return null;
     }
 
     private static bool CanViewField(IServerPlayer viewer, IServerPlayer target, CharacterSheetFieldDefinition field, CharacterSheetViewMode mode)
@@ -424,6 +737,16 @@ public class CharacterSheetSystem : BaseBasicModSystem
         }
 
         return visibility == CharacterSheetFieldVisibilities.Public;
+    }
+
+    private static bool CanEditField(IServerPlayer viewer, IServerPlayer target, CharacterSheetFieldDefinition field, bool isAdminAction)
+    {
+        if (isAdminAction)
+        {
+            return true;
+        }
+
+        return viewer != null && target != null && viewer.PlayerUID == target.PlayerUID && GetFieldVisibility(field) != CharacterSheetFieldVisibilities.Admin;
     }
 
     private CharacterSheetFieldDefinition ResolveField(string fieldName)
@@ -469,14 +792,14 @@ public class CharacterSheetSystem : BaseBasicModSystem
 
     private static CharacterSheetData GetSheetData(IServerPlayer player)
     {
-        var data = player.GetModData<CharacterSheetData>(ModDataKey, new CharacterSheetData()) ?? new CharacterSheetData();
-        data.Fields ??= new System.Collections.Generic.Dictionary<string, string>();
+        var data = IServerPlayerExtensions.GetModData(player, ModDataKey, new CharacterSheetData()) ?? new CharacterSheetData();
+        data.Fields ??= new List<CharacterSheetStoredField>();
         return data;
     }
 
     private static void SaveSheetData(IServerPlayer player, CharacterSheetData data)
     {
-        player.SetModData(ModDataKey, data);
+        IServerPlayerExtensions.SetModData(player, ModDataKey, data);
     }
 
     private static string GetFieldValue(IServerPlayer player, CharacterSheetData data, CharacterSheetFieldDefinition field)
@@ -486,7 +809,52 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return player.HasNickname() ? player.GetNickname() : string.Empty;
         }
 
-        return data.Fields.TryGetValue(GetFieldId(field), out var value) ? value : string.Empty;
+        return data.Fields.FirstOrDefault(storedField => storedField.FieldId.Equals(GetFieldId(field), StringComparison.OrdinalIgnoreCase))?.Value ?? string.Empty;
+    }
+
+    private static string GetCharacterDisplayName(IServerPlayer player, CharacterSheetData data)
+    {
+        var fullName = data.Fields.FirstOrDefault(storedField => storedField.FieldId.Equals("fullName", StringComparison.OrdinalIgnoreCase))?.Value?.Trim();
+        var nickname = player.HasNickname() ? player.GetNickname()?.Trim() : string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(fullName) && !string.IsNullOrWhiteSpace(nickname) && !fullName.Equals(nickname, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{fullName} ({nickname})";
+        }
+
+        if (!string.IsNullOrWhiteSpace(fullName))
+        {
+            return fullName;
+        }
+
+        return string.IsNullOrWhiteSpace(nickname) ? player.PlayerName : nickname;
+    }
+
+    private static void SetStoredFieldValue(CharacterSheetData data, string fieldId, string value)
+    {
+        var storedField = data.Fields.FirstOrDefault(field => field.FieldId.Equals(fieldId, StringComparison.OrdinalIgnoreCase));
+        if (storedField == null)
+        {
+            data.Fields.Add(new CharacterSheetStoredField
+            {
+                FieldId = fieldId,
+                Value = value
+            });
+            return;
+        }
+
+        storedField.Value = value;
+    }
+
+    private static void RemoveStoredField(CharacterSheetData data, string fieldId)
+    {
+        for (var index = data.Fields.Count - 1; index >= 0; index--)
+        {
+            if (data.Fields[index].FieldId.Equals(fieldId, StringComparison.OrdinalIgnoreCase))
+            {
+                data.Fields.RemoveAt(index);
+            }
+        }
     }
 
     private string GetValidFieldList()
@@ -502,6 +870,11 @@ public class CharacterSheetSystem : BaseBasicModSystem
         }
 
         return IsNicknameField(field) ? Config.MaxNicknameLength : 0;
+    }
+
+    private static int GetEditorRows(CharacterSheetFieldDefinition field)
+    {
+        return GetFieldType(field) == CharacterSheetFieldTypes.LongString ? Math.Clamp(field.EditorRows, 0, 16) : 0;
     }
 
     private static string GetFieldId(CharacterSheetFieldDefinition field)
@@ -555,26 +928,33 @@ public class CharacterSheetSystem : BaseBasicModSystem
 
         behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
         behavior.RenderRange = Config.NametagRenderRange;
+        behavior.SetName(BuildNametagDisplayName(player, Config));
+    }
 
-        string displayName;
-        if (Config.ShowNicknameInNametag)
+    internal static string BuildNametagDisplayName(IServerPlayer player, ModConfig config)
+    {
+        if (player == null || config == null)
         {
-            var nickname = player.GetNickname();
-            if (string.IsNullOrWhiteSpace(nickname))
-            {
-                displayName = Config.ShowPlayerNameInNametag ? player.PlayerName : string.Empty;
-            }
-            else
-            {
-                displayName = Config.ShowPlayerNameInNametag ? $"{nickname} ({player.PlayerName})" : nickname;
-            }
-        }
-        else
-        {
-            displayName = Config.ShowPlayerNameInNametag ? player.PlayerName : string.Empty;
+            return string.Empty;
         }
 
-        behavior.SetName(displayName);
+        if (!config.ShowNicknameInNametag)
+        {
+            return config.ShowPlayerNameInNametag ? player.PlayerName : string.Empty;
+        }
+
+        var displayName = player.HasNickname() ? player.GetNickname()?.Trim() : player.GetCharacterSheetFullName()?.Trim();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            return config.ShowPlayerNameInNametag ? player.PlayerName : string.Empty;
+        }
+
+        if (!config.ShowPlayerNameInNametag || displayName.Equals(player.PlayerName, StringComparison.OrdinalIgnoreCase))
+        {
+            return displayName;
+        }
+
+        return $"{displayName} ({player.PlayerName})";
     }
 
     private static TextCommandResult Success(string message)
@@ -592,6 +972,16 @@ public class CharacterSheetSystem : BaseBasicModSystem
         {
             Status = EnumCommandStatus.Error,
             StatusMessage = message,
+        };
+    }
+
+    private static CharacterSheetViewMessage CreateErrorView(string message)
+    {
+        return new CharacterSheetViewMessage
+        {
+            Success = false,
+            IsErrorResponse = true,
+            Message = message
         };
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using thebasics.Configs;
@@ -31,6 +32,16 @@ public class ChatUiSystem : ModSystem
     private static bool _usingRptts = false;
     private static dynamic _rpttsApi = null;
     private static dynamic _rpttsChatSystem = null;
+    private static CharacterSheetDialog _characterSheetDialog;
+    private static CharacterSheetMessageDialog _characterSheetMessageDialog;
+    private static bool _pendingCharacterSheetSave;
+    private static bool _pendingCharacterSheetOpenFromCharacterDialog;
+    private static bool _suppressNextCharacterDialogSheetOpen;
+    private static bool _characterSheetOpenedFromCharacterDialog;
+    private static CharacterSheetViewMessage _lastOwnCharacterSheetView;
+    private static string _characterDialogTitleOverride;
+    private static GuiDialogCharacterBase _characterDialog;
+    private static bool _characterDialogHooked;
     private const int RpttsInitMaxAttempts = 3;
     private static int _rpttsInitAttempts = 0;
     private static bool _rpttsInitScheduled = false;
@@ -74,6 +85,7 @@ public class ChatUiSystem : ModSystem
         ScheduleRpttsInitialization();
 
         RegisterForServerSideConfig();
+        RegisterCharacterSheetUi(api);
 
         // Renderer is cheap when disabled; keep it always registered.
         _typingIndicatorRenderer = new TypingIndicatorRenderer(api);
@@ -97,39 +109,82 @@ public class ChatUiSystem : ModSystem
 
     }
 
-    // private void Dlg_ComposeExtraGuis()
-    // {
-    //     ComposeCharacterSheetGui();
-    // }
-    //
-    // private void ComposeCharacterSheetGui()
-    // {
-    //
-    //     var pcDialogPadding = 400;
-    //     var dialogWidth = 400;
-    //     var rowPadding = 20;
-    //     ElementBounds statsBounds = this.Composers["playercharacter"].Bounds;
-    //     _api.Logger.Debug($"THEBASICS - test bounds {statsBounds.absX + statsBounds.OuterWidth + pcDialogPadding}, {statsBounds.absY}");
-    //     ElementBounds dialogBounds = new ElementBounds()
-    //         .WithSizing(ElementSizing.Fixed)
-    //         .WithFixedPosition(statsBounds.absX + statsBounds.OuterWidth + pcDialogPadding, statsBounds.absY)
-    //         .WithFixedSize(dialogWidth, statsBounds.OuterHeight);
-    //
-    //     ElementBounds bgBounds = ElementBounds.Fill
-    //         .WithFixedPadding(GuiStyle.ElementToDialogPadding)
-    //         .WithSizing(ElementSizing.FitToChildren)
-    //         .WithChildren();
-    //         
-    //     this.Composers["charsheet"] = _api.Gui
-    //         .CreateCompo("charsheet", dialogBounds)
-    //         .AddShadedDialogBG(bgBounds)
-    //         .AddDialogTitleBar(Lang.Get("Character Sheet"), () => dlg.OnTitleBarClose())
-    //         .BeginChildElements()
-    //         // .AddInset()
-    //             .AddDynamicText("Testing!", CairoFont.WhiteSmallText(), ElementStdBounds.Rowed(0, rowPadding))
-    //         .EndChildElements()
-    //         .Compose();
-    // }
+    private static void RegisterCharacterSheetUi(ICoreClientAPI api)
+    {
+        api.Input.RegisterHotKey("thebasicscharsheet", Lang.Get("thebasics:charsheet-gui-title"), GlKeys.B, HotkeyType.HelpAndOverlays, altPressed: false, ctrlPressed: true, shiftPressed: true);
+        api.Input.SetHotKeyHandler("thebasicscharsheet", OnCharacterSheetHotkey);
+        HookCharacterDialog(api);
+    }
+
+    private static bool OnCharacterSheetHotkey(KeyCombination combination)
+    {
+        if (_characterSheetDialog?.IsOpened() == true)
+        {
+            _characterSheetDialog.TryClose();
+            return true;
+        }
+
+        RequestOwnCharacterSheet();
+        return true;
+    }
+
+    private static void HookCharacterDialog(ICoreClientAPI api)
+    {
+        if (_characterDialogHooked)
+        {
+            return;
+        }
+
+        _characterDialog = api.Gui.LoadedGuis.Find(dialog => dialog is GuiDialogCharacterBase) as GuiDialogCharacterBase;
+        if (_characterDialog == null)
+        {
+            api.Event.RegisterCallback(_ => HookCharacterDialog(api), 1000);
+            return;
+        }
+
+        _characterDialog.ComposeExtraGuis += OnCharacterDialogComposed;
+        _characterDialogHooked = true;
+    }
+
+    private static void OnCharacterDialogComposed()
+    {
+        if (_suppressNextCharacterDialogSheetOpen)
+        {
+            _suppressNextCharacterDialogSheetOpen = false;
+            return;
+        }
+
+        if (_config == null || !_config.EnableCharacterSheets || _characterSheetDialog?.IsOpened() == true || _pendingCharacterSheetOpenFromCharacterDialog)
+        {
+            return;
+        }
+
+        _characterSheetOpenedFromCharacterDialog = true;
+        if (_lastOwnCharacterSheetView != null)
+        {
+            OpenCharacterSheetDialog(_lastOwnCharacterSheetView);
+        }
+
+        _pendingCharacterSheetOpenFromCharacterDialog = true;
+        RequestOwnCharacterSheet();
+    }
+
+    private static void RequestOwnCharacterSheet()
+    {
+        SendCharacterSheetRequest(new CharacterSheetOpenRequest { Mode = CharacterSheetOpenRequest.ModeOwn });
+    }
+
+    private static void SendCharacterSheetRequest(CharacterSheetOpenRequest request)
+    {
+        _pendingCharacterSheetSave = false;
+        _safeNetworkChannel?.SendPacketSafely(request);
+    }
+
+    private static void SendCharacterSheetSaveRequest(CharacterSheetSaveRequest request)
+    {
+        _pendingCharacterSheetSave = true;
+        _safeNetworkChannel?.SendPacketSafely(request);
+    }
 
     // private void ApplyRenderer(Entity entity)
     // {
@@ -210,11 +265,15 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<ChatTypingStateMessage>()
             .RegisterMessageType<ChatterSoundMessage>()
             .RegisterMessageType<PlacedEnvironmentMessage>()
+            .RegisterMessageType<CharacterSheetOpenRequest>()
+            .RegisterMessageType<CharacterSheetSaveRequest>()
+            .RegisterMessageType<CharacterSheetViewMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
             .SetMessageHandler<ChatterSoundMessage>(OnChatterSoundMessage)
-            .SetMessageHandler<PlacedEnvironmentMessage>(OnPlacedEnvironmentMessage);
+            .SetMessageHandler<PlacedEnvironmentMessage>(OnPlacedEnvironmentMessage)
+            .SetMessageHandler<CharacterSheetViewMessage>(OnCharacterSheetViewMessage);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
@@ -225,6 +284,138 @@ public class ChatUiSystem : ModSystem
             MaxRetries = 10
         };
         _safeNetworkChannel = new SafeClientNetworkChannel(_clientConfigChannel, _api, config);
+    }
+
+    private static void OnCharacterSheetViewMessage(CharacterSheetViewMessage message)
+    {
+        if (message == null)
+        {
+            _pendingCharacterSheetOpenFromCharacterDialog = false;
+            return;
+        }
+
+        UpdateLocalCharacterDisplayName(message);
+        CacheOwnCharacterSheetView(message);
+
+        if (!message.Success || message.IsErrorResponse)
+        {
+            _pendingCharacterSheetSave = false;
+            _pendingCharacterSheetOpenFromCharacterDialog = false;
+            _characterSheetMessageDialog?.TryClose();
+            _api.TriggerIngameError(_api.World, "charsheet", message.Message);
+            return;
+        }
+
+        if (message.IsSaveResponse || _pendingCharacterSheetSave)
+        {
+            _pendingCharacterSheetSave = false;
+            _pendingCharacterSheetOpenFromCharacterDialog = false;
+            RefreshCharacterDialogTitle();
+            var saveMessage = message.Message;
+            message.Message = string.Empty;
+
+            OpenCharacterSheetDialog(message);
+
+            ShowCharacterSheetMessage(saveMessage);
+            return;
+        }
+
+        _pendingCharacterSheetSave = false;
+        _pendingCharacterSheetOpenFromCharacterDialog = false;
+
+        OpenCharacterSheetDialog(message);
+    }
+
+    private static void OpenCharacterSheetDialog(CharacterSheetViewMessage message)
+    {
+        if (_characterSheetDialog == null)
+        {
+            _characterSheetDialog = new CharacterSheetDialog(_api, message, SendCharacterSheetSaveRequest);
+        }
+        else
+        {
+            _characterSheetDialog.SetView(message);
+        }
+
+        if (!_characterSheetDialog.IsOpened())
+        {
+            _characterSheetDialog.TryOpen();
+        }
+    }
+
+    private static void CacheOwnCharacterSheetView(CharacterSheetViewMessage message)
+    {
+        if (_api?.World?.Player == null || message.TargetPlayerUid != _api.World.Player.PlayerUID || !message.Success)
+        {
+            return;
+        }
+
+        _lastOwnCharacterSheetView = message;
+    }
+
+    private static void UpdateLocalCharacterDisplayName(CharacterSheetViewMessage message)
+    {
+        if (_api?.World?.Player == null || message.TargetPlayerUid != _api.World.Player.PlayerUID || string.IsNullOrWhiteSpace(message.DisplayName))
+        {
+            return;
+        }
+
+        _characterDialogTitleOverride = message.DisplayName;
+    }
+
+    private static void RefreshCharacterDialogTitle()
+    {
+        if (_characterDialog?.IsOpened() != true)
+        {
+            return;
+        }
+
+        _suppressNextCharacterDialogSheetOpen = true;
+        _characterDialog.OnGuiOpened();
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Vintagestory.API.Client.GuiComposerHelpers), "AddDialogTitleBar")]
+    public static void GuiComposerHelpers_AddDialogTitleBar_Prefix(GuiComposer composer, ref string text)
+    {
+        if (composer?.DialogName != "playercharacter" || string.IsNullOrWhiteSpace(_characterDialogTitleOverride))
+        {
+            return;
+        }
+
+        var characterClass = _api?.World?.Player?.Entity?.WatchedAttributes?.GetString("characterClass");
+        if (!string.IsNullOrWhiteSpace(characterClass) && Lang.HasTranslation("characterclass-" + characterClass))
+        {
+            text = Lang.Get("characterdialog-title-nameandclass", _characterDialogTitleOverride, Lang.Get("characterclass-" + characterClass));
+            return;
+        }
+
+        text = _characterDialogTitleOverride;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(GuiDialogCharacter), "OnGuiClosed")]
+    public static void GuiDialogCharacter_OnGuiClosed_Postfix()
+    {
+        _pendingCharacterSheetOpenFromCharacterDialog = false;
+        if (_characterSheetOpenedFromCharacterDialog && _characterSheetDialog?.IsOpened() == true)
+        {
+            _characterSheetDialog.TryClose();
+        }
+
+        _characterSheetOpenedFromCharacterDialog = false;
+    }
+
+    private static void ShowCharacterSheetMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        _characterSheetMessageDialog?.TryClose();
+        _characterSheetMessageDialog = new CharacterSheetMessageDialog(_api, message);
+        _characterSheetMessageDialog.TryOpen();
     }
 
     private static void OnChatTypingStateMessage(ChatTypingStateMessage message)

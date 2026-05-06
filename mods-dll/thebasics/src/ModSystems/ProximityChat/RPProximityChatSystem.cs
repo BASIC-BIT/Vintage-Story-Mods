@@ -3,6 +3,7 @@ using System.Drawing;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
+using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
@@ -264,9 +265,36 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<ChatTypingStateMessage>()
             .RegisterMessageType<ChatterSoundMessage>()
             .RegisterMessageType<PlacedEnvironmentMessage>()
+            .RegisterMessageType<CharacterSheetOpenRequest>()
+            .RegisterMessageType<CharacterSheetSaveRequest>()
+            .RegisterMessageType<CharacterSheetViewMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
-            .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage);
+            .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
+            .SetMessageHandler<CharacterSheetOpenRequest>(OnCharacterSheetOpenRequest)
+            .SetMessageHandler<CharacterSheetSaveRequest>(OnCharacterSheetSaveRequest);
+    }
+
+    private void OnCharacterSheetOpenRequest(IServerPlayer player, CharacterSheetOpenRequest message)
+    {
+        var sheetSystem = API.ModLoader.GetModSystem<CharacterSheetSystem>();
+        var response = sheetSystem?.BuildClientView(player, message) ?? new CharacterSheetViewMessage
+        {
+            Success = false,
+            Message = Lang.Get("thebasics:charsheet-gui-disabled")
+        };
+        _serverConfigChannel.SendPacket(response, player);
+    }
+
+    private void OnCharacterSheetSaveRequest(IServerPlayer player, CharacterSheetSaveRequest message)
+    {
+        var sheetSystem = API.ModLoader.GetModSystem<CharacterSheetSystem>();
+        var response = sheetSystem?.SaveClientFields(player, message) ?? new CharacterSheetViewMessage
+        {
+            Success = false,
+            Message = Lang.Get("thebasics:charsheet-gui-disabled")
+        };
+        _serverConfigChannel.SendPacket(response, player);
     }
 
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
