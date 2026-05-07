@@ -10,7 +10,7 @@ The branch has a first implementation of the admin config foundation:
 - Server-side setting registry and validation for an initial allowlist.
 - Client `GuiJsonDialog` panel with save, reload, close, and mark-reviewed actions.
 - The panel shows one setting group at a time via a group dropdown because Vintage Story's `GuiJsonDialog` is autosized and does not scroll.
-- Persisted `ReviewedConfigSettingKeys` using `ProtoMember(93)`.
+- Persisted `ReviewedConfigSettingKeys` using `ProtoMember(100)`.
 - Live refresh hooks for TPA timeout, save notifications, sleep notifications, nametag refresh, and typing-indicator clearing.
 - Most scalar `ModConfig` values are now present in the admin registry; complex dictionaries/lists remain intentionally unsupported pending custom UI/validation.
 - Command privilege settings now live-refresh on existing command instances for TPA, language, nickname color, OOC toggle, RP text toggle, and stat-clear commands.

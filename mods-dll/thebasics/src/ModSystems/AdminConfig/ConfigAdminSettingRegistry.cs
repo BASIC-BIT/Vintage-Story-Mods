@@ -115,7 +115,7 @@ public static class ConfigAdminSettingRegistry
             {
                 if (!ConfigAdminSettingDefinition.TryParseBool(value, out var parsed))
                 {
-                    return $"{key} must be true or false.";
+                    return $"{key} must be true/false or 1/0.";
                 }
 
                 set(config, parsed);

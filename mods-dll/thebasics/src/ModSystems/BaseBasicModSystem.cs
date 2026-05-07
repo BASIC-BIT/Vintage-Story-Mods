@@ -164,7 +164,7 @@ namespace thebasics.ModSystems
 
             if (config == null)
             {
-                api.Server.LogNotification("The BASICs: non-existant modconfig at 'ModConfig/" + ConfigName +
+                api.Server.LogNotification("The BASICs: non-existent modconfig at 'ModConfig/" + ConfigName +
                                            "', creating default...");
                 config = new ModConfig();
                 config.InitializeDefaultsIfNeeded();
