@@ -213,6 +213,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         API.ChatCommands.GetOrCreate("thebasics")
             .WithRootAlias("tb")
+            .WithRootAlias("basic")
             .WithDescription("The BASICs administration commands")
             .RequiresPrivilege(Privilege.root)
             .BeginSubCommand("config")

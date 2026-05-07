@@ -4,7 +4,7 @@
 
 The branch has a first implementation of the admin config foundation:
 
-- Admin-only commands: `/thebasics config`, `/tb config`, `/thebasics reloadconfig`, `/tb reloadconfig`.
+- Admin-only commands: `/basic config`, `/thebasics config`, `/tb config`, `/basic reloadconfig`, `/thebasics reloadconfig`, `/tb reloadconfig`.
 - Server-authoritative save/reload packets on the existing `thebasics` network channel.
 - Shared mutable server `ModConfig` instance via `BaseBasicModSystem`.
 - Server-side setting registry and validation for an initial allowlist.
@@ -102,13 +102,13 @@ Card 1: Client Boot And Mod Load
 
 Card 2: Non-Admin Access Denial
 
-- On the non-admin client, run `/tb config` and `/thebasics config`.
+- On the non-admin client, run `/basic config`, `/tb config`, and `/thebasics config`.
 - Expected: config panel does not open and the player receives a denial/error message.
 - Failure modes: panel opens, save/reload controls are usable, or no feedback is shown.
 
 Card 3: Admin Panel Open And Group Usability
 
-- On the admin client, run `/tb config`.
+- On the admin client, run `/basic config`.
 - Change the group dropdown through several groups.
 - Expected: each group redraws with readable labels, status text, and Save/Reload/Mark Reviewed/Close controls visible at target resolution.
 - Failure modes: clipped dialog, inaccessible buttons, missing group entries, or exceptions in the client log.

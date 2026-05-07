@@ -33,7 +33,7 @@ Version 5.5.0 shifts the generated/default config toward showcasing RP-server fe
 
 Features:
 
-- Server-authoritative admin config panel opened with `/thebasics config` or `/tb config`.
+- Server-authoritative admin config panel opened with `/basic config`, `/thebasics config`, or `/tb config`.
 - Server-side validation and persistence to `ModConfig/the_basics.json`.
 - Shared server config object so live-safe changes update existing systems without replacing stale references.
 - Client config resync after successful saves or disk reloads.
@@ -42,8 +42,8 @@ Features:
 
 Admin commands:
 
-- `/thebasics config`, `/tb config`
-- `/thebasics reloadconfig`, `/tb reloadconfig`
+- `/basic config`, `/thebasics config`, `/tb config`
+- `/basic reloadconfig`, `/thebasics reloadconfig`, `/tb reloadconfig`
 
 Live-applied setting groups currently include chatter, typing indicators, nametag display/range, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, and debug mode. Restart-required settings include startup-shaped command registration, chat group setup, language system enablement, and player stats enablement.
 

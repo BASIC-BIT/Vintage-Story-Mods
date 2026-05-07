@@ -166,7 +166,7 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 
 1. **Admin Config Panel Access And Save** (P0)
    - Config: admin/root client and non-admin client available.
-   - Do: As non-admin, try `/thebasics config`. As admin, run `/thebasics config`, toggle `DebugMode`, save, close/reopen, then restore the original value.
+   - Do: As non-admin, try `/basic config`. As admin, run `/basic config`, toggle `DebugMode`, save, close/reopen, then restore the original value.
    - Expect: Non-admin is denied; admin sees the panel; save persists to `ModConfig/the_basics.json`; clients receive updated config without restart.
    - Watch for: panel opening for non-admins, duplicate network channel errors, save packet errors, or stale UI values after save.
 
@@ -184,7 +184,7 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 
 4. **Admin Config Reviewed Settings** (P2)
    - Config: existing config with missing or empty `ReviewedConfigSettingKeys`.
-   - Do: Open `/thebasics config`, note `NEW:` labels, click `Mark Reviewed`, close and reopen.
+   - Do: Open `/basic config`, note `NEW:` labels, click `Mark Reviewed`, close and reopen.
    - Expect: New-setting labels disappear and `ReviewedConfigSettingKeys` is persisted.
    - Watch for: reviewed state not saving or unrelated config values changing.
 
