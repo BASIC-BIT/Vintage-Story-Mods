@@ -387,6 +387,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
             }
         }
 
+        if (errors.Count > 0)
+        {
+            SendConfigAdminResult(player, false, string.Join("\n", errors), Array.Empty<string>());
+            return;
+        }
+
         if (message?.MarkReviewedKeys != null && message.MarkReviewedKeys.Count > 0)
         {
             var reviewed = new HashSet<string>(draft.ReviewedConfigSettingKeys ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
@@ -396,12 +402,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
             }
 
             draft.ReviewedConfigSettingKeys = reviewed.OrderBy(key => key, StringComparer.OrdinalIgnoreCase).ToList();
-        }
-
-        if (errors.Count > 0)
-        {
-            SendConfigAdminResult(player, false, string.Join("\n", errors), Array.Empty<string>());
-            return;
         }
 
         var changedKeys = GetChangedConfigKeys(Config, draft);

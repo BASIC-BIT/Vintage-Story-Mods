@@ -710,9 +710,6 @@ public class ChatUiSystem : ModSystem
     {
         _safeNetworkChannel?.SendPacketSafely(new TheBasicsConfigAdminSaveMessage
         {
-            Values = _configAdminDraft
-                .Select(kvp => new ConfigAdminSettingValue { Key = kvp.Key, Value = kvp.Value })
-                .ToList(),
             MarkReviewedKeys = ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key).ToList()
         });
     }
@@ -1307,6 +1304,7 @@ public class ChatUiSystem : ModSystem
             _configAdminDialog = null;
             _configAdminDraft.Clear();
             _configAdminReviewedKeys.Clear();
+            _configAdminSelectedGroup = null;
             _configAdminStatusMessage = null;
 
             // Clear static typing indicator state to prevent stale data on reconnect/world reload.
