@@ -175,5 +175,19 @@
   "parser-syntax-explanation": "{0} est le nom, le surnom ou l'uid d'un joueur en ligne.",
   "parser-error-player-not-found": "Aucun joueur en ligne avec le nom ou le surnom '{0}' n'existe",
   "util-on": "activé",
-  "util-off": "désactivé"
+  "util-off": "désactivé",
+  "config-admin-title": "The BASICs Config",
+  "config-admin-save": "Save",
+  "config-admin-save-tooltip": "Persist changes and live-apply safe settings.",
+  "config-admin-mark-reviewed": "Mark Reviewed",
+  "config-admin-mark-reviewed-tooltip": "Mark every listed setting as reviewed.",
+  "config-admin-reload": "Reload Disk",
+  "config-admin-reload-tooltip": "Reload config from ModConfig/the_basics.json.",
+  "config-admin-close": "Close",
+  "config-admin-close-tooltip": "Close this panel.",
+  "config-admin-group": "Setting group",
+  "config-admin-group-tooltip": "Choose which group of settings to show.",
+  "config-admin-new-prefix": "NEW: {0}",
+  "config-admin-live-tooltip": "{0} Live-applied after save.",
+  "config-admin-restart-tooltip": "{0} Restart required after save."
 }

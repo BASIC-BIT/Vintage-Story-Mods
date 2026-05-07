@@ -118,8 +118,8 @@ namespace thebasics.Configs
             ProximityChatPresentationMode = ProximityChatPresentationModes.Normalize(ProximityChatPresentationMode);
             OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
             ProseNicknameToken ??= "@";
-
             InitializeCharacterSheetDefaults();
+            ReviewedConfigSettingKeys ??= new List<string>();
         }
 
         private void InitializeCharacterSheetDefaults()
@@ -597,5 +597,9 @@ namespace thebasics.Configs
 
         [ProtoMember(99)]
         public bool CharacterSheetRequireRequiredFieldsForRoleplay { get; set; } = false;
+
+        // Settings the server owner has acknowledged in the in-game config panel.
+        [ProtoMember(100)]
+        public IList<string> ReviewedConfigSettingKeys { get; set; }
     }
 }

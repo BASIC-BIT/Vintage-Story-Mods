@@ -5,6 +5,7 @@ using System.Reflection;
 using HarmonyLib;
 using thebasics.Configs;
 using thebasics.Models;
+using thebasics.ModSystems.AdminConfig;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -53,6 +54,11 @@ public class ChatUiSystem : ModSystem
     private static ChatTypingIndicatorState? _lastSentTypingState;
     private static string _lastChatInputText;
     private static long _lastChatInputChangeMs;
+    private static GuiJsonDialog _configAdminDialog;
+    private static Dictionary<string, string> _configAdminDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    private static HashSet<string> _configAdminReviewedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private static string _configAdminStatusMessage;
+    private static string _configAdminSelectedGroup;
 
     private static void DebugLog(string message)
     {
@@ -259,6 +265,9 @@ public class ChatUiSystem : ModSystem
     {
         _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
+            .RegisterMessageType<TheBasicsConfigAdminOpenMessage>()
+            .RegisterMessageType<TheBasicsConfigAdminSaveMessage>()
+            .RegisterMessageType<TheBasicsConfigAdminResultMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
@@ -269,6 +278,8 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<CharacterSheetSaveRequest>()
             .RegisterMessageType<CharacterSheetViewMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
+            .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
+            .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
             .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
             .SetMessageHandler<ChatterSoundMessage>(OnChatterSoundMessage)
@@ -416,6 +427,302 @@ public class ChatUiSystem : ModSystem
         _characterSheetMessageDialog?.TryClose();
         _characterSheetMessageDialog = new CharacterSheetMessageDialog(_api, message);
         _characterSheetMessageDialog.TryOpen();
+    }
+
+    private void OnConfigAdminOpenMessage(TheBasicsConfigAdminOpenMessage message)
+    {
+        if (message?.Config != null)
+        {
+            _config = message.Config;
+            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
+        }
+
+        UpdateConfigAdminDraft(message?.Values, message?.ReviewedKeys, message?.StatusMessage);
+        OpenConfigAdminDialog();
+    }
+
+    private void OnConfigAdminResultMessage(TheBasicsConfigAdminResultMessage message)
+    {
+        if (message?.Config != null)
+        {
+            _config = message.Config;
+            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(message?.Message))
+        {
+            _api.ShowChatMessage(message.Message);
+        }
+
+        UpdateConfigAdminDraft(message?.Values, message?.ReviewedKeys, message?.Message);
+        OpenConfigAdminDialog();
+    }
+
+    private static void UpdateConfigAdminDraft(IEnumerable<ConfigAdminSettingValue> values, IEnumerable<string> reviewedKeys, string statusMessage)
+    {
+        _configAdminDraft = ConfigAdminSettingRegistry.Settings.ToDictionary(
+            setting => setting.Key,
+            setting => _config == null ? string.Empty : setting.GetValue(_config),
+            StringComparer.OrdinalIgnoreCase);
+
+        if (values != null)
+        {
+            foreach (var value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value?.Key))
+                {
+                    _configAdminDraft[value.Key] = value.Value ?? string.Empty;
+                }
+            }
+        }
+
+        _configAdminReviewedKeys = new HashSet<string>(reviewedKeys ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+        _configAdminStatusMessage = statusMessage;
+    }
+
+    private static void OpenConfigAdminDialog()
+    {
+        if (_api == null)
+        {
+            return;
+        }
+
+        _configAdminDialog?.TryClose();
+        _configAdminDialog = new GuiJsonDialog(BuildConfigAdminDialogSettings(), _api, focusFirstElement: false);
+        _configAdminDialog.TryOpen();
+    }
+
+    private static JsonDialogSettings BuildConfigAdminDialogSettings()
+    {
+        var rows = new List<DialogRow>
+        {
+            new(new DialogElement
+            {
+                Code = "title",
+                Type = EnumDialogElementType.Text,
+                Text = Lang.Get("thebasics:config-admin-title"),
+                Width = 720,
+                Height = 32,
+                FontSize = 18
+            })
+        };
+
+        if (!string.IsNullOrWhiteSpace(_configAdminStatusMessage))
+        {
+            rows.Add(new DialogRow(new DialogElement
+            {
+                Code = "status",
+                Type = EnumDialogElementType.Text,
+                Text = _configAdminStatusMessage,
+                Width = 720,
+                Height = 42,
+                FontSize = 13
+            }));
+        }
+
+        var groups = GetConfigAdminGroups();
+        _configAdminSelectedGroup = NormalizeConfigAdminGroup(_configAdminSelectedGroup, groups);
+        rows.Add(new DialogRow(new DialogElement
+        {
+            Code = "group-select",
+            Label = "thebasics:config-admin-group",
+            Tooltip = "thebasics:config-admin-group-tooltip",
+            Type = EnumDialogElementType.Select,
+            Mode = EnumDialogElementMode.DropDown,
+            Values = groups.ToArray(),
+            Names = groups.ToArray(),
+            Width = 720,
+            Height = 28
+        })
+        {
+            TopPadding = 8,
+            BottomPadding = 6
+        });
+
+        foreach (var group in ConfigAdminSettingRegistry.Settings.Where(setting => string.Equals(setting.Group, _configAdminSelectedGroup, StringComparison.OrdinalIgnoreCase)).GroupBy(setting => setting.Group))
+        {
+            rows.Add(new DialogRow(new DialogElement
+            {
+                Code = "group-" + group.Key,
+                Type = EnumDialogElementType.Text,
+                Text = group.Key,
+                Width = 720,
+                Height = 26,
+                FontSize = 15
+            })
+            {
+                TopPadding = 8,
+                BottomPadding = 2
+            });
+
+            foreach (var setting in group.OrderBy(setting => _configAdminReviewedKeys.Contains(setting.Key) ? 1 : 0).ThenBy(setting => setting.Label))
+            {
+                rows.Add(new DialogRow(CreateConfigAdminElement(setting))
+                {
+                    BottomPadding = 4
+                });
+            }
+        }
+
+        rows.Add(new DialogRow(
+            CreateButton("save", Lang.Get("thebasics:config-admin-save"), Lang.Get("thebasics:config-admin-save-tooltip")),
+            CreateButton("mark-reviewed", Lang.Get("thebasics:config-admin-mark-reviewed"), Lang.Get("thebasics:config-admin-mark-reviewed-tooltip")),
+            CreateButton("reload", Lang.Get("thebasics:config-admin-reload"), Lang.Get("thebasics:config-admin-reload-tooltip")),
+            CreateButton("close", Lang.Get("thebasics:config-admin-close"), Lang.Get("thebasics:config-admin-close-tooltip")))
+        {
+            TopPadding = 12
+        });
+
+        return new JsonDialogSettings
+        {
+            Code = "thebasics-config-admin",
+            Alignment = EnumDialogArea.CenterMiddle,
+            Rows = rows.ToArray(),
+            SizeMultiplier = 0.9,
+            Padding = 16,
+            DisableWorldInteract = true,
+            OnGet = GetConfigAdminValue,
+            OnSet = SetConfigAdminValue
+        };
+    }
+
+    private static List<string> GetConfigAdminGroups()
+    {
+        return ConfigAdminSettingRegistry.Settings
+            .Select(setting => setting.Group)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string NormalizeConfigAdminGroup(string group, IReadOnlyList<string> groups)
+    {
+        if (groups.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return groups.FirstOrDefault(candidate => string.Equals(candidate, group, StringComparison.OrdinalIgnoreCase)) ?? groups[0];
+    }
+
+    private static DialogElement CreateConfigAdminElement(ConfigAdminSettingDefinition setting)
+    {
+        var label = _configAdminReviewedKeys.Contains(setting.Key) ? setting.Label : Lang.Get("thebasics:config-admin-new-prefix", setting.Label);
+        var tooltip = setting.ReloadBehavior == ConfigAdminReloadBehavior.Live
+            ? Lang.Get("thebasics:config-admin-live-tooltip", setting.Description)
+            : Lang.Get("thebasics:config-admin-restart-tooltip", setting.Description);
+
+        var element = new DialogElement
+        {
+            Code = setting.Key,
+            Label = label,
+            Tooltip = tooltip,
+            Width = 720,
+            Height = 28
+        };
+
+        switch (setting.Kind)
+        {
+            case ConfigAdminSettingKind.Boolean:
+                element.Type = EnumDialogElementType.Switch;
+                break;
+            case ConfigAdminSettingKind.Integer:
+            case ConfigAdminSettingKind.Decimal:
+                element.Type = EnumDialogElementType.NumberInput;
+                break;
+            case ConfigAdminSettingKind.Select:
+                element.Type = EnumDialogElementType.Select;
+                element.Mode = EnumDialogElementMode.DropDown;
+                element.Values = setting.Options.ToArray();
+                element.Names = setting.OptionNames.ToArray();
+                break;
+            default:
+                element.Type = EnumDialogElementType.Input;
+                break;
+        }
+
+        return element;
+    }
+
+    private static DialogElement CreateButton(string code, string text, string tooltip)
+    {
+        return new DialogElement
+        {
+            Code = code,
+            Type = EnumDialogElementType.Button,
+            Text = text,
+            Tooltip = tooltip,
+            Width = 150,
+            Height = 34,
+            FontSize = 13
+        };
+    }
+
+    private static string GetConfigAdminValue(string code)
+    {
+        if (code == "group-select")
+        {
+            return _configAdminSelectedGroup ?? string.Empty;
+        }
+
+        return _configAdminDraft.TryGetValue(code, out var value) ? value : string.Empty;
+    }
+
+    private static void SetConfigAdminValue(string code, string value)
+    {
+        switch (code)
+        {
+            case "save":
+                SendConfigAdminSave();
+                break;
+            case "mark-reviewed":
+                SendConfigAdminMarkReviewed();
+                break;
+            case "reload":
+                SendConfigAdminReload();
+                break;
+            case "close":
+                _configAdminDialog?.TryClose();
+                break;
+            case "group-select":
+                _configAdminSelectedGroup = NormalizeConfigAdminGroup(value, GetConfigAdminGroups());
+                OpenConfigAdminDialog();
+                break;
+            default:
+                if (ConfigAdminSettingRegistry.TryGet(code, out _))
+                {
+                    _configAdminDraft[code] = value ?? string.Empty;
+                }
+                break;
+        }
+    }
+
+    private static void SendConfigAdminSave()
+    {
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsConfigAdminSaveMessage
+        {
+            Values = _configAdminDraft
+                .Select(kvp => new ConfigAdminSettingValue { Key = kvp.Key, Value = kvp.Value })
+                .ToList()
+        });
+    }
+
+    private static void SendConfigAdminMarkReviewed()
+    {
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsConfigAdminSaveMessage
+        {
+            Values = _configAdminDraft
+                .Select(kvp => new ConfigAdminSettingValue { Key = kvp.Key, Value = kvp.Value })
+                .ToList(),
+            MarkReviewedKeys = ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key).ToList()
+        });
+    }
+
+    private static void SendConfigAdminReload()
+    {
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsConfigAdminSaveMessage
+        {
+            ReloadFromDisk = true
+        });
     }
 
     private static void OnChatTypingStateMessage(ChatTypingStateMessage message)
@@ -996,6 +1303,11 @@ public class ChatUiSystem : ModSystem
             _pendingConfigActions.Clear();
             _safeNetworkChannel?.Dispose();
             _safeNetworkChannel = null;
+            _configAdminDialog?.TryClose();
+            _configAdminDialog = null;
+            _configAdminDraft.Clear();
+            _configAdminReviewedKeys.Clear();
+            _configAdminStatusMessage = null;
 
             // Clear static typing indicator state to prevent stale data on reconnect/world reload.
             _typingStatesByEntityId.Clear();

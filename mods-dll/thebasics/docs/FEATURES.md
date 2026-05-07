@@ -29,6 +29,26 @@ Version 5.5.0 shifts the generated/default config toward showcasing RP-server fe
 - `NametagRequiresLineOfSight=true`
 - `OverheadChatBubbleMode=RpText`
 
+## In-Game Admin Config
+
+Features:
+
+- Server-authoritative admin config panel opened with `/thebasics config` or `/tb config`.
+- Server-side validation and persistence to `ModConfig/the_basics.json`.
+- Shared server config object so live-safe changes update existing systems without replacing stale references.
+- Client config resync after successful saves or disk reloads.
+- New-setting discovery through persisted `ReviewedConfigSettingKeys`.
+- Live/restart labeling in the panel; startup-shaped settings can be edited but are reported as restart-required.
+
+Admin commands:
+
+- `/thebasics config`, `/tb config`
+- `/thebasics reloadconfig`, `/tb reloadconfig`
+
+Live-applied setting groups currently include chatter, typing indicators, nametag display/range, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, and debug mode. Restart-required settings include startup-shaped command registration, chat group setup, language system enablement, and player stats enablement.
+
+The admin panel intentionally exposes scalar settings first. Complex collection settings such as language definitions, chat delimiters, per-mode distance/verb/audio dictionaries, and player-stat toggle dictionaries still require direct JSON editing or a future custom editor with stronger validation.
+
 ## RP Proximity Chat
 
 Features:
@@ -81,6 +101,7 @@ Shortcut delimiters:
 
 Primary config areas:
 
+- `ReviewedConfigSettingKeys`
 - `DisableRPChat`
 - `ProximityChatName`
 - `UseGeneralChannelAsProximityChat`

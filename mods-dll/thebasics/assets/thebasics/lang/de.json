@@ -175,5 +175,19 @@
   "parser-syntax-explanation": "{0} ist der Name, Spitzname oder die UID eines Online-Spielers.",
   "parser-error-player-not-found": "Kein Online-Spieler mit Name oder Spitzname '{0}' vorhanden",
   "util-on": "an",
-  "util-off": "aus"
+  "util-off": "aus",
+  "config-admin-title": "The BASICs Config",
+  "config-admin-save": "Save",
+  "config-admin-save-tooltip": "Persist changes and live-apply safe settings.",
+  "config-admin-mark-reviewed": "Mark Reviewed",
+  "config-admin-mark-reviewed-tooltip": "Mark every listed setting as reviewed.",
+  "config-admin-reload": "Reload Disk",
+  "config-admin-reload-tooltip": "Reload config from ModConfig/the_basics.json.",
+  "config-admin-close": "Close",
+  "config-admin-close-tooltip": "Close this panel.",
+  "config-admin-group": "Setting group",
+  "config-admin-group-tooltip": "Choose which group of settings to show.",
+  "config-admin-new-prefix": "NEW: {0}",
+  "config-admin-live-tooltip": "{0} Live-applied after save.",
+  "config-admin-restart-tooltip": "{0} Restart required after save."
 }
