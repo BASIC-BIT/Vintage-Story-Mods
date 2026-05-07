@@ -256,5 +256,20 @@
   "chat-chatter-set": "Character chatter is now {0}.",
 
   "util-on": "on",
-  "util-off": "off"
+  "util-off": "off",
+
+  "config-admin-title": "The BASICs Config",
+  "config-admin-save": "Save",
+  "config-admin-save-tooltip": "Persist changes and live-apply safe settings.",
+  "config-admin-mark-reviewed": "Mark Reviewed",
+  "config-admin-mark-reviewed-tooltip": "Mark every listed setting as reviewed.",
+  "config-admin-reload": "Reload Disk",
+  "config-admin-reload-tooltip": "Reload config from ModConfig/the_basics.json.",
+  "config-admin-close": "Close",
+  "config-admin-close-tooltip": "Close this panel.",
+  "config-admin-group": "Setting group",
+  "config-admin-group-tooltip": "Choose which group of settings to show.",
+  "config-admin-new-prefix": "NEW: {0}",
+  "config-admin-live-tooltip": "{0} Live-applied after save.",
+  "config-admin-restart-tooltip": "{0} Restart required after save."
 }

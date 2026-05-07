@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
+using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
@@ -202,7 +205,55 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RequiresPlayer()
             .HandleWith(Whisper);
 
+        RegisterAdminConfigCommands();
         RegisterForServerSideConfig();
+    }
+
+    private void RegisterAdminConfigCommands()
+    {
+        API.ChatCommands.GetOrCreate("thebasics")
+            .WithRootAlias("tb")
+            .WithRootAlias("basic")
+            .WithDescription("The BASICs administration commands")
+            .RequiresPrivilege(Privilege.root)
+            .BeginSubCommand("config")
+                .WithDescription("Open The BASICs config panel")
+                .RequiresPrivilege(Privilege.root)
+                .RequiresPlayer()
+                .HandleWith(HandleOpenConfigCommand)
+            .EndSubCommand()
+            .BeginSubCommand("reloadconfig")
+                .WithDescription("Reload The BASICs config from disk")
+                .RequiresPrivilege(Privilege.root)
+                .HandleWith(HandleReloadConfigCommand)
+            .EndSubCommand();
+    }
+
+    private TextCommandResult HandleOpenConfigCommand(TextCommandCallingArgs args)
+    {
+        if (args.Caller.Player is not IServerPlayer player)
+        {
+            return TextCommandResult.Error("This command can only be used by a player.");
+        }
+
+        SendConfigAdminOpen(player, null);
+        return TextCommandResult.Success("Opening The BASICs config panel.");
+    }
+
+    private TextCommandResult HandleReloadConfigCommand(TextCommandCallingArgs args)
+    {
+        var before = CloneConfig(Config);
+        ReloadSharedConfigFromDisk(API);
+        var changedKeys = GetChangedConfigKeys(before, Config);
+        ApplyConfigChangeSideEffects(changedKeys);
+        BroadcastClientConfigs();
+
+        if (args.Caller.Player is IServerPlayer player)
+        {
+            SendConfigAdminOpen(player, $"Reloaded The BASICs config from disk. Changed settings: {changedKeys.Count}.");
+        }
+
+        return TextCommandResult.Success($"Reloaded The BASICs config from disk. Changed settings: {changedKeys.Count}.");
     }
 
     private TextCommandResult SendGlobalOOCMessage(TextCommandCallingArgs args)
@@ -259,6 +310,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         _serverConfigChannel = API.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
+            .RegisterMessageType<TheBasicsConfigAdminOpenMessage>()
+            .RegisterMessageType<TheBasicsConfigAdminSaveMessage>()
+            .RegisterMessageType<TheBasicsConfigAdminResultMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
@@ -272,7 +326,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
             .SetMessageHandler<CharacterSheetOpenRequest>(OnCharacterSheetOpenRequest)
-            .SetMessageHandler<CharacterSheetSaveRequest>(OnCharacterSheetSaveRequest);
+            .SetMessageHandler<CharacterSheetSaveRequest>(OnCharacterSheetSaveRequest)
+            .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
     }
 
     private void OnCharacterSheetOpenRequest(IServerPlayer player, CharacterSheetOpenRequest message)
@@ -295,6 +350,73 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Message = Lang.Get("thebasics:charsheet-gui-disabled")
         };
         _serverConfigChannel.SendPacket(response, player);
+    }
+
+    private void OnConfigAdminSaveMessage(IServerPlayer player, TheBasicsConfigAdminSaveMessage message)
+    {
+        if (player?.HasPrivilege(Privilege.root) != true)
+        {
+            SendConfigAdminResult(player, false, "You do not have permission to edit The BASICs config.", Array.Empty<string>());
+            return;
+        }
+
+        if (message?.ReloadFromDisk == true)
+        {
+            var before = CloneConfig(Config);
+            ReloadSharedConfigFromDisk(API);
+            var reloadChangedKeys = GetChangedConfigKeys(before, Config);
+            ApplyConfigChangeSideEffects(reloadChangedKeys);
+            BroadcastClientConfigs();
+            SendConfigAdminResult(player, true, $"Reloaded config from disk. Changed settings: {reloadChangedKeys.Count}.", reloadChangedKeys);
+            return;
+        }
+
+        var draft = CloneConfig(Config);
+        var errors = new List<string>();
+
+        foreach (var value in message?.Values ?? new List<ConfigAdminSettingValue>())
+        {
+            if (!ConfigAdminSettingRegistry.TryGet(value.Key, out var setting))
+            {
+                errors.Add($"Unknown setting: {value.Key}");
+                continue;
+            }
+
+            if (!setting.TrySetValue(draft, value.Value, out var error))
+            {
+                errors.Add(error);
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            SendConfigAdminResult(player, false, string.Join("\n", errors), Array.Empty<string>());
+            return;
+        }
+
+        if (message?.MarkReviewedKeys != null && message.MarkReviewedKeys.Count > 0)
+        {
+            var reviewed = new HashSet<string>(draft.ReviewedConfigSettingKeys ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+            foreach (var key in message.MarkReviewedKeys.Where(key => ConfigAdminSettingRegistry.TryGet(key, out _)))
+            {
+                reviewed.Add(key);
+            }
+
+            draft.ReviewedConfigSettingKeys = reviewed.OrderBy(key => key, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        var changedKeys = GetChangedConfigKeys(Config, draft);
+        CopyConfigValues(draft, Config);
+        SaveSharedConfig(API);
+        ApplyConfigChangeSideEffects(changedKeys);
+        BroadcastClientConfigs();
+
+        var restartRequired = GetRestartRequiredKeys(changedKeys);
+        var messageText = restartRequired.Count == 0
+            ? $"Saved The BASICs config. Live-applied settings: {changedKeys.Count}."
+            : $"Saved The BASICs config. Restart required for: {string.Join(", ", restartRequired)}.";
+
+        SendConfigAdminResult(player, true, messageText, changedKeys);
     }
 
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
@@ -464,6 +586,136 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             API.Logger.Debug($"THEBASICS - Sent complete config to client {byPlayer.PlayerName}");
         }
+    }
+
+    private void BroadcastClientConfigs()
+    {
+        foreach (var onlinePlayer in API.World.AllOnlinePlayers)
+        {
+            if (onlinePlayer is IServerPlayer serverPlayer)
+            {
+                SendClientConfig(serverPlayer);
+            }
+        }
+    }
+
+    private void SendConfigAdminOpen(IServerPlayer player, string statusMessage)
+    {
+        _serverConfigChannel?.SendPacket(new TheBasicsConfigAdminOpenMessage
+        {
+            Config = Config,
+            Values = GetConfigAdminValues(Config),
+            ReviewedKeys = (Config.ReviewedConfigSettingKeys ?? Array.Empty<string>()).ToList(),
+            StatusMessage = statusMessage
+        }, player);
+    }
+
+    private void SendConfigAdminResult(IServerPlayer player, bool success, string message, IReadOnlyCollection<string> changedKeys)
+    {
+        if (player == null)
+        {
+            return;
+        }
+
+        var restartRequired = GetRestartRequiredKeys(changedKeys);
+        var liveApplied = changedKeys.Where(key => !restartRequired.Contains(key, StringComparer.OrdinalIgnoreCase)).ToList();
+
+        _serverConfigChannel?.SendPacket(new TheBasicsConfigAdminResultMessage
+        {
+            Success = success,
+            Message = message,
+            Config = Config,
+            Values = GetConfigAdminValues(Config),
+            ReviewedKeys = (Config.ReviewedConfigSettingKeys ?? Array.Empty<string>()).ToList(),
+            LiveAppliedKeys = liveApplied,
+            RestartRequiredKeys = restartRequired
+        }, player);
+    }
+
+    private static List<ConfigAdminSettingValue> GetConfigAdminValues(ModConfig config)
+    {
+        return ConfigAdminSettingRegistry.Settings
+            .Select(setting => new ConfigAdminSettingValue
+            {
+                Key = setting.Key,
+                Value = setting.GetValue(config)
+            })
+            .ToList();
+    }
+
+    private static HashSet<string> GetChangedConfigKeys(ModConfig before, ModConfig after)
+    {
+        return ConfigAdminSettingRegistry.Settings
+            .Where(setting => !string.Equals(setting.GetValue(before), setting.GetValue(after), StringComparison.Ordinal))
+            .Select(setting => setting.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static List<string> GetRestartRequiredKeys(IEnumerable<string> changedKeys)
+    {
+        return changedKeys
+            .Where(key => ConfigAdminSettingRegistry.TryGet(key, out var setting) && setting.ReloadBehavior == ConfigAdminReloadBehavior.RestartRequired)
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    protected override void OnConfigReloaded(IReadOnlySet<string> changedKeys)
+    {
+        if (changedKeys.Contains(nameof(Config.ChangeNicknameColorPermission)) ||
+            changedKeys.Contains(nameof(Config.RPTextTogglePermission)) ||
+            changedKeys.Contains(nameof(Config.OOCTogglePermission)) ||
+            changedKeys.Contains(nameof(Config.ChangeOwnLanguagePermission)) ||
+            changedKeys.Contains(nameof(Config.ChangeOtherLanguagePermission)))
+        {
+            RefreshCommandPrivileges();
+        }
+    }
+
+    private void RefreshCommandPrivileges()
+    {
+        API.ChatCommands.Get("nickcolor")?.RequiresPrivilege(Config.ChangeNicknameColorPermission);
+        API.ChatCommands.Get("clearnickcolor")?.RequiresPrivilege(Config.ChangeNicknameColorPermission);
+        API.ChatCommands.Get("rptext")?.RequiresPrivilege(Config.RPTextTogglePermission);
+        API.ChatCommands.Get("oocToggle")?.RequiresPrivilege(Config.OOCTogglePermission);
+
+        API.ChatCommands.Get("addlang")?.RequiresPrivilege(Config.ChangeOwnLanguagePermission);
+        API.ChatCommands.Get("removelang")?.RequiresPrivilege(Config.ChangeOwnLanguagePermission);
+        API.ChatCommands.Get("adminaddlang")?.RequiresPrivilege(Config.ChangeOtherLanguagePermission);
+        API.ChatCommands.Get("adminremovelang")?.RequiresPrivilege(Config.ChangeOtherLanguagePermission);
+        API.ChatCommands.Get("adminlistlang")?.RequiresPrivilege(Config.ChangeOtherLanguagePermission);
+    }
+
+    private void ApplyConfigChangeSideEffects(IReadOnlySet<string> changedKeys)
+    {
+        NotifyConfigReloaded(changedKeys);
+
+        if (changedKeys.Contains(nameof(Config.ShowNicknameInNametag)) ||
+            changedKeys.Contains(nameof(Config.ShowPlayerNameInNametag)) ||
+            changedKeys.Contains(nameof(Config.HideNametagUnlessTargeting)) ||
+            changedKeys.Contains(nameof(Config.NametagRenderRange)))
+        {
+            RefreshAllNameTags();
+        }
+
+        if (changedKeys.Contains(nameof(Config.EnableTypingIndicator)) && !Config.EnableTypingIndicator)
+        {
+            ClearTypingIndicators();
+        }
+    }
+
+    private void ClearTypingIndicators()
+    {
+        foreach (var entityId in _typingStatesByEntityId.Keys.ToArray())
+        {
+            _serverConfigChannel?.BroadcastPacket(new ChatTypingStateMessage
+            {
+                EntityId = entityId,
+                IsTyping = false,
+                State = ChatTypingIndicatorState.None
+            });
+        }
+
+        _typingStatesByEntityId.Clear();
     }
 
     internal void DispatchSpeechForContext(MessageContext context)

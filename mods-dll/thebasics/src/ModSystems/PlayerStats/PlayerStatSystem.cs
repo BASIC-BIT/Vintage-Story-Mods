@@ -25,6 +25,20 @@ namespace thebasics.ModSystems.PlayerStats
             }
         }
 
+        protected override void OnConfigReloaded(IReadOnlySet<string> changedKeys)
+        {
+            if (changedKeys.Contains(nameof(Config.PlayerStatClearPermission)))
+            {
+                RefreshCommandPrivileges();
+            }
+        }
+
+        private void RefreshCommandPrivileges()
+        {
+            API.ChatCommands.Get("clearstats")?.RequiresPrivilege(Config.PlayerStatClearPermission);
+            API.ChatCommands.Get("clearstat")?.RequiresPrivilege(Config.PlayerStatClearPermission);
+        }
+
         private readonly IDictionary<string, EntityPos> _prevPlayerPositions = new Dictionary<string, EntityPos>();
 
         private void SetupCommands()

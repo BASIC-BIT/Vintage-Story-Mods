@@ -164,19 +164,49 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 
 ## Batch 5: Admin And Stats
 
-1. **Player Stats Display** (P1)
+1. **Admin Config Panel Access And Save** (P0)
+   - Config: admin/root client and non-admin client available.
+   - Do: As non-admin, try `/basic config`. As admin, run `/basic config`, toggle `DebugMode`, save, close/reopen, then restore the original value.
+   - Expect: Non-admin is denied; admin sees the panel; save persists to `ModConfig/the_basics.json`; clients receive updated config without restart.
+   - Watch for: panel opening for non-admins, duplicate network channel errors, save packet errors, or stale UI values after save.
+
+2. **Admin Config Live Toggle** (P1)
+   - Config: admin/root client.
+   - Do: Toggle `EnableTypingIndicator` off, save, type on another client, then toggle it back on and save.
+   - Expect: Indicators clear when disabled and resume when re-enabled without a server restart.
+   - Watch for: stale overhead indicators, client exceptions, or config file not matching the saved value.
+
+3. **Admin Config Restart-Required Warning** (P1)
+   - Config: admin/root client.
+   - Do: Change a restart-required setting such as `EnableLanguageSystem`, save, then restore the original value.
+   - Expect: Save succeeds and reports that restart is required for that setting.
+   - Watch for: setting silently applying as if live, no warning, or command/UI desync.
+
+4. **Admin Config Reviewed Settings** (P2)
+   - Config: existing config with missing or empty `ReviewedConfigSettingKeys`.
+   - Do: Open `/basic config`, note `NEW:` labels, click `Mark Reviewed`, close and reopen.
+   - Expect: New-setting labels disappear and `ReviewedConfigSettingKeys` is persisted.
+   - Watch for: reviewed state not saving or unrelated config values changing.
+
+5. **Player Stats Display** (P1)
    - Config: `PlayerStatSystem=true`.
    - Do: Run `/playerstats` and `/pstats <player>`.
-   - Expect: Current tracked stats display without raw keys.
-   - Watch for: missing block-break/distance stats or formatting errors.
+    - Expect: Current tracked stats display without raw keys.
+    - Watch for: missing block-break/distance stats or formatting errors.
 
-2. **Player Stats Clear Flow** (P1)
+6. **Admin Config Live Permission Refresh** (P1)
+   - Config: admin/root client and a non-admin test client without a temporary test privilege.
+   - Do: Change a live permission setting such as `TpaRequestPrivilege` to a temporary privilege, save, verify the non-admin cannot use `/tpa`, then restore the original privilege and save.
+   - Expect: The permission change applies to existing command instances without restart and restores cleanly.
+   - Watch for: commands remaining usable after privilege tightening, commands staying locked after restore, or restart-required warnings for permission-only changes.
+
+7. **Player Stats Clear Flow** (P1)
    - Config: admin permission available.
    - Do: Run `/clearstat <player> <statName>` without confirm, then with `confirm`.
    - Expect: Confirmation guard appears; confirmed clear resets only selected stat.
    - Watch for: accidental clear without confirm or wrong stat cleared.
 
-3. **Set Durability** (P2)
+8. **Set Durability** (P2)
    - Config: root/admin client.
    - Do: Hold a durability item and run `/setdurability 1` and `/setdurability 100%`, then test negative input, empty hand, and non-durability item.
    - Expect: Valid item updates; invalid cases produce readable errors.
