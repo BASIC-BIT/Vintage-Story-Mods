@@ -10,28 +10,18 @@ public sealed class ConfigAdminSettingDefinition
     private readonly Func<ModConfig, string> _getValue;
     private readonly Func<ModConfig, string, string> _setValue;
 
-    public ConfigAdminSettingDefinition(
-        string key,
-        string group,
-        string label,
-        string description,
-        ConfigAdminSettingKind kind,
-        ConfigAdminReloadBehavior reloadBehavior,
-        Func<ModConfig, string> getValue,
-        Func<ModConfig, string, string> setValue,
-        string[] options = null,
-        string[] optionNames = null)
+    public ConfigAdminSettingDefinition(ConfigAdminSettingDefinitionOptions definition)
     {
-        Key = key;
-        Group = group;
-        Label = label;
-        Description = description;
-        Kind = kind;
-        ReloadBehavior = reloadBehavior;
-        _getValue = getValue;
-        _setValue = setValue;
-        Options = options ?? Array.Empty<string>();
-        OptionNames = optionNames ?? Options;
+        Key = definition.Key;
+        Group = definition.Group;
+        Label = definition.Label;
+        Description = definition.Description;
+        Kind = definition.Kind;
+        ReloadBehavior = definition.ReloadBehavior;
+        _getValue = definition.GetValue;
+        _setValue = definition.SetValue;
+        Options = definition.Options ?? Array.Empty<string>();
+        OptionNames = definition.OptionNames ?? Options;
     }
 
     public string Key { get; }
@@ -85,4 +75,18 @@ public sealed class ConfigAdminSettingDefinition
     {
         return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed);
     }
+}
+
+public sealed class ConfigAdminSettingDefinitionOptions
+{
+    public string Key { get; set; }
+    public string Group { get; set; }
+    public string Label { get; set; }
+    public string Description { get; set; }
+    public ConfigAdminSettingKind Kind { get; set; }
+    public ConfigAdminReloadBehavior ReloadBehavior { get; set; }
+    public Func<ModConfig, string> GetValue { get; set; }
+    public Func<ModConfig, string, string> SetValue { get; set; }
+    public string[] Options { get; set; }
+    public string[] OptionNames { get; set; }
 }
