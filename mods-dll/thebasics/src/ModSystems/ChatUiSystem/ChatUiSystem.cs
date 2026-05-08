@@ -60,6 +60,7 @@ public class ChatUiSystem : ModSystem
     private static HashSet<string> _configAdminReviewedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private static string _configAdminStatusMessage;
     private static string _configAdminSelectedGroup;
+    private static bool _returnToConfigAdminAfterLanguageDialog;
 
     private static void DebugLog(string message)
     {
@@ -503,7 +504,7 @@ public class ChatUiSystem : ModSystem
         var entries = (languages ?? Array.Empty<LanguageConfigEntryMessage>()).ToList();
         if (_languageConfigDialog == null)
         {
-            _languageConfigDialog = new LanguageConfigDialog(_api, entries, message, success, SendLanguageConfigSaveRequest, SendLanguageConfigReload);
+            _languageConfigDialog = new LanguageConfigDialog(_api, entries, message, success, SendLanguageConfigSaveRequest, SendLanguageConfigReload, OnLanguageConfigClosed);
         }
         else
         {
@@ -514,6 +515,18 @@ public class ChatUiSystem : ModSystem
         {
             _languageConfigDialog.TryOpen();
         }
+    }
+
+    private static void OnLanguageConfigClosed()
+    {
+        _languageConfigDialog = null;
+        if (!_returnToConfigAdminAfterLanguageDialog)
+        {
+            return;
+        }
+
+        _returnToConfigAdminAfterLanguageDialog = false;
+        OpenConfigAdminDialog();
     }
 
     private static void UpdateConfigAdminDraft(IEnumerable<ConfigAdminSettingValue> values, IEnumerable<string> reviewedKeys, string statusMessage)
@@ -597,6 +610,13 @@ public class ChatUiSystem : ModSystem
             BottomPadding = 6
         });
 
+        rows.Add(new DialogRow(
+            CreateButton("languages", Lang.Get("thebasics:config-admin-languages"), Lang.Get("thebasics:config-admin-languages-tooltip")))
+        {
+            TopPadding = 4,
+            BottomPadding = 8
+        });
+
         foreach (var group in ConfigAdminSettingRegistry.Settings.Where(setting => string.Equals(setting.Group, _configAdminSelectedGroup, StringComparison.OrdinalIgnoreCase)).GroupBy(setting => setting.Group))
         {
             rows.Add(new DialogRow(new DialogElement
@@ -623,7 +643,6 @@ public class ChatUiSystem : ModSystem
         }
 
         rows.Add(new DialogRow(
-            CreateButton("languages", Lang.Get("thebasics:config-admin-languages"), Lang.Get("thebasics:config-admin-languages-tooltip")),
             CreateButton("save", Lang.Get("thebasics:config-admin-save"), Lang.Get("thebasics:config-admin-save-tooltip")),
             CreateButton("mark-reviewed", Lang.Get("thebasics:config-admin-mark-reviewed"), Lang.Get("thebasics:config-admin-mark-reviewed-tooltip")),
             CreateButton("reload", Lang.Get("thebasics:config-admin-reload"), Lang.Get("thebasics:config-admin-reload-tooltip")))
@@ -739,6 +758,9 @@ public class ChatUiSystem : ModSystem
                 SendConfigAdminSave();
                 break;
             case "languages":
+                _returnToConfigAdminAfterLanguageDialog = true;
+                _configAdminDialog?.TryClose();
+                _configAdminDialog = null;
                 SendLanguageConfigOpenRequest();
                 break;
             case "mark-reviewed":
@@ -1396,6 +1418,7 @@ public class ChatUiSystem : ModSystem
             _configAdminReviewedKeys.Clear();
             _configAdminSelectedGroup = null;
             _configAdminStatusMessage = null;
+            _returnToConfigAdminAfterLanguageDialog = false;
 
             // Clear static typing indicator state to prevent stale data on reconnect/world reload.
             _typingStatesByEntityId.Clear();

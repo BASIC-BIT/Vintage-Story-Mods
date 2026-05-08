@@ -221,6 +221,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .RequiresPrivilege(Privilege.root)
                 .RequiresPlayer()
                 .BeginSubCommand("languages")
+                    .WithAlias("language")
                     .WithDescription("Open The BASICs language config editor")
                     .RequiresPrivilege(Privilege.root)
                     .RequiresPlayer()
