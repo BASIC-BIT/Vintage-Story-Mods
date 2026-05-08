@@ -16,7 +16,8 @@ public class OOCTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        context.Message = ChatHelper.Color($"(OOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}", _config.OOCColor);
+        var color = ChatVisualPreferenceResolver.GetOocColor(context.ReceivingPlayer, _config);
+        context.Message = ChatHelper.Color($"(OOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}", color);
 
         return context;
     }

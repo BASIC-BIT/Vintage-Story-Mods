@@ -103,7 +103,7 @@ namespace thebasics.ModSystems.ProximityChat
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:lang-error-already-known", ChatHelper.LangIdentifier(lang)),
+                    StatusMessage = Lang.Get("thebasics:lang-error-already-known", ChatHelper.LangIdentifier(lang, player)),
                 };
             }
 
@@ -129,7 +129,7 @@ namespace thebasics.ModSystems.ProximityChat
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = Lang.Get("thebasics:lang-success-added", ChatHelper.LangIdentifier(lang)),
+                StatusMessage = Lang.Get("thebasics:lang-success-added", ChatHelper.LangIdentifier(lang, player)),
             };
         }
 
@@ -153,7 +153,7 @@ namespace thebasics.ModSystems.ProximityChat
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:lang-error-not-known", ChatHelper.LangIdentifier(language)),
+                    StatusMessage = Lang.Get("thebasics:lang-error-not-known", ChatHelper.LangIdentifier(language, player)),
                 };
             }
 
@@ -167,13 +167,13 @@ namespace thebasics.ModSystems.ProximityChat
                 // If the player now knows no languages, set their default to babble
                 if (newPlayerLanguages.Count == 0)
                 {
-                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-no-languages", ChatHelper.LangColor("babble", BabbleLang)), EnumChatType.Notification);
+                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-no-languages", ChatVisualPreferenceResolver.FormatLanguageText("babble", BabbleLang, player)), EnumChatType.Notification);
                     player.SetDefaultLanguage(BabbleLang);
                 }
                 else
                 {
                     var newDefault = newPlayerLanguages.First();
-                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-new-default", ChatHelper.LangIdentifier(language), ChatHelper.LangIdentifier(newDefault)), EnumChatType.Notification);
+                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-new-default", ChatHelper.LangIdentifier(language, player), ChatHelper.LangIdentifier(newDefault, player)), EnumChatType.Notification);
                     player.SetDefaultLanguage(newDefault);
                 }
             }
@@ -181,7 +181,7 @@ namespace thebasics.ModSystems.ProximityChat
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = Lang.Get("thebasics:lang-success-removed", ChatHelper.LangIdentifier(language)),
+                StatusMessage = Lang.Get("thebasics:lang-success-removed", ChatHelper.LangIdentifier(language, player)),
             };
         }
 
@@ -194,12 +194,12 @@ namespace thebasics.ModSystems.ProximityChat
                 .Where(l => !knownNames.Contains(l.Name))
                 .ToList();
 
-            var knownList = string.Join("\n  ", known.Select(ChatHelper.LangIdentifierWithDescription));
+            var knownList = string.Join("\n  ", known.Select(lang => ChatHelper.LangIdentifierWithDescription(lang, player)));
             var message = Lang.Get("thebasics:lang-list-known", known.Count > 0 ? "\n  " + knownList : knownList);
 
             if (unknown.Count > 0)
             {
-                var unknownList = string.Join("\n  ", unknown.Select(ChatHelper.LangIdentifierWithDescription));
+                var unknownList = string.Join("\n  ", unknown.Select(lang => ChatHelper.LangIdentifierWithDescription(lang, player)));
                 message += "\n" + Lang.Get("thebasics:lang-list-unknown", "\n  " + unknownList);
             }
 
@@ -212,6 +212,7 @@ namespace thebasics.ModSystems.ProximityChat
 
         private TextCommandResult HandleAdminAddLanguageCommand(TextCommandCallingArgs args)
         {
+            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
             var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
             var languageIdentifier = (string)args.Parsers[1].GetValue();
             var lang = GetLangFromText(languageIdentifier, true, allowHidden: true);
@@ -231,7 +232,7 @@ namespace thebasics.ModSystems.ProximityChat
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:lang-error-admin-already-known", targetPlayer.PlayerName, ChatHelper.LangIdentifier(lang)),
+                    StatusMessage = Lang.Get("thebasics:lang-error-admin-already-known", targetPlayer.PlayerName, ChatHelper.LangIdentifier(lang, player)),
                 };
             }
 
@@ -248,7 +249,7 @@ namespace thebasics.ModSystems.ProximityChat
                 targetPlayer.SetDefaultLanguage(lang);
             }
 
-            var statusMessage = Lang.Get("thebasics:lang-success-admin-added", ChatHelper.LangIdentifier(lang), targetPlayer.PlayerName);
+            var statusMessage = Lang.Get("thebasics:lang-success-admin-added", ChatHelper.LangIdentifier(lang, player), targetPlayer.PlayerName);
             if (exceedsConfiguredLimit)
             {
                 statusMessage += "\n" + Lang.Get("thebasics:lang-warning-admin-over-max-languages", targetPlayer.PlayerName, targetPlayer.GetLanguages().Count, Config.MaxLanguagesPerPlayer);
@@ -282,7 +283,7 @@ namespace thebasics.ModSystems.ProximityChat
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:lang-error-admin-not-known", targetPlayer.PlayerName, ChatHelper.LangIdentifier(language)),
+                    StatusMessage = Lang.Get("thebasics:lang-error-admin-not-known", targetPlayer.PlayerName, ChatHelper.LangIdentifier(language, player)),
                 };
             }
 
@@ -297,13 +298,13 @@ namespace thebasics.ModSystems.ProximityChat
                 // If the player now knows no languages, set their default to babble
                 if (newPlayerLanguages.Count == 0)
                 {
-                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-no-languages", targetPlayer.PlayerName, ChatHelper.LangColor("babble", BabbleLang)), EnumChatType.Notification);
+                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-no-languages", targetPlayer.PlayerName, ChatVisualPreferenceResolver.FormatLanguageText("babble", BabbleLang, player)), EnumChatType.Notification);
                     targetPlayer.SetDefaultLanguage(BabbleLang);
                 }
                 else
                 {
                     var newDefault = newPlayerLanguages.First();
-                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-new-default", targetPlayer.PlayerName, ChatHelper.LangIdentifier(language), ChatHelper.LangColor(newDefault.Name, newDefault)), EnumChatType.Notification);
+                    player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-new-default", targetPlayer.PlayerName, ChatHelper.LangIdentifier(language, player), ChatVisualPreferenceResolver.FormatLanguageText(newDefault.Name, newDefault, player)), EnumChatType.Notification);
                     targetPlayer.SetDefaultLanguage(newDefault);
                 }
             }
@@ -311,7 +312,7 @@ namespace thebasics.ModSystems.ProximityChat
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = Lang.Get("thebasics:lang-success-admin-removed", ChatHelper.LangIdentifier(language), targetPlayer.PlayerName),
+                StatusMessage = Lang.Get("thebasics:lang-success-admin-removed", ChatHelper.LangIdentifier(language, player), targetPlayer.PlayerName),
             };
         }
 
@@ -322,9 +323,9 @@ namespace thebasics.ModSystems.ProximityChat
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = Lang.Get("thebasics:lang-list-admin-known", targetPlayer.PlayerName, string.Join(", ", languages.Select(ChatHelper.LangIdentifier))) +
+                StatusMessage = Lang.Get("thebasics:lang-list-admin-known", targetPlayer.PlayerName, string.Join(", ", languages.Select(lang => ChatHelper.LangIdentifier(lang, (IServerPlayer)args.Caller.Player)))) +
                                 "\n" +
-                                Lang.Get("thebasics:lang-list-all", string.Join(", ", GetAllLanguages(true, includeHidden: true).Select(ChatHelper.LangIdentifier))),
+                                Lang.Get("thebasics:lang-list-all", string.Join(", ", GetAllLanguages(true, includeHidden: true).Select(lang => ChatHelper.LangIdentifier(lang, (IServerPlayer)args.Caller.Player)))),
             };
         }
 

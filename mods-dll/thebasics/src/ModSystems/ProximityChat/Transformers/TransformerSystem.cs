@@ -51,9 +51,7 @@ public class TransformerSystem
             new BabbleWarningTransformer(_chatSystem), // Warn if babbling
             
             new ChatTypeTransformer(_chatSystem),
-            new NameTransformer(_chatSystem), // Use nickname if RP chat, add color/bold
-            new OOCTransformer(_chatSystem), // Format OOC Messages
-            new GlobalOOCTransformer(_chatSystem), // Format Global OOC Messages
+            new NameTransformer(_chatSystem), // Canonical name for logging; recipient phase reapplies preferences.
             new AutoCapitalizationTransformer(_chatSystem), // Add capitalization if needed
             new AutoPunctuationTransformer(_chatSystem), // Add punctuation if needed
             new AccentTransformer(_chatSystem), // Process accents
@@ -69,6 +67,9 @@ public class TransformerSystem
         // Initialize transformers for the recipient phase (content transformation for each recipient)
         _recipientPhaseTransformers = new List<MessageTransformerBase>
         {
+            new NameTransformer(_chatSystem), // Use nickname if RP chat, add recipient-specific color/bold
+            new OOCTransformer(_chatSystem), // Format OOC Messages with recipient-specific colors
+            new GlobalOOCTransformer(_chatSystem), // Format Global OOC Messages with recipient-specific colors
             new EmoteTransformer(_chatSystem, _languageSystem), // Format emotes correctly
             // Keep only transformers that need recipient-specific processing
             new LanguageTransformer(_languageSystem, _chatSystem),

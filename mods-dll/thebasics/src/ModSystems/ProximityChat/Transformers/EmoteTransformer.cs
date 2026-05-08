@@ -49,7 +49,7 @@ public class EmoteTransformer : MessageTransformerBase
                         needsNameSeparator = false;
                     }
 
-                    builder.Append(ChatHelper.Color(narrative, _config.EmoteColor));
+                    builder.Append(ChatHelper.Color(narrative, ChatVisualPreferenceResolver.GetEmoteColor(context.ReceivingPlayer, _config)));
                 }
             }
             else
@@ -75,11 +75,12 @@ public class EmoteTransformer : MessageTransformerBase
 
                 if (languageEnabled)
                 {
-                    text = ChatHelper.LangColor(text, language);
                     if (language == LanguageSystem.SignLanguage)
                     {
                         text = ChatHelper.Italic(text);
                     }
+
+                    text = ChatVisualPreferenceResolver.FormatLanguageText(text, language, context.ReceivingPlayer);
                 }
 
                 builder.Append(text);

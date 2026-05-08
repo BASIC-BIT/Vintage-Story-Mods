@@ -100,11 +100,11 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         return i < message.Length && message[i] == ':';
     }
 
-    private string BuildValidLanguageList(bool includeHidden)
+    private string BuildValidLanguageList(bool includeHidden, Vintagestory.API.Server.IServerPlayer recipient)
     {
         var languages = _languageSystem.GetAllLanguages(true, includeHidden: includeHidden)
             .Where(lang => includeHidden || !lang.Hidden)
-            .Select(ChatHelper.LangIdentifierWithDescription);
+            .Select(lang => ChatHelper.LangIdentifierWithDescription(lang, recipient));
 
         return "\n  " + string.Join("\n  ", languages);
     }
@@ -153,7 +153,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
             {
                 context.SendingPlayer.SendMessage(
                     _chatSystem.ProximityChatId,
-                    Lang.Get("thebasics:lang-error-invalid-with-list", languageIdentifier, BuildValidLanguageList(showHidden)),
+                    Lang.Get("thebasics:lang-error-invalid-with-list", languageIdentifier, BuildValidLanguageList(showHidden, context.SendingPlayer)),
                     EnumChatType.CommandError);
                 context.State = MessageContextState.STOP;
                 return context;
@@ -191,7 +191,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
             var showHidden = context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission);
             context.SendingPlayer.SendMessage(
                 _chatSystem.ProximityChatId,
-                Lang.Get("thebasics:lang-error-invalid-prefix-with-list", BuildValidLanguageList(showHidden)),
+                Lang.Get("thebasics:lang-error-invalid-prefix-with-list", BuildValidLanguageList(showHidden, context.SendingPlayer)),
                 EnumChatType.CommandError);
             context.State = MessageContextState.STOP;
             return context;
