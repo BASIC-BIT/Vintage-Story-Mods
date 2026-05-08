@@ -317,6 +317,14 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
+        if (message.SuppressDialogOpen)
+        {
+            _pendingCharacterSheetSave = false;
+            _pendingCharacterSheetOpenFromCharacterDialog = false;
+            RefreshCharacterDialogTitle();
+            return;
+        }
+
         if (message.IsSaveResponse || _pendingCharacterSheetSave)
         {
             _pendingCharacterSheetSave = false;

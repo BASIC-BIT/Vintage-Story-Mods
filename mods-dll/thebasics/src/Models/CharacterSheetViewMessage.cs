@@ -43,4 +43,7 @@ public class CharacterSheetViewMessage
 
     [ProtoMember(12)]
     public bool IsErrorResponse { get; set; }
+
+    [ProtoMember(13)]
+    public bool SuppressDialogOpen { get; set; }
 }

@@ -120,6 +120,7 @@ namespace thebasics.Configs
             ProseNicknameToken ??= "@";
             InitializeCharacterSheetDefaults();
             ReviewedConfigSettingKeys ??= new List<string>();
+            MaxRpCharacterSlots = MaxRpCharacterSlots <= 0 ? 3 : MaxRpCharacterSlots;
         }
 
         private void InitializeCharacterSheetDefaults()
@@ -601,5 +602,12 @@ namespace thebasics.Configs
         // Settings the server owner has acknowledged in the in-game config panel.
         [ProtoMember(100)]
         public IList<string> ReviewedConfigSettingKeys { get; set; }
+
+        // Enables identity-only RP character slots. Inventory, position, class, and skin remain shared.
+        [ProtoMember(101)]
+        public bool EnableRpCharacterSlots { get; set; } = false;
+
+        [ProtoMember(102)]
+        public int MaxRpCharacterSlots { get; set; } = 3;
     }
 }
