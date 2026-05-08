@@ -139,7 +139,8 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
                 _config,
                 languageEnabled,
                 text => ProcessProseQuotedText(context, text, bubbleLang, languageEnabled),
-                context.GetMetadata<string>(MessageContext.FORMATTED_NAME));
+                context.GetMetadata<string>(MessageContext.FORMATTED_NAME),
+                text => ChatVisualPreferenceResolver.FormatLanguageText(text, bubbleLang, context.ReceivingPlayer));
         }
 
         if (ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode))
@@ -165,7 +166,7 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         return ProximityChatPresentationModes.Normalize(_config.ProximityChatPresentationMode) == ProximityChatPresentationModes.Prose
             ? bubbleText
-            : ChatHelper.LangColor(bubbleText, bubbleLang);
+            : ChatVisualPreferenceResolver.FormatLanguageText(bubbleText, bubbleLang, context.ReceivingPlayer);
     }
 
     private static string BuildMarkers(MessageContext context)

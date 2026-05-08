@@ -200,7 +200,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         GrantLanguages(
             player,
             toGrant,
-            notify ? language => L(ClassGainKey, classCode, ChatHelper.LangIdentifier(language)) : null);
+            notify ? language => L(ClassGainKey, classCode, ChatHelper.LangIdentifier(language, player)) : null);
     }
 
     private void RemoveClassLanguages(IServerPlayer player, string classCode)
@@ -226,7 +226,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         RemoveLanguages(
             player,
             toRemove,
-            language => L(ClassLossKey, classCode, ChatHelper.LangIdentifier(language)));
+            language => L(ClassLossKey, classCode, ChatHelper.LangIdentifier(language, player)));
     }
 
     private void GrantTraitLanguages(IServerPlayer player, IEnumerable<string> traitCodes, bool notify)
@@ -240,7 +240,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         GrantLanguages(
             player,
             toGrant,
-            notify ? language => L(TraitGainKey, ChatHelper.LangIdentifier(language)) : null);
+            notify ? language => L(TraitGainKey, ChatHelper.LangIdentifier(language, player)) : null);
     }
 
     private void RemoveTraitLanguages(IServerPlayer player, IEnumerable<string> traitCodes)
@@ -263,7 +263,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         RemoveLanguages(
             player,
             toRemove,
-            language => L(TraitLossKey, ChatHelper.LangIdentifier(language)));
+            language => L(TraitLossKey, ChatHelper.LangIdentifier(language, player)));
     }
 
     private void GrantModelLanguages(IServerPlayer player, string modelCode, string modelGroup, bool notify)
@@ -280,7 +280,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         GrantLanguages(
             player,
             toGrant,
-            notify ? language => L(ModelGainKey, GetDescriptorForLanguage(language, modelCode, modelGroup, modelVariants, groupVariants), ChatHelper.LangIdentifier(language)) : null);
+            notify ? language => L(ModelGainKey, GetDescriptorForLanguage(language, modelCode, modelGroup, modelVariants, groupVariants), ChatHelper.LangIdentifier(language, player)) : null);
     }
 
     private void RemoveModelLanguages(IServerPlayer player, string modelCode, string modelGroup)
@@ -307,7 +307,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         RemoveLanguages(
             player,
             toRemove,
-            language => L(ModelLossKey, GetDescriptorForLanguage(language, modelCode, modelGroup, modelVariants, groupVariants), ChatHelper.LangIdentifier(language)));
+            language => L(ModelLossKey, GetDescriptorForLanguage(language, modelCode, modelGroup, modelVariants, groupVariants), ChatHelper.LangIdentifier(language, player)));
     }
 
     private void RegisterModelWatcher(IServerPlayer player)

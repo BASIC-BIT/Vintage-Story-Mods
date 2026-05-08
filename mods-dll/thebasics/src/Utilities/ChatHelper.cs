@@ -177,7 +177,8 @@ namespace thebasics.Utilities
             ModConfig config,
             bool languageEnabled,
             Func<string, string> processQuotedText = null,
-            string nicknameReplacement = null)
+            string nicknameReplacement = null,
+            Func<string, string> formatQuotedText = null)
         {
             if (string.IsNullOrEmpty(message))
             {
@@ -208,13 +209,16 @@ namespace thebasics.Utilities
 
                     text = WrapSpeechQuotes(text, language, config, canUseLanguage);
 
+                    if (canUseLanguage && language == LanguageSystem.SignLanguage)
+                    {
+                        text = Italic(text);
+                    }
+
                     if (canUseLanguage)
                     {
-                        text = LangColor(text, language);
-                        if (language == LanguageSystem.SignLanguage)
-                        {
-                            text = Italic(text);
-                        }
+                        text = formatQuotedText != null
+                            ? formatQuotedText(text)
+                            : LangColor(text, language);
                     }
 
                     builder.Append(text);
@@ -273,15 +277,28 @@ namespace thebasics.Utilities
             return VtmlUtils.EscapeVtml(input);
         }
 
-        public static string LangIdentifier(Language lang)
+        public static string LangIdentifier(Language lang, IServerPlayer recipient = null)
         {
             var hiddenMarker = lang.Hidden ? " [hidden]" : string.Empty;
-            return LangColor($"{lang.Name} (:{lang.Prefix}){hiddenMarker}", lang);
+            var text = $"{lang.Name} (:{lang.Prefix}){hiddenMarker}";
+            if (recipient == null)
+            {
+                return LangColor(text, lang);
+            }
+
+            if (recipient.GetChatLanguageLabelsEnabled())
+            {
+                text = $"[{EscapeMarkup(lang.Name)}] {text}";
+            }
+
+            return recipient.GetChatLanguageColorsEnabled()
+                ? Color(text, ChatVisualPreferenceResolver.GetLanguageColor(lang, recipient))
+                : text;
         }
 
-        public static string LangIdentifierWithDescription(Language lang)
+        public static string LangIdentifierWithDescription(Language lang, IServerPlayer recipient = null)
         {
-            var identifier = LangIdentifier(lang);
+            var identifier = LangIdentifier(lang, recipient);
             if (string.IsNullOrWhiteSpace(lang.Description))
             {
                 return identifier;

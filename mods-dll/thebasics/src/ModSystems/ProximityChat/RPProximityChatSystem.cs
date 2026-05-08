@@ -180,6 +180,21 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RequiresPlayer()
             .HandleWith(ChatterToggle);
 
+        API.ChatCommands.GetOrCreate("chatprefs")
+            .WithDescription(Lang.Get("thebasics:chat-cmd-chatprefs-desc"))
+            .WithArgs(new WordArgParser("setting", false), new WordArgParser("value", false), new WordArgParser("extra", false))
+            .RequiresPrivilege(Privilege.chat)
+            .RequiresPlayer()
+            .HandleWith(ChatPreferences);
+
+        API.ChatCommands.GetOrCreate("langcolor")
+            .WithAlias("languagecolor", "langcolors", "languagecolors")
+            .WithDescription(Lang.Get("thebasics:chat-cmd-langcolor-desc"))
+            .WithArgs(new BoolArgParser("mode", "on", false))
+            .RequiresPrivilege(Privilege.chat)
+            .RequiresPlayer()
+            .HandleWith(LanguageColorPreference);
+
         // Always register basic chat mode commands
         API.ChatCommands.GetOrCreate("yell")
             .WithAlias("y")
@@ -297,6 +312,253 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             Status = EnumCommandStatus.Success,
         };
+    }
+
+    private TextCommandResult LanguageColorPreference(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        var preferences = player.GetChatVisualPreferences();
+        if (args.Parsers[0].IsMissing)
+        {
+            return Success(Lang.Get("thebasics:chatprefs-langcolor-status", ChatHelper.OnOff(preferences.LanguageColorsEnabled)));
+        }
+
+        preferences.LanguageColorsEnabled = (bool)args.Parsers[0].GetValue();
+        player.SetChatVisualPreferences(preferences);
+        return Success(Lang.Get("thebasics:chatprefs-langcolor-set", ChatHelper.OnOff(preferences.LanguageColorsEnabled)));
+    }
+
+    private TextCommandResult ChatPreferences(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        var setting = GetOptionalWord(args, 0)?.ToLowerInvariant();
+        var value = GetOptionalWord(args, 1);
+        var extra = GetOptionalWord(args, 2);
+        var preferences = player.GetChatVisualPreferences();
+
+        if (string.IsNullOrWhiteSpace(setting) || setting == "status")
+        {
+            return Success(BuildChatPreferencesStatus(preferences));
+        }
+
+        if (setting == "help")
+        {
+            return Success(Lang.Get("thebasics:chatprefs-help"));
+        }
+
+        switch (setting)
+        {
+            case "languagecolors":
+            case "langcolors":
+                return SetBooleanPreference(player, preferences, value, pref => pref.LanguageColorsEnabled, (pref, enabled) => pref.LanguageColorsEnabled = enabled, "thebasics:chatprefs-langcolor-status", "thebasics:chatprefs-langcolor-set");
+            case "labels":
+            case "languagelabels":
+                return SetBooleanPreference(player, preferences, value, pref => pref.ShowLanguageLabels, (pref, enabled) => pref.ShowLanguageLabels = enabled, "thebasics:chatprefs-labels-status", "thebasics:chatprefs-labels-set");
+            case "nickcolors":
+            case "nicknamecolors":
+                return SetBooleanPreference(player, preferences, value, pref => pref.NicknameColorsEnabled, (pref, enabled) => pref.NicknameColorsEnabled = enabled, "thebasics:chatprefs-nickcolors-status", "thebasics:chatprefs-nickcolors-set");
+            case "preset":
+                return SetColorPreset(player, preferences, value);
+            case "langcolor":
+            case "languagecolor":
+                return SetLanguageColorOverride(player, preferences, value, extra);
+            case "ooccolor":
+                return SetColorOverride(player, preferences, value, pref => pref.OocColorOverride, (pref, color) => pref.OocColorOverride = color, "thebasics:chatprefs-ooccolor-status", "thebasics:chatprefs-ooccolor-set");
+            case "gooccolor":
+            case "globalooccolor":
+                if (!Config.EnableGlobalOOC)
+                {
+                    return Error(Lang.Get("thebasics:chatprefs-gooc-disabled"));
+                }
+
+                return SetColorOverride(player, preferences, value, pref => pref.GlobalOocColorOverride, (pref, color) => pref.GlobalOocColorOverride = color, "thebasics:chatprefs-gooccolor-status", "thebasics:chatprefs-gooccolor-set");
+            case "emotecolor":
+                return SetColorOverride(player, preferences, value, pref => pref.EmoteColorOverride, (pref, color) => pref.EmoteColorOverride = color, "thebasics:chatprefs-emotecolor-status", "thebasics:chatprefs-emotecolor-set");
+            case "reset":
+                player.ClearChatVisualPreferences();
+                return Success(Lang.Get("thebasics:chatprefs-reset"));
+            default:
+                return Error(Lang.Get("thebasics:chatprefs-usage"));
+        }
+    }
+
+    private static string GetOptionalWord(TextCommandCallingArgs args, int index)
+    {
+        return args.Parsers.Count > index && !args.Parsers[index].IsMissing
+            ? (string)args.Parsers[index].GetValue()
+            : null;
+    }
+
+    private string BuildChatPreferencesStatus(ChatVisualPreferences preferences)
+    {
+        return Lang.Get(
+            "thebasics:chatprefs-status",
+            ChatHelper.OnOff(preferences.LanguageColorsEnabled),
+            ChatHelper.OnOff(preferences.ShowLanguageLabels),
+            preferences.ColorPreset,
+            ChatHelper.OnOff(preferences.NicknameColorsEnabled));
+    }
+
+    private static string FormatColorSetting(string color)
+    {
+        return string.IsNullOrWhiteSpace(color) ? "default" : ChatHelper.Color(color, color);
+    }
+
+    private static TextCommandResult SetBooleanPreference(
+        IServerPlayer player,
+        ChatVisualPreferences preferences,
+        string value,
+        System.Func<ChatVisualPreferences, bool> getter,
+        System.Action<ChatVisualPreferences, bool> setter,
+        string statusKey,
+        string successKey)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Success(Lang.Get(statusKey, ChatHelper.OnOff(getter(preferences))));
+        }
+
+        if (!TryParseOnOff(value, out var enabled))
+        {
+            return Error(Lang.Get("thebasics:chatprefs-error-onoff"));
+        }
+
+        setter(preferences, enabled);
+        player.SetChatVisualPreferences(preferences);
+        return Success(Lang.Get(successKey, ChatHelper.OnOff(enabled)));
+    }
+
+    private static TextCommandResult SetColorPreset(IServerPlayer player, ChatVisualPreferences preferences, string preset)
+    {
+        if (string.IsNullOrWhiteSpace(preset))
+        {
+            return Success(Lang.Get("thebasics:chatprefs-preset-status", preferences.ColorPreset));
+        }
+
+        if (!ChatVisualPreferenceResolver.IsValidPreset(preset))
+        {
+            return Error(Lang.Get("thebasics:chatprefs-error-preset", GetPresetList()));
+        }
+
+        preferences.ColorPreset = ChatVisualPreferenceResolver.NormalizePreset(preset);
+        player.SetChatVisualPreferences(preferences);
+        return Success(Lang.Get("thebasics:chatprefs-preset-set", preferences.ColorPreset));
+    }
+
+    private TextCommandResult SetLanguageColorOverride(IServerPlayer player, ChatVisualPreferences preferences, string languageIdentifier, string colorValue)
+    {
+        if (string.IsNullOrWhiteSpace(languageIdentifier))
+        {
+            return Error(Lang.Get("thebasics:chatprefs-langcolor-usage"));
+        }
+
+        var language = LanguageSystem?.GetLangFromText(languageIdentifier, true, allowHidden: true);
+        if (language == null)
+        {
+            return Error(Lang.Get("thebasics:lang-error-invalid", languageIdentifier));
+        }
+
+        preferences.LanguageColorOverrides ??= new System.Collections.Generic.List<ColorOverrideEntry>();
+        if (string.IsNullOrWhiteSpace(colorValue))
+        {
+            return Success(Lang.Get("thebasics:chatprefs-langcolor-override-status", ChatHelper.LangIdentifier(language, player), FormatColorSetting(ChatVisualPreferenceResolver.GetLanguageColor(language, player))));
+        }
+
+        preferences.LanguageColorOverrides.RemoveAll(entry => string.Equals(entry?.Key, language.Name, StringComparison.OrdinalIgnoreCase) || string.Equals(entry?.Key, language.Prefix, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.Equals(colorValue, "default", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryNormalizeColor(colorValue, out var color))
+            {
+                return Error(Lang.Get("thebasics:chat-error-invalid-color"));
+            }
+
+            preferences.LanguageColorOverrides.Add(new ColorOverrideEntry { Key = language.Name, Color = color });
+        }
+
+        player.SetChatVisualPreferences(preferences);
+        return Success(Lang.Get("thebasics:chatprefs-langcolor-override-set", ChatHelper.LangIdentifier(language, player), FormatColorSetting(ChatVisualPreferenceResolver.GetLanguageColor(language, player))));
+    }
+
+    private static TextCommandResult SetColorOverride(
+        IServerPlayer player,
+        ChatVisualPreferences preferences,
+        string colorValue,
+        System.Func<ChatVisualPreferences, string> getter,
+        System.Action<ChatVisualPreferences, string> setter,
+        string statusKey,
+        string successKey)
+    {
+        if (string.IsNullOrWhiteSpace(colorValue))
+        {
+            return Success(Lang.Get(statusKey, FormatColorSetting(getter(preferences))));
+        }
+
+        string color = null;
+        if (!string.Equals(colorValue, "default", StringComparison.OrdinalIgnoreCase) && !TryNormalizeColor(colorValue, out color))
+        {
+            return Error(Lang.Get("thebasics:chat-error-invalid-color"));
+        }
+
+        setter(preferences, color);
+        player.SetChatVisualPreferences(preferences);
+        return Success(Lang.Get(successKey, FormatColorSetting(color)));
+    }
+
+    private static bool TryNormalizeColor(string colorValue, out string color)
+    {
+        color = null;
+        try
+        {
+            color = ColorToHex(ColorTranslator.FromHtml(colorValue));
+            return !string.IsNullOrWhiteSpace(color) && !color.Contains('<') && !color.Contains('>');
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryParseOnOff(string value, out bool enabled)
+    {
+        switch (value?.Trim().ToLowerInvariant())
+        {
+            case "on":
+            case "true":
+            case "yes":
+            case "1":
+                enabled = true;
+                return true;
+            case "off":
+            case "false":
+            case "no":
+            case "0":
+                enabled = false;
+                return true;
+            default:
+                enabled = false;
+                return false;
+        }
+    }
+
+    private static string GetPresetList()
+    {
+        return string.Join(", ", ChatVisualPreferencePresets.Default, ChatVisualPreferencePresets.HighContrast, ChatVisualPreferencePresets.ColorUniversal, ChatVisualPreferencePresets.Protanopia, ChatVisualPreferencePresets.Deuteranopia, ChatVisualPreferencePresets.Tritanopia, ChatVisualPreferencePresets.Monochrome);
+    }
+
+    private static string ColorToHex(Color color)
+    {
+        return $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+    }
+
+    private static TextCommandResult Success(string message)
+    {
+        return new TextCommandResult { Status = EnumCommandStatus.Success, StatusMessage = message };
+    }
+
+    private static TextCommandResult Error(string message)
+    {
+        return new TextCommandResult { Status = EnumCommandStatus.Error, StatusMessage = message };
     }
 
     private TextCommandResult SendOOCMessage(TextCommandCallingArgs args)
@@ -603,7 +865,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
 
         var newNicknameColor = (Color)args.Parsers[1].GetValue();
-        var newColorHex = ColorTranslator.ToHtml(newNicknameColor);
+        var newColorHex = ColorToHex(newNicknameColor);
         if (newColorHex.Contains('<') || newColorHex.Contains('>'))
         {
             return new TextCommandResult
@@ -646,7 +908,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
 
         var newColor = (Color)args.Parsers[0].GetValue();
-        var colorHex = ColorTranslator.ToHtml(newColor);
+        var colorHex = ColorToHex(newColor);
         if (colorHex.Contains('<') || colorHex.Contains('>'))
         {
             return new TextCommandResult

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using thebasics.Configs;
+using thebasics.Models;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
@@ -43,6 +44,10 @@ namespace thebasics.Extensions
 
         private const string ModDataLastSelectedGroupId = "BASIC_LAST_SELECTED_GROUP_ID";
         private const string ModDataChatterEnabled = "BASIC_CHATTER_ENABLED";
+        private const string ModDataChatVisualPreferences = "BASIC_CHAT_VISUAL_PREFERENCES";
+        private const string ModDataChatLanguageColorsEnabled = "BASIC_CHAT_LANGUAGE_COLORS_ENABLED";
+        private const string ModDataChatLanguageLabelsEnabled = "BASIC_CHAT_LANGUAGE_LABELS_ENABLED";
+        private const string ModDataChatNicknameColorsEnabled = "BASIC_CHAT_NICKNAME_COLORS_ENABLED";
 
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
         {
@@ -270,6 +275,54 @@ namespace thebasics.Extensions
         {
             return GetModData(player, ModDataRpTextEnabled, true);
         }
+
+        #region Chat Visual Preferences
+        public static ChatVisualPreferences GetChatVisualPreferences(this IServerPlayer player)
+        {
+            var preferences = GetModData(player, ModDataChatVisualPreferences, new ChatVisualPreferences());
+            preferences ??= new ChatVisualPreferences();
+            preferences.LanguageColorOverrides ??= new List<ColorOverrideEntry>();
+            preferences.ColorPreset = ChatVisualPreferenceResolver.NormalizePreset(preferences.ColorPreset);
+            preferences.LanguageColorsEnabled = player.GetChatLanguageColorsEnabled(preferences.LanguageColorsEnabled);
+            preferences.ShowLanguageLabels = player.GetChatLanguageLabelsEnabled(preferences.ShowLanguageLabels);
+            preferences.NicknameColorsEnabled = player.GetChatNicknameColorsEnabled(preferences.NicknameColorsEnabled);
+            return preferences;
+        }
+
+        public static bool GetChatLanguageColorsEnabled(this IServerPlayer player, bool defaultValue = true)
+        {
+            return GetModData(player, ModDataChatLanguageColorsEnabled, defaultValue);
+        }
+
+        public static bool GetChatLanguageLabelsEnabled(this IServerPlayer player, bool defaultValue = false)
+        {
+            return GetModData(player, ModDataChatLanguageLabelsEnabled, defaultValue);
+        }
+
+        public static bool GetChatNicknameColorsEnabled(this IServerPlayer player, bool defaultValue = true)
+        {
+            return GetModData(player, ModDataChatNicknameColorsEnabled, defaultValue);
+        }
+
+        public static void SetChatVisualPreferences(this IServerPlayer player, ChatVisualPreferences preferences)
+        {
+            preferences ??= new ChatVisualPreferences();
+            preferences.LanguageColorOverrides ??= new List<ColorOverrideEntry>();
+            preferences.ColorPreset = ChatVisualPreferenceResolver.NormalizePreset(preferences.ColorPreset);
+            SetModData(player, ModDataChatVisualPreferences, preferences);
+            SetModData(player, ModDataChatLanguageColorsEnabled, preferences.LanguageColorsEnabled);
+            SetModData(player, ModDataChatLanguageLabelsEnabled, preferences.ShowLanguageLabels);
+            SetModData(player, ModDataChatNicknameColorsEnabled, preferences.NicknameColorsEnabled);
+        }
+
+        public static void ClearChatVisualPreferences(this IServerPlayer player)
+        {
+            player.RemoveModdata(ModDataChatVisualPreferences);
+            player.RemoveModdata(ModDataChatLanguageColorsEnabled);
+            player.RemoveModdata(ModDataChatLanguageLabelsEnabled);
+            player.RemoveModdata(ModDataChatNicknameColorsEnabled);
+        }
+        #endregion
 
         #region Player Stats
         private static string GetPlayerStatID(PlayerStatType type)

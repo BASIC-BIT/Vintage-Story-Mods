@@ -54,7 +54,8 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
                 _config,
                 languageEnabled,
                 text => ProcessProseQuotedText(context, text, lang, languageEnabled),
-                nickname);
+                nickname,
+                text => ChatVisualPreferenceResolver.FormatLanguageText(text, lang, context.ReceivingPlayer));
 
             context.Message = ChatHelper.ApplyFreeformAttribution(context.Message, context.SendingPlayer, _config);
             if (hasDistanceFontSize)
@@ -79,7 +80,7 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         // Add Lang color
         if (languageEnabled)
         {
-            context.Message = ChatHelper.LangColor(context.Message, lang);
+            context.Message = ChatVisualPreferenceResolver.FormatLanguageText(context.Message, lang, context.ReceivingPlayer);
         }
 
         var verb = GetProximityChatVerb(lang, mode);
