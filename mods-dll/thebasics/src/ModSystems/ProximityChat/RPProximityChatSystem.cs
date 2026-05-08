@@ -405,6 +405,13 @@ public class RPProximityChatSystem : BaseBasicModSystem
             draft.ReviewedConfigSettingKeys = reviewed.OrderBy(key => key, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
+        errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(draft));
+        if (errors.Count > 0)
+        {
+            SendConfigAdminResult(player, false, string.Join("\n", errors), Array.Empty<string>());
+            return;
+        }
+
         var changedKeys = GetChangedConfigKeys(Config, draft);
         CopyConfigValues(draft, Config);
         SaveSharedConfig(API);

@@ -9,29 +9,31 @@ namespace thebasics.Tests.ModSystems.AdminConfig;
 public class ConfigAdminSettingRegistryTests
 {
     [Fact]
-    public void TrySetValue_RejectsRangeAtOrBelowObfuscationStart()
+    public void ValidateConfig_RejectsRangeAtOrBelowObfuscationStart()
     {
         var config = CreateConfig();
         var setting = GetSetting("ProximityChatModeDistances.Normal");
 
         var success = setting.TrySetValue(config, "15", out var error);
+        var errors = ConfigAdminSettingRegistry.ValidateConfig(config);
 
-        success.Should().BeFalse();
-        error.Should().Contain("Normal range must be greater than its obfuscation start");
-        config.ProximityChatModeDistances[ProximityChatMode.Normal].Should().Be(35);
+        success.Should().BeTrue(error);
+        errors.Should().ContainSingle().Which.Should().Contain("Normal range must be greater than its obfuscation start");
+        config.ProximityChatModeDistances[ProximityChatMode.Normal].Should().Be(15);
     }
 
     [Fact]
-    public void TrySetValue_RejectsObfuscationStartAtOrAboveRange()
+    public void ValidateConfig_RejectsObfuscationStartAtOrAboveRange()
     {
         var config = CreateConfig();
         var setting = GetSetting("ProximityChatModeObfuscationRanges.Normal");
 
         var success = setting.TrySetValue(config, "35", out var error);
+        var errors = ConfigAdminSettingRegistry.ValidateConfig(config);
 
-        success.Should().BeFalse();
-        error.Should().Contain("Normal obfuscation start must be less than its range");
-        config.ProximityChatModeObfuscationRanges[ProximityChatMode.Normal].Should().Be(15);
+        success.Should().BeTrue(error);
+        errors.Should().ContainSingle().Which.Should().Contain("Normal range must be greater than its obfuscation start");
+        config.ProximityChatModeObfuscationRanges[ProximityChatMode.Normal].Should().Be(35);
     }
 
     [Fact]
@@ -58,6 +60,35 @@ public class ConfigAdminSettingRegistryTests
         success.Should().BeFalse();
         error.Should().Contain("whole numbers from 1 to 128");
         config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 6);
+    }
+
+    [Fact]
+    public void TrySetValue_RejectsEmptyClampFontSizes()
+    {
+        var config = CreateConfig();
+        var setting = GetSetting("ProximityChatClampFontSizes");
+
+        var success = setting.TrySetValue(config, "", out var error);
+
+        success.Should().BeFalse();
+        error.Should().Contain("must contain at least one whole number");
+        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 6);
+    }
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("Infinity")]
+    [InlineData("-Infinity")]
+    public void TrySetValue_RejectsNonFiniteDecimalValues(string value)
+    {
+        var config = CreateConfig();
+        var setting = GetSetting("TpaCooldownInGameHours");
+
+        var success = setting.TrySetValue(config, value, out var error);
+
+        success.Should().BeFalse();
+        error.Should().Contain("must be a number from 0 to 720");
+        config.TpaCooldownInGameHours.Should().Be(0.5);
     }
 
     [Fact]
@@ -135,6 +166,21 @@ public class ConfigAdminSettingRegistryTests
         success.Should().BeFalse();
         error.Should().Contain("8 characters or fewer");
         config.ProximityChatModePunctuation[ProximityChatMode.Yell].Should().Be("!");
+    }
+
+    [Fact]
+    public void GetValue_UsesModeSpecificFallbacksForMissingLegacyEntries()
+    {
+        var config = CreateConfig();
+        config.ProximityChatModeDistances.Remove(ProximityChatMode.Yell);
+        config.ProximityChatModeVerbs.Remove(ProximityChatMode.Whisper);
+        config.RPTTS_ModeFalloff.Remove(ProximityChatMode.Whisper);
+        config.ChatterModeVolume.Remove(ProximityChatMode.Yell);
+
+        GetSetting("ProximityChatModeDistances.Yell").GetValue(config).Should().Be("90");
+        GetSetting("ProximityChatModeVerbs.Whisper").GetValue(config).Should().Be("whispers, mumbles, mutters");
+        GetSetting("RPTTS_ModeFalloff.Whisper").GetValue(config).Should().Be("5");
+        GetSetting("ChatterModeVolume.Yell").GetValue(config).Should().Be("1.4");
     }
 
     private static ModConfig CreateConfig()
