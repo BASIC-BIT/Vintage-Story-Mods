@@ -507,12 +507,37 @@ namespace thebasics.Extensions
 
         public static void SetChatterEnabled(this IServerPlayer player, bool enabled)
         {
-            SetModData(player, ModDataChatterEnabled, enabled);
+            player.SetModdata(ModDataChatterEnabled, new[] { enabled ? (byte)1 : (byte)0 });
         }
 
         public static bool GetChatterEnabled(this IServerPlayer player)
         {
-            return GetModData(player, ModDataChatterEnabled, true);
+            var data = player.GetModdata(ModDataChatterEnabled);
+            if (data == null)
+            {
+                return true;
+            }
+
+            // Legacy protobuf serialized bool false as an empty byte array.
+            if (data.Length == 0)
+            {
+                return false;
+            }
+
+            if (data.Length == 1 && data[0] <= 1)
+            {
+                return data[0] == 1;
+            }
+
+            try
+            {
+                return SerializerUtil.Deserialize(data, true);
+            }
+            catch
+            {
+                player.RemoveModdata(ModDataChatterEnabled);
+                return true;
+            }
         }
 
         public static double GetDistance(this IServerPlayer sendingPlayer, IServerPlayer receivingPlayer) =>

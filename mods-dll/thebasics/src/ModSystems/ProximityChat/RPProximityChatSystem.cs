@@ -718,6 +718,39 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _typingStatesByEntityId.Clear();
     }
 
+    private void ClearTypingIndicator(IServerPlayer player)
+    {
+        if (player?.Entity == null)
+        {
+            return;
+        }
+
+        var entityId = player.Entity.EntityId;
+        if (entityId == 0)
+        {
+            return;
+        }
+
+        if (!_typingStatesByEntityId.TryGetValue(entityId, out var state) || state == ChatTypingIndicatorState.None)
+        {
+            return;
+        }
+
+        _typingStatesByEntityId.Remove(entityId);
+
+        if (Config?.EnableTypingIndicator != true)
+        {
+            return;
+        }
+
+        _serverConfigChannel?.BroadcastPacket(new ChatTypingStateMessage
+        {
+            EntityId = entityId,
+            IsTyping = false,
+            State = ChatTypingIndicatorState.None
+        });
+    }
+
     internal void DispatchSpeechForContext(MessageContext context)
     {
         if (_serverConfigChannel == null || !context.HasFlag(MessageContext.IS_SPEECH))
@@ -907,35 +940,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     private void Event_PlayerDisconnect(IServerPlayer player)
     {
-        if (player?.Entity == null)
-        {
-            return;
-        }
-
-        var entityId = player.Entity.EntityId;
-        if (entityId == 0)
-        {
-            return;
-        }
-
-        if (!_typingStatesByEntityId.TryGetValue(entityId, out var state) || state == ChatTypingIndicatorState.None)
-        {
-            return;
-        }
-
-        _typingStatesByEntityId.Remove(entityId);
-
-        if (Config?.EnableTypingIndicator != true)
-        {
-            return;
-        }
-
-        _serverConfigChannel?.BroadcastPacket(new ChatTypingStateMessage
-        {
-            EntityId = entityId,
-            IsTyping = false,
-            State = ChatTypingIndicatorState.None
-        });
+        ClearTypingIndicator(player);
     }
 
     private void SetupProximityGroup()
@@ -1035,6 +1040,39 @@ public class RPProximityChatSystem : BaseBasicModSystem
         behavior.RenderRange = Config.NametagRenderRange;
 
         behavior.SetName(CharacterSheetSystem.BuildNametagDisplayName(player, Config));
+    }
+
+    internal void RefreshPlayerIdentityState(IServerPlayer player)
+    {
+        if (player?.Entity == null)
+        {
+            return;
+        }
+
+        ClearTypingIndicator(player);
+        SwapOutNameTag(player);
+        SendOwnCharacterSheetView(player);
+    }
+
+    private void SendOwnCharacterSheetView(IServerPlayer player)
+    {
+        if (_serverConfigChannel == null || Config?.EnableCharacterSheets != true)
+        {
+            return;
+        }
+
+        var sheetSystem = API.ModLoader.GetModSystem<CharacterSheetSystem>();
+        if (sheetSystem == null)
+        {
+            return;
+        }
+
+        var view = sheetSystem.BuildClientView(player, new CharacterSheetOpenRequest
+        {
+            Mode = CharacterSheetOpenRequest.ModeOwn
+        });
+        view.SuppressDialogOpen = true;
+        _serverConfigChannel.SendPacket(view, player);
     }
 
     private TextCommandResult SetNickname(TextCommandCallingArgs fullArgs)
