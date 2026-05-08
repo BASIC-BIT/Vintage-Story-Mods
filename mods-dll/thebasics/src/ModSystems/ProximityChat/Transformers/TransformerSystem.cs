@@ -126,8 +126,21 @@ public class TransformerSystem
     // TODO: Refactor common usage with ICSpeechFormatTransformer
     private void LogChatMessage(MessageContext context)
     {
+        var nickname = context.GetMetadata(MessageContext.FORMATTED_NAME, context.SendingPlayer?.PlayerName ?? "unknown");
+
+        if (context.HasFlag(MessageContext.IS_OOC))
+        {
+            _chatSystem.API.Logger.Chat($"(OOC) {nickname}: {context.Message}");
+            return;
+        }
+
+        if (context.HasFlag(MessageContext.IS_GLOBAL_OOC))
+        {
+            _chatSystem.API.Logger.Chat($"(GOOC) {nickname}: {context.Message}");
+            return;
+        }
+
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
-        var nickname = context.GetMetadata<string>(MessageContext.FORMATTED_NAME);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
         var presentationMode = ProximityChatPresentationModes.Normalize(_chatSystem.Config.ProximityChatPresentationMode);
 

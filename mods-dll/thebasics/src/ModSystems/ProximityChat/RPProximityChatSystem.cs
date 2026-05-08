@@ -332,20 +332,20 @@ public class RPProximityChatSystem : BaseBasicModSystem
         {
             case "languagecolors":
             case "langcolors":
-                return SetBooleanPreference(player, preferences, value, pref => pref.LanguageColorsEnabled, (pref, enabled) => pref.LanguageColorsEnabled = enabled, "thebasics:chatprefs-langcolor-set");
+                return SetBooleanPreference(player, preferences, value, pref => pref.LanguageColorsEnabled, (pref, enabled) => pref.LanguageColorsEnabled = enabled, "thebasics:chatprefs-langcolor-status", "thebasics:chatprefs-langcolor-set");
             case "labels":
             case "languagelabels":
-                return SetBooleanPreference(player, preferences, value, pref => pref.ShowLanguageLabels, (pref, enabled) => pref.ShowLanguageLabels = enabled, "thebasics:chatprefs-labels-set");
+                return SetBooleanPreference(player, preferences, value, pref => pref.ShowLanguageLabels, (pref, enabled) => pref.ShowLanguageLabels = enabled, "thebasics:chatprefs-labels-status", "thebasics:chatprefs-labels-set");
             case "nickcolors":
             case "nicknamecolors":
-                return SetBooleanPreference(player, preferences, value, pref => pref.NicknameColorsEnabled, (pref, enabled) => pref.NicknameColorsEnabled = enabled, "thebasics:chatprefs-nickcolors-set");
+                return SetBooleanPreference(player, preferences, value, pref => pref.NicknameColorsEnabled, (pref, enabled) => pref.NicknameColorsEnabled = enabled, "thebasics:chatprefs-nickcolors-status", "thebasics:chatprefs-nickcolors-set");
             case "preset":
                 return SetColorPreset(player, preferences, value);
             case "langcolor":
             case "languagecolor":
                 return SetLanguageColorOverride(player, preferences, value, extra);
             case "ooccolor":
-                return SetColorOverride(player, preferences, value, (pref, color) => pref.OocColorOverride = color, "thebasics:chatprefs-ooccolor-set");
+                return SetColorOverride(player, preferences, value, pref => pref.OocColorOverride, (pref, color) => pref.OocColorOverride = color, "thebasics:chatprefs-ooccolor-status", "thebasics:chatprefs-ooccolor-set");
             case "gooccolor":
             case "globalooccolor":
                 if (!Config.EnableGlobalOOC)
@@ -353,9 +353,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     return Error(Lang.Get("thebasics:chatprefs-gooc-disabled"));
                 }
 
-                return SetColorOverride(player, preferences, value, (pref, color) => pref.GlobalOocColorOverride = color, "thebasics:chatprefs-gooccolor-set");
+                return SetColorOverride(player, preferences, value, pref => pref.GlobalOocColorOverride, (pref, color) => pref.GlobalOocColorOverride = color, "thebasics:chatprefs-gooccolor-status", "thebasics:chatprefs-gooccolor-set");
             case "emotecolor":
-                return SetColorOverride(player, preferences, value, (pref, color) => pref.EmoteColorOverride = color, "thebasics:chatprefs-emotecolor-set");
+                return SetColorOverride(player, preferences, value, pref => pref.EmoteColorOverride, (pref, color) => pref.EmoteColorOverride = color, "thebasics:chatprefs-emotecolor-status", "thebasics:chatprefs-emotecolor-set");
             case "reset":
                 player.ClearChatVisualPreferences();
                 return Success(Lang.Get("thebasics:chatprefs-reset"));
@@ -392,11 +392,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
         string value,
         System.Func<ChatVisualPreferences, bool> getter,
         System.Action<ChatVisualPreferences, bool> setter,
+        string statusKey,
         string successKey)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return Success(Lang.Get(successKey, ChatHelper.OnOff(getter(preferences))));
+            return Success(Lang.Get(statusKey, ChatHelper.OnOff(getter(preferences))));
         }
 
         if (!TryParseOnOff(value, out var enabled))
@@ -413,7 +414,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         if (string.IsNullOrWhiteSpace(preset))
         {
-            return Success(Lang.Get("thebasics:chatprefs-preset-set", preferences.ColorPreset));
+            return Success(Lang.Get("thebasics:chatprefs-preset-status", preferences.ColorPreset));
         }
 
         if (!ChatVisualPreferenceResolver.IsValidPreset(preset))
@@ -428,7 +429,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
     private TextCommandResult SetLanguageColorOverride(IServerPlayer player, ChatVisualPreferences preferences, string languageIdentifier, string colorValue)
     {
-        if (string.IsNullOrWhiteSpace(languageIdentifier) || string.IsNullOrWhiteSpace(colorValue))
+        if (string.IsNullOrWhiteSpace(languageIdentifier))
         {
             return Error(Lang.Get("thebasics:chatprefs-langcolor-usage"));
         }
@@ -440,7 +441,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
 
         preferences.LanguageColorOverrides ??= new System.Collections.Generic.List<ColorOverrideEntry>();
-        preferences.LanguageColorOverrides.RemoveAll(entry => string.Equals(entry.Key, language.Name, StringComparison.OrdinalIgnoreCase) || string.Equals(entry.Key, language.Prefix, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(colorValue))
+        {
+            return Success(Lang.Get("thebasics:chatprefs-langcolor-override-status", ChatHelper.LangIdentifier(language, player), FormatColorSetting(ChatVisualPreferenceResolver.GetLanguageColor(language, player))));
+        }
+
+        preferences.LanguageColorOverrides.RemoveAll(entry => string.Equals(entry?.Key, language.Name, StringComparison.OrdinalIgnoreCase) || string.Equals(entry?.Key, language.Prefix, StringComparison.OrdinalIgnoreCase));
 
         if (!string.Equals(colorValue, "default", StringComparison.OrdinalIgnoreCase))
         {
@@ -456,11 +462,18 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:chatprefs-langcolor-override-set", ChatHelper.LangIdentifier(language, player), FormatColorSetting(ChatVisualPreferenceResolver.GetLanguageColor(language, player))));
     }
 
-    private static TextCommandResult SetColorOverride(IServerPlayer player, ChatVisualPreferences preferences, string colorValue, System.Action<ChatVisualPreferences, string> setter, string successKey)
+    private static TextCommandResult SetColorOverride(
+        IServerPlayer player,
+        ChatVisualPreferences preferences,
+        string colorValue,
+        System.Func<ChatVisualPreferences, string> getter,
+        System.Action<ChatVisualPreferences, string> setter,
+        string statusKey,
+        string successKey)
     {
         if (string.IsNullOrWhiteSpace(colorValue))
         {
-            return Error(Lang.Get("thebasics:chatprefs-color-usage"));
+            return Success(Lang.Get(statusKey, FormatColorSetting(getter(preferences))));
         }
 
         string color = null;

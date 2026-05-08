@@ -52,7 +52,23 @@ public static class ChatVisualPreferenceResolver
             return null;
         }
 
-        var preferences = recipient.GetChatVisualPreferences();
+        if (recipient == null)
+        {
+            return language.Color;
+        }
+
+        return GetLanguageColor(language, recipient.GetChatVisualPreferences());
+    }
+
+    public static string GetLanguageColor(Language language, ChatVisualPreferences preferences)
+    {
+        if (language == null)
+        {
+            return null;
+        }
+
+        preferences ??= new ChatVisualPreferences();
+        preferences.LanguageColorOverrides ??= [];
         var overrideColor = GetLanguageOverride(preferences, language);
         if (!string.IsNullOrWhiteSpace(overrideColor))
         {
@@ -80,7 +96,9 @@ public static class ChatVisualPreferenceResolver
             return message;
         }
 
-        if (recipient != null && recipient.GetChatLanguageLabelsEnabled())
+        var preferences = recipient?.GetChatVisualPreferences();
+
+        if (preferences?.ShowLanguageLabels == true)
         {
             message = $"[{ChatHelper.EscapeMarkup(language.Name)}] {message}";
         }
@@ -90,9 +108,9 @@ public static class ChatVisualPreferenceResolver
             return ChatHelper.Color(message, language.Color);
         }
 
-        if (recipient.GetChatLanguageColorsEnabled())
+        if (preferences.LanguageColorsEnabled)
         {
-            message = ChatHelper.Color(message, GetLanguageColor(language, recipient));
+            message = ChatHelper.Color(message, GetLanguageColor(language, preferences));
         }
 
         return message;
@@ -148,7 +166,7 @@ public static class ChatVisualPreferenceResolver
                 hash = hash * 31 + char.ToLowerInvariant(ch);
             }
 
-            return Math.Abs(hash) % count;
+            return (hash & 0x7FFFFFFF) % count;
         }
     }
 }
