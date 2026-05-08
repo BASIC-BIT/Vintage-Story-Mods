@@ -248,12 +248,6 @@ public class RpCharacterServiceTests
     }
 
     [Fact]
-    public void ModConfig_DefaultsFullCharacterSwitchingToOptIn()
-    {
-        new ModConfig().EnableRpCharacterFullSwitching.Should().BeFalse();
-    }
-
-    [Fact]
     public void InventoryParticipant_RestoresEmptyInventorySnapshotForNewRecords()
     {
         var record = new RpCharacterRecord
@@ -266,13 +260,11 @@ public class RpCharacterServiceTests
     }
 
     [Fact]
-    public void CreateCharacter_MarksEmptyInventoryAvailableWhenFullSwitchingIsEnabled()
+    public void CreateCharacter_MarksEmptyInventoryAvailableWhenInventoryParticipantIsRegistered()
     {
         var player = CreatePlayer();
         var config = CreateConfig();
-        config.EnableRpCharacterFullSwitching = true;
-        config.EnableRpCharacterInventorySwitching = true;
-        var service = new RpCharacterService(config);
+        var service = new RpCharacterService(config, participants: new[] { new RpCharacterInventoryParticipant() });
         service.EnsureRegistry(player);
 
         service.CreateCharacter(player, "Bob", maxCharacters: 3).Success.Should().BeTrue();

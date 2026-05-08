@@ -37,25 +37,13 @@ public class RpCharacterSystem : BaseBasicModSystem
             return;
         }
 
-        var participants = new List<IRpCharacterSwitchParticipant>();
-        if (Config.EnableRpCharacterFullSwitching)
+        var participants = new List<IRpCharacterSwitchParticipant>
         {
-            participants.Add(new RpCharacterSafetyParticipant(T));
-            if (Config.EnableRpCharacterAppearanceSwitching)
-            {
-                participants.Add(new RpCharacterAppearanceParticipant());
-            }
-
-            if (Config.EnableRpCharacterInventorySwitching)
-            {
-                participants.Add(new RpCharacterInventoryParticipant());
-            }
-
-            if (Config.EnableRpCharacterBodySwitching)
-            {
-                participants.Add(new RpCharacterBodyParticipant());
-            }
-        }
+            new RpCharacterSafetyParticipant(T),
+            new RpCharacterAppearanceParticipant(),
+            new RpCharacterInventoryParticipant(),
+            new RpCharacterBodyParticipant()
+        };
 
         participants.AddRange(_externalParticipants);
         _characters = new RpCharacterService(Config, T, participants);
