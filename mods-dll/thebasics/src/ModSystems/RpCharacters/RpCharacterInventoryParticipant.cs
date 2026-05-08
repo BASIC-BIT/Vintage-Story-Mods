@@ -9,6 +9,8 @@ namespace thebasics.ModSystems.RpCharacters;
 
 public class RpCharacterInventoryParticipant : IRpCharacterSwitchParticipant
 {
+    public const string ParticipantCode = "thebasics:inventory";
+
     private static readonly string[] ScopedInventoryClasses =
     {
         "hotbar",
@@ -16,7 +18,7 @@ public class RpCharacterInventoryParticipant : IRpCharacterSwitchParticipant
         "character"
     };
 
-    public string Code => "thebasics:inventory";
+    public string Code => ParticipantCode;
 
     public int Order => 200;
 
