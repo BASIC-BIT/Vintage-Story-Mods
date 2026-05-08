@@ -26,11 +26,11 @@ public class NameTransformer : MessageTransformerBase
             (context.HasFlag(MessageContext.IS_OOC) && _config.UseNicknameInOOC) ||
             (context.HasFlag(MessageContext.IS_GLOBAL_OOC) && _config.UseNicknameInGlobalOOC);
 
-        context.SetMetadata(MessageContext.FORMATTED_NAME, GetFormattedName(context.SendingPlayer, isIC, _config));
+        context.SetMetadata(MessageContext.FORMATTED_NAME, GetFormattedName(context.SendingPlayer, isIC, _config, context.ReceivingPlayer));
         return context;
     }
 
-    public string GetFormattedName(IServerPlayer player, bool isIC, ModConfig config)
+    public string GetFormattedName(IServerPlayer player, bool isIC, ModConfig config, IServerPlayer receivingPlayer = null)
     {
         string name = isIC ? GetRoleplayName(player, config) : player.PlayerName;
 
@@ -38,7 +38,8 @@ public class NameTransformer : MessageTransformerBase
         name = ChatHelper.EscapeMarkup(name);
 
         string color = player.GetNicknameColor();
-        bool applyColor = !string.IsNullOrEmpty(color) && (isIC ? config.ApplyColorsToNicknames : config.ApplyColorsToPlayerNames);
+        bool recipientAllowsNameColors = receivingPlayer?.GetChatVisualPreferences().NicknameColorsEnabled ?? true;
+        bool applyColor = recipientAllowsNameColors && !string.IsNullOrEmpty(color) && (isIC ? config.ApplyColorsToNicknames : config.ApplyColorsToPlayerNames);
 
         if (config.BoldNicknames)
         {

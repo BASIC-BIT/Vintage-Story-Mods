@@ -16,7 +16,8 @@ public class GlobalOOCTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
-        context.Message = ChatHelper.Color($"(GOOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}", _config.GlobalOOCColor);
+        var color = ChatVisualPreferenceResolver.GetGlobalOocColor(context.ReceivingPlayer, _config);
+        context.Message = ChatHelper.Color($"(GOOC) {context.GetMetadata<string>(MessageContext.FORMATTED_NAME)}: {context.Message}", color);
 
         return context;
     }
