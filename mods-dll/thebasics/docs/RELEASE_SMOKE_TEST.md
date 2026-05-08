@@ -191,8 +191,8 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 5. **Player Stats Display** (P1)
    - Config: `PlayerStatSystem=true`.
    - Do: Run `/playerstats` and `/pstats <player>`.
-    - Expect: Current tracked stats display without raw keys.
-    - Watch for: missing block-break/distance stats or formatting errors.
+   - Expect: Current tracked stats display without raw keys.
+   - Watch for: missing block-break/distance stats or formatting errors.
 
 6. **Admin Config Live Permission Refresh** (P1)
    - Config: admin/root client and a non-admin test client without a temporary test privilege.
@@ -200,13 +200,19 @@ Run this after the ModDB release is published. It verifies the player-facing ins
    - Expect: The permission change applies to existing command instances without restart and restores cleanly.
    - Watch for: commands remaining usable after privilege tightening, commands staying locked after restore, or restart-required warnings for permission-only changes.
 
-7. **Player Stats Clear Flow** (P1)
+7. **Admin Config Complex Row Validation** (P1)
+   - Config: admin/root client.
+   - Do: Open `/basic config`, change one flattened complex row such as `ProximityChatClampFontSizes`, a `ChatDelimiters.*` value, or a `PlayerStatToggles.*` value, save, close/reopen, then restore the original value.
+   - Expect: Valid edits persist and reload in the panel; invalid ranges or malformed comma-separated integers are rejected without changing the config.
+   - Watch for: save exceptions, partial writes after validation failure, unreadable field labels, or stale values after reopen.
+
+8. **Player Stats Clear Flow** (P1)
    - Config: admin permission available.
    - Do: Run `/clearstat <player> <statName>` without confirm, then with `confirm`.
    - Expect: Confirmation guard appears; confirmed clear resets only selected stat.
    - Watch for: accidental clear without confirm or wrong stat cleared.
 
-8. **Set Durability** (P2)
+9. **Set Durability** (P2)
    - Config: root/admin client.
    - Do: Hold a durability item and run `/setdurability 1` and `/setdurability 100%`, then test negative input, empty hand, and non-durability item.
    - Expect: Valid item updates; invalid cases produce readable errors.

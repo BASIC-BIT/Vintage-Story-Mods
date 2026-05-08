@@ -45,9 +45,9 @@ Admin commands:
 - `/basic config`, `/thebasics config`, `/tb config`
 - `/basic reloadconfig`, `/thebasics reloadconfig`, `/tb reloadconfig`
 
-Live-applied setting groups currently include chatter, typing indicators, nametag display/range, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, and debug mode. Restart-required settings include startup-shaped command registration, chat group setup, language system enablement, and player stats enablement.
+Live-applied setting groups currently include chatter, typing indicators, nametag display/range, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, per-mode proximity/chat/audio dictionaries, chat delimiters, player-stat toggles, and debug mode. Restart-required settings include startup-shaped command registration, chat group setup, language system enablement, and player stats enablement.
 
-The admin panel intentionally exposes scalar settings first. Complex collection settings such as language definitions, chat delimiters, per-mode distance/verb/audio dictionaries, and player-stat toggle dictionaries still require direct JSON editing or a future custom editor with stronger validation.
+The admin panel exposes fixed-shape complex settings as validated flattened rows. This covers per-mode distance, obfuscation, font-size, verb, punctuation, RPTTS, chatter dictionaries, chat delimiter start/end values, player-stat toggles, and comma-separated font-size clamps. Variable-length/nested collections such as `Languages` and `CharacterSheetFields` still require direct JSON editing or a future custom editor with stronger add/remove validation.
 
 ## RP Proximity Chat
 
@@ -351,7 +351,5 @@ Messages:
 
 ## Follow-Up Candidates
 
-- Add an in-game admin config panel for feature toggles and new-setting discovery.
-- Add a `/thebasics reloadconfig` command for live config reload where safe.
-- Add a server-admin "what's new" UI for newly introduced config keys that require an explicit choice.
+- Add custom nested editors for variable-length config collections such as `Languages` and `CharacterSheetFields`.
 - Investigate a targeted decompiled Vintage Story API diff between the previous supported version and the current version before major compatibility releases.

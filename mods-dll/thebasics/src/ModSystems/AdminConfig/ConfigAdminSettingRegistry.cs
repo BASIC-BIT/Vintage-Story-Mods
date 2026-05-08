@@ -4,11 +4,16 @@ using System.Globalization;
 using System.Linq;
 using thebasics.Configs;
 using thebasics.Models;
+using thebasics.ModSystems.PlayerStats.Definitions;
+using thebasics.ModSystems.PlayerStats.Models;
+using thebasics.ModSystems.ProximityChat.Models;
 
 namespace thebasics.ModSystems.AdminConfig;
 
 public static class ConfigAdminSettingRegistry
 {
+    private readonly record struct SettingMeta(string Key, string Group, string Label, string Description, ConfigAdminReloadBehavior ReloadBehavior);
+
     private static readonly IReadOnlyList<ConfigAdminSettingDefinition> _settings = BuildSettings();
     private static readonly IDictionary<string, ConfigAdminSettingDefinition> _settingsByKey =
         _settings.ToDictionary(setting => setting.Key, StringComparer.OrdinalIgnoreCase);
@@ -20,9 +25,37 @@ public static class ConfigAdminSettingRegistry
         return _settingsByKey.TryGetValue(key, out setting);
     }
 
+    public static IReadOnlyList<string> ValidateConfig(ModConfig config)
+    {
+        var errors = new List<string>();
+
+        foreach (var mode in EnumValues<ProximityChatMode>())
+        {
+            var range = GetModeValue(config.ProximityChatModeDistances, mode, DefaultDistance(mode));
+            var obfuscationStart = GetModeValue(config.ProximityChatModeObfuscationRanges, mode, DefaultObfuscationStart(mode));
+            if (range <= obfuscationStart)
+            {
+                errors.Add($"{mode} range must be greater than its obfuscation start.");
+            }
+        }
+
+        return errors;
+    }
+
     private static IReadOnlyList<ConfigAdminSettingDefinition> BuildSettings()
     {
-        return new List<ConfigAdminSettingDefinition>
+        var settings = new List<ConfigAdminSettingDefinition>();
+        AddScalarSettings(settings);
+        AddProximityModeSettings(settings);
+        AddAudioModeSettings(settings);
+        AddDelimiterSettings(settings);
+        AddPlayerStatToggleSettings(settings);
+        return settings;
+    }
+
+    private static void AddScalarSettings(List<ConfigAdminSettingDefinition> settings)
+    {
+        settings.AddRange(new[]
         {
             Bool("EnableChatter", "Chat/RP", "Enable chatter sounds", "Play seraph voice chatter for speech messages.", ConfigAdminReloadBehavior.Live, c => c.EnableChatter, (c, v) => c.EnableChatter = v),
             Select("ProximityChatPresentationMode", "Chat/RP", "Chat presentation mode", "Controls how proximity speech appears in chat.", ConfigAdminReloadBehavior.Live, (c => ProximityChatPresentationModes.Normalize(c.ProximityChatPresentationMode), (c, v) => c.ProximityChatPresentationMode = v), new[] { "StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose" }),
@@ -99,8 +132,252 @@ public static class ConfigAdminSettingRegistry
             Bool("ProximityChatAsDefault", "Restart Required", "Proximity chat as default", "Requires restart/rejoin for chat tab default behavior.", ConfigAdminReloadBehavior.RestartRequired, c => c.ProximityChatAsDefault, (c, v) => c.ProximityChatAsDefault = v),
             Bool("PreserveDefaultChatChoice", "Restart Required", "Preserve default chat choice", "Requires restart/rejoin for chat tab default behavior.", ConfigAdminReloadBehavior.RestartRequired, c => c.PreserveDefaultChatChoice, (c, v) => c.PreserveDefaultChatChoice = v),
             Bool("PreventProximityChannelSwitching", "Restart Required", "Prevent proximity tab switching", "Requires reconnect for existing clients.", ConfigAdminReloadBehavior.RestartRequired, c => c.PreventProximityChannelSwitching, (c, v) => c.PreventProximityChannelSwitching = v)
+        });
+    }
+
+    private static void AddProximityModeSettings(List<ConfigAdminSettingDefinition> settings)
+    {
+        foreach (var mode in EnumValues<ProximityChatMode>())
+        {
+            settings.Add(ModeInt(ModeMeta("ProximityChatModeDistances", "Chat/Ranges", mode, "range", "Maximum delivery range in blocks."), mode, c => c.ProximityChatModeDistances, DefaultDistance(mode), (1, 512)));
+            settings.Add(ModeInt(ModeMeta("ProximityChatModeObfuscationRanges", "Chat/Ranges", mode, "obfuscation start", "Distance where speech starts obfuscating."), mode, c => c.ProximityChatModeObfuscationRanges, DefaultObfuscationStart(mode), (0, 512)));
+            settings.Add(ModeInt(ModeMeta("ProximityChatDefaultFontSize", "Chat/Font Sizes", mode, "default font size", "Font size used near the speaker."), mode, c => c.ProximityChatDefaultFontSize, DefaultFontSize(mode), (1, 128)));
+            settings.Add(ModeText(ModeMeta("ProximityChatModePunctuation", "Chat/RP Text", mode, "punctuation", "Punctuation appended by auto-punctuation."), mode, c => c.ProximityChatModePunctuation, DefaultPunctuation(mode), maxLength: 8));
+            settings.Add(ModeTextArray(ModeMeta("ProximityChatModeVerbs", "Chat/RP Text", mode, "verbs", "Comma-separated speech verbs for this mode."), mode, c => c.ProximityChatModeVerbs, DefaultVerbs(mode)));
+        }
+
+        settings.Add(IntArray(new SettingMeta("ProximityChatClampFontSizes", "Chat/Font Sizes", "Clamp font sizes", "Comma-separated allowed distance font sizes.", ConfigAdminReloadBehavior.Live), c => c.ProximityChatClampFontSizes, (c, v) => c.ProximityChatClampFontSizes = v, (1, 128)));
+    }
+
+    private static void AddAudioModeSettings(List<ConfigAdminSettingDefinition> settings)
+    {
+        foreach (var mode in EnumValues<ProximityChatMode>())
+        {
+            settings.Add(ModeFloat(ModeMeta("RPTTS_ModeGain", "Chat/RPTTS Audio", mode, "RPTTS gain", "Speech audio gain for this mode."), mode, c => c.RPTTS_ModeGain, DefaultRpttsGain(mode), (0, 4)));
+            settings.Add(ModeFloat(ModeMeta("RPTTS_ModeFalloff", "Chat/RPTTS Audio", mode, "RPTTS falloff", "Speech audio falloff for this mode."), mode, c => c.RPTTS_ModeFalloff, DefaultRpttsFalloff(mode), (0.1, 10)));
+            settings.Add(ModeFloat(ModeMeta("ChatterModeVolume", "Chat/Chatter Audio", mode, "chatter volume", "Seraph chatter volume for this mode."), mode, c => c.ChatterModeVolume, DefaultChatterVolume(mode), (0, 4)));
+            settings.Add(ModeFloat(ModeMeta("ChatterModePitch", "Chat/Chatter Audio", mode, "chatter pitch", "Seraph chatter pitch for this mode."), mode, c => c.ChatterModePitch, DefaultChatterPitch(mode), (0.1, 4)));
+        }
+    }
+
+    private static void AddDelimiterSettings(List<ConfigAdminSettingDefinition> settings)
+    {
+        foreach (var delimiter in GetDelimiterDefinitions())
+        {
+            settings.Add(DelimiterText(delimiter.Key + ".Start", delimiter.Label + " start", "Opening delimiter text.", config => delimiter.Get(config.ChatDelimiters).Start, (config, value) => delimiter.Get(config.ChatDelimiters).Start = value, required: true));
+            settings.Add(DelimiterText(delimiter.Key + ".End", delimiter.Label + " end", "Closing delimiter text. May be empty for prefix-style delimiters.", config => delimiter.Get(config.ChatDelimiters).End, (config, value) => delimiter.Get(config.ChatDelimiters).End = value, required: false));
+        }
+    }
+
+    private static void AddPlayerStatToggleSettings(List<ConfigAdminSettingDefinition> settings)
+    {
+        foreach (var stat in EnumValues<PlayerStatType>())
+        {
+            var title = StatTypes.Types.TryGetValue(stat, out var definition) ? definition.Title : stat.ToString();
+            settings.Add(Bool($"PlayerStatToggles.{stat}", "Player Stats/Toggles", title, "Enable or disable tracking for this stat.", ConfigAdminReloadBehavior.Live,
+                c => GetModeValue(c.PlayerStatToggles, stat, true),
+                (c, v) => c.PlayerStatToggles[stat] = v));
+        }
+    }
+
+    private static SettingMeta ModeMeta(string keyPrefix, string group, ProximityChatMode mode, string labelSuffix, string description)
+    {
+        return new SettingMeta($"{keyPrefix}.{mode}", group, $"{mode} {labelSuffix}", description, ConfigAdminReloadBehavior.Live);
+    }
+
+    private static ConfigAdminSettingDefinition ModeInt(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, int>> get, int fallback, (int Min, int Max) range)
+    {
+        return Int(meta.Key, meta.Group, meta.Label, meta.Description, meta.ReloadBehavior,
+            (config => GetModeValue(get(config), mode, fallback), (config, value) => get(config)[mode] = value), range);
+    }
+
+    private static ConfigAdminSettingDefinition ModeFloat(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, float>> get, float fallback, (double Min, double Max) range)
+    {
+        return new ConfigAdminSettingDefinition(new ConfigAdminSettingDefinitionOptions
+        {
+            Key = meta.Key,
+            Group = meta.Group,
+            Label = meta.Label,
+            Description = meta.Description,
+            Kind = ConfigAdminSettingKind.Decimal,
+            ReloadBehavior = meta.ReloadBehavior,
+            GetValue = config => GetModeValue(get(config), mode, fallback).ToString("0.########", CultureInfo.InvariantCulture),
+            SetValue = (config, value) =>
+            {
+                if (!ConfigAdminSettingDefinition.TryParseDecimal(value, out var parsed) || parsed < range.Min || parsed > range.Max)
+                {
+                    return $"{meta.Key} must be a number from {range.Min.ToString(CultureInfo.InvariantCulture)} to {range.Max.ToString(CultureInfo.InvariantCulture)}.";
+                }
+
+                get(config)[mode] = (float)parsed;
+                return null;
+            }
+        });
+    }
+
+    private static ConfigAdminSettingDefinition ModeText(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, string>> get, string fallback, int maxLength)
+    {
+        return ValidatedText(meta,
+            config => GetModeValue(get(config), mode, fallback),
+            (config, value) => get(config)[mode] = value,
+            value => value.Length > maxLength ? $"{meta.Key} must be {maxLength} characters or fewer." : null);
+    }
+
+    private static ConfigAdminSettingDefinition ModeTextArray(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, string[]>> get, string[] fallback)
+    {
+        return ValidatedText(meta,
+            config => FormatStringArray(GetModeValue(get(config), mode, fallback)),
+            (config, value) => get(config)[mode] = ParseStringArray(value),
+            value => ParseStringArray(value).Length == 0 ? $"{meta.Key} must contain at least one value." : null);
+    }
+
+    private static ConfigAdminSettingDefinition IntArray(SettingMeta meta, Func<ModConfig, int[]> get, Action<ModConfig, int[]> set, (int Min, int Max) range)
+    {
+        return new ConfigAdminSettingDefinition(new ConfigAdminSettingDefinitionOptions
+        {
+            Key = meta.Key,
+            Group = meta.Group,
+            Label = meta.Label,
+            Description = meta.Description,
+            Kind = ConfigAdminSettingKind.Text,
+            ReloadBehavior = meta.ReloadBehavior,
+            GetValue = config => string.Join(", ", get(config) ?? Array.Empty<int>()),
+            SetValue = (config, value) =>
+            {
+                var error = ValidateIntArray(meta.Key, value, range, out var parsed);
+                if (error != null)
+                {
+                    return error;
+                }
+
+                set(config, parsed);
+                return null;
+            }
+        });
+    }
+
+    private static ConfigAdminSettingDefinition DelimiterText(string key, string label, string description, Func<ModConfig, string> get, Action<ModConfig, string> set, bool required)
+    {
+        return ValidatedText(new SettingMeta(key, "Chat/Delimiters", label, description, ConfigAdminReloadBehavior.Live), get, set,
+            value => required && string.IsNullOrEmpty(value) ? $"{key} cannot be empty." : null);
+    }
+
+    private static IReadOnlyList<(string Key, string Label, Func<ChatDelimiters, ChatDelimiter> Get)> GetDelimiterDefinitions()
+    {
+        return new List<(string, string, Func<ChatDelimiters, ChatDelimiter>)>
+        {
+            ("ChatDelimiters.Bold", "Bold", delimiters => delimiters.Bold),
+            ("ChatDelimiters.Italic", "Italic", delimiters => delimiters.Italic),
+            ("ChatDelimiters.Emote", "Emote", delimiters => delimiters.Emote),
+            ("ChatDelimiters.Environmental", "Environmental", delimiters => delimiters.Environmental),
+            ("ChatDelimiters.PlacedEnvironmental", "Placed environmental", delimiters => delimiters.PlacedEnvironmental),
+            ("ChatDelimiters.OOC", "Local OOC", delimiters => delimiters.OOC),
+            ("ChatDelimiters.GlobalOOC", "Global OOC", delimiters => delimiters.GlobalOOC),
+            ("ChatDelimiters.Quote", "Quote", delimiters => delimiters.Quote),
+            ("ChatDelimiters.SignLanguageQuote", "Sign language quote", delimiters => delimiters.SignLanguageQuote)
         };
     }
+
+    private static TValue GetModeValue<TKey, TValue>(IDictionary<TKey, TValue> dictionary, TKey key, TValue fallback)
+    {
+        return dictionary != null && dictionary.TryGetValue(key, out var value) ? value : fallback;
+    }
+
+    private static string FormatStringArray(IEnumerable<string> values)
+    {
+        return string.Join(", ", values ?? Array.Empty<string>());
+    }
+
+    private static string[] ParseStringArray(string value)
+    {
+        return (value ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .ToArray();
+    }
+
+    private static string ValidateIntArray(string key, string value, (int Min, int Max) range, out int[] parsedValues)
+    {
+        var parsed = new List<int>();
+        var parts = (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            parsedValues = Array.Empty<int>();
+            return $"{key} must contain at least one whole number.";
+        }
+
+        foreach (var part in parts)
+        {
+            if (!int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var item) || item < range.Min || item > range.Max)
+            {
+                parsedValues = Array.Empty<int>();
+                return $"{key} must contain whole numbers from {range.Min} to {range.Max}, separated by commas.";
+            }
+
+            parsed.Add(item);
+        }
+
+        parsedValues = parsed.ToArray();
+        return null;
+    }
+
+    private static int DefaultDistance(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 90,
+        ProximityChatMode.Whisper => 5,
+        _ => 35
+    };
+
+    private static int DefaultObfuscationStart(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 45,
+        ProximityChatMode.Whisper => 2,
+        _ => 15
+    };
+
+    private static int DefaultFontSize(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 30,
+        ProximityChatMode.Whisper => 12,
+        _ => 16
+    };
+
+    private static string[] DefaultVerbs(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => new[] { "yells", "shouts", "exclaims" },
+        ProximityChatMode.Whisper => new[] { "whispers", "mumbles", "mutters" },
+        _ => new[] { "says", "states", "mentions" }
+    };
+
+    private static string DefaultPunctuation(ProximityChatMode mode) => mode == ProximityChatMode.Yell ? "!" : ".";
+
+    private static float DefaultRpttsGain(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 1.7f,
+        ProximityChatMode.Whisper => 0.65f,
+        _ => 1f
+    };
+
+    private static float DefaultRpttsFalloff(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Whisper => 5f,
+        ProximityChatMode.Normal => 1.5f,
+        _ => 1f
+    };
+
+    private static float DefaultChatterVolume(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 1.4f,
+        ProximityChatMode.Whisper => 0.4f,
+        _ => 0.8f
+    };
+
+    private static float DefaultChatterPitch(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 1.1f,
+        ProximityChatMode.Whisper => 0.95f,
+        _ => 1f
+    };
 
     private static ConfigAdminSettingDefinition Bool(string key, string group, string label, string description, ConfigAdminReloadBehavior reloadBehavior, Func<ModConfig, bool> get, Action<ModConfig, bool> set)
     {
@@ -187,7 +464,34 @@ public static class ConfigAdminSettingRegistry
             GetValue = config => get(config) ?? string.Empty,
             SetValue = (config, value) =>
             {
-                set(config, value ?? string.Empty);
+                var normalizedValue = value ?? string.Empty;
+                set(config, normalizedValue);
+                return null;
+            }
+        });
+    }
+
+    private static ConfigAdminSettingDefinition ValidatedText(SettingMeta meta, Func<ModConfig, string> get, Action<ModConfig, string> set, Func<string, string> validate)
+    {
+        return new ConfigAdminSettingDefinition(new ConfigAdminSettingDefinitionOptions
+        {
+            Key = meta.Key,
+            Group = meta.Group,
+            Label = meta.Label,
+            Description = meta.Description,
+            Kind = ConfigAdminSettingKind.Text,
+            ReloadBehavior = meta.ReloadBehavior,
+            GetValue = config => get(config) ?? string.Empty,
+            SetValue = (config, value) =>
+            {
+                var normalizedValue = value ?? string.Empty;
+                var error = validate(normalizedValue);
+                if (error != null)
+                {
+                    return error;
+                }
+
+                set(config, normalizedValue);
                 return null;
             }
         });
@@ -223,5 +527,10 @@ public static class ConfigAdminSettingRegistry
     private static string[] EnumNames<TEnum>() where TEnum : struct, Enum
     {
         return Enum.GetNames<TEnum>();
+    }
+
+    private static TEnum[] EnumValues<TEnum>() where TEnum : struct, Enum
+    {
+        return Enum.GetValues<TEnum>();
     }
 }

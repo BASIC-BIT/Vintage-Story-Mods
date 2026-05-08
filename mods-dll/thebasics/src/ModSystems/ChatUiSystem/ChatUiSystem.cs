@@ -502,7 +502,7 @@ public class ChatUiSystem : ModSystem
 
         _configAdminDialog?.TryClose();
         _configAdminDialog = new GuiJsonDialog(BuildConfigAdminDialogSettings(), _api, focusFirstElement: false);
-        _configAdminDialog.TryOpen();
+        _configAdminDialog.TryOpen(withFocus: false);
     }
 
     private static JsonDialogSettings BuildConfigAdminDialogSettings()

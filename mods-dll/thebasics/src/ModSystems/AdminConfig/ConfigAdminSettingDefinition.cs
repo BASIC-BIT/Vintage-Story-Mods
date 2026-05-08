@@ -73,7 +73,9 @@ public sealed class ConfigAdminSettingDefinition
 
     public static bool TryParseDecimal(string value, out double parsed)
     {
-        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed);
+        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed)
+               && !double.IsNaN(parsed)
+               && !double.IsInfinity(parsed);
     }
 }
 
