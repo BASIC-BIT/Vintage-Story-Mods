@@ -78,11 +78,17 @@ public static class LanguageConfigAdmin
             var traitGrants = ParseArray(entry.GrantedToTraits);
             var label = string.IsNullOrWhiteSpace(name) ? $"row {rowNumber}" : $"language '{name}'";
 
+            var rowErrorCount = errors.Count;
             ValidateName(errors, names, rowNumber, name, label);
             ValidateDescription(errors, description, label);
             ValidatePrefix(errors, prefixes, prefix, label);
             ValidateColor(errors, color, label);
             ValidateSyllables(errors, syllables, label);
+
+            if (errors.Count != rowErrorCount)
+            {
+                continue;
+            }
 
             languages.Add(new Language(
                 name,
@@ -135,6 +141,12 @@ public static class LanguageConfigAdmin
         if (string.IsNullOrWhiteSpace(description))
         {
             errors.Add($"{label} must have a description.");
+            return;
+        }
+
+        if (ContainsVtmlControlCharacters(description))
+        {
+            errors.Add($"{label} description cannot contain '<' or '>'.");
         }
     }
 

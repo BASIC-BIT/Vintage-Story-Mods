@@ -481,17 +481,33 @@ public class ChatUiSystem : ModSystem
 
     private static void OnLanguageConfigOpenMessage(TheBasicsLanguageConfigOpenMessage message)
     {
-        OpenLanguageConfigDialog(message?.Languages, message?.Message, message?.Success != false);
+        if (message?.Success == false)
+        {
+            ShowLanguageConfigChatMessage(message.Message);
+            _returnToConfigAdminAfterLanguageDialog = false;
+            return;
+        }
+
+        OpenLanguageConfigDialog(message?.Languages, message?.Message, true);
     }
 
     private static void OnLanguageConfigResultMessage(TheBasicsLanguageConfigResultMessage message)
     {
-        if (!string.IsNullOrWhiteSpace(message?.Message))
+        if (_languageConfigDialog == null)
         {
-            _api.ShowChatMessage(message.Message);
+            ShowLanguageConfigChatMessage(message?.Message);
+            return;
         }
 
         OpenLanguageConfigDialog(message?.Languages, message?.Message, message?.Success == true);
+    }
+
+    private static void ShowLanguageConfigChatMessage(string message)
+    {
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            _api?.ShowChatMessage(message);
+        }
     }
 
     private static void OpenLanguageConfigDialog(IEnumerable<LanguageConfigEntryMessage> languages, string message, bool success)
@@ -1431,6 +1447,7 @@ public class ChatUiSystem : ModSystem
             _pendingConfigActions.Clear();
             _safeNetworkChannel?.Dispose();
             _safeNetworkChannel = null;
+            _returnToConfigAdminAfterLanguageDialog = false;
             _languageConfigDialog?.TryClose();
             _languageConfigDialog = null;
             _configAdminDialog?.TryClose();
@@ -1439,7 +1456,6 @@ public class ChatUiSystem : ModSystem
             _configAdminReviewedKeys.Clear();
             _configAdminSelectedGroup = null;
             _configAdminStatusMessage = null;
-            _returnToConfigAdminAfterLanguageDialog = false;
 
             // Clear static typing indicator state to prevent stale data on reconnect/world reload.
             _typingStatesByEntityId.Clear();

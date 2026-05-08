@@ -109,6 +109,29 @@ public class LanguageConfigAdminTests
     }
 
     [Fact]
+    public void TryApplyEntries_RejectsDescriptionVtmlControlCharacters()
+    {
+        var config = CreateConfig();
+        var entries = new List<LanguageConfigEntryMessage> { ValidEntry() with { Description = "<bad>" } };
+
+        var success = LanguageConfigAdmin.TryApplyEntries(config, entries, out var errors);
+
+        success.Should().BeFalse();
+        errors.Should().Contain(error => error.Contains("description") && error.Contains("cannot contain"));
+    }
+
+    [Fact]
+    public void ValidateEntries_DoesNotReturnInvalidLanguages()
+    {
+        var entries = new List<LanguageConfigEntryMessage> { ValidEntry() with { Name = "" } };
+
+        var errors = LanguageConfigAdmin.ValidateEntries(entries, out var languages);
+
+        errors.Should().NotBeEmpty();
+        languages.Should().BeEmpty();
+    }
+
+    [Fact]
     public void TryApplyEntries_NormalizesCommaSeparatedGrantArrays()
     {
         var config = CreateConfig();
