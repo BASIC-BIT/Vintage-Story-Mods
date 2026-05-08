@@ -578,6 +578,27 @@ public class ChatUiSystem : ModSystem
             })
         };
 
+        AddConfigAdminStatusRow(rows);
+        AddConfigAdminGroupSelectorRow(rows);
+        AddConfigAdminLanguageShortcutRow(rows);
+        AddConfigAdminSettingRows(rows);
+        AddConfigAdminActionRows(rows);
+
+        return new JsonDialogSettings
+        {
+            Code = "thebasics-config-admin",
+            Alignment = EnumDialogArea.CenterMiddle,
+            Rows = rows.ToArray(),
+            SizeMultiplier = 0.9,
+            Padding = 16,
+            DisableWorldInteract = true,
+            OnGet = GetConfigAdminValue,
+            OnSet = SetConfigAdminValue
+        };
+    }
+
+    private static void AddConfigAdminStatusRow(List<DialogRow> rows)
+    {
         if (!string.IsNullOrWhiteSpace(_configAdminStatusMessage))
         {
             rows.Add(new DialogRow(new DialogElement
@@ -590,7 +611,10 @@ public class ChatUiSystem : ModSystem
                 FontSize = 13
             }));
         }
+    }
 
+    private static void AddConfigAdminGroupSelectorRow(List<DialogRow> rows)
+    {
         var groups = GetConfigAdminGroups();
         _configAdminSelectedGroup = NormalizeConfigAdminGroup(_configAdminSelectedGroup, groups);
         rows.Add(new DialogRow(new DialogElement
@@ -609,14 +633,20 @@ public class ChatUiSystem : ModSystem
             TopPadding = 8,
             BottomPadding = 6
         });
+    }
 
+    private static void AddConfigAdminLanguageShortcutRow(List<DialogRow> rows)
+    {
         rows.Add(new DialogRow(
             CreateButton("languages", Lang.Get("thebasics:config-admin-languages"), Lang.Get("thebasics:config-admin-languages-tooltip")))
         {
             TopPadding = 4,
             BottomPadding = 8
         });
+    }
 
+    private static void AddConfigAdminSettingRows(List<DialogRow> rows)
+    {
         foreach (var group in ConfigAdminSettingRegistry.Settings.Where(setting => string.Equals(setting.Group, _configAdminSelectedGroup, StringComparison.OrdinalIgnoreCase)).GroupBy(setting => setting.Group))
         {
             rows.Add(new DialogRow(new DialogElement
@@ -641,7 +671,10 @@ public class ChatUiSystem : ModSystem
                 });
             }
         }
+    }
 
+    private static void AddConfigAdminActionRows(List<DialogRow> rows)
+    {
         rows.Add(new DialogRow(
             CreateButton("save", Lang.Get("thebasics:config-admin-save"), Lang.Get("thebasics:config-admin-save-tooltip")),
             CreateButton("mark-reviewed", Lang.Get("thebasics:config-admin-mark-reviewed"), Lang.Get("thebasics:config-admin-mark-reviewed-tooltip")),
@@ -655,18 +688,6 @@ public class ChatUiSystem : ModSystem
         {
             TopPadding = 4
         });
-
-        return new JsonDialogSettings
-        {
-            Code = "thebasics-config-admin",
-            Alignment = EnumDialogArea.CenterMiddle,
-            Rows = rows.ToArray(),
-            SizeMultiplier = 0.9,
-            Padding = 16,
-            DisableWorldInteract = true,
-            OnGet = GetConfigAdminValue,
-            OnSet = SetConfigAdminValue
-        };
     }
 
     private static List<string> GetConfigAdminGroups()

@@ -78,68 +78,11 @@ public static class LanguageConfigAdmin
             var traitGrants = ParseArray(entry.GrantedToTraits);
             var label = string.IsNullOrWhiteSpace(name) ? $"row {rowNumber}" : $"language '{name}'";
 
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                errors.Add($"Language row {rowNumber} must have a name.");
-            }
-            else
-            {
-                if (ContainsVtmlControlCharacters(name))
-                {
-                    errors.Add($"{label} name cannot contain '<' or '>'.");
-                }
-
-                if (ReservedNames.Contains(name, StringComparer.OrdinalIgnoreCase))
-                {
-                    errors.Add($"{label} uses a reserved language name.");
-                }
-
-                if (!names.Add(name))
-                {
-                    errors.Add($"Language name '{name}' is duplicated.");
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(description))
-            {
-                errors.Add($"{label} must have a description.");
-            }
-
-            if (string.IsNullOrWhiteSpace(prefix))
-            {
-                errors.Add($"{label} must have a prefix.");
-            }
-            else
-            {
-                if (!PrefixPattern.IsMatch(prefix))
-                {
-                    errors.Add($"{label} prefix may only contain letters, numbers, and underscore.");
-                }
-
-                if (ReservedPrefixes.Contains(prefix, StringComparer.OrdinalIgnoreCase))
-                {
-                    errors.Add($"{label} uses a reserved language prefix.");
-                }
-
-                if (!prefixes.Add(prefix))
-                {
-                    errors.Add($"Language prefix '{prefix}' is duplicated.");
-                }
-            }
-
-            if (!HexColorPattern.IsMatch(color))
-            {
-                errors.Add($"{label} color must be a hex color like #E9DDCE.");
-            }
-
-            if (syllables.Length == 0)
-            {
-                errors.Add($"{label} must have at least one syllable.");
-            }
-            else if (syllables.Any(ContainsVtmlControlCharacters))
-            {
-                errors.Add($"{label} syllables cannot contain '<' or '>'.");
-            }
+            ValidateName(errors, names, rowNumber, name, label);
+            ValidateDescription(errors, description, label);
+            ValidatePrefix(errors, prefixes, prefix, label);
+            ValidateColor(errors, color, label);
+            ValidateSyllables(errors, syllables, label);
 
             languages.Add(new Language(
                 name,
@@ -161,6 +104,82 @@ public static class LanguageConfigAdmin
         }
 
         return errors;
+    }
+
+    private static void ValidateName(List<string> errors, HashSet<string> names, int rowNumber, string name, string label)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            errors.Add($"Language row {rowNumber} must have a name.");
+            return;
+        }
+
+        if (ContainsVtmlControlCharacters(name))
+        {
+            errors.Add($"{label} name cannot contain '<' or '>'.");
+        }
+
+        if (ReservedNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+        {
+            errors.Add($"{label} uses a reserved language name.");
+        }
+
+        if (!names.Add(name))
+        {
+            errors.Add($"Language name '{name}' is duplicated.");
+        }
+    }
+
+    private static void ValidateDescription(List<string> errors, string description, string label)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            errors.Add($"{label} must have a description.");
+        }
+    }
+
+    private static void ValidatePrefix(List<string> errors, HashSet<string> prefixes, string prefix, string label)
+    {
+        if (string.IsNullOrWhiteSpace(prefix))
+        {
+            errors.Add($"{label} must have a prefix.");
+            return;
+        }
+
+        if (!PrefixPattern.IsMatch(prefix))
+        {
+            errors.Add($"{label} prefix may only contain letters, numbers, and underscore.");
+        }
+
+        if (ReservedPrefixes.Contains(prefix, StringComparer.OrdinalIgnoreCase))
+        {
+            errors.Add($"{label} uses a reserved language prefix.");
+        }
+
+        if (!prefixes.Add(prefix))
+        {
+            errors.Add($"Language prefix '{prefix}' is duplicated.");
+        }
+    }
+
+    private static void ValidateColor(List<string> errors, string color, string label)
+    {
+        if (!HexColorPattern.IsMatch(color))
+        {
+            errors.Add($"{label} color must be a hex color like #E9DDCE.");
+        }
+    }
+
+    private static void ValidateSyllables(List<string> errors, string[] syllables, string label)
+    {
+        if (syllables.Length == 0)
+        {
+            errors.Add($"{label} must have at least one syllable.");
+        }
+        else if (syllables.Any(ContainsVtmlControlCharacters))
+        {
+            errors.Add($"{label} syllables cannot contain '<' or '>'.");
+        }
     }
 
     public static IReadOnlyDictionary<string, string> BuildRenameMap(IEnumerable<LanguageConfigEntryMessage> entries)
