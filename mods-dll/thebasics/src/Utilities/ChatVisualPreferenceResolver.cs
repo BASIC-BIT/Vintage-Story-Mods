@@ -75,14 +75,19 @@ public static class ChatVisualPreferenceResolver
 
     public static string FormatLanguageText(string message, Language language, IServerPlayer recipient)
     {
-        if (string.IsNullOrEmpty(message) || language == null || recipient == null)
+        if (string.IsNullOrEmpty(message) || language == null)
         {
             return message;
         }
 
-        if (recipient.GetChatLanguageLabelsEnabled())
+        if (recipient != null && recipient.GetChatLanguageLabelsEnabled())
         {
             message = $"[{ChatHelper.EscapeMarkup(language.Name)}] {message}";
+        }
+
+        if (recipient == null)
+        {
+            return ChatHelper.Color(message, language.Color);
         }
 
         if (recipient.GetChatLanguageColorsEnabled())

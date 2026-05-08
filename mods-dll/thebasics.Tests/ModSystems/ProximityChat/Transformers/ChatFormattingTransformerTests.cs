@@ -145,6 +145,7 @@ public class ChatFormattingTransformerTests
         var context = CreateSpeechContext("walks over \"hello there!\"");
         context.SendingPlayer.Entity.Returns(CreateEntityPlayer(1, x: 0));
         context.ReceivingPlayer = Substitute.For<IServerPlayer>();
+        context.ReceivingPlayer.GetModdata(Arg.Any<string>()).Returns((byte[])null!);
         context.ReceivingPlayer.Entity.Returns(CreateEntityPlayer(2, x: 10));
         context.SetMetadata(MessageContext.FORMATTED_NAME, "Alice");
         context.SetMetadata(MessageContext.LANGUAGE, config.Languages[0]);
