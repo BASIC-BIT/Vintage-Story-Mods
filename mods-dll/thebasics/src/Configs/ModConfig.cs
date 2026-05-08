@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using ProtoBuf;
 using thebasics.Configs;
 using thebasics.Models;
+using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 
@@ -117,6 +118,107 @@ namespace thebasics.Configs
             ProximityChatPresentationMode = ProximityChatPresentationModes.Normalize(ProximityChatPresentationMode);
             OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
             ProseNicknameToken ??= "@";
+            InitializeCharacterSheetDefaults();
+            ReviewedConfigSettingKeys ??= new List<string>();
+            MaxRpCharacterSlots = MaxRpCharacterSlots <= 0 ? 3 : MaxRpCharacterSlots;
+        }
+
+        private void InitializeCharacterSheetDefaults()
+        {
+            CharacterSheetSetPermission = string.IsNullOrWhiteSpace(CharacterSheetSetPermission) ? "chat" : CharacterSheetSetPermission;
+            CharacterSheetAdminPermission = string.IsNullOrWhiteSpace(CharacterSheetAdminPermission) ? "commandplayer" : CharacterSheetAdminPermission;
+            CharacterSheetFields ??= CreateDefaultCharacterSheetFields();
+
+            foreach (var field in CharacterSheetFields)
+            {
+                NormalizeCharacterSheetField(field);
+            }
+        }
+
+        private static void NormalizeCharacterSheetField(CharacterSheetFieldDefinition field)
+        {
+            field.Id ??= string.Empty;
+            field.Label ??= field.Id;
+            field.Type = string.IsNullOrWhiteSpace(field.Type) ? CharacterSheetFieldTypes.String : field.Type.ToLowerInvariant();
+            field.Options ??= new List<string>();
+            field.BindTo ??= string.Empty;
+            field.Visibility = string.IsNullOrWhiteSpace(field.Visibility) ? CharacterSheetFieldVisibilities.Public : field.Visibility.ToLowerInvariant();
+            field.EditorRows = field.EditorRows < 0 ? 0 : field.EditorRows;
+        }
+
+        private static IList<CharacterSheetFieldDefinition> CreateDefaultCharacterSheetFields()
+        {
+            return
+            [
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "fullName",
+                    Label = "Full Name",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = false,
+                    BindTo = "thebasics.fullName",
+                    MaxLength = 100,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "nickname",
+                    Label = "Nickname",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = true,
+                    BindTo = "thebasics.nickname",
+                    MaxLength = 100,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "pronouns",
+                    Label = "Pronouns",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = true,
+                    MaxLength = 64,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "species",
+                    Label = "Species / Heritage",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = true,
+                    MaxLength = 100,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "age",
+                    Label = "Age",
+                    Type = CharacterSheetFieldTypes.String,
+                    Optional = true,
+                    MaxLength = 64,
+                    Visibility = CharacterSheetFieldVisibilities.Public
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "appearance",
+                    Label = "Appearance",
+                    Type = CharacterSheetFieldTypes.LongString,
+                    Optional = true,
+                    MaxLength = 600,
+                    Visibility = CharacterSheetFieldVisibilities.Nearby,
+                    EditorRows = 4
+                },
+                new CharacterSheetFieldDefinition
+                {
+                    Id = "background",
+                    Label = "Background",
+                    Type = CharacterSheetFieldTypes.LongString,
+                    Optional = true,
+                    MaxLength = 1500,
+                    Visibility = CharacterSheetFieldVisibilities.Self,
+                    ShowInLook = false,
+                    EditorRows = 8
+                }
+            ];
         }
 
         [ProtoMember(1)]
@@ -475,5 +577,37 @@ namespace thebasics.Configs
         // This is a moderation/auditability aid for servers that allow freeform unattributed text.
         [ProtoMember(92)]
         public bool AttributeFreeformMessagesToPlayerName { get; set; } = false;
+
+        [ProtoMember(93)]
+        public bool EnableCharacterSheets { get; set; } = true;
+
+        [ProtoMember(94)]
+        public string CharacterSheetSetPermission { get; set; } = "chat";
+
+        [ProtoMember(95)]
+        public string CharacterSheetAdminPermission { get; set; } = "commandplayer";
+
+        [ProtoMember(96)]
+        public IList<CharacterSheetFieldDefinition> CharacterSheetFields { get; set; }
+
+        [ProtoMember(97)]
+        public double CharacterSheetLookRange { get; set; } = 12.0;
+
+        [ProtoMember(98)]
+        public bool CharacterSheetLookRequiresLineOfSight { get; set; } = true;
+
+        [ProtoMember(99)]
+        public bool CharacterSheetRequireRequiredFieldsForRoleplay { get; set; } = false;
+
+        // Settings the server owner has acknowledged in the in-game config panel.
+        [ProtoMember(100)]
+        public IList<string> ReviewedConfigSettingKeys { get; set; }
+
+        // Enables RP character slots.
+        [ProtoMember(101)]
+        public bool EnableRpCharacterSlots { get; set; } = false;
+
+        [ProtoMember(102)]
+        public int MaxRpCharacterSlots { get; set; } = 3;
     }
 }

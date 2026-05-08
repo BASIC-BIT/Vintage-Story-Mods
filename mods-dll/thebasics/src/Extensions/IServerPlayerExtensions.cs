@@ -4,6 +4,7 @@ using System.Linq;
 using Newtonsoft.Json;
 using thebasics.Configs;
 using thebasics.Models;
+using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat;
@@ -20,6 +21,11 @@ namespace thebasics.Extensions
     public static class IServerPlayerExtensions
     {
         private const string ModDataNickname = "BASIC_NICKNAME";
+        private const string ModDataCharacterSheet = "BASIC_CHARACTER_SHEET";
+        private const string CharacterSheetFullNameBind = "thebasics.fullName";
+        private const string CharacterSheetFullNameField = "fullName";
+        private const string CharacterSheetNicknameBind = "thebasics.nickname";
+        private const string CharacterSheetNicknameField = "nickname";
         private const string ModDataNicknameColor = "BASIC_NICKNAME_COLOR";
         private const string ModDataChatMode = "BASIC_CHATMODE";
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
@@ -73,12 +79,26 @@ namespace thebasics.Extensions
         #region Nicknames
         public static string GetNickname(this IServerPlayer player)
         {
-            return GetModData(player, ModDataNickname, player.PlayerName);
+            return GetLegacyNickname(player) ?? player.PlayerName;
         }
+
+        public static string GetNickname(this IServerPlayer player, ModConfig config)
+        {
+            var nickname = GetCharacterSheetBoundValue(player, config, CharacterSheetNicknameBind, CharacterSheetNicknameField);
+            return string.IsNullOrWhiteSpace(nickname) ? GetNickname(player) : nickname;
+        }
+
         public static string GetNicknameWithColor(this IServerPlayer player)
         {
             // Escape the nickname first to prevent VTML injection, then apply color
             var escapedNickname = VtmlUtils.EscapeVtml(GetNickname(player));
+            return ChatHelper.Color(escapedNickname, GetNicknameColor(player));
+        }
+
+        public static string GetNicknameWithColor(this IServerPlayer player, ModConfig config)
+        {
+            // Escape the nickname first to prevent VTML injection, then apply color
+            var escapedNickname = VtmlUtils.EscapeVtml(GetNickname(player, config));
             return ChatHelper.Color(escapedNickname, GetNicknameColor(player));
         }
 
@@ -87,14 +107,108 @@ namespace thebasics.Extensions
             SetModData(player, ModDataNickname, nickname);
         }
 
+        public static void SetNickname(this IServerPlayer player, string nickname, ModConfig config)
+        {
+            if (config?.EnableCharacterSheets == true)
+            {
+                SetCharacterSheetBoundValue(player, config, CharacterSheetNicknameBind, CharacterSheetNicknameField, nickname);
+                player.RemoveModdata(ModDataNickname);
+                return;
+            }
+
+            SetNickname(player, nickname);
+        }
+
         public static bool HasNickname(this IServerPlayer player)
         {
-            return GetModData<string>(player, ModDataNickname, null) != null;
+            return GetLegacyNickname(player) != null;
+        }
+
+        public static bool HasNickname(this IServerPlayer player, ModConfig config)
+        {
+            return !string.IsNullOrWhiteSpace(GetCharacterSheetBoundValue(player, config, CharacterSheetNicknameBind, CharacterSheetNicknameField)) || HasNickname(player);
+        }
+
+        public static string GetCharacterSheetFullName(this IServerPlayer player, ModConfig config)
+        {
+            return GetCharacterSheetBoundValue(player, config, CharacterSheetFullNameBind, CharacterSheetFullNameField);
         }
 
         public static void ClearNickname(this IServerPlayer player)
         {
             player.RemoveModdata(ModDataNickname);
+        }
+
+        public static void ClearNickname(this IServerPlayer player, ModConfig config)
+        {
+            if (config?.EnableCharacterSheets == true)
+            {
+                ClearCharacterSheetBoundValue(player, config, CharacterSheetNicknameBind, CharacterSheetNicknameField);
+            }
+
+            player.RemoveModdata(ModDataNickname);
+        }
+
+        private static string GetLegacyNickname(IServerPlayer player)
+        {
+            return GetModData<string>(player, ModDataNickname, null);
+        }
+
+        private static string GetCharacterSheetBoundValue(IServerPlayer player, ModConfig config, string bindTo, string fallbackFieldId)
+        {
+            if (config?.EnableCharacterSheets != true)
+            {
+                return null;
+            }
+
+            var data = GetModData(player, ModDataCharacterSheet, new CharacterSheetData());
+            var fieldId = GetCharacterSheetBoundFieldId(config, bindTo, fallbackFieldId);
+            return data?.Fields?.FirstOrDefault(field => field.FieldId.Equals(fieldId, StringComparison.OrdinalIgnoreCase))?.Value;
+        }
+
+        private static void SetCharacterSheetBoundValue(IServerPlayer player, ModConfig config, string bindTo, string fallbackFieldId, string value)
+        {
+            var fieldId = GetCharacterSheetBoundFieldId(config, bindTo, fallbackFieldId);
+            var data = GetModData(player, ModDataCharacterSheet, new CharacterSheetData()) ?? new CharacterSheetData();
+            data.Fields ??= new List<CharacterSheetStoredField>();
+
+            var field = data.Fields.FirstOrDefault(field => field.FieldId.Equals(fieldId, StringComparison.OrdinalIgnoreCase));
+            if (field == null)
+            {
+                data.Fields.Add(new CharacterSheetStoredField { FieldId = fieldId, Value = value ?? string.Empty });
+            }
+            else
+            {
+                field.Value = value ?? string.Empty;
+            }
+
+            SetModData(player, ModDataCharacterSheet, data);
+        }
+
+        private static void ClearCharacterSheetBoundValue(IServerPlayer player, ModConfig config, string bindTo, string fallbackFieldId)
+        {
+            var fieldId = GetCharacterSheetBoundFieldId(config, bindTo, fallbackFieldId);
+            var data = GetModData(player, ModDataCharacterSheet, new CharacterSheetData()) ?? new CharacterSheetData();
+            data.Fields ??= new List<CharacterSheetStoredField>();
+
+            for (var index = data.Fields.Count - 1; index >= 0; index--)
+            {
+                if (data.Fields[index].FieldId.Equals(fieldId, StringComparison.OrdinalIgnoreCase))
+                {
+                    data.Fields.RemoveAt(index);
+                }
+            }
+
+            SetModData(player, ModDataCharacterSheet, data);
+        }
+
+        private static string GetCharacterSheetBoundFieldId(ModConfig config, string bindTo, string fallbackFieldId)
+        {
+            var fieldId = config?.CharacterSheetFields?
+                .FirstOrDefault(field => field.BindTo?.Equals(bindTo, StringComparison.OrdinalIgnoreCase) == true)
+                ?.Id;
+
+            return string.IsNullOrWhiteSpace(fieldId) ? fallbackFieldId : fieldId;
         }
         #endregion
 
@@ -446,12 +560,37 @@ namespace thebasics.Extensions
 
         public static void SetChatterEnabled(this IServerPlayer player, bool enabled)
         {
-            SetModData(player, ModDataChatterEnabled, enabled);
+            player.SetModdata(ModDataChatterEnabled, new[] { enabled ? (byte)1 : (byte)0 });
         }
 
         public static bool GetChatterEnabled(this IServerPlayer player)
         {
-            return GetModData(player, ModDataChatterEnabled, true);
+            var data = player.GetModdata(ModDataChatterEnabled);
+            if (data == null)
+            {
+                return true;
+            }
+
+            // Legacy protobuf serialized bool false as an empty byte array.
+            if (data.Length == 0)
+            {
+                return false;
+            }
+
+            if (data.Length == 1 && data[0] <= 1)
+            {
+                return data[0] == 1;
+            }
+
+            try
+            {
+                return SerializerUtil.Deserialize(data, true);
+            }
+            catch
+            {
+                player.RemoveModdata(ModDataChatterEnabled);
+                return true;
+            }
         }
 
         public static double GetDistance(this IServerPlayer sendingPlayer, IServerPlayer receivingPlayer) =>

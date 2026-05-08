@@ -25,3 +25,6 @@ RichTextTextureUtils::GenRichTextTexture
 
 # CCN=22, 121 lines - chatter dispatch mixes audio selection and emission
 RPProximityChatSystem::DispatchChatterForContext
+
+# Lizard treats the admin config registry's file-level setting definitions as one global block.
+*global*
