@@ -7,7 +7,7 @@ namespace thebasics.ModSystems.RpCharacters.Models;
 public class RpCharacterRegistry
 {
     [ProtoMember(1)]
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 2;
 
     [ProtoMember(2)]
     public List<RpCharacterRecord> Characters { get; set; } = new List<RpCharacterRecord>();

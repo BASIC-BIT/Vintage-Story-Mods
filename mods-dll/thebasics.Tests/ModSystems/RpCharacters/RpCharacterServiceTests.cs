@@ -102,6 +102,31 @@ public class RpCharacterServiceTests
     }
 
     [Fact]
+    public void SelectCharacter_CapturesAndRestoresRegisteredParticipantSnapshots()
+    {
+        var player = CreatePlayer();
+        var participant = new TestModDataParticipant();
+        var service = new RpCharacterService(CreateConfig(), participants: new[] { participant });
+        IServerPlayerExtensions.SetModData(player, TestModDataParticipant.ModDataKey, "Alice original");
+        service.EnsureRegistry(player);
+        var aliceId = service.GetActiveCharacterId(player);
+        service.CreateCharacter(player, "Bob", maxCharacters: 3).Success.Should().BeTrue();
+
+        var registry = service.ReadRegistry(player);
+        var bob = registry.Characters.Should().ContainSingle(character => character.DisplayName == "Bob").Subject;
+        bob.SetExtensionSnapshot(TestModDataParticipant.ParticipantCode, SerializerUtil.Serialize("Bob state"));
+        IServerPlayerExtensions.SetModData(player, RpCharacterService.CharacterSlotsKey, registry);
+        IServerPlayerExtensions.SetModData(player, TestModDataParticipant.ModDataKey, "Alice edited");
+
+        var result = service.SelectCharacter(player, bob.CharacterId);
+
+        result.Success.Should().BeTrue();
+        IServerPlayerExtensions.GetModData(player, TestModDataParticipant.ModDataKey, string.Empty).Should().Be("Bob state");
+        var savedAlice = service.ReadRegistry(player).Characters.Should().ContainSingle(character => character.CharacterId == aliceId).Subject;
+        SerializerUtil.Deserialize<string>(savedAlice.GetExtensionSnapshot(TestModDataParticipant.ParticipantCode)).Should().Be("Alice edited");
+    }
+
+    [Fact]
     public void CreateCharacter_EnforcesActiveCharacterLimit()
     {
         var player = CreatePlayer();
@@ -159,6 +184,30 @@ public class RpCharacterServiceTests
         service.GetActiveCharacterId(player).Should().Be(bob.CharacterId);
     }
 
+    [Fact]
+    public void InventoryParticipant_DoesNotRestoreLegacyRecordWithoutInventorySnapshot()
+    {
+        var record = new RpCharacterRecord
+        {
+            SnapshotVersion = 1,
+            Inventory = new RpCharacterInventorySnapshot()
+        };
+
+        RpCharacterInventoryParticipant.HasRestorableSnapshot(record).Should().BeFalse();
+    }
+
+    [Fact]
+    public void InventoryParticipant_RestoresEmptyInventorySnapshotForNewRecords()
+    {
+        var record = new RpCharacterRecord
+        {
+            SnapshotVersion = 2,
+            Inventory = new RpCharacterInventorySnapshot()
+        };
+
+        RpCharacterInventoryParticipant.HasRestorableSnapshot(record).Should().BeTrue();
+    }
+
     private static ModConfig CreateConfig()
     {
         return new ModConfig
@@ -213,5 +262,32 @@ public class RpCharacterServiceTests
     private static CharacterSheetData GetStoredSheetData(IServerPlayer player)
     {
         return SerializerUtil.Deserialize(player.GetModdata("BASIC_CHARACTER_SHEET"), new CharacterSheetData()) ?? new CharacterSheetData();
+    }
+
+    private sealed class TestModDataParticipant : IRpCharacterSwitchParticipant
+    {
+        public const string ParticipantCode = "test:moddata";
+        public const string ModDataKey = "TEST_CHARACTER_STATE";
+
+        public string Code => ParticipantCode;
+
+        public int Order => 100;
+
+        public RpCharacterOperationResult Validate(RpCharacterSwitchContext context)
+        {
+            return RpCharacterOperationResult.Ok(string.Empty);
+        }
+
+        public void Capture(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+            var value = IServerPlayerExtensions.GetModData(context.Player, ModDataKey, string.Empty);
+            record.SetExtensionSnapshot(Code, SerializerUtil.Serialize(value));
+        }
+
+        public void Restore(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+            var data = record.GetExtensionSnapshot(Code);
+            IServerPlayerExtensions.SetModData(context.Player, ModDataKey, SerializerUtil.Deserialize<string>(data) ?? string.Empty);
+        }
     }
 }

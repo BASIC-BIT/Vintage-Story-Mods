@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using ProtoBuf;
 
 namespace thebasics.ModSystems.RpCharacters.Models;
@@ -22,4 +25,44 @@ public class RpCharacterRecord
 
     [ProtoMember(6)]
     public string ModifiedUtc { get; set; } = string.Empty;
+
+    [ProtoMember(7)]
+    public int SnapshotVersion { get; set; } = 2;
+
+    [ProtoMember(8)]
+    public RpCharacterAppearanceSnapshot Appearance { get; set; } = new RpCharacterAppearanceSnapshot();
+
+    [ProtoMember(9)]
+    public RpCharacterInventorySnapshot Inventory { get; set; } = new RpCharacterInventorySnapshot();
+
+    [ProtoMember(10)]
+    public RpCharacterBodySnapshot Body { get; set; } = new RpCharacterBodySnapshot();
+
+    [ProtoMember(11)]
+    public List<RpCharacterExtensionSnapshot> Extensions { get; set; } = new List<RpCharacterExtensionSnapshot>();
+
+    public byte[] GetExtensionSnapshot(string key)
+    {
+        return Extensions?.FirstOrDefault(extension =>
+            extension != null && string.Equals(extension.Key, key, StringComparison.OrdinalIgnoreCase))?.Data;
+    }
+
+    public void SetExtensionSnapshot(string key, byte[] data)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        Extensions ??= new List<RpCharacterExtensionSnapshot>();
+        Extensions.RemoveAll(extension => extension == null || string.Equals(extension.Key, key, StringComparison.OrdinalIgnoreCase));
+        if (data != null)
+        {
+            Extensions.Add(new RpCharacterExtensionSnapshot
+            {
+                Key = key,
+                Data = data
+            });
+        }
+    }
 }

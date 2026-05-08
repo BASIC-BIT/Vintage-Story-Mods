@@ -603,11 +603,24 @@ namespace thebasics.Configs
         [ProtoMember(100)]
         public IList<string> ReviewedConfigSettingKeys { get; set; }
 
-        // Enables identity-only RP character slots. Inventory, position, class, and skin remain shared.
+        // Enables RP character slots.
         [ProtoMember(101)]
         public bool EnableRpCharacterSlots { get; set; } = false;
 
         [ProtoMember(102)]
         public int MaxRpCharacterSlots { get; set; } = 3;
+
+        // When true, RP character switches include vanilla character state beyond The BASICs identity projection.
+        [ProtoMember(103)]
+        public bool EnableRpCharacterFullSwitching { get; set; } = true;
+
+        [ProtoMember(104)]
+        public bool EnableRpCharacterAppearanceSwitching { get; set; } = true;
+
+        [ProtoMember(105)]
+        public bool EnableRpCharacterInventorySwitching { get; set; } = true;
+
+        [ProtoMember(106)]
+        public bool EnableRpCharacterBodySwitching { get; set; } = true;
     }
 }

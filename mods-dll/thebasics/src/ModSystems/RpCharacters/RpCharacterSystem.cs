@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Collections.Generic;
 using System.Text;
 using thebasics.Extensions;
 using thebasics.ModSystems.RpCharacters.Models;
@@ -13,7 +14,21 @@ namespace thebasics.ModSystems.RpCharacters;
 
 public class RpCharacterSystem : BaseBasicModSystem
 {
+    private readonly List<IRpCharacterSwitchParticipant> _externalParticipants = new List<IRpCharacterSwitchParticipant>();
     private RpCharacterService _characters;
+
+    public bool RegisterSwitchParticipant(IRpCharacterSwitchParticipant participant)
+    {
+        if (participant == null || string.IsNullOrWhiteSpace(participant.Code))
+        {
+            return false;
+        }
+
+        _externalParticipants.RemoveAll(existing => existing.Code.Equals(participant.Code, System.StringComparison.OrdinalIgnoreCase));
+        _externalParticipants.Add(participant);
+        _characters?.RegisterParticipant(participant);
+        return true;
+    }
 
     protected override void BasicStartServerSide()
     {
@@ -22,7 +37,28 @@ public class RpCharacterSystem : BaseBasicModSystem
             return;
         }
 
-        _characters = new RpCharacterService(Config, T);
+        var participants = new List<IRpCharacterSwitchParticipant>();
+        if (Config.EnableRpCharacterFullSwitching)
+        {
+            participants.Add(new RpCharacterSafetyParticipant(T));
+            if (Config.EnableRpCharacterAppearanceSwitching)
+            {
+                participants.Add(new RpCharacterAppearanceParticipant());
+            }
+
+            if (Config.EnableRpCharacterInventorySwitching)
+            {
+                participants.Add(new RpCharacterInventoryParticipant());
+            }
+
+            if (Config.EnableRpCharacterBodySwitching)
+            {
+                participants.Add(new RpCharacterBodyParticipant());
+            }
+        }
+
+        participants.AddRange(_externalParticipants);
+        _characters = new RpCharacterService(Config, T, participants);
         HookEvents();
         RegisterCommands();
     }
@@ -107,7 +143,7 @@ public class RpCharacterSystem : BaseBasicModSystem
 
     private void Event_PlayerDisconnect(IServerPlayer player)
     {
-        _characters.CaptureActiveProjection(player);
+        _characters.CaptureActiveCharacterState(player);
     }
 
     private void Event_GameWorldSave()
@@ -116,7 +152,7 @@ public class RpCharacterSystem : BaseBasicModSystem
         {
             if (onlinePlayer is IServerPlayer serverPlayer)
             {
-                _characters.CaptureActiveProjection(serverPlayer);
+                _characters.CaptureActiveCharacterState(serverPlayer);
             }
         }
     }
