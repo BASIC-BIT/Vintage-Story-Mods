@@ -2,7 +2,7 @@
 
 The BASICs RP character slots preserve the real Vintage Story account identity. `IPlayer.PlayerUID`, vanilla roles, groups, privileges, and `ServerPlayerData` remain account-scoped.
 
-When `EnableRpCharacterSlots` and `EnableRpCharacterFullSwitching` are enabled, `/character select` captures the active character and restores the target character through ordered switch participants.
+When `EnableRpCharacterSlots` and the opt-in `EnableRpCharacterFullSwitching` setting are enabled, `/character select` captures the active character and restores the target character through ordered switch participants.
 
 Built-in participants capture:
 
@@ -56,3 +56,4 @@ public sealed class MyCharacterParticipant : IRpCharacterSwitchParticipant
 ```
 
 Use a stable, namespaced `Code`. Registering another participant with the same code replaces the previous participant.
+`Validate` should be side-effect free. If a participant must mutate player state before capture/restore, it can also implement `IRpCharacterSwitchPreparationParticipant`; `Prepare` runs only after all participants validate successfully.

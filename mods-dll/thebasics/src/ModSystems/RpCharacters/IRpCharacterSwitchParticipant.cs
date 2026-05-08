@@ -14,3 +14,8 @@ public interface IRpCharacterSwitchParticipant
 
     void Restore(RpCharacterSwitchContext context, RpCharacterRecord record);
 }
+
+public interface IRpCharacterSwitchPreparationParticipant
+{
+    RpCharacterOperationResult Prepare(RpCharacterSwitchContext context);
+}

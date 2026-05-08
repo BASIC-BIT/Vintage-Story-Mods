@@ -57,7 +57,7 @@ public class RpCharacterService
         }
     }
 
-    public IReadOnlyList<IRpCharacterSwitchParticipant> Participants => _participants.OrderBy(participant => participant.Order).ToList();
+    public IReadOnlyList<IRpCharacterSwitchParticipant> Participants => _participants;
 
     public void RegisterParticipant(IRpCharacterSwitchParticipant participant)
     {
@@ -68,6 +68,7 @@ public class RpCharacterService
 
         _participants.RemoveAll(existing => existing.Code.Equals(participant.Code, StringComparison.OrdinalIgnoreCase));
         _participants.Add(participant);
+        _participants.Sort(CompareParticipants);
     }
 
     public RpCharacterRegistry EnsureRegistry(IServerPlayer player)
@@ -203,6 +204,12 @@ public class RpCharacterService
                 return validationResult;
             }
 
+            var prepareResult = PrepareSwitch(context);
+            if (!prepareResult.Success)
+            {
+                return prepareResult;
+            }
+
             if (active != null)
             {
                 CaptureIntoRecord(context, active);
@@ -224,6 +231,7 @@ public class RpCharacterService
                         var rollbackCurrent = target;
                         var rollbackTarget = active;
                         RestoreRecord(new RpCharacterSwitchContext(player, _config, registry, rollbackCurrent, rollbackTarget), active);
+                        SaveRegistry(player, registry);
                     }
                     catch (Exception rollbackException)
                     {
@@ -363,7 +371,9 @@ public class RpCharacterService
             participant.Capture(context, record);
         }
 
-        record.SnapshotVersion = Math.Max(record.SnapshotVersion, 2);
+        record.SnapshotVersion = _config.EnableRpCharacterFullSwitching
+            ? Math.Max(record.SnapshotVersion, 2)
+            : Math.Max(record.SnapshotVersion, 1);
         record.ModifiedUtc = NowUtc();
     }
 
@@ -372,6 +382,25 @@ public class RpCharacterService
         foreach (var participant in Participants)
         {
             var result = participant.Validate(context);
+            if (result != null && !result.Success)
+            {
+                return result;
+            }
+        }
+
+        return RpCharacterOperationResult.Ok(string.Empty);
+    }
+
+    private RpCharacterOperationResult PrepareSwitch(RpCharacterSwitchContext context)
+    {
+        foreach (var participant in Participants)
+        {
+            if (participant is not IRpCharacterSwitchPreparationParticipant preparationParticipant)
+            {
+                continue;
+            }
+
+            var result = preparationParticipant.Prepare(context);
             if (result != null && !result.Success)
             {
                 return result;
@@ -444,15 +473,22 @@ public class RpCharacterService
     private RpCharacterRecord CreateRecord(string characterId, string displayName, RpCharacterProjectionSnapshot projection)
     {
         var now = NowUtc();
-        return new RpCharacterRecord
+        var record = new RpCharacterRecord
         {
             CharacterId = characterId,
             DisplayName = displayName,
             Projection = projection,
-            SnapshotVersion = 2,
+            SnapshotVersion = _config.EnableRpCharacterFullSwitching ? 2 : 1,
             CreatedUtc = now,
             ModifiedUtc = now
         };
+
+        if (_config.EnableRpCharacterFullSwitching && _config.EnableRpCharacterInventorySwitching)
+        {
+            record.Inventory.Available = true;
+        }
+
+        return record;
     }
 
     private string GetDefaultDisplayName(IServerPlayer player)
@@ -592,6 +628,14 @@ public class RpCharacterService
     private static string NowUtc()
     {
         return DateTime.UtcNow.ToString("O");
+    }
+
+    private static int CompareParticipants(IRpCharacterSwitchParticipant left, IRpCharacterSwitchParticipant right)
+    {
+        var orderComparison = left.Order.CompareTo(right.Order);
+        return orderComparison != 0
+            ? orderComparison
+            : string.Compare(left.Code, right.Code, StringComparison.OrdinalIgnoreCase);
     }
 
     private string Text(string key, params object[] args)

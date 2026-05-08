@@ -27,7 +27,7 @@ public class RpCharacterRecord
     public string ModifiedUtc { get; set; } = string.Empty;
 
     [ProtoMember(7)]
-    public int SnapshotVersion { get; set; } = 2;
+    public int SnapshotVersion { get; set; }
 
     [ProtoMember(8)]
     public RpCharacterAppearanceSnapshot Appearance { get; set; } = new RpCharacterAppearanceSnapshot();

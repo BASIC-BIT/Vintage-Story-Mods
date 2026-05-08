@@ -611,8 +611,9 @@ namespace thebasics.Configs
         public int MaxRpCharacterSlots { get; set; } = 3;
 
         // When true, RP character switches include vanilla character state beyond The BASICs identity projection.
+        // Defaults to false so existing identity-only servers opt in explicitly.
         [ProtoMember(103)]
-        public bool EnableRpCharacterFullSwitching { get; set; } = true;
+        public bool EnableRpCharacterFullSwitching { get; set; } = false;
 
         [ProtoMember(104)]
         public bool EnableRpCharacterAppearanceSwitching { get; set; } = true;

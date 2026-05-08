@@ -6,7 +6,7 @@ using Vintagestory.API.Common;
 
 namespace thebasics.ModSystems.RpCharacters;
 
-public class RpCharacterSafetyParticipant : IRpCharacterSwitchParticipant
+public class RpCharacterSafetyParticipant : IRpCharacterSwitchParticipant, IRpCharacterSwitchPreparationParticipant
 {
     private static readonly HashSet<string> AllowedOpenInventoryClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -44,16 +44,6 @@ public class RpCharacterSafetyParticipant : IRpCharacterSwitchParticipant
             return Error("rpchar-error-switch-dead");
         }
 
-        if (!entity.TryStopHandAction(forceStop: true, EnumItemUseCancelReason.ReleasedMouse))
-        {
-            return Error("rpchar-error-switch-hand-use");
-        }
-
-        if (entity.MountedOn != null && !entity.TryUnmount())
-        {
-            return Error("rpchar-error-switch-mounted");
-        }
-
         if (player.InventoryManager?.MouseItemSlot?.Empty == false)
         {
             return Error("rpchar-error-switch-cursor");
@@ -67,6 +57,27 @@ public class RpCharacterSafetyParticipant : IRpCharacterSwitchParticipant
         if (CraftingGridHasInput(player))
         {
             return Error("rpchar-error-switch-crafting-grid");
+        }
+
+        return RpCharacterOperationResult.Ok(string.Empty);
+    }
+
+    public RpCharacterOperationResult Prepare(RpCharacterSwitchContext context)
+    {
+        var entity = context.Player?.Entity;
+        if (entity == null)
+        {
+            return Error("rpchar-error-valid-online-player");
+        }
+
+        if (!entity.TryStopHandAction(forceStop: true, EnumItemUseCancelReason.ReleasedMouse))
+        {
+            return Error("rpchar-error-switch-hand-use");
+        }
+
+        if (entity.MountedOn != null && !entity.TryUnmount())
+        {
+            return Error("rpchar-error-switch-mounted");
         }
 
         return RpCharacterOperationResult.Ok(string.Empty);

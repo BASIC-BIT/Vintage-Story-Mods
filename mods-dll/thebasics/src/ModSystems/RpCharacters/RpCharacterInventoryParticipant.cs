@@ -31,6 +31,7 @@ public class RpCharacterInventoryParticipant : IRpCharacterSwitchParticipant
         var manager = player.InventoryManager;
         var snapshot = new RpCharacterInventorySnapshot
         {
+            Available = true,
             ActiveHotbarSlotNumber = manager?.ActiveHotbarSlotNumber ?? 0
         };
 
@@ -103,7 +104,8 @@ public class RpCharacterInventoryParticipant : IRpCharacterSwitchParticipant
     internal static bool HasRestorableSnapshot(RpCharacterRecord record)
     {
         return record != null &&
-               (record.SnapshotVersion >= 2 || record.Inventory?.Inventories?.Count > 0);
+               record.Inventory != null &&
+               (record.Inventory.Available || record.Inventory.Inventories?.Count > 0);
     }
 
     private static TreeAttribute CreateEmptyInventoryTree(InventoryBase inventory)
