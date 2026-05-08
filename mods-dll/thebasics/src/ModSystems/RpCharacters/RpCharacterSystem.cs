@@ -158,11 +158,15 @@ public class RpCharacterSystem : BaseBasicModSystem
     {
         var player = (IServerPlayer)args.Caller.Player;
         var characterIdOrName = (string)args.Parsers[0].GetValue();
+        var preActiveId = _characters.GetActiveCharacterId(player);
         var result = _characters.SelectCharacter(player, characterIdOrName);
         if (result.Success)
         {
             RefreshIdentityState(player);
-            API.Logger.Audit($"Player {player.PlayerName} ({player.PlayerUID}) switched to RP character {result.Character?.DisplayName} ({result.Character?.CharacterId}).");
+            if (DidSwitchCharacter(result, preActiveId))
+            {
+                API.Logger.Audit($"Player {player.PlayerName} ({player.PlayerUID}) switched to RP character {result.Character?.DisplayName} ({result.Character?.CharacterId}).");
+            }
         }
 
         return ToCommandResult(result);
@@ -213,11 +217,15 @@ public class RpCharacterSystem : BaseBasicModSystem
         }
 
         var characterIdOrName = (string)args.Parsers[1].GetValue();
+        var preActiveId = _characters.GetActiveCharacterId(target);
         var result = _characters.SelectCharacter(target, characterIdOrName);
         if (result.Success)
         {
             RefreshIdentityState(target);
-            API.Logger.Audit($"Admin {args.Caller.Player?.PlayerName ?? "server"} forced {target.PlayerName} ({target.PlayerUID}) to RP character {result.Character?.DisplayName} ({result.Character?.CharacterId}).");
+            if (DidSwitchCharacter(result, preActiveId))
+            {
+                API.Logger.Audit($"Admin {args.Caller.Player?.PlayerName ?? "server"} forced {target.PlayerName} ({target.PlayerUID}) to RP character {result.Character?.DisplayName} ({result.Character?.CharacterId}).");
+            }
         }
 
         return ToCommandResult(result);
@@ -232,6 +240,12 @@ public class RpCharacterSystem : BaseBasicModSystem
         }
 
         return API.GetPlayerByUID(players[0].Uid);
+    }
+
+    private static bool DidSwitchCharacter(RpCharacterOperationResult result, string preActiveId)
+    {
+        return result.Character != null &&
+               !result.Character.CharacterId.Equals(preActiveId, System.StringComparison.OrdinalIgnoreCase);
     }
 
     private void RefreshIdentityState(IServerPlayer player)

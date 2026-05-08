@@ -518,6 +518,7 @@ namespace thebasics.Extensions
                 return true;
             }
 
+            // Legacy protobuf serialized bool false as an empty byte array.
             if (data.Length == 0)
             {
                 return false;
