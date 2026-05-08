@@ -86,7 +86,7 @@ public class RpCharacterSystem : BaseBasicModSystem
         API.ChatCommands.GetOrCreate("thebasics")
             .BeginSubCommand("character")
                 .WithDescription(T("rpchar-cmd-admin-character-desc"))
-                .RequiresPrivilege(Privilege.commandplayer)
+                .RequiresPrivilege(Privilege.root)
                 .BeginSubCommand("list")
                     .WithDescription(T("rpchar-cmd-admin-list-desc"))
                     .WithArgs(new PlayersArgParser(T("rpchar-arg-player"), API, true))

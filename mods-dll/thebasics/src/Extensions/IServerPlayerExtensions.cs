@@ -534,6 +534,7 @@ namespace thebasics.Extensions
             }
             catch
             {
+                player.RemoveModdata(ModDataChatterEnabled);
                 return true;
             }
         }

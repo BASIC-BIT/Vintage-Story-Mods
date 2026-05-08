@@ -322,6 +322,11 @@ public class ChatUiSystem : ModSystem
             _pendingCharacterSheetSave = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
             RefreshCharacterDialogTitle();
+            if (_characterSheetDialog?.IsOpened() == true)
+            {
+                _characterSheetDialog.SetView(message);
+            }
+
             return;
         }
 

@@ -4,7 +4,7 @@ Date: 2026-05-07
 
 Issue: https://github.com/BASIC-BIT/Vintage-Story-Mods/issues/130
 
-Scope: research only. No implementation in this spike.
+Scope: feasibility research for issue #130. This document started as a research-only spike and now records the constraints that shaped the MVP implementation in this PR.
 
 ## Recently Merged PR Context Checked
 
