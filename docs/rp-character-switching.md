@@ -2,7 +2,7 @@
 
 The BASICs RP character slots preserve the real Vintage Story account identity. `IPlayer.PlayerUID`, vanilla roles, groups, privileges, and `ServerPlayerData` remain account-scoped.
 
-When `EnableRpCharacterSlots` and the opt-in `EnableRpCharacterFullSwitching` setting are enabled, `/character select` captures the active character and restores the target character through ordered switch participants.
+When `EnableRpCharacterSlots` and `EnableCharacterSheets` are enabled, `/character select` captures the active character and restores the target character through ordered switch participants.
 
 Built-in participants capture:
 
@@ -11,7 +11,9 @@ Built-in participants capture:
 - Player inventories: `hotbar`, `backpack`, and `character` only.
 - Body state: health, hunger/nutrition, intoxication, psychedelic effect, position, spawn position, and vanilla death count.
 
-Switching is rejected when the player is dead, carrying a cursor item, has an external container open, or has input items in the crafting grid. The switcher attempts to force-stop active hand use and unmount first; if either operation fails, the switch is rejected.
+Switching is rejected when the player is dead, carrying a cursor item, has an external container open, or has input items in the crafting grid. After all validations pass, the switcher attempts to force-stop active hand use and unmount; if either operation fails, the switch is rejected.
+
+The config surface is intentionally small: `EnableRpCharacterSlots` enables the complete feature, and `MaxRpCharacterSlots` controls the active slot limit. Partial identity-only, inventory-only, appearance-only, or body-only modes are not exposed as supported server configurations.
 
 ## Mod Integration
 
@@ -56,4 +58,5 @@ public sealed class MyCharacterParticipant : IRpCharacterSwitchParticipant
 ```
 
 Use a stable, namespaced `Code`. Registering another participant with the same code replaces the previous participant.
+
 `Validate` should be side-effect free. If a participant must mutate player state before capture/restore, it can also implement `IRpCharacterSwitchPreparationParticipant`; `Prepare` runs only after all participants validate successfully.

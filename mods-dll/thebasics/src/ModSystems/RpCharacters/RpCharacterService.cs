@@ -371,9 +371,7 @@ public class RpCharacterService
             participant.Capture(context, record);
         }
 
-        record.SnapshotVersion = _config.EnableRpCharacterFullSwitching
-            ? Math.Max(record.SnapshotVersion, 2)
-            : Math.Max(record.SnapshotVersion, 1);
+        record.SnapshotVersion = Math.Max(record.SnapshotVersion, 2);
         record.ModifiedUtc = NowUtc();
     }
 
@@ -478,12 +476,12 @@ public class RpCharacterService
             CharacterId = characterId,
             DisplayName = displayName,
             Projection = projection,
-            SnapshotVersion = _config.EnableRpCharacterFullSwitching ? 2 : 1,
+            SnapshotVersion = 2,
             CreatedUtc = now,
             ModifiedUtc = now
         };
 
-        if (_config.EnableRpCharacterFullSwitching && _config.EnableRpCharacterInventorySwitching)
+        if (HasParticipant(RpCharacterInventoryParticipant.ParticipantCode))
         {
             record.Inventory.Available = true;
         }
@@ -636,6 +634,11 @@ public class RpCharacterService
         return orderComparison != 0
             ? orderComparison
             : string.Compare(left.Code, right.Code, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool HasParticipant(string code)
+    {
+        return _participants.Any(participant => participant.Code.Equals(code, StringComparison.OrdinalIgnoreCase));
     }
 
     private string Text(string key, params object[] args)
