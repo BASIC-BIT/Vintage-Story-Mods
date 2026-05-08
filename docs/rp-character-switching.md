@@ -13,7 +13,7 @@ Built-in participants capture:
 
 Switching is rejected when the player is dead, carrying a cursor item, has an external container open, or has input items in the crafting grid. After all validations pass, the switcher attempts to force-stop active hand use and unmount; if either operation fails, the switch is rejected.
 
-The config surface is intentionally small: `EnableRpCharacterSlots` enables the complete feature, and `MaxRpCharacterSlots` controls the active slot limit. Partial identity-only, inventory-only, appearance-only, or body-only modes are not exposed as supported server configurations.
+The config surface is intentionally small: `EnableCharacterSheets` remains a prerequisite for RP character records, `EnableRpCharacterSlots` enables complete character switching, and `MaxRpCharacterSlots` controls the active slot limit. Partial identity-only, inventory-only, appearance-only, or body-only modes are not exposed as supported server configurations.
 
 ## Mod Integration
 
