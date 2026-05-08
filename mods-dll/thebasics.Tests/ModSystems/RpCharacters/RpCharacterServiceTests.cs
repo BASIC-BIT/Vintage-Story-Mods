@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using FluentAssertions;
 using NSubstitute;
@@ -102,6 +103,75 @@ public class RpCharacterServiceTests
     }
 
     [Fact]
+    public void SelectCharacter_CapturesAndRestoresRegisteredParticipantSnapshots()
+    {
+        var player = CreatePlayer();
+        var participant = new TestModDataParticipant();
+        var service = new RpCharacterService(CreateConfig(), participants: new[] { participant });
+        IServerPlayerExtensions.SetModData(player, TestModDataParticipant.ModDataKey, "Alice original");
+        service.EnsureRegistry(player);
+        var aliceId = service.GetActiveCharacterId(player);
+        service.CreateCharacter(player, "Bob", maxCharacters: 3).Success.Should().BeTrue();
+
+        var registry = service.ReadRegistry(player);
+        var bob = registry.Characters.Should().ContainSingle(character => character.DisplayName == "Bob").Subject;
+        bob.SetExtensionSnapshot(TestModDataParticipant.ParticipantCode, SerializerUtil.Serialize("Bob state"));
+        IServerPlayerExtensions.SetModData(player, RpCharacterService.CharacterSlotsKey, registry);
+        IServerPlayerExtensions.SetModData(player, TestModDataParticipant.ModDataKey, "Alice edited");
+
+        var result = service.SelectCharacter(player, bob.CharacterId);
+
+        result.Success.Should().BeTrue();
+        IServerPlayerExtensions.GetModData(player, TestModDataParticipant.ModDataKey, string.Empty).Should().Be("Bob state");
+        var savedAlice = service.ReadRegistry(player).Characters.Should().ContainSingle(character => character.CharacterId == aliceId).Subject;
+        SerializerUtil.Deserialize<string>(savedAlice.GetExtensionSnapshot(TestModDataParticipant.ParticipantCode)).Should().Be("Alice edited");
+    }
+
+    [Fact]
+    public void SelectCharacter_DoesNotPrepareParticipantsWhenValidationFails()
+    {
+        var player = CreatePlayer();
+        var preparingParticipant = new TestPreparingParticipant();
+        var service = new RpCharacterService(CreateConfig(), participants: new IRpCharacterSwitchParticipant[]
+        {
+            preparingParticipant,
+            new TestRejectingParticipant()
+        });
+        service.EnsureRegistry(player);
+        service.CreateCharacter(player, "Bob", maxCharacters: 3).Success.Should().BeTrue();
+        var bob = service.ReadRegistry(player).Characters.Should().ContainSingle(character => character.DisplayName == "Bob").Subject;
+
+        var result = service.SelectCharacter(player, bob.CharacterId);
+
+        result.Success.Should().BeFalse();
+        preparingParticipant.PrepareCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public void SelectCharacter_SavesCapturedActiveSnapshotAfterRollbackSucceeds()
+    {
+        var player = CreatePlayer();
+        var service = new RpCharacterService(CreateConfig(), participants: new[] { new TestThrowingRestoreParticipant() });
+        IServerPlayerExtensions.SetModData(player, TestThrowingRestoreParticipant.ModDataKey, "Alice original");
+        service.EnsureRegistry(player);
+        var aliceId = service.GetActiveCharacterId(player);
+        service.CreateCharacter(player, "Bob", maxCharacters: 3).Success.Should().BeTrue();
+
+        var registry = service.ReadRegistry(player);
+        var bob = registry.Characters.Should().ContainSingle(character => character.DisplayName == "Bob").Subject;
+        bob.SetExtensionSnapshot(TestThrowingRestoreParticipant.ParticipantCode, SerializerUtil.Serialize(TestThrowingRestoreParticipant.ThrowValue));
+        IServerPlayerExtensions.SetModData(player, RpCharacterService.CharacterSlotsKey, registry);
+        IServerPlayerExtensions.SetModData(player, TestThrowingRestoreParticipant.ModDataKey, "Alice edited");
+
+        var result = service.SelectCharacter(player, bob.CharacterId);
+
+        result.Success.Should().BeFalse();
+        IServerPlayerExtensions.GetModData(player, TestThrowingRestoreParticipant.ModDataKey, string.Empty).Should().Be("Alice edited");
+        var savedAlice = service.ReadRegistry(player).Characters.Should().ContainSingle(character => character.CharacterId == aliceId).Subject;
+        SerializerUtil.Deserialize<string>(savedAlice.GetExtensionSnapshot(TestThrowingRestoreParticipant.ParticipantCode)).Should().Be("Alice edited");
+    }
+
+    [Fact]
     public void CreateCharacter_EnforcesActiveCharacterLimit()
     {
         var player = CreatePlayer();
@@ -159,6 +229,59 @@ public class RpCharacterServiceTests
         service.GetActiveCharacterId(player).Should().Be(bob.CharacterId);
     }
 
+    [Fact]
+    public void InventoryParticipant_DoesNotRestoreLegacyRecordWithoutInventorySnapshot()
+    {
+        var record = new RpCharacterRecord
+        {
+            SnapshotVersion = 1,
+            Inventory = new RpCharacterInventorySnapshot()
+        };
+
+        RpCharacterInventoryParticipant.HasRestorableSnapshot(record).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RpCharacterRecord_DefaultSnapshotVersionIsLegacySafe()
+    {
+        new RpCharacterRecord().SnapshotVersion.Should().Be(0);
+    }
+
+    [Fact]
+    public void ModConfig_DefaultsFullCharacterSwitchingToOptIn()
+    {
+        new ModConfig().EnableRpCharacterFullSwitching.Should().BeFalse();
+    }
+
+    [Fact]
+    public void InventoryParticipant_RestoresEmptyInventorySnapshotForNewRecords()
+    {
+        var record = new RpCharacterRecord
+        {
+            SnapshotVersion = 2,
+            Inventory = new RpCharacterInventorySnapshot { Available = true }
+        };
+
+        RpCharacterInventoryParticipant.HasRestorableSnapshot(record).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CreateCharacter_MarksEmptyInventoryAvailableWhenFullSwitchingIsEnabled()
+    {
+        var player = CreatePlayer();
+        var config = CreateConfig();
+        config.EnableRpCharacterFullSwitching = true;
+        config.EnableRpCharacterInventorySwitching = true;
+        var service = new RpCharacterService(config);
+        service.EnsureRegistry(player);
+
+        service.CreateCharacter(player, "Bob", maxCharacters: 3).Success.Should().BeTrue();
+
+        var bob = service.ReadRegistry(player).Characters.Should().ContainSingle(character => character.DisplayName == "Bob").Subject;
+        bob.SnapshotVersion.Should().Be(2);
+        bob.Inventory.Available.Should().BeTrue();
+    }
+
     private static ModConfig CreateConfig()
     {
         return new ModConfig
@@ -213,5 +336,113 @@ public class RpCharacterServiceTests
     private static CharacterSheetData GetStoredSheetData(IServerPlayer player)
     {
         return SerializerUtil.Deserialize(player.GetModdata("BASIC_CHARACTER_SHEET"), new CharacterSheetData()) ?? new CharacterSheetData();
+    }
+
+    private sealed class TestModDataParticipant : IRpCharacterSwitchParticipant
+    {
+        public const string ParticipantCode = "test:moddata";
+        public const string ModDataKey = "TEST_CHARACTER_STATE";
+
+        public string Code => ParticipantCode;
+
+        public int Order => 100;
+
+        public RpCharacterOperationResult Validate(RpCharacterSwitchContext context)
+        {
+            return RpCharacterOperationResult.Ok(string.Empty);
+        }
+
+        public void Capture(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+            var value = IServerPlayerExtensions.GetModData(context.Player, ModDataKey, string.Empty);
+            record.SetExtensionSnapshot(Code, SerializerUtil.Serialize(value));
+        }
+
+        public void Restore(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+            var data = record.GetExtensionSnapshot(Code);
+            IServerPlayerExtensions.SetModData(context.Player, ModDataKey, SerializerUtil.Deserialize<string>(data) ?? string.Empty);
+        }
+    }
+
+    private sealed class TestPreparingParticipant : IRpCharacterSwitchParticipant, IRpCharacterSwitchPreparationParticipant
+    {
+        public int PrepareCalls { get; private set; }
+
+        public string Code => "test:prepare";
+
+        public int Order => 100;
+
+        public RpCharacterOperationResult Validate(RpCharacterSwitchContext context)
+        {
+            return RpCharacterOperationResult.Ok(string.Empty);
+        }
+
+        public RpCharacterOperationResult Prepare(RpCharacterSwitchContext context)
+        {
+            PrepareCalls++;
+            return RpCharacterOperationResult.Ok(string.Empty);
+        }
+
+        public void Capture(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+        }
+
+        public void Restore(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+        }
+    }
+
+    private sealed class TestRejectingParticipant : IRpCharacterSwitchParticipant
+    {
+        public string Code => "test:reject";
+
+        public int Order => 200;
+
+        public RpCharacterOperationResult Validate(RpCharacterSwitchContext context)
+        {
+            return RpCharacterOperationResult.Error("nope");
+        }
+
+        public void Capture(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+        }
+
+        public void Restore(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+        }
+    }
+
+    private sealed class TestThrowingRestoreParticipant : IRpCharacterSwitchParticipant
+    {
+        public const string ParticipantCode = "test:rollback";
+        public const string ModDataKey = "TEST_ROLLBACK_STATE";
+        public const string ThrowValue = "throw";
+
+        public string Code => ParticipantCode;
+
+        public int Order => 100;
+
+        public RpCharacterOperationResult Validate(RpCharacterSwitchContext context)
+        {
+            return RpCharacterOperationResult.Ok(string.Empty);
+        }
+
+        public void Capture(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+            var value = IServerPlayerExtensions.GetModData(context.Player, ModDataKey, string.Empty);
+            record.SetExtensionSnapshot(Code, SerializerUtil.Serialize(value));
+        }
+
+        public void Restore(RpCharacterSwitchContext context, RpCharacterRecord record)
+        {
+            var value = SerializerUtil.Deserialize<string>(record.GetExtensionSnapshot(Code)) ?? string.Empty;
+            if (value == ThrowValue)
+            {
+                throw new InvalidOperationException("restore failed");
+            }
+
+            IServerPlayerExtensions.SetModData(context.Player, ModDataKey, value);
+        }
     }
 }

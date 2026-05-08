@@ -26,6 +26,8 @@ public class RpCharacterService
         ["rpchar-error-duplicate-name"] = "You already have an active RP character named '{0}'.",
         ["rpchar-error-valid-online-player"] = "A valid online player is required.",
         ["rpchar-error-switch-in-progress"] = "A character switch is already in progress for this account.",
+        ["rpchar-error-switch-failed"] = "Character switch failed before it could be completed: {0}",
+        ["rpchar-error-switch-rollback-failed"] = "Character switch failed and rollback also failed: {0}",
         ["rpchar-error-no-match"] = "No active RP character matches '{0}'.",
         ["rpchar-error-archive-active"] = "Cannot archive the active RP character. Switch to another character first.",
         ["rpchar-success-created"] = "Created RP character '{0}' ({1}).",
@@ -38,12 +40,35 @@ public class RpCharacterService
     private readonly ModConfig _config;
     private readonly Func<string, object[], string> _localize;
     private readonly HashSet<string> _swapLocks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private readonly List<IRpCharacterSwitchParticipant> _participants = new List<IRpCharacterSwitchParticipant>();
 
-    public RpCharacterService(ModConfig config, Func<string, object[], string> localize = null)
+    public RpCharacterService(ModConfig config, Func<string, object[], string> localize = null, IEnumerable<IRpCharacterSwitchParticipant> participants = null)
     {
         _config = config ?? new ModConfig();
         _config.InitializeDefaultsIfNeeded();
         _localize = localize ?? EnglishText;
+        _participants.Add(new RpCharacterProjectionParticipant(this));
+        if (participants != null)
+        {
+            foreach (var participant in participants)
+            {
+                RegisterParticipant(participant);
+            }
+        }
+    }
+
+    public IReadOnlyList<IRpCharacterSwitchParticipant> Participants => _participants;
+
+    public void RegisterParticipant(IRpCharacterSwitchParticipant participant)
+    {
+        if (participant == null || string.IsNullOrWhiteSpace(participant.Code))
+        {
+            return;
+        }
+
+        _participants.RemoveAll(existing => existing.Code.Equals(participant.Code, StringComparison.OrdinalIgnoreCase));
+        _participants.Add(participant);
+        _participants.Sort(CompareParticipants);
     }
 
     public RpCharacterRegistry EnsureRegistry(IServerPlayer player)
@@ -55,6 +80,7 @@ public class RpCharacterService
         {
             var defaultRecord = CreateRecord(GenerateCharacterId(registry, player.PlayerName), GetDefaultDisplayName(player), CaptureProjection(player));
             registry.Characters.Add(defaultRecord);
+            CaptureIntoRecord(new RpCharacterSwitchContext(player, _config, registry, defaultRecord, defaultRecord), defaultRecord);
             activeId = defaultRecord.CharacterId;
             SaveRegistry(player, registry);
             SetActiveCharacterId(player, activeId);
@@ -70,7 +96,7 @@ public class RpCharacterService
             SetActiveCharacterId(player, activeId);
         }
 
-        CaptureIntoRecord(player, activeRecord);
+        CaptureIntoRecord(new RpCharacterSwitchContext(player, _config, registry, activeRecord, activeRecord), activeRecord);
         SaveRegistry(player, registry);
         return registry;
     }
@@ -79,13 +105,25 @@ public class RpCharacterService
     {
         var registry = IServerPlayerExtensions.GetModData(player, CharacterSlotsKey, new RpCharacterRegistry()) ?? new RpCharacterRegistry();
         registry.Characters ??= new List<RpCharacterRecord>();
-        registry.Version = registry.Version <= 0 ? 1 : registry.Version;
+        registry.Version = registry.Version <= 0 ? 2 : Math.Max(registry.Version, 2);
 
         foreach (var character in registry.Characters)
         {
             character.CharacterId ??= string.Empty;
             character.DisplayName ??= string.Empty;
+            character.SnapshotVersion = character.SnapshotVersion <= 0 ? 1 : character.SnapshotVersion;
             character.Projection ??= CreateDefaultProjection();
+            character.Appearance ??= new RpCharacterAppearanceSnapshot();
+            character.Inventory ??= new RpCharacterInventorySnapshot();
+            character.Inventory.Inventories ??= new List<RpCharacterInventoryData>();
+            character.Body ??= new RpCharacterBodySnapshot();
+            character.Body.Health ??= new RpCharacterHealthSnapshot();
+            character.Body.Hunger ??= new RpCharacterHungerSnapshot();
+            character.Body.Position ??= new RpCharacterPositionSnapshot();
+            character.Body.PositionBeforeFalling ??= new RpCharacterPositionSnapshot();
+            character.Body.Spawn ??= new RpCharacterSpawnSnapshot();
+            character.Extensions ??= new List<RpCharacterExtensionSnapshot>();
+            character.Extensions.RemoveAll(extension => extension == null || string.IsNullOrWhiteSpace(extension.Key));
             NormalizeProjection(character.Projection);
         }
 
@@ -153,21 +191,56 @@ public class RpCharacterService
             var activeId = GetActiveCharacterId(player);
             if (target.CharacterId.Equals(activeId, StringComparison.OrdinalIgnoreCase))
             {
-                CaptureIntoRecord(player, target);
+                CaptureIntoRecord(new RpCharacterSwitchContext(player, _config, registry, target, target), target);
                 SaveRegistry(player, registry);
                 return RpCharacterOperationResult.Ok(Text("rpchar-success-already-active", Safe(target.DisplayName)), target);
             }
 
             var active = FindCharacter(registry, activeId, includeArchived: true);
-            if (active != null)
+            var context = new RpCharacterSwitchContext(player, _config, registry, active, target);
+            var validationResult = ValidateSwitch(context);
+            if (!validationResult.Success)
             {
-                CaptureIntoRecord(player, active);
+                return validationResult;
             }
 
-            RestoreProjection(player, target.Projection);
-            SetActiveCharacterId(player, target.CharacterId);
-            SaveRegistry(player, registry);
-            player.ClearOutgoingTpaRequest();
+            var prepareResult = PrepareSwitch(context);
+            if (!prepareResult.Success)
+            {
+                return prepareResult;
+            }
+
+            if (active != null)
+            {
+                CaptureIntoRecord(context, active);
+            }
+
+            try
+            {
+                RestoreRecord(context, target);
+                SetActiveCharacterId(player, target.CharacterId);
+                SaveRegistry(player, registry);
+                player.ClearOutgoingTpaRequest();
+            }
+            catch (Exception exception)
+            {
+                if (active != null)
+                {
+                    try
+                    {
+                        var rollbackCurrent = target;
+                        var rollbackTarget = active;
+                        RestoreRecord(new RpCharacterSwitchContext(player, _config, registry, rollbackCurrent, rollbackTarget), active);
+                        SaveRegistry(player, registry);
+                    }
+                    catch (Exception rollbackException)
+                    {
+                        return RpCharacterOperationResult.Error(Text("rpchar-error-switch-rollback-failed", Safe(rollbackException.Message)));
+                    }
+                }
+
+                return RpCharacterOperationResult.Error(Text("rpchar-error-switch-failed", Safe(exception.Message)));
+            }
 
             return RpCharacterOperationResult.Ok(Text("rpchar-success-switched", Safe(target.DisplayName)), target);
         }
@@ -228,6 +301,11 @@ public class RpCharacterService
 
     public void CaptureActiveProjection(IServerPlayer player)
     {
+        CaptureActiveCharacterState(player);
+    }
+
+    public void CaptureActiveCharacterState(IServerPlayer player)
+    {
         if (player == null)
         {
             return;
@@ -245,7 +323,7 @@ public class RpCharacterService
             return;
         }
 
-        CaptureIntoRecord(player, active);
+        CaptureIntoRecord(new RpCharacterSwitchContext(player, _config, registry, active, active), active);
         SaveRegistry(player, registry);
     }
 
@@ -286,10 +364,58 @@ public class RpCharacterService
         return projection;
     }
 
-    private void CaptureIntoRecord(IServerPlayer player, RpCharacterRecord record)
+    private void CaptureIntoRecord(RpCharacterSwitchContext context, RpCharacterRecord record)
     {
-        record.Projection = CaptureProjection(player);
+        foreach (var participant in Participants)
+        {
+            participant.Capture(context, record);
+        }
+
+        record.SnapshotVersion = _config.EnableRpCharacterFullSwitching
+            ? Math.Max(record.SnapshotVersion, 2)
+            : Math.Max(record.SnapshotVersion, 1);
         record.ModifiedUtc = NowUtc();
+    }
+
+    private RpCharacterOperationResult ValidateSwitch(RpCharacterSwitchContext context)
+    {
+        foreach (var participant in Participants)
+        {
+            var result = participant.Validate(context);
+            if (result != null && !result.Success)
+            {
+                return result;
+            }
+        }
+
+        return RpCharacterOperationResult.Ok(string.Empty);
+    }
+
+    private RpCharacterOperationResult PrepareSwitch(RpCharacterSwitchContext context)
+    {
+        foreach (var participant in Participants)
+        {
+            if (participant is not IRpCharacterSwitchPreparationParticipant preparationParticipant)
+            {
+                continue;
+            }
+
+            var result = preparationParticipant.Prepare(context);
+            if (result != null && !result.Success)
+            {
+                return result;
+            }
+        }
+
+        return RpCharacterOperationResult.Ok(string.Empty);
+    }
+
+    private void RestoreRecord(RpCharacterSwitchContext context, RpCharacterRecord record)
+    {
+        foreach (var participant in Participants)
+        {
+            participant.Restore(context, record);
+        }
     }
 
     private void SaveRegistry(IServerPlayer player, RpCharacterRegistry registry)
@@ -347,14 +473,22 @@ public class RpCharacterService
     private RpCharacterRecord CreateRecord(string characterId, string displayName, RpCharacterProjectionSnapshot projection)
     {
         var now = NowUtc();
-        return new RpCharacterRecord
+        var record = new RpCharacterRecord
         {
             CharacterId = characterId,
             DisplayName = displayName,
             Projection = projection,
+            SnapshotVersion = _config.EnableRpCharacterFullSwitching ? 2 : 1,
             CreatedUtc = now,
             ModifiedUtc = now
         };
+
+        if (_config.EnableRpCharacterFullSwitching && _config.EnableRpCharacterInventorySwitching)
+        {
+            record.Inventory.Available = true;
+        }
+
+        return record;
     }
 
     private string GetDefaultDisplayName(IServerPlayer player)
@@ -494,6 +628,14 @@ public class RpCharacterService
     private static string NowUtc()
     {
         return DateTime.UtcNow.ToString("O");
+    }
+
+    private static int CompareParticipants(IRpCharacterSwitchParticipant left, IRpCharacterSwitchParticipant right)
+    {
+        var orderComparison = left.Order.CompareTo(right.Order);
+        return orderComparison != 0
+            ? orderComparison
+            : string.Compare(left.Code, right.Code, StringComparison.OrdinalIgnoreCase);
     }
 
     private string Text(string key, params object[] args)
