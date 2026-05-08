@@ -35,6 +35,7 @@ public class ChatUiSystem : ModSystem
     private static dynamic _rpttsChatSystem = null;
     private static CharacterSheetDialog _characterSheetDialog;
     private static CharacterSheetMessageDialog _characterSheetMessageDialog;
+    private static LanguageConfigDialog _languageConfigDialog;
     private static bool _pendingCharacterSheetSave;
     private static bool _pendingCharacterSheetOpenFromCharacterDialog;
     private static bool _suppressNextCharacterDialogSheetOpen;
@@ -268,6 +269,10 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsConfigAdminOpenMessage>()
             .RegisterMessageType<TheBasicsConfigAdminSaveMessage>()
             .RegisterMessageType<TheBasicsConfigAdminResultMessage>()
+            .RegisterMessageType<TheBasicsLanguageConfigOpenRequest>()
+            .RegisterMessageType<TheBasicsLanguageConfigOpenMessage>()
+            .RegisterMessageType<TheBasicsLanguageConfigSaveMessage>()
+            .RegisterMessageType<TheBasicsLanguageConfigResultMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
@@ -280,6 +285,8 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
+            .SetMessageHandler<TheBasicsLanguageConfigOpenMessage>(OnLanguageConfigOpenMessage)
+            .SetMessageHandler<TheBasicsLanguageConfigResultMessage>(OnLanguageConfigResultMessage)
             .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
             .SetMessageHandler<ChatterSoundMessage>(OnChatterSoundMessage)
@@ -471,6 +478,44 @@ public class ChatUiSystem : ModSystem
         OpenConfigAdminDialog();
     }
 
+    private static void OnLanguageConfigOpenMessage(TheBasicsLanguageConfigOpenMessage message)
+    {
+        OpenLanguageConfigDialog(message?.Languages, message?.Message, message?.Success != false);
+    }
+
+    private static void OnLanguageConfigResultMessage(TheBasicsLanguageConfigResultMessage message)
+    {
+        if (!string.IsNullOrWhiteSpace(message?.Message))
+        {
+            _api.ShowChatMessage(message.Message);
+        }
+
+        OpenLanguageConfigDialog(message?.Languages, message?.Message, message?.Success == true);
+    }
+
+    private static void OpenLanguageConfigDialog(IEnumerable<LanguageConfigEntryMessage> languages, string message, bool success)
+    {
+        if (_api == null)
+        {
+            return;
+        }
+
+        var entries = (languages ?? Array.Empty<LanguageConfigEntryMessage>()).ToList();
+        if (_languageConfigDialog == null)
+        {
+            _languageConfigDialog = new LanguageConfigDialog(_api, entries, message, success, SendLanguageConfigSaveRequest, SendLanguageConfigReload);
+        }
+        else
+        {
+            _languageConfigDialog.SetView(entries, message, success);
+        }
+
+        if (!_languageConfigDialog.IsOpened())
+        {
+            _languageConfigDialog.TryOpen();
+        }
+    }
+
     private static void UpdateConfigAdminDraft(IEnumerable<ConfigAdminSettingValue> values, IEnumerable<string> reviewedKeys, string statusMessage)
     {
         _configAdminDraft = ConfigAdminSettingRegistry.Settings.ToDictionary(
@@ -578,12 +623,18 @@ public class ChatUiSystem : ModSystem
         }
 
         rows.Add(new DialogRow(
+            CreateButton("languages", Lang.Get("thebasics:config-admin-languages"), Lang.Get("thebasics:config-admin-languages-tooltip")),
             CreateButton("save", Lang.Get("thebasics:config-admin-save"), Lang.Get("thebasics:config-admin-save-tooltip")),
             CreateButton("mark-reviewed", Lang.Get("thebasics:config-admin-mark-reviewed"), Lang.Get("thebasics:config-admin-mark-reviewed-tooltip")),
-            CreateButton("reload", Lang.Get("thebasics:config-admin-reload"), Lang.Get("thebasics:config-admin-reload-tooltip")),
-            CreateButton("close", Lang.Get("thebasics:config-admin-close"), Lang.Get("thebasics:config-admin-close-tooltip")))
+            CreateButton("reload", Lang.Get("thebasics:config-admin-reload"), Lang.Get("thebasics:config-admin-reload-tooltip")))
         {
             TopPadding = 12
+        });
+
+        rows.Add(new DialogRow(
+            CreateButton("close", Lang.Get("thebasics:config-admin-close"), Lang.Get("thebasics:config-admin-close-tooltip")))
+        {
+            TopPadding = 4
         });
 
         return new JsonDialogSettings
@@ -687,6 +738,9 @@ public class ChatUiSystem : ModSystem
             case "save":
                 SendConfigAdminSave();
                 break;
+            case "languages":
+                SendLanguageConfigOpenRequest();
+                break;
             case "mark-reviewed":
                 SendConfigAdminMarkReviewed();
                 break;
@@ -730,6 +784,27 @@ public class ChatUiSystem : ModSystem
     private static void SendConfigAdminReload()
     {
         _safeNetworkChannel?.SendPacketSafely(new TheBasicsConfigAdminSaveMessage
+        {
+            ReloadFromDisk = true
+        });
+    }
+
+    private static void SendLanguageConfigOpenRequest()
+    {
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsLanguageConfigOpenRequest());
+    }
+
+    private static void SendLanguageConfigSaveRequest(List<LanguageConfigEntryMessage> languages)
+    {
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsLanguageConfigSaveMessage
+        {
+            Languages = languages ?? new List<LanguageConfigEntryMessage>()
+        });
+    }
+
+    private static void SendLanguageConfigReload()
+    {
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsLanguageConfigSaveMessage
         {
             ReloadFromDisk = true
         });
@@ -1313,6 +1388,8 @@ public class ChatUiSystem : ModSystem
             _pendingConfigActions.Clear();
             _safeNetworkChannel?.Dispose();
             _safeNetworkChannel = null;
+            _languageConfigDialog?.TryClose();
+            _languageConfigDialog = null;
             _configAdminDialog?.TryClose();
             _configAdminDialog = null;
             _configAdminDraft.Clear();
