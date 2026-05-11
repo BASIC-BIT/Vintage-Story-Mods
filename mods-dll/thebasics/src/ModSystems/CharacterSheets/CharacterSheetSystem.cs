@@ -250,66 +250,27 @@ public class CharacterSheetSystem : BaseBasicModSystem
 
     internal HeadshotUploadResult HandleHeadshotUpload(IServerPlayer sender, HeadshotUploadRequest request)
     {
-        if (!Config.EnableCharacterSheets || !Config.EnableCharacterHeadshots || _headshotStore == null)
-        {
-            return HeadshotUploadFail(sender?.PlayerUID, Lang.Get("thebasics:headshot-error-disabled"));
-        }
+        var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        if (sender == null || request == null)
+        var resolveFail = ResolveHeadshotUploadTarget(sender, request, out var target, out var isAdminAction);
+        if (resolveFail != null)
         {
-            return HeadshotUploadFail(sender?.PlayerUID, Lang.Get("thebasics:headshot-error-bad-request"));
-        }
-
-        var isAdminAction = !string.IsNullOrWhiteSpace(request.AdminTargetPlayerUid)
-                            && !request.AdminTargetPlayerUid.Equals(sender.PlayerUID, StringComparison.Ordinal);
-
-        if (isAdminAction && !sender.HasPrivilege(Config.CharacterSheetAdminPermission))
-        {
-            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:charsheet-error-admin-privilege"));
-        }
-
-        var target = isAdminAction
-            ? API.GetPlayerByUID(request.AdminTargetPlayerUid)
-            : sender;
-        if (target == null)
-        {
-            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:charsheet-error-player-not-found"));
-        }
-
-        if (!isAdminAction && !sender.HasPrivilege(Config.CharacterSheetSetPermission))
-        {
-            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:headshot-error-no-permission"));
+            return resolveFail;
         }
 
         var maxKb = Math.Max(1, Config.HeadshotMaxKb);
         var maxOutputBytes = maxKb * 1024;
         var inputBytes = request.PngBytes;
-        if (inputBytes == null || inputBytes.Length == 0)
+        var sizeFail = ValidateHeadshotUploadSize(target, inputBytes, maxOutputBytes, maxKb);
+        if (sizeFail != null)
         {
-            return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-empty"));
+            return sizeFail;
         }
 
-        // Pre-decode size guard: even before decoding, the *encoded* input shouldn't exceed our cap by much.
-        // Allow up to 4x the post-normalization budget for the encoded input (heuristic for JPEGs that compress well).
-        var inputMaxBytes = Math.Max(maxOutputBytes * 4, 64 * 1024);
-        if (inputBytes.Length > inputMaxBytes)
+        var cooldownFail = CheckHeadshotUploadCooldown(sender, target, isAdminAction, nowMs);
+        if (cooldownFail != null)
         {
-            return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-too-large", maxKb));
-        }
-
-        if (!isAdminAction)
-        {
-            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            if (_lastHeadshotUploadAtMs.TryGetValue(sender.PlayerUID, out var lastMs))
-            {
-                var cooldownMs = Math.Max(0, Config.HeadshotUploadCooldownSec) * 1000L;
-                var sinceMs = nowMs - lastMs;
-                if (sinceMs < cooldownMs)
-                {
-                    var waitSec = (int)Math.Ceiling((cooldownMs - sinceMs) / 1000.0);
-                    return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-cooldown", waitSec));
-                }
-            }
+            return cooldownFail;
         }
 
         var options = new HeadshotPipeline.NormalizeOptions(
@@ -329,13 +290,13 @@ public class CharacterSheetSystem : BaseBasicModSystem
         }
 
         var data = GetSheetData(target);
-        data.Headshot = HeadshotPipeline.BuildMetadata(result, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        data.Headshot = HeadshotPipeline.BuildMetadata(result, nowMs);
         SaveSheetData(target, data);
         SyncHeadshotHashAttr(target, result.Hash);
 
         if (!isAdminAction)
         {
-            _lastHeadshotUploadAtMs[sender.PlayerUID] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            _lastHeadshotUploadAtMs[sender.PlayerUID] = nowMs;
         }
 
         // Hash from ComputeSha256Hex is always 64 hex chars.
@@ -348,6 +309,84 @@ public class CharacterSheetSystem : BaseBasicModSystem
             Metadata = data.Headshot,
             Message = Lang.Get("thebasics:headshot-upload-success")
         };
+    }
+
+    private HeadshotUploadResult ResolveHeadshotUploadTarget(IServerPlayer sender, HeadshotUploadRequest request, out IServerPlayer target, out bool isAdminAction)
+    {
+        target = null;
+        isAdminAction = false;
+
+        if (!Config.EnableCharacterSheets || !Config.EnableCharacterHeadshots || _headshotStore == null)
+        {
+            return HeadshotUploadFail(sender?.PlayerUID, Lang.Get("thebasics:headshot-error-disabled"));
+        }
+
+        if (sender == null || request == null)
+        {
+            return HeadshotUploadFail(sender?.PlayerUID, Lang.Get("thebasics:headshot-error-bad-request"));
+        }
+
+        isAdminAction = !string.IsNullOrWhiteSpace(request.AdminTargetPlayerUid)
+                        && !request.AdminTargetPlayerUid.Equals(sender.PlayerUID, StringComparison.Ordinal);
+
+        if (isAdminAction && !sender.HasPrivilege(Config.CharacterSheetAdminPermission))
+        {
+            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:charsheet-error-admin-privilege"));
+        }
+
+        target = isAdminAction ? API.GetPlayerByUID(request.AdminTargetPlayerUid) : sender;
+        if (target == null)
+        {
+            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:charsheet-error-player-not-found"));
+        }
+
+        if (!isAdminAction && !sender.HasPrivilege(Config.CharacterSheetSetPermission))
+        {
+            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:headshot-error-no-permission"));
+        }
+
+        return null;
+    }
+
+    private HeadshotUploadResult ValidateHeadshotUploadSize(IServerPlayer target, byte[] inputBytes, int maxOutputBytes, int maxKb)
+    {
+        if (inputBytes == null || inputBytes.Length == 0)
+        {
+            return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-empty"));
+        }
+
+        // Pre-decode size guard: even before decoding, the *encoded* input shouldn't exceed our cap by much.
+        // Allow up to 4x the post-normalization budget for the encoded input (heuristic for JPEGs that compress well).
+        var inputMaxBytes = Math.Max(maxOutputBytes * 4, 64 * 1024);
+        if (inputBytes.Length > inputMaxBytes)
+        {
+            return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-too-large", maxKb));
+        }
+
+        return null;
+    }
+
+    private HeadshotUploadResult CheckHeadshotUploadCooldown(IServerPlayer sender, IServerPlayer target, bool isAdminAction, long nowMs)
+    {
+        if (isAdminAction)
+        {
+            return null;
+        }
+
+        if (!_lastHeadshotUploadAtMs.TryGetValue(sender.PlayerUID, out var lastMs))
+        {
+            return null;
+        }
+
+        var cooldownMs = Math.Max(0, Config.HeadshotUploadCooldownSec) * 1000L;
+        var sinceMs = nowMs - lastMs;
+        if (sinceMs >= cooldownMs)
+        {
+            return null;
+        }
+
+        var waitSec = (int)Math.Ceiling((cooldownMs - sinceMs) / 1000.0);
+        return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-cooldown", waitSec));
     }
 
     internal HeadshotFetchResult HandleHeadshotFetch(IServerPlayer sender, HeadshotFetchRequest request)
@@ -365,6 +404,13 @@ public class CharacterSheetSystem : BaseBasicModSystem
         var target = API.GetPlayerByUID(request.TargetPlayerUid);
         if (target == null)
         {
+            return new HeadshotFetchResult { TargetPlayerUid = request.TargetPlayerUid };
+        }
+
+        if (!IsHeadshotFetchAuthorized(sender, target))
+        {
+            // Indistinguishable from "target has no headshot" so we don't leak whether a
+            // far-away player has uploaded one.
             return new HeadshotFetchResult { TargetPlayerUid = request.TargetPlayerUid };
         }
 
@@ -412,6 +458,49 @@ public class CharacterSheetSystem : BaseBasicModSystem
         result.Width = 0;
         result.Height = 0;
         return result;
+    }
+
+    /// <summary>
+    /// Mirrors nametag-render authorization: a player can only fetch a portrait when they are the
+    /// owner, an admin, or in physical proximity to the target. Prevents UID-enumeration attacks
+    /// that would otherwise download portraits of non-public profiles.
+    /// </summary>
+    private bool IsHeadshotFetchAuthorized(IServerPlayer sender, IServerPlayer target)
+    {
+        if (sender == null || target == null)
+        {
+            return false;
+        }
+
+        if (string.Equals(sender.PlayerUID, target.PlayerUID, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (sender.HasPrivilege(Config.CharacterSheetAdminPermission))
+        {
+            return true;
+        }
+
+        // NametagRenderRange is the same gate vanilla uses for showing a nametag at all, so
+        // by definition a player who can see the nametag is "in range" to see the portrait.
+        // A configured range of 0 means "no nametags rendered" — match that strictness here
+        // and refuse all non-self/non-admin fetches.
+        var range = Config.NametagRenderRange;
+        if (range <= 0)
+        {
+            return false;
+        }
+
+        var senderEntity = sender.Entity;
+        var targetEntity = target.Entity;
+        if (senderEntity == null || targetEntity == null)
+        {
+            return false;
+        }
+
+        var distanceSq = senderEntity.ServerPos.SquareDistanceTo(targetEntity.ServerPos.XYZ);
+        return distanceSq <= (double)range * range;
     }
 
     internal bool ClearHeadshot(IServerPlayer target)

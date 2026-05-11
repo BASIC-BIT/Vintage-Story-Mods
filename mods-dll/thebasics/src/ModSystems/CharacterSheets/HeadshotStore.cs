@@ -82,6 +82,7 @@ public sealed class HeadshotStore
             return false;
         }
 
+        string tmp = null;
         try
         {
             var path = ResolveFilePath(playerUid, characterId);
@@ -91,16 +92,26 @@ public sealed class HeadshotStore
                 Directory.CreateDirectory(dir);
             }
 
-            var tmp = path + ".tmp";
+            tmp = path + ".tmp";
             File.WriteAllBytes(tmp, pngBytes);
             // File.Move with overwrite is atomic on the same volume on modern .NET.
             File.Move(tmp, path, overwrite: true);
+            tmp = null;
             return true;
         }
         catch (Exception ex)
         {
             _api.Logger.Warning($"[thebasics] Failed to write headshot for {playerUid}/{characterId}: {ex.Message}");
             return false;
+        }
+        finally
+        {
+            // Best-effort cleanup of the staging file when the rename never happened (write failed
+            // or rename threw). Prevents stale `.tmp` siblings piling up under repeated failures.
+            if (tmp != null)
+            {
+                try { File.Delete(tmp); } catch { /* ignore — leftover cleanup, not load-bearing */ }
+            }
         }
     }
 

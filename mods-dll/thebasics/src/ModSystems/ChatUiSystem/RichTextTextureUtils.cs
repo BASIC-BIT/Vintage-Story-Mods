@@ -98,64 +98,119 @@ internal static class RichTextTextureUtils
             }
             CenterVisualLines(renderComps, textWidthPx);
 
-            var hPad = GetScaledLengthPx(background.HorPadding, guiScale);
-            var verPad = GetScaledLengthPx(background.VerPadding, guiScale);
-            // Inset the bubble path so its stroke renders fully inside the surface, plus one
-            // extra transparent pixel to absorb Cairo's AA bleed (which extends ~0.5px past the
-            // geometric stroke). Without that AA margin the surface's outermost column ends up
-            // with ~50% alpha border color, which flickers under GL sampling at varying subpixel
-            // positions.
-            var borderInset = background.BorderWidth > 0 ? (int)Math.Ceiling(background.BorderWidth / 2.0) + 1 : 0;
-            var bubbleWidth = textWidthPx + 2 * hPad;
-            var bubbleHeight = textHeightPx + 2 * verPad;
-            var surfaceWidth = bubbleWidth + 2 * borderInset;
-            var surfaceHeight = bubbleHeight + 2 * borderInset + Math.Max(0, extraBottomMarginPx);
+            var layout = ComputeBubbleLayout(background, textWidthPx, textHeightPx, guiScale, extraBottomMarginPx);
 
-            var surface = new ImageSurface(Format.Argb32, surfaceWidth, surfaceHeight);
-            using var ctx = new Context(surface);
-
-            GuiElement.RoundRectangle(ctx, borderInset, borderInset, bubbleWidth, bubbleHeight, background.Radius);
-            ctx.SetSourceRGBA(background.FillColor);
-            if (background.BorderWidth > 0)
+            var surface = new ImageSurface(Format.Argb32, layout.SurfaceWidth, layout.SurfaceHeight);
+            try
             {
-                ctx.FillPreserve();
-                ctx.LineWidth = background.BorderWidth;
-                ctx.SetSourceRGBA(background.BorderColor);
-                ctx.Stroke();
+                using var ctx = new Context(surface);
+
+                PaintBubbleBackground(ctx, background, layout);
+                ComposeTextInsideBubble(rich, ctx, surface, layout, guiScale);
+                ClearBottomMargin(ctx, layout, extraBottomMarginPx);
+
+                return surface;
             }
-            else
+            catch
             {
-                ctx.Fill();
+                // Painting failed after the surface was allocated; release the native memory before
+                // we fall through to the outer catch (which returns null without a reference).
+                surface.Dispose();
+                throw;
             }
-
-            // Text inside the bubble, centered vertically within the bubble's interior.
-            var vPad = (bubbleHeight - textHeightPx) / 2.0;
-            var offsetBounds = ElementBounds.Fixed(
-                (borderInset + hPad) / guiScale,
-                (borderInset + vPad) / guiScale,
-                textWidthPx / (double)guiScale,
-                textHeightPx / (double)guiScale
-            );
-            offsetBounds.ParentBounds = ElementBounds.Empty;
-            rich.ComposeFor(offsetBounds, ctx, surface);
-
-            // Clear the bottom transparent margin (chat-bubble spacing) so no stray Cairo AA
-            // bleeds into the gap separating the bubble from the nametag below it.
-            if (extraBottomMarginPx > 0)
-            {
-                ctx.Save();
-                ctx.Operator = Operator.Clear;
-                ctx.Rectangle(0, borderInset + bubbleHeight, surfaceWidth, extraBottomMarginPx + borderInset);
-                ctx.Fill();
-                ctx.Restore();
-            }
-
-            return surface;
         }
         catch
         {
             return null;
         }
+    }
+
+    private sealed class BubbleLayout
+    {
+        public int BorderInset { get; init; }
+        public int HPad { get; init; }
+        public int VPad { get; init; }
+        public int TextWidthPx { get; init; }
+        public int TextHeightPx { get; init; }
+        public int BubbleWidth { get; init; }
+        public int BubbleHeight { get; init; }
+        public int SurfaceWidth { get; init; }
+        public int SurfaceHeight { get; init; }
+    }
+
+    private static BubbleLayout ComputeBubbleLayout(TextBackground background, int textWidthPx, int textHeightPx, double guiScale, int extraBottomMarginPx)
+    {
+        var hPad = GetScaledLengthPx(background.HorPadding, guiScale);
+        var verPad = GetScaledLengthPx(background.VerPadding, guiScale);
+        // Inset the bubble path so its stroke renders fully inside the surface, plus one
+        // extra transparent pixel to absorb Cairo's AA bleed (which extends ~0.5px past the
+        // geometric stroke). Without that AA margin the surface's outermost column ends up
+        // with ~50% alpha border color, which flickers under GL sampling at varying subpixel
+        // positions.
+        var borderInset = background.BorderWidth > 0 ? (int)Math.Ceiling(background.BorderWidth / 2.0) + 1 : 0;
+        var bubbleWidth = textWidthPx + 2 * hPad;
+        var bubbleHeight = textHeightPx + 2 * verPad;
+        var surfaceWidth = bubbleWidth + 2 * borderInset;
+        var surfaceHeight = bubbleHeight + 2 * borderInset + Math.Max(0, extraBottomMarginPx);
+        return new BubbleLayout
+        {
+            BorderInset = borderInset,
+            HPad = hPad,
+            VPad = verPad,
+            TextWidthPx = textWidthPx,
+            TextHeightPx = textHeightPx,
+            BubbleWidth = bubbleWidth,
+            BubbleHeight = bubbleHeight,
+            SurfaceWidth = surfaceWidth,
+            SurfaceHeight = surfaceHeight
+        };
+    }
+
+    private static void PaintBubbleBackground(Context ctx, TextBackground background, BubbleLayout layout)
+    {
+        GuiElement.RoundRectangle(ctx, layout.BorderInset, layout.BorderInset, layout.BubbleWidth, layout.BubbleHeight, background.Radius);
+        ctx.SetSourceRGBA(background.FillColor);
+        if (background.BorderWidth > 0)
+        {
+            ctx.FillPreserve();
+            ctx.LineWidth = background.BorderWidth;
+            ctx.SetSourceRGBA(background.BorderColor);
+            ctx.Stroke();
+        }
+        else
+        {
+            ctx.Fill();
+        }
+    }
+
+    private static void ComposeTextInsideBubble(GuiElementRichtext rich, Context ctx, ImageSurface surface, BubbleLayout layout, double guiScale)
+    {
+        // Text inside the bubble, centered vertically within the bubble's interior.
+        var vPad = (layout.BubbleHeight - layout.TextHeightPx) / 2.0;
+        var offsetBounds = ElementBounds.Fixed(
+            (layout.BorderInset + layout.HPad) / guiScale,
+            (layout.BorderInset + vPad) / guiScale,
+            layout.TextWidthPx / guiScale,
+            layout.TextHeightPx / guiScale
+        );
+        offsetBounds.ParentBounds = ElementBounds.Empty;
+        rich.ComposeFor(offsetBounds, ctx, surface);
+    }
+
+    private static void ClearBottomMargin(Context ctx, BubbleLayout layout, int extraBottomMarginPx)
+    {
+        // Clear the bottom transparent margin (chat-bubble spacing) so no stray Cairo AA
+        // bleeds into the gap separating the bubble from the nametag below it.
+        if (extraBottomMarginPx <= 0)
+        {
+            return;
+        }
+
+        ctx.Save();
+        ctx.Operator = Operator.Clear;
+        ctx.Rectangle(0, layout.BorderInset + layout.BubbleHeight, layout.SurfaceWidth, extraBottomMarginPx + layout.BorderInset);
+        ctx.Fill();
+        ctx.Restore();
     }
 
     private static bool UsesMultipleVisualLines(RichTextComponentBase[] components)
