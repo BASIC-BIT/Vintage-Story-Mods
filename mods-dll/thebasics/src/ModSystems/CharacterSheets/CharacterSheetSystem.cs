@@ -482,6 +482,16 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return true;
         }
 
+        // NametagRenderRange is the same gate vanilla uses for showing a nametag at all, so
+        // by definition a player who can see the nametag is "in range" to see the portrait.
+        // A configured range of 0 means "no nametags rendered" — match that strictness here
+        // and refuse all non-self/non-admin fetches.
+        var range = Config.NametagRenderRange;
+        if (range <= 0)
+        {
+            return false;
+        }
+
         var senderEntity = sender.Entity;
         var targetEntity = target.Entity;
         if (senderEntity == null || targetEntity == null)
@@ -489,9 +499,6 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return false;
         }
 
-        // NametagRenderRange is the same gate vanilla uses for showing a nametag at all, so
-        // by definition a player who can see the nametag is "in range" to see the portrait.
-        var range = Math.Max(1, Config.NametagRenderRange);
         var distanceSq = senderEntity.ServerPos.SquareDistanceTo(targetEntity.ServerPos.XYZ);
         return distanceSq <= (double)range * range;
     }
