@@ -7,6 +7,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
@@ -49,6 +50,24 @@ public static class EntityBehaviorNameTagPatches
         {
             // Crash-safe: don't break vanilla nametag rendering.
         }
+    }
+
+    /// <summary>
+    /// Called by ChatUiSystem when a client-side player leaves so the tracked-entity dictionary
+    /// doesn't pin <see cref="Entity"/> references for disconnected players.
+    /// </summary>
+    public static void OnPlayerLeft(string playerUid)
+    {
+        if (string.IsNullOrEmpty(playerUid)) return;
+        _trackedPlayerEntities.Remove(playerUid);
+    }
+
+    /// <summary>
+    /// Drops every tracked-entity reference. Called from ChatUiSystem.Dispose() on mod unload.
+    /// </summary>
+    public static void ClearTrackedPlayers()
+    {
+        _trackedPlayerEntities.Clear();
     }
 
     /// <summary>
@@ -97,11 +116,7 @@ public static class EntityBehaviorNameTagPatches
             return;
         }
 
-        // Track player entities so HeadshotFetchResult can poke the right one.
-        if (entity is EntityPlayer ep && ep.PlayerUID is { Length: > 0 } uid)
-        {
-            _trackedPlayerEntities[uid] = entity;
-        }
+        TrackPlayerEntity(entity);
 
         var nametagTree = entity.WatchedAttributes?.GetTreeAttribute("nametag");
         var name = nametagTree?.GetString("name") ?? string.Empty;
@@ -110,65 +125,16 @@ public static class EntityBehaviorNameTagPatches
             return;
         }
 
-        var headshotHash = nametagTree?.GetString(CharacterSheetSystem.HeadshotHashAttrKey) ?? string.Empty;
-        BitmapExternal headshotBitmap = null;
-        var inlineImageEnabled = ChatUiSystem.IsHeadshotInNametagEnabled();
-        if (inlineImageEnabled && !string.IsNullOrEmpty(headshotHash))
-        {
-            var pngBytes = ChatUiSystem.TryGetCachedHeadshotPngBytes(headshotHash);
-            if (pngBytes != null && pngBytes.Length > 0)
-            {
-                try
-                {
-                    headshotBitmap = new BitmapExternal(pngBytes, pngBytes.Length, capi.Logger);
-                }
-                catch
-                {
-                    headshotBitmap?.Dispose();
-                    headshotBitmap = null;
-                }
-            }
-            else if (entity is EntityPlayer playerEntity && playerEntity.PlayerUID is { Length: > 0 } trackedUid)
-            {
-                // Bytes not yet available — kick off a fetch and we'll rebuild when they arrive.
-                ChatUiSystem.RequestHeadshotForHash(trackedUid, headshotHash);
-            }
-        }
-
-        // Text bubble styled like vanilla so the visual baseline stays familiar; the framed headshot
-        // floats next to it as a separate visual element (MMO-style portrait card).
-        var background = new TextBackground
-        {
-            FillColor = GuiStyle.DialogLightBgColor,
-            Padding = 3,
-            Radius = GuiStyle.ElementBGRadius,
-            Shade = true,
-            BorderColor = GuiStyle.DialogBorderColor,
-            BorderWidth = 3.0
-        };
-
-        var baseFont = CairoFont.WhiteMediumText().WithColor(ColorUtil.WhiteArgbDouble);
-        baseFont.Orientation = EnumTextOrientation.Left;
-
+        var headshotBitmap = TryAcquireHeadshotBitmap(capi, entity, nametagTree);
         try
         {
-            // Vanilla supports legacy "nametag-..." Lang lookups for hardcoded entity names.
-            // Our display names are runtime-built and never collide; preserve the lookup just in case.
-            var resolvedName = Lang.GetIfExists("nametag-" + name.ToLowerInvariant()) ?? name;
-
-            // Compose VTML on the client side using the plain name + separate nickname-color
-            // sub-attribute. Keeps the watched-attr "nametag/name" plain so vanilla code paths
-            // (look-at HUD, character dialog title, etc.) don't render literal `<font>` tags.
-            var nicknameColor = nametagTree?.GetString(CharacterSheetSystem.NicknameColorAttrKey) ?? string.Empty;
-            var playerName = (entity as EntityPlayer)?.Player?.PlayerName ?? string.Empty;
-            var vtml = WrapWithNicknameColor(resolvedName, nicknameColor, playerName);
-
+            var vtml = BuildNametagVtml(name, nametagTree, entity);
             var newTex = NametagComposer.Compose(capi, new NametagComposer.Options
             {
                 Vtml = vtml,
-                BaseFont = baseFont,
+                BaseFont = BuildBaseFont(),
                 MaxTextWidthPx = NametagMaxTextWidthPx,
-                TextBackground = background,
+                TextBackground = BuildBubbleBackground(),
                 HeadshotBitmap = headshotBitmap,
                 HeadshotRenderSizePx = ChatUiSystem.GetNametagInlineImagePixelSize()
             });
@@ -186,6 +152,85 @@ public static class EntityBehaviorNameTagPatches
         {
             headshotBitmap?.Dispose();
         }
+    }
+
+    private static void TrackPlayerEntity(Entity entity)
+    {
+        // So HeadshotFetchResult can poke the right one when bytes arrive later.
+        if (entity is EntityPlayer ep && ep.PlayerUID is { Length: > 0 } uid)
+        {
+            _trackedPlayerEntities[uid] = entity;
+        }
+    }
+
+    private static BitmapExternal TryAcquireHeadshotBitmap(ICoreClientAPI capi, Entity entity, ITreeAttribute nametagTree)
+    {
+        if (!ChatUiSystem.IsHeadshotInNametagEnabled())
+        {
+            return null;
+        }
+
+        var headshotHash = nametagTree?.GetString(CharacterSheetSystem.HeadshotHashAttrKey) ?? string.Empty;
+        if (string.IsNullOrEmpty(headshotHash))
+        {
+            return null;
+        }
+
+        var pngBytes = ChatUiSystem.TryGetCachedHeadshotPngBytes(headshotHash);
+        if (pngBytes == null || pngBytes.Length == 0)
+        {
+            // Bytes not yet available — kick off a fetch and we'll rebuild when they arrive.
+            if (entity is EntityPlayer playerEntity && playerEntity.PlayerUID is { Length: > 0 } trackedUid)
+            {
+                ChatUiSystem.RequestHeadshotForHash(trackedUid, headshotHash);
+            }
+            return null;
+        }
+
+        try
+        {
+            return new BitmapExternal(pngBytes, pngBytes.Length, capi.Logger);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string BuildNametagVtml(string name, ITreeAttribute nametagTree, Entity entity)
+    {
+        // Vanilla supports legacy "nametag-..." Lang lookups for hardcoded entity names.
+        // Our display names are runtime-built and never collide; preserve the lookup just in case.
+        var resolvedName = Lang.GetIfExists("nametag-" + name.ToLowerInvariant()) ?? name;
+
+        // Compose VTML on the client side using the plain name + separate nickname-color
+        // sub-attribute. Keeps the watched-attr "nametag/name" plain so vanilla code paths
+        // (look-at HUD, character dialog title, etc.) don't render literal `<font>` tags.
+        var nicknameColor = nametagTree?.GetString(CharacterSheetSystem.NicknameColorAttrKey) ?? string.Empty;
+        var playerName = (entity as EntityPlayer)?.Player?.PlayerName ?? string.Empty;
+        return WrapWithNicknameColor(resolvedName, nicknameColor, playerName);
+    }
+
+    // Text bubble styled like vanilla so the visual baseline stays familiar; the framed headshot
+    // floats next to it as a separate visual element (MMO-style portrait card).
+    private static TextBackground BuildBubbleBackground()
+    {
+        return new TextBackground
+        {
+            FillColor = GuiStyle.DialogLightBgColor,
+            Padding = 3,
+            Radius = GuiStyle.ElementBGRadius,
+            Shade = true,
+            BorderColor = GuiStyle.DialogBorderColor,
+            BorderWidth = 3.0
+        };
+    }
+
+    private static CairoFont BuildBaseFont()
+    {
+        var baseFont = CairoFont.WhiteMediumText().WithColor(ColorUtil.WhiteArgbDouble);
+        baseFont.Orientation = EnumTextOrientation.Left;
+        return baseFont;
     }
 
     /// <summary>

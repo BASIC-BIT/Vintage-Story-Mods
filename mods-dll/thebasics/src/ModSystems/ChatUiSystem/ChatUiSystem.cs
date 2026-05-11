@@ -119,7 +119,7 @@ public class ChatUiSystem : ModSystem
         // Register event handlers
         _api.Event.PlayerJoin += OnPlayerJoin;
         _api.Event.PlayerEntitySpawn += OnPlayerEntitySpawn;
-        // _api.Event.PlayerLeave += OnPlayerLeave;
+        _api.Event.PlayerLeave += OnPlayerLeave;
 
         // Initialize Harmony patches if needed
         if (!Harmony.HasAnyPatches(Mod.Info.ModID))
@@ -275,6 +275,15 @@ public class ChatUiSystem : ModSystem
     private static void OnPlayerEntitySpawn(IClientPlayer byPlayer)
     {
         ApplyClientNametagSettings(byPlayer?.Entity);
+    }
+
+    private static void OnPlayerLeave(IClientPlayer byPlayer)
+    {
+        var uid = byPlayer?.PlayerUID;
+        if (!string.IsNullOrEmpty(uid))
+        {
+            EntityBehaviorNameTagPatches.OnPlayerLeft(uid);
+        }
     }
 
     private void RegisterForServerSideConfig()
@@ -504,7 +513,7 @@ public class ChatUiSystem : ModSystem
                 return;
             }
 
-            SubmitNormalizedUpload(bytes, adminTargetUid);
+            SubmitNormalizedUpload(bytes, adminTargetUid, requestId);
         });
     }
 
@@ -568,7 +577,7 @@ public class ChatUiSystem : ModSystem
             : viewTargetPlayerUid;
     }
 
-    private static void SubmitNormalizedUpload(byte[] inputBytes, string adminTargetUid)
+    private static void SubmitNormalizedUpload(byte[] inputBytes, string adminTargetUid, long requestId)
     {
         if (inputBytes == null || inputBytes.Length == 0 || _config == null)
         {
@@ -588,6 +597,14 @@ public class ChatUiSystem : ModSystem
 
         OnMain(() =>
         {
+            // Re-check after the normalize+marshal hop: a newer drop/url may have superseded us
+            // while we were busy. Without this re-check the stale bytes would still be sent to the
+            // server, racing with the newer request.
+            if (Interlocked.Read(ref _headshotPendingRequestId) != requestId)
+            {
+                return;
+            }
+
             _safeNetworkChannel?.SendPacketSafely(new HeadshotUploadRequest
             {
                 PngBytes = result.PngBytes,
@@ -754,7 +771,7 @@ public class ChatUiSystem : ModSystem
                 {
                     return;
                 }
-                SubmitNormalizedUpload(bytes, adminTargetUid);
+                SubmitNormalizedUpload(bytes, adminTargetUid, requestId);
             });
         }
         catch (Exception ex)
@@ -1892,6 +1909,7 @@ public class ChatUiSystem : ModSystem
             {
                 _api.Event.PlayerJoin -= OnPlayerJoin;
                 _api.Event.PlayerEntitySpawn -= OnPlayerEntitySpawn;
+                _api.Event.PlayerLeave -= OnPlayerLeave;
                 _typingIndicatorRenderer?.Dispose();
                 _typingIndicatorRenderer = null;
                 _placedBubbleRenderer?.Dispose();
@@ -1904,6 +1922,9 @@ public class ChatUiSystem : ModSystem
             _pendingConfigActions.Clear();
             _safeNetworkChannel?.Dispose();
             _safeNetworkChannel = null;
+            _headshotHttpClient?.Dispose();
+            _headshotHttpClient = null;
+            EntityBehaviorNameTagPatches.ClearTrackedPlayers();
             _returnToConfigAdminAfterLanguageDialog = false;
             _languageConfigDialog?.TryClose();
             _languageConfigDialog = null;

@@ -97,6 +97,59 @@ public class CharacterSheetDialog : GuiDialog
 
     private void ComposeDialog()
     {
+        ResetComposerState();
+
+        var showHeadshotSection = _headshotCallbacks != null && _view?.Success == true;
+        var allFields = _view?.Fields ?? Array.Empty<CharacterSheetFieldViewMessage>();
+        var (hoistedIndices, scrollFields) = PartitionFields(allFields, showHeadshotSection);
+
+        var layout = ComputeDialogLayout(scrollFields, showHeadshotSection, hoistedIndices.Count);
+        _scrollContainer = new SafeGuiElementContainer(capi, layout.ScrollContentBounds)
+        {
+            Tabbable = scrollFields.Any(f => f.Field.CanEdit),
+            unscaledCellSpacing = 0
+        };
+
+        var title = string.IsNullOrWhiteSpace(_view?.Title) ? Lang.Get("thebasics:charsheet-gui-title") : _view.Title;
+        var composer = capi.Gui.CreateCompo("thebasics-character-sheet", layout.DialogBounds)
+            .AddShadedDialogBG(layout.BodyBounds)
+            .AddDialogTitleBar(title, OnTitleBarCloseClicked)
+            .BeginChildElements(layout.BodyBounds);
+
+        // Single inset wraps the header + scroll content. Draw it before adding interactive
+        // children so the children render on top of the frame.
+        composer.AddInset(layout.ScrollInsetBounds, 3);
+
+        if (showHeadshotSection)
+        {
+            ComposeHeadshotSection(composer, layout.HeadshotTop, hoistedIndices);
+        }
+
+        composer
+            .BeginClip(layout.ScrollClipBounds)
+            .AddInteractiveElement(_scrollContainer, "scrollBody");
+
+        ComposeScrollBody(scrollFields, layout.InitialRow);
+
+        composer.EndClip()
+            .AddVerticalScrollbar(OnNewScrollbarValue, ElementStdBounds.VerticalScrollbar(layout.ScrollClipBounds), "scrollbar")
+            .AddSmallButton(Lang.Get("Cancel"), OnCancel, ElementBounds.Fixed(0, layout.ButtonY, 120, layout.ButtonHeight));
+
+        if (_view?.CanEdit == true && _view.Success)
+        {
+            composer.AddSmallButton(Lang.Get("Save"), OnSave, ElementBounds.Fixed(DialogWidth - 142, layout.ButtonY, 120, layout.ButtonHeight), EnumButtonStyle.Normal, "saveButton");
+        }
+
+        SingleComposer = composer.EndChildElements().Compose(focusFirstElement: false);
+        SingleComposer.GetScrollbar("scrollbar").SetHeights((float)layout.ScrollHeight, (float)_scrollContainer.Bounds.fixedHeight);
+        SetDeferredTextAreaValues();
+        RecalculateScrolledBounds(_scrollContainer.Bounds);
+
+        _headshotCallbacks?.RequestHeadshotForView?.Invoke(this, _view);
+    }
+
+    private void ResetComposerState()
+    {
         SingleComposer?.Dispose();
         _textInputs.Clear();
         _textAreas.Clear();
@@ -108,11 +161,11 @@ public class CharacterSheetDialog : GuiDialog
             _headshotElement.Dispose();
             _headshotElement = null;
         }
+    }
 
-        var showHeadshotSection = _headshotCallbacks != null && _view?.Success == true;
-        var title = string.IsNullOrWhiteSpace(_view?.Title) ? Lang.Get("thebasics:charsheet-gui-title") : _view.Title;
-        var allFields = _view?.Fields ?? Array.Empty<CharacterSheetFieldViewMessage>();
-
+    private static (List<int> Hoisted, List<(int Index, CharacterSheetFieldViewMessage Field)> Scroll) PartitionFields(
+        IList<CharacterSheetFieldViewMessage> allFields, bool showHeadshotSection)
+    {
         // Hoist name fields next to the headshot when the headshot section is visible. When it's
         // not (no callbacks / errored view), name fields render in the scroll list with everything else.
         var hoistedIndices = showHeadshotSection ? CollectHoistedFieldIndices(allFields) : new List<int>();
@@ -125,12 +178,19 @@ public class CharacterSheetDialog : GuiDialog
                 scrollFields.Add((i, allFields[i]));
             }
         }
+        return (hoistedIndices, scrollFields);
+    }
 
+    private DialogLayout ComputeDialogLayout(
+        IList<(int Index, CharacterSheetFieldViewMessage Field)> scrollFields,
+        bool showHeadshotSection,
+        int hoistedCount)
+    {
         var contentHeight = CalculateContentHeight(scrollFields.Select(f => f.Field).ToList(), _view);
         var scrollHeight = Math.Min(MaxScrollHeight, Math.Max(100, contentHeight));
         var contentTop = GuiStyle.TitleBarHeight + 10;
         var headshotTop = contentTop;
-        var headshotSectionHeight = showHeadshotSection ? ComputeHeadshotSectionHeight(hoistedIndices.Count) : 0;
+        var headshotSectionHeight = showHeadshotSection ? ComputeHeadshotSectionHeight(hoistedCount) : 0;
         var scrollTop = contentTop + headshotSectionHeight;
         var buttonGap = 10;
         var buttonHeight = 30;
@@ -143,61 +203,52 @@ public class CharacterSheetDialog : GuiDialog
         var unifiedInsetHeight = (scrollTop + scrollHeight) - unifiedInsetTop;
         var scrollInsetBounds = ElementBounds.Fixed(0, unifiedInsetTop, DialogWidth - 36, unifiedInsetHeight).FixedGrow(3).WithFixedOffset(-3, -3);
         var scrollContentBounds = ElementBounds.Fixed(0, 0, DialogWidth - 48, contentHeight);
-        var row = ElementBounds.Fixed(0, 8, DialogWidth - 48, 24);
+        var initialRow = ElementBounds.Fixed(0, 8, DialogWidth - 48, 24);
         var buttonY = scrollClipBounds.fixedY + scrollHeight + buttonGap;
         var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
-        _scrollContainer = new SafeGuiElementContainer(capi, scrollContentBounds)
+
+        return new DialogLayout
         {
-            Tabbable = scrollFields.Any(f => f.Field.CanEdit),
-            unscaledCellSpacing = 0
+            BodyBounds = bodyBounds,
+            DialogBounds = dialogBounds,
+            ScrollClipBounds = scrollClipBounds,
+            ScrollContentBounds = scrollContentBounds,
+            ScrollInsetBounds = scrollInsetBounds,
+            InitialRow = initialRow,
+            HeadshotTop = headshotTop,
+            ButtonY = buttonY,
+            ButtonHeight = buttonHeight,
+            ScrollHeight = scrollHeight
         };
+    }
 
-        var composer = capi.Gui.CreateCompo("thebasics-character-sheet", dialogBounds)
-            .AddShadedDialogBG(bodyBounds)
-            .AddDialogTitleBar(title, OnTitleBarCloseClicked)
-            .BeginChildElements(bodyBounds);
-
-        // Single inset wraps the header + scroll content. Draw it before adding interactive
-        // children so the children render on top of the frame.
-        composer.AddInset(scrollInsetBounds, 3);
-
-        if (showHeadshotSection)
-        {
-            ComposeHeadshotSection(composer, headshotTop, hoistedIndices);
-        }
-
-        composer
-            .BeginClip(scrollClipBounds)
-            .AddInteractiveElement(_scrollContainer, "scrollBody");
-
+    private void ComposeScrollBody(IList<(int Index, CharacterSheetFieldViewMessage Field)> scrollFields, ElementBounds row)
+    {
         if (_view?.Success == false)
         {
             AddRichtext(_scrollContainer, VtmlUtils.EscapeVtml(_view.Message), row.WithFixedHeight(56));
+            return;
         }
-        else
+
+        row = AddFields(_scrollContainer, row, scrollFields);
+        if (!string.IsNullOrWhiteSpace(_view?.Message))
         {
-            row = AddFields(_scrollContainer, row, scrollFields);
-            if (!string.IsNullOrWhiteSpace(_view?.Message))
-            {
-                AddRichtext(_scrollContainer, VtmlUtils.EscapeVtml(_view.Message), row.WithFixedHeight(36));
-            }
+            AddRichtext(_scrollContainer, VtmlUtils.EscapeVtml(_view.Message), row.WithFixedHeight(36));
         }
+    }
 
-        composer.EndClip()
-            .AddVerticalScrollbar(OnNewScrollbarValue, ElementStdBounds.VerticalScrollbar(scrollClipBounds), "scrollbar")
-            .AddSmallButton(Lang.Get("Cancel"), OnCancel, ElementBounds.Fixed(0, buttonY, 120, buttonHeight));
-
-        if (_view?.CanEdit == true && _view.Success)
-        {
-            composer.AddSmallButton(Lang.Get("Save"), OnSave, ElementBounds.Fixed(DialogWidth - 142, buttonY, 120, buttonHeight), EnumButtonStyle.Normal, "saveButton");
-        }
-
-        SingleComposer = composer.EndChildElements().Compose(focusFirstElement: false);
-        SingleComposer.GetScrollbar("scrollbar").SetHeights((float)scrollHeight, (float)_scrollContainer.Bounds.fixedHeight);
-        SetDeferredTextAreaValues();
-        RecalculateScrolledBounds(_scrollContainer.Bounds);
-
-        _headshotCallbacks?.RequestHeadshotForView?.Invoke(this, _view);
+    private sealed class DialogLayout
+    {
+        public ElementBounds BodyBounds { get; set; }
+        public ElementBounds DialogBounds { get; set; }
+        public ElementBounds ScrollClipBounds { get; set; }
+        public ElementBounds ScrollContentBounds { get; set; }
+        public ElementBounds ScrollInsetBounds { get; set; }
+        public ElementBounds InitialRow { get; set; }
+        public double HeadshotTop { get; set; }
+        public double ButtonY { get; set; }
+        public int ButtonHeight { get; set; }
+        public double ScrollHeight { get; set; }
     }
 
     /// <summary>
