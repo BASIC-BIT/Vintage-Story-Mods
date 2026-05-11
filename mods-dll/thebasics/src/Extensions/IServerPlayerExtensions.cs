@@ -424,9 +424,19 @@ namespace thebasics.Extensions
             return GetModData(player, ModDataLanguages, new List<string>());
         }
 
+        public static List<string> GetLanguages(this IWorldPlayerData playerData)
+        {
+            return playerData?.GetModData(ModDataLanguages, new List<string>()) ?? new List<string>();
+        }
+
         public static void SetLanguages(this IServerPlayer player, IEnumerable<string> languages)
         {
             SetModData(player, ModDataLanguages, languages.ToList());
+        }
+
+        public static void SetLanguages(this IWorldPlayerData playerData, IEnumerable<string> languages)
+        {
+            playerData?.SetModData(ModDataLanguages, languages?.ToList() ?? new List<string>());
         }
 
         public static bool KnowsLanguage(this IServerPlayer player, Language lang)
@@ -461,6 +471,11 @@ namespace thebasics.Extensions
             return GetModData<string>(player, ModDataDefaultLanguage, null);
         }
 
+        public static string GetDefaultLanguageName(this IWorldPlayerData playerData)
+        {
+            return playerData?.GetModData<string>(ModDataDefaultLanguage, null);
+        }
+
         private static Language GetLangFromName(string langName, ModConfig config, bool allowBabble, bool allowSignLanguage)
         {
             return GetAllLanguages(config, allowBabble, allowSignLanguage).First((lang) => lang.Name == langName);
@@ -484,6 +499,11 @@ namespace thebasics.Extensions
         public static void SetDefaultLanguage(this IServerPlayer player, Language lang)
         {
             SetModData(player, ModDataDefaultLanguage, lang.Name);
+        }
+
+        public static void SetDefaultLanguage(this IWorldPlayerData playerData, Language lang)
+        {
+            playerData?.SetModData(ModDataDefaultLanguage, lang?.Name);
         }
         #endregion
 
