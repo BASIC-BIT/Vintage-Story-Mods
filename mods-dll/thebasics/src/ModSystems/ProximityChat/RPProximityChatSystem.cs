@@ -17,6 +17,7 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using Vintagestory.GameContent;
+using Vintagestory.Server;
 
 namespace thebasics.ModSystems.ProximityChat;
 
@@ -765,6 +766,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         var changedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { nameof(Config.Languages) };
         ReconcileOnlinePlayerLanguages(renameMap);
+        ReconcileStoredPlayerLanguages(renameMap);
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();
 
@@ -1095,6 +1097,86 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             ReconcilePlayerLanguages(serverPlayer, renameMap);
         }
+    }
+
+    private void ReconcileStoredPlayerLanguages(IReadOnlyDictionary<string, string> renameMap)
+    {
+        if (API.PlayerData is not PlayerDataManager playerDataManager)
+        {
+            return;
+        }
+
+        var onlinePlayerIds = new HashSet<string>(API.World.AllOnlinePlayers.Select(player => player.PlayerUID), StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in playerDataManager.WorldDataByUID)
+        {
+            var playerData = entry.Value;
+            if (playerData == null || onlinePlayerIds.Contains(entry.Key))
+            {
+                continue;
+            }
+
+            ReconcileStoredPlayerLanguages(playerData, renameMap);
+        }
+    }
+
+    private void ReconcileStoredPlayerLanguages(ServerWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap)
+    {
+        var languagesByName = Config.Languages.ToDictionary(language => language.Name, StringComparer.OrdinalIgnoreCase);
+        var validNames = new HashSet<string>(languagesByName.Keys, StringComparer.OrdinalIgnoreCase);
+        var currentNames = playerData.GetLanguages();
+        var reconciledNames = new List<string>();
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var currentName in currentNames)
+        {
+            var candidate = renameMap.TryGetValue(currentName, out var renamed) ? renamed : currentName;
+            if (!validNames.Contains(candidate) || !seenNames.Add(candidate))
+            {
+                continue;
+            }
+
+            reconciledNames.Add(languagesByName[candidate].Name);
+        }
+
+        if (!currentNames.SequenceEqual(reconciledNames, StringComparer.OrdinalIgnoreCase))
+        {
+            playerData.SetLanguages(reconciledNames);
+        }
+
+        ReconcileStoredDefaultLanguage(playerData, renameMap, languagesByName, reconciledNames);
+    }
+
+    private void ReconcileStoredDefaultLanguage(ServerWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> reconciledNames)
+    {
+        var defaultLanguageName = playerData.GetDefaultLanguageName();
+        var mappedDefault = renameMap.TryGetValue(defaultLanguageName ?? string.Empty, out var renamedDefault)
+            ? renamedDefault
+            : defaultLanguageName;
+
+        if (string.Equals(mappedDefault, LanguageSystem.BabbleLang.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            playerData.SetDefaultLanguage(LanguageSystem.BabbleLang);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(mappedDefault) && languagesByName.TryGetValue(mappedDefault, out var defaultLanguage))
+        {
+            if (!string.Equals(defaultLanguageName, defaultLanguage.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                playerData.SetDefaultLanguage(defaultLanguage);
+            }
+
+            return;
+        }
+
+        var fallbackName = reconciledNames.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(fallbackName) && languagesByName.TryGetValue(fallbackName, out var fallbackLanguage))
+        {
+            playerData.SetDefaultLanguage(fallbackLanguage);
+            return;
+        }
+
+        playerData.SetDefaultLanguage(Config.Languages.FirstOrDefault(language => language.Default) ?? LanguageSystem.BabbleLang);
     }
 
     private void ReconcilePlayerLanguages(IServerPlayer serverPlayer, IReadOnlyDictionary<string, string> renameMap)
