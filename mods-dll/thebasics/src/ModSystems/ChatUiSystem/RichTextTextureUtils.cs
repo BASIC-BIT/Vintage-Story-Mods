@@ -101,13 +101,23 @@ internal static class RichTextTextureUtils
             var layout = ComputeBubbleLayout(background, textWidthPx, textHeightPx, guiScale, extraBottomMarginPx);
 
             var surface = new ImageSurface(Format.Argb32, layout.SurfaceWidth, layout.SurfaceHeight);
-            using var ctx = new Context(surface);
+            try
+            {
+                using var ctx = new Context(surface);
 
-            PaintBubbleBackground(ctx, background, layout);
-            ComposeTextInsideBubble(rich, ctx, surface, layout, guiScale);
-            ClearBottomMargin(ctx, layout, extraBottomMarginPx);
+                PaintBubbleBackground(ctx, background, layout);
+                ComposeTextInsideBubble(rich, ctx, surface, layout, guiScale);
+                ClearBottomMargin(ctx, layout, extraBottomMarginPx);
 
-            return surface;
+                return surface;
+            }
+            catch
+            {
+                // Painting failed after the surface was allocated; release the native memory before
+                // we fall through to the outer catch (which returns null without a reference).
+                surface.Dispose();
+                throw;
+            }
         }
         catch
         {

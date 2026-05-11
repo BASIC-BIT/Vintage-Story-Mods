@@ -637,12 +637,18 @@ public class ChatUiSystem : ModSystem
             _characterSheetDialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-status-loading"));
         }
 
-        // Re-request the sheet so the view reflects the new Headshot metadata (or its absence after a clear).
+        // Re-request the sheet so the view reflects the new Headshot metadata (or its absence
+        // after a clear). Preserve the current view mode so an admin editing another player's
+        // sheet doesn't get downgraded to ModeView (which would strip the admin-edit affordances
+        // and force them to /adminview again to keep working).
         if (!string.IsNullOrEmpty(message.TargetPlayerUid))
         {
+            var refreshMode = _characterSheetDialog?.IsAdminView == true
+                ? CharacterSheetOpenRequest.ModeAdmin
+                : CharacterSheetOpenRequest.ModeView;
             _safeNetworkChannel?.SendPacketSafely(new CharacterSheetOpenRequest
             {
-                Mode = CharacterSheetOpenRequest.ModeView,
+                Mode = refreshMode,
                 TargetPlayerUid = message.TargetPlayerUid
             });
         }
@@ -1910,12 +1916,18 @@ public class ChatUiSystem : ModSystem
                 _api.Event.PlayerJoin -= OnPlayerJoin;
                 _api.Event.PlayerEntitySpawn -= OnPlayerEntitySpawn;
                 _api.Event.PlayerLeave -= OnPlayerLeave;
+                if (_headshotFileDropSubscribed && _headshotFileDropHandler != null)
+                {
+                    _api.Event.FileDrop -= _headshotFileDropHandler;
+                }
                 _typingIndicatorRenderer?.Dispose();
                 _typingIndicatorRenderer = null;
                 _placedBubbleRenderer?.Dispose();
                 _placedBubbleRenderer = null;
                 _api = null;
             }
+            _headshotFileDropHandler = null;
+            _headshotFileDropSubscribed = false;
             _harmony?.UnpatchAll(Mod.Info.ModID);
             _config = null;
             _lastSelectedGroupId = null;
@@ -1924,6 +1936,9 @@ public class ChatUiSystem : ModSystem
             _safeNetworkChannel = null;
             _headshotHttpClient?.Dispose();
             _headshotHttpClient = null;
+            _headshotCache?.Clear();
+            _headshotCache = null;
+            _headshotFetchAttemptedAtMs.Clear();
             EntityBehaviorNameTagPatches.ClearTrackedPlayers();
             _returnToConfigAdminAfterLanguageDialog = false;
             _languageConfigDialog?.TryClose();

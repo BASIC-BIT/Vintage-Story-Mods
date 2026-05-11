@@ -81,7 +81,8 @@ public static class HeadshotPipeline
 
         try
         {
-            using var codec = SKCodec.Create(new MemoryStream(inputBytes, writable: false));
+            using var stream = new MemoryStream(inputBytes, writable: false);
+            using var codec = SKCodec.Create(stream);
             if (codec == null)
             {
                 return Fail(HeadshotErrorCodes.DecodeCreateFailed);

@@ -50,6 +50,7 @@ public class CharacterSheetDialog : GuiDialog
     }
 
     public string CurrentTargetPlayerUid => _view?.TargetPlayerUid;
+    public bool IsAdminView => _view?.IsAdminView == true;
 
     public bool CanEditHeadshot => _view?.CanEditHeadshot == true && _view?.Success == true;
 
