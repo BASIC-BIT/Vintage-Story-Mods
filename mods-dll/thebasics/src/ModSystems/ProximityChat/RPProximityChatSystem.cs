@@ -584,12 +584,54 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<CharacterSheetOpenRequest>()
             .RegisterMessageType<CharacterSheetSaveRequest>()
             .RegisterMessageType<CharacterSheetViewMessage>()
+            .RegisterMessageType<HeadshotUploadRequest>()
+            .RegisterMessageType<HeadshotUploadResult>()
+            .RegisterMessageType<HeadshotFetchRequest>()
+            .RegisterMessageType<HeadshotFetchResult>()
+            .RegisterMessageType<HeadshotClearRequest>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
             .SetMessageHandler<CharacterSheetOpenRequest>(OnCharacterSheetOpenRequest)
             .SetMessageHandler<CharacterSheetSaveRequest>(OnCharacterSheetSaveRequest)
+            .SetMessageHandler<HeadshotUploadRequest>(OnHeadshotUploadRequest)
+            .SetMessageHandler<HeadshotFetchRequest>(OnHeadshotFetchRequest)
+            .SetMessageHandler<HeadshotClearRequest>(OnHeadshotClearRequest)
             .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
+    }
+
+    private void OnHeadshotUploadRequest(IServerPlayer player, HeadshotUploadRequest message)
+    {
+        var sheetSystem = API.ModLoader.GetModSystem<thebasics.ModSystems.CharacterSheets.CharacterSheetSystem>();
+        var result = sheetSystem?.HandleHeadshotUpload(player, message) ?? new HeadshotUploadResult
+        {
+            Success = false,
+            Message = Lang.Get("thebasics:charsheet-gui-disabled"),
+            TargetPlayerUid = player?.PlayerUID ?? string.Empty
+        };
+        _serverConfigChannel.SendPacket(result, player);
+    }
+
+    private void OnHeadshotFetchRequest(IServerPlayer player, HeadshotFetchRequest message)
+    {
+        var sheetSystem = API.ModLoader.GetModSystem<thebasics.ModSystems.CharacterSheets.CharacterSheetSystem>();
+        var result = sheetSystem?.HandleHeadshotFetch(player, message) ?? new HeadshotFetchResult
+        {
+            TargetPlayerUid = message?.TargetPlayerUid ?? string.Empty
+        };
+        _serverConfigChannel.SendPacket(result, player);
+    }
+
+    private void OnHeadshotClearRequest(IServerPlayer player, HeadshotClearRequest message)
+    {
+        var sheetSystem = API.ModLoader.GetModSystem<thebasics.ModSystems.CharacterSheets.CharacterSheetSystem>();
+        var result = sheetSystem?.HandleHeadshotClear(player, message) ?? new HeadshotUploadResult
+        {
+            Success = false,
+            Message = Lang.Get("thebasics:charsheet-gui-disabled"),
+            TargetPlayerUid = player?.PlayerUID ?? string.Empty
+        };
+        _serverConfigChannel.SendPacket(result, player);
     }
 
     private void OnCharacterSheetOpenRequest(IServerPlayer player, CharacterSheetOpenRequest message)

@@ -19,19 +19,66 @@ public class CharacterSheetDialog : GuiDialog
     private const double TextInputClipTolerance = 6;
     private const double LongTextBaseHeight = 28;
     private const double LongTextRowHeight = 19;
+    private const double HeadshotSize = 96;
+    private const double HeadshotButtonHeight = 24;
+    private const double HeadshotButtonGap = 4;
+    private const double TopSectionBottomPadding = 14;
+    // Two-column grid for header-side fields. Each cell holds a label above its input.
+    private const int HeaderGridCols = 2;
+    private const double HeaderGridColGap = 12;
+    private const double HeaderGridRowGap = 8;
+    private const double HeaderGridLabelHeight = 22;
+    private const double HeaderGridInputHeight = 30;
+    private const double HeaderGridCellHeight = HeaderGridLabelHeight + HeaderGridInputHeight;
     private readonly Action<CharacterSheetSaveRequest> _onSave;
+    private readonly HeadshotDialogCallbacks _headshotCallbacks;
     private readonly Dictionary<int, GuiElementTextInput> _textInputs = new();
     private readonly Dictionary<int, GuiElementTextArea> _textAreas = new();
     private readonly Dictionary<int, string> _textAreaInitialValues = new();
     private readonly Dictionary<int, GuiElementDropDown> _dropDowns = new();
     private GuiElementContainer _scrollContainer;
+    private HeadshotElement _headshotElement;
+    private HeadshotUrlPromptDialog _urlPrompt;
     private CharacterSheetViewMessage _view;
 
-    public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave) : base(capi)
+    public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null) : base(capi)
     {
         _view = view;
         _onSave = onSave;
+        _headshotCallbacks = headshotCallbacks;
         ComposeDialog();
+    }
+
+    public string CurrentTargetPlayerUid => _view?.TargetPlayerUid;
+
+    public bool CanEditHeadshot => _view?.CanEditHeadshot == true && _view?.Success == true;
+
+    /// <summary>
+    /// Hot-swaps the headshot element's texture without recomposing the dialog. Pass null for
+    /// the empty-state placeholder.
+    /// </summary>
+    public void ApplyHeadshotTexture(LoadedTexture texture)
+    {
+        if (_headshotElement == null)
+        {
+            return;
+        }
+
+        if (texture == null || texture.TextureId == 0)
+        {
+            _headshotElement.ClearTexture();
+            _headshotElement.SetStatusText(_view?.CanEditHeadshot == true
+                ? Lang.Get("thebasics:headshot-empty-editable")
+                : Lang.Get("thebasics:headshot-empty-readonly"));
+            return;
+        }
+
+        _headshotElement.SetTexture(texture);
+    }
+
+    public void SetHeadshotStatus(string status)
+    {
+        _headshotElement?.SetStatusText(status);
     }
 
     public override string ToggleKeyCombinationCode => "thebasicscharsheet";
@@ -56,17 +103,40 @@ public class CharacterSheetDialog : GuiDialog
         _textAreaInitialValues.Clear();
         _dropDowns.Clear();
         _scrollContainer = null;
+        if (_headshotElement != null)
+        {
+            _headshotElement.Dispose();
+            _headshotElement = null;
+        }
 
+        var showHeadshotSection = _headshotCallbacks != null && _view?.Success == true;
         var title = string.IsNullOrWhiteSpace(_view?.Title) ? Lang.Get("thebasics:charsheet-gui-title") : _view.Title;
-        var fields = _view?.Fields ?? Array.Empty<CharacterSheetFieldViewMessage>();
-        var contentHeight = CalculateContentHeight(fields, _view);
+        var allFields = _view?.Fields ?? Array.Empty<CharacterSheetFieldViewMessage>();
+
+        // Hoist name fields next to the headshot when the headshot section is visible. When it's
+        // not (no callbacks / errored view), name fields render in the scroll list with everything else.
+        var hoistedIndices = showHeadshotSection ? CollectHoistedFieldIndices(allFields) : new List<int>();
+        var hoistedSet = new HashSet<int>(hoistedIndices);
+        var scrollFields = new List<(int Index, CharacterSheetFieldViewMessage Field)>();
+        for (var i = 0; i < allFields.Count; i++)
+        {
+            if (!hoistedSet.Contains(i))
+            {
+                scrollFields.Add((i, allFields[i]));
+            }
+        }
+
+        var contentHeight = CalculateContentHeight(scrollFields.Select(f => f.Field).ToList(), _view);
         var scrollHeight = Math.Min(MaxScrollHeight, Math.Max(100, contentHeight));
         var contentTop = GuiStyle.TitleBarHeight + 10;
+        var headshotTop = contentTop;
+        var headshotSectionHeight = showHeadshotSection ? ComputeHeadshotSectionHeight(hoistedIndices.Count) : 0;
+        var scrollTop = contentTop + headshotSectionHeight;
         var buttonGap = 10;
         var buttonHeight = 30;
         var bottomPadding = 6;
-        var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth - 10, contentTop + scrollHeight + buttonGap + buttonHeight + bottomPadding).WithFixedPadding(GuiStyle.ElementToDialogPadding);
-        var scrollClipBounds = ElementBounds.Fixed(0, contentTop, DialogWidth - 36, scrollHeight);
+        var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth - 10, scrollTop + scrollHeight + buttonGap + buttonHeight + bottomPadding).WithFixedPadding(GuiStyle.ElementToDialogPadding);
+        var scrollClipBounds = ElementBounds.Fixed(0, scrollTop, DialogWidth - 36, scrollHeight);
         var scrollInsetBounds = scrollClipBounds.FlatCopy().FixedGrow(3).WithFixedOffset(-3, -3);
         var scrollContentBounds = ElementBounds.Fixed(0, 0, DialogWidth - 48, contentHeight);
         var row = ElementBounds.Fixed(0, 8, DialogWidth - 48, 24);
@@ -74,14 +144,21 @@ public class CharacterSheetDialog : GuiDialog
         var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
         _scrollContainer = new SafeGuiElementContainer(capi, scrollContentBounds)
         {
-            Tabbable = fields.Any(field => field.CanEdit),
+            Tabbable = scrollFields.Any(f => f.Field.CanEdit),
             unscaledCellSpacing = 0
         };
 
         var composer = capi.Gui.CreateCompo("thebasics-character-sheet", dialogBounds)
             .AddShadedDialogBG(bodyBounds)
             .AddDialogTitleBar(title, OnTitleBarCloseClicked)
-            .BeginChildElements(bodyBounds)
+            .BeginChildElements(bodyBounds);
+
+        if (showHeadshotSection)
+        {
+            ComposeHeadshotSection(composer, headshotTop, hoistedIndices);
+        }
+
+        composer
             .AddInset(scrollInsetBounds, 3)
             .BeginClip(scrollClipBounds)
             .AddInteractiveElement(_scrollContainer, "scrollBody");
@@ -92,7 +169,7 @@ public class CharacterSheetDialog : GuiDialog
         }
         else
         {
-            row = AddFields(_scrollContainer, row, fields);
+            row = AddFields(_scrollContainer, row, scrollFields);
             if (!string.IsNullOrWhiteSpace(_view?.Message))
             {
                 AddRichtext(_scrollContainer, VtmlUtils.EscapeVtml(_view.Message), row.WithFixedHeight(36));
@@ -112,12 +189,157 @@ public class CharacterSheetDialog : GuiDialog
         SingleComposer.GetScrollbar("scrollbar").SetHeights((float)scrollHeight, (float)_scrollContainer.Bounds.fixedHeight);
         SetDeferredTextAreaValues();
         RecalculateScrolledBounds(_scrollContainer.Bounds);
+
+        _headshotCallbacks?.RequestHeadshotForView?.Invoke(_view);
     }
 
-    private ElementBounds AddFields(GuiElementContainer container, ElementBounds row, IEnumerable<CharacterSheetFieldViewMessage> fields)
+    /// <summary>
+    /// Returns indices of fields whose <c>LayoutSection</c> places them next to the headshot, in
+    /// the original config order. Empty when no fields are flagged for HeaderSide.
+    /// </summary>
+    private static List<int> CollectHoistedFieldIndices(IList<CharacterSheetFieldViewMessage> fields)
     {
-        var index = 0;
-        foreach (var field in fields)
+        var result = new List<int>();
+        for (var i = 0; i < fields.Count; i++)
+        {
+            if (CharacterSheetLayoutSections.Normalize(fields[i].LayoutSection) == CharacterSheetLayoutSections.HeaderSide)
+            {
+                result.Add(i);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// The section sizes to fit whichever column is taller: the headshot+buttons stack on the left,
+    /// or the 2-column field grid on the right.
+    /// </summary>
+    private double ComputeHeadshotSectionHeight(int hoistedFieldCount)
+    {
+        var leftColHeight = HeadshotSize;
+        var canEdit = _view?.CanEditHeadshot == true;
+        var allowUrl = canEdit && _headshotCallbacks?.UrlUploadAllowed == true;
+        if (canEdit)
+        {
+            // Buttons block: optional Set URL + always-on Clear, stacked under the PFP.
+            var buttonsBlock = HeadshotButtonGap + HeadshotButtonHeight + (allowUrl ? HeadshotButtonGap + HeadshotButtonHeight : 0);
+            leftColHeight += buttonsBlock;
+        }
+
+        var rows = (hoistedFieldCount + HeaderGridCols - 1) / HeaderGridCols;
+        var rightColHeight = rows == 0 ? 0 : rows * HeaderGridCellHeight + Math.Max(0, rows - 1) * HeaderGridRowGap;
+        return Math.Max(leftColHeight, rightColHeight) + TopSectionBottomPadding;
+    }
+
+    private void ComposeHeadshotSection(GuiComposer composer, double top, List<int> hoistedIndices)
+    {
+        var canEdit = _view?.CanEditHeadshot == true;
+        var allowUrl = canEdit && _headshotCallbacks?.UrlUploadAllowed == true;
+
+        // --- Left column: headshot square + Set URL / Clear buttons stacked below ---
+        var headshotBounds = ElementBounds.Fixed(0, top, HeadshotSize, HeadshotSize);
+        _headshotElement = new HeadshotElement(capi, headshotBounds);
+        composer.AddInteractiveElement(_headshotElement, "headshot");
+
+        if (canEdit)
+        {
+            var buttonsTop = top + HeadshotSize + HeadshotButtonGap;
+            if (allowUrl)
+            {
+                composer.AddSmallButton(
+                    Lang.Get("thebasics:headshot-button-set-url"),
+                    OnHeadshotSetUrlClicked,
+                    ElementBounds.Fixed(0, buttonsTop, HeadshotSize, HeadshotButtonHeight),
+                    EnumButtonStyle.Small,
+                    "headshotSetUrlButton");
+            }
+
+            var clearTop = buttonsTop + (allowUrl ? HeadshotButtonHeight + HeadshotButtonGap : 0);
+            composer.AddSmallButton(
+                Lang.Get("thebasics:headshot-button-clear"),
+                OnHeadshotClearClicked,
+                ElementBounds.Fixed(0, clearTop, HeadshotSize, HeadshotButtonHeight),
+                EnumButtonStyle.Small,
+                "headshotClearButton");
+        }
+
+        // --- Right side: 2-column row-major grid of hoisted fields ---
+        var rightX = HeadshotSize + 16;
+        var rightWidth = DialogWidth - 48 - rightX;
+        if (rightWidth <= 0 || hoistedIndices.Count == 0)
+        {
+            return;
+        }
+
+        var allFields = _view?.Fields ?? Array.Empty<CharacterSheetFieldViewMessage>();
+        var labelFont = CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold);
+        var cellWidth = (rightWidth - HeaderGridColGap * (HeaderGridCols - 1)) / HeaderGridCols;
+        for (var slot = 0; slot < hoistedIndices.Count; slot++)
+        {
+            var fieldIndex = hoistedIndices[slot];
+            if (fieldIndex < 0 || fieldIndex >= allFields.Count)
+            {
+                continue;
+            }
+
+            var field = allFields[fieldIndex];
+            var col = slot % HeaderGridCols;
+            var row = slot / HeaderGridCols;
+            var cellX = rightX + col * (cellWidth + HeaderGridColGap);
+            var cellY = top + row * (HeaderGridCellHeight + HeaderGridRowGap);
+
+            var label = field.Optional ? field.Label : field.Label + " *";
+            composer.AddStaticText(label, labelFont, ElementBounds.Fixed(cellX, cellY, cellWidth, HeaderGridLabelHeight));
+
+            var inputBounds = ElementBounds.Fixed(cellX, cellY + HeaderGridLabelHeight, cellWidth, HeaderGridInputHeight);
+            if (field.CanEdit)
+            {
+                AddEditableField(el => composer.AddInteractiveElement(el, $"hoistedField-{fieldIndex}"), inputBounds, field, fieldIndex);
+            }
+            else
+            {
+                var value = string.IsNullOrWhiteSpace(field.Value) ? Lang.Get("thebasics:charsheet-unset") : field.Value;
+                composer.AddRichtext(VtmlUtils.EscapeVtml(value), CairoFont.WhiteSmallText(), inputBounds);
+            }
+        }
+    }
+
+    private bool OnHeadshotSetUrlClicked()
+    {
+        _urlPrompt?.TryClose();
+        _urlPrompt = new HeadshotUrlPromptDialog(capi, OnUrlPromptSubmitted);
+        _urlPrompt.TryOpen();
+        return true;
+    }
+
+    private void OnUrlPromptSubmitted(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return;
+        }
+
+        SetHeadshotStatus(Lang.Get("thebasics:headshot-status-uploading"));
+        _headshotCallbacks?.UploadFromUrl?.Invoke(_view?.TargetPlayerUid, url);
+    }
+
+    private bool OnHeadshotClearClicked()
+    {
+        _headshotCallbacks?.ClearHeadshot?.Invoke(_view?.TargetPlayerUid);
+        SetHeadshotStatus(Lang.Get("thebasics:headshot-status-clearing"));
+        return true;
+    }
+
+    public override void OnGuiClosed()
+    {
+        base.OnGuiClosed();
+        _urlPrompt?.TryClose();
+        _urlPrompt = null;
+    }
+
+    private ElementBounds AddFields(GuiElementContainer container, ElementBounds row, IList<(int Index, CharacterSheetFieldViewMessage Field)> fields)
+    {
+        foreach (var (index, field) in fields)
         {
             var label = field.Optional ? field.Label : field.Label + " *";
             var labelBounds = row.FlatCopy().WithFixedHeight(24);
@@ -126,7 +348,9 @@ public class CharacterSheetDialog : GuiDialog
 
             if (field.CanEdit)
             {
-                row = AddEditableField(container, row, field, index);
+                var inputBounds = row.FlatCopy().WithFixedHeight(GetEditControlHeight(field));
+                AddEditableField(el => container.Add(el), inputBounds, field, index);
+                row = inputBounds.BelowCopy(0, 8);
             }
             else
             {
@@ -135,11 +359,9 @@ public class CharacterSheetDialog : GuiDialog
                 AddRichtext(container, VtmlUtils.EscapeVtml(value), valueBounds);
                 row = row.BelowCopy(0, 10);
             }
-
-            index++;
         }
 
-        if (index == 0)
+        if (fields.Count == 0)
         {
             AddRichtext(container, VtmlUtils.EscapeVtml(_view?.Message ?? Lang.Get("thebasics:charsheet-empty")), row.FlatCopy().WithFixedHeight(28));
             row = row.BelowCopy(0, 28);
@@ -148,9 +370,13 @@ public class CharacterSheetDialog : GuiDialog
         return row;
     }
 
-    private ElementBounds AddEditableField(GuiElementContainer container, ElementBounds row, CharacterSheetFieldViewMessage field, int index)
+    /// <summary>
+    /// Builds the editable input element for a field and registers it under its <paramref name="index"/>
+    /// in the appropriate dictionary so OnSave can find it. The caller passes in the "add to parent"
+    /// step — this lets the same builder serve both the scrollable container and the headshot row.
+    /// </summary>
+    private void AddEditableField(Action<GuiElement> add, ElementBounds inputBounds, CharacterSheetFieldViewMessage field, int index)
     {
-        var inputBounds = row.FlatCopy().WithFixedHeight(GetEditControlHeight(field));
         if (field.Type == CharacterSheetFieldTypes.Option && field.Options?.Count > 0)
         {
             var values = field.Optional ? new[] { string.Empty }.Concat(field.Options).ToArray() : field.Options.ToArray();
@@ -160,9 +386,11 @@ public class CharacterSheetDialog : GuiDialog
                 : Math.Max(0, Array.FindIndex(values, option => option.Equals(field.Value, StringComparison.OrdinalIgnoreCase)));
             var dropDown = new GuiElementDropDown(capi, values, displayValues, selectedIndex, null, inputBounds, CairoFont.WhiteSmallText(), multiSelect: false);
             _dropDowns[index] = dropDown;
-            container.Add(dropDown);
+            add(dropDown);
+            return;
         }
-        else if (field.Type == CharacterSheetFieldTypes.LongString)
+
+        if (field.Type == CharacterSheetFieldTypes.LongString)
         {
             var textArea = new ScrollClippedTextArea(capi, inputBounds, null, CairoFont.TextInput())
             {
@@ -176,29 +404,19 @@ public class CharacterSheetDialog : GuiDialog
 
             _textAreas[index] = textArea;
             _textAreaInitialValues[index] = field.Value ?? string.Empty;
-            container.Add(textArea);
-        }
-        else if (field.Type is CharacterSheetFieldTypes.String or CharacterSheetFieldTypes.Number)
-        {
-            var textInput = new ScrollClippedTextInput(capi, inputBounds, null, CairoFont.TextInput());
-            textInput.SetValue(field.Value ?? string.Empty);
-            if (field.MaxLength > 0)
-            {
-                textInput.SetMaxLength(field.MaxLength);
-            }
-
-            _textInputs[index] = textInput;
-            container.Add(textInput);
-        }
-        else
-        {
-            var textInput = new ScrollClippedTextInput(capi, inputBounds, null, CairoFont.TextInput());
-            textInput.SetValue(field.Value ?? string.Empty);
-            _textInputs[index] = textInput;
-            container.Add(textInput);
+            add(textArea);
+            return;
         }
 
-        return inputBounds.BelowCopy(0, 8);
+        var textInput = new ScrollClippedTextInput(capi, inputBounds, null, CairoFont.TextInput());
+        textInput.SetValue(field.Value ?? string.Empty);
+        if (field.MaxLength > 0)
+        {
+            textInput.SetMaxLength(field.MaxLength);
+        }
+
+        _textInputs[index] = textInput;
+        add(textInput);
     }
 
     private void SetDeferredTextAreaValues()

@@ -22,6 +22,7 @@ namespace thebasics.Extensions
     {
         private const string ModDataNickname = "BASIC_NICKNAME";
         private const string ModDataCharacterSheet = "BASIC_CHARACTER_SHEET";
+        private const string ModDataActiveCharacterId = "BASIC_ACTIVE_CHARACTER_ID";
         private const string CharacterSheetFullNameBind = "thebasics.fullName";
         private const string CharacterSheetFullNameField = "fullName";
         private const string CharacterSheetNicknameBind = "thebasics.nickname";
@@ -74,6 +75,28 @@ namespace thebasics.Extensions
         public static void SetModData<T>(this IServerPlayer player, string key, T value)
         {
             player.SetModdata(key, SerializerUtil.Serialize<T>(value));
+        }
+
+        /// <summary>
+        /// Returns the player's active RP character id, or empty string when RP characters are disabled
+        /// or no character has been selected. Mirrors the value <see cref="ModSystems.RpCharacters.RpCharacterService"/>
+        /// stores under the same key.
+        /// </summary>
+        public static string GetActiveRpCharacterId(this IServerPlayer player)
+        {
+            if (player == null)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return GetModData<string>(player, ModDataActiveCharacterId, string.Empty) ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         #region Nicknames
@@ -233,6 +256,7 @@ namespace thebasics.Extensions
         public static void SetNicknameColor(this IServerPlayer player, string nickname)
         {
             SetModData(player, ModDataNicknameColor, nickname);
+            SyncNametagSubAttribute(player, ModSystems.CharacterSheets.CharacterSheetSystem.NicknameColorAttrKey, nickname ?? string.Empty);
         }
 
         public static bool HasNicknameColor(this IServerPlayer player)
@@ -243,6 +267,23 @@ namespace thebasics.Extensions
         public static void ClearNicknameColor(this IServerPlayer player)
         {
             player.RemoveModdata(ModDataNicknameColor);
+            SyncNametagSubAttribute(player, ModSystems.CharacterSheets.CharacterSheetSystem.NicknameColorAttrKey, string.Empty);
+        }
+
+        /// <summary>
+        /// Writes a value into the entity's "nametag" tree-attribute and marks it dirty so vanilla's
+        /// <c>EntityBehaviorNameTag.OnNameChanged</c> listener fires on the client. Used for the
+        /// nickname-color and headshot-hash sub-attributes that drive our patched nametag renderer.
+        /// </summary>
+        private static void SyncNametagSubAttribute(IServerPlayer player, string subKey, string value)
+        {
+            if (player?.Entity?.WatchedAttributes is not { } attrs) return;
+            var tree = ModSystems.CharacterSheets.CharacterSheetSystem.NametagAttrTree;
+            var nametag = attrs.GetTreeAttribute(tree);
+            if (nametag == null) return;
+            if (nametag.GetString(subKey) == value) return;
+            nametag.SetString(subKey, value);
+            attrs.MarkPathDirty(tree);
         }
         #endregion
 

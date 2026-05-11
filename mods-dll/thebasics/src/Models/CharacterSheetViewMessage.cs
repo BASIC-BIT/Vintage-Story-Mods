@@ -46,4 +46,17 @@ public class CharacterSheetViewMessage
 
     [ProtoMember(13)]
     public bool SuppressDialogOpen { get; set; }
+
+    /// <summary>
+    /// The target player's current headshot metadata, when one exists and the viewer can see it.
+    /// Bytes are not embedded here — clients fetch them lazily via HeadshotFetchRequest using the hash.
+    /// </summary>
+    [ProtoMember(14)]
+    public HeadshotMetadata Headshot { get; set; }
+
+    /// <summary>
+    /// True when the viewer is permitted to upload/replace the target's headshot.
+    /// </summary>
+    [ProtoMember(15)]
+    public bool CanEditHeadshot { get; set; }
 }

@@ -35,4 +35,11 @@ public class CharacterSheetFieldDefinition
 
     [ProtoMember(10)]
     public int EditorRows { get; set; }
+
+    /// <summary>
+    /// Where the field renders in the bio dialog. See <see cref="CharacterSheetLayoutSections"/>.
+    /// Empty defaults to body (the scrollable section).
+    /// </summary>
+    [ProtoMember(11)]
+    public string LayoutSection { get; set; } = CharacterSheetLayoutSections.Body;
 }

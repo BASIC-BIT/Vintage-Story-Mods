@@ -27,6 +27,31 @@ internal static class RichTextTextureUtils
     /// </remarks>
     public static LoadedTexture GenRichTextTexture(ICoreClientAPI capi, string vtml, CairoFont baseFont, int maxTextWidthPx, TextBackground background, int extraBottomMarginPx = 0)
     {
+        var surface = GenRichTextSurface(capi, vtml, baseFont, maxTextWidthPx, background, extraBottomMarginPx);
+        if (surface == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var tex = new LoadedTexture(capi);
+            capi.Gui.LoadOrUpdateCairoTexture(surface, linearMag: false, ref tex);
+            return tex;
+        }
+        finally
+        {
+            surface.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Same renderer as <see cref="GenRichTextTexture"/> but returns the raw Cairo surface so
+    /// callers can composite the bubble alongside other Cairo content (e.g. a framed headshot
+    /// in a nametag). Caller owns the returned surface and must dispose it.
+    /// </summary>
+    public static ImageSurface GenRichTextSurface(ICoreClientAPI capi, string vtml, CairoFont baseFont, int maxTextWidthPx, TextBackground background, int extraBottomMarginPx = 0)
+    {
         if (capi == null || string.IsNullOrWhiteSpace(vtml))
         {
             return null;
@@ -79,7 +104,7 @@ internal static class RichTextTextureUtils
             var bubbleHeight = textHeightPx + 2 * verPad;
             var surfaceHeight = bubbleHeight + Math.Max(0, extraBottomMarginPx);
 
-            using var surface = new ImageSurface(Format.Argb32, surfaceWidth, surfaceHeight);
+            var surface = new ImageSurface(Format.Argb32, surfaceWidth, surfaceHeight);
             using var ctx = new Context(surface);
 
             // Background (do not include transparent bottom margin).
@@ -124,9 +149,7 @@ internal static class RichTextTextureUtils
                 ctx.Restore();
             }
 
-            var tex = new LoadedTexture(capi);
-            capi.Gui.LoadOrUpdateCairoTexture(surface, linearMag: false, ref tex);
-            return tex;
+            return surface;
         }
         catch
         {

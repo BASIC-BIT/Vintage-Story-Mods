@@ -333,6 +333,18 @@ public class RpCharacterService
         NormalizeProjection(projection);
 
         IServerPlayerExtensions.SetModData(player, CharacterSheetKey, CloneSheet(projection.Sheet));
+
+        // Mirror the active character's headshot hash to the entity's "nametag" tree-attribute
+        // so vanilla's OnNameChanged listener automatically rebuilds the nametag texture when an
+        // RP character switch lands.
+        var headshotHash = projection.Sheet?.Headshot?.Hash ?? string.Empty;
+        var attrs = player.Entity?.WatchedAttributes;
+        var nametagTree = attrs?.GetTreeAttribute(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.NametagAttrTree);
+        if (attrs != null && nametagTree != null && nametagTree.GetString(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.HeadshotHashAttrKey) != headshotHash)
+        {
+            nametagTree.SetString(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.HeadshotHashAttrKey, headshotHash);
+            attrs.MarkPathDirty(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.NametagAttrTree);
+        }
         if (string.IsNullOrWhiteSpace(projection.NicknameColor))
         {
             player.RemoveModdata(NicknameColorKey);
