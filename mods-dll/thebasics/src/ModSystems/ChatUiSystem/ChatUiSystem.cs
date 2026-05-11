@@ -11,6 +11,7 @@ using thebasics.Configs;
 using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.CharacterSheets;
+using thebasics.Utilities;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -441,16 +442,9 @@ public class ChatUiSystem : ModSystem
         return _headshotHttpClient;
     }
 
-    private static void OnDialogRequestHeadshotForView(CharacterSheetViewMessage view)
+    private static void OnDialogRequestHeadshotForView(CharacterSheetDialog dialog, CharacterSheetViewMessage view)
     {
-        if (view == null || _config?.EnableCharacterHeadshots != true)
-        {
-            return;
-        }
-
-        var cache = GetOrCreateHeadshotCache();
-        var dialog = _characterSheetDialog;
-        if (dialog == null)
+        if (dialog == null || view == null || _config?.EnableCharacterHeadshots != true)
         {
             return;
         }
@@ -461,6 +455,7 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
+        var cache = GetOrCreateHeadshotCache();
         if (cache != null && cache.TryGet(view.Headshot.Hash, out var tex, out _, out _))
         {
             dialog.ApplyHeadshotTexture(tex);
@@ -857,19 +852,26 @@ public class ChatUiSystem : ModSystem
     [HarmonyPatch(typeof(Vintagestory.API.Client.GuiComposerHelpers), "AddDialogTitleBar")]
     public static void GuiComposerHelpers_AddDialogTitleBar_Prefix(GuiComposer composer, ref string text)
     {
-        if (composer?.DialogName != "playercharacter" || string.IsNullOrWhiteSpace(_characterDialogTitleOverride))
+        if (composer?.DialogName != "playercharacter")
         {
             return;
         }
 
-        var characterClass = _api?.World?.Player?.Entity?.WatchedAttributes?.GetString("characterClass");
-        if (!string.IsNullOrWhiteSpace(characterClass) && Lang.HasTranslation("characterclass-" + characterClass))
+        // Whatever flowed in (vanilla's `<player> the <class>` or our override) is rendered as plain
+        // text by the vanilla title bar; strip any VTML so colored-name tags from the nametag pipeline
+        // don't show up as literal `<font color=...>` in the character dialog title.
+        if (!string.IsNullOrWhiteSpace(_characterDialogTitleOverride))
         {
-            text = Lang.Get("characterdialog-title-nameandclass", _characterDialogTitleOverride, Lang.Get("characterclass-" + characterClass));
-            return;
+            var characterClass = _api?.World?.Player?.Entity?.WatchedAttributes?.GetString("characterClass");
+            text = !string.IsNullOrWhiteSpace(characterClass) && Lang.HasTranslation("characterclass-" + characterClass)
+                ? Lang.Get("characterdialog-title-nameandclass", _characterDialogTitleOverride, Lang.Get("characterclass-" + characterClass))
+                : _characterDialogTitleOverride;
         }
 
-        text = _characterDialogTitleOverride;
+        if (!string.IsNullOrEmpty(text) && text.IndexOf('<') >= 0)
+        {
+            text = VtmlUtils.StripVtmlTags(text, _api?.Logger);
+        }
     }
 
     [HarmonyPostfix]

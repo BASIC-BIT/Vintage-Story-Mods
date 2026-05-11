@@ -235,7 +235,7 @@
 
   "headshot-cmd-clear-desc": "Borrar el retrato de tu personaje",
   "headshot-cmd-admin-clear-desc": "Admin: Borrar el retrato del personaje de otro jugador",
-  "headshot-button-set-url": "Establecer desde URL…",
+  "headshot-button-set-url": "Usar URL",
   "headshot-button-clear": "Borrar",
   "headshot-empty-editable": "Arrastra una imagen aquí",
   "headshot-empty-readonly": "(sin retrato)",

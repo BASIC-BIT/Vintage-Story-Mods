@@ -156,9 +156,16 @@ public static class EntityBehaviorNameTagPatches
             // Our display names are runtime-built and never collide; preserve the lookup just in case.
             var resolvedName = Lang.GetIfExists("nametag-" + name.ToLowerInvariant()) ?? name;
 
+            // Compose VTML on the client side using the plain name + separate nickname-color
+            // sub-attribute. Keeps the watched-attr "nametag/name" plain so vanilla code paths
+            // (look-at HUD, character dialog title, etc.) don't render literal `<font>` tags.
+            var nicknameColor = nametagTree?.GetString(CharacterSheetSystem.NicknameColorAttrKey) ?? string.Empty;
+            var playerName = (entity as EntityPlayer)?.Player?.PlayerName ?? string.Empty;
+            var vtml = WrapWithNicknameColor(resolvedName, nicknameColor, playerName);
+
             var newTex = NametagComposer.Compose(capi, new NametagComposer.Options
             {
-                Vtml = resolvedName,
+                Vtml = vtml,
                 BaseFont = baseFont,
                 MaxTextWidthPx = NametagMaxTextWidthPx,
                 TextBackground = background,
@@ -179,5 +186,41 @@ public static class EntityBehaviorNameTagPatches
         {
             headshotBitmap?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Wraps the styled portion of the nametag name with a VTML color. When the name has the
+    /// canonical <c>"DisplayName (PlayerName)"</c> form from BuildNametagDisplayName, only the
+    /// DisplayName part is colored — the parenthetical PlayerName suffix stays neutral.
+    /// </summary>
+    private static string WrapWithNicknameColor(string plainName, string colorHex, string playerName)
+    {
+        if (string.IsNullOrEmpty(plainName))
+        {
+            return string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(colorHex))
+        {
+            return VtmlUtils.EscapeVtml(plainName);
+        }
+
+        var color = colorHex.Trim();
+        if (!color.StartsWith('#'))
+        {
+            color = "#" + color;
+        }
+
+        if (!string.IsNullOrEmpty(playerName))
+        {
+            var suffix = $" ({playerName})";
+            if (plainName.EndsWith(suffix, System.StringComparison.Ordinal))
+            {
+                var styled = plainName.Substring(0, plainName.Length - suffix.Length);
+                return $"<font color=\"{color}\">{VtmlUtils.EscapeVtml(styled)}</font>{VtmlUtils.EscapeVtml(suffix)}";
+            }
+        }
+
+        return $"<font color=\"{color}\">{VtmlUtils.EscapeVtml(plainName)}</font>";
     }
 }

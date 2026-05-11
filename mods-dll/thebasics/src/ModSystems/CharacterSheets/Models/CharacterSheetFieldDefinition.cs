@@ -42,4 +42,12 @@ public class CharacterSheetFieldDefinition
     /// </summary>
     [ProtoMember(11)]
     public string LayoutSection { get; set; } = CharacterSheetLayoutSections.Body;
+
+    /// <summary>
+    /// How much horizontal room the field consumes in the body layout. See
+    /// <see cref="CharacterSheetFieldWidths"/>. Two consecutive Half fields pair on one row.
+    /// Header-side fields use a separate grid layout and ignore this.
+    /// </summary>
+    [ProtoMember(12)]
+    public string Width { get; set; } = CharacterSheetFieldWidths.Full;
 }

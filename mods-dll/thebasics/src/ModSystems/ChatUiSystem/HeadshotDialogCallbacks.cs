@@ -11,7 +11,9 @@ public sealed class HeadshotDialogCallbacks
 {
     public bool UrlUploadAllowed { get; init; }
 
-    public Action<CharacterSheetViewMessage> RequestHeadshotForView { get; init; }
+    // Receives the dialog instance directly because the owning system's static dialog field
+    // isn't yet assigned during the very first constructor call.
+    public Action<CharacterSheetDialog, CharacterSheetViewMessage> RequestHeadshotForView { get; init; }
 
     public Action<string, string> UploadFromUrl { get; init; }
 

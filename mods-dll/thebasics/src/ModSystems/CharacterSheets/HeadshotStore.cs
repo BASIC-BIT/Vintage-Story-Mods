@@ -104,6 +104,55 @@ public sealed class HeadshotStore
         }
     }
 
+    /// <summary>
+    /// Fallback for cases where the active RP character id at fetch time doesn't match what
+    /// was used at upload (timing/race on rejoin, character switch in flight, etc.). Returns
+    /// the first file matching <c>&lt;uid&gt;_*.png</c> for the player so the portrait survives
+    /// id drift instead of triggering the "file missing" wipe.
+    /// </summary>
+    public bool TryFindAnyForPlayer(string playerUid, out byte[] bytes)
+    {
+        bytes = null;
+        if (string.IsNullOrWhiteSpace(playerUid))
+        {
+            return false;
+        }
+
+        try
+        {
+            var safeUid = Sanitize(playerUid);
+            if (!Directory.Exists(_baseDir))
+            {
+                return false;
+            }
+
+            var matches = Directory.EnumerateFiles(_baseDir, safeUid + "_*.png", SearchOption.TopDirectoryOnly);
+            foreach (var path in matches)
+            {
+                try
+                {
+                    var candidate = File.ReadAllBytes(path);
+                    if (candidate.Length > 0)
+                    {
+                        bytes = candidate;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Skip unreadable files and keep scanning.
+                }
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _api.Logger.Warning($"[thebasics] Failed to scan headshot fallbacks for {playerUid}: {ex.Message}");
+            return false;
+        }
+    }
+
     public bool TryDelete(string playerUid, string characterId)
     {
         try

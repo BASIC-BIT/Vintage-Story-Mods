@@ -235,7 +235,7 @@
 
   "headshot-cmd-clear-desc": "清除你的角色头像",
   "headshot-cmd-admin-clear-desc": "管理员：清除其他玩家的角色头像",
-  "headshot-button-set-url": "从 URL 设置…",
+  "headshot-button-set-url": "从 URL",
   "headshot-button-clear": "清除",
   "headshot-empty-editable": "拖入图片",
   "headshot-empty-readonly": "（无头像）",

@@ -118,6 +118,28 @@ Comprehensive catalog of feature requests from GitHub issues and ModDB community
 - **Current Status**: Basic restriction with `ProximityChatAllowPlayersToChangeNicknames`
 - **Enhancement**: Per-group permissions, nickname approval systems
 
+### Request #13: Full-Body Character Image (Secondary Image)
+- **Source**: QA session, May 2026
+- **Request**: A second image slot on the bio for a full-body character picture, separate from the headshot.
+- **Proposed UX**:
+  - Small thumbnail rendered inside the bio dialog (likely beneath the headshot area).
+  - Click-to-enlarge into a dedicated pane that shows the image at a larger size.
+  - Same upload mechanics as the headshot (drag-and-drop, URL prompt, server-relay-bytes, cache-by-hash).
+- **Implementation Notes**:
+  - Reuses the existing `HeadshotPipeline` / `HeadshotStore` / `HeadshotClientCache` plumbing — generalize to support N named image slots per character (`headshot`, `fullBody`, etc.).
+  - The "enlarge into dedicated pane" is a new `GuiDialog` subclass.
+  - Storage path becomes `<dataPath>/ModData/thebasics/headshots/<savegameId>/<playerUid>_<characterId>_<slot>.png`.
+
+### Request #14: Character Photo Album
+- **Source**: QA session, May 2026
+- **Request**: Arbitrary-count gallery of player-uploaded character images.
+- **Proposed UX**: Grid of thumbnails on a dedicated tab inside the bio dialog. Click to enlarge. Add/remove buttons. Captions optional.
+- **Implementation Notes**:
+  - Per-character image list (filename or hash array) persisted with the sheet.
+  - Server-side: per-character upload-count cap (config), per-image normalization same as headshot.
+  - Wire protocol: add/remove image messages reusing the byte-upload pipeline.
+  - Probably gates behind a server-config switch — non-trivial disk and bandwidth footprint per character.
+
 ## Implementation Roadmap
 
 ### Phase 1: High-Impact User Experience (Next Release)

@@ -1,3 +1,4 @@
+using System;
 using Cairo;
 using Vintagestory.API.Client;
 
@@ -82,11 +83,11 @@ public sealed class HeadshotElement : GuiElement
             return;
         }
 
-        _statusTextTexture ??= new LoadedTexture(api);
+        // Use the wrap-aware overload so multi-word error messages stay inside the slot.
         var font = CairoFont.WhiteSmallText().WithFontSize(13f);
-        // Default-constructed TextBackground has FillColor = new double[4] (transparent).
-        // Setting FillColor = null causes an NRE inside Cairo.Context.SetSourceRGBA.
-        api.Gui.TextTexture.GenOrUpdateTextTexture(text, font, ref _statusTextTexture, new TextBackground());
+        var maxWidth = (int)Math.Max(16, Bounds.fixedWidth - 8);
+        _statusTextTexture?.Dispose();
+        _statusTextTexture = api.Gui.TextTexture.GenTextTexture(text, font, maxWidth, new TextBackground(), EnumTextOrientation.Center);
     }
 
     public override void Dispose()

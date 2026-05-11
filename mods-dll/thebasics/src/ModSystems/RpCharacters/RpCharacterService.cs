@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using thebasics.Configs;
 using thebasics.Extensions;
+using thebasics.Models;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -631,7 +632,15 @@ public class RpCharacterService
                     FieldId = field.FieldId,
                     Value = field.Value ?? string.Empty
                 })
-                .ToList()
+                .ToList(),
+            Headshot = data?.Headshot == null ? null : new HeadshotMetadata
+            {
+                Hash = data.Headshot.Hash ?? string.Empty,
+                UpdatedAtUnixMs = data.Headshot.UpdatedAtUnixMs,
+                Width = data.Headshot.Width,
+                Height = data.Headshot.Height,
+                ByteLength = data.Headshot.ByteLength
+            }
         };
     }
 

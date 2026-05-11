@@ -199,7 +199,8 @@ namespace thebasics.Configs
                     Type = CharacterSheetFieldTypes.String,
                     Optional = true,
                     MaxLength = 64,
-                    Visibility = CharacterSheetFieldVisibilities.Public
+                    Visibility = CharacterSheetFieldVisibilities.Public,
+                    LayoutSection = CharacterSheetLayoutSections.HeaderSide
                 },
                 new CharacterSheetFieldDefinition
                 {

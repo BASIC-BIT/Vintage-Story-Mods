@@ -42,4 +42,11 @@ public class CharacterSheetFieldViewMessage
     /// </summary>
     [ProtoMember(13)]
     public string LayoutSection { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Horizontal width hint in the body section. See <c>CharacterSheetFieldWidths</c>.
+    /// Two consecutive Half fields share a row; everything else takes the full row width.
+    /// </summary>
+    [ProtoMember(14)]
+    public string Width { get; set; } = string.Empty;
 }

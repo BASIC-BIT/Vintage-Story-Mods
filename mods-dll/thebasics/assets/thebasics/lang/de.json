@@ -235,7 +235,7 @@
 
   "headshot-cmd-clear-desc": "Lösche dein Charakter-Porträt",
   "headshot-cmd-admin-clear-desc": "Admin: Lösche das Charakter-Porträt eines anderen Spielers",
-  "headshot-button-set-url": "Von URL festlegen…",
+  "headshot-button-set-url": "URL nutzen",
   "headshot-button-clear": "Löschen",
   "headshot-empty-editable": "Bild hier ablegen",
   "headshot-empty-readonly": "(kein Porträt)",

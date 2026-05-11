@@ -600,6 +600,16 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
     }
 
+    /// <summary>
+    /// Public push: lets <c>CharacterSheetSystem</c> open the GUI bio dialog on a player from
+    /// server-side chat commands without owning the network channel itself.
+    /// </summary>
+    public void PushCharacterSheetView(IServerPlayer viewer, CharacterSheetViewMessage view)
+    {
+        if (viewer == null || view == null || _serverConfigChannel == null) return;
+        _serverConfigChannel.SendPacket(view, viewer);
+    }
+
     private void OnHeadshotUploadRequest(IServerPlayer player, HeadshotUploadRequest message)
     {
         var sheetSystem = API.ModLoader.GetModSystem<thebasics.ModSystems.CharacterSheets.CharacterSheetSystem>();

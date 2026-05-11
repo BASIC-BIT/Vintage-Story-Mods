@@ -137,7 +137,11 @@ public class CharacterSheetDialog : GuiDialog
         var bottomPadding = 6;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth - 10, scrollTop + scrollHeight + buttonGap + buttonHeight + bottomPadding).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         var scrollClipBounds = ElementBounds.Fixed(0, scrollTop, DialogWidth - 36, scrollHeight);
-        var scrollInsetBounds = scrollClipBounds.FlatCopy().FixedGrow(3).WithFixedOffset(-3, -3);
+        // One unified inset frame around the header section + scroll body so they read as a
+        // single card rather than two stacked panels with a seam between them.
+        var unifiedInsetTop = showHeadshotSection ? headshotTop : scrollTop;
+        var unifiedInsetHeight = (scrollTop + scrollHeight) - unifiedInsetTop;
+        var scrollInsetBounds = ElementBounds.Fixed(0, unifiedInsetTop, DialogWidth - 36, unifiedInsetHeight).FixedGrow(3).WithFixedOffset(-3, -3);
         var scrollContentBounds = ElementBounds.Fixed(0, 0, DialogWidth - 48, contentHeight);
         var row = ElementBounds.Fixed(0, 8, DialogWidth - 48, 24);
         var buttonY = scrollClipBounds.fixedY + scrollHeight + buttonGap;
@@ -153,13 +157,16 @@ public class CharacterSheetDialog : GuiDialog
             .AddDialogTitleBar(title, OnTitleBarCloseClicked)
             .BeginChildElements(bodyBounds);
 
+        // Single inset wraps the header + scroll content. Draw it before adding interactive
+        // children so the children render on top of the frame.
+        composer.AddInset(scrollInsetBounds, 3);
+
         if (showHeadshotSection)
         {
             ComposeHeadshotSection(composer, headshotTop, hoistedIndices);
         }
 
         composer
-            .AddInset(scrollInsetBounds, 3)
             .BeginClip(scrollClipBounds)
             .AddInteractiveElement(_scrollContainer, "scrollBody");
 
@@ -190,7 +197,7 @@ public class CharacterSheetDialog : GuiDialog
         SetDeferredTextAreaValues();
         RecalculateScrolledBounds(_scrollContainer.Bounds);
 
-        _headshotCallbacks?.RequestHeadshotForView?.Invoke(_view);
+        _headshotCallbacks?.RequestHeadshotForView?.Invoke(this, _view);
     }
 
     /// <summary>
@@ -339,25 +346,34 @@ public class CharacterSheetDialog : GuiDialog
 
     private ElementBounds AddFields(GuiElementContainer container, ElementBounds row, IList<(int Index, CharacterSheetFieldViewMessage Field)> fields)
     {
-        foreach (var (index, field) in fields)
-        {
-            var label = field.Optional ? field.Label : field.Label + " *";
-            var labelBounds = row.FlatCopy().WithFixedHeight(24);
-            container.Add(new GuiElementStaticText(capi, label, EnumTextOrientation.Left, labelBounds, CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold)));
-            row = labelBounds.BelowCopy(0, -2);
+        var rowWidth = row.fixedWidth;
+        const double HalfGap = 12;
+        var halfWidth = Math.Max(60, (rowWidth - HalfGap) / 2);
 
-            if (field.CanEdit)
+        var i = 0;
+        while (i < fields.Count)
+        {
+            var current = fields[i];
+            var currentIsHalf = IsHalfWidth(current.Field);
+            var pairable = currentIsHalf
+                && i + 1 < fields.Count
+                && IsHalfWidth(fields[i + 1].Field);
+
+            if (pairable)
             {
-                var inputBounds = row.FlatCopy().WithFixedHeight(GetEditControlHeight(field));
-                AddEditableField(el => container.Add(el), inputBounds, field, index);
-                row = inputBounds.BelowCopy(0, 8);
+                var next = fields[i + 1];
+                AddFieldCell(container, row.fixedY, current.Index, current.Field, x: 0, width: halfWidth);
+                AddFieldCell(container, row.fixedY, next.Index, next.Field, x: halfWidth + HalfGap, width: halfWidth);
+                var rowHeight = Math.Max(GetCellHeight(current.Field), GetCellHeight(next.Field));
+                row = ElementBounds.Fixed(0, row.fixedY + rowHeight + 8, rowWidth, row.fixedHeight);
+                i += 2;
             }
             else
             {
-                var value = string.IsNullOrWhiteSpace(field.Value) ? Lang.Get("thebasics:charsheet-unset") : field.Value;
-                var valueBounds = row.FlatCopy().WithFixedHeight(GetReadOnlyHeight(value));
-                AddRichtext(container, VtmlUtils.EscapeVtml(value), valueBounds);
-                row = row.BelowCopy(0, 10);
+                var width = currentIsHalf ? halfWidth : rowWidth;
+                AddFieldCell(container, row.fixedY, current.Index, current.Field, x: 0, width: width);
+                row = ElementBounds.Fixed(0, row.fixedY + GetCellHeight(current.Field) + 8, rowWidth, row.fixedHeight);
+                i += 1;
             }
         }
 
@@ -368,6 +384,49 @@ public class CharacterSheetDialog : GuiDialog
         }
 
         return row;
+    }
+
+    /// <summary>
+    /// Renders a single field (label + input/value) inside <paramref name="container"/> at the given
+    /// <paramref name="x"/> offset and <paramref name="width"/>, with the label at <paramref name="topY"/>.
+    /// The caller decides how to advance the row position so paired half-width fields can share a row.
+    /// </summary>
+    private void AddFieldCell(
+        GuiElementContainer container,
+        double topY,
+        int fieldIndex,
+        CharacterSheetFieldViewMessage field,
+        double x,
+        double width)
+    {
+        var label = field.Optional ? field.Label : field.Label + " *";
+        var labelBounds = ElementBounds.Fixed(x, topY, width, 24);
+        container.Add(new GuiElementStaticText(capi, label, EnumTextOrientation.Left, labelBounds, CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold)));
+
+        var inputY = topY + 22;
+        if (field.CanEdit)
+        {
+            var inputBounds = ElementBounds.Fixed(x, inputY, width, GetEditControlHeight(field));
+            AddEditableField(el => container.Add(el), inputBounds, field, fieldIndex);
+        }
+        else
+        {
+            var value = string.IsNullOrWhiteSpace(field.Value) ? Lang.Get("thebasics:charsheet-unset") : field.Value;
+            var valueBounds = ElementBounds.Fixed(x, inputY, width, GetReadOnlyHeight(value));
+            AddRichtext(container, VtmlUtils.EscapeVtml(value), valueBounds);
+        }
+    }
+
+    private static bool IsHalfWidth(CharacterSheetFieldViewMessage field)
+    {
+        return CharacterSheetFieldWidths.Normalize(field.Width) == CharacterSheetFieldWidths.Half;
+    }
+
+    private static double GetCellHeight(CharacterSheetFieldViewMessage field)
+    {
+        // Label height + input/value height. Used to align paired half-width cells vertically.
+        var inputH = field.CanEdit ? GetEditControlHeight(field) : GetReadOnlyHeight(field.Value);
+        return 22 + inputH;
     }
 
     /// <summary>
@@ -513,9 +572,26 @@ public class CharacterSheetDialog : GuiDialog
             return 56;
         }
 
-        foreach (var field in fields)
+        // Mirror AddFields' pair-when-adjacent rule so the scroll content sizes match the rendered layout.
+        var i = 0;
+        while (i < fields.Count)
         {
-            height += field.CanEdit ? GetEditableFieldHeight(field) : 44 + GetReadOnlyHeight(field.Value);
+            var current = fields[i];
+            var pairable = IsHalfWidth(current)
+                && i + 1 < fields.Count
+                && IsHalfWidth(fields[i + 1]);
+
+            if (pairable)
+            {
+                var rowHeight = Math.Max(GetCellHeight(current), GetCellHeight(fields[i + 1]));
+                height += rowHeight + 8;
+                i += 2;
+            }
+            else
+            {
+                height += current.CanEdit ? GetEditableFieldHeight(current) : 44 + GetReadOnlyHeight(current.Value);
+                i += 1;
+            }
         }
 
         if (fields.Count == 0 || !string.IsNullOrWhiteSpace(view?.Message))

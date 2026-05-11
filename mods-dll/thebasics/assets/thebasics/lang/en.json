@@ -132,7 +132,7 @@
 
   "headshot-cmd-clear-desc": "Clear your character headshot",
   "headshot-cmd-admin-clear-desc": "Admin: Clear another player's character headshot",
-  "headshot-button-set-url": "Set from URL...",
+  "headshot-button-set-url": "Use URL",
   "headshot-button-clear": "Clear",
   "headshot-url-prompt-title": "Set headshot from URL",
   "headshot-url-prompt-hint": "Paste a direct link to a PNG or JPEG image.",

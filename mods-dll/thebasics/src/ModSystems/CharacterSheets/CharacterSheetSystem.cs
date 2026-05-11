@@ -392,18 +392,25 @@ public class CharacterSheetSystem : BaseBasicModSystem
         if (_headshotStore.TryRead(target.PlayerUID, characterId, out var bytes))
         {
             result.PngBytes = bytes;
-        }
-        else
-        {
-            // Metadata says we have a headshot but the file is missing. Clear the metadata so it doesn't keep
-            // confusing clients on subsequent fetches.
-            data.Headshot = null;
-            SaveSheetData(target, data);
-            result.Hash = string.Empty;
-            result.Width = 0;
-            result.Height = 0;
+            return result;
         }
 
+        // File missing at the resolved path. Don't auto-wipe metadata — character-id or
+        // file-system timing races have caused false positives in the past, and silently
+        // erasing a player's portrait on a single missed read is unrecoverable. Fall back to
+        // scanning the player's headshot directory for any file matching `<uid>_*.png`
+        // (covers RP character-id drift after rejoin); if we find one, serve those bytes.
+        if (_headshotStore.TryFindAnyForPlayer(target.PlayerUID, out var fallbackBytes))
+        {
+            result.PngBytes = fallbackBytes;
+            return result;
+        }
+
+        // Truly nothing on disk for this player; surface the empty state but keep the metadata
+        // pointer alone so a re-upload (or admin /adminclearheadshot) is the only way to clear it.
+        result.Hash = string.Empty;
+        result.Width = 0;
+        result.Height = 0;
         return result;
     }
 
@@ -581,7 +588,18 @@ public class CharacterSheetSystem : BaseBasicModSystem
         }
 
         var viewer = args.Caller.Type == EnumCallerType.Player ? args.Caller.Player as IServerPlayer : null;
-        return Success(RenderSheet(viewer, target, CharacterSheetViewMode.Full, includeEmpty: false));
+
+        // When a player runs the command in-game, push the GUI dialog instead of a chat-text view.
+        // Console / non-player callers (server scripts, etc.) still get the rendered text response.
+        if (viewer != null)
+        {
+            var isOwnSheet = viewer.PlayerUID == target.PlayerUID;
+            var view = BuildSheetViewMessage(viewer, target, CharacterSheetViewMode.Full, includeEmpty: isOwnSheet, canEdit: isOwnSheet, isAdminView: false);
+            API.ModLoader.GetModSystem<ProximityChat.RPProximityChatSystem>()?.PushCharacterSheetView(viewer, view);
+            return Success(string.Empty);
+        }
+
+        return Success(RenderSheet(null, target, CharacterSheetViewMode.Full, includeEmpty: false));
     }
 
     private TextCommandResult ViewAdminSheet(TextCommandCallingArgs args)
@@ -590,6 +608,14 @@ public class CharacterSheetSystem : BaseBasicModSystem
         if (target == null)
         {
             return Error(Lang.Get("thebasics:charsheet-error-player-not-found"));
+        }
+
+        var viewer = args.Caller.Type == EnumCallerType.Player ? args.Caller.Player as IServerPlayer : null;
+        if (viewer != null)
+        {
+            var view = BuildSheetViewMessage(viewer, target, CharacterSheetViewMode.Admin, includeEmpty: true, canEdit: true, isAdminView: true);
+            API.ModLoader.GetModSystem<ProximityChat.RPProximityChatSystem>()?.PushCharacterSheetView(viewer, view);
+            return Success(string.Empty);
         }
 
         return Success(RenderSheet(null, target, CharacterSheetViewMode.Admin, includeEmpty: true));
@@ -604,23 +630,29 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return Error(Lang.Get("thebasics:charsheet-error-look-target"));
         }
 
-        if (target.PlayerUID == viewer.PlayerUID)
+        if (target.PlayerUID != viewer.PlayerUID)
         {
-            return Success(RenderSheet(viewer, target, CharacterSheetViewMode.Full, includeEmpty: false));
+            var distance = viewer.Entity.Pos.DistanceTo(target.Entity.Pos);
+            if (distance > Config.CharacterSheetLookRange)
+            {
+                return Error(Lang.Get("thebasics:charsheet-error-look-range", Config.CharacterSheetLookRange));
+            }
+
+            if (Config.CharacterSheetLookRequiresLineOfSight && !VisibilityUtils.HasLineOfSight(API.World, viewer.Entity, target.Entity))
+            {
+                return Error(Lang.Get("thebasics:charsheet-error-look-los"));
+            }
         }
 
-        var distance = viewer.Entity.Pos.DistanceTo(target.Entity.Pos);
-        if (distance > Config.CharacterSheetLookRange)
-        {
-            return Error(Lang.Get("thebasics:charsheet-error-look-range", Config.CharacterSheetLookRange));
-        }
-
-        if (Config.CharacterSheetLookRequiresLineOfSight && !VisibilityUtils.HasLineOfSight(API.World, viewer.Entity, target.Entity))
-        {
-            return Error(Lang.Get("thebasics:charsheet-error-look-los"));
-        }
-
-        return Success(RenderSheet(viewer, target, CharacterSheetViewMode.Look, includeEmpty: false));
+        // Players get the GUI dialog; LookMode for cross-player so visibility rules + read-only apply.
+        var isSelf = target.PlayerUID == viewer.PlayerUID;
+        var lookView = BuildSheetViewMessage(viewer, target,
+            isSelf ? CharacterSheetViewMode.Full : CharacterSheetViewMode.Look,
+            includeEmpty: isSelf,
+            canEdit: isSelf,
+            isAdminView: false);
+        API.ModLoader.GetModSystem<ProximityChat.RPProximityChatSystem>()?.PushCharacterSheetView(viewer, lookView);
+        return Success(string.Empty);
     }
 
     private CharacterSheetViewMessage BuildRegularClientView(IServerPlayer viewer, CharacterSheetOpenRequest request)
@@ -730,7 +762,8 @@ public class CharacterSheetSystem : BaseBasicModSystem
             CanEdit = canEdit && CanEditField(viewer, target, field, isAdminView),
             Visibility = GetFieldVisibility(field),
             EditorRows = GetEditorRows(field),
-            LayoutSection = ResolveLayoutSection(field)
+            LayoutSection = ResolveLayoutSection(field),
+            Width = CharacterSheetFieldWidths.Normalize(field.Width)
         };
     }
 
@@ -1344,6 +1377,9 @@ public class CharacterSheetSystem : BaseBasicModSystem
 
     internal static string BuildNametagDisplayName(IServerPlayer player, ModConfig config)
     {
+        // Returns plain text. Coloring is applied client-side by EntityBehaviorNameTagPatches
+        // using the separate `thebasicsNicknameColor` watched-attribute, so any vanilla code path
+        // that reads the nametag name (look-at HUD, character dialog title, etc.) shows clean text.
         if (player == null || config == null)
         {
             return string.Empty;
@@ -1369,34 +1405,12 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return config.ShowPlayerNameInNametag ? player.PlayerName : string.Empty;
         }
 
-        // VTML-format the styled portion with the player's nickname color, when set. The
-        // patched client-side nametag renderer parses VTML; older clients (or vanilla without
-        // our patch) would see the raw tags, but this mod requires a matching client mod.
-        var styledName = WrapNicknameColor(displayName, player.GetNicknameColor());
-
         if (!config.ShowPlayerNameInNametag || displayName.Equals(player.PlayerName, StringComparison.OrdinalIgnoreCase))
         {
-            return styledName;
+            return displayName;
         }
 
-        return $"{styledName} ({VtmlUtils.EscapeVtml(player.PlayerName)})";
-    }
-
-    private static string WrapNicknameColor(string name, string colorHex)
-    {
-        var safe = VtmlUtils.EscapeVtml(name ?? string.Empty);
-        if (string.IsNullOrWhiteSpace(colorHex))
-        {
-            return safe;
-        }
-
-        var trimmed = colorHex.Trim();
-        if (!trimmed.StartsWith('#'))
-        {
-            trimmed = "#" + trimmed;
-        }
-
-        return $"<font color=\"{trimmed}\">{safe}</font>";
+        return $"{displayName} ({player.PlayerName})";
     }
 
     private static TextCommandResult Success(string message)

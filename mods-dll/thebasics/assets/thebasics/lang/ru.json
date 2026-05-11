@@ -235,7 +235,7 @@
 
   "headshot-cmd-clear-desc": "Удалить портрет персонажа",
   "headshot-cmd-admin-clear-desc": "Админ: Удалить портрет другого игрока",
-  "headshot-button-set-url": "Указать URL…",
+  "headshot-button-set-url": "По URL",
   "headshot-button-clear": "Очистить",
   "headshot-empty-editable": "Перетащите изображение сюда",
   "headshot-empty-readonly": "(нет портрета)",
