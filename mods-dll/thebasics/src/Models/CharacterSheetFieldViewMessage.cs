@@ -35,4 +35,18 @@ public class CharacterSheetFieldViewMessage
 
     [ProtoMember(10)]
     public int EditorRows { get; set; }
+
+    /// <summary>
+    /// Layout placement for this field. See <c>CharacterSheetLayoutSections</c>.
+    /// Lets admins put any field next to the headshot (HeaderSide) or in the scrollable body (Body, the default).
+    /// </summary>
+    [ProtoMember(13)]
+    public string LayoutSection { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Horizontal width hint in the body section. See <c>CharacterSheetFieldWidths</c>.
+    /// Two consecutive Half fields share a row; everything else takes the full row width.
+    /// </summary>
+    [ProtoMember(14)]
+    public string Width { get; set; } = string.Empty;
 }

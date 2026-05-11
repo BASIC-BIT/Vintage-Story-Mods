@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using thebasics.Configs;
 using thebasics.Extensions;
+using thebasics.Models;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -333,6 +334,18 @@ public class RpCharacterService
         NormalizeProjection(projection);
 
         IServerPlayerExtensions.SetModData(player, CharacterSheetKey, CloneSheet(projection.Sheet));
+
+        // Mirror the active character's headshot hash to the entity's "nametag" tree-attribute
+        // so vanilla's OnNameChanged listener automatically rebuilds the nametag texture when an
+        // RP character switch lands.
+        var headshotHash = projection.Sheet?.Headshot?.Hash ?? string.Empty;
+        var attrs = player.Entity?.WatchedAttributes;
+        var nametagTree = attrs?.GetTreeAttribute(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.NametagAttrTree);
+        if (attrs != null && nametagTree != null && nametagTree.GetString(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.HeadshotHashAttrKey) != headshotHash)
+        {
+            nametagTree.SetString(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.HeadshotHashAttrKey, headshotHash);
+            attrs.MarkPathDirty(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.NametagAttrTree);
+        }
         if (string.IsNullOrWhiteSpace(projection.NicknameColor))
         {
             player.RemoveModdata(NicknameColorKey);
@@ -619,7 +632,15 @@ public class RpCharacterService
                     FieldId = field.FieldId,
                     Value = field.Value ?? string.Empty
                 })
-                .ToList()
+                .ToList(),
+            Headshot = data?.Headshot == null ? null : new HeadshotMetadata
+            {
+                Hash = data.Headshot.Hash ?? string.Empty,
+                UpdatedAtUnixMs = data.Headshot.UpdatedAtUnixMs,
+                Width = data.Headshot.Width,
+                Height = data.Headshot.Height,
+                ByteLength = data.Headshot.ByteLength
+            }
         };
     }
 

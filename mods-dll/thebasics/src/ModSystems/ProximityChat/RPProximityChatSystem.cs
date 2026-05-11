@@ -608,14 +608,66 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<CharacterSheetOpenRequest>()
             .RegisterMessageType<CharacterSheetSaveRequest>()
             .RegisterMessageType<CharacterSheetViewMessage>()
+            .RegisterMessageType<HeadshotUploadRequest>()
+            .RegisterMessageType<HeadshotUploadResult>()
+            .RegisterMessageType<HeadshotFetchRequest>()
+            .RegisterMessageType<HeadshotFetchResult>()
+            .RegisterMessageType<HeadshotClearRequest>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
             .SetMessageHandler<CharacterSheetOpenRequest>(OnCharacterSheetOpenRequest)
             .SetMessageHandler<CharacterSheetSaveRequest>(OnCharacterSheetSaveRequest)
+            .SetMessageHandler<HeadshotUploadRequest>(OnHeadshotUploadRequest)
+            .SetMessageHandler<HeadshotFetchRequest>(OnHeadshotFetchRequest)
+            .SetMessageHandler<HeadshotClearRequest>(OnHeadshotClearRequest)
             .SetMessageHandler<TheBasicsLanguageConfigOpenRequest>(OnLanguageConfigOpenRequest)
             .SetMessageHandler<TheBasicsLanguageConfigSaveMessage>(OnLanguageConfigSaveMessage)
             .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
+    }
+
+    /// <summary>
+    /// Public push: lets <c>CharacterSheetSystem</c> open the GUI bio dialog on a player from
+    /// server-side chat commands without owning the network channel itself.
+    /// </summary>
+    public void PushCharacterSheetView(IServerPlayer viewer, CharacterSheetViewMessage view)
+    {
+        if (viewer == null || view == null || _serverConfigChannel == null) return;
+        _serverConfigChannel.SendPacket(view, viewer);
+    }
+
+    private void OnHeadshotUploadRequest(IServerPlayer player, HeadshotUploadRequest message)
+    {
+        var sheetSystem = API.ModLoader.GetModSystem<thebasics.ModSystems.CharacterSheets.CharacterSheetSystem>();
+        var result = sheetSystem?.HandleHeadshotUpload(player, message) ?? new HeadshotUploadResult
+        {
+            Success = false,
+            Message = Lang.Get("thebasics:charsheet-gui-disabled"),
+            TargetPlayerUid = player?.PlayerUID ?? string.Empty
+        };
+        _serverConfigChannel.SendPacket(result, player);
+    }
+
+    private void OnHeadshotFetchRequest(IServerPlayer player, HeadshotFetchRequest message)
+    {
+        var sheetSystem = API.ModLoader.GetModSystem<thebasics.ModSystems.CharacterSheets.CharacterSheetSystem>();
+        var result = sheetSystem?.HandleHeadshotFetch(player, message) ?? new HeadshotFetchResult
+        {
+            TargetPlayerUid = message?.TargetPlayerUid ?? string.Empty
+        };
+        _serverConfigChannel.SendPacket(result, player);
+    }
+
+    private void OnHeadshotClearRequest(IServerPlayer player, HeadshotClearRequest message)
+    {
+        var sheetSystem = API.ModLoader.GetModSystem<thebasics.ModSystems.CharacterSheets.CharacterSheetSystem>();
+        var result = sheetSystem?.HandleHeadshotClear(player, message) ?? new HeadshotUploadResult
+        {
+            Success = false,
+            Message = Lang.Get("thebasics:charsheet-gui-disabled"),
+            TargetPlayerUid = player?.PlayerUID ?? string.Empty
+        };
+        _serverConfigChannel.SendPacket(result, player);
     }
 
     private void OnLanguageConfigOpenRequest(IServerPlayer player, TheBasicsLanguageConfigOpenRequest message)

@@ -1,11 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using HarmonyLib;
 using thebasics.Configs;
 using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
+using thebasics.ModSystems.CharacterSheets;
+using thebasics.Utilities;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -61,6 +67,14 @@ public class ChatUiSystem : ModSystem
     private static string _configAdminStatusMessage;
     private static string _configAdminSelectedGroup;
     private static bool _returnToConfigAdminAfterLanguageDialog;
+
+    private static HeadshotClientCache _headshotCache;
+    private static HttpClient _headshotHttpClient;
+    private static FileDropDelegate _headshotFileDropHandler;
+    private static bool _headshotFileDropSubscribed;
+    private static long _headshotPendingRequestId;
+    private static readonly Dictionary<string, long> _headshotFetchAttemptedAtMs = new();
+    private const long HeadshotFetchRetryWindowMs = 30_000;
 
     private static void DebugLog(string message)
     {
@@ -283,6 +297,11 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<CharacterSheetOpenRequest>()
             .RegisterMessageType<CharacterSheetSaveRequest>()
             .RegisterMessageType<CharacterSheetViewMessage>()
+            .RegisterMessageType<HeadshotUploadRequest>()
+            .RegisterMessageType<HeadshotUploadResult>()
+            .RegisterMessageType<HeadshotFetchRequest>()
+            .RegisterMessageType<HeadshotFetchResult>()
+            .RegisterMessageType<HeadshotClearRequest>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
@@ -292,7 +311,9 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
             .SetMessageHandler<ChatterSoundMessage>(OnChatterSoundMessage)
             .SetMessageHandler<PlacedEnvironmentMessage>(OnPlacedEnvironmentMessage)
-            .SetMessageHandler<CharacterSheetViewMessage>(OnCharacterSheetViewMessage);
+            .SetMessageHandler<CharacterSheetViewMessage>(OnCharacterSheetViewMessage)
+            .SetMessageHandler<HeadshotUploadResult>(OnHeadshotUploadResult)
+            .SetMessageHandler<HeadshotFetchResult>(OnHeadshotFetchResult);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
@@ -362,7 +383,7 @@ public class ChatUiSystem : ModSystem
     {
         if (_characterSheetDialog == null)
         {
-            _characterSheetDialog = new CharacterSheetDialog(_api, message, SendCharacterSheetSaveRequest);
+            _characterSheetDialog = new CharacterSheetDialog(_api, message, SendCharacterSheetSaveRequest, BuildHeadshotCallbacks());
         }
         else
         {
@@ -372,6 +393,435 @@ public class ChatUiSystem : ModSystem
         if (!_characterSheetDialog.IsOpened())
         {
             _characterSheetDialog.TryOpen();
+        }
+
+        SubscribeFileDropIfNeeded();
+    }
+
+    private static HeadshotDialogCallbacks BuildHeadshotCallbacks()
+    {
+        if (_config?.EnableCharacterHeadshots != true)
+        {
+            return null;
+        }
+
+        return new HeadshotDialogCallbacks
+        {
+            UrlUploadAllowed = _config.HeadshotUrlAllowed,
+            RequestHeadshotForView = OnDialogRequestHeadshotForView,
+            UploadFromUrl = OnDialogUploadFromUrl,
+            ClearHeadshot = OnDialogClearHeadshot
+        };
+    }
+
+    private static HeadshotClientCache GetOrCreateHeadshotCache()
+    {
+        if (_headshotCache == null && _api != null)
+        {
+            _headshotCache = new HeadshotClientCache(_api);
+        }
+
+        return _headshotCache;
+    }
+
+    private static HttpClient GetOrCreateHeadshotHttpClient()
+    {
+        if (_headshotHttpClient != null)
+        {
+            return _headshotHttpClient;
+        }
+
+        var handler = new HttpClientHandler
+        {
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 5,
+            AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+        };
+        _headshotHttpClient = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+        var version = _api?.ModLoader?.GetMod("thebasics")?.Info?.Version ?? "0";
+        _headshotHttpClient.DefaultRequestHeaders.UserAgent.Clear();
+        _headshotHttpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("thebasics-headshot", version));
+        _headshotHttpClient.DefaultRequestHeaders.Accept.Clear();
+        _headshotHttpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("image/png"));
+        _headshotHttpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("image/jpeg"));
+        return _headshotHttpClient;
+    }
+
+    private static void OnDialogRequestHeadshotForView(CharacterSheetDialog dialog, CharacterSheetViewMessage view)
+    {
+        if (dialog == null || view == null || _config?.EnableCharacterHeadshots != true)
+        {
+            return;
+        }
+
+        if (view.Headshot == null || string.IsNullOrEmpty(view.Headshot.Hash))
+        {
+            dialog.ApplyHeadshotTexture(null);
+            return;
+        }
+
+        var cache = GetOrCreateHeadshotCache();
+        if (cache != null && cache.TryGet(view.Headshot.Hash, out var tex, out _, out _))
+        {
+            dialog.ApplyHeadshotTexture(tex);
+            return;
+        }
+
+        dialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-status-loading"));
+        var fetch = new HeadshotFetchRequest
+        {
+            TargetPlayerUid = view.TargetPlayerUid ?? string.Empty,
+            ClientCachedHash = string.Empty
+        };
+        _safeNetworkChannel?.SendPacketSafely(fetch);
+    }
+
+    private static void OnDialogUploadFromUrl(string targetPlayerUid, string url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || _config?.HeadshotUrlAllowed != true)
+        {
+            return;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-bad-url"));
+            return;
+        }
+
+        var requestId = Interlocked.Increment(ref _headshotPendingRequestId);
+        var maxDownloadKb = Math.Max(64, _config.HeadshotUrlMaxDownloadKb);
+        var adminTargetUid = ResolveAdminTargetUid(targetPlayerUid);
+
+        Task.Run(async () =>
+        {
+            var bytes = await TryDownloadHeadshotAsync(uri, maxDownloadKb).ConfigureAwait(false);
+            if (bytes == null || Interlocked.Read(ref _headshotPendingRequestId) != requestId)
+            {
+                return;
+            }
+
+            SubmitNormalizedUpload(bytes, adminTargetUid);
+        });
+    }
+
+    /// <summary>
+    /// Returns the downloaded bytes on success; null on any failure (errors are surfaced to the dialog).
+    /// </summary>
+    private static async Task<byte[]> TryDownloadHeadshotAsync(Uri uri, int maxDownloadKb)
+    {
+        var maxDownloadBytes = maxDownloadKb * 1024L;
+        try
+        {
+            using var response = await GetOrCreateHeadshotHttpClient().GetAsync(uri, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            if (response.Content?.Headers?.ContentLength is long declared && declared > maxDownloadBytes)
+            {
+                OnMain(() => ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-too-large", maxDownloadKb)));
+                return null;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+            if (bytes.Length > maxDownloadBytes)
+            {
+                OnMain(() => ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-too-large", maxDownloadKb)));
+                return null;
+            }
+
+            return bytes;
+        }
+        catch (Exception ex)
+        {
+            _api?.Logger.Notification($"[thebasics] Headshot URL fetch failed: {ex.Message}");
+            OnMain(() => ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-fetch")));
+            return null;
+        }
+    }
+
+    private static void OnDialogClearHeadshot(string targetPlayerUid)
+    {
+        var adminTargetUid = ResolveAdminTargetUid(targetPlayerUid);
+        _safeNetworkChannel?.SendPacketSafely(new HeadshotClearRequest
+        {
+            AdminTargetPlayerUid = adminTargetUid ?? string.Empty
+        });
+    }
+
+    private static string ResolveAdminTargetUid(string viewTargetPlayerUid)
+    {
+        if (string.IsNullOrEmpty(viewTargetPlayerUid))
+        {
+            return null;
+        }
+
+        var ownUid = _api?.World?.Player?.PlayerUID;
+        if (string.IsNullOrEmpty(ownUid))
+        {
+            return null;
+        }
+
+        return string.Equals(viewTargetPlayerUid, ownUid, StringComparison.Ordinal)
+            ? null
+            : viewTargetPlayerUid;
+    }
+
+    private static void SubmitNormalizedUpload(byte[] inputBytes, string adminTargetUid)
+    {
+        if (inputBytes == null || inputBytes.Length == 0 || _config == null)
+        {
+            return;
+        }
+
+        var options = new HeadshotPipeline.NormalizeOptions(
+            TargetDimension: Math.Max(16, _config.HeadshotMaxDimension),
+            MaxOutputBytes: Math.Max(16 * 1024, _config.HeadshotMaxKb * 1024),
+            MaxDecodedDimensionEitherAxis: Math.Max(64, _config.HeadshotMaxDecodedDimension));
+        var result = HeadshotPipeline.Normalize(inputBytes, options);
+        if (!result.Ok)
+        {
+            OnMain(() => ShowHeadshotErrorOnDialog(HeadshotPipeline.GetErrorMessage(result.ErrorCode, _config.HeadshotMaxKb)));
+            return;
+        }
+
+        OnMain(() =>
+        {
+            _safeNetworkChannel?.SendPacketSafely(new HeadshotUploadRequest
+            {
+                PngBytes = result.PngBytes,
+                AdminTargetPlayerUid = adminTargetUid ?? string.Empty
+            });
+        });
+    }
+
+    private static void ShowHeadshotErrorOnDialog(string message)
+    {
+        _characterSheetDialog?.SetHeadshotStatus(message);
+        _api?.TriggerIngameError(_api.World, "thebasics-headshot", message);
+    }
+
+    private static void OnHeadshotUploadResult(HeadshotUploadResult message)
+    {
+        if (message == null)
+        {
+            return;
+        }
+
+        if (!message.Success)
+        {
+            ShowHeadshotErrorOnDialog(string.IsNullOrEmpty(message.Message) ? Lang.Get("thebasics:headshot-error-generic") : message.Message);
+            return;
+        }
+
+        if (_characterSheetDialog?.CurrentTargetPlayerUid == message.TargetPlayerUid)
+        {
+            _characterSheetDialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-status-loading"));
+        }
+
+        // Re-request the sheet so the view reflects the new Headshot metadata (or its absence after a clear).
+        if (!string.IsNullOrEmpty(message.TargetPlayerUid))
+        {
+            _safeNetworkChannel?.SendPacketSafely(new CharacterSheetOpenRequest
+            {
+                Mode = CharacterSheetOpenRequest.ModeView,
+                TargetPlayerUid = message.TargetPlayerUid
+            });
+        }
+    }
+
+    private static void OnHeadshotFetchResult(HeadshotFetchResult message)
+    {
+        if (message == null)
+        {
+            return;
+        }
+
+        var dialogOpen = _characterSheetDialog?.IsOpened() == true;
+        var dialogIsForTarget = dialogOpen && _characterSheetDialog.CurrentTargetPlayerUid == message.TargetPlayerUid;
+
+        if (string.IsNullOrEmpty(message.Hash))
+        {
+            if (dialogIsForTarget)
+            {
+                _characterSheetDialog.ApplyHeadshotTexture(null);
+            }
+            return;
+        }
+
+        var cache = GetOrCreateHeadshotCache();
+
+        if (message.PngBytes == null || message.PngBytes.Length == 0)
+        {
+            // Server confirmed our cached hash is current; reuse the cached texture.
+            if (dialogIsForTarget && cache != null && cache.TryGet(message.Hash, out var tex, out _, out _))
+            {
+                _characterSheetDialog.ApplyHeadshotTexture(tex);
+            }
+            return;
+        }
+
+        if (cache == null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var bitmap = new BitmapExternal(message.PngBytes, message.PngBytes.Length, _api.Logger);
+            var loaded = new LoadedTexture(_api);
+            _api.Render.LoadTexture(bitmap, ref loaded, linearMag: true, clampMode: 1);
+            cache.Put(message.Hash, loaded, message.PngBytes, bitmap.Width, bitmap.Height);
+            EntityBehaviorNameTagPatches.OnHeadshotTextureCached(message.TargetPlayerUid);
+            // Hash resolved — clear the throttle so a future eviction can re-fetch promptly.
+            _headshotFetchAttemptedAtMs.Remove(message.Hash);
+
+            if (dialogIsForTarget)
+            {
+                _characterSheetDialog.ApplyHeadshotTexture(loaded);
+            }
+        }
+        catch (Exception ex)
+        {
+            _api.Logger.Warning($"[thebasics] Failed to decode received headshot: {ex.Message}");
+            if (dialogIsForTarget)
+            {
+                _characterSheetDialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-error-decode"));
+            }
+        }
+    }
+
+    private static void SubscribeFileDropIfNeeded()
+    {
+        if (_headshotFileDropSubscribed || _api == null || _config?.EnableCharacterHeadshots != true)
+        {
+            return;
+        }
+
+        _headshotFileDropHandler = OnFileDropped;
+        _api.Event.FileDrop += _headshotFileDropHandler;
+        _headshotFileDropSubscribed = true;
+    }
+
+    private static void OnFileDropped(FileDropEvent e)
+    {
+        if (e == null || string.IsNullOrEmpty(e.Filename) || e.Handled)
+        {
+            return;
+        }
+
+        if (_characterSheetDialog?.IsOpened() != true || _characterSheetDialog.CanEditHeadshot != true)
+        {
+            return;
+        }
+
+        var path = e.Filename;
+        var maxKb = Math.Max(64, _config?.HeadshotUrlMaxDownloadKb ?? 4096);
+        var maxBytes = maxKb * 1024L;
+
+        try
+        {
+            var info = new System.IO.FileInfo(path);
+            if (!info.Exists)
+            {
+                return;
+            }
+
+            if (info.Length > maxBytes)
+            {
+                ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-too-large", maxKb));
+                e.Handled = true;
+                return;
+            }
+
+            var bytes = System.IO.File.ReadAllBytes(path);
+            if (!HeadshotPipeline.IsPng(bytes) && !HeadshotPipeline.IsJpeg(bytes))
+            {
+                ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-format"));
+                e.Handled = true;
+                return;
+            }
+
+            e.Handled = true;
+            _characterSheetDialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-status-uploading"));
+            var adminTargetUid = ResolveAdminTargetUid(_characterSheetDialog.CurrentTargetPlayerUid);
+            // Bump the request token so any in-flight URL upload is superseded by this drop.
+            var requestId = Interlocked.Increment(ref _headshotPendingRequestId);
+            Task.Run(() =>
+            {
+                if (Interlocked.Read(ref _headshotPendingRequestId) != requestId)
+                {
+                    return;
+                }
+                SubmitNormalizedUpload(bytes, adminTargetUid);
+            });
+        }
+        catch (Exception ex)
+        {
+            _api.Logger.Warning($"[thebasics] Headshot file-drop read failed: {ex.Message}");
+            ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-generic"));
+        }
+    }
+
+    /// <summary>
+    /// Returns the original PNG bytes for a cached headshot, or null when not cached.
+    /// Used by the patched nametag renderer to composite the headshot into the texture.
+    /// </summary>
+    internal static byte[] TryGetCachedHeadshotPngBytes(string hash)
+    {
+        return _headshotCache?.TryGetPngBytes(hash);
+    }
+
+    /// <summary>
+    /// Called by EntityBehaviorNameTagPatches when it sees a hash without cached bytes. Fires a
+    /// fetch request, throttled per-hash so an unresolvable hash doesn't spam the server every frame.
+    /// </summary>
+    internal static void RequestHeadshotForHash(string targetPlayerUid, string hash)
+    {
+        if (_safeNetworkChannel == null || string.IsNullOrEmpty(targetPlayerUid) || string.IsNullOrEmpty(hash))
+        {
+            return;
+        }
+
+        var nowMs = _api?.World?.ElapsedMilliseconds ?? 0;
+        if (_headshotFetchAttemptedAtMs.TryGetValue(hash, out var lastMs) && nowMs - lastMs < HeadshotFetchRetryWindowMs)
+        {
+            return;
+        }
+
+        _headshotFetchAttemptedAtMs[hash] = nowMs;
+        _safeNetworkChannel.SendPacketSafely(new HeadshotFetchRequest
+        {
+            TargetPlayerUid = targetPlayerUid,
+            ClientCachedHash = string.Empty
+        });
+    }
+
+    internal static bool IsCustomNametagEnabled() => _config?.UseCustomNametagRenderer != false;
+
+    internal static bool IsHeadshotInNametagEnabled() => _config?.EnableCharacterHeadshots == true && _config?.ShowHeadshotInNametag == true;
+
+    // Cairo-pixel size — VS's distance scaling shrinks the on-screen size from here.
+    internal static int GetNametagInlineImagePixelSize() => Math.Max(24, _config?.NametagInlineImagePixelSize ?? 100);
+
+    private static void OnMain(Action action)
+    {
+        if (action == null || _api == null)
+        {
+            return;
+        }
+
+        try
+        {
+            _api.Event.EnqueueMainThreadTask(action, "thebasics-headshot");
+        }
+        catch (Exception ex)
+        {
+            // EnqueueMainThreadTask itself failing is unexpected; log and drop. Don't fall back to inline
+            // invocation — the action expects to run on the render thread, and double-running it after a
+            // partial main-thread enqueue could corrupt UI state.
+            _api.Logger.Warning($"[thebasics] EnqueueMainThreadTask failed for headshot action: {ex.Message}");
         }
     }
 
@@ -410,19 +860,26 @@ public class ChatUiSystem : ModSystem
     [HarmonyPatch(typeof(Vintagestory.API.Client.GuiComposerHelpers), "AddDialogTitleBar")]
     public static void GuiComposerHelpers_AddDialogTitleBar_Prefix(GuiComposer composer, ref string text)
     {
-        if (composer?.DialogName != "playercharacter" || string.IsNullOrWhiteSpace(_characterDialogTitleOverride))
+        if (composer?.DialogName != "playercharacter")
         {
             return;
         }
 
-        var characterClass = _api?.World?.Player?.Entity?.WatchedAttributes?.GetString("characterClass");
-        if (!string.IsNullOrWhiteSpace(characterClass) && Lang.HasTranslation("characterclass-" + characterClass))
+        // Whatever flowed in (vanilla's `<player> the <class>` or our override) is rendered as plain
+        // text by the vanilla title bar; strip any VTML so colored-name tags from the nametag pipeline
+        // don't show up as literal `<font color=...>` in the character dialog title.
+        if (!string.IsNullOrWhiteSpace(_characterDialogTitleOverride))
         {
-            text = Lang.Get("characterdialog-title-nameandclass", _characterDialogTitleOverride, Lang.Get("characterclass-" + characterClass));
-            return;
+            var characterClass = _api?.World?.Player?.Entity?.WatchedAttributes?.GetString("characterClass");
+            text = !string.IsNullOrWhiteSpace(characterClass) && Lang.HasTranslation("characterclass-" + characterClass)
+                ? Lang.Get("characterdialog-title-nameandclass", _characterDialogTitleOverride, Lang.Get("characterclass-" + characterClass))
+                : _characterDialogTitleOverride;
         }
 
-        text = _characterDialogTitleOverride;
+        if (!string.IsNullOrEmpty(text) && text.IndexOf('<') >= 0)
+        {
+            text = VtmlUtils.StripVtmlTags(text, _api?.Logger);
+        }
     }
 
     [HarmonyPostfix]

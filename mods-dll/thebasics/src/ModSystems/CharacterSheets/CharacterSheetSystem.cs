@@ -22,6 +22,23 @@ public class CharacterSheetSystem : BaseBasicModSystem
     private const string ModDataKey = "BASIC_CHARACTER_SHEET";
     private const string NicknameBind = "thebasics.nickname";
     private const string FullNameBind = "thebasics.fullName";
+    /// <summary>
+    /// Sub-key inside the entity's "nametag" tree-attribute. Stored there (rather than at
+    /// top-level WatchedAttributes) so vanilla's <c>EntityBehaviorNameTag.OnNameChanged</c>
+    /// listener — which fires on any "nametag" path change — automatically rebuilds the
+    /// texture when the headshot updates.
+    /// </summary>
+    internal const string NametagAttrTree = "nametag";
+    internal const string HeadshotHashAttrKey = "thebasicsHeadshotHash";
+
+    /// <summary>
+    /// Sub-key for the player's nickname color (hex string with leading '#'), or empty when none.
+    /// Lives next to <see cref="HeadshotHashAttrKey"/> for the same OnNameChanged-triggering reason.
+    /// </summary>
+    internal const string NicknameColorAttrKey = "thebasicsNicknameColor";
+
+    private HeadshotStore _headshotStore;
+    private readonly Dictionary<string, long> _lastHeadshotUploadAtMs = new();
 
     protected override void BasicStartServerSide()
     {
@@ -30,7 +47,38 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return;
         }
 
+        if (Config.EnableCharacterHeadshots)
+        {
+            _headshotStore = new HeadshotStore(API);
+            API.Event.PlayerDisconnect += OnPlayerDisconnect;
+            API.Event.PlayerJoin += OnPlayerJoin;
+        }
+
         RegisterCommands();
+    }
+
+    /// <summary>
+    /// Backfills the player's <see cref="HeadshotHashAttrKey"/> watched attribute from their saved
+    /// <see cref="CharacterSheetData.Headshot"/>. Needed because pre-existing players from before
+    /// nametag-headshot rendering shipped won't have the watched attribute set yet.
+    /// </summary>
+    private void OnPlayerJoin(IServerPlayer player)
+    {
+        if (player?.Entity == null) return;
+        var data = GetSheetData(player);
+        SyncHeadshotHashAttr(player, data?.Headshot?.Hash);
+        SyncNicknameColorAttr(player);
+    }
+
+    private static void SyncHeadshotHashAttr(IServerPlayer player, string hash)
+    {
+        if (player?.Entity?.WatchedAttributes is not { } attrs) return;
+        var nametag = attrs.GetTreeAttribute(NametagAttrTree);
+        if (nametag == null) return; // The vanilla EntityBehaviorNameTag creates this on entity init.
+        var safe = hash ?? string.Empty;
+        if (nametag.GetString(HeadshotHashAttrKey) == safe) return;
+        nametag.SetString(HeadshotHashAttrKey, safe);
+        attrs.MarkPathDirty(NametagAttrTree);
     }
 
     private void RegisterCommands()
@@ -98,6 +146,53 @@ public class CharacterSheetSystem : BaseBasicModSystem
             .RequiresPrivilege(Config.CharacterSheetAdminPermission)
             .WithArgs(new PlayersArgParser("player", API, true), new WordArgParser("field", false))
             .HandleWith(ClearAdminField);
+
+        if (Config.EnableCharacterHeadshots)
+        {
+            API.ChatCommands.GetOrCreate("clearheadshot")
+                .WithDescription(Lang.Get("thebasics:headshot-cmd-clear-desc"))
+                .RequiresPrivilege(Config.CharacterSheetSetPermission)
+                .RequiresPlayer()
+                .HandleWith(ClearOwnHeadshot);
+
+            API.ChatCommands.GetOrCreate("adminclearheadshot")
+                .WithDescription(Lang.Get("thebasics:headshot-cmd-admin-clear-desc"))
+                .RequiresPrivilege(Config.CharacterSheetAdminPermission)
+                .WithArgs(new PlayersArgParser("player", API, true))
+                .HandleWith(ClearAdminHeadshot);
+        }
+    }
+
+    private TextCommandResult ClearOwnHeadshot(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        var ok = ClearHeadshot(player);
+        if (!ok)
+        {
+            return Error(Lang.Get("thebasics:headshot-error-clear-failed"));
+        }
+
+        API.Logger.Audit($"Player {player.PlayerName} cleared their headshot.");
+        return Success(Lang.Get("thebasics:headshot-clear-success-self"));
+    }
+
+    private TextCommandResult ClearAdminHeadshot(TextCommandCallingArgs args)
+    {
+        var target = ResolveTarget(args, 0, allowSelfFallback: false);
+        if (target == null)
+        {
+            return Error(Lang.Get("thebasics:charsheet-error-player-not-found"));
+        }
+
+        var ok = ClearHeadshot(target);
+        if (!ok)
+        {
+            return Error(Lang.Get("thebasics:headshot-error-clear-failed"));
+        }
+
+        var editorName = args.Caller.Type == EnumCallerType.Player ? args.Caller.Player?.PlayerName ?? "console" : "console";
+        API.Logger.Audit($"Admin {editorName} cleared headshot for {target.PlayerName}.");
+        return Success(Lang.Get("thebasics:headshot-clear-success-other", VtmlUtils.EscapeVtml(target.PlayerName)));
     }
 
     internal CharacterSheetViewMessage BuildClientView(IServerPlayer viewer, CharacterSheetOpenRequest request)
@@ -152,6 +247,258 @@ public class CharacterSheetSystem : BaseBasicModSystem
         response.IsSaveResponse = true;
         return response;
     }
+
+    internal HeadshotUploadResult HandleHeadshotUpload(IServerPlayer sender, HeadshotUploadRequest request)
+    {
+        if (!Config.EnableCharacterSheets || !Config.EnableCharacterHeadshots || _headshotStore == null)
+        {
+            return HeadshotUploadFail(sender?.PlayerUID, Lang.Get("thebasics:headshot-error-disabled"));
+        }
+
+        if (sender == null || request == null)
+        {
+            return HeadshotUploadFail(sender?.PlayerUID, Lang.Get("thebasics:headshot-error-bad-request"));
+        }
+
+        var isAdminAction = !string.IsNullOrWhiteSpace(request.AdminTargetPlayerUid)
+                            && !request.AdminTargetPlayerUid.Equals(sender.PlayerUID, StringComparison.Ordinal);
+
+        if (isAdminAction && !sender.HasPrivilege(Config.CharacterSheetAdminPermission))
+        {
+            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:charsheet-error-admin-privilege"));
+        }
+
+        var target = isAdminAction
+            ? API.GetPlayerByUID(request.AdminTargetPlayerUid)
+            : sender;
+        if (target == null)
+        {
+            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:charsheet-error-player-not-found"));
+        }
+
+        if (!isAdminAction && !sender.HasPrivilege(Config.CharacterSheetSetPermission))
+        {
+            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:headshot-error-no-permission"));
+        }
+
+        var maxKb = Math.Max(1, Config.HeadshotMaxKb);
+        var maxOutputBytes = maxKb * 1024;
+        var inputBytes = request.PngBytes;
+        if (inputBytes == null || inputBytes.Length == 0)
+        {
+            return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-empty"));
+        }
+
+        // Pre-decode size guard: even before decoding, the *encoded* input shouldn't exceed our cap by much.
+        // Allow up to 4x the post-normalization budget for the encoded input (heuristic for JPEGs that compress well).
+        var inputMaxBytes = Math.Max(maxOutputBytes * 4, 64 * 1024);
+        if (inputBytes.Length > inputMaxBytes)
+        {
+            return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-too-large", maxKb));
+        }
+
+        if (!isAdminAction)
+        {
+            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (_lastHeadshotUploadAtMs.TryGetValue(sender.PlayerUID, out var lastMs))
+            {
+                var cooldownMs = Math.Max(0, Config.HeadshotUploadCooldownSec) * 1000L;
+                var sinceMs = nowMs - lastMs;
+                if (sinceMs < cooldownMs)
+                {
+                    var waitSec = (int)Math.Ceiling((cooldownMs - sinceMs) / 1000.0);
+                    return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-cooldown", waitSec));
+                }
+            }
+        }
+
+        var options = new HeadshotPipeline.NormalizeOptions(
+            TargetDimension: Math.Max(16, Config.HeadshotMaxDimension),
+            MaxOutputBytes: maxOutputBytes,
+            MaxDecodedDimensionEitherAxis: Math.Max(64, Config.HeadshotMaxDecodedDimension));
+        var result = HeadshotPipeline.Normalize(inputBytes, options);
+        if (!result.Ok)
+        {
+            return HeadshotUploadFail(target.PlayerUID, HeadshotPipeline.GetErrorMessage(result.ErrorCode, maxKb));
+        }
+
+        var characterId = target.GetActiveRpCharacterId();
+        if (!_headshotStore.TryWrite(target.PlayerUID, characterId, result.PngBytes))
+        {
+            return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-write"));
+        }
+
+        var data = GetSheetData(target);
+        data.Headshot = HeadshotPipeline.BuildMetadata(result, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        SaveSheetData(target, data);
+        SyncHeadshotHashAttr(target, result.Hash);
+
+        if (!isAdminAction)
+        {
+            _lastHeadshotUploadAtMs[sender.PlayerUID] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        }
+
+        // Hash from ComputeSha256Hex is always 64 hex chars.
+        API.Logger.Audit($"{(isAdminAction ? "Admin" : "Player")} {sender.PlayerName} uploaded headshot for {target.PlayerName} ({result.PngBytes.Length} bytes, hash {result.Hash[..8]}).");
+
+        return new HeadshotUploadResult
+        {
+            Success = true,
+            TargetPlayerUid = target.PlayerUID,
+            Metadata = data.Headshot,
+            Message = Lang.Get("thebasics:headshot-upload-success")
+        };
+    }
+
+    internal HeadshotFetchResult HandleHeadshotFetch(IServerPlayer sender, HeadshotFetchRequest request)
+    {
+        if (!Config.EnableCharacterSheets || !Config.EnableCharacterHeadshots || _headshotStore == null)
+        {
+            return new HeadshotFetchResult { TargetPlayerUid = request?.TargetPlayerUid ?? string.Empty };
+        }
+
+        if (request == null || string.IsNullOrWhiteSpace(request.TargetPlayerUid))
+        {
+            return new HeadshotFetchResult();
+        }
+
+        var target = API.GetPlayerByUID(request.TargetPlayerUid);
+        if (target == null)
+        {
+            return new HeadshotFetchResult { TargetPlayerUid = request.TargetPlayerUid };
+        }
+
+        var data = GetSheetData(target);
+        var metadata = data.Headshot;
+        if (metadata == null || string.IsNullOrEmpty(metadata.Hash))
+        {
+            return new HeadshotFetchResult { TargetPlayerUid = request.TargetPlayerUid };
+        }
+
+        var result = new HeadshotFetchResult
+        {
+            TargetPlayerUid = request.TargetPlayerUid,
+            Hash = metadata.Hash,
+            Width = metadata.Width,
+            Height = metadata.Height
+        };
+
+        if (!string.IsNullOrEmpty(request.ClientCachedHash) && string.Equals(request.ClientCachedHash, metadata.Hash, StringComparison.Ordinal))
+        {
+            return result;
+        }
+
+        var characterId = target.GetActiveRpCharacterId();
+        if (_headshotStore.TryRead(target.PlayerUID, characterId, out var bytes))
+        {
+            result.PngBytes = bytes;
+            return result;
+        }
+
+        // File missing at the resolved path. Don't auto-wipe metadata — character-id or
+        // file-system timing races have caused false positives in the past, and silently
+        // erasing a player's portrait on a single missed read is unrecoverable. Fall back to
+        // scanning the player's headshot directory for any file matching `<uid>_*.png`
+        // (covers RP character-id drift after rejoin); if we find one, serve those bytes.
+        if (_headshotStore.TryFindAnyForPlayer(target.PlayerUID, out var fallbackBytes))
+        {
+            result.PngBytes = fallbackBytes;
+            return result;
+        }
+
+        // Truly nothing on disk for this player; surface the empty state but keep the metadata
+        // pointer alone so a re-upload (or admin /adminclearheadshot) is the only way to clear it.
+        result.Hash = string.Empty;
+        result.Width = 0;
+        result.Height = 0;
+        return result;
+    }
+
+    internal bool ClearHeadshot(IServerPlayer target)
+    {
+        if (!Config.EnableCharacterSheets || !Config.EnableCharacterHeadshots || _headshotStore == null || target == null)
+        {
+            return false;
+        }
+
+        var characterId = target.GetActiveRpCharacterId();
+        var deleted = _headshotStore.TryDelete(target.PlayerUID, characterId);
+        var data = GetSheetData(target);
+        if (data.Headshot != null)
+        {
+            data.Headshot = null;
+            SaveSheetData(target, data);
+        }
+        SyncHeadshotHashAttr(target, null);
+        return deleted;
+    }
+
+    internal HeadshotUploadResult HandleHeadshotClear(IServerPlayer sender, HeadshotClearRequest request)
+    {
+        if (!Config.EnableCharacterSheets || !Config.EnableCharacterHeadshots || _headshotStore == null)
+        {
+            return HeadshotUploadFail(sender?.PlayerUID, Lang.Get("thebasics:headshot-error-disabled"));
+        }
+
+        if (sender == null)
+        {
+            return HeadshotUploadFail(null, Lang.Get("thebasics:headshot-error-bad-request"));
+        }
+
+        var isAdminAction = !string.IsNullOrWhiteSpace(request?.AdminTargetPlayerUid)
+                            && !request.AdminTargetPlayerUid.Equals(sender.PlayerUID, StringComparison.Ordinal);
+
+        if (isAdminAction && !sender.HasPrivilege(Config.CharacterSheetAdminPermission))
+        {
+            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:charsheet-error-admin-privilege"));
+        }
+
+        var target = isAdminAction ? API.GetPlayerByUID(request.AdminTargetPlayerUid) : sender;
+        if (target == null)
+        {
+            return HeadshotUploadFail(sender.PlayerUID, Lang.Get("thebasics:charsheet-error-player-not-found"));
+        }
+
+        var ok = ClearHeadshot(target);
+        if (!ok)
+        {
+            return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-clear-failed"));
+        }
+
+        API.Logger.Audit($"{(isAdminAction ? "Admin" : "Player")} {sender.PlayerName} cleared headshot for {target.PlayerName}.");
+        return new HeadshotUploadResult
+        {
+            Success = true,
+            TargetPlayerUid = target.PlayerUID,
+            Metadata = null,
+            Message = isAdminAction
+                ? Lang.Get("thebasics:headshot-clear-success-other", target.PlayerName)
+                : Lang.Get("thebasics:headshot-clear-success-self")
+        };
+    }
+
+    /// <summary>
+    /// Drops the cooldown entry for a leaving player so the dictionary doesn't accumulate
+    /// over the lifetime of a long-running server.
+    /// </summary>
+    internal void OnPlayerDisconnect(IServerPlayer player)
+    {
+        if (player?.PlayerUID is { } uid)
+        {
+            _lastHeadshotUploadAtMs.Remove(uid);
+        }
+    }
+
+    private static HeadshotUploadResult HeadshotUploadFail(string targetUid, string message)
+    {
+        return new HeadshotUploadResult
+        {
+            Success = false,
+            TargetPlayerUid = targetUid ?? string.Empty,
+            Message = message ?? string.Empty
+        };
+    }
+
 
     private bool TryBuildClientFieldChanges(IServerPlayer editor, IServerPlayer target, CharacterSheetSaveRequest request, bool isAdminAction, out List<CharacterSheetFieldChange> changes, out string errorMessage)
     {
@@ -241,7 +588,18 @@ public class CharacterSheetSystem : BaseBasicModSystem
         }
 
         var viewer = args.Caller.Type == EnumCallerType.Player ? args.Caller.Player as IServerPlayer : null;
-        return Success(RenderSheet(viewer, target, CharacterSheetViewMode.Full, includeEmpty: false));
+
+        // When a player runs the command in-game, push the GUI dialog instead of a chat-text view.
+        // Console / non-player callers (server scripts, etc.) still get the rendered text response.
+        if (viewer != null)
+        {
+            var isOwnSheet = viewer.PlayerUID == target.PlayerUID;
+            var view = BuildSheetViewMessage(viewer, target, CharacterSheetViewMode.Full, includeEmpty: isOwnSheet, canEdit: isOwnSheet, isAdminView: false);
+            API.ModLoader.GetModSystem<ProximityChat.RPProximityChatSystem>()?.PushCharacterSheetView(viewer, view);
+            return Success(string.Empty);
+        }
+
+        return Success(RenderSheet(null, target, CharacterSheetViewMode.Full, includeEmpty: false));
     }
 
     private TextCommandResult ViewAdminSheet(TextCommandCallingArgs args)
@@ -250,6 +608,14 @@ public class CharacterSheetSystem : BaseBasicModSystem
         if (target == null)
         {
             return Error(Lang.Get("thebasics:charsheet-error-player-not-found"));
+        }
+
+        var viewer = args.Caller.Type == EnumCallerType.Player ? args.Caller.Player as IServerPlayer : null;
+        if (viewer != null)
+        {
+            var view = BuildSheetViewMessage(viewer, target, CharacterSheetViewMode.Admin, includeEmpty: true, canEdit: true, isAdminView: true);
+            API.ModLoader.GetModSystem<ProximityChat.RPProximityChatSystem>()?.PushCharacterSheetView(viewer, view);
+            return Success(string.Empty);
         }
 
         return Success(RenderSheet(null, target, CharacterSheetViewMode.Admin, includeEmpty: true));
@@ -264,23 +630,29 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return Error(Lang.Get("thebasics:charsheet-error-look-target"));
         }
 
-        if (target.PlayerUID == viewer.PlayerUID)
+        if (target.PlayerUID != viewer.PlayerUID)
         {
-            return Success(RenderSheet(viewer, target, CharacterSheetViewMode.Full, includeEmpty: false));
+            var distance = viewer.Entity.Pos.DistanceTo(target.Entity.Pos);
+            if (distance > Config.CharacterSheetLookRange)
+            {
+                return Error(Lang.Get("thebasics:charsheet-error-look-range", Config.CharacterSheetLookRange));
+            }
+
+            if (Config.CharacterSheetLookRequiresLineOfSight && !VisibilityUtils.HasLineOfSight(API.World, viewer.Entity, target.Entity))
+            {
+                return Error(Lang.Get("thebasics:charsheet-error-look-los"));
+            }
         }
 
-        var distance = viewer.Entity.Pos.DistanceTo(target.Entity.Pos);
-        if (distance > Config.CharacterSheetLookRange)
-        {
-            return Error(Lang.Get("thebasics:charsheet-error-look-range", Config.CharacterSheetLookRange));
-        }
-
-        if (Config.CharacterSheetLookRequiresLineOfSight && !VisibilityUtils.HasLineOfSight(API.World, viewer.Entity, target.Entity))
-        {
-            return Error(Lang.Get("thebasics:charsheet-error-look-los"));
-        }
-
-        return Success(RenderSheet(viewer, target, CharacterSheetViewMode.Look, includeEmpty: false));
+        // Players get the GUI dialog; LookMode for cross-player so visibility rules + read-only apply.
+        var isSelf = target.PlayerUID == viewer.PlayerUID;
+        var lookView = BuildSheetViewMessage(viewer, target,
+            isSelf ? CharacterSheetViewMode.Full : CharacterSheetViewMode.Look,
+            includeEmpty: isSelf,
+            canEdit: isSelf,
+            isAdminView: false);
+        API.ModLoader.GetModSystem<ProximityChat.RPProximityChatSystem>()?.PushCharacterSheetView(viewer, lookView);
+        return Success(string.Empty);
     }
 
     private CharacterSheetViewMessage BuildRegularClientView(IServerPlayer viewer, CharacterSheetOpenRequest request)
@@ -347,7 +719,9 @@ public class CharacterSheetSystem : BaseBasicModSystem
             DisplayName = displayName,
             CanEdit = canEdit,
             IsAdminView = isAdminView,
-            IsLookView = mode == CharacterSheetViewMode.Look
+            IsLookView = mode == CharacterSheetViewMode.Look,
+            Headshot = Config.EnableCharacterHeadshots ? data.Headshot : null,
+            CanEditHeadshot = Config.EnableCharacterHeadshots && canEdit
         };
 
         foreach (var field in Config.CharacterSheetFields)
@@ -366,7 +740,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
             view.Fields.Add(CreateFieldView(viewer, target, field, value, canEdit, isAdminView));
         }
 
-        if (view.Fields.Count == 0)
+        if (view.Fields.Count == 0 && view.Headshot == null)
         {
             view.Message = mode == CharacterSheetViewMode.Look ? Lang.Get("thebasics:charsheet-look-empty") : Lang.Get("thebasics:charsheet-empty");
         }
@@ -387,8 +761,27 @@ public class CharacterSheetSystem : BaseBasicModSystem
             Options = field.Options?.ToList() ?? new List<string>(),
             CanEdit = canEdit && CanEditField(viewer, target, field, isAdminView),
             Visibility = GetFieldVisibility(field),
-            EditorRows = GetEditorRows(field)
+            EditorRows = GetEditorRows(field),
+            LayoutSection = ResolveLayoutSection(field),
+            Width = CharacterSheetFieldWidths.Normalize(field.Width)
         };
+    }
+
+    /// <summary>
+    /// Returns the field's configured LayoutSection, with backfill: configs predating layout sections
+    /// won't have one set, so we infer HeaderSide for nickname/full-name fields and Body for everything
+    /// else. This means existing servers see the new layout for their name fields without any config edit.
+    /// </summary>
+    private static string ResolveLayoutSection(CharacterSheetFieldDefinition field)
+    {
+        if (!string.IsNullOrWhiteSpace(field.LayoutSection))
+        {
+            return CharacterSheetLayoutSections.Normalize(field.LayoutSection);
+        }
+
+        return IsNicknameField(field) || IsFullNameField(field)
+            ? CharacterSheetLayoutSections.HeaderSide
+            : CharacterSheetLayoutSections.Body;
     }
 
     private string GetSheetTitle(IServerPlayer viewer, IServerPlayer target, CharacterSheetViewMode mode, string displayName)
@@ -963,10 +1356,30 @@ public class CharacterSheetSystem : BaseBasicModSystem
         behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
         behavior.RenderRange = Config.NametagRenderRange;
         behavior.SetName(BuildNametagDisplayName(player, Config));
+        SyncNicknameColorAttr(player);
+    }
+
+    /// <summary>
+    /// Pushes the player's current nickname color into the "nametag" tree-attribute so the
+    /// client-side patched nametag renderer can apply it to the name text. Stored next to the
+    /// headshot hash so vanilla's OnNameChanged listener picks up changes here too.
+    /// </summary>
+    internal static void SyncNicknameColorAttr(IServerPlayer player)
+    {
+        if (player?.Entity?.WatchedAttributes is not { } attrs) return;
+        var nametag = attrs.GetTreeAttribute(NametagAttrTree);
+        if (nametag == null) return;
+        var color = player.GetNicknameColor() ?? string.Empty;
+        if (nametag.GetString(NicknameColorAttrKey) == color) return;
+        nametag.SetString(NicknameColorAttrKey, color);
+        attrs.MarkPathDirty(NametagAttrTree);
     }
 
     internal static string BuildNametagDisplayName(IServerPlayer player, ModConfig config)
     {
+        // Returns plain text. Coloring is applied client-side by EntityBehaviorNameTagPatches
+        // using the separate `thebasicsNicknameColor` watched-attribute, so any vanilla code path
+        // that reads the nametag name (look-at HUD, character dialog title, etc.) shows clean text.
         if (player == null || config == null)
         {
             return string.Empty;

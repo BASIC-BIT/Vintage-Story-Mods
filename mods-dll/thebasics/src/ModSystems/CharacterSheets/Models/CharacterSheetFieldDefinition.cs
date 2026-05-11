@@ -35,4 +35,19 @@ public class CharacterSheetFieldDefinition
 
     [ProtoMember(10)]
     public int EditorRows { get; set; }
+
+    /// <summary>
+    /// Where the field renders in the bio dialog. See <see cref="CharacterSheetLayoutSections"/>.
+    /// Empty defaults to body (the scrollable section).
+    /// </summary>
+    [ProtoMember(11)]
+    public string LayoutSection { get; set; } = CharacterSheetLayoutSections.Body;
+
+    /// <summary>
+    /// How much horizontal room the field consumes in the body layout. See
+    /// <see cref="CharacterSheetFieldWidths"/>. Two consecutive Half fields pair on one row.
+    /// Header-side fields use a separate grid layout and ignore this.
+    /// </summary>
+    [ProtoMember(12)]
+    public string Width { get; set; } = CharacterSheetFieldWidths.Full;
 }

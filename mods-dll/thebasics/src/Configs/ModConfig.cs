@@ -158,7 +158,8 @@ namespace thebasics.Configs
                     Optional = false,
                     BindTo = "thebasics.fullName",
                     MaxLength = 100,
-                    Visibility = CharacterSheetFieldVisibilities.Public
+                    Visibility = CharacterSheetFieldVisibilities.Public,
+                    LayoutSection = CharacterSheetLayoutSections.HeaderSide
                 },
                 new CharacterSheetFieldDefinition
                 {
@@ -168,7 +169,8 @@ namespace thebasics.Configs
                     Optional = true,
                     BindTo = "thebasics.nickname",
                     MaxLength = 100,
-                    Visibility = CharacterSheetFieldVisibilities.Public
+                    Visibility = CharacterSheetFieldVisibilities.Public,
+                    LayoutSection = CharacterSheetLayoutSections.HeaderSide
                 },
                 new CharacterSheetFieldDefinition
                 {
@@ -177,7 +179,8 @@ namespace thebasics.Configs
                     Type = CharacterSheetFieldTypes.String,
                     Optional = true,
                     MaxLength = 64,
-                    Visibility = CharacterSheetFieldVisibilities.Public
+                    Visibility = CharacterSheetFieldVisibilities.Public,
+                    LayoutSection = CharacterSheetLayoutSections.HeaderSide
                 },
                 new CharacterSheetFieldDefinition
                 {
@@ -186,7 +189,8 @@ namespace thebasics.Configs
                     Type = CharacterSheetFieldTypes.String,
                     Optional = true,
                     MaxLength = 100,
-                    Visibility = CharacterSheetFieldVisibilities.Public
+                    Visibility = CharacterSheetFieldVisibilities.Public,
+                    LayoutSection = CharacterSheetLayoutSections.HeaderSide
                 },
                 new CharacterSheetFieldDefinition
                 {
@@ -195,7 +199,8 @@ namespace thebasics.Configs
                     Type = CharacterSheetFieldTypes.String,
                     Optional = true,
                     MaxLength = 64,
-                    Visibility = CharacterSheetFieldVisibilities.Public
+                    Visibility = CharacterSheetFieldVisibilities.Public,
+                    LayoutSection = CharacterSheetLayoutSections.HeaderSide
                 },
                 new CharacterSheetFieldDefinition
                 {
@@ -609,5 +614,47 @@ namespace thebasics.Configs
 
         [ProtoMember(102)]
         public int MaxRpCharacterSlots { get; set; } = 3;
+
+        // Headshots / character portraits attached to bios.
+        [ProtoMember(103)]
+        public bool EnableCharacterHeadshots { get; set; } = true;
+
+        // Maximum accepted size of an uploaded image (post-normalization PNG, in kilobytes).
+        [ProtoMember(104)]
+        public int HeadshotMaxKb { get; set; } = 256;
+
+        // Square dimension that uploads are resized to (server-side normalization). Output is always square.
+        [ProtoMember(105)]
+        public int HeadshotMaxDimension { get; set; } = 256;
+
+        // Per-player upload cooldown in seconds (anti-spam). Admins bypass this.
+        [ProtoMember(106)]
+        public int HeadshotUploadCooldownSec { get; set; } = 60;
+
+        // Allow clients to fetch a headshot from a URL via /setbiourl. Disable to require drag-and-drop only.
+        [ProtoMember(107)]
+        public bool HeadshotUrlAllowed { get; set; } = true;
+
+        // Maximum bytes the client will download from a URL before bailing (kilobytes, pre-normalization).
+        [ProtoMember(108)]
+        public int HeadshotUrlMaxDownloadKb { get; set; } = 4096;
+
+        // Maximum decoded dimension on either axis the server will accept before rejecting (decompression-bomb guard).
+        [ProtoMember(109)]
+        public int HeadshotMaxDecodedDimension { get; set; } = 4096;
+
+        // Renders a player's headshot inline inside their floating nametag when one is set. Cosmetic only.
+        [ProtoMember(110)]
+        public bool ShowHeadshotInNametag { get; set; } = true;
+
+        // Cairo-pixel render size for the inline headshot in the nametag (square). VS's distance
+        // scaling shrinks the on-screen size from there. ~100 is a balanced MMO-portrait size.
+        [ProtoMember(111)]
+        public int NametagInlineImagePixelSize { get; set; } = 100;
+
+        // Use our patched nametag texture renderer (VTML + inline image). Disable to fall back to the
+        // vanilla plain-text nametag renderer.
+        [ProtoMember(112)]
+        public bool UseCustomNametagRenderer { get; set; } = true;
     }
 }

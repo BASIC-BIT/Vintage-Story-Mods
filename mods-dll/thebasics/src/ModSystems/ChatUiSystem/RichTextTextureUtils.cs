@@ -27,6 +27,31 @@ internal static class RichTextTextureUtils
     /// </remarks>
     public static LoadedTexture GenRichTextTexture(ICoreClientAPI capi, string vtml, CairoFont baseFont, int maxTextWidthPx, TextBackground background, int extraBottomMarginPx = 0)
     {
+        var surface = GenRichTextSurface(capi, vtml, baseFont, maxTextWidthPx, background, extraBottomMarginPx);
+        if (surface == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var tex = new LoadedTexture(capi);
+            capi.Gui.LoadOrUpdateCairoTexture(surface, linearMag: false, ref tex);
+            return tex;
+        }
+        finally
+        {
+            surface.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Same renderer as <see cref="GenRichTextTexture"/> but returns the raw Cairo surface so
+    /// callers can composite the bubble alongside other Cairo content (e.g. a framed headshot
+    /// in a nametag). Caller owns the returned surface and must dispose it.
+    /// </summary>
+    public static ImageSurface GenRichTextSurface(ICoreClientAPI capi, string vtml, CairoFont baseFont, int maxTextWidthPx, TextBackground background, int extraBottomMarginPx = 0)
+    {
         if (capi == null || string.IsNullOrWhiteSpace(vtml))
         {
             return null;
@@ -75,15 +100,21 @@ internal static class RichTextTextureUtils
 
             var hPad = GetScaledLengthPx(background.HorPadding, guiScale);
             var verPad = GetScaledLengthPx(background.VerPadding, guiScale);
-            var surfaceWidth = textWidthPx + 2 * hPad;
+            // Inset the bubble path so its stroke renders fully inside the surface, plus one
+            // extra transparent pixel to absorb Cairo's AA bleed (which extends ~0.5px past the
+            // geometric stroke). Without that AA margin the surface's outermost column ends up
+            // with ~50% alpha border color, which flickers under GL sampling at varying subpixel
+            // positions.
+            var borderInset = background.BorderWidth > 0 ? (int)Math.Ceiling(background.BorderWidth / 2.0) + 1 : 0;
+            var bubbleWidth = textWidthPx + 2 * hPad;
             var bubbleHeight = textHeightPx + 2 * verPad;
-            var surfaceHeight = bubbleHeight + Math.Max(0, extraBottomMarginPx);
+            var surfaceWidth = bubbleWidth + 2 * borderInset;
+            var surfaceHeight = bubbleHeight + 2 * borderInset + Math.Max(0, extraBottomMarginPx);
 
-            using var surface = new ImageSurface(Format.Argb32, surfaceWidth, surfaceHeight);
+            var surface = new ImageSurface(Format.Argb32, surfaceWidth, surfaceHeight);
             using var ctx = new Context(surface);
 
-            // Background (do not include transparent bottom margin).
-            GuiElement.RoundRectangle(ctx, 0, 0, surfaceWidth, bubbleHeight, background.Radius);
+            GuiElement.RoundRectangle(ctx, borderInset, borderInset, bubbleWidth, bubbleHeight, background.Radius);
             ctx.SetSourceRGBA(background.FillColor);
             if (background.BorderWidth > 0)
             {
@@ -97,36 +128,29 @@ internal static class RichTextTextureUtils
                 ctx.Fill();
             }
 
-            // Render text at a centered offset within the bubble.
-            // Horizontal: use the bubble padding as the text area's origin; individual
-            // visual lines are centered after richtext layout so wrapped lines do not
-            // stay left-aligned inside a wide bubble.
-            // Vertical: center the text block within the bubble height (excluding bottom margin).
+            // Text inside the bubble, centered vertically within the bubble's interior.
             var vPad = (bubbleHeight - textHeightPx) / 2.0;
             var offsetBounds = ElementBounds.Fixed(
-                hPad / guiScale,
-                vPad / guiScale,
+                (borderInset + hPad) / guiScale,
+                (borderInset + vPad) / guiScale,
                 textWidthPx / (double)guiScale,
                 textHeightPx / (double)guiScale
             );
             offsetBounds.ParentBounds = ElementBounds.Empty;
             rich.ComposeFor(offsetBounds, ctx, surface);
 
-            // Explicitly clear the bottom margin region so no rendering artifacts
-            // (from ComposeFor overflow or Cairo anti-aliasing) leak into the
-            // transparent spacing that separates the bubble from the nametag.
+            // Clear the bottom transparent margin (chat-bubble spacing) so no stray Cairo AA
+            // bleeds into the gap separating the bubble from the nametag below it.
             if (extraBottomMarginPx > 0)
             {
                 ctx.Save();
                 ctx.Operator = Operator.Clear;
-                ctx.Rectangle(0, bubbleHeight, surfaceWidth, extraBottomMarginPx);
+                ctx.Rectangle(0, borderInset + bubbleHeight, surfaceWidth, extraBottomMarginPx + borderInset);
                 ctx.Fill();
                 ctx.Restore();
             }
 
-            var tex = new LoadedTexture(capi);
-            capi.Gui.LoadOrUpdateCairoTexture(surface, linearMag: false, ref tex);
-            return tex;
+            return surface;
         }
         catch
         {

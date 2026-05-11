@@ -50,6 +50,18 @@
       <HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="SkiaSharp">
+      <HintPath>$(VINTAGE_STORY)\Lib\SkiaSharp.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Native SkiaSharp dependency must sit next to the managed assembly at runtime. -->
+  <ItemGroup>
+    <Content Include="$(VINTAGE_STORY)\Lib\libSkiaSharp.dll" Condition="Exists('$(VINTAGE_STORY)\Lib\libSkiaSharp.dll')">
+      <Link>libSkiaSharp.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
