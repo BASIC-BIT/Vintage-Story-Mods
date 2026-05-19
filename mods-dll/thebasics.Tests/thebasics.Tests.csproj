@@ -54,10 +54,14 @@
       <HintPath>$(VINTAGE_STORY)\Lib\protobuf-net.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="SkiaSharp">
+    <Reference Include="SkiaSharp" Condition="Exists('$(VINTAGE_STORY)\Lib\SkiaSharp.dll')">
       <HintPath>$(VINTAGE_STORY)\Lib\SkiaSharp.dll</HintPath>
       <Private>True</Private>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="!Exists('$(VINTAGE_STORY)\Lib\SkiaSharp.dll')">
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
   </ItemGroup>
 
   <!-- Native SkiaSharp dependency must sit next to the managed assembly at runtime. -->

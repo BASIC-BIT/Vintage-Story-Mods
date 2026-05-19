@@ -444,7 +444,14 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
             if (ok)
             {
                 _forceClose = true;
-                TryClose();
+                try
+                {
+                    TryClose();
+                }
+                finally
+                {
+                    _forceClose = false;
+                }
             }
         });
         _unsavedCloseConfirm.TryOpen();
