@@ -42,6 +42,7 @@ public class ChatUiSystem : ModSystem
     private static CharacterSheetDialog _characterSheetDialog;
     private static CharacterSheetMessageDialog _characterSheetMessageDialog;
     private static LanguageConfigDialog _languageConfigDialog;
+    private static CharacterSheetFieldConfigDialog _characterSheetFieldConfigDialog;
     private static bool _pendingCharacterSheetSave;
     private static bool _pendingCharacterSheetOpenFromCharacterDialog;
     private static bool _suppressNextCharacterDialogSheetOpen;
@@ -61,12 +62,15 @@ public class ChatUiSystem : ModSystem
     private static ChatTypingIndicatorState? _lastSentTypingState;
     private static string _lastChatInputText;
     private static long _lastChatInputChangeMs;
-    private static GuiJsonDialog _configAdminDialog;
+    private static ConfirmingConfigAdminDialog _configAdminDialog;
     private static Dictionary<string, string> _configAdminDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    private static Dictionary<string, string> _configAdminLoadedDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static HashSet<string> _configAdminReviewedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private static string _configAdminStatusMessage;
     private static string _configAdminSelectedGroup;
+    private static GuiDialogConfirm _configAdminUnsavedCloseConfirm;
     private static bool _returnToConfigAdminAfterLanguageDialog;
+    private static bool _returnToConfigAdminAfterCharacterSheetFieldDialog;
 
     private static HeadshotClientCache _headshotCache;
     private static HttpClient _headshotHttpClient;
@@ -288,6 +292,10 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsLanguageConfigOpenMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigSaveMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigResultMessage>()
+            .RegisterMessageType<TheBasicsCharacterSheetFieldConfigOpenRequest>()
+            .RegisterMessageType<TheBasicsCharacterSheetFieldConfigOpenMessage>()
+            .RegisterMessageType<TheBasicsCharacterSheetFieldConfigSaveMessage>()
+            .RegisterMessageType<TheBasicsCharacterSheetFieldConfigResultMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
@@ -307,6 +315,8 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
             .SetMessageHandler<TheBasicsLanguageConfigOpenMessage>(OnLanguageConfigOpenMessage)
             .SetMessageHandler<TheBasicsLanguageConfigResultMessage>(OnLanguageConfigResultMessage)
+            .SetMessageHandler<TheBasicsCharacterSheetFieldConfigOpenMessage>(OnCharacterSheetFieldConfigOpenMessage)
+            .SetMessageHandler<TheBasicsCharacterSheetFieldConfigResultMessage>(OnCharacterSheetFieldConfigResultMessage)
             .SetMessageHandler<ProximitySpeechMessage>(OnProximitySpeechMessage)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
             .SetMessageHandler<ChatterSoundMessage>(OnChatterSoundMessage)
@@ -882,6 +892,18 @@ public class ChatUiSystem : ModSystem
         }
     }
 
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(GuiDialog), nameof(GuiDialog.TryClose))]
+    public static bool GuiDialog_TryClose_Prefix(GuiDialog __instance)
+    {
+        if (__instance is not GuiDialogCharacter || !_characterSheetOpenedFromCharacterDialog || _characterSheetDialog?.IsOpened() != true)
+        {
+            return true;
+        }
+
+        return _characterSheetDialog.TryCloseFromParent(() => _characterDialog?.TryClose());
+    }
+
     [HarmonyPostfix]
     [HarmonyPatch(typeof(GuiDialogCharacter), "OnGuiClosed")]
     public static void GuiDialogCharacter_OnGuiClosed_Postfix()
@@ -959,7 +981,38 @@ public class ChatUiSystem : ModSystem
         OpenLanguageConfigDialog(message?.Languages, message?.Message, message?.Success == true);
     }
 
+    private static void OnCharacterSheetFieldConfigOpenMessage(TheBasicsCharacterSheetFieldConfigOpenMessage message)
+    {
+        if (message?.Success == false)
+        {
+            ShowConfigAdminChatMessage(message.Message);
+            _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
+            return;
+        }
+
+        OpenCharacterSheetFieldConfigDialog(message?.Fields, message?.Message, true);
+    }
+
+    private static void OnCharacterSheetFieldConfigResultMessage(TheBasicsCharacterSheetFieldConfigResultMessage message)
+    {
+        if (_characterSheetFieldConfigDialog == null)
+        {
+            ShowConfigAdminChatMessage(message?.Message);
+            return;
+        }
+
+        OpenCharacterSheetFieldConfigDialog(message?.Fields, message?.Message, message?.Success == true);
+    }
+
     private static void ShowLanguageConfigChatMessage(string message)
+    {
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            _api?.ShowChatMessage(message);
+        }
+    }
+
+    private static void ShowConfigAdminChatMessage(string message)
     {
         if (!string.IsNullOrWhiteSpace(message))
         {
@@ -1002,6 +1055,41 @@ public class ChatUiSystem : ModSystem
         OpenConfigAdminDialog();
     }
 
+    private static void OpenCharacterSheetFieldConfigDialog(IEnumerable<CharacterSheetFieldConfigEntryMessage> fields, string message, bool success)
+    {
+        if (_api == null)
+        {
+            return;
+        }
+
+        var entries = (fields ?? Array.Empty<CharacterSheetFieldConfigEntryMessage>()).ToList();
+        if (_characterSheetFieldConfigDialog == null)
+        {
+            _characterSheetFieldConfigDialog = new CharacterSheetFieldConfigDialog(_api, entries, message, success, SendCharacterSheetFieldConfigSaveRequest, SendCharacterSheetFieldConfigReload, OnCharacterSheetFieldConfigClosed);
+        }
+        else
+        {
+            _characterSheetFieldConfigDialog.SetView(entries, message, success);
+        }
+
+        if (!_characterSheetFieldConfigDialog.IsOpened())
+        {
+            _characterSheetFieldConfigDialog.TryOpen();
+        }
+    }
+
+    private static void OnCharacterSheetFieldConfigClosed()
+    {
+        _characterSheetFieldConfigDialog = null;
+        if (!_returnToConfigAdminAfterCharacterSheetFieldDialog)
+        {
+            return;
+        }
+
+        _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
+        OpenConfigAdminDialog();
+    }
+
     private static void UpdateConfigAdminDraft(IEnumerable<ConfigAdminSettingValue> values, IEnumerable<string> reviewedKeys, string statusMessage)
     {
         _configAdminDraft = ConfigAdminSettingRegistry.Settings.ToDictionary(
@@ -1022,6 +1110,7 @@ public class ChatUiSystem : ModSystem
 
         _configAdminReviewedKeys = new HashSet<string>(reviewedKeys ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
         _configAdminStatusMessage = statusMessage;
+        _configAdminLoadedDraft = new Dictionary<string, string>(_configAdminDraft, StringComparer.OrdinalIgnoreCase);
     }
 
     private static void OpenConfigAdminDialog()
@@ -1031,9 +1120,55 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        _configAdminDialog?.TryClose();
-        _configAdminDialog = new GuiJsonDialog(BuildConfigAdminDialogSettings(), _api, focusFirstElement: false);
+        _configAdminDialog?.TryCloseWithoutPrompt();
+        _configAdminDialog = new ConfirmingConfigAdminDialog(
+            BuildConfigAdminDialogSettings(),
+            _api,
+            focusFirstElement: false,
+            HasConfigAdminUnsavedChanges,
+            ConfirmConfigAdminDiscard,
+            OnConfigAdminDialogClosed);
         _configAdminDialog.TryOpen(withFocus: false);
+    }
+
+    private static void OnConfigAdminDialogClosed()
+    {
+        _configAdminDialog = null;
+        _configAdminUnsavedCloseConfirm?.TryClose();
+        _configAdminUnsavedCloseConfirm = null;
+    }
+
+    private static bool HasConfigAdminUnsavedChanges()
+    {
+        foreach (var setting in ConfigAdminSettingRegistry.Settings)
+        {
+            var key = setting.Key;
+            _configAdminDraft.TryGetValue(key, out var draftValue);
+            _configAdminLoadedDraft.TryGetValue(key, out var loadedValue);
+            if (!string.Equals(draftValue ?? string.Empty, loadedValue ?? string.Empty, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void ConfirmConfigAdminDiscard(Action onDiscard)
+    {
+        if (_api == null || _configAdminUnsavedCloseConfirm?.IsOpened() == true)
+        {
+            return;
+        }
+
+        _configAdminUnsavedCloseConfirm = new GuiDialogConfirm(_api, Lang.Get("thebasics:config-admin-close-unsaved-confirm"), ok =>
+        {
+            if (ok)
+            {
+                onDiscard?.Invoke();
+            }
+        });
+        _configAdminUnsavedCloseConfirm.TryOpen();
     }
 
     private static JsonDialogSettings BuildConfigAdminDialogSettings()
@@ -1111,7 +1246,8 @@ public class ChatUiSystem : ModSystem
     private static void AddConfigAdminLanguageShortcutRow(List<DialogRow> rows)
     {
         rows.Add(new DialogRow(
-            CreateButton("languages", Lang.Get("thebasics:config-admin-languages"), Lang.Get("thebasics:config-admin-languages-tooltip")))
+            CreateButton("languages", Lang.Get("thebasics:config-admin-languages"), Lang.Get("thebasics:config-admin-languages-tooltip")),
+            CreateButton("charsheetfields", Lang.Get("thebasics:config-admin-charsheet-fields"), Lang.Get("thebasics:config-admin-charsheet-fields-tooltip")))
         {
             TopPadding = 4,
             BottomPadding = 8
@@ -1252,16 +1388,23 @@ public class ChatUiSystem : ModSystem
                 SendConfigAdminSave();
                 break;
             case "languages":
-                _returnToConfigAdminAfterLanguageDialog = true;
-                _configAdminDialog?.TryClose();
-                _configAdminDialog = null;
-                SendLanguageConfigOpenRequest();
+                OpenLanguageConfigFromConfigAdmin();
+                break;
+            case "charsheetfields":
+                OpenCharacterSheetFieldConfigFromConfigAdmin();
                 break;
             case "mark-reviewed":
                 SendConfigAdminMarkReviewed();
                 break;
             case "reload":
-                SendConfigAdminReload();
+                if (HasConfigAdminUnsavedChanges())
+                {
+                    ConfirmConfigAdminDiscard(SendConfigAdminReload);
+                }
+                else
+                {
+                    SendConfigAdminReload();
+                }
                 break;
             case "close":
                 _configAdminDialog?.TryClose();
@@ -1277,6 +1420,20 @@ public class ChatUiSystem : ModSystem
                 }
                 break;
         }
+    }
+
+    private static void OpenLanguageConfigFromConfigAdmin()
+    {
+        _returnToConfigAdminAfterLanguageDialog = true;
+        _configAdminDialog?.TryCloseWithoutPrompt();
+        SendLanguageConfigOpenRequest();
+    }
+
+    private static void OpenCharacterSheetFieldConfigFromConfigAdmin()
+    {
+        _returnToConfigAdminAfterCharacterSheetFieldDialog = true;
+        _configAdminDialog?.TryCloseWithoutPrompt();
+        SendCharacterSheetFieldConfigOpenRequest();
     }
 
     private static void SendConfigAdminSave()
@@ -1321,6 +1478,27 @@ public class ChatUiSystem : ModSystem
     private static void SendLanguageConfigReload()
     {
         _safeNetworkChannel?.SendPacketSafely(new TheBasicsLanguageConfigSaveMessage
+        {
+            ReloadFromDisk = true
+        });
+    }
+
+    private static void SendCharacterSheetFieldConfigOpenRequest()
+    {
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsCharacterSheetFieldConfigOpenRequest());
+    }
+
+    private static void SendCharacterSheetFieldConfigSaveRequest(List<CharacterSheetFieldConfigEntryMessage> fields)
+    {
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsCharacterSheetFieldConfigSaveMessage
+        {
+            Fields = fields ?? new List<CharacterSheetFieldConfigEntryMessage>()
+        });
+    }
+
+    private static void SendCharacterSheetFieldConfigReload()
+    {
+        _safeNetworkChannel?.SendPacketSafely(new TheBasicsCharacterSheetFieldConfigSaveMessage
         {
             ReloadFromDisk = true
         });
@@ -2095,6 +2273,75 @@ public class ChatUiSystem : ModSystem
         catch
         {
             // Ignore.
+        }
+    }
+
+    private sealed class ConfirmingConfigAdminDialog : GuiJsonDialog
+    {
+        private readonly Func<bool> _hasUnsavedChanges;
+        private readonly Action<Action> _confirmDiscard;
+        private readonly Action _onClosed;
+        private bool _forceClose;
+
+        public ConfirmingConfigAdminDialog(
+            JsonDialogSettings settings,
+            ICoreClientAPI capi,
+            bool focusFirstElement,
+            Func<bool> hasUnsavedChanges,
+            Action<Action> confirmDiscard,
+            Action onClosed) : base(settings, capi, focusFirstElement)
+        {
+            _hasUnsavedChanges = hasUnsavedChanges;
+            _confirmDiscard = confirmDiscard;
+            _onClosed = onClosed;
+        }
+
+        public override bool TryClose()
+        {
+            return TryCloseWithContinuation(null);
+        }
+
+        public bool TryCloseWithContinuation(Action afterClose)
+        {
+            if (!_forceClose && _hasUnsavedChanges?.Invoke() == true)
+            {
+                _confirmDiscard?.Invoke(() =>
+                {
+                    if (TryCloseWithoutPrompt())
+                    {
+                        afterClose?.Invoke();
+                    }
+                });
+                return false;
+            }
+
+            var closed = base.TryClose();
+            if (closed)
+            {
+                _onClosed?.Invoke();
+                afterClose?.Invoke();
+            }
+
+            return closed;
+        }
+
+        public bool TryCloseWithoutPrompt()
+        {
+            _forceClose = true;
+            try
+            {
+                var closed = base.TryClose();
+                if (closed)
+                {
+                    _onClosed?.Invoke();
+                }
+
+                return closed;
+            }
+            finally
+            {
+                _forceClose = false;
+            }
         }
     }
 }

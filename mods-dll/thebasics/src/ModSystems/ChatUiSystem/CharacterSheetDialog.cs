@@ -39,7 +39,10 @@ public class CharacterSheetDialog : GuiDialog
     private GuiElementContainer _scrollContainer;
     private HeadshotElement _headshotElement;
     private HeadshotUrlPromptDialog _urlPrompt;
+    private GuiDialogConfirm _unsavedCloseConfirm;
     private CharacterSheetViewMessage _view;
+    private bool _forceClose;
+    private Action _afterDiscardConfirmed;
 
     public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null) : base(capi)
     {
@@ -88,6 +91,30 @@ public class CharacterSheetDialog : GuiDialog
     public override bool DisableMouseGrab => true;
 
     public override double DrawOrder => 0.25;
+
+    public bool TryCloseFromParent(Action afterDiscardConfirmed)
+    {
+        if (!_forceClose && HasUnsavedChanges())
+        {
+            _afterDiscardConfirmed = afterDiscardConfirmed;
+            ConfirmCloseWithUnsavedChanges();
+            return false;
+        }
+
+        return TryClose();
+    }
+
+    public override bool TryClose()
+    {
+        if (!_forceClose && HasUnsavedChanges())
+        {
+            _afterDiscardConfirmed = null;
+            ConfirmCloseWithUnsavedChanges();
+            return false;
+        }
+
+        return base.TryClose();
+    }
 
     public void SetView(CharacterSheetViewMessage view)
     {
@@ -342,6 +369,8 @@ public class CharacterSheetDialog : GuiDialog
         base.OnGuiClosed();
         _urlPrompt?.TryClose();
         _urlPrompt = null;
+        _unsavedCloseConfirm?.TryClose();
+        _unsavedCloseConfirm = null;
     }
 
     private ElementBounds AddFields(GuiElementContainer container, ElementBounds row, IList<(int Index, CharacterSheetFieldViewMessage Field)> fields)
@@ -519,6 +548,63 @@ public class CharacterSheetDialog : GuiDialog
 
         _onSave(request);
         return true;
+    }
+
+    private bool HasUnsavedChanges()
+    {
+        if (_view?.CanEdit != true || _view.Success != true || _view.Fields == null)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < _view.Fields.Count; index++)
+        {
+            var field = _view.Fields[index];
+            if (!field.CanEdit)
+            {
+                continue;
+            }
+
+            if (!string.Equals(GetFieldInputValue(index, field), field.Value ?? string.Empty, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ConfirmCloseWithUnsavedChanges()
+    {
+        if (_unsavedCloseConfirm?.IsOpened() == true)
+        {
+            return;
+        }
+
+        _unsavedCloseConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:charsheet-close-unsaved-confirm"), ok =>
+        {
+            if (!ok)
+            {
+                _afterDiscardConfirmed = null;
+                return;
+            }
+
+            var afterClose = _afterDiscardConfirmed;
+            _afterDiscardConfirmed = null;
+            _forceClose = true;
+            try
+            {
+                if (TryClose())
+                {
+                    afterClose?.Invoke();
+                }
+            }
+            finally
+            {
+                _forceClose = false;
+            }
+        });
+        _unsavedCloseConfirm.TryOpen();
     }
 
     private string GetFieldInputValue(int index, CharacterSheetFieldViewMessage field)

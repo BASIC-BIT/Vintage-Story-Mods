@@ -50,6 +50,10 @@
       <HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="protobuf-net">
+      <HintPath>$(VINTAGE_STORY)\Lib\protobuf-net.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="SkiaSharp">
       <HintPath>$(VINTAGE_STORY)\Lib\SkiaSharp.dll</HintPath>
       <Private>True</Private>
