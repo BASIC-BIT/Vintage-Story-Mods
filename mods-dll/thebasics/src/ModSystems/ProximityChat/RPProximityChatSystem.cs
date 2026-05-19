@@ -244,7 +244,21 @@ public class RPProximityChatSystem : BaseBasicModSystem
                     .RequiresPlayer()
                     .HandleWith(HandleOpenLanguageConfigCommand)
                 .EndSubCommand()
+                .BeginSubCommand("charsheetfields")
+                    .WithAlias("sheetfields", "biofields")
+                    .WithDescription("Open The BASICs character sheet field editor")
+                    .RequiresPrivilege(Privilege.root)
+                    .RequiresPlayer()
+                    .HandleWith(HandleOpenCharacterSheetFieldConfigCommand)
+                .EndSubCommand()
                 .HandleWith(HandleOpenConfigCommand)
+            .EndSubCommand()
+            .BeginSubCommand("charsheetfields")
+                .WithAlias("sheetfields", "biofields")
+                .WithDescription("Open The BASICs character sheet field editor")
+                .RequiresPrivilege(Privilege.root)
+                .RequiresPlayer()
+                .HandleWith(HandleOpenCharacterSheetFieldConfigCommand)
             .EndSubCommand()
             .BeginSubCommand("reloadconfig")
                 .WithDescription("Reload The BASICs config from disk")
@@ -273,6 +287,17 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         SendLanguageConfigOpen(player, null);
         return TextCommandResult.Success("Opening The BASICs language config editor.");
+    }
+
+    private TextCommandResult HandleOpenCharacterSheetFieldConfigCommand(TextCommandCallingArgs args)
+    {
+        if (args.Caller.Player is not IServerPlayer player)
+        {
+            return TextCommandResult.Error("This command can only be used by a player.");
+        }
+
+        SendCharacterSheetFieldConfigOpen(player, null);
+        return TextCommandResult.Success("Opening The BASICs character sheet field editor.");
     }
 
     private TextCommandResult HandleReloadConfigCommand(TextCommandCallingArgs args)
@@ -599,6 +624,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<TheBasicsLanguageConfigOpenMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigSaveMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigResultMessage>()
+            .RegisterMessageType<TheBasicsCharacterSheetFieldConfigOpenRequest>()
+            .RegisterMessageType<TheBasicsCharacterSheetFieldConfigOpenMessage>()
+            .RegisterMessageType<TheBasicsCharacterSheetFieldConfigSaveMessage>()
+            .RegisterMessageType<TheBasicsCharacterSheetFieldConfigResultMessage>()
             .RegisterMessageType<TheBasicsClientReadyMessage>()
             .RegisterMessageType<ChannelSelectedMessage>()
             .RegisterMessageType<ProximitySpeechMessage>()
@@ -623,6 +652,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .SetMessageHandler<HeadshotClearRequest>(OnHeadshotClearRequest)
             .SetMessageHandler<TheBasicsLanguageConfigOpenRequest>(OnLanguageConfigOpenRequest)
             .SetMessageHandler<TheBasicsLanguageConfigSaveMessage>(OnLanguageConfigSaveMessage)
+            .SetMessageHandler<TheBasicsCharacterSheetFieldConfigOpenRequest>(OnCharacterSheetFieldConfigOpenRequest)
+            .SetMessageHandler<TheBasicsCharacterSheetFieldConfigSaveMessage>(OnCharacterSheetFieldConfigSaveMessage)
             .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
     }
 
@@ -679,6 +710,17 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
 
         SendLanguageConfigOpen(player, null);
+    }
+
+    private void OnCharacterSheetFieldConfigOpenRequest(IServerPlayer player, TheBasicsCharacterSheetFieldConfigOpenRequest message)
+    {
+        if (player?.HasPrivilege(Privilege.root) != true)
+        {
+            SendCharacterSheetFieldConfigResult(player, false, "You do not have permission to edit The BASICs character sheet fields.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
+            return;
+        }
+
+        SendCharacterSheetFieldConfigOpen(player, null);
     }
 
     private void OnCharacterSheetOpenRequest(IServerPlayer player, CharacterSheetOpenRequest message)
@@ -827,6 +869,50 @@ public class RPProximityChatSystem : BaseBasicModSystem
             true,
             "Saved The BASICs language config. Online players were reconciled; renamed languages also reconcile for later joins until the next server restart.",
             LanguageConfigAdmin.BuildEntries(Config));
+    }
+
+    private void OnCharacterSheetFieldConfigSaveMessage(IServerPlayer player, TheBasicsCharacterSheetFieldConfigSaveMessage message)
+    {
+        if (player?.HasPrivilege(Privilege.root) != true)
+        {
+            SendCharacterSheetFieldConfigResult(player, false, "You do not have permission to edit The BASICs character sheet fields.", message?.Fields ?? CharacterSheetFieldConfigAdmin.BuildEntries(Config));
+            return;
+        }
+
+        if (message?.ReloadFromDisk == true)
+        {
+            var before = CloneConfig(Config);
+            ReloadSharedConfigFromDisk(API);
+            var reloadChangedKeys = GetChangedConfigKeys(before, Config);
+            ApplyConfigChangeSideEffects(reloadChangedKeys);
+            BroadcastClientConfigs();
+            SendCharacterSheetFieldConfigResult(player, true, $"Reloaded character sheet fields from disk. Changed settings: {reloadChangedKeys.Count}.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
+            return;
+        }
+
+        var draft = CloneConfig(Config);
+        var submittedFields = message?.Fields ?? new List<CharacterSheetFieldConfigEntryMessage>();
+        if (!CharacterSheetFieldConfigAdmin.TryApplyEntries(draft, submittedFields, out var errors))
+        {
+            SendCharacterSheetFieldConfigResult(player, false, string.Join("\n", errors), submittedFields);
+            return;
+        }
+
+        errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(draft));
+        if (errors.Count > 0)
+        {
+            SendCharacterSheetFieldConfigResult(player, false, string.Join("\n", errors), submittedFields);
+            return;
+        }
+
+        CopyConfigValues(draft, Config);
+        SaveSharedConfig(API);
+
+        var changedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { nameof(Config.CharacterSheetFields) };
+        ApplyConfigChangeSideEffects(changedKeys);
+        BroadcastClientConfigs();
+
+        SendCharacterSheetFieldConfigResult(player, true, "Saved The BASICs character sheet field config.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
     }
 
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
@@ -1030,6 +1116,16 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }, player);
     }
 
+    private void SendCharacterSheetFieldConfigOpen(IServerPlayer player, string message)
+    {
+        _serverConfigChannel?.SendPacket(new TheBasicsCharacterSheetFieldConfigOpenMessage
+        {
+            Success = true,
+            Message = message,
+            Fields = CharacterSheetFieldConfigAdmin.BuildEntries(Config)
+        }, player);
+    }
+
     private void SendLanguageConfigResult(IServerPlayer player, bool success, string message, IEnumerable<LanguageConfigEntryMessage> languages)
     {
         if (player == null)
@@ -1042,6 +1138,21 @@ public class RPProximityChatSystem : BaseBasicModSystem
             Success = success,
             Message = message,
             Languages = (languages ?? LanguageConfigAdmin.BuildEntries(Config)).ToList()
+        }, player);
+    }
+
+    private void SendCharacterSheetFieldConfigResult(IServerPlayer player, bool success, string message, IEnumerable<CharacterSheetFieldConfigEntryMessage> fields)
+    {
+        if (player == null)
+        {
+            return;
+        }
+
+        _serverConfigChannel?.SendPacket(new TheBasicsCharacterSheetFieldConfigResultMessage
+        {
+            Success = success,
+            Message = message,
+            Fields = (fields ?? CharacterSheetFieldConfigAdmin.BuildEntries(Config)).ToList()
         }, player);
     }
 
@@ -1127,7 +1238,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         if (changedKeys.Contains(nameof(Config.ShowNicknameInNametag)) ||
             changedKeys.Contains(nameof(Config.ShowPlayerNameInNametag)) ||
             changedKeys.Contains(nameof(Config.HideNametagUnlessTargeting)) ||
-            changedKeys.Contains(nameof(Config.NametagRenderRange)))
+            changedKeys.Contains(nameof(Config.NametagRenderRange)) ||
+            changedKeys.Contains(nameof(Config.CharacterSheetFields)))
         {
             RefreshAllNameTags();
         }

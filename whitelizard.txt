@@ -23,6 +23,18 @@ SpeechBubbleVtmlPatches::Prefix
 # CCN=10 but 108 lines - texture generation setup with resource management
 RichTextTextureUtils::GenRichTextTexture
 
+# CCN=24, 101 lines - headshot upload pipeline with validation and image processing branches
+CharacterSheetSystem::HandleHeadshotUpload
+
+# CCN=24, 104 lines - character sheet layout composition with optional header/body sections
+CharacterSheetDialog::ComposeDialog
+
+# CCN=30, 98 lines - nametag Harmony texture replacement with defensive render branches
+EntityBehaviorNameTagPatches::ReplaceTexture
+
+# CCN=11, 107 lines - rich text surface generation with native drawing lifecycle
+RichTextTextureUtils::GenRichTextSurface
+
 # CCN=22, 121 lines - chatter dispatch mixes audio selection and emission
 RPProximityChatSystem::DispatchChatterForContext
 

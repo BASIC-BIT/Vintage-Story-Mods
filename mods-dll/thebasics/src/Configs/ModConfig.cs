@@ -139,11 +139,27 @@ namespace thebasics.Configs
         {
             field.Id ??= string.Empty;
             field.Label ??= field.Id;
+            field.Description ??= string.Empty;
             field.Type = string.IsNullOrWhiteSpace(field.Type) ? CharacterSheetFieldTypes.String : field.Type.ToLowerInvariant();
             field.Options ??= new List<string>();
             field.BindTo ??= string.Empty;
             field.Visibility = string.IsNullOrWhiteSpace(field.Visibility) ? CharacterSheetFieldVisibilities.Public : field.Visibility.ToLowerInvariant();
             field.EditorRows = field.EditorRows < 0 ? 0 : field.EditorRows;
+            field.LayoutSection = ResolveCharacterSheetLayoutSection(field);
+            field.Width = CharacterSheetFieldWidths.Normalize(field.Width);
+        }
+
+        private static string ResolveCharacterSheetLayoutSection(CharacterSheetFieldDefinition field)
+        {
+            var bindTo = field.BindTo?.Trim();
+            if (string.IsNullOrWhiteSpace(field.LayoutSection) &&
+                (string.Equals(bindTo, "thebasics.fullName", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(bindTo, "thebasics.nickname", StringComparison.OrdinalIgnoreCase)))
+            {
+                return CharacterSheetLayoutSections.HeaderSide;
+            }
+
+            return CharacterSheetLayoutSections.Normalize(field.LayoutSection);
         }
 
         private static IList<CharacterSheetFieldDefinition> CreateDefaultCharacterSheetFields()

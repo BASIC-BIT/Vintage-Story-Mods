@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using ProtoBuf;
 
 namespace thebasics.ModSystems.CharacterSheets.Models;
@@ -16,6 +17,7 @@ public class CharacterSheetFieldDefinition
     public string Type { get; set; } = CharacterSheetFieldTypes.String;
 
     [ProtoMember(4)]
+    [DefaultValue(true)]
     public bool Optional { get; set; } = true;
 
     [ProtoMember(5)]
@@ -31,6 +33,7 @@ public class CharacterSheetFieldDefinition
     public string Visibility { get; set; } = CharacterSheetFieldVisibilities.Public;
 
     [ProtoMember(9)]
+    [DefaultValue(true)]
     public bool ShowInLook { get; set; } = true;
 
     [ProtoMember(10)]
@@ -50,4 +53,7 @@ public class CharacterSheetFieldDefinition
     /// </summary>
     [ProtoMember(12)]
     public string Width { get; set; } = CharacterSheetFieldWidths.Full;
+
+    [ProtoMember(13)]
+    public string Description { get; set; } = string.Empty;
 }

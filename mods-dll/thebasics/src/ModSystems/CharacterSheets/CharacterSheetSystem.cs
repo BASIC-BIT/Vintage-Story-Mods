@@ -944,7 +944,11 @@ public class CharacterSheetSystem : BaseBasicModSystem
         }
 
         API.Logger.Audit($"{(isAdminAction ? "Admin" : "Player")} updated character sheet field '{GetFieldId(field)}' for {player.PlayerName}.");
-        return Success(Lang.Get("thebasics:charsheet-success-set", VtmlUtils.EscapeVtml(GetFieldLabel(field)), VtmlUtils.EscapeVtml(player.PlayerName)));
+        return Success(Lang.Get(
+            "thebasics:charsheet-success-set",
+            VtmlUtils.EscapeVtml(GetFieldLabel(field)),
+            VtmlUtils.EscapeVtml(player.PlayerName),
+            VtmlUtils.EscapeVtml(normalizedValue)));
     }
 
     private TextCommandResult ClearField(IServerPlayer editor, IServerPlayer player, string fieldName, bool isAdminAction)
@@ -1339,6 +1343,13 @@ public class CharacterSheetSystem : BaseBasicModSystem
     {
         if (player.Entity == null)
         {
+            return;
+        }
+
+        var proximityChatSystem = API.ModLoader.GetModSystem<ProximityChat.RPProximityChatSystem>();
+        if (proximityChatSystem != null)
+        {
+            proximityChatSystem.RefreshPlayerIdentityState(player);
             return;
         }
 

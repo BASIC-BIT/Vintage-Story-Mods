@@ -46,7 +46,7 @@
     <Reference Include="Harmony">
       <HintPath>$(VINTAGE_STORY)/Lib/0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="SkiaSharp">
+    <Reference Include="SkiaSharp" Condition="Exists('$(VINTAGE_STORY)\Lib\SkiaSharp.dll')">
       <HintPath>$(VINTAGE_STORY)\Lib\SkiaSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
@@ -67,6 +67,7 @@
     <PackageReference Include="ApacheTech.Common.Extensions" Version="1.2.0" />
     <PackageReference Include="ApacheTech.Common.Extensions.Harmony" Version="1.2.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="SkiaSharp" Version="3.119.1" Condition="!Exists('$(VINTAGE_STORY)\Lib\SkiaSharp.dll')" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.6.0.109712">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
