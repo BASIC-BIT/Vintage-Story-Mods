@@ -23,6 +23,9 @@ public class PlayerNotesDialog : GuiDialog
     private const double FreeformContentPadding = 14;
     private const double FieldHeight = 28;
     private const int MaxEntryTitleLength = 120;
+    private const int DefaultMaxNoteLength = 20000;
+    private const int DefaultMaxFreeformNoteLength = 20000;
+    private const int ExpandedListEntryCount = 5;
     private const string FreeformScrollbarKey = "notes-freeform-scrollbar";
     private const string ScopeAdmin = PlayerNotesConstants.ScopeAdmin;
 
@@ -36,6 +39,7 @@ public class PlayerNotesDialog : GuiDialog
     private AdminNoteLedgerMessage _adminLedger = new();
     private PersonalNoteLedgerMessage _personalLedger = new();
     private int _selectedIndex;
+    private int _listOffset;
     private string _lastLoadedSnapshot;
     private string _localMessage;
     private GuiElementTextInput _titleInput;
@@ -72,7 +76,8 @@ public class PlayerNotesDialog : GuiDialog
 
     public void SetView(TheBasicsNotesViewMessage view)
     {
-        if (IsSameNotesView(view))
+        var sameView = IsSameNotesView(view);
+        if (sameView)
         {
             _freeformScrollY = GetFreeformScrollY();
         }
@@ -80,6 +85,14 @@ public class PlayerNotesDialog : GuiDialog
         {
             _freeformScrollY = 0;
             _scrollFreeformToBottomAfterCompose = true;
+        }
+
+        if (sameView && view?.Success == false && _view?.Success == true)
+        {
+            CaptureCurrentInputs();
+            _localMessage = view.Message;
+            ComposeDialog();
+            return;
         }
 
         SetDraft(view, updateBaseline: view?.Success == true);
@@ -116,6 +129,7 @@ public class PlayerNotesDialog : GuiDialog
         _adminLedger = CloneLedger(_view.AdminLedger);
         _personalLedger = ClonePersonalLedger(_view.PersonalLedger);
         _selectedIndex = Clamp(_selectedIndex, CurrentNotes().Count);
+        NormalizeListOffset();
         if (updateBaseline)
         {
             _localMessage = null;
@@ -243,18 +257,24 @@ public class PlayerNotesDialog : GuiDialog
             return;
         }
 
+        NormalizeListOffset();
+        var visibleCount = VisibleEntryCount(notes.Count);
+        var lastVisibleIndex = Math.Min(notes.Count, _listOffset + visibleCount);
         var rowY = y + 76;
-        for (var i = 0; i < Math.Min(notes.Count, 6); i++)
+        for (var index = _listOffset; index < lastVisibleIndex; index++)
         {
-            var index = i;
             var selected = index == _selectedIndex ? "> " : string.Empty;
             composer.AddSmallButton(selected + TrimText(NoteSummary(notes[index], index), 34), () => SelectNote(index), ElementBounds.Fixed(x + 8, rowY, width - 16, 25));
             rowY += 28;
         }
 
-        if (notes.Count > 6)
+        if (notes.Count > visibleCount)
         {
-            composer.AddStaticText(Lang.Get("thebasics:notes-more-entries", notes.Count - 6), CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + 10, rowY + 4, width - 20, 20));
+            var rangeText = Lang.Get("thebasics:notes-entry-range", _listOffset + 1, lastVisibleIndex, notes.Count);
+            composer
+                .AddSmallButton(Lang.Get("thebasics:notes-previous"), OnPreviousNotesPage, ElementBounds.Fixed(x + 8, rowY + 4, 70, 24))
+                .AddStaticText(rangeText, CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + 86, rowY + 8, width - 172, 18))
+                .AddSmallButton(Lang.Get("thebasics:notes-next"), OnNextNotesPage, ElementBounds.Fixed(x + width - 78, rowY + 4, 70, 24));
         }
     }
 
@@ -280,7 +300,7 @@ public class PlayerNotesDialog : GuiDialog
             Autoheight = false
         };
         _bodyInput.SetMaxLines(8);
-        _bodyInput.SetMaxLength(20000);
+        _bodyInput.SetMaxLength(EffectiveMaxNoteLength());
         _deferredBodyValue = note.Text ?? string.Empty;
         composer.AddInteractiveElement(_bodyInput, "notes-body");
     }
@@ -295,7 +315,7 @@ public class PlayerNotesDialog : GuiDialog
             Autoheight = false
         };
         _freeformInput.SetMaxLines(9999);
-        _freeformInput.SetMaxLength(200000);
+        _freeformInput.SetMaxLength(EffectiveMaxFreeformNoteLength());
         _freeformInput.OnCaretPositionChanged = OnFreeformCaretMoved;
         _deferredFreeformValue = CurrentFreeformText();
 
@@ -505,6 +525,7 @@ public class PlayerNotesDialog : GuiDialog
             Text = string.Empty
         });
         _selectedIndex = 0;
+        _listOffset = 0;
         ComposeDialog();
         return true;
     }
@@ -518,6 +539,7 @@ public class PlayerNotesDialog : GuiDialog
             _localMessage = null;
             notes.RemoveAt(_selectedIndex);
             _selectedIndex = Clamp(_selectedIndex, notes.Count);
+            NormalizeListOffset();
             ComposeDialog();
         }
 
@@ -529,8 +551,33 @@ public class PlayerNotesDialog : GuiDialog
         CaptureCurrentInputs();
         _localMessage = null;
         _selectedIndex = Clamp(index, CurrentNotes().Count);
+        NormalizeListOffset();
         ComposeDialog();
         return true;
+    }
+
+    private bool OnPreviousNotesPage()
+    {
+        CaptureCurrentInputs();
+        PageNotes(-1);
+        return true;
+    }
+
+    private bool OnNextNotesPage()
+    {
+        CaptureCurrentInputs();
+        PageNotes(1);
+        return true;
+    }
+
+    private void PageNotes(int direction)
+    {
+        var notes = CurrentNotes();
+        var visibleCount = VisibleEntryCount(notes.Count);
+        _listOffset = Math.Clamp(_listOffset + direction * visibleCount, 0, MaxListOffset(notes.Count, visibleCount));
+        _selectedIndex = Clamp(_listOffset, notes.Count);
+        _localMessage = null;
+        ComposeDialog();
     }
 
     private bool OnSave()
@@ -697,6 +744,47 @@ public class PlayerNotesDialog : GuiDialog
         {
             _personalLedger.Text = text ?? string.Empty;
         }
+    }
+
+    private int EffectiveMaxNoteLength()
+    {
+        return _view?.MaxNoteLength > 0 ? _view.MaxNoteLength : DefaultMaxNoteLength;
+    }
+
+    private int EffectiveMaxFreeformNoteLength()
+    {
+        return _view?.MaxFreeformNoteLength > 0 ? _view.MaxFreeformNoteLength : DefaultMaxFreeformNoteLength;
+    }
+
+    private void NormalizeListOffset()
+    {
+        var count = CurrentNotes().Count;
+        if (count == 0)
+        {
+            _listOffset = 0;
+            return;
+        }
+
+        var visibleCount = VisibleEntryCount(count);
+        _listOffset = Math.Clamp(_listOffset, 0, MaxListOffset(count, visibleCount));
+        if (_selectedIndex < _listOffset)
+        {
+            _listOffset = Math.Clamp(_selectedIndex, 0, MaxListOffset(count, visibleCount));
+        }
+        else if (_selectedIndex >= _listOffset + visibleCount)
+        {
+            _listOffset = Math.Clamp(_selectedIndex - visibleCount + 1, 0, MaxListOffset(count, visibleCount));
+        }
+    }
+
+    private static int VisibleEntryCount(int count)
+    {
+        return count > 6 ? ExpandedListEntryCount : Math.Min(count, 6);
+    }
+
+    private static int MaxListOffset(int count, int visibleCount)
+    {
+        return Math.Max(0, count - visibleCount);
     }
 
     private static int Clamp(int index, int count)

@@ -50,4 +50,10 @@ public class TheBasicsNotesViewMessage
 
     [ProtoMember(15)]
     public PersonalNoteLedgerMessage PersonalLedger { get; set; } = new();
+
+    [ProtoMember(16)]
+    public int MaxNoteLength { get; set; }
+
+    [ProtoMember(17)]
+    public int MaxFreeformNoteLength { get; set; }
 }

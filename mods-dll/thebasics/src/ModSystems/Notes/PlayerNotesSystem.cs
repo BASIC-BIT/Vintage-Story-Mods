@@ -64,7 +64,7 @@ public class PlayerNotesSystem : BaseBasicModSystem
         var scope = NormalizeScope(request?.Scope);
         if (scope == PlayerNotesConstants.ScopeAdmin)
         {
-            if (!CanUseAdminNotes(actor))
+            if (!CanUseAdminNotes(actor, allowConsole: false))
             {
                 return ErrorView(scope, Lang.Get("thebasics:notes-error-admin-permission"));
             }
@@ -140,6 +140,11 @@ public class PlayerNotesSystem : BaseBasicModSystem
             return TextCommandResult.Success(Lang.Get("thebasics:notes-open-admin", target.Name));
         }
 
+        if (IsStructuredAdminAction(action) && !CanUseStructuredAdminNotes(args.Caller.Player as IServerPlayer))
+        {
+            return TextCommandResult.Error(Lang.Get("thebasics:notes-error-structured-admin-disabled"));
+        }
+
         return action switch
         {
             "list" => TextCommandResult.Success(RenderNoteList(GetAdminNotes(target.Uid), Lang.Get("thebasics:notes-admin-list-empty", target.Name))),
@@ -199,7 +204,7 @@ public class PlayerNotesSystem : BaseBasicModSystem
 
     private TheBasicsNotesViewMessage SaveAdminView(IServerPlayer actor, TheBasicsNotesSaveMessage message)
     {
-        if (!CanUseAdminNotes(actor))
+        if (!CanUseAdminNotes(actor, allowConsole: false))
         {
             return ErrorView(PlayerNotesConstants.ScopeAdmin, Lang.Get("thebasics:notes-error-admin-permission"));
         }
@@ -287,7 +292,9 @@ public class PlayerNotesSystem : BaseBasicModSystem
             CanEditAdminNotes = showNotes && viewer?.HasPrivilege(Config.AdminNotesPermission) == true,
             CanEditAdminLedger = showLedger && viewer?.HasPrivilege(Config.AdminNotesPermission) == true,
             AdminNotes = showNotes ? GetAdminNotes(target.Uid, data).Select(CloneNote).ToList() : new List<PlayerNoteEntryMessage>(),
-            AdminLedger = showLedger ? CloneLedger(GetLedger(target, data)) : new AdminNoteLedgerMessage()
+            AdminLedger = showLedger ? CloneLedger(GetLedger(target, data)) : new AdminNoteLedgerMessage(),
+            MaxNoteLength = Config.MaxNoteLength,
+            MaxFreeformNoteLength = Config.MaxFreeformNoteLength
         };
     }
 
@@ -305,7 +312,9 @@ public class PlayerNotesSystem : BaseBasicModSystem
             ShowPersonalNotes = showPersonal,
             CanEditPersonalNotes = showPersonal && viewer?.HasPrivilege(Config.PlayerNotesPermission) == true,
             PersonalNotes = showPersonal ? GetPersonalNotes(viewer.PlayerUID, target.Uid, data).Select(CloneNote).ToList() : new List<PlayerNoteEntryMessage>(),
-            PersonalLedger = showPersonal ? ClonePersonalLedger(GetPersonalLedger(viewer.PlayerUID, target, data)) : new PersonalNoteLedgerMessage()
+            PersonalLedger = showPersonal ? ClonePersonalLedger(GetPersonalLedger(viewer.PlayerUID, target, data)) : new PersonalNoteLedgerMessage(),
+            MaxNoteLength = Config.MaxNoteLength,
+            MaxFreeformNoteLength = Config.MaxFreeformNoteLength
         };
     }
 
@@ -805,9 +814,21 @@ public class PlayerNotesSystem : BaseBasicModSystem
         API.ModLoader.GetModSystem<RPProximityChatSystem>()?.PushNotesView(player, view);
     }
 
-    private bool CanUseAdminNotes(IServerPlayer player)
+    private bool CanUseAdminNotes(IServerPlayer player, bool allowConsole = true)
     {
-        return Config.EnableAdminNotes && (Config.EnableStructuredAdminNotes || Config.EnableAdminNoteLedger) && (player == null || player.HasPrivilege(Config.AdminNotesPermission));
+        return Config.EnableAdminNotes &&
+            (Config.EnableStructuredAdminNotes || Config.EnableAdminNoteLedger) &&
+            HasAdminNotesPrivilege(player, allowConsole);
+    }
+
+    private bool CanUseStructuredAdminNotes(IServerPlayer player, bool allowConsole = true)
+    {
+        return Config.EnableAdminNotes && Config.EnableStructuredAdminNotes && HasAdminNotesPrivilege(player, allowConsole);
+    }
+
+    private bool HasAdminNotesPrivilege(IServerPlayer player, bool allowConsole)
+    {
+        return player == null ? allowConsole : player.HasPrivilege(Config.AdminNotesPermission);
     }
 
     private bool CanUsePersonalNotes(IServerPlayer player)
@@ -833,6 +854,11 @@ public class PlayerNotesSystem : BaseBasicModSystem
         }
 
         return kind == PlayerNotesConstants.KindAdmin || string.Equals(note.AuthorPlayerUid, actorUid, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsStructuredAdminAction(string action)
+    {
+        return action is "list" or "add" or "view" or "edit" or "delete";
     }
 
     private static bool BelongsToPersonalTarget(PlayerNoteEntryMessage note, string authorUid, string targetUid)
