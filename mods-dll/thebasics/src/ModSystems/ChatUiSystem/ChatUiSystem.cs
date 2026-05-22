@@ -11,6 +11,7 @@ using thebasics.Configs;
 using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.CharacterSheets;
+using thebasics.ModSystems.Notes.Models;
 using thebasics.Utilities;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
@@ -43,6 +44,7 @@ public class ChatUiSystem : ModSystem
     private static CharacterSheetMessageDialog _characterSheetMessageDialog;
     private static LanguageConfigDialog _languageConfigDialog;
     private static CharacterSheetFieldConfigDialog _characterSheetFieldConfigDialog;
+    private static PlayerNotesDialog _playerNotesDialog;
     private static bool _pendingCharacterSheetSave;
     private static bool _pendingCharacterSheetOpenFromCharacterDialog;
     private static bool _suppressNextCharacterDialogSheetOpen;
@@ -310,6 +312,9 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<HeadshotFetchRequest>()
             .RegisterMessageType<HeadshotFetchResult>()
             .RegisterMessageType<HeadshotClearRequest>()
+            .RegisterMessageType<TheBasicsNotesOpenRequest>()
+            .RegisterMessageType<TheBasicsNotesSaveMessage>()
+            .RegisterMessageType<TheBasicsNotesViewMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
@@ -323,7 +328,8 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<PlacedEnvironmentMessage>(OnPlacedEnvironmentMessage)
             .SetMessageHandler<CharacterSheetViewMessage>(OnCharacterSheetViewMessage)
             .SetMessageHandler<HeadshotUploadResult>(OnHeadshotUploadResult)
-            .SetMessageHandler<HeadshotFetchResult>(OnHeadshotFetchResult);
+            .SetMessageHandler<HeadshotFetchResult>(OnHeadshotFetchResult)
+            .SetMessageHandler<TheBasicsNotesViewMessage>(OnNotesViewMessage);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
@@ -1004,6 +1010,17 @@ public class ChatUiSystem : ModSystem
         OpenCharacterSheetFieldConfigDialog(message?.Fields, message?.Message, message?.Success == true);
     }
 
+    private static void OnNotesViewMessage(TheBasicsNotesViewMessage message)
+    {
+        if (message?.Success == false && _playerNotesDialog == null)
+        {
+            ShowConfigAdminChatMessage(message.Message);
+            return;
+        }
+
+        OpenPlayerNotesDialog(message);
+    }
+
     private static void ShowLanguageConfigChatMessage(string message)
     {
         if (!string.IsNullOrWhiteSpace(message))
@@ -1088,6 +1105,33 @@ public class ChatUiSystem : ModSystem
 
         _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
         OpenConfigAdminDialog();
+    }
+
+    private static void OpenPlayerNotesDialog(TheBasicsNotesViewMessage message)
+    {
+        if (_api == null || message == null)
+        {
+            return;
+        }
+
+        if (_playerNotesDialog == null)
+        {
+            _playerNotesDialog = new PlayerNotesDialog(_api, message, SendNotesSaveRequest, SendNotesReloadRequest, OnPlayerNotesClosed);
+        }
+        else
+        {
+            _playerNotesDialog.SetView(message);
+        }
+
+        if (!_playerNotesDialog.IsOpened())
+        {
+            _playerNotesDialog.TryOpen();
+        }
+    }
+
+    private static void OnPlayerNotesClosed()
+    {
+        _playerNotesDialog = null;
     }
 
     private static void UpdateConfigAdminDraft(IEnumerable<ConfigAdminSettingValue> values, IEnumerable<string> reviewedKeys, string statusMessage)
@@ -1502,6 +1546,18 @@ public class ChatUiSystem : ModSystem
         {
             ReloadFromDisk = true
         });
+    }
+
+    private static void SendNotesSaveRequest(TheBasicsNotesSaveMessage message)
+    {
+        _safeNetworkChannel?.SendPacketSafely(message ?? new TheBasicsNotesSaveMessage());
+    }
+
+    private static void SendNotesReloadRequest(TheBasicsNotesSaveMessage message)
+    {
+        message ??= new TheBasicsNotesSaveMessage();
+        message.Reload = true;
+        _safeNetworkChannel?.SendPacketSafely(message);
     }
 
     private static void OnChatTypingStateMessage(ChatTypingStateMessage message)

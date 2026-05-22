@@ -7,6 +7,8 @@ using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.CharacterSheets;
+using thebasics.ModSystems.Notes;
+using thebasics.ModSystems.Notes.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
@@ -642,6 +644,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .RegisterMessageType<HeadshotFetchRequest>()
             .RegisterMessageType<HeadshotFetchResult>()
             .RegisterMessageType<HeadshotClearRequest>()
+            .RegisterMessageType<TheBasicsNotesOpenRequest>()
+            .RegisterMessageType<TheBasicsNotesSaveMessage>()
+            .RegisterMessageType<TheBasicsNotesViewMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
@@ -654,6 +659,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .SetMessageHandler<TheBasicsLanguageConfigSaveMessage>(OnLanguageConfigSaveMessage)
             .SetMessageHandler<TheBasicsCharacterSheetFieldConfigOpenRequest>(OnCharacterSheetFieldConfigOpenRequest)
             .SetMessageHandler<TheBasicsCharacterSheetFieldConfigSaveMessage>(OnCharacterSheetFieldConfigSaveMessage)
+            .SetMessageHandler<TheBasicsNotesOpenRequest>(OnNotesOpenRequest)
+            .SetMessageHandler<TheBasicsNotesSaveMessage>(OnNotesSaveMessage)
             .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
     }
 
@@ -665,6 +672,34 @@ public class RPProximityChatSystem : BaseBasicModSystem
     {
         if (viewer == null || view == null || _serverConfigChannel == null) return;
         _serverConfigChannel.SendPacket(view, viewer);
+    }
+
+    public void PushNotesView(IServerPlayer viewer, TheBasicsNotesViewMessage view)
+    {
+        if (viewer == null || view == null || _serverConfigChannel == null) return;
+        _serverConfigChannel.SendPacket(view, viewer);
+    }
+
+    private void OnNotesOpenRequest(IServerPlayer player, TheBasicsNotesOpenRequest message)
+    {
+        var notesSystem = API.ModLoader.GetModSystem<PlayerNotesSystem>();
+        var response = notesSystem?.HandleNotesOpenRequest(player, message) ?? new TheBasicsNotesViewMessage
+        {
+            Success = false,
+            Message = Lang.Get("thebasics:notes-error-disabled")
+        };
+        _serverConfigChannel.SendPacket(response, player);
+    }
+
+    private void OnNotesSaveMessage(IServerPlayer player, TheBasicsNotesSaveMessage message)
+    {
+        var notesSystem = API.ModLoader.GetModSystem<PlayerNotesSystem>();
+        var response = notesSystem?.HandleNotesSaveRequest(player, message) ?? new TheBasicsNotesViewMessage
+        {
+            Success = false,
+            Message = Lang.Get("thebasics:notes-error-disabled")
+        };
+        _serverConfigChannel.SendPacket(response, player);
     }
 
     private void OnHeadshotUploadRequest(IServerPlayer player, HeadshotUploadRequest message)

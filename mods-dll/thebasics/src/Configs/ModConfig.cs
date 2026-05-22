@@ -119,8 +119,24 @@ namespace thebasics.Configs
             OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
             ProseNicknameToken ??= "@";
             InitializeCharacterSheetDefaults();
+            InitializeGeneralFeatureDefaults();
+            InitializeNotesDefaults();
+        }
+
+        private void InitializeGeneralFeatureDefaults()
+        {
             ReviewedConfigSettingKeys ??= new List<string>();
             MaxRpCharacterSlots = MaxRpCharacterSlots <= 0 ? 3 : MaxRpCharacterSlots;
+        }
+
+        private void InitializeNotesDefaults()
+        {
+            AdminNotesPermission = string.IsNullOrWhiteSpace(AdminNotesPermission) ? "commandplayer" : AdminNotesPermission;
+            PlayerNotesPermission = string.IsNullOrWhiteSpace(PlayerNotesPermission) ? "chat" : PlayerNotesPermission;
+            MaxNoteLength = MaxNoteLength <= 0 ? 2000 : MaxNoteLength;
+            MaxFreeformNoteLength = MaxFreeformNoteLength <= 0 ? 20000 : MaxFreeformNoteLength;
+            MaxAdminNotesPerTarget = MaxAdminNotesPerTarget <= 0 ? 100 : MaxAdminNotesPerTarget;
+            MaxPlayerNotesPerAuthor = MaxPlayerNotesPerAuthor <= 0 ? 200 : MaxPlayerNotesPerAuthor;
         }
 
         private void InitializeCharacterSheetDefaults()
@@ -672,5 +688,35 @@ namespace thebasics.Configs
         // vanilla plain-text nametag renderer.
         [ProtoMember(112)]
         public bool UseCustomNametagRenderer { get; set; } = true;
+
+        [ProtoMember(113)]
+        public bool EnableAdminNotes { get; set; } = true;
+
+        [ProtoMember(114)]
+        public bool EnableStructuredAdminNotes { get; set; } = true;
+
+        [ProtoMember(115)]
+        public bool EnableAdminNoteLedger { get; set; } = true;
+
+        [ProtoMember(116)]
+        public string AdminNotesPermission { get; set; } = "commandplayer";
+
+        [ProtoMember(117)]
+        public bool EnablePlayerNotes { get; set; } = true;
+
+        [ProtoMember(118)]
+        public string PlayerNotesPermission { get; set; } = "chat";
+
+        [ProtoMember(119)]
+        public int MaxNoteLength { get; set; } = 2000;
+
+        [ProtoMember(120)]
+        public int MaxFreeformNoteLength { get; set; } = 20000;
+
+        [ProtoMember(121)]
+        public int MaxAdminNotesPerTarget { get; set; } = 100;
+
+        [ProtoMember(122)]
+        public int MaxPlayerNotesPerAuthor { get; set; } = 200;
     }
 }
