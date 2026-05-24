@@ -201,7 +201,7 @@ namespace thebasics.ModSystems.TPA
             var messageType = (reason == TpaExpireReason.Denied) ? EnumChatType.CommandError : EnumChatType.Notification;
             requestingPlayer.SendMessage(GlobalConstants.CurrentChatGroup, message, messageType);
 
-            NotifyTargetOfTimeout(requestingPlayer, targetPlayer, reason);
+            NotifyTargetOfRequestExpiry(requestingPlayer, targetPlayer, reason);
 
             // Clear the outgoing request
             requestingPlayer.ClearOutgoingTpaRequest();
@@ -212,16 +212,24 @@ namespace thebasics.ModSystems.TPA
             return !request.TemporalGearConsumed || ReturnTemporalGear(requestingPlayer);
         }
 
-        private static void NotifyTargetOfTimeout(IServerPlayer requestingPlayer, IServerPlayer targetPlayer, TpaExpireReason reason)
+        private void NotifyTargetOfRequestExpiry(IServerPlayer requestingPlayer, IServerPlayer targetPlayer, TpaExpireReason reason)
         {
-            if (reason != TpaExpireReason.Timeout || targetPlayer == null)
+            if (targetPlayer == null)
             {
                 return;
             }
 
-            targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup,
-                Lang.Get("thebasics:tpa-notify-timeout", requestingPlayer.PlayerName),
-                EnumChatType.Notification);
+            var message = reason switch
+            {
+                TpaExpireReason.Timeout => Lang.Get("thebasics:tpa-notify-timeout", requestingPlayer.PlayerName),
+                TpaExpireReason.Cancelled => Lang.Get("thebasics:tpa-notify-target-cancelled", GetPlayerDisplayName(requestingPlayer)),
+                _ => null
+            };
+
+            if (message != null)
+            {
+                targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup, message, EnumChatType.Notification);
+            }
         }
 
         private static string GenerateTpaExpireMessage(TpaExpireReason reason, string targetPlayerName, bool gearConsumed, bool gearReturned)
@@ -743,14 +751,6 @@ namespace thebasics.ModSystems.TPA
 
             // Use the centralized method to handle the cancellation
             ExpireOrCancelTpaRequest(player, outgoingRequest, TpaExpireReason.Cancelled, targetPlayer);
-
-            // Notify the target player if they're online
-            if (targetPlayer != null)
-            {
-                targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup,
-                    Lang.Get("thebasics:tpa-notify-target-cancelled", GetPlayerDisplayName(player)),
-                    EnumChatType.Notification);
-            }
 
             return new TextCommandResult
             {

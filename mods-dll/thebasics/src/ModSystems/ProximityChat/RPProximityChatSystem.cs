@@ -1,4 +1,3 @@
-#pragma warning disable S1541, S3776 // Central chat orchestration is intentionally deferred to a dedicated behavior-preserving refactor.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -379,6 +378,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:chatprefs-langcolor-set", ChatHelper.OnOff(preferences.LanguageColorsEnabled)));
     }
 
+#pragma warning disable S1541 // Legacy command router retained until a dedicated chat-preferences refactor.
     private TextCommandResult ChatPreferences(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
@@ -432,6 +432,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 return Error(Lang.Get("thebasics:chatprefs-usage"));
         }
     }
+
+#pragma warning restore S1541
 
     private static string GetOptionalWord(TextCommandCallingArgs args, int index)
     {
@@ -496,6 +498,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:chatprefs-preset-set", preferences.ColorPreset));
     }
 
+#pragma warning disable S1541 // Legacy command validation retained until a dedicated chat-preferences refactor.
     private TextCommandResult SetLanguageColorOverride(IServerPlayer player, ChatVisualPreferences preferences, string languageIdentifier, string colorValue)
     {
         if (string.IsNullOrWhiteSpace(languageIdentifier))
@@ -530,6 +533,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         player.SetChatVisualPreferences(preferences);
         return Success(Lang.Get("thebasics:chatprefs-langcolor-override-set", ChatHelper.LangIdentifier(language, player), FormatColorSetting(ChatVisualPreferenceResolver.GetLanguageColor(language, player))));
     }
+
+#pragma warning restore S1541
 
     private static TextCommandResult SetColorOverride(
         IServerPlayer player,
@@ -802,6 +807,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _serverConfigChannel.SendPacket(response, player);
     }
 
+#pragma warning disable S1541 // Admin config save orchestration is intentionally deferred to a focused refactor.
     private void OnConfigAdminSaveMessage(IServerPlayer player, TheBasicsConfigAdminSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -875,7 +881,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         SendConfigAdminResult(player, true, messageText, changedKeys);
     }
+#pragma warning restore S1541
 
+#pragma warning disable S1541 // Admin config save orchestration is intentionally deferred to a focused refactor.
     private void OnLanguageConfigSaveMessage(IServerPlayer player, TheBasicsLanguageConfigSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -927,7 +935,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
             "Saved The BASICs language config. Online players were reconciled; renamed languages also reconcile for later joins until the next server restart.",
             LanguageConfigAdmin.BuildEntries(Config));
     }
+#pragma warning restore S1541
 
+#pragma warning disable S1541 // Admin config save orchestration is intentionally deferred to a focused refactor.
     private void OnCharacterSheetFieldConfigSaveMessage(IServerPlayer player, TheBasicsCharacterSheetFieldConfigSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -971,7 +981,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         SendCharacterSheetFieldConfigResult(player, true, "Saved The BASICs character sheet field config.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
     }
+#pragma warning restore S1541
 
+#pragma warning disable S1541 // Typing-state normalization is kept inline to preserve wire-compatibility behavior.
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
     {
         if (player?.Entity == null || message == null)
@@ -1015,6 +1027,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // Best-effort broadcast; clients without this message type will silently ignore it.
         _serverConfigChannel?.BroadcastPacket(message, player);
     }
+#pragma warning restore S1541
 
     private static void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)
     {
@@ -1576,6 +1589,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return (gain, falloff);
     }
 
+#pragma warning disable S1541, S3776 // Chatter dispatch branches mirror RP mode semantics; deeper split is tracked as follow-up debt.
     internal void DispatchChatterForContext(MessageContext context)
     {
         if (_serverConfigChannel == null || !Config.EnableChatter)
@@ -1697,6 +1711,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             _serverConfigChannel.SendPacket(recipientMessage, recipient);
         }
     }
+#pragma warning restore S1541, S3776
 
     internal static int CountQuotedSpeechLength(string message)
     {
