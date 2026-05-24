@@ -34,7 +34,7 @@ namespace forensicstory
 
         public void Log(IServerPlayer player, T data)
         {
-            IServerChunk chunk = _serverApi.WorldManager.GetChunk(player.Entity.ServerPos.AsBlockPos);
+            IServerChunk chunk = _serverApi.WorldManager.GetChunk(player.Entity.Pos.AsBlockPos);
 
             if (!_chunkLogs.ContainsKey(chunk))
             {

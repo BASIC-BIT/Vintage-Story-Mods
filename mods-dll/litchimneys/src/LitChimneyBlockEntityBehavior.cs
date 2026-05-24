@@ -48,12 +48,7 @@ public class LitChimneyBlockEntityBehavior : BlockEntityBehavior
 
         while (height > 0)
         {
-            var searchPos = new BlockPos
-            {
-                X = Pos.X,
-                Y = height,
-                Z = Pos.Z,
-            };
+            var searchPos = new BlockPos(Pos.X, height, Pos.Z, Pos.dimension);
 
             // Get the block entity and check if it implements IFirePit
             var blockEntity = Api.World.BlockAccessor.GetBlockEntity(searchPos);

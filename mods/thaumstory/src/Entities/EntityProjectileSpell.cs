@@ -61,7 +61,7 @@ namespace thaumstory.Entities
             if (this.Alive)
             {
                 var random = new Random();
-                InFlightParticles.MinPos = SidedPos.XYZ;
+                InFlightParticles.MinPos = Pos.XYZ;
 
                 for (var i = 0; i < times; i++)
                 {
@@ -76,7 +76,7 @@ namespace thaumstory.Entities
             if (this.Alive)
             {
                 var random = new Random();
-                ExplosionParticles.MinPos = SidedPos.XYZ;
+                ExplosionParticles.MinPos = Pos.XYZ;
 
                 for (var i = 0; i < times; i++)
                 {

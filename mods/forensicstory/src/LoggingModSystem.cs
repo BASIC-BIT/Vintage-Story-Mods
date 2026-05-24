@@ -34,7 +34,7 @@ namespace forensicstory
             {
                 this.config = api.LoadModConfig<ModConfig>(CONFIGNAME);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 api.Server.LogError("Forensic Story: Failed to load mod config!");
                 return;
