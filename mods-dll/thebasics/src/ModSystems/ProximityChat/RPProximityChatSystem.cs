@@ -234,8 +234,18 @@ public class RPProximityChatSystem : BaseBasicModSystem
         API.ChatCommands.GetOrCreate("thebasics")
             .WithRootAlias("tb")
             .WithRootAlias("basic")
-            .WithDescription("The BASICs administration commands")
-            .RequiresPrivilege(Privilege.root)
+            .WithDescription(Lang.Get("thebasics:thebasics-cmd-desc"))
+            .RequiresPrivilege(Privilege.chat)
+            .BeginSubCommand("help")
+                .WithAlias("commands")
+                .WithDescription(Lang.Get("thebasics:thebasics-cmd-help-desc"))
+                .HandleWith(HandleTheBasicsHelpCommand)
+            .EndSubCommand()
+            .BeginSubCommand("guide")
+                .WithAlias("handbook")
+                .WithDescription(Lang.Get("thebasics:thebasics-cmd-guide-desc"))
+                .HandleWith(HandleTheBasicsGuideCommand)
+            .EndSubCommand()
             .BeginSubCommand("config")
                 .WithDescription("Open The BASICs config panel")
                 .RequiresPrivilege(Privilege.root)
@@ -267,7 +277,18 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .WithDescription("Reload The BASICs config from disk")
                 .RequiresPrivilege(Privilege.root)
                 .HandleWith(HandleReloadConfigCommand)
-            .EndSubCommand();
+            .EndSubCommand()
+            .HandleWith(HandleTheBasicsHelpCommand);
+    }
+
+    private static TextCommandResult HandleTheBasicsHelpCommand(TextCommandCallingArgs args)
+    {
+        return TextCommandResult.Success(Lang.Get("thebasics:thebasics-help"));
+    }
+
+    private static TextCommandResult HandleTheBasicsGuideCommand(TextCommandCallingArgs args)
+    {
+        return TextCommandResult.Success(Lang.Get("thebasics:thebasics-guide-link"));
     }
 
     private TextCommandResult HandleOpenConfigCommand(TextCommandCallingArgs args)

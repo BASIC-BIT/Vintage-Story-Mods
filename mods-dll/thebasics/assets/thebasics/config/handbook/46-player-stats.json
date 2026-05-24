@@ -1,0 +1,6 @@
+{
+  "pageCode": "thebasics-player-stats",
+  "title": "thebasics:thebasics-handbook-title-player-stats",
+  "categoryCode": "thebasics",
+  "text": "<strong>Player stats</strong> are optional server-side counters. Server config controls whether the stats system is enabled and which counters are tracked.\n\n<strong>Player command</strong>\n- <strong>/playerstats [player]</strong> or <strong>/pstats [player]</strong>: view your stats or another online player's stats when enabled.\n\n<strong>Tracked stats</strong>\nStats can include deaths, player kills, NPC kills, blocks broken, and distance travelled. Each counter can be enabled or disabled by server config.\n\n<strong>Staff cleanup</strong>\n- <strong>/clearstats &lt;player&gt; confirm</strong>: clear all stats for an online player.\n- <strong>/clearstat &lt;player&gt; &lt;stat&gt; confirm</strong>: clear one stat. Valid stat names include DEATHS, KILLS_PLAYER, KILLS_NPC, BLOCK_BREAKS, and DISTANCE_TRAVELLED.\nThe clear commands require the configured player-stat clear privilege."
+}

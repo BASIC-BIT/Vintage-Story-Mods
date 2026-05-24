@@ -16,10 +16,10 @@ public class PlayerNotesDialog : GuiDialog
 {
     private const double DialogWidth = 860;
     private const double ContentWidth = DialogWidth - 48;
-    private const double EntryPanelHeight = 275;
+    private const double EntryPanelHeight = 330;
+    private const double EntryBodyHeight = 205;
     private const double FreeformChromeHeight = 48;
-    private const double FreeformMinViewportHeight = 115;
-    private const double FreeformMaxViewportHeight = 310;
+    private const double FreeformViewportHeight = 310;
     private const double FreeformLineHeight = 16;
     private const double FreeformContentPadding = 14;
     private const double FieldHeight = 28;
@@ -66,7 +66,7 @@ public class PlayerNotesDialog : GuiDialog
         _onReload = onReload;
         _onClose = onClose;
         SetDraft(view, updateBaseline: true);
-        _scrollFreeformToBottomAfterCompose = true;
+        _scrollFreeformToBottomAfterCompose = false;
         ComposeDialog();
     }
 
@@ -85,7 +85,7 @@ public class PlayerNotesDialog : GuiDialog
         else
         {
             _freeformScrollY = 0;
-            _scrollFreeformToBottomAfterCompose = true;
+            _scrollFreeformToBottomAfterCompose = false;
         }
 
         if (sameView && view?.Success == false && _view?.Success == true)
@@ -155,7 +155,7 @@ public class PlayerNotesDialog : GuiDialog
         var rightX = leftWidth + 15;
         var rightWidth = ContentWidth - rightX;
         var entriesY = top + 20;
-        var freeformHeight = CalculateFreeformPanelHeight(CurrentFreeformText(), ContentWidth);
+        var freeformHeight = FreeformViewportHeight + FreeformChromeHeight;
         var freeformY = entriesY + EntryPanelHeight + 22;
         var statusMessage = StatusMessage();
         var statusHeight = string.IsNullOrWhiteSpace(statusMessage) ? 0 : 24;
@@ -173,7 +173,7 @@ public class PlayerNotesDialog : GuiDialog
             .AddInset(ElementBounds.Fixed(rightX, entriesY, rightWidth, EntryPanelHeight).FixedGrow(3).WithFixedOffset(-3, -3), 3)
             .AddInset(ElementBounds.Fixed(0, freeformY, ContentWidth, freeformHeight).FixedGrow(3).WithFixedOffset(-3, -3), 3);
 
-        AddDialogContent(composer, entriesY, leftWidth, rightX, rightWidth, freeformY, freeformHeight);
+        AddDialogContent(composer, entriesY, leftWidth, rightX, rightWidth, freeformY);
 
         if (!string.IsNullOrWhiteSpace(statusMessage))
         {
@@ -182,6 +182,7 @@ public class PlayerNotesDialog : GuiDialog
 
         composer
             .AddSmallButton(Lang.Get("thebasics:notes-reload"), OnReload, ElementBounds.Fixed(0, buttonY, 110, 30))
+            .AddSmallButton(Lang.Get("thebasics:guide-button"), OnGuide, ElementBounds.Fixed(120, buttonY, 110, 30))
             .AddSmallButton(Lang.Get("thebasics:notes-save"), OnSave, ElementBounds.Fixed(ContentWidth - 250, buttonY, 110, 30))
             .AddSmallButton(Lang.Get("thebasics:notes-close"), OnCancel, ElementBounds.Fixed(ContentWidth - 125, buttonY, 110, 30));
 
@@ -199,7 +200,7 @@ public class PlayerNotesDialog : GuiDialog
         _deferredFreeformValue = null;
     }
 
-    private void AddDialogContent(GuiComposer composer, double entriesY, double leftWidth, double rightX, double rightWidth, double freeformY, double freeformHeight)
+    private void AddDialogContent(GuiComposer composer, double entriesY, double leftWidth, double rightX, double rightWidth, double freeformY)
     {
         if (!_view.Success)
         {
@@ -209,7 +210,7 @@ public class PlayerNotesDialog : GuiDialog
 
         AddNoteList(composer, 0, entriesY, leftWidth);
         AddNoteEditor(composer, rightX, entriesY, rightWidth);
-        AddFreeformEditor(composer, 0, freeformY, ContentWidth, freeformHeight);
+        AddFreeformEditor(composer, 0, freeformY, ContentWidth);
     }
 
     private void ApplyDeferredInputValues()
@@ -310,7 +311,7 @@ public class PlayerNotesDialog : GuiDialog
         composer.AddInteractiveElement(_titleInput, "notes-title");
 
         composer.AddStaticText(Lang.Get("thebasics:notes-entry-content"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + 10, y + 90, width - 20, 20));
-        _bodyInput = new GuiElementTextArea(capi, ElementBounds.Fixed(x + 10, y + 110, width - 20, 150), null, CairoFont.TextInput())
+        _bodyInput = new GuiElementTextArea(capi, ElementBounds.Fixed(x + 10, y + 110, width - 20, EntryBodyHeight), null, CairoFont.TextInput())
         {
             Autoheight = false
         };
@@ -320,10 +321,10 @@ public class PlayerNotesDialog : GuiDialog
         composer.AddInteractiveElement(_bodyInput, "notes-body");
     }
 
-    private void AddFreeformEditor(GuiComposer composer, double x, double y, double width, double height)
+    private void AddFreeformEditor(GuiComposer composer, double x, double y, double width)
     {
         composer.AddStaticText(FreeformLabel(), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), ElementBounds.Fixed(x + 10, y + 8, width - 20, 22));
-        _freeformScrollViewportHeight = Math.Max(FreeformMinViewportHeight, height - FreeformChromeHeight);
+        _freeformScrollViewportHeight = FreeformViewportHeight;
         var clipBounds = ElementBounds.Fixed(x + 10, y + 36, width - 36, _freeformScrollViewportHeight);
         _freeformInput = new GuiElementTextArea(capi, ElementBounds.Fixed(0, 0, clipBounds.fixedWidth - 6, _freeformScrollViewportHeight), OnFreeformTextChanged, CairoFont.TextInput())
         {
@@ -371,27 +372,6 @@ public class PlayerNotesDialog : GuiDialog
         return string.IsNullOrWhiteSpace(message) || string.Equals(message, Lang.Get("thebasics:notes-status-opened"), StringComparison.Ordinal)
             ? null
             : message;
-    }
-
-    private static double CalculateFreeformPanelHeight(string text, double width)
-    {
-        var estimatedLines = EstimateWrappedLineCount(text, width - 60);
-        var textHeight = 2 * FreeformContentPadding + estimatedLines * FreeformLineHeight;
-        var viewportHeight = Math.Clamp(textHeight, FreeformMinViewportHeight, FreeformMaxViewportHeight);
-        return viewportHeight + FreeformChromeHeight;
-    }
-
-    private static int EstimateWrappedLineCount(string text, double textWidth)
-    {
-        var columns = Math.Max(24, (int)Math.Floor(textWidth / 8.5));
-        var lines = (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-        var count = 0;
-        foreach (var line in lines)
-        {
-            count += Math.Max(1, (int)Math.Ceiling((double)(line?.Length ?? 0) / columns));
-        }
-
-        return Math.Max(1, count);
     }
 
     private void OnFreeformTextChanged(string text)
@@ -629,6 +609,11 @@ public class PlayerNotesDialog : GuiDialog
 
         SendReload();
         return true;
+    }
+
+    private bool OnGuide()
+    {
+        return HandbookGuide.Open(capi, HandbookGuide.NotesPage);
     }
 
     private void SendReload()

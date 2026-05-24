@@ -1271,7 +1271,8 @@ public class ChatUiSystem : ModSystem
     {
         rows.Add(new DialogRow(
             CreateButton("languages", Lang.Get("thebasics:config-admin-languages"), Lang.Get("thebasics:config-admin-languages-tooltip")),
-            CreateButton("charsheetfields", Lang.Get("thebasics:config-admin-charsheet-fields"), Lang.Get("thebasics:config-admin-charsheet-fields-tooltip")))
+            CreateButton("charsheetfields", Lang.Get("thebasics:config-admin-charsheet-fields"), Lang.Get("thebasics:config-admin-charsheet-fields-tooltip")),
+            CreateButton("guide", Lang.Get("thebasics:guide-button"), Lang.Get("thebasics:config-admin-guide-tooltip")))
         {
             TopPadding = 4,
             BottomPadding = 8
@@ -1416,6 +1417,9 @@ public class ChatUiSystem : ModSystem
                 break;
             case "charsheetfields":
                 OpenCharacterSheetFieldConfigFromConfigAdmin();
+                break;
+            case "guide":
+                HandbookGuide.Open(_api, HandbookGuide.OverviewPage);
                 break;
             case "mark-reviewed":
                 SendConfigAdminMarkReviewed();
