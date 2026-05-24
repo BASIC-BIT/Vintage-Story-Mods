@@ -17,7 +17,7 @@ using Vintagestory.API.Common;
 [assembly: AssemblyCulture("")]
 
 // Setting ComVisible to false makes the types in this assembly not visible 
-// to COM components.  If you need to access a type in this assembly from 
+// to COM components.  If you need to access a type from 
 // COM, set the ComVisible attribute to true on that type.
 [assembly: ComVisible(false)]
 
@@ -36,14 +36,13 @@ using Vintagestory.API.Common;
 [assembly: AssemblyVersion("1.0.0.0")]
 
 [assembly: ModInfo("The BASICs", "thebasics",
-    Version = "5.5.0",
+    Version = "5.6.0",
     Description = "Adds an RP proximity chat system, with configurable talking ranges, nicknames, automatic message formatting, and more! Also adds a server save notification.",
     Authors = new[] { "BASIC" })]
 
 [assembly: ModDependency("game")]
 
 [assembly: InternalsVisibleTo("thebasics.Tests")]
-
 
 
 
