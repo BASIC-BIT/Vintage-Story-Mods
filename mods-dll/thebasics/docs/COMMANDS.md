@@ -1,22 +1,22 @@
 # The BASICs Command Reference
 
 Use `/thebasics help`, `/basic help`, or `/tb help` in game for a short command summary.
-Use `/thebasics guide` or press `H` and open the The BASICs handbook tab for the in-game guide.
+Use `/thebasics guide` or press `H` and choose The BASICs in the handbook for the in-game guide.
 
 ## Player Commands
 
+- `/me`, `/it`, `/envhere`, `/ooc`, `/gooc`, `/say`, `/yell`, `/whisper` - RP chat commands.
+- `/nick`, `/clearnick`, `/nickcolor`, `/clearnickcolor` - Manage RP nickname identity when enabled.
+- `/rptext`, `/emotemode`, `/chatter` - Per-player RP chat presentation toggles.
+- `/chatprefs` - View or change local chat accessibility and color preferences.
 - `/thebasics guide`, `/basic guide`, `/tb guide` - Link to the in-game Survival Handbook guide.
 - `/charsheet` - Open your character sheet.
 - `/look` - Inspect visible character details for a nearby player.
 - `/bio` - Quick character sheet view alias.
+- `/character` - Manage optional RP character slots when enabled.
 - `/notes` - Open your private notes.
 - `/notes about <player>` - Open private notes about another player.
 - `/notes help` - Show private notes command syntax.
-- `/chatprefs` - View or change local chat accessibility and color preferences.
-- `/character` - Manage optional RP character slots when enabled.
-- `/nick`, `/clearnick`, `/nickcolor`, `/clearnickcolor` - Manage RP nickname identity when enabled.
-- `/me`, `/it`, `/envhere`, `/ooc`, `/gooc`, `/say`, `/yell`, `/whisper` - RP chat commands.
-- `/rptext`, `/emotemode`, `/chatter` - Per-player RP chat presentation toggles.
 - `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`, `/tpalist`, `/tpallow`, `/tpacancel` - Teleport request commands when enabled.
 - `/playerstats` - View player stats when enabled.
 
