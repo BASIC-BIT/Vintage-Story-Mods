@@ -23,7 +23,7 @@ namespace thaumstory
             entity.ServerPos.Motion.Set(pos);
             entity.Pos.SetFrom(entity.ServerPos);
             entity.World = byEntity.World;
-            entity.SetRotation();
+            entity.SetInitialRotation();
             byEntity.World.SpawnEntity(entity);
             
             handling = EnumHandHandling.PreventDefaultAction;
