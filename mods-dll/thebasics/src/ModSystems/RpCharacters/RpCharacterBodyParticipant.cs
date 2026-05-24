@@ -250,13 +250,23 @@ public class RpCharacterBodyParticipant : IRpCharacterSwitchParticipant
 
     private static bool IsEmpty(RpCharacterBodySnapshot snapshot)
     {
+        return IsBodyStateUnavailable(snapshot) &&
+               snapshot.Deaths == 0 &&
+               IsNearlyZero(snapshot.Intoxication) &&
+               IsNearlyZero(snapshot.Psychedelic);
+    }
+
+    private static bool IsBodyStateUnavailable(RpCharacterBodySnapshot snapshot)
+    {
         return snapshot.Health?.Available != true &&
                snapshot.Hunger?.Available != true &&
                snapshot.Position?.Available != true &&
                snapshot.PositionBeforeFalling?.Available != true &&
-               snapshot.Spawn?.HasSpawn != true &&
-               snapshot.Deaths == 0 &&
-               snapshot.Intoxication == 0f &&
-               snapshot.Psychedelic == 0f;
+               snapshot.Spawn?.HasSpawn != true;
+    }
+
+    private static bool IsNearlyZero(float value)
+    {
+        return value > -float.Epsilon && value < float.Epsilon;
     }
 }

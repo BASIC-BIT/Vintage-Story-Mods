@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using thebasics.ModSystems.RpCharacters.Models;
+using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.GameContent;
 using Vintagestory.Server;
@@ -58,28 +60,46 @@ public class RpCharacterAppearanceParticipant : IRpCharacterSwitchParticipant
         attributes.SetStringArray("extraTraits", extraTraits);
         attributes.MarkPathDirty("extraTraits");
 
-        if (!string.IsNullOrWhiteSpace(snapshot.CharacterClass))
+        RestoreCharacterClass(entity, attributes, snapshot.CharacterClass);
+        RestoreSkinConfig(attributes, snapshot.SkinConfig);
+        RestoreVoiceAndModel(entity, attributes, snapshot);
+        entity.MarkShapeModified();
+        attributes.MarkPathDirty("skinConfig");
+
+        if (player.WorldData is ServerWorldPlayerData worldData)
         {
-            var characterSystem = entity.Api.ModLoader.GetModSystem<CharacterSystem>();
-            if (characterSystem != null)
-            {
-                characterSystem.setCharacterClass(entity, snapshot.CharacterClass, initializeGear: false);
-            }
-            else
-            {
-                attributes.SetString("characterClass", snapshot.CharacterClass);
-            }
+            worldData.DidSelectSkin = snapshot.DidSelectSkin;
+        }
+    }
+
+    private static void RestoreCharacterClass(EntityPlayer entity, TreeAttribute attributes, string characterClass)
+    {
+        if (string.IsNullOrWhiteSpace(characterClass))
+        {
+            return;
         }
 
-        if (snapshot.SkinConfig != null && snapshot.SkinConfig.Length > 0)
+        var characterSystem = entity.Api.ModLoader.GetModSystem<CharacterSystem>();
+        if (characterSystem != null)
         {
-            var skinConfig = RpCharacterSnapshotUtilities.FromBytes(snapshot.SkinConfig);
-            if (skinConfig != null)
-            {
-                attributes.SetAttribute("skinConfig", skinConfig);
-            }
+            characterSystem.setCharacterClass(entity, characterClass, initializeGear: false);
+            return;
         }
 
+        attributes.SetString("characterClass", characterClass);
+    }
+
+    private static void RestoreSkinConfig(TreeAttribute attributes, byte[] skinConfigBytes)
+    {
+        var skinConfig = RpCharacterSnapshotUtilities.FromBytes(skinConfigBytes);
+        if (skinConfig != null)
+        {
+            attributes.SetAttribute("skinConfig", skinConfig);
+        }
+    }
+
+    private static void RestoreVoiceAndModel(EntityPlayer entity, TreeAttribute attributes, RpCharacterAppearanceSnapshot snapshot)
+    {
         var voiceType = snapshot.VoiceType ?? string.Empty;
         var voicePitch = snapshot.VoicePitch ?? string.Empty;
         attributes.SetString("skinModel", snapshot.SkinModel ?? string.Empty);
@@ -88,13 +108,6 @@ public class RpCharacterAppearanceParticipant : IRpCharacterSwitchParticipant
 
         var skinnable = entity.GetBehavior<EntityBehaviorExtraSkinnable>();
         skinnable?.ApplyVoice(voiceType, voicePitch, testTalk: false);
-        entity.MarkShapeModified();
-        attributes.MarkPathDirty("skinConfig");
-
-        if (player.WorldData is ServerWorldPlayerData worldData)
-        {
-            worldData.DidSelectSkin = snapshot.DidSelectSkin;
-        }
     }
 
     private static bool IsEmpty(RpCharacterAppearanceSnapshot snapshot)

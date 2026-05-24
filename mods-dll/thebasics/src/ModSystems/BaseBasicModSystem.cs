@@ -10,8 +10,8 @@ namespace thebasics.ModSystems
 {
     public abstract class BaseBasicModSystem : ModSystem
     {
-        public ICoreServerAPI API;
-        public ModConfig Config;
+        public ICoreServerAPI API { get; set; }
+        public ModConfig Config { get; set; }
         protected const string ConfigName = "the_basics.json";
 
         private static bool _loggedConfigLoadFailure;
@@ -118,48 +118,13 @@ namespace thebasics.ModSystems
             }
             catch (Exception e)
             {
-                // Fail safe: do not crash mod systems if config deserialization fails.
-                // This can happen if the JSON file is corrupted, or if the config file was accidentally stored
-                // as a JSON *string* containing JSON (e.g. "{ ... }").
-
-                // Recovery path: if the file is a JSON string containing object JSON, repair it in-place.
-                try
+                var repaired = TryRepairJsonStringConfig(api);
+                if (repaired != null)
                 {
-                    var maybeJsonString = api.LoadModConfig<string>(ConfigName);
-                    if (!string.IsNullOrWhiteSpace(maybeJsonString) && maybeJsonString.TrimStart().StartsWith('{'))
-                    {
-                        var repaired = JsonConvert.DeserializeObject<ModConfig>(maybeJsonString);
-                        if (repaired != null)
-                        {
-                            repaired.InitializeDefaultsIfNeeded();
-                            api.StoreModConfig(repaired, ConfigName);
-
-                            if (!_loggedConfigRepair)
-                            {
-                                _loggedConfigRepair = true;
-                                api.Server.LogWarning($"The BASICs: Repaired malformed config file '{ConfigName}' (was JSON string). Saved corrected config.");
-                            }
-
-                            return repaired;
-                        }
-                    }
-                }
-                catch
-                {
-                    // ignore - fall back to defaults
+                    return repaired;
                 }
 
-                if (!_loggedConfigLoadFailure)
-                {
-                    _loggedConfigLoadFailure = true;
-                    // Avoid logging the raw exception text: it may contain braces/newlines that some loggers try to format.
-                    api.Server.LogError($"The BASICs: Failed to load mod config '{ConfigName}'. Using defaults. (Exception type: {e.GetType().Name})");
-                }
-
-                config = new ModConfig();
-                config.InitializeDefaultsIfNeeded();
-                // Intentionally do not overwrite the existing config file here.
-                return config;
+                return CreateFallbackConfig(api, e);
             }
 
             if (config == null)
@@ -176,6 +141,58 @@ namespace thebasics.ModSystems
             config.InitializeDefaultsIfNeeded();
             // Optionally persist any backfilled defaults for future runs
             api.StoreModConfig(config, ConfigName);
+            return config;
+        }
+
+        private static ModConfig TryRepairJsonStringConfig(ICoreServerAPI api)
+        {
+            try
+            {
+                var maybeJsonString = api.LoadModConfig<string>(ConfigName);
+                if (string.IsNullOrWhiteSpace(maybeJsonString) || !maybeJsonString.TrimStart().StartsWith('{'))
+                {
+                    return null;
+                }
+
+                var repaired = JsonConvert.DeserializeObject<ModConfig>(maybeJsonString);
+                if (repaired == null)
+                {
+                    return null;
+                }
+
+                repaired.InitializeDefaultsIfNeeded();
+                api.StoreModConfig(repaired, ConfigName);
+                LogConfigRepairOnce(api);
+                return repaired;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void LogConfigRepairOnce(ICoreServerAPI api)
+        {
+            if (_loggedConfigRepair)
+            {
+                return;
+            }
+
+            _loggedConfigRepair = true;
+            api.Server.LogWarning($"The BASICs: Repaired malformed config file '{ConfigName}' (was JSON string). Saved corrected config.");
+        }
+
+        private static ModConfig CreateFallbackConfig(ICoreServerAPI api, Exception exception)
+        {
+            if (!_loggedConfigLoadFailure)
+            {
+                _loggedConfigLoadFailure = true;
+                api.Server.LogError($"The BASICs: Failed to load mod config '{ConfigName}'. Using defaults. (Exception type: {exception.GetType().Name})");
+            }
+
+            var config = new ModConfig();
+            config.InitializeDefaultsIfNeeded();
+            // Intentionally do not overwrite the existing config file here.
             return config;
         }
     }

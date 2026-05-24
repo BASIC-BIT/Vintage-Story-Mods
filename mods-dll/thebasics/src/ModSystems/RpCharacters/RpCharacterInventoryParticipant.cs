@@ -3,6 +3,7 @@ using System.Linq;
 using thebasics.ModSystems.RpCharacters.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.Server;
 using Vintagestory.Server;
 
 namespace thebasics.ModSystems.RpCharacters;
@@ -76,6 +77,15 @@ public class RpCharacterInventoryParticipant : IRpCharacterSwitchParticipant
         var snapshot = record.Inventory ?? new RpCharacterInventorySnapshot();
         snapshot.Inventories ??= new System.Collections.Generic.List<RpCharacterInventoryData>();
 
+        RestoreInventories(player, manager, snapshot);
+        RestoreActiveHotbarSlot(player, manager, snapshot);
+
+        player.BroadcastPlayerData(sendInventory: true);
+        manager.BroadcastHotbarSlot();
+    }
+
+    private static void RestoreInventories(IServerPlayer player, IPlayerInventoryManager manager, RpCharacterInventorySnapshot snapshot)
+    {
         foreach (var className in ScopedInventoryClasses)
         {
             if (manager.GetOwnInventory(className) is not InventoryBase inventory)
@@ -89,7 +99,10 @@ public class RpCharacterInventoryParticipant : IRpCharacterSwitchParticipant
             inventory.AfterBlocksLoaded(player.Entity.World);
             MarkInventoryDirty(inventory);
         }
+    }
 
+    private static void RestoreActiveHotbarSlot(IServerPlayer player, IPlayerInventoryManager manager, RpCharacterInventorySnapshot snapshot)
+    {
         if (snapshot.ActiveHotbarSlotNumber >= 0)
         {
             manager.ActiveHotbarSlotNumber = snapshot.ActiveHotbarSlotNumber;
@@ -98,9 +111,6 @@ public class RpCharacterInventoryParticipant : IRpCharacterSwitchParticipant
                 worldData.SelectedHotbarSlot = snapshot.ActiveHotbarSlotNumber;
             }
         }
-
-        player.BroadcastPlayerData(sendInventory: true);
-        manager.BroadcastHotbarSlot();
     }
 
     internal static bool HasRestorableSnapshot(RpCharacterRecord record)

@@ -1,3 +1,4 @@
+#pragma warning disable S101 // Vintage Story API acronym casing is kept to match the extended type name.
 using System;
 using System.Linq;
 using Vintagestory.API.Server;

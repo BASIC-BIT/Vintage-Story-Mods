@@ -1,3 +1,4 @@
+#pragma warning disable S1133 // Deprecated config members are retained for live config compatibility.
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
@@ -25,8 +26,16 @@ namespace thebasics.Configs
         public void InitializeDefaultsIfNeeded()
         {
             TpaRequestPrivilege = string.IsNullOrWhiteSpace(TpaRequestPrivilege) ? "chat" : TpaRequestPrivilege;
+            InitializeProximityChatDefaults();
+            InitializeLanguageDefaults();
+            InitializeChatterDefaults();
+            InitializeCharacterSheetDefaults();
+            InitializeGeneralFeatureDefaults();
+            InitializeNotesDefaults();
+        }
 
-            // Initialize dictionaries only if they're null
+        private void InitializeProximityChatDefaults()
+        {
             ProximityChatModeDistances ??= new Dictionary<ProximityChatMode, int>
             {
                 { ProximityChatMode.Yell, 90 },
@@ -64,20 +73,16 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, "." }
             };
 
-            RPTTS_ModeGain ??= new Dictionary<ProximityChatMode, float>
-            {
-                { ProximityChatMode.Yell, 1.7f },
-                { ProximityChatMode.Normal, 1f },
-                { ProximityChatMode.Whisper, 0.65f }
-            };
+            ChatDelimiters ??= new ChatDelimiters();
+            ChatDelimiters.InitializeDefaultsIfNeeded();
 
-            RPTTS_ModeFalloff ??= new Dictionary<ProximityChatMode, float>
-            {
-                { ProximityChatMode.Yell, 1f },
-                { ProximityChatMode.Normal, 1.5f },
-                { ProximityChatMode.Whisper, 5f }
-            };
+            ProximityChatPresentationMode = ProximityChatPresentationModes.Normalize(ProximityChatPresentationMode);
+            OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
+            ProseNicknameToken ??= "@";
+        }
 
+        private void InitializeLanguageDefaults()
+        {
             PlayerStatToggles ??= new Dictionary<PlayerStatType, bool>
             {
                 { PlayerStatType.Deaths, true },
@@ -96,6 +101,23 @@ namespace thebasics.Configs
                     new string[] { "feng", "tar", "kin", "ga", "shin", "ji" },
                     "#D4A96A", false, false)
             ];
+        }
+
+        private void InitializeChatterDefaults()
+        {
+            RPTTS_ModeGain ??= new Dictionary<ProximityChatMode, float>
+            {
+                { ProximityChatMode.Yell, 1.7f },
+                { ProximityChatMode.Normal, 1f },
+                { ProximityChatMode.Whisper, 0.65f }
+            };
+
+            RPTTS_ModeFalloff ??= new Dictionary<ProximityChatMode, float>
+            {
+                { ProximityChatMode.Yell, 1f },
+                { ProximityChatMode.Normal, 1.5f },
+                { ProximityChatMode.Whisper, 5f }
+            };
 
             ChatterModeVolume ??= new Dictionary<ProximityChatMode, float>
             {
@@ -110,17 +132,6 @@ namespace thebasics.Configs
                 { ProximityChatMode.Normal, 1.0f },
                 { ProximityChatMode.Whisper, 0.95f }
             };
-
-            // Initialize chat delimiters and ensure nested defaults even for legacy configs
-            ChatDelimiters ??= new ChatDelimiters();
-            ChatDelimiters.InitializeDefaultsIfNeeded();
-
-            ProximityChatPresentationMode = ProximityChatPresentationModes.Normalize(ProximityChatPresentationMode);
-            OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
-            ProseNicknameToken ??= "@";
-            InitializeCharacterSheetDefaults();
-            InitializeGeneralFeatureDefaults();
-            InitializeNotesDefaults();
         }
 
         private void InitializeGeneralFeatureDefaults()

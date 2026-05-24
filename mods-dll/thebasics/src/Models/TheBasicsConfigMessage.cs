@@ -7,12 +7,12 @@ namespace thebasics.Models;
 public class TheBasicsConfigMessage
 {
     [ProtoMember(1)]
-    public int ProximityGroupId;
+    public int ProximityGroupId { get; set; }
 
     // Full config object instead of individual properties
     [ProtoMember(2)]
-    public ModConfig Config;
+    public ModConfig Config { get; set; }
 
     [ProtoMember(3)]
-    public int? LastSelectedGroupId;
+    public int? LastSelectedGroupId { get; set; }
 }

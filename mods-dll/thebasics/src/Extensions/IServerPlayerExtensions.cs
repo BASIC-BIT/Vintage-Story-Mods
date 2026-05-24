@@ -655,6 +655,6 @@ namespace thebasics.Extensions
         }
 
         public static double GetDistance(this IServerPlayer sendingPlayer, IServerPlayer receivingPlayer) =>
-            sendingPlayer.Entity.ServerPos.DistanceTo(receivingPlayer.Entity.ServerPos);
+            sendingPlayer.Entity.Pos.DistanceTo(receivingPlayer.Entity.Pos);
     }
 }

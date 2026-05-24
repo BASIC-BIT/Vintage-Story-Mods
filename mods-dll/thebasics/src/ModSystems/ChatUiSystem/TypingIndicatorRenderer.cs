@@ -77,71 +77,89 @@ public sealed class TypingIndicatorRenderer : IRenderer
         // Only iterate known players; this feature is cosmetic.
         foreach (var plr in world.AllPlayers)
         {
-            var entity = plr?.Entity;
-            if (entity == null || entity.EntityId == localPlayerEntity.EntityId)
-            {
-                continue;
-            }
-
-            var state = ChatUiSystem.GetEntityTypingIndicatorState(entity.EntityId);
-            if (state == ChatTypingIndicatorState.None)
-            {
-                continue;
-            }
-
-            var distSq = localPlayerEntity.Pos.SquareDistanceTo(entity.Pos);
-            if (distSq > maxDistSq)
-            {
-                continue;
-            }
-
-            if (!CanSeeCached(world, nowMs, localPlayerEntity, entity))
-            {
-                continue;
-            }
-
-            // Use the game's own above-head logic for correct mount offsets.
-            if (entity.Properties?.Client?.Renderer is not EntityShapeRenderer esr)
-            {
-                continue;
-            }
-
-            var label = GetLabelForState(state, displayMode);
-            var tex = GetOrCreateTexture(label, state, displayMode);
-            if (tex == null)
-            {
-                continue;
-            }
-
-            // Consistent world-space offset for all states — avoids vertical jumping when state changes.
-            const double yWorldOffset = 0.25;
-            var aboveHeadPos = esr.getAboveHeadPosition(entity).Add(0, yWorldOffset, 0);
-            Vec3d pos = MatrixToolsd.Project(aboveHeadPos, rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
-            if (pos.Z < 0.0)
-            {
-                continue;
-            }
-
-            // Gentler dampening than speech bubbles — typing indicator is a subtle
-            // status badge, not content to read. Uses 3/Z^0.8 (vs bubbles' 4/Z^0.6)
-            // so it shrinks faster with distance while still being smoother than
-            // vanilla's linear 4/Z.
-            var dampenedZ = (float)Math.Pow(Math.Max(1.0, pos.Z), 0.8);
-            float scale = 3f / dampenedZ;
-            float cappedScale = Math.Min(1f, scale);
-            if (cappedScale > 0.75f)
-            {
-                cappedScale = 0.75f + (cappedScale - 0.75f) / 2f;
-            }
-
-            float posx = (float)pos.X - cappedScale * tex.Width / 2f;
-
-            // Small screen-space nudge; most separation comes from the world-space offset above.
-            float yOffset = 2f;
-            float posy = (float)rapi.FrameHeight - (float)pos.Y - cappedScale * tex.Height - yOffset;
-
-            rapi.Render2DTexture(tex.TextureId, posx, posy, cappedScale * tex.Width, cappedScale * tex.Height, 20f);
+            RenderPlayerIndicator(plr?.Entity, localPlayerEntity, world, rapi, nowMs, maxDistSq, displayMode);
         }
+    }
+
+    private void RenderPlayerIndicator(
+        EntityPlayer entity,
+        EntityPlayer localPlayerEntity,
+        IClientWorldAccessor world,
+        IRenderAPI rapi,
+        long nowMs,
+        double maxDistSq,
+        TypingIndicatorDisplayMode displayMode)
+    {
+        if (!CanRenderIndicatorForEntity(entity, localPlayerEntity, world, nowMs, maxDistSq, out var state, out var renderer))
+        {
+            return;
+        }
+
+        var label = GetLabelForState(state, displayMode);
+        var tex = GetOrCreateTexture(label, state, displayMode);
+        if (tex == null)
+        {
+            return;
+        }
+
+        var pos = ProjectIndicatorPosition(entity, renderer, rapi);
+        if (pos.Z < 0.0)
+        {
+            return;
+        }
+
+        var cappedScale = GetIndicatorScale(pos.Z);
+        var posx = (float)pos.X - cappedScale * tex.Width / 2f;
+        var posy = (float)rapi.FrameHeight - (float)pos.Y - cappedScale * tex.Height - 2f;
+
+        rapi.Render2DTexture(tex.TextureId, posx, posy, cappedScale * tex.Width, cappedScale * tex.Height, 20f);
+    }
+
+    private bool CanRenderIndicatorForEntity(
+        EntityPlayer entity,
+        EntityPlayer localPlayerEntity,
+        IClientWorldAccessor world,
+        long nowMs,
+        double maxDistSq,
+        out ChatTypingIndicatorState state,
+        out EntityShapeRenderer renderer)
+    {
+        state = ChatTypingIndicatorState.None;
+        renderer = null;
+
+        if (entity == null || entity.EntityId == localPlayerEntity.EntityId)
+        {
+            return false;
+        }
+
+        state = ChatUiSystem.GetEntityTypingIndicatorState(entity.EntityId);
+        if (state == ChatTypingIndicatorState.None || localPlayerEntity.Pos.SquareDistanceTo(entity.Pos) > maxDistSq)
+        {
+            return false;
+        }
+
+        if (!CanSeeCached(world, nowMs, localPlayerEntity, entity))
+        {
+            return false;
+        }
+
+        renderer = entity.Properties?.Client?.Renderer as EntityShapeRenderer;
+        return renderer != null;
+    }
+
+    private static Vec3d ProjectIndicatorPosition(EntityPlayer entity, EntityShapeRenderer renderer, IRenderAPI rapi)
+    {
+        var aboveHeadPos = renderer.getAboveHeadPosition(entity).Add(0, 0.25, 0);
+        return MatrixToolsd.Project(aboveHeadPos, rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
+    }
+
+    private static float GetIndicatorScale(double z)
+    {
+        var dampenedZ = (float)Math.Pow(Math.Max(1.0, z), 0.8);
+        var cappedScale = Math.Min(1f, 3f / dampenedZ);
+        return cappedScale > 0.75f
+            ? 0.75f + (cappedScale - 0.75f) / 2f
+            : cappedScale;
     }
 
     /// <summary>

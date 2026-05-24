@@ -140,51 +140,52 @@ public sealed class PlacedBubbleRenderer : IRenderer
 
             if (age > bubble.DurationMs)
             {
-                bubble.Texture?.Dispose();
-                _bubbles.RemoveAt(i);
+                RemoveBubbleAt(i);
                 continue;
             }
 
-            // LOS check to the world position.
-            if (!CanSeePositionCached(world, nowMs, localPlayerEntity, bubble.WorldPos))
-            {
-                continue;
-            }
-
-            var tex = bubble.Texture;
-            if (tex == null)
-            {
-                continue;
-            }
-
-            // Project world position to screen space.
-            var pos = MatrixToolsd.Project(
-                bubble.WorldPos,
-                rapi.PerspectiveProjectionMat,
-                rapi.PerspectiveViewMat,
-                rapi.FrameWidth,
-                rapi.FrameHeight
-            );
-
-            if (pos.Z < 0.0)
-            {
-                continue; // Behind the camera.
-            }
-
-            // Dampened distance scaling — same formula as SpeechBubbleRenderPatches.
-            var dampenedZ = Math.Pow(Math.Max(1.0, pos.Z), DistanceDampeningExponent);
-            var scale = (float)(4.0 / dampenedZ);
-            var cappedScale = Math.Min(1f, scale);
-            if (cappedScale > 0.75f)
-            {
-                cappedScale = 0.75f + (cappedScale - 0.75f) / 2f;
-            }
-
-            var posx = (float)pos.X - cappedScale * tex.Width / 2f;
-            var posy = (float)rapi.FrameHeight - (float)pos.Y - cappedScale * tex.Height;
-
-            rapi.Render2DTexture(tex.TextureId, posx, posy, cappedScale * tex.Width, cappedScale * tex.Height, 20f);
+            RenderBubble(world, localPlayerEntity, rapi, nowMs, bubble);
         }
+    }
+
+    private void RemoveBubbleAt(int index)
+    {
+        _bubbles[index].Texture?.Dispose();
+        _bubbles.RemoveAt(index);
+    }
+
+    private void RenderBubble(IWorldAccessor world, Entity localPlayerEntity, IRenderAPI rapi, long nowMs, PlacedBubble bubble)
+    {
+        if (bubble.Texture == null || !CanSeePositionCached(world, nowMs, localPlayerEntity, bubble.WorldPos))
+        {
+            return;
+        }
+
+        var pos = MatrixToolsd.Project(
+            bubble.WorldPos,
+            rapi.PerspectiveProjectionMat,
+            rapi.PerspectiveViewMat,
+            rapi.FrameWidth,
+            rapi.FrameHeight);
+        if (pos.Z < 0.0)
+        {
+            return;
+        }
+
+        var cappedScale = GetBubbleScale(pos.Z);
+        var posx = (float)pos.X - cappedScale * bubble.Texture.Width / 2f;
+        var posy = (float)rapi.FrameHeight - (float)pos.Y - cappedScale * bubble.Texture.Height;
+
+        rapi.Render2DTexture(bubble.Texture.TextureId, posx, posy, cappedScale * bubble.Texture.Width, cappedScale * bubble.Texture.Height, 20f);
+    }
+
+    private static float GetBubbleScale(double z)
+    {
+        var dampenedZ = Math.Pow(Math.Max(1.0, z), DistanceDampeningExponent);
+        var cappedScale = Math.Min(1f, (float)(4.0 / dampenedZ));
+        return cappedScale > 0.75f
+            ? 0.75f + (cappedScale - 0.75f) / 2f
+            : cappedScale;
     }
 
     /// <summary>
@@ -243,7 +244,7 @@ public sealed class PlacedBubbleRenderer : IRenderer
         _losCache.Clear();
     }
 
-    private class PlacedBubble
+    private sealed class PlacedBubble
     {
         public Vec3d WorldPos;
         public LoadedTexture Texture;

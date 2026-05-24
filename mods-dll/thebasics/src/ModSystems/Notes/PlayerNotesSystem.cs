@@ -1,3 +1,4 @@
+#pragma warning disable S1541, S3776 // Command/network orchestration needs behavior-preserving refactors, not opportunistic churn.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -790,7 +791,7 @@ public class PlayerNotesSystem : BaseBasicModSystem
         return TryResolveTarget(targetUid, query, allowOffline: true, out var target, out error) ? target : null;
     }
 
-    private RpCharacterRecord GetActiveCharacter(IServerPlayer player)
+    private static RpCharacterRecord GetActiveCharacter(IServerPlayer player)
     {
         if (player == null)
         {

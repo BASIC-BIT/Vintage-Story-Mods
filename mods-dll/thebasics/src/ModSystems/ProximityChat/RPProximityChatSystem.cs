@@ -1,3 +1,4 @@
+#pragma warning disable S1541, S3776 // Central chat orchestration is intentionally deferred to a dedicated behavior-preserving refactor.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -25,12 +26,12 @@ namespace thebasics.ModSystems.ProximityChat;
 
 public class RPProximityChatSystem : BaseBasicModSystem
 {
-    public int ProximityChatId;
-    public LanguageSystem LanguageSystem;
-    public DistanceObfuscationSystem DistanceObfuscationSystem;
+    public int ProximityChatId { get; set; }
+    public LanguageSystem LanguageSystem { get; set; }
+    public DistanceObfuscationSystem DistanceObfuscationSystem { get; set; }
     private IServerNetworkChannel _serverConfigChannel;
-    public ProximityCheckUtils ProximityCheckUtils;
-    public TransformerSystem TransformerSystem;
+    public ProximityCheckUtils ProximityCheckUtils { get; set; }
+    public TransformerSystem TransformerSystem { get; set; }
 
     // Ephemeral state; do not persist.
     private readonly System.Collections.Generic.Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new();
@@ -343,7 +344,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         };
     }
 
-    private TextCommandResult LanguageColorPreference(TextCommandCallingArgs args)
+    private static TextCommandResult LanguageColorPreference(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
         var preferences = player.GetChatVisualPreferences();
@@ -418,7 +419,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             : null;
     }
 
-    private string BuildChatPreferencesStatus(ChatVisualPreferences preferences)
+    private static string BuildChatPreferencesStatus(ChatVisualPreferences preferences)
     {
         return Lang.Get(
             "thebasics:chatprefs-status",
@@ -994,7 +995,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _serverConfigChannel?.BroadcastPacket(message, player);
     }
 
-    private void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)
+    private static void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)
     {
         player.SetLastSelectedGroupId(message.GroupId);
     }
@@ -1923,16 +1924,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
             var newNickname = (string)fullArgs.Parsers[2].GetValue();
 
             // Validate nickname against conflicts and show warning to admin - always enforced unless forced
-            if (!isForced)
+            if (!isForced &&
+                !NicknameValidationUtils.ValidateNickname(attemptTarget, newNickname, API, Config, out string conflictingPlayer, out string conflictType))
             {
-                if (!NicknameValidationUtils.ValidateNickname(attemptTarget, newNickname, API, Config, out string conflictingPlayer, out string conflictType))
+                return new TextCommandResult
                 {
-                    return new TextCommandResult
-                    {
-                        Status = EnumCommandStatus.Error,
-                        StatusMessage = Lang.Get("thebasics:chat-nick-admin-conflict-warn", newNickname, conflictingPlayer, conflictType, attemptTarget.PlayerName),
-                    };
-                }
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = Lang.Get("thebasics:chat-nick-admin-conflict-warn", newNickname, conflictingPlayer, conflictType, attemptTarget.PlayerName),
+                };
             }
 
             attemptTarget.SetNickname(newNickname, Config);

@@ -1,3 +1,4 @@
+#pragma warning disable S1450 // Deferred input values bridge GUI element creation and post-compose value application.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -147,12 +148,7 @@ public class PlayerNotesDialog : GuiDialog
     private void ComposeDialog()
     {
         SingleComposer?.Dispose();
-        _titleInput = null;
-        _bodyInput = null;
-        _freeformInput = null;
-        _deferredTitleValue = null;
-        _deferredBodyValue = null;
-        _deferredFreeformValue = null;
+        ResetDeferredInputs();
 
         var top = GuiStyle.TitleBarHeight + 12;
         var leftWidth = 275;
@@ -177,16 +173,7 @@ public class PlayerNotesDialog : GuiDialog
             .AddInset(ElementBounds.Fixed(rightX, entriesY, rightWidth, EntryPanelHeight).FixedGrow(3).WithFixedOffset(-3, -3), 3)
             .AddInset(ElementBounds.Fixed(0, freeformY, ContentWidth, freeformHeight).FixedGrow(3).WithFixedOffset(-3, -3), 3);
 
-        if (!_view.Success)
-        {
-            AddRichtext(composer, VtmlUtils.EscapeVtml(_view.Message), ElementBounds.Fixed(10, entriesY + 12, ContentWidth - 20, 80));
-        }
-        else
-        {
-            AddNoteList(composer, 0, entriesY, leftWidth);
-            AddNoteEditor(composer, rightX, entriesY, rightWidth);
-            AddFreeformEditor(composer, 0, freeformY, ContentWidth, freeformHeight);
-        }
+        AddDialogContent(composer, entriesY, leftWidth, rightX, rightWidth, freeformY, freeformHeight);
 
         if (!string.IsNullOrWhiteSpace(statusMessage))
         {
@@ -199,6 +186,34 @@ public class PlayerNotesDialog : GuiDialog
             .AddSmallButton(Lang.Get("thebasics:notes-close"), OnCancel, ElementBounds.Fixed(ContentWidth - 125, buttonY, 110, 30));
 
         SingleComposer = composer.EndChildElements().Compose(focusFirstElement: false);
+        ApplyDeferredInputValues();
+    }
+
+    private void ResetDeferredInputs()
+    {
+        _titleInput = null;
+        _bodyInput = null;
+        _freeformInput = null;
+        _deferredTitleValue = null;
+        _deferredBodyValue = null;
+        _deferredFreeformValue = null;
+    }
+
+    private void AddDialogContent(GuiComposer composer, double entriesY, double leftWidth, double rightX, double rightWidth, double freeformY, double freeformHeight)
+    {
+        if (!_view.Success)
+        {
+            AddRichtext(composer, VtmlUtils.EscapeVtml(_view.Message), ElementBounds.Fixed(10, entriesY + 12, ContentWidth - 20, 80));
+            return;
+        }
+
+        AddNoteList(composer, 0, entriesY, leftWidth);
+        AddNoteEditor(composer, rightX, entriesY, rightWidth);
+        AddFreeformEditor(composer, 0, freeformY, ContentWidth, freeformHeight);
+    }
+
+    private void ApplyDeferredInputValues()
+    {
         if (_titleInput != null && _deferredTitleValue != null)
         {
             _titleInput.SetValue(_deferredTitleValue);
@@ -820,21 +835,31 @@ public class PlayerNotesDialog : GuiDialog
 
     private static PlayerNoteEntryMessage CloneNote(PlayerNoteEntryMessage note)
     {
-        return note == null ? new PlayerNoteEntryMessage() : new PlayerNoteEntryMessage
+        if (note == null)
         {
-            Id = note.Id ?? string.Empty,
-            Kind = note.Kind ?? string.Empty,
-            AuthorPlayerUid = note.AuthorPlayerUid ?? string.Empty,
-            AuthorName = note.AuthorName ?? string.Empty,
-            TargetPlayerUid = note.TargetPlayerUid ?? string.Empty,
-            TargetPlayerName = note.TargetPlayerName ?? string.Empty,
-            TargetCharacterId = note.TargetCharacterId ?? string.Empty,
-            TargetCharacterName = note.TargetCharacterName ?? string.Empty,
-            CreatedUtc = note.CreatedUtc ?? string.Empty,
-            UpdatedUtc = note.UpdatedUtc ?? string.Empty,
-            Title = note.Title ?? string.Empty,
-            Text = note.Text ?? string.Empty
+            return new PlayerNoteEntryMessage();
+        }
+
+        return new PlayerNoteEntryMessage
+        {
+            Id = EmptyIfNull(note.Id),
+            Kind = EmptyIfNull(note.Kind),
+            AuthorPlayerUid = EmptyIfNull(note.AuthorPlayerUid),
+            AuthorName = EmptyIfNull(note.AuthorName),
+            TargetPlayerUid = EmptyIfNull(note.TargetPlayerUid),
+            TargetPlayerName = EmptyIfNull(note.TargetPlayerName),
+            TargetCharacterId = EmptyIfNull(note.TargetCharacterId),
+            TargetCharacterName = EmptyIfNull(note.TargetCharacterName),
+            CreatedUtc = EmptyIfNull(note.CreatedUtc),
+            UpdatedUtc = EmptyIfNull(note.UpdatedUtc),
+            Title = EmptyIfNull(note.Title),
+            Text = EmptyIfNull(note.Text)
         };
+    }
+
+    private static string EmptyIfNull(string value)
+    {
+        return value ?? string.Empty;
     }
 
     private static AdminNoteLedgerMessage CloneLedger(AdminNoteLedgerMessage ledger)

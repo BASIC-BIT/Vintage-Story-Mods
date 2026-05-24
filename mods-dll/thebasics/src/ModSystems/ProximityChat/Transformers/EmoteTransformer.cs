@@ -39,56 +39,76 @@ public class EmoteTransformer : MessageTransformerBase
         {
             if (i % 2 == 0)
             {
-                // Narrative parts outside quotes
-                var narrative = splitMessage[i];
-                if (!string.IsNullOrEmpty(narrative))
-                {
-                    if (needsNameSeparator)
-                    {
-                        narrative = " " + narrative;
-                        needsNameSeparator = false;
-                    }
-
-                    builder.Append(ChatHelper.Color(narrative, ChatVisualPreferenceResolver.GetEmoteColor(context.ReceivingPlayer, _config)));
-                }
+                AppendNarrative(builder, splitMessage[i], context, ref needsNameSeparator);
             }
             else
             {
-                var text = splitMessage[i];
-
-                // Add quotes based on language type (or default quotes when languages are disabled)
-                var delimiters = _config.ChatDelimiters;
-                var quoteDelimiter = (languageEnabled && language == LanguageSystem.SignLanguage) ? delimiters.SignLanguageQuote : delimiters.Quote;
-
-                if (languageEnabled)
-                {
-                    _languageSystem.ProcessMessage(context.ReceivingPlayer, ref text, language);
-                }
-
-                text = $"{quoteDelimiter.Start}{text}{quoteDelimiter.End}";
-
-                if (needsNameSeparator)
-                {
-                    text = " " + text;
-                    needsNameSeparator = false;
-                }
-
-                if (languageEnabled)
-                {
-                    if (language == LanguageSystem.SignLanguage)
-                    {
-                        text = ChatHelper.Italic(text);
-                    }
-
-                    text = ChatVisualPreferenceResolver.FormatLanguageText(text, language, context.ReceivingPlayer);
-                }
-
-                builder.Append(text);
+                AppendQuotedSpeech(builder, splitMessage[i], language, languageEnabled, context, ref needsNameSeparator);
             }
         }
 
         context.Message = builder.ToString();
         return context;
+    }
+
+    private void AppendNarrative(StringBuilder builder, string narrative, MessageContext context, ref bool needsNameSeparator)
+    {
+        if (string.IsNullOrEmpty(narrative))
+        {
+            return;
+        }
+
+        if (needsNameSeparator)
+        {
+            narrative = " " + narrative;
+            needsNameSeparator = false;
+        }
+
+        builder.Append(ChatHelper.Color(narrative, ChatVisualPreferenceResolver.GetEmoteColor(context.ReceivingPlayer, _config)));
+    }
+
+    private void AppendQuotedSpeech(StringBuilder builder, string text, Language language, bool languageEnabled, MessageContext context, ref bool needsNameSeparator)
+    {
+        var delimiters = _config.ChatDelimiters;
+        var quoteDelimiter = languageEnabled && language == LanguageSystem.SignLanguage
+            ? delimiters.SignLanguageQuote
+            : delimiters.Quote;
+
+        if (languageEnabled)
+        {
+            _languageSystem.ProcessMessage(context.ReceivingPlayer, ref text, language);
+        }
+
+        text = $"{quoteDelimiter.Start}{text}{quoteDelimiter.End}";
+        text = PrefixSeparatorIfNeeded(text, ref needsNameSeparator);
+
+        if (languageEnabled)
+        {
+            text = FormatQuotedLanguageText(text, language, context);
+        }
+
+        builder.Append(text);
+    }
+
+    private static string PrefixSeparatorIfNeeded(string text, ref bool needsNameSeparator)
+    {
+        if (!needsNameSeparator)
+        {
+            return text;
+        }
+
+        needsNameSeparator = false;
+        return " " + text;
+    }
+
+    private static string FormatQuotedLanguageText(string text, Language language, MessageContext context)
+    {
+        if (language == LanguageSystem.SignLanguage)
+        {
+            text = ChatHelper.Italic(text);
+        }
+
+        return ChatVisualPreferenceResolver.FormatLanguageText(text, language, context.ReceivingPlayer);
     }
 
 }

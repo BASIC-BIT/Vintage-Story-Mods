@@ -193,35 +193,11 @@ namespace thebasics.Utilities
             {
                 if (i % 2 == 0)
                 {
-                    var narrative = splitMessage[i];
-                    if (!string.IsNullOrEmpty(narrative))
-                    {
-                        AppendProseNarrative(builder, narrative, config, nicknameReplacement);
-                    }
+                    AppendProseNarrative(builder, splitMessage[i], config, nicknameReplacement);
                 }
                 else
                 {
-                    var text = splitMessage[i];
-                    if (canUseLanguage && processQuotedText != null)
-                    {
-                        text = processQuotedText(text);
-                    }
-
-                    text = WrapSpeechQuotes(text, language, config, canUseLanguage);
-
-                    if (canUseLanguage && language == LanguageSystem.SignLanguage)
-                    {
-                        text = Italic(text);
-                    }
-
-                    if (canUseLanguage)
-                    {
-                        text = formatQuotedText != null
-                            ? formatQuotedText(text)
-                            : LangColor(text, language);
-                    }
-
-                    builder.Append(text);
+                    builder.Append(FormatProseQuotedText(splitMessage[i], language, config, canUseLanguage, processQuotedText, formatQuotedText));
                 }
             }
 
@@ -243,6 +219,11 @@ namespace thebasics.Utilities
 
         private static void AppendProseNarrative(StringBuilder builder, string narrative, ModConfig config, string nicknameReplacement)
         {
+            if (string.IsNullOrEmpty(narrative))
+            {
+                return;
+            }
+
             var token = config.ProseNicknameToken;
             if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(nicknameReplacement))
             {
@@ -267,6 +248,36 @@ namespace thebasics.Utilities
             {
                 builder.Append(Color(narrative[lastIndex..], config.EmoteColor));
             }
+        }
+
+        private static string FormatProseQuotedText(
+            string text,
+            Language language,
+            ModConfig config,
+            bool canUseLanguage,
+            Func<string, string> processQuotedText,
+            Func<string, string> formatQuotedText)
+        {
+            if (canUseLanguage && processQuotedText != null)
+            {
+                text = processQuotedText(text);
+            }
+
+            text = WrapSpeechQuotes(text, language, config, canUseLanguage);
+
+            if (!canUseLanguage)
+            {
+                return text;
+            }
+
+            if (language == LanguageSystem.SignLanguage)
+            {
+                text = Italic(text);
+            }
+
+            return formatQuotedText != null
+                ? formatQuotedText(text)
+                : LangColor(text, language);
         }
 
         // Escape user-provided nicknames to prevent VTML injection

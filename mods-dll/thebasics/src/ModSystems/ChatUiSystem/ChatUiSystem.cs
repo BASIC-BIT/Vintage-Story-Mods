@@ -1,3 +1,6 @@
+#pragma warning disable S1541 // Client UI orchestration is legacy integration glue; split in a dedicated refactor.
+#pragma warning disable S2696 // Static client state is required by Harmony patch callbacks and reset on Dispose.
+#pragma warning disable S3011 // Reflection accesses private Vintage Story UI state for compatibility patches.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -101,9 +104,6 @@ public class ChatUiSystem : ModSystem
     {
         base.StartClientSide(api);
         _api = api;
-        // _isInitialized = false;
-        // _initializationAttempts = 0;
-
         _rpttsApi = null;
         _rpttsChatSystem = null;
         _usingRptts = false;
@@ -125,8 +125,6 @@ public class ChatUiSystem : ModSystem
         // Register event handlers
         _api.Event.PlayerJoin += OnPlayerJoin;
         _api.Event.PlayerEntitySpawn += OnPlayerEntitySpawn;
-        // _api.Event.PlayerLeave += OnPlayerLeave;
-
         // Initialize Harmony patches if needed
         if (!Harmony.HasAnyPatches(Mod.Info.ModID))
         {
@@ -214,20 +212,6 @@ public class ChatUiSystem : ModSystem
         _safeNetworkChannel?.SendPacketSafely(request);
     }
 
-    // private void ApplyRenderer(Entity entity)
-    // {
-    //     if (entity is EntityPlayer entityPlayer)
-    //     {
-    //         var oldRenderer = entity.Properties.Client.Renderer;
-    //         var newRenderer = new RpTextEntityPlayerShapeRenderer(entity,_api);
-    //         entity.Properties.Client.Renderer = newRenderer;
-    //         entity.Properties.Client.RendererName = "TestPlayerShape";
-    //
-    //         oldRenderer.Dispose();
-    //         newRenderer.OnEntityLoaded();
-    //     }
-    // }
-
 
     // Queue an action to be executed once we have the config from server
     private static void QueueConfigAction(System.Action action)
@@ -265,7 +249,7 @@ public class ChatUiSystem : ModSystem
         _pendingConfigActions.Clear();
     }
 
-    private void OnPlayerJoin(IClientPlayer byPlayer)
+    private static void OnPlayerJoin(IClientPlayer byPlayer)
     {
         // Only send ready message when the local player joins, not when any player joins
         if (byPlayer.PlayerUID == _api.World.Player.PlayerUID)
@@ -727,7 +711,7 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        if (_characterSheetDialog?.IsOpened() != true || _characterSheetDialog.CanEditHeadshot != true)
+        if (_characterSheetDialog == null || !_characterSheetDialog.IsOpened() || !_characterSheetDialog.CanEditHeadshot)
         {
             return;
         }
@@ -935,7 +919,7 @@ public class ChatUiSystem : ModSystem
         _characterSheetMessageDialog.TryOpen();
     }
 
-    private void OnConfigAdminOpenMessage(TheBasicsConfigAdminOpenMessage message)
+    private static void OnConfigAdminOpenMessage(TheBasicsConfigAdminOpenMessage message)
     {
         if (message?.Config != null)
         {
@@ -947,7 +931,7 @@ public class ChatUiSystem : ModSystem
         OpenConfigAdminDialog();
     }
 
-    private void OnConfigAdminResultMessage(TheBasicsConfigAdminResultMessage message)
+    private static void OnConfigAdminResultMessage(TheBasicsConfigAdminResultMessage message)
     {
         if (message?.Config != null)
         {
@@ -1143,12 +1127,9 @@ public class ChatUiSystem : ModSystem
 
         if (values != null)
         {
-            foreach (var value in values)
+            foreach (var value in values.Where(value => !string.IsNullOrWhiteSpace(value?.Key)))
             {
-                if (!string.IsNullOrWhiteSpace(value?.Key))
-                {
-                    _configAdminDraft[value.Key] = value.Value ?? string.Empty;
-                }
+                _configAdminDraft[value.Key] = value.Value ?? string.Empty;
             }
         }
 
@@ -1184,9 +1165,8 @@ public class ChatUiSystem : ModSystem
 
     private static bool HasConfigAdminUnsavedChanges()
     {
-        foreach (var setting in ConfigAdminSettingRegistry.Settings)
+        foreach (var key in ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key))
         {
-            var key = setting.Key;
             _configAdminDraft.TryGetValue(key, out var draftValue);
             _configAdminLoadedDraft.TryGetValue(key, out var loadedValue);
             if (!string.Equals(draftValue ?? string.Empty, loadedValue ?? string.Empty, StringComparison.Ordinal))
@@ -1658,7 +1638,7 @@ public class ChatUiSystem : ModSystem
         return Lang.Get("thebasics:typingindicator-typing-text");
     }
 
-    private void OnServerConfigMessage(TheBasicsConfigMessage configMessage)
+    private static void OnServerConfigMessage(TheBasicsConfigMessage configMessage)
     {
         try
         {
@@ -1789,7 +1769,7 @@ public class ChatUiSystem : ModSystem
 
         try
         {
-            ((dynamic)_rpttsChatSystem).OverwriteChatSubscription(false);
+            _rpttsChatSystem.OverwriteChatSubscription(false);
             _rpttsExplicitModeApplied = true;
         }
         catch (System.Exception ex)
@@ -2004,8 +1984,15 @@ public class ChatUiSystem : ModSystem
 
         try
         {
-            int targetGroupId = (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null) ? _lastSelectedGroupId.Value :
-            (_config.ProximityChatAsDefault && _proximityGroupId != null) ? _proximityGroupId.Value : GlobalConstants.GeneralChatGroup;
+            var targetGroupId = GlobalConstants.GeneralChatGroup;
+            if (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null)
+            {
+                targetGroupId = _lastSelectedGroupId.Value;
+            }
+            else if (_config.ProximityChatAsDefault && _proximityGroupId != null)
+            {
+                targetGroupId = _proximityGroupId.Value;
+            }
 
             // Get the tab index for the target group
             System.Reflection.MethodInfo tabIndexMethod = typeof(HudDialogChat).GetMethod("tabIndexByGroupId",
@@ -2065,59 +2052,6 @@ public class ChatUiSystem : ModSystem
         }
     }
 
-    // [HarmonyPrefix]
-    // [HarmonyPatch(typeof(EntityShapeRenderer), "OnChatMessage")]
-    // protected static bool OnChatMessage(EntityPlayerShapeRenderer __instance, int groupId, string message,
-    //     EnumChatType chattype, string data)
-    // {
-    //     if (!(__instance.entity is EntityPlayer))
-    //     {
-    //         return true;
-    //     }
-    //
-    //     if (data == null || !data.Contains("from:") ||
-    //         __instance.entity.Pos.SquareDistanceTo(__instance.capi.World.Player.Entity.Pos.XYZ) >= 400.0 ||
-    //         message.Length <= 0)
-    //         return false;
-    //     string[] strArray1 = data.Split(new char[1] { ',' }, 2);
-    //     if (strArray1.Length < 2)
-    //         return false;
-    //     string[] strArray2 = strArray1[0].Split(new char[1]
-    //     {
-    //         ':'
-    //     }, 2);
-    //     string[] strArray3 = strArray1[1].Split(new char[1]
-    //     {
-    //         ':'
-    //     }, 2);
-    //     if (strArray2[0] != "from")
-    //         return false;
-    //     int result;
-    //     int.TryParse(strArray2[1], out result);
-    //     if (__instance.entity.EntityId != (long)result)
-    //         return false;
-    //     message = strArray3[1];
-    //     message = message.Replace("&lt;", "<").Replace("&gt;", ">");
-    //     LoadedTexture loadedTexture = __instance.capi.Gui.TextTexture.GenTextTexture(message,
-    //         new CairoFont(25.0, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble), 350, new TextBackground()
-    //         {
-    //             FillColor = GuiStyle.DialogLightBgColor,
-    //             Padding = 100,
-    //             Radius = GuiStyle.ElementBGRadius
-    //         }, EnumTextOrientation.Center);
-    //     var messageTexturesField = __instance.GetType()
-    //         .GetField("messageTextures", BindingFlags.NonPublic | BindingFlags.Instance);
-    //     var messageTextures = (List<MessageTexture>)messageTexturesField.GetValue(__instance);
-    //     messageTextures.Insert(0, new MessageTexture()
-    //     {
-    //         tex = loadedTexture,
-    //         message = message,
-    //         receivedTime = __instance.capi.World.ElapsedMilliseconds
-    //     });
-    //
-    //     return false;
-    // }
-
     public override void Dispose()
     {
         try
@@ -2126,6 +2060,12 @@ public class ChatUiSystem : ModSystem
             {
                 _api.Event.PlayerJoin -= OnPlayerJoin;
                 _api.Event.PlayerEntitySpawn -= OnPlayerEntitySpawn;
+                if (_headshotFileDropSubscribed)
+                {
+                    _api.Event.FileDrop -= _headshotFileDropHandler ?? OnFileDropped;
+                    _headshotFileDropHandler = null;
+                    _headshotFileDropSubscribed = false;
+                }
                 _typingIndicatorRenderer?.Dispose();
                 _typingIndicatorRenderer = null;
                 _placedBubbleRenderer?.Dispose();

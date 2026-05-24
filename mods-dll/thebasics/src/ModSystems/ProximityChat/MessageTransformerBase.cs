@@ -7,7 +7,7 @@ public abstract class MessageTransformerBase : IMessageTransformer
     protected readonly RPProximityChatSystem _chatSystem;
     protected readonly ModConfig _config;
 
-    public MessageTransformerBase(RPProximityChatSystem chatSystem)
+    protected MessageTransformerBase(RPProximityChatSystem chatSystem)
     {
         _chatSystem = chatSystem;
         _config = chatSystem.Config;
