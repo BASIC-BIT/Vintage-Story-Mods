@@ -16,12 +16,11 @@ namespace thaumstory
             entity.Damage = 0;
             var SPEEEEED = 0.4f;
             var SHOT_HEIGHT = 0.87f;
-            Vec3d vec3d = byEntity.ServerPos.XYZ.Add(0.0, byEntity.LocalEyePos.Y, 0.0);
-            Vec3d pos = (vec3d.AheadCopy(0.5, (double)byEntity.SidedPos.Pitch, (double)byEntity.SidedPos.Yaw) - vec3d) *
+            Vec3d vec3d = byEntity.Pos.XYZ.Add(0.0, byEntity.LocalEyePos.Y, 0.0);
+            Vec3d pos = (vec3d.AheadCopy(0.5, byEntity.Pos.Pitch, byEntity.Pos.Yaw) - vec3d) *
                         SPEEEEED;
-            entity.ServerPos.SetPos(byEntity.SidedPos.AheadCopy(0.1).XYZ.Add(0.0, byEntity.LocalEyePos.Y * SHOT_HEIGHT, 0.0));
-            entity.ServerPos.Motion.Set(pos);
-            entity.Pos.SetFrom(entity.ServerPos);
+            entity.Pos.SetPos(byEntity.Pos.AheadCopy(0.1).XYZ.Add(0.0, byEntity.LocalEyePos.Y * SHOT_HEIGHT, 0.0));
+            entity.Pos.Motion.Set(pos);
             entity.World = byEntity.World;
             entity.SetInitialRotation();
             byEntity.World.SpawnEntity(entity);

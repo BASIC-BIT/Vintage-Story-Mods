@@ -37,7 +37,7 @@ namespace makersmark
             {
                 this.config = api.LoadModConfig<ModConfig>(CONFIGNAME);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 api.Server.LogError("Thaumstory: Failed to load mod config!");
                 return;
