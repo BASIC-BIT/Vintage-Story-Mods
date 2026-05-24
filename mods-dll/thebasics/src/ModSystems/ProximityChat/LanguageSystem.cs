@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using thebasics.Configs;
 using thebasics.Extensions;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
@@ -126,6 +127,9 @@ namespace thebasics.ModSystems.ProximityChat
                 player.SetDefaultLanguage(lang);
             }
 
+            AnalyticsService.TrackCommandUsed("addlang", true);
+            AnalyticsService.TrackFeatureUsed("language", "add");
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -178,6 +182,9 @@ namespace thebasics.ModSystems.ProximityChat
                 }
             }
 
+            AnalyticsService.TrackCommandUsed("removelang", true);
+            AnalyticsService.TrackFeatureUsed("language", "remove");
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -202,6 +209,9 @@ namespace thebasics.ModSystems.ProximityChat
                 var unknownList = string.Join("\n  ", unknown.Select(lang => ChatHelper.LangIdentifierWithDescription(lang, player)));
                 message += "\n" + Lang.Get("thebasics:lang-list-unknown", "\n  " + unknownList);
             }
+
+            AnalyticsService.TrackCommandUsed("listlang", true);
+            AnalyticsService.TrackFeatureUsed("language", "list");
 
             return new TextCommandResult
             {
@@ -254,6 +264,9 @@ namespace thebasics.ModSystems.ProximityChat
             {
                 statusMessage += "\n" + Lang.Get("thebasics:lang-warning-admin-over-max-languages", targetPlayer.PlayerName, targetPlayer.GetLanguages().Count, Config.MaxLanguagesPerPlayer);
             }
+
+            AnalyticsService.TrackCommandUsed("adminaddlang", true);
+            AnalyticsService.TrackFeatureUsed("language", "admin_add");
 
             return new TextCommandResult
             {
@@ -309,6 +322,9 @@ namespace thebasics.ModSystems.ProximityChat
                 }
             }
 
+            AnalyticsService.TrackCommandUsed("adminremovelang", true);
+            AnalyticsService.TrackFeatureUsed("language", "admin_remove");
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -321,6 +337,8 @@ namespace thebasics.ModSystems.ProximityChat
             var targetPlayer = API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid);
             var player = GetCallerPlayer(args);
             var languages = GetPlayerLanguages(targetPlayer);
+            AnalyticsService.TrackCommandUsed("adminlistlang", true);
+            AnalyticsService.TrackFeatureUsed("language", "admin_list");
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,

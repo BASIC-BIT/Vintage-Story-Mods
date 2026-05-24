@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using thebasics.Extensions;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.TPA.Models;
 using thebasics.Utilities.Parsers;
 using Vintagestory.API.Common;
@@ -425,6 +426,8 @@ namespace thebasics.ModSystems.TPA
 
             if (targetPlayer == null)
             {
+                AnalyticsService.TrackCommandUsed(type == TpaRequestType.Goto ? "tpa" : "tpahere", false, "target_not_found");
+                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "target_not_found");
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
@@ -443,6 +446,7 @@ namespace thebasics.ModSystems.TPA
             {
                 if (!IsPlayerHoldingTemporalGear(player))
                 {
+                    AnalyticsService.TrackFeatureUsed("tpa", "request", false, "missing_temporal_gear");
                     return new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
@@ -456,6 +460,8 @@ namespace thebasics.ModSystems.TPA
             {
                 var hoursString = Config.TpaCooldownInGameHours.ToString("0.##");
 
+                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "cooldown");
+
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
@@ -466,6 +472,7 @@ namespace thebasics.ModSystems.TPA
             // Validate self-teleport prevention
             if (targetPlayer.PlayerUID == player.PlayerUID)
             {
+                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "self_teleport");
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
@@ -476,6 +483,7 @@ namespace thebasics.ModSystems.TPA
             // Validate target player permissions
             if (!targetPlayer.GetTpAllowed())
             {
+                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "target_disabled");
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
@@ -500,6 +508,8 @@ namespace thebasics.ModSystems.TPA
                     ? Lang.Get("thebasics:tpa-error-existing-request-goto")
                     : Lang.Get("thebasics:tpa-error-existing-request-bring");
 
+                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "existing_request");
+
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
@@ -512,6 +522,7 @@ namespace thebasics.ModSystems.TPA
             {
                 if (!RemoveTemporalGear(player))
                 {
+                    AnalyticsService.TrackFeatureUsed("tpa", "request", false, "consume_gear_failed");
                     return new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
@@ -561,6 +572,9 @@ namespace thebasics.ModSystems.TPA
             // Store request only on the requester (single source of truth)
             player.SetOutgoingTpaRequest(request);
             player.SetTpaTime(API.World.Calendar);
+
+            AnalyticsService.TrackCommandUsed(type == TpaRequestType.Goto ? "tpa" : "tpahere", true);
+            AnalyticsService.TrackFeatureUsed("tpa", type == TpaRequestType.Goto ? "request_goto" : "request_bring");
 
             return new TextCommandResult
             {
@@ -659,6 +673,9 @@ namespace thebasics.ModSystems.TPA
             // Teleport was successful - clear the outgoing request since gear was used properly
             targetPlayer.ClearOutgoingTpaRequest();
 
+            AnalyticsService.TrackCommandUsed("tpaccept", true);
+            AnalyticsService.TrackFeatureUsed("tpa", "accept");
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -680,6 +697,9 @@ namespace thebasics.ModSystems.TPA
             // Use the centralized method to handle the denial
             ExpireOrCancelTpaRequest(targetPlayer, request, TpaExpireReason.Denied);
 
+            AnalyticsService.TrackCommandUsed("tpdeny", true);
+            AnalyticsService.TrackFeatureUsed("tpa", "deny");
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -693,6 +713,8 @@ namespace thebasics.ModSystems.TPA
             var player = args.Caller.Player as IServerPlayer;
 
             player.SetTpAllowed(value);
+            AnalyticsService.TrackCommandUsed("tpallow", true);
+            AnalyticsService.TrackFeatureUsed("tpa", value ? "allow_incoming" : "disallow_incoming");
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -727,6 +749,9 @@ namespace thebasics.ModSystems.TPA
                 ? Lang.Get("thebasics:tpa-success-cleared-one")
                 : Lang.Get("thebasics:tpa-success-cleared-many", allRequests.Count);
 
+            AnalyticsService.TrackCommandUsed("cleartpa", true);
+            AnalyticsService.TrackFeatureUsed("tpa", "clear_incoming");
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -756,6 +781,9 @@ namespace thebasics.ModSystems.TPA
 
             // Use the centralized method to handle the cancellation
             ExpireOrCancelTpaRequest(player, outgoingRequest, TpaExpireReason.Cancelled, targetPlayer);
+
+            AnalyticsService.TrackCommandUsed("tpacancel", true);
+            AnalyticsService.TrackFeatureUsed("tpa", "cancel");
 
             // Notify the target player if they're online
             if (targetPlayer != null)
@@ -820,6 +848,9 @@ namespace thebasics.ModSystems.TPA
             }
 
             requestList.AppendLine(Lang.Get("thebasics:tpa-list-footer"));
+
+            AnalyticsService.TrackCommandUsed("tpalist", true);
+            AnalyticsService.TrackFeatureUsed("tpa", "list");
 
             return new TextCommandResult
             {

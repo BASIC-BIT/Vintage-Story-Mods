@@ -1,0 +1,5 @@
+tf_state_bucket        = "replace-with-thebasics-analytics-terraform-state-bucket"
+tf_state_kms_key_arn   = "replace-with-backend-kms-key-arn"
+aws_terraform_role_arn = "replace-with-github-actions-role-arn"
+# Optional until Cloudflare credentials are available.
+# cloudflare_account_id = "replace-with-cloudflare-account-id"

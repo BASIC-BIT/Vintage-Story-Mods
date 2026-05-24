@@ -19,6 +19,10 @@ Contributions are welcome. Please feel free to:
 
 Join the [Discord server](https://discord.gg/PYKTaJ5Ett) for support and updates.
 
+## Infrastructure
+
+Public-facing infrastructure for The BASICs lives under `infra/`. The analytics relay Terraform uses an encrypted S3 backend pattern so deployment state and secret bindings are not stored in the public repository.
+
 ## Acknowledgments
 
 Special thanks to the Vintage Story community and the servers that have helped test and improve this mod.

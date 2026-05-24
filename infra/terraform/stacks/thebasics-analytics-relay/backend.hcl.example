@@ -1,0 +1,6 @@
+bucket       = "replace-with-thebasics-analytics-terraform-state-bucket"
+key          = "thebasics-analytics/prod/terraform.tfstate"
+region       = "us-east-2"
+kms_key_id   = "replace-with-backend-kms-key-arn"
+encrypt      = true
+use_lockfile = true
