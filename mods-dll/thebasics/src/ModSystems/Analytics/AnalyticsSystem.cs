@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using thebasics.Configs;
+using thebasics.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -10,15 +11,21 @@ namespace thebasics.ModSystems.Analytics;
 
 public class AnalyticsSystem : BaseBasicModSystem
 {
+    public const string AnalyticsChannelName = "thebasicsanalytics";
     private const string AnalyticsConfigName = "the_basics_analytics.json";
     private const string AnalyticsCommand = "basicsanalytics";
+    private const int ConsentPromptDelayMs = 3000;
+    private const int ConsentPromptMaxAttempts = 10;
 
     private AnalyticsConfig _analyticsConfig;
+    private IServerNetworkChannel _analyticsChannel;
     private long _flushListenerId;
+    private readonly HashSet<string> _analyticsReadyPlayers = new();
 
     protected override void BasicStartServerSide()
     {
         _analyticsConfig = LoadAnalyticsConfig();
+        RegisterNetworkChannel();
         ConfigureAnalyticsSink();
         RegisterCommands();
         HookEvents();
@@ -59,6 +66,7 @@ public class AnalyticsSystem : BaseBasicModSystem
         if (API?.Event != null)
         {
             API.Event.PlayerJoin -= OnPlayerJoin;
+            API.Event.PlayerDisconnect -= OnPlayerDisconnect;
         }
 
         AnalyticsService.Shutdown();
@@ -120,9 +128,21 @@ public class AnalyticsSystem : BaseBasicModSystem
             .HandleWith(HandleAnalyticsCommand);
     }
 
+    private void RegisterNetworkChannel()
+    {
+        _analyticsChannel = API.Network.RegisterChannel(AnalyticsChannelName)
+            .RegisterMessageType<AnalyticsClientReadyMessage>()
+            .RegisterMessageType<AnalyticsConsentPromptMessage>()
+            .RegisterMessageType<AnalyticsConsentChoiceMessage>()
+            .RegisterMessageType<AnalyticsConsentResultMessage>()
+            .SetMessageHandler<AnalyticsClientReadyMessage>(OnClientReadyMessage)
+            .SetMessageHandler<AnalyticsConsentChoiceMessage>(OnConsentChoiceMessage);
+    }
+
     private void HookEvents()
     {
         API.Event.PlayerJoin += OnPlayerJoin;
+        API.Event.PlayerDisconnect += OnPlayerDisconnect;
     }
 
     private TextCommandResult HandleAnalyticsCommand(TextCommandCallingArgs args)
@@ -178,7 +198,8 @@ public class AnalyticsSystem : BaseBasicModSystem
 
     private TextCommandResult SendConsentPrompt(IServerPlayer player)
     {
-        SendConsentPromptMessages(player);
+        SendConsentPromptSurface(player);
+        MarkConsentPromptSent();
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -188,33 +209,72 @@ public class AnalyticsSystem : BaseBasicModSystem
 
     private void OnPlayerJoin(IServerPlayer player)
     {
-        if (!ShouldPrompt(player))
+        if (!ShouldQueueConsentPrompt(player))
         {
             return;
         }
 
-        _analyticsConfig.LastPromptUtc = DateTime.UtcNow.ToString("O");
-        StoreAnalyticsConfig();
+        QueueConsentPrompt(player, ConsentPromptMaxAttempts);
+    }
 
-        API.Event.RegisterCallback(_ =>
+    private void QueueConsentPrompt(IServerPlayer player, int attemptsRemaining)
+    {
+        API.Event.RegisterCallback(_ => TrySendQueuedConsentPrompt(player, attemptsRemaining), ConsentPromptDelayMs);
+    }
+
+    private void TrySendQueuedConsentPrompt(IServerPlayer player, int attemptsRemaining)
+    {
+        try
         {
-            try
+            if (!ShouldQueueConsentPrompt(player))
             {
-                if (player.ConnectionState == EnumClientState.Playing)
+                return;
+            }
+
+            if (!IsConsentPromptDue())
+            {
+                return;
+            }
+
+            if (player.ConnectionState == EnumClientState.Playing && player.HasPrivilege(Privilege.root))
+            {
+                if (IsClientReadyForAnalytics(player))
+                {
+                    SendConsentPromptSurface(player);
+                    MarkConsentPromptSent();
+                    return;
+                }
+
+                if (attemptsRemaining <= 1)
                 {
                     SendConsentPromptMessages(player);
+                    MarkConsentPromptSent();
+                    return;
                 }
+
+                QueueConsentPrompt(player, attemptsRemaining - 1);
+                return;
             }
-            catch
+
+            if (attemptsRemaining > 1)
             {
-                // Player may have disconnected during the delayed prompt.
+                QueueConsentPrompt(player, attemptsRemaining - 1);
             }
-        }, 3000);
+        }
+        catch
+        {
+            // Player may have disconnected during the delayed prompt.
+        }
     }
 
     private bool ShouldPrompt(IServerPlayer player)
     {
-        if (player == null || !_analyticsConfig.PromptAdminsToOptIn || !_analyticsConfig.RequiresConsentChoice())
+        if (!ShouldQueueConsentPrompt(player))
+        {
+            return false;
+        }
+
+        if (player.ConnectionState != EnumClientState.Playing)
         {
             return false;
         }
@@ -224,6 +284,48 @@ public class AnalyticsSystem : BaseBasicModSystem
             return false;
         }
 
+        return IsConsentPromptDue();
+    }
+
+    private void OnClientReadyMessage(IServerPlayer player, AnalyticsClientReadyMessage message)
+    {
+        if (!string.IsNullOrWhiteSpace(player?.PlayerUID))
+        {
+            _analyticsReadyPlayers.Add(player.PlayerUID);
+        }
+
+        if (!ShouldPrompt(player))
+        {
+            return;
+        }
+
+        SendConsentPromptSurface(player);
+        MarkConsentPromptSent();
+    }
+
+    private void OnPlayerDisconnect(IServerPlayer player)
+    {
+        if (!string.IsNullOrWhiteSpace(player?.PlayerUID))
+        {
+            _analyticsReadyPlayers.Remove(player.PlayerUID);
+        }
+    }
+
+    private bool ShouldQueueConsentPrompt(IServerPlayer player)
+    {
+        return player != null &&
+               _analyticsConfig.PromptAdminsToOptIn &&
+               _analyticsConfig.RequiresConsentChoice();
+    }
+
+    private bool IsClientReadyForAnalytics(IServerPlayer player)
+    {
+        return !string.IsNullOrWhiteSpace(player?.PlayerUID) &&
+               _analyticsReadyPlayers.Contains(player.PlayerUID);
+    }
+
+    private bool IsConsentPromptDue()
+    {
         if (!DateTime.TryParse(_analyticsConfig.LastPromptUtc, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var lastPromptUtc))
         {
             return true;
@@ -252,6 +354,70 @@ public class AnalyticsSystem : BaseBasicModSystem
         player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:analytics-consent-prompt-intro"), EnumChatType.Notification);
         player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:analytics-consent-prompt-privacy"), EnumChatType.Notification);
         player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:analytics-consent-prompt-actions", AnalyticsCommand), EnumChatType.Notification);
+    }
+
+    private void SendConsentPromptSurface(IServerPlayer player)
+    {
+        try
+        {
+            _analyticsChannel?.SendPacket(new AnalyticsConsentPromptMessage
+            {
+                CurrentConsentLevel = _analyticsConfig.ConsentLevel,
+                ConsentVersion = AnalyticsConsentLevels.CurrentConsentVersion,
+                CommandName = AnalyticsCommand
+            }, player);
+        }
+        catch
+        {
+            SendConsentPromptMessages(player);
+        }
+    }
+
+    private void OnConsentChoiceMessage(IServerPlayer player, AnalyticsConsentChoiceMessage message)
+    {
+        if (player?.HasPrivilege(Privilege.root) != true)
+        {
+            SendConsentResult(player, false, Lang.Get("thebasics:analytics-consent-error-not-root"), _analyticsConfig.ConsentLevel);
+            return;
+        }
+
+        var consentLevel = AnalyticsConsentLevels.Normalize(message?.ConsentLevel);
+        if (consentLevel == AnalyticsConsentLevels.Unknown)
+        {
+            SendConsentResult(player, false, Lang.Get("thebasics:analytics-consent-error-invalid"), _analyticsConfig.ConsentLevel);
+            return;
+        }
+
+        var result = SetConsent(consentLevel);
+        SendConsentResult(player, result.Status == EnumCommandStatus.Success, result.StatusMessage, _analyticsConfig.ConsentLevel);
+    }
+
+    private void SendConsentResult(IServerPlayer player, bool success, string message, string consentLevel)
+    {
+        if (player == null)
+        {
+            return;
+        }
+
+        try
+        {
+            _analyticsChannel?.SendPacket(new AnalyticsConsentResultMessage
+            {
+                Success = success,
+                Message = message,
+                ConsentLevel = consentLevel
+            }, player);
+        }
+        catch
+        {
+            player.SendMessage(GlobalConstants.CurrentChatGroup, message, EnumChatType.Notification);
+        }
+    }
+
+    private void MarkConsentPromptSent()
+    {
+        _analyticsConfig.LastPromptUtc = DateTime.UtcNow.ToString("O");
+        StoreAnalyticsConfig();
     }
 
     private string BuildStatusMessage()

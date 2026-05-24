@@ -33,25 +33,37 @@ public static class AnalyticsService
         }
     }
 
-    public static void TrackCommandUsed(string commandName, bool success, string result = null)
+    public static void TrackCommandUsed(string commandName, bool success, string result = null, IDictionary<string, object> properties = null)
     {
-        Track("command used", new Dictionary<string, object>
+        var eventProperties = new Dictionary<string, object>
         {
             ["command_name"] = commandName,
             ["success"] = success,
             ["result"] = result ?? (success ? "success" : "failure")
-        });
+        };
+        AddProperties(eventProperties, properties);
+        Track("command used", eventProperties);
     }
 
-    public static void TrackFeatureUsed(string featureName, string action = null, bool success = true, string result = null)
+    public static void TrackFeatureUsed(string featureName, string action = null, bool success = true, string result = null, IDictionary<string, object> properties = null)
     {
-        Track("feature used", new Dictionary<string, object>
+        var eventProperties = new Dictionary<string, object>
         {
             ["feature_name"] = featureName,
             ["action"] = action ?? "used",
             ["success"] = success,
             ["result"] = result ?? (success ? "success" : "failure")
-        });
+        };
+        AddProperties(eventProperties, properties);
+        Track("feature used", eventProperties);
+    }
+
+    public static IDictionary<string, object> ChatProperties(string chatType)
+    {
+        return new Dictionary<string, object>
+        {
+            ["chat_type"] = chatType
+        };
     }
 
     public static void TrackConfigSnapshot(ModConfig config)
@@ -105,5 +117,18 @@ public static class AnalyticsService
     public static void Shutdown()
     {
         Configure(NoopAnalyticsSink.Instance);
+    }
+
+    private static void AddProperties(Dictionary<string, object> eventProperties, IDictionary<string, object> properties)
+    {
+        if (properties == null)
+        {
+            return;
+        }
+
+        foreach (var property in properties)
+        {
+            eventProperties[property.Key] = property.Value;
+        }
     }
 }

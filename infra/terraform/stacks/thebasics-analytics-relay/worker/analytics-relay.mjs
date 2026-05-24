@@ -25,6 +25,7 @@ const ALLOWED_PROPERTIES = new Set([
   "allow_player_tpa",
   "analytics_consent_level",
   "attribute_freeform_messages_to_player_name",
+  "chat_type",
   "command_name",
   "disable_nicknames",
   "disable_rp_chat",
@@ -106,6 +107,7 @@ const ALLOWED_STRING_VALUES = new Map([
     "view_own",
   ])],
   ["analytics_consent_level", new Set(["server", "personalized"])],
+  ["chat_type", new Set(["chat_tab", "envhere", "gooc", "it", "me", "normal", "ooc", "whisper", "yell"])],
   ["command_name", new Set([
     "addlang",
     "adminaddlang",
