@@ -234,6 +234,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             .WithRootAlias("tb")
             .WithRootAlias("basic")
             .WithDescription(Lang.Get("thebasics:thebasics-cmd-desc"))
+            .RequiresPrivilege(Privilege.chat)
             .BeginSubCommand("help")
                 .WithAlias("commands")
                 .WithDescription(Lang.Get("thebasics:thebasics-cmd-help-desc"))
