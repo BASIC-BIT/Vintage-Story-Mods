@@ -8,6 +8,7 @@ public class LanguageAssetTests
 {
     private static readonly Regex RawVtmlTagRegex = new("<[^>]+>", RegexOptions.CultureInvariant);
 
+    // Excludes intentional VTML link strings such as thebasics-guide-link; this set is only for plain chat text.
     private static readonly string[] PlainChatKeys =
     [
         "thebasics-help",

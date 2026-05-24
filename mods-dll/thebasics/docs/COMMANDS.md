@@ -3,6 +3,10 @@
 Use `/thebasics help`, `/basic help`, or `/tb help` in game for a short command summary.
 Use `/thebasics guide` or press `H` and choose The BASICs in the handbook for the in-game guide.
 
+## Localization Note
+
+New guide/help strings in non-English locale files intentionally use English fallback text until human translations are available.
+
 ## Player Commands
 
 - `/me`, `/it`, `/envhere`, `/ooc`, `/gooc`, `/say`, `/yell`, `/whisper` - RP chat commands.
