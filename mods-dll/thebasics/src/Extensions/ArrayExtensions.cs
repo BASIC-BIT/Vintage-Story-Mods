@@ -11,7 +11,7 @@ public static class ArrayExtensions
     {
         if (items.Length == 0)
         {
-            throw new ArgumentException();
+            throw new ArgumentException("Array must contain at least one element.", nameof(items));
         }
 
         if (items.Length == 1)
@@ -26,7 +26,7 @@ public static class ArrayExtensions
     {
         if (items.Length == 0)
         {
-            throw new ArgumentException();
+            throw new ArgumentException("Array must contain at least one element.", nameof(items));
         }
 
         if (items.Length == 1)

@@ -42,143 +42,7 @@ public static class SpeechBubbleVtmlPatches
 
         try
         {
-            Entity entity = __instance.entity;
-            ICoreClientAPI capi = __instance.capi;
-
-            if (capi == null || entity == null)
-            {
-                return true;
-            }
-
-            var localPlayerEntity = capi.World?.Player?.Entity;
-            if (localPlayerEntity == null)
-            {
-                return true;
-            }
-
-            // Vanilla uses 400 sq (20 blocks). We raise to 10000 sq (100 blocks) so bubbles
-            // can appear at the full yell range (90 blocks). The server already gates by chat
-            // range, so this is just a safety cap.
-            if (data == null || !data.Contains("from:") || entity.Pos.SquareDistanceTo(localPlayerEntity.Pos.XYZ) >= 10000.0 || message.Length <= 0)
-            {
-                return true;
-            }
-
-            string[] parts = data.Split(new char[1] { ',' }, 2);
-            if (parts.Length < 2)
-            {
-                return true;
-            }
-
-            string[] partone = parts[0].Split(new char[1] { ':' }, 2);
-            string[] parttwo = parts[1].Split(new char[1] { ':' }, 2);
-            if (partone.Length < 2 || parttwo.Length < 2)
-            {
-                return true;
-            }
-
-            if (partone[0] != "from")
-            {
-                return true;
-            }
-
-            // Validate the second segment is a message payload (starts with "msg").
-            // Other payload types (if any) should not be treated as bubble text.
-            if (!parttwo[0].StartsWith("msg", StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            int.TryParse(partone[1], out var entityid);
-            if (entity.EntityId != entityid)
-            {
-                return true;
-            }
-
-            // Bubble text comes from the data payload.
-            // The server encodes markers in the key segment (before ':') using unit separator:
-            //   from:<id>,msg\u001fkind=<emote|env|ooc>\u001fmode=<yell|whisper>:<text>
-            // Legacy suffix format in the value is also supported for kind.
-            var rawMsg = parttwo[1];
-            string kind = null;
-            string mode = null;
-
-            // Parse markers from the key segment (preferred format).
-            var keySegment = parttwo[0];
-            kind = ExtractMarker(keySegment, "\u001fkind=");
-            mode = ExtractMarker(keySegment, "\u001fmode=");
-
-            // Legacy suffix format for kind (kept for safety).
-            if (kind == null)
-            {
-                const string kindValueMarker = "\u001fkind:";
-                var valueKindIndex = rawMsg.LastIndexOf(kindValueMarker, StringComparison.Ordinal);
-                if (valueKindIndex >= 0)
-                {
-                    kind = rawMsg[(valueKindIndex + kindValueMarker.Length)..].Trim();
-                    rawMsg = rawMsg[..valueKindIndex];
-                }
-            }
-
-            var bubbleVtml = rawMsg;
-            bubbleVtml = VtmlUtils.UnescapeRenderableVtmlTags(bubbleVtml);
-
-            var hasVtml = bubbleVtml.Contains('<');
-            // If there are no tags, no kind, and no mode marker, vanilla rendering is fine.
-            if (!hasVtml && kind == null && mode == null)
-            {
-                return true;
-            }
-
-            var background = GetBubbleBackground(kind);
-
-            var fontColor = GetBubbleFontColor();
-
-            // Scale bubble font size by chat mode: yell is larger, whisper is smaller.
-            var baseFontSize = 25.0;
-            var fontSizeMultiplier = mode switch
-            {
-                "yell" => 1.3,
-                "whisper" => 0.75,
-                _ => 1.0
-            };
-            var fontSize = baseFontSize * fontSizeMultiplier;
-
-            var baseFont = new CairoFont(fontSize, GuiStyle.StandardFontName, fontColor)
-            {
-                // Left-align to avoid GuiElementRichtext positioning errors at inline
-                // tag boundaries (bold/color transitions) that occur with Center alignment.
-                Orientation = EnumTextOrientation.Left
-            };
-
-            // Always attempt richtext rendering here (even for plain text) so we can apply
-            // consistent sizing. Nametag spacing is handled at render time by
-            // SpeechBubbleRenderPatches (no transparent margin baked into the texture).
-            var tex = RichTextTextureUtils.GenRichTextTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background);
-            if (tex == null)
-            {
-                // Fallback: strip tags and let vanilla-esque plain rendering handle it.
-                var plain = VtmlUtils.StripVtmlTags(bubbleVtml, capi.Logger);
-                tex = capi.Gui.TextTexture.GenTextTexture(plain, baseFont, BubbleMaxTextWidthPx, background, EnumTextOrientation.Center);
-            }
-
-            var plainForTimer = VtmlUtils.StripVtmlTags(bubbleVtml, capi.Logger);
-            var nowMs = capi.World.ElapsedMilliseconds;
-            var receivedTime = CalculateReceivedTimeForMinimumDuration(
-                nowMs,
-                plainForTimer.Length,
-                ChatUiSystem.GetSpeechBubbleMinimumDisplayMilliseconds());
-
-            var list = MessageTexturesRef(__instance);
-            list.Insert(0, new MessageTexture
-            {
-                tex = tex,
-                message = plainForTimer,
-                receivedTime = receivedTime
-            });
-
-            // We handled it.
-            return false;
+            return HandleSpeechBubble(__instance, message, data);
         }
         catch
         {
@@ -193,6 +57,160 @@ public static class SpeechBubbleVtmlPatches
                 PerfStats.Record(__instance?.capi, "EntityShapeRenderer.OnChatMessage (bubble)", startTicks, PerfStats.Timestamp());
             }
         }
+    }
+
+    private static bool HandleSpeechBubble(EntityShapeRenderer renderer, string message, string data)
+    {
+        if (!TryGetBubbleContext(renderer, message, data, out var entity, out var capi))
+        {
+            return true;
+        }
+
+        if (!TryExtractBubblePayload(data, entity.EntityId, out var rawMsg, out var kind, out var mode))
+        {
+            return true;
+        }
+
+        var bubbleVtml = VtmlUtils.UnescapeRenderableVtmlTags(rawMsg);
+        if (!RequiresCustomBubbleRendering(bubbleVtml, kind, mode))
+        {
+            return true;
+        }
+
+        var plainForTimer = VtmlUtils.StripVtmlTags(bubbleVtml, capi.Logger);
+        MessageTexturesRef(renderer).Insert(0, new MessageTexture
+        {
+            tex = CreateBubbleTexture(capi, bubbleVtml, kind, mode),
+            message = plainForTimer,
+            receivedTime = CalculateReceivedTimeForMinimumDuration(
+                capi.World.ElapsedMilliseconds,
+                plainForTimer.Length,
+                ChatUiSystem.GetSpeechBubbleMinimumDisplayMilliseconds())
+        });
+
+        return false;
+    }
+
+    private static bool TryGetBubbleContext(EntityShapeRenderer renderer, string message, string data, out Entity entity, out ICoreClientAPI capi)
+    {
+        entity = renderer.entity;
+        capi = renderer.capi;
+        var localPlayerEntity = capi?.World?.Player?.Entity;
+
+        return capi != null
+            && entity != null
+            && localPlayerEntity != null
+            && HasBubblePayload(message, data)
+            && IsWithinBubbleRange(entity, localPlayerEntity);
+    }
+
+    private static bool HasBubblePayload(string message, string data)
+    {
+        return data != null && data.Contains("from:") && message?.Length > 0;
+    }
+
+    private static bool IsWithinBubbleRange(Entity entity, EntityPlayer localPlayerEntity)
+    {
+        // Vanilla uses 400 sq (20 blocks). We raise to 10000 sq (100 blocks) so bubbles can
+        // appear at the full yell range. The server already gates by chat range.
+        return entity.Pos.SquareDistanceTo(localPlayerEntity.Pos.XYZ) < 10000.0;
+    }
+
+    private static bool TryExtractBubblePayload(string data, long entityId, out string rawMsg, out string kind, out string mode)
+    {
+        rawMsg = null;
+        kind = null;
+        mode = null;
+
+        string[] parts = data.Split(new char[1] { ',' }, 2);
+        if (parts.Length < 2)
+        {
+            return false;
+        }
+
+        string[] partone = parts[0].Split(new char[1] { ':' }, 2);
+        string[] parttwo = parts[1].Split(new char[1] { ':' }, 2);
+        if (!IsBubblePayloadForEntity(partone, parttwo, entityId))
+        {
+            return false;
+        }
+
+        rawMsg = parttwo[1];
+        var keySegment = parttwo[0];
+        kind = ExtractMarker(keySegment, "\u001fkind=");
+        mode = ExtractMarker(keySegment, "\u001fmode=");
+        kind ??= ExtractLegacyKind(ref rawMsg);
+        return true;
+    }
+
+    private static bool IsBubblePayloadForEntity(string[] partone, string[] parttwo, long entityId)
+    {
+        if (partone.Length < 2 || parttwo.Length < 2 || partone[0] != "from")
+        {
+            return false;
+        }
+
+        if (!parttwo[0].StartsWith("msg", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        int.TryParse(partone[1], out var parsedEntityId);
+        return entityId == parsedEntityId;
+    }
+
+    private static string ExtractLegacyKind(ref string rawMsg)
+    {
+        const string kindValueMarker = "\u001fkind:";
+        var valueKindIndex = rawMsg.LastIndexOf(kindValueMarker, StringComparison.Ordinal);
+        if (valueKindIndex < 0)
+        {
+            return null;
+        }
+
+        var kind = rawMsg[(valueKindIndex + kindValueMarker.Length)..].Trim();
+        rawMsg = rawMsg[..valueKindIndex];
+        return kind;
+    }
+
+    private static bool RequiresCustomBubbleRendering(string bubbleVtml, string kind, string mode)
+    {
+        return bubbleVtml.Contains('<') || kind != null || mode != null;
+    }
+
+    private static LoadedTexture CreateBubbleTexture(ICoreClientAPI capi, string bubbleVtml, string kind, string mode)
+    {
+        var background = GetBubbleBackground(kind);
+        var baseFont = CreateBubbleFont(mode);
+
+        var tex = RichTextTextureUtils.GenRichTextTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background);
+        if (tex != null)
+        {
+            return tex;
+        }
+
+        var plain = VtmlUtils.StripVtmlTags(bubbleVtml, capi.Logger);
+        return capi.Gui.TextTexture.GenTextTexture(plain, baseFont, BubbleMaxTextWidthPx, background, EnumTextOrientation.Center);
+    }
+
+    private static CairoFont CreateBubbleFont(string mode)
+    {
+        var fontSize = 25.0 * GetFontSizeMultiplier(mode);
+        return new CairoFont(fontSize, GuiStyle.StandardFontName, GetBubbleFontColor())
+        {
+            // Left-align to avoid GuiElementRichtext positioning errors at inline tag boundaries.
+            Orientation = EnumTextOrientation.Left
+        };
+    }
+
+    private static double GetFontSizeMultiplier(string mode)
+    {
+        return mode switch
+        {
+            "yell" => 1.3,
+            "whisper" => 0.75,
+            _ => 1.0
+        };
     }
 
     private static TextBackground GetBubbleBackground(string kind)
@@ -301,88 +319,98 @@ public static class SpeechBubbleRenderPatches
 
         try
         {
-            var entity = __instance.entity;
-            var capi = __instance.capi;
-            if (capi == null || entity == null)
-            {
-                return;
-            }
-
-            var localPlayerEntity = capi.World?.Player?.Entity;
-            if (localPlayerEntity == null)
-            {
-                return;
-            }
-
-            var textures = SpeechBubbleVtmlPatches.MessageTexturesRef(__instance);
-            if (textures == null || textures.Count == 0)
-            {
-                return; // Nothing to render or hide.
-            }
-
-            // Skip LOS check for own entity — always see your own bubbles.
-            // (Distance scaling still applies for third-person cameras, but Z is usually tiny.)
-            var isOwnEntity = localPlayerEntity.EntityId == entity.EntityId;
-
-            // LOS check.
-            if (!isOwnEntity)
-            {
-                var nowMs = capi.World.ElapsedMilliseconds;
-                if (!CanSeeCached(capi.World, nowMs, localPlayerEntity, entity))
-                {
-                    // Hide from vanilla, don't render ourselves.
-                    __state = textures;
-                    SpeechBubbleVtmlPatches.MessageTexturesRef(__instance) = EmptyList;
-                    return;
-                }
-            }
-
-            // Render bubbles ourselves with dampened distance scaling.
-            var rapi = capi.Render;
-            var aboveHeadPos = __instance.getAboveHeadPosition(localPlayerEntity);
-            var pos = MatrixToolsd.Project(aboveHeadPos, rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
-            if (pos.Z < 0.0)
-            {
-                // Behind the camera — hide from vanilla but don't render.
-                __state = textures;
-                SpeechBubbleVtmlPatches.MessageTexturesRef(__instance) = EmptyList;
-                return;
-            }
-
-            // Dampened distance scaling: 4 / Z^exponent instead of vanilla's 4 / Z.
-            // This makes bubbles shrink much more gradually with distance.
-            var dampenedZ = Math.Pow(Math.Max(1.0, pos.Z), DistanceDampeningExponent);
-            var scale = (float)(4.0 / dampenedZ);
-            var cappedScale = Math.Min(1f, scale);
-            if (cappedScale > 0.75f)
-            {
-                cappedScale = 0.75f + (cappedScale - 0.75f) / 2f;
-            }
-
-            // Stack bubbles upward from the projected position. Vanilla renders the
-            // nametag first, then starts bubbles above it; reserve that height here
-            // because we hide vanilla's bubble list and render our own.
-            var nametagHeight = SpeechBubbleVtmlPatches.DebugTagTextureRef(__instance)?.Height ?? 0;
-            var offY = (nametagHeight + 8f) * cappedScale;
-            for (var i = 0; i < textures.Count; i++)
-            {
-                var mt = textures[i];
-                offY += mt.tex.Height * cappedScale + 4f * cappedScale;
-                var posx = (float)pos.X - cappedScale * mt.tex.Width / 2f;
-                var posy = (float)rapi.FrameHeight - ((float)pos.Y + offY);
-
-                rapi.Render2DTexture(mt.tex.TextureId, posx, posy,
-                    cappedScale * mt.tex.Width, cappedScale * mt.tex.Height, 20f);
-            }
-
-            // Hide textures from vanilla so it doesn't render them again.
-            __state = textures;
-            SpeechBubbleVtmlPatches.MessageTexturesRef(__instance) = EmptyList;
+            RenderBubblesAndHideVanilla(__instance, ref __state);
         }
         catch
         {
             // Crash-safe: if anything fails, let vanilla handle rendering normally.
         }
+    }
+
+    private static void RenderBubblesAndHideVanilla(EntityShapeRenderer renderer, ref List<MessageTexture> state)
+    {
+        if (!TryGetRenderContext(renderer, out var capi, out var entity, out var localPlayerEntity, out var textures))
+        {
+            return;
+        }
+
+        if (!CanRenderForLineOfSight(capi, localPlayerEntity, entity))
+        {
+            HideVanillaBubbles(renderer, textures, ref state);
+            return;
+        }
+
+        var rapi = capi.Render;
+        var pos = ProjectAboveHeadPosition(renderer, localPlayerEntity, rapi);
+        if (pos.Z < 0.0)
+        {
+            HideVanillaBubbles(renderer, textures, ref state);
+            return;
+        }
+
+        RenderMessageTextures(renderer, rapi, textures, pos, GetBubbleScale(pos.Z));
+        HideVanillaBubbles(renderer, textures, ref state);
+    }
+
+    private static bool TryGetRenderContext(
+        EntityShapeRenderer renderer,
+        out ICoreClientAPI capi,
+        out Entity entity,
+        out EntityPlayer localPlayerEntity,
+        out List<MessageTexture> textures)
+    {
+        entity = renderer.entity;
+        capi = renderer.capi;
+        localPlayerEntity = capi?.World?.Player?.Entity;
+        textures = SpeechBubbleVtmlPatches.MessageTexturesRef(renderer);
+
+        return capi != null && entity != null && localPlayerEntity != null && textures is { Count: > 0 };
+    }
+
+    private static bool CanRenderForLineOfSight(ICoreClientAPI capi, EntityPlayer localPlayerEntity, Entity entity)
+    {
+        if (localPlayerEntity.EntityId == entity.EntityId)
+        {
+            return true;
+        }
+
+        return CanSeeCached(capi.World, capi.World.ElapsedMilliseconds, localPlayerEntity, entity);
+    }
+
+    private static Vec3d ProjectAboveHeadPosition(EntityShapeRenderer renderer, EntityPlayer localPlayerEntity, IRenderAPI rapi)
+    {
+        var aboveHeadPos = renderer.getAboveHeadPosition(localPlayerEntity);
+        return MatrixToolsd.Project(aboveHeadPos, rapi.PerspectiveProjectionMat, rapi.PerspectiveViewMat, rapi.FrameWidth, rapi.FrameHeight);
+    }
+
+    private static float GetBubbleScale(double z)
+    {
+        var dampenedZ = Math.Pow(Math.Max(1.0, z), DistanceDampeningExponent);
+        var cappedScale = Math.Min(1f, (float)(4.0 / dampenedZ));
+        return cappedScale > 0.75f
+            ? 0.75f + (cappedScale - 0.75f) / 2f
+            : cappedScale;
+    }
+
+    private static void RenderMessageTextures(EntityShapeRenderer renderer, IRenderAPI rapi, List<MessageTexture> textures, Vec3d pos, float cappedScale)
+    {
+        var offY = ((SpeechBubbleVtmlPatches.DebugTagTextureRef(renderer)?.Height ?? 0) + 8f) * cappedScale;
+        for (var i = 0; i < textures.Count; i++)
+        {
+            var mt = textures[i];
+            offY += mt.tex.Height * cappedScale + 4f * cappedScale;
+            var posx = (float)pos.X - cappedScale * mt.tex.Width / 2f;
+            var posy = (float)rapi.FrameHeight - ((float)pos.Y + offY);
+
+            rapi.Render2DTexture(mt.tex.TextureId, posx, posy,
+                cappedScale * mt.tex.Width, cappedScale * mt.tex.Height, 20f);
+        }
+    }
+
+    private static void HideVanillaBubbles(EntityShapeRenderer renderer, List<MessageTexture> textures, ref List<MessageTexture> state)
+    {
+        state = textures;
+        SpeechBubbleVtmlPatches.MessageTexturesRef(renderer) = EmptyList;
     }
 
     /// <summary>

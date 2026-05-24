@@ -1,3 +1,4 @@
+#pragma warning disable S101 // OOC is the player-facing command acronym used throughout chat code.
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 

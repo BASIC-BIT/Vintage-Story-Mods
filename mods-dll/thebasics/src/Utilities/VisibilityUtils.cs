@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -54,21 +55,13 @@ public static class VisibilityUtils
         try
         {
             // RayTraceForSelection expects world-space coordinates.
-            // Use the most appropriate position source for the current side.
-            var fromBase = world.Side == EnumAppSide.Server ? observer.ServerPos.XYZ : observer.Pos.XYZ;
-            var toBase = world.Side == EnumAppSide.Server ? target.ServerPos.XYZ : target.Pos.XYZ;
+            var fromBase = observer.Pos.XYZ;
+            var toBase = target.Pos.XYZ;
 
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
 
-            foreach (var targetPos in GetEntityLineOfSightTargetPositions(toBase, target, useMultiPointTargets))
-            {
-                if (IsRayClear(world, fromPos, targetPos, failOpen))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return GetEntityLineOfSightTargetPositions(toBase, target, useMultiPointTargets)
+                .Any(targetPos => IsRayClear(world, fromPos, targetPos, failOpen));
         }
         catch
         {
@@ -96,7 +89,7 @@ public static class VisibilityUtils
 
         try
         {
-            var fromBase = world.Side == EnumAppSide.Server ? observer.ServerPos.XYZ : observer.Pos.XYZ;
+            var fromBase = observer.Pos.XYZ;
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
 
             return IsRayClear(world, fromPos, targetPos, failOpen);

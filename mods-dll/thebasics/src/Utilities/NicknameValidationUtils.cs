@@ -101,41 +101,66 @@ namespace thebasics.Utilities
                 return true; // Empty nickname is valid (will use player name)
             }
 
-            // Check against online players' nicknames
-            foreach (IPlayer onlinePlayer in sapi.World.AllOnlinePlayers)
+            if (TryFindOnlineNicknameConflict(player, nickname, sapi, config, out conflictingPlayer))
             {
-                if (onlinePlayer.PlayerUID == player.PlayerUID) continue; // Skip self
-
-                var serverPlayer = onlinePlayer as IServerPlayer;
-                if (serverPlayer != null)
-                {
-                    var existingNickname = serverPlayer.GetNickname(config);
-                    if (serverPlayer.HasNickname(config) && existingNickname.Equals(nickname, StringComparison.OrdinalIgnoreCase))
-                    {
-                        conflictingPlayer = serverPlayer.PlayerName;
-                        conflictType = "nickname";
-                        return false;
-                    }
-                }
+                conflictType = "nickname";
+                return false;
             }
 
-            // Check against all player usernames (both online and offline)
-            foreach (var playerDataPair in sapi.PlayerData.PlayerDataByUid)
+            if (TryFindUsernameConflict(player, nickname, sapi, out conflictingPlayer))
             {
-                if (playerDataPair.Key == player.PlayerUID) continue; // Skip self
-
-                var playerData = playerDataPair.Value;
-                if (playerData == null || playerData.LastKnownPlayername == null) continue; // Skip missing
-
-                if (playerData.LastKnownPlayername.Equals(nickname, StringComparison.OrdinalIgnoreCase))
-                {
-                    conflictingPlayer = playerData.LastKnownPlayername;
-                    conflictType = "username";
-                    return false;
-                }
+                conflictType = "username";
+                return false;
             }
 
             return true;
+        }
+
+        private static bool TryFindOnlineNicknameConflict(IServerPlayer player, string nickname, ICoreServerAPI sapi, ModConfig config, out string conflictingPlayer)
+        {
+            foreach (IPlayer onlinePlayer in sapi.World.AllOnlinePlayers)
+            {
+                if (onlinePlayer.PlayerUID == player.PlayerUID)
+                {
+                    continue;
+                }
+
+                if (onlinePlayer is not IServerPlayer serverPlayer || !serverPlayer.HasNickname(config))
+                {
+                    continue;
+                }
+
+                var existingNickname = serverPlayer.GetNickname(config);
+                if (existingNickname.Equals(nickname, StringComparison.OrdinalIgnoreCase))
+                {
+                    conflictingPlayer = serverPlayer.PlayerName;
+                    return true;
+                }
+            }
+
+            conflictingPlayer = null;
+            return false;
+        }
+
+        private static bool TryFindUsernameConflict(IServerPlayer player, string nickname, ICoreServerAPI sapi, out string conflictingPlayer)
+        {
+            foreach (var playerDataPair in sapi.PlayerData.PlayerDataByUid)
+            {
+                if (playerDataPair.Key == player.PlayerUID)
+                {
+                    continue;
+                }
+
+                var playerName = playerDataPair.Value?.LastKnownPlayername;
+                if (playerName != null && playerName.Equals(nickname, StringComparison.OrdinalIgnoreCase))
+                {
+                    conflictingPlayer = playerName;
+                    return true;
+                }
+            }
+
+            conflictingPlayer = null;
+            return false;
         }
 
         /// <summary>

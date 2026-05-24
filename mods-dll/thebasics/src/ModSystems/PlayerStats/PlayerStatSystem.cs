@@ -109,7 +109,7 @@ namespace thebasics.ModSystems.PlayerStats
             }
         }
 
-        private void OnBreakBlock(IServerPlayer byplayer, BlockSelection blocksel, ref float dropquantitymultiplier, ref EnumHandling handling)
+        private static void OnBreakBlock(IServerPlayer byplayer, BlockSelection blocksel, ref float dropquantitymultiplier, ref EnumHandling handling)
         {
             if (byplayer.WorldData.CurrentGameMode == EnumGameMode.Survival)
             {
@@ -150,7 +150,7 @@ namespace thebasics.ModSystems.PlayerStats
             };
         }
 
-        private PlayerStatType? ResolveStat(string input)
+        private static PlayerStatType? ResolveStat(string input)
         {
             var lowerInput = input.ToLower();
             foreach (var playerStatDefinition in StatTypes.Types)
@@ -250,14 +250,11 @@ namespace thebasics.ModSystems.PlayerStats
             var message = new StringBuilder();
             message.Append(isOtherPlayer ? Lang.Get("thebasics:stats-header-other", targetPlayer.PlayerName) : Lang.Get("thebasics:stats-header-own"));
 
-            foreach (var stat in StatTypes.Types)
+            foreach (var stat in StatTypes.Types.Where(stat => Config.PlayerStatEnabled(stat.Key)))
             {
-                if (Config.PlayerStatEnabled(stat.Key))
-                {
-                    var statValue = targetPlayer.GetPlayerStat(stat.Key);
-                    var statTitle = stat.Value.LangKey != null ? Lang.Get(stat.Value.LangKey) : stat.Value.Title;
-                    message.Append(ChatHelper.Build("\n", statTitle, ": ", statValue.ToString()));
-                }
+                var statValue = targetPlayer.GetPlayerStat(stat.Key);
+                var statTitle = stat.Value.LangKey != null ? Lang.Get(stat.Value.LangKey) : stat.Value.Title;
+                message.Append(ChatHelper.Build("\n", statTitle, ": ", statValue.ToString()));
             }
 
             return new TextCommandResult
@@ -287,7 +284,6 @@ namespace thebasics.ModSystems.PlayerStats
                 entity.GetPlayer() == null &&
                 damageSource is { Source: EnumDamageSource.Player })
             {
-                // var wasRangedKill = damageSource.SourceEntity != damageSource.CauseEntity;
                 var player = (damageSource.CauseEntity ?? damageSource.SourceEntity).GetPlayer();
                 player.AddPlayerStat(PlayerStatType.NpcKills);
             }

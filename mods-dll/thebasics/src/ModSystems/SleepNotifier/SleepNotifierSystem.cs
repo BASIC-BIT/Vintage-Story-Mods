@@ -7,7 +7,7 @@ namespace thebasics.ModSystems.SleepNotifier
 {
     public class SleepNotifierSystem : BaseBasicModSystem
     {
-        public int LastSleepingCount;
+        public int LastSleepingCount { get; set; }
         private long _slowTickListenerId;
         private bool _saveGameLoadedSubscribed;
 
@@ -97,8 +97,7 @@ namespace thebasics.ModSystems.SleepNotifier
         private int GetSleepingCount()
         {
             return API.World.AllOnlinePlayers
-                .ToList()
-                .Where((player) =>
+                .Count((player) =>
                 {
                     var splr = player as IServerPlayer;
 
@@ -107,7 +106,7 @@ namespace thebasics.ModSystems.SleepNotifier
                            player.Entity != null &&
                            player.Entity.MountedOn != null &&
                            player.Entity.MountedOn is BlockEntityBed;
-                }).Count();
+                });
         }
     }
 }

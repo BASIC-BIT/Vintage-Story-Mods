@@ -2,7 +2,7 @@ using System;
 
 namespace thebasics.ModSystems.TPA.Models
 {
-    public class TpaRequest : IEquatable<TpaRequest>
+    public sealed class TpaRequest : IEquatable<TpaRequest>
     {
         public TpaRequestType Type { get; init; }
 

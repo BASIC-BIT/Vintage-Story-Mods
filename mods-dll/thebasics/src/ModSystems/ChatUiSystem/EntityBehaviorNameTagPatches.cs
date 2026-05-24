@@ -91,53 +91,133 @@ public static class EntityBehaviorNameTagPatches
 
     private static void ReplaceTexture(EntityBehaviorNameTag behavior, Entity entity)
     {
-        var capi = entity?.World?.Api as ICoreClientAPI;
-        if (capi == null || entity == null)
+        var capi = GetClientApi(entity);
+        if (capi == null)
         {
             return;
         }
 
-        // Track player entities so HeadshotFetchResult can poke the right one.
-        if (entity is EntityPlayer ep && ep.PlayerUID is { Length: > 0 } uid)
-        {
-            _trackedPlayerEntities[uid] = entity;
-        }
+        TrackPlayerEntity(entity);
 
-        var nametagTree = entity.WatchedAttributes?.GetTreeAttribute("nametag");
-        var name = nametagTree?.GetString("name") ?? string.Empty;
+        var name = GetNametagValue(entity, "name");
         if (string.IsNullOrWhiteSpace(name))
         {
             return;
         }
 
-        var headshotHash = nametagTree?.GetString(CharacterSheetSystem.HeadshotHashAttrKey) ?? string.Empty;
-        BitmapExternal headshotBitmap = null;
-        var inlineImageEnabled = ChatUiSystem.IsHeadshotInNametagEnabled();
-        if (inlineImageEnabled && !string.IsNullOrEmpty(headshotHash))
+        var headshotHash = GetNametagValue(entity, CharacterSheetSystem.HeadshotHashAttrKey);
+        var nicknameColor = GetNametagValue(entity, CharacterSheetSystem.NicknameColorAttrKey);
+        var playerName = GetPlayerName(entity);
+        var headshotBitmap = TryCreateHeadshotBitmap(capi, entity, headshotHash);
+
+        try
         {
-            var pngBytes = ChatUiSystem.TryGetCachedHeadshotPngBytes(headshotHash);
-            if (pngBytes != null && pngBytes.Length > 0)
-            {
-                try
-                {
-                    headshotBitmap = new BitmapExternal(pngBytes, pngBytes.Length, capi.Logger);
-                }
-                catch
-                {
-                    headshotBitmap?.Dispose();
-                    headshotBitmap = null;
-                }
-            }
-            else if (entity is EntityPlayer playerEntity && playerEntity.PlayerUID is { Length: > 0 } trackedUid)
-            {
-                // Bytes not yet available — kick off a fetch and we'll rebuild when they arrive.
-                ChatUiSystem.RequestHeadshotForHash(trackedUid, headshotHash);
-            }
+            ApplyNametagTexture(behavior, ComposeNametagTexture(capi, name, nicknameColor, playerName, headshotBitmap));
+        }
+        finally
+        {
+            headshotBitmap?.Dispose();
+        }
+    }
+
+    private static ICoreClientAPI GetClientApi(Entity entity)
+    {
+        return entity?.World?.Api as ICoreClientAPI;
+    }
+
+    private static string GetNametagValue(Entity entity, string key)
+    {
+        return entity.WatchedAttributes?.GetTreeAttribute("nametag")?.GetString(key) ?? string.Empty;
+    }
+
+    private static string GetPlayerName(Entity entity)
+    {
+        return (entity as EntityPlayer)?.Player?.PlayerName ?? string.Empty;
+    }
+
+    private static void ApplyNametagTexture(EntityBehaviorNameTag behavior, LoadedTexture newTex)
+    {
+        if (newTex == null)
+        {
+            return;
         }
 
-        // Text bubble styled like vanilla so the visual baseline stays familiar; the framed headshot
-        // floats next to it as a separate visual element (MMO-style portrait card).
-        var background = new TextBackground
+        var oldTex = NameTagTextureRef(behavior);
+        oldTex?.Dispose();
+        NameTagTextureRef(behavior) = newTex;
+    }
+
+    private static void TrackPlayerEntity(Entity entity)
+    {
+        if (entity is EntityPlayer ep && ep.PlayerUID is { Length: > 0 } uid)
+        {
+            _trackedPlayerEntities[uid] = entity;
+        }
+    }
+
+    private static BitmapExternal TryCreateHeadshotBitmap(ICoreClientAPI capi, Entity entity, string headshotHash)
+    {
+        if (!ChatUiSystem.IsHeadshotInNametagEnabled() || string.IsNullOrEmpty(headshotHash))
+        {
+            return null;
+        }
+
+        var pngBytes = ChatUiSystem.TryGetCachedHeadshotPngBytes(headshotHash);
+        if (pngBytes != null && pngBytes.Length > 0)
+        {
+            return TryDecodeHeadshotBitmap(capi, pngBytes);
+        }
+
+        RequestMissingHeadshot(entity, headshotHash);
+        return null;
+    }
+
+    private static BitmapExternal TryDecodeHeadshotBitmap(ICoreClientAPI capi, byte[] pngBytes)
+    {
+        try
+        {
+            return new BitmapExternal(pngBytes, pngBytes.Length, capi.Logger);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void RequestMissingHeadshot(Entity entity, string headshotHash)
+    {
+        if (entity is EntityPlayer playerEntity && playerEntity.PlayerUID is { Length: > 0 } trackedUid)
+        {
+            ChatUiSystem.RequestHeadshotForHash(trackedUid, headshotHash);
+        }
+    }
+
+    private static LoadedTexture ComposeNametagTexture(ICoreClientAPI capi, string name, string nicknameColor, string playerName, BitmapExternal headshotBitmap)
+    {
+        var resolvedName = Lang.GetIfExists("nametag-" + name.ToLowerInvariant()) ?? name;
+        var vtml = WrapWithNicknameColor(resolvedName, nicknameColor, playerName);
+
+        return NametagComposer.Compose(capi, new NametagComposer.Options
+        {
+            Vtml = vtml,
+            BaseFont = CreateNametagBaseFont(),
+            MaxTextWidthPx = NametagMaxTextWidthPx,
+            TextBackground = CreateNametagBackground(),
+            HeadshotBitmap = headshotBitmap,
+            HeadshotRenderSizePx = ChatUiSystem.GetNametagInlineImagePixelSize()
+        });
+    }
+
+    private static CairoFont CreateNametagBaseFont()
+    {
+        var baseFont = CairoFont.WhiteMediumText().WithColor(ColorUtil.WhiteArgbDouble);
+        baseFont.Orientation = EnumTextOrientation.Left;
+        return baseFont;
+    }
+
+    private static TextBackground CreateNametagBackground()
+    {
+        return new TextBackground
         {
             FillColor = GuiStyle.DialogLightBgColor,
             Padding = 3,
@@ -146,46 +226,6 @@ public static class EntityBehaviorNameTagPatches
             BorderColor = GuiStyle.DialogBorderColor,
             BorderWidth = 3.0
         };
-
-        var baseFont = CairoFont.WhiteMediumText().WithColor(ColorUtil.WhiteArgbDouble);
-        baseFont.Orientation = EnumTextOrientation.Left;
-
-        try
-        {
-            // Vanilla supports legacy "nametag-..." Lang lookups for hardcoded entity names.
-            // Our display names are runtime-built and never collide; preserve the lookup just in case.
-            var resolvedName = Lang.GetIfExists("nametag-" + name.ToLowerInvariant()) ?? name;
-
-            // Compose VTML on the client side using the plain name + separate nickname-color
-            // sub-attribute. Keeps the watched-attr "nametag/name" plain so vanilla code paths
-            // (look-at HUD, character dialog title, etc.) don't render literal `<font>` tags.
-            var nicknameColor = nametagTree?.GetString(CharacterSheetSystem.NicknameColorAttrKey) ?? string.Empty;
-            var playerName = (entity as EntityPlayer)?.Player?.PlayerName ?? string.Empty;
-            var vtml = WrapWithNicknameColor(resolvedName, nicknameColor, playerName);
-
-            var newTex = NametagComposer.Compose(capi, new NametagComposer.Options
-            {
-                Vtml = vtml,
-                BaseFont = baseFont,
-                MaxTextWidthPx = NametagMaxTextWidthPx,
-                TextBackground = background,
-                HeadshotBitmap = headshotBitmap,
-                HeadshotRenderSizePx = ChatUiSystem.GetNametagInlineImagePixelSize()
-            });
-
-            if (newTex == null)
-            {
-                return;
-            }
-
-            var oldTex = NameTagTextureRef(behavior);
-            oldTex?.Dispose();
-            NameTagTextureRef(behavior) = newTex;
-        }
-        finally
-        {
-            headshotBitmap?.Dispose();
-        }
     }
 
     /// <summary>

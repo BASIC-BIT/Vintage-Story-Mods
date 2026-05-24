@@ -27,61 +27,69 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
             return false;
         }
 
-        var i = 0;
-        // Skip whitespace and any stray combining/format characters.
-        while (i < message.Length && (char.IsWhiteSpace(message[i]) || ChatHelper.IsDecoratorChar(message[i])))
-        {
-            i++;
-        }
+        var index = 0;
+        SkipWhitespaceAndDecorators(message, ref index);
 
-        if (i >= message.Length || message[i] != ':')
+        if (index >= message.Length || message[index] != ':')
         {
             return false;
         }
 
-        i++;
+        index++;
         // Skip decorators right after ':' (e.g. zalgo).
-        while (i < message.Length && ChatHelper.IsDecoratorChar(message[i]))
+        SkipDecorators(message, ref index);
+
+        if (!TryReadLanguageIdentifier(message, ref index, out languageIdentifier))
         {
-            i++;
+            return false;
         }
 
-        // Collect identifier chars, ignoring decorators in-between.
-        var sb = new StringBuilder();
-        while (i < message.Length)
+        // Skip whitespace and decorators between identifier and content.
+        SkipWhitespaceAndDecorators(message, ref index);
+
+        remainder = index < message.Length ? message[index..] : string.Empty;
+        return true;
+    }
+
+    private static void SkipWhitespaceAndDecorators(string message, ref int index)
+    {
+        while (index < message.Length && (char.IsWhiteSpace(message[index]) || ChatHelper.IsDecoratorChar(message[index])))
         {
-            var c = message[i];
+            index++;
+        }
+    }
+
+    private static void SkipDecorators(string message, ref int index)
+    {
+        while (index < message.Length && ChatHelper.IsDecoratorChar(message[index]))
+        {
+            index++;
+        }
+    }
+
+    private static bool TryReadLanguageIdentifier(string message, ref int index, out string languageIdentifier)
+    {
+        var sb = new StringBuilder();
+        while (index < message.Length)
+        {
+            var c = message[index];
             if (ChatHelper.IsDecoratorChar(c))
             {
-                i++;
+                index++;
                 continue;
             }
 
-            if (char.IsLetterOrDigit(c) || c == '_')
+            if (!char.IsLetterOrDigit(c) && c != '_')
             {
-                sb.Append(c);
-                i++;
-                continue;
+                break;
             }
 
-            break;
-        }
-
-        if (sb.Length == 0)
-        {
-            return false;
+            sb.Append(c);
+            index++;
         }
 
         languageIdentifier = sb.ToString();
-
-        // Skip whitespace and decorators between identifier and content.
-        while (i < message.Length && (char.IsWhiteSpace(message[i]) || ChatHelper.IsDecoratorChar(message[i])))
-        {
-            i++;
-        }
-
-        remainder = i < message.Length ? message[i..] : string.Empty;
-        return true;
+        return languageIdentifier.Length > 0;
     }
 
     private static bool StartsWithLanguagePrefixSyntax(string message)
@@ -92,10 +100,7 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
         }
 
         var i = 0;
-        while (i < message.Length && (char.IsWhiteSpace(message[i]) || ChatHelper.IsDecoratorChar(message[i])))
-        {
-            i++;
-        }
+        SkipWhitespaceAndDecorators(message, ref i);
 
         return i < message.Length && message[i] == ':';
     }
@@ -118,96 +123,116 @@ public class ChangeSpeakingLanguageTransformer : MessageTransformerBase
     {
         // Always populate a default language for downstream formatting.
         // If the language system is disabled, we intentionally do NOT parse :lang prefixes.
-        var defaultLang = _config.Languages?.FirstOrDefault(l => l.Default) ?? _config.Languages?.FirstOrDefault();
-        if (defaultLang == null)
-        {
-            defaultLang = LanguageSystem.BabbleLang;
-        }
+        var defaultLang = GetConfiguredDefaultLanguage();
 
         var languageEnabled = _config.EnableLanguageSystem && !_config.DisableRPChat;
         if (!languageEnabled)
         {
-            context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
-            if (TryParseLanguageSpecifier(context.Message, out _, out _))
-            {
-                context.SendingPlayer.SendMessage(
-                    _chatSystem.ProximityChatId,
-                    Lang.Get("thebasics:lang-error-system-disabled"),
-                    EnumChatType.CommandError);
-                context.State = MessageContextState.STOP;
-            }
-
-            return context;
+            return HandleDisabledLanguageSystem(context, defaultLang);
         }
 
         if (TryParseLanguageSpecifier(context.Message, out var languageIdentifier, out var remainder))
         {
-            // First try to get the language with allowHidden=true to check if it exists at all
-            var lang = _languageSystem.GetLangFromText(languageIdentifier, true, allowHidden: true);
-
-            // Determine if we should show hidden languages in the error message
-            bool showHidden = context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission);
-
-            // If the language doesn't exist, or it's hidden and player can't use it, show error
-            if (lang == null || (lang.Hidden && !context.SendingPlayer.KnowsLanguage(lang) && !showHidden))
-            {
-                context.SendingPlayer.SendMessage(
-                    _chatSystem.ProximityChatId,
-                    Lang.Get("thebasics:lang-error-invalid-with-list", languageIdentifier, BuildValidLanguageList(showHidden, context.SendingPlayer)),
-                    EnumChatType.CommandError);
-                context.State = MessageContextState.STOP;
-                return context;
-            }
-
-            if (lang.Name != LanguageSystem.BabbleLang.Name && !context.SendingPlayer.KnowsLanguage(lang))
-            {
-                context.SendingPlayer.SendMessage(
-                    _chatSystem.ProximityChatId,
-                    Lang.Get("thebasics:lang-error-unknown-language"),
-                    EnumChatType.CommandError);
-                context.State = MessageContextState.STOP;
-                return context;
-            }
-
-            // If the message is empty, set the default language and stop processing
-            if (string.IsNullOrWhiteSpace(remainder))
-            {
-                context.SendingPlayer.SetDefaultLanguage(lang);
-                context.SendingPlayer.SendMessage(
-                    _chatSystem.ProximityChatId,
-                    Lang.Get("thebasics:lang-success-now-speaking", lang.Name),
-                    EnumChatType.CommandSuccess);
-                context.State = MessageContextState.STOP;
-            }
-            else
-            {
-                // Remove the language identifier and continue processing
-                context.UpdateMessage(remainder.Trim());
-                context.SetMetadata(MessageContext.LANGUAGE, lang);
-            }
+            return HandleLanguageSpecifier(context, languageIdentifier, remainder);
         }
-        else if (StartsWithLanguagePrefixSyntax(context.Message))
+
+        if (StartsWithLanguagePrefixSyntax(context.Message))
         {
-            var showHidden = context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission);
+            return RejectInvalidPrefix(context);
+        }
+
+        SetDefaultLanguageMetadata(context, defaultLang);
+        return context;
+    }
+
+    private Language GetConfiguredDefaultLanguage()
+    {
+        return _config.Languages?.FirstOrDefault(l => l.Default) ??
+               _config.Languages?.FirstOrDefault() ??
+               LanguageSystem.BabbleLang;
+    }
+
+    private MessageContext HandleDisabledLanguageSystem(MessageContext context, Language defaultLang)
+    {
+        context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
+        if (TryParseLanguageSpecifier(context.Message, out _, out _))
+        {
             context.SendingPlayer.SendMessage(
                 _chatSystem.ProximityChatId,
-                Lang.Get("thebasics:lang-error-invalid-prefix-with-list", BuildValidLanguageList(showHidden, context.SendingPlayer)),
+                Lang.Get("thebasics:lang-error-system-disabled"),
+                EnumChatType.CommandError);
+            context.State = MessageContextState.STOP;
+        }
+
+        return context;
+    }
+
+    private MessageContext HandleLanguageSpecifier(MessageContext context, string languageIdentifier, string remainder)
+    {
+        var showHidden = context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission);
+        var lang = _languageSystem.GetLangFromText(languageIdentifier, true, allowHidden: true);
+
+        if (!CanUseLanguage(context, lang, showHidden))
+        {
+            context.SendingPlayer.SendMessage(
+                _chatSystem.ProximityChatId,
+                Lang.Get("thebasics:lang-error-invalid-with-list", languageIdentifier, BuildValidLanguageList(showHidden, context.SendingPlayer)),
                 EnumChatType.CommandError);
             context.State = MessageContextState.STOP;
             return context;
         }
-        else
+
+        if (lang.Name != LanguageSystem.BabbleLang.Name && !context.SendingPlayer.KnowsLanguage(lang))
         {
-            try
-            {
-                context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_config));
-            }
-            catch
-            {
-                context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
-            }
+            context.SendingPlayer.SendMessage(
+                _chatSystem.ProximityChatId,
+                Lang.Get("thebasics:lang-error-unknown-language"),
+                EnumChatType.CommandError);
+            context.State = MessageContextState.STOP;
+            return context;
         }
 
+        if (string.IsNullOrWhiteSpace(remainder))
+        {
+            context.SendingPlayer.SetDefaultLanguage(lang);
+            context.SendingPlayer.SendMessage(
+                _chatSystem.ProximityChatId,
+                Lang.Get("thebasics:lang-success-now-speaking", lang.Name),
+                EnumChatType.CommandSuccess);
+            context.State = MessageContextState.STOP;
+            return context;
+        }
+
+        context.UpdateMessage(remainder.Trim());
+        context.SetMetadata(MessageContext.LANGUAGE, lang);
         return context;
+    }
+
+    private static bool CanUseLanguage(MessageContext context, Language lang, bool showHidden)
+    {
+        return lang != null && (!lang.Hidden || context.SendingPlayer.KnowsLanguage(lang) || showHidden);
+    }
+
+    private MessageContext RejectInvalidPrefix(MessageContext context)
+    {
+        var showHidden = context.SendingPlayer.HasPrivilege(_config.ChangeOtherLanguagePermission);
+        context.SendingPlayer.SendMessage(
+            _chatSystem.ProximityChatId,
+            Lang.Get("thebasics:lang-error-invalid-prefix-with-list", BuildValidLanguageList(showHidden, context.SendingPlayer)),
+            EnumChatType.CommandError);
+        context.State = MessageContextState.STOP;
+        return context;
+    }
+
+    private void SetDefaultLanguageMetadata(MessageContext context, Language defaultLang)
+    {
+        try
+        {
+            context.SetMetadata(MessageContext.LANGUAGE, context.SendingPlayer.GetDefaultLanguage(_config));
+        }
+        catch
+        {
+            context.SetMetadata(MessageContext.LANGUAGE, defaultLang);
+        }
     }
 }

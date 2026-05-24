@@ -6,6 +6,6 @@ namespace thebasics.Models;
 [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
 public class TheBasicsPlayerNicknameMessage
 {
-    public string PlayerUID;
-    public string Nickname;
+    public string PlayerUID { get; set; }
+    public string Nickname { get; set; }
 }

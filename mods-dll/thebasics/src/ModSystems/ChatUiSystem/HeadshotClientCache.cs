@@ -6,14 +6,13 @@ namespace thebasics.ModSystems.ChatUiSystem;
 
 /// <summary>
 /// Per-process LRU cache mapping headshot hash → loaded texture so that revisiting a player's
-/// bio doesn't re-fetch and re-decode bytes already in VRAM. The texture is owned by the cache
+    /// bio doesn't re-fetch and re-decode bytes already in VRAM. The texture is owned by the cache
 /// and disposed when evicted or on shutdown.
 /// </summary>
 public sealed class HeadshotClientCache
 {
     private const int DefaultCapacity = 32;
 
-    private readonly ICoreClientAPI _capi;
     private readonly int _capacity;
     private readonly LinkedList<string> _lru = new();
     private readonly Dictionary<string, Entry> _entries = new();
@@ -29,7 +28,7 @@ public sealed class HeadshotClientCache
 
     public HeadshotClientCache(ICoreClientAPI capi, int capacity = DefaultCapacity)
     {
-        _capi = capi ?? throw new ArgumentNullException(nameof(capi));
+        _ = capi ?? throw new ArgumentNullException(nameof(capi));
         _capacity = capacity > 0 ? capacity : DefaultCapacity;
     }
 
@@ -52,14 +51,14 @@ public sealed class HeadshotClientCache
 
     /// <summary>
     /// Returns the original PNG bytes for the cached headshot. Used when we need pixel-level
-    /// access (e.g. compositing into a Cairo surface for the nametag texture). Null when the
+    /// access (e.g. compositing into a Cairo surface for the nametag texture). Empty when the
     /// hash is unknown or bytes weren't cached.
     /// </summary>
     public byte[] TryGetPngBytes(string hash)
     {
         if (string.IsNullOrEmpty(hash) || !_entries.TryGetValue(hash, out var entry))
         {
-            return null;
+            return Array.Empty<byte>();
         }
 
         Touch(entry);

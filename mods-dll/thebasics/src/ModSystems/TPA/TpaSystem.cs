@@ -38,22 +38,19 @@ namespace thebasics.ModSystems.TPA
 
         private void SpawnTeleportParticles(params IServerPlayer[] players)
         {
-            foreach (var player in players)
+            foreach (var player in players.Where(player => player != null))
             {
-                if (player != null)
-                {
-                    API.World.SpawnParticles(GetTpaRequestParticles(player));
-                }
+                API.World.SpawnParticles(GetTpaRequestParticles(player));
             }
         }
 
-        private void ExecuteTeleport(IServerPlayer from, IServerPlayer to)
+        private static void ExecuteTeleport(IServerPlayer from, IServerPlayer to)
         {
             var pos = to.Entity.Pos;
             from.Entity.TeleportToDouble(pos.X, pos.Y, pos.Z);
         }
 
-        private string FormatTimeRemaining(TimeSpan time)
+        private static string FormatTimeRemaining(TimeSpan time)
         {
             if (time.TotalSeconds <= 0)
                 return Lang.Get("thebasics:tpa-time-expired");
@@ -91,20 +88,20 @@ namespace thebasics.ModSystems.TPA
             };
         }
 
-        private bool IsPlayerHoldingTemporalGear(IServerPlayer player)
+        private static bool IsPlayerHoldingTemporalGear(IServerPlayer player)
         {
             return ItemSlotContainsTemporalGear(player.Entity.LeftHandItemSlot) ||
                    ItemSlotContainsTemporalGear(player.Entity.RightHandItemSlot);
         }
 
-        private bool ItemSlotContainsTemporalGear(ItemSlot itemSlot)
+        private static bool ItemSlotContainsTemporalGear(ItemSlot itemSlot)
         {
             return itemSlot != null &&
                    itemSlot.Itemstack != null &&
                    itemSlot.Itemstack.Item is ItemTemporalGear;
         }
 
-        private bool RemoveTemporalGear(IServerPlayer player)
+        private static bool RemoveTemporalGear(IServerPlayer player)
         {
             var leftHand = ItemSlotContainsTemporalGear(player.Entity.LeftHandItemSlot);
             var rightHand = ItemSlotContainsTemporalGear(player.Entity.RightHandItemSlot);
@@ -124,7 +121,7 @@ namespace thebasics.ModSystems.TPA
             return true;
         }
 
-        private bool TryPutInHandSlot(ItemSlot slot, ItemStack itemStack, IServerPlayer player)
+        private static bool TryPutInHandSlot(ItemSlot slot, ItemStack itemStack, IServerPlayer player)
         {
             if (slot != null && slot.Empty)
             {
@@ -185,22 +182,17 @@ namespace thebasics.ModSystems.TPA
             return string.IsNullOrWhiteSpace(Config.TpaRequestPrivilege) ? Privilege.chat : Config.TpaRequestPrivilege;
         }
 
-        private bool ExpireOrCancelTpaRequest(IServerPlayer requestingPlayer, TpaRequest request, TpaExpireReason reason, IServerPlayer targetPlayer = null)
+        private void ExpireOrCancelTpaRequest(IServerPlayer requestingPlayer, TpaRequest request, TpaExpireReason reason, IServerPlayer targetPlayer = null)
         {
             // Null checks
-            if (requestingPlayer == null || request == null) return false;
+            if (requestingPlayer == null || request == null) return;
 
             // Get target player name for messages (might be offline)
             var targetPlayerName = targetPlayer?.PlayerName ??
                                    API.GetPlayerByUID(request.TargetPlayerUID)?.PlayerName ??
                                    "unknown player";
 
-            // Handle temporal gear return if it was consumed
-            bool gearReturnedSuccessfully = true;
-            if (request.TemporalGearConsumed)
-            {
-                gearReturnedSuccessfully = ReturnTemporalGear(requestingPlayer);
-            }
+            var gearReturnedSuccessfully = ReturnConsumedTemporalGear(requestingPlayer, request);
 
             // Generate appropriate message based on reason
             string message = GenerateTpaExpireMessage(reason, targetPlayerName, request.TemporalGearConsumed, gearReturnedSuccessfully);
@@ -209,21 +201,38 @@ namespace thebasics.ModSystems.TPA
             var messageType = (reason == TpaExpireReason.Denied) ? EnumChatType.CommandError : EnumChatType.Notification;
             requestingPlayer.SendMessage(GlobalConstants.CurrentChatGroup, message, messageType);
 
-            // Notify target player if they're online and it's a timeout
-            if (reason == TpaExpireReason.Timeout && targetPlayer != null)
-            {
-                targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup,
-                    Lang.Get("thebasics:tpa-notify-timeout", requestingPlayer.PlayerName),
-                    EnumChatType.Notification);
-            }
+            NotifyTargetOfRequestExpiry(requestingPlayer, targetPlayer, reason);
 
             // Clear the outgoing request
             requestingPlayer.ClearOutgoingTpaRequest();
-
-            return true;
         }
 
-        private string GenerateTpaExpireMessage(TpaExpireReason reason, string targetPlayerName, bool gearConsumed, bool gearReturned)
+        private bool ReturnConsumedTemporalGear(IServerPlayer requestingPlayer, TpaRequest request)
+        {
+            return !request.TemporalGearConsumed || ReturnTemporalGear(requestingPlayer);
+        }
+
+        private void NotifyTargetOfRequestExpiry(IServerPlayer requestingPlayer, IServerPlayer targetPlayer, TpaExpireReason reason)
+        {
+            if (targetPlayer == null)
+            {
+                return;
+            }
+
+            var message = reason switch
+            {
+                TpaExpireReason.Timeout => Lang.Get("thebasics:tpa-notify-timeout", requestingPlayer.PlayerName),
+                TpaExpireReason.Cancelled => Lang.Get("thebasics:tpa-notify-target-cancelled", GetPlayerDisplayName(requestingPlayer)),
+                _ => null
+            };
+
+            if (message != null)
+            {
+                targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup, message, EnumChatType.Notification);
+            }
+        }
+
+        private static string GenerateTpaExpireMessage(TpaExpireReason reason, string targetPlayerName, bool gearConsumed, bool gearReturned)
         {
             string baseMessage = reason switch
             {
@@ -438,115 +447,25 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpaRequest(IServerPlayer player, IServerPlayer targetPlayer,
             TpaRequestType type)
         {
-            // Validate temporal gear requirement FIRST, but don't consume yet
-            if (Config.TpaRequireTemporalGear)
+            var validationError = ValidateTpaRequest(player, targetPlayer);
+            if (validationError != null)
             {
-                if (!IsPlayerHoldingTemporalGear(player))
-                {
-                    return new TextCommandResult
-                    {
-                        Status = EnumCommandStatus.Error,
-                        StatusMessage = Lang.Get("thebasics:tpa-error-need-temporal-gear"),
-                    };
-                }
-            }
-
-            // Validate cooldown restrictions
-            if (!player.CanTpa(API.World.Calendar, Config)) // TODO: Dynamic error message
-            {
-                var hoursString = Config.TpaCooldownInGameHours.ToString("0.##");
-
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:tpa-error-cooldown", hoursString),
-                };
-            }
-
-            // Validate self-teleport prevention
-            if (targetPlayer.PlayerUID == player.PlayerUID)
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:tpa-error-self-teleport"),
-                };
-            }
-
-            // Validate target player permissions
-            if (!targetPlayer.GetTpAllowed())
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:tpa-error-target-disabled"),
-                };
-            }
-
-            // Check for existing outgoing request
-            var existingRequest = player.GetOutgoingTpaRequest();
-            if (existingRequest != null && !IsRequestExpired(existingRequest))
-            {
-                var existingTargetPlayer = API.GetPlayerByUID(existingRequest.TargetPlayerUID);
-                var existingTargetName = existingTargetPlayer != null ? GetPlayerDisplayName(existingTargetPlayer) : "unknown player";
-
-                // Calculate time remaining
-                var elapsedTime = DateTime.UtcNow - new DateTime(existingRequest.RequestTimeRealTicks);
-                var timeRemaining = TimeSpan.FromMinutes(Config.TpaTimeoutMinutes) - elapsedTime;
-                var timeString = FormatTimeRemaining(timeRemaining);
-
-                // Build informative message
-                var requestTypeStr = existingRequest.Type == TpaRequestType.Goto
-                    ? Lang.Get("thebasics:tpa-error-existing-request-goto")
-                    : Lang.Get("thebasics:tpa-error-existing-request-bring");
-
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:tpa-error-existing-request", requestTypeStr, existingTargetName, timeString),
-                };
+                return validationError;
             }
 
             // ALL validations passed - NOW consume the temporal gear
-            if (Config.TpaRequireTemporalGear)
+            if (Config.TpaRequireTemporalGear && !RemoveTemporalGear(player))
             {
-                if (!RemoveTemporalGear(player))
+                return new TextCommandResult
                 {
-                    return new TextCommandResult
-                    {
-                        Status = EnumCommandStatus.Error,
-                        StatusMessage = Lang.Get("thebasics:tpa-error-consume-gear-failed"),
-                    };
-                }
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = Lang.Get("thebasics:tpa-error-consume-gear-failed"),
+                };
             }
 
             SpawnTeleportParticles(player);
 
-            var requestMessage = new StringBuilder();
-
-            if (type == TpaRequestType.Bring)
-            {
-                requestMessage.Append(Lang.Get("thebasics:tpa-notify-request-bring", player.PlayerName));
-            }
-            else if (type == TpaRequestType.Goto)
-            {
-                requestMessage.Append(Lang.Get("thebasics:tpa-notify-request-goto", player.PlayerName));
-            }
-
-            // Check if target has multiple requests to suggest using /tpalist
-            var existingRequests = targetPlayer.FindAllIncomingTpaRequests(this);
-
-            if (existingRequests.Count > 0)  // Will be > 0 after this request is stored
-            {
-                requestMessage.Append(Lang.Get("thebasics:tpa-notify-request-hint-multiple"));
-            }
-            else
-            {
-                requestMessage.Append(Lang.Get("thebasics:tpa-notify-request-hint-single"));
-            }
-
-            targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup, requestMessage.ToString(),
-                EnumChatType.Notification);
+            NotifyTargetOfTpaRequest(player, targetPlayer, type);
 
             var request = new TpaRequest
             {
@@ -566,6 +485,82 @@ namespace thebasics.ModSystems.TPA
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = Lang.Get("thebasics:tpa-success-request-sent", targetPlayer.PlayerName),
+            };
+        }
+
+        private TextCommandResult ValidateTpaRequest(IServerPlayer player, IServerPlayer targetPlayer)
+        {
+            if (Config.TpaRequireTemporalGear && !IsPlayerHoldingTemporalGear(player))
+            {
+                return Error("thebasics:tpa-error-need-temporal-gear");
+            }
+
+            if (!player.CanTpa(API.World.Calendar, Config))
+            {
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = Lang.Get("thebasics:tpa-error-cooldown", Config.TpaCooldownInGameHours.ToString("0.##")),
+                };
+            }
+
+            if (targetPlayer.PlayerUID == player.PlayerUID)
+            {
+                return Error("thebasics:tpa-error-self-teleport");
+            }
+
+            if (!targetPlayer.GetTpAllowed())
+            {
+                return Error("thebasics:tpa-error-target-disabled");
+            }
+
+            var existingRequest = player.GetOutgoingTpaRequest();
+            return existingRequest != null && !IsRequestExpired(existingRequest)
+                ? BuildExistingTpaRequestError(existingRequest)
+                : null;
+        }
+
+        private TextCommandResult BuildExistingTpaRequestError(TpaRequest existingRequest)
+        {
+            var existingTargetPlayer = API.GetPlayerByUID(existingRequest.TargetPlayerUID);
+            var existingTargetName = existingTargetPlayer != null ? GetPlayerDisplayName(existingTargetPlayer) : "unknown player";
+            var elapsedTime = DateTime.UtcNow - new DateTime(existingRequest.RequestTimeRealTicks, DateTimeKind.Utc);
+            var timeString = FormatTimeRemaining(TimeSpan.FromMinutes(Config.TpaTimeoutMinutes) - elapsedTime);
+            var requestTypeStr = existingRequest.Type == TpaRequestType.Goto
+                ? Lang.Get("thebasics:tpa-error-existing-request-goto")
+                : Lang.Get("thebasics:tpa-error-existing-request-bring");
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = Lang.Get("thebasics:tpa-error-existing-request", requestTypeStr, existingTargetName, timeString),
+            };
+        }
+
+        private void NotifyTargetOfTpaRequest(IServerPlayer player, IServerPlayer targetPlayer, TpaRequestType type)
+        {
+            var requestMessage = new StringBuilder(GetTpaRequestNotificationText(player, type));
+            var existingRequests = targetPlayer.FindAllIncomingTpaRequests(this);
+            requestMessage.Append(Lang.Get(existingRequests.Count > 0
+                ? "thebasics:tpa-notify-request-hint-multiple"
+                : "thebasics:tpa-notify-request-hint-single"));
+
+            targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup, requestMessage.ToString(), EnumChatType.Notification);
+        }
+
+        private static string GetTpaRequestNotificationText(IServerPlayer player, TpaRequestType type)
+        {
+            return type == TpaRequestType.Bring
+                ? Lang.Get("thebasics:tpa-notify-request-bring", player.PlayerName)
+                : Lang.Get("thebasics:tpa-notify-request-goto", player.PlayerName);
+        }
+
+        private static TextCommandResult Error(string langKey)
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = Lang.Get(langKey),
             };
         }
 
@@ -757,14 +752,6 @@ namespace thebasics.ModSystems.TPA
             // Use the centralized method to handle the cancellation
             ExpireOrCancelTpaRequest(player, outgoingRequest, TpaExpireReason.Cancelled, targetPlayer);
 
-            // Notify the target player if they're online
-            if (targetPlayer != null)
-            {
-                targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup,
-                    Lang.Get("thebasics:tpa-notify-target-cancelled", GetPlayerDisplayName(player)),
-                    EnumChatType.Notification);
-            }
-
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -799,7 +786,7 @@ namespace thebasics.ModSystems.TPA
                 // Calculate time remaining if timeout is enabled
                 if (Config.TpaUseTimeout)
                 {
-                    var elapsedTime = DateTime.UtcNow - new DateTime(request.RequestTimeRealTicks);
+                    var elapsedTime = DateTime.UtcNow - new DateTime(request.RequestTimeRealTicks, DateTimeKind.Utc);
                     var timeRemaining = TimeSpan.FromMinutes(Config.TpaTimeoutMinutes) - elapsedTime;
                     var timeString = FormatTimeRemaining(timeRemaining);
 

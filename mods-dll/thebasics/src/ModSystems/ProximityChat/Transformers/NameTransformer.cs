@@ -1,3 +1,4 @@
+#pragma warning disable S2325 // GetFormattedName remains an instance method for existing tests and call sites.
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat;

@@ -5,6 +5,6 @@ namespace thebasics.Models
     public class ChannelSelectedMessage
     {
         [ProtoMember(1)]
-        public int? GroupId;
+        public int? GroupId { get; set; }
     }
 }

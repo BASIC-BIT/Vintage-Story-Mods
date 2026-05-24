@@ -59,6 +59,24 @@ public static class HeadshotPipeline
 
     public static NormalizeResult Normalize(byte[] inputBytes, NormalizeOptions options)
     {
+        var validationError = ValidateNormalizeRequest(inputBytes, options);
+        if (validationError != null)
+        {
+            return validationError;
+        }
+
+        try
+        {
+            return NormalizeCore(inputBytes, options);
+        }
+        catch (Exception)
+        {
+            return Fail(HeadshotErrorCodes.Exception);
+        }
+    }
+
+    private static NormalizeResult ValidateNormalizeRequest(byte[] inputBytes, NormalizeOptions options)
+    {
         if (options == null)
         {
             return Fail(HeadshotErrorCodes.OptionsNull);
@@ -74,82 +92,106 @@ public static class HeadshotPipeline
             return Fail(HeadshotErrorCodes.UnsupportedFormat);
         }
 
-        if (options.TargetDimension <= 0 || options.MaxOutputBytes <= 0 || options.MaxDecodedDimensionEitherAxis <= 0)
+        return options.TargetDimension <= 0 || options.MaxOutputBytes <= 0 || options.MaxDecodedDimensionEitherAxis <= 0
+            ? Fail(HeadshotErrorCodes.BadOptions)
+            : null;
+    }
+
+    private static NormalizeResult NormalizeCore(byte[] inputBytes, NormalizeOptions options)
+    {
+        var decodeError = TryDecodeBitmap(inputBytes, options, out var decoded);
+        if (decodeError != null)
         {
-            return Fail(HeadshotErrorCodes.BadOptions);
+            return decodeError;
         }
 
-        try
+        using (decoded)
         {
-            using var codec = SKCodec.Create(new MemoryStream(inputBytes, writable: false));
-            if (codec == null)
+            var resizeError = TryCreateFinalBitmap(decoded, options, out var finalBitmap);
+            if (resizeError != null)
             {
-                return Fail(HeadshotErrorCodes.DecodeCreateFailed);
+                return resizeError;
             }
 
-            var info = codec.Info;
-            if (info.Width <= 0 || info.Height <= 0)
+            using (finalBitmap)
             {
-                return Fail(HeadshotErrorCodes.DecodeZeroDims);
+                return EncodeResult(finalBitmap, options);
             }
-
-            // Decompression-bomb guard: reject before allocating decoded pixels.
-            if (info.Width > options.MaxDecodedDimensionEitherAxis || info.Height > options.MaxDecodedDimensionEitherAxis)
-            {
-                return Fail(HeadshotErrorCodes.DimensionsExceeded);
-            }
-
-            using var decoded = SKBitmap.Decode(codec);
-            if (decoded == null || decoded.Width <= 0 || decoded.Height <= 0)
-            {
-                return Fail(HeadshotErrorCodes.DecodeFailed);
-            }
-
-            using var squared = CenterCropSquare(decoded);
-            if (squared == null)
-            {
-                return Fail(HeadshotErrorCodes.CropFailed);
-            }
-
-            var targetSize = Math.Min(options.TargetDimension, squared.Width);
-            if (targetSize <= 0)
-            {
-                return Fail(HeadshotErrorCodes.TargetZero);
-            }
-
-            using var finalBitmap = squared.Width == targetSize
-                ? squared.Copy()
-                : squared.Resize(new SKImageInfo(targetSize, targetSize, SKColorType.Bgra8888, SKAlphaType.Premul), SKFilterQuality.High);
-            if (finalBitmap == null)
-            {
-                return Fail(HeadshotErrorCodes.ResizeFailed);
-            }
-
-            using var image = SKImage.FromBitmap(finalBitmap);
-            if (image == null)
-            {
-                return Fail(HeadshotErrorCodes.ImageFailed);
-            }
-
-            using var data = image.Encode(SKEncodedImageFormat.Png, PngEncodeQuality);
-            if (data == null)
-            {
-                return Fail(HeadshotErrorCodes.EncodeFailed);
-            }
-
-            var encoded = data.ToArray();
-            if (encoded.Length > options.MaxOutputBytes)
-            {
-                return Fail(HeadshotErrorCodes.OutputTooLarge);
-            }
-
-            var hash = ComputeSha256Hex(encoded);
-            return new NormalizeResult(true, null, encoded, hash, finalBitmap.Width, finalBitmap.Height);
         }
-        catch (Exception)
+    }
+
+    private static NormalizeResult TryDecodeBitmap(byte[] inputBytes, NormalizeOptions options, out SKBitmap decoded)
+    {
+        decoded = null;
+        using var codec = SKCodec.Create(new MemoryStream(inputBytes, writable: false));
+        if (codec == null)
         {
-            return Fail(HeadshotErrorCodes.Exception);
+            return Fail(HeadshotErrorCodes.DecodeCreateFailed);
         }
+
+        var info = codec.Info;
+        if (info.Width <= 0 || info.Height <= 0)
+        {
+            return Fail(HeadshotErrorCodes.DecodeZeroDims);
+        }
+
+        if (info.Width > options.MaxDecodedDimensionEitherAxis || info.Height > options.MaxDecodedDimensionEitherAxis)
+        {
+            return Fail(HeadshotErrorCodes.DimensionsExceeded);
+        }
+
+        decoded = SKBitmap.Decode(codec);
+        return decoded == null || decoded.Width <= 0 || decoded.Height <= 0
+            ? Fail(HeadshotErrorCodes.DecodeFailed)
+            : null;
+    }
+
+    private static NormalizeResult TryCreateFinalBitmap(SKBitmap decoded, NormalizeOptions options, out SKBitmap finalBitmap)
+    {
+        finalBitmap = null;
+        using var squared = CenterCropSquare(decoded);
+        if (squared == null)
+        {
+            return Fail(HeadshotErrorCodes.CropFailed);
+        }
+
+        var targetSize = Math.Min(options.TargetDimension, squared.Width);
+        if (targetSize <= 0)
+        {
+            return Fail(HeadshotErrorCodes.TargetZero);
+        }
+
+        finalBitmap = squared.Width == targetSize
+            ? squared.Copy()
+            : squared.Resize(
+                new SKImageInfo(targetSize, targetSize, SKColorType.Bgra8888, SKAlphaType.Premul),
+                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+
+        return finalBitmap == null ? Fail(HeadshotErrorCodes.ResizeFailed) : null;
+    }
+
+    private static NormalizeResult EncodeResult(SKBitmap finalBitmap, NormalizeOptions options)
+    {
+        using var image = SKImage.FromBitmap(finalBitmap);
+        if (image == null)
+        {
+            return Fail(HeadshotErrorCodes.ImageFailed);
+        }
+
+        using var data = image.Encode(SKEncodedImageFormat.Png, PngEncodeQuality);
+        if (data == null)
+        {
+            return Fail(HeadshotErrorCodes.EncodeFailed);
+        }
+
+        var encoded = data.ToArray();
+        if (encoded.Length > options.MaxOutputBytes)
+        {
+            return Fail(HeadshotErrorCodes.OutputTooLarge);
+        }
+
+        var hash = ComputeSha256Hex(encoded);
+        return new NormalizeResult(true, null, encoded, hash, finalBitmap.Width, finalBitmap.Height);
     }
 
     public static bool IsPng(byte[] bytes)
