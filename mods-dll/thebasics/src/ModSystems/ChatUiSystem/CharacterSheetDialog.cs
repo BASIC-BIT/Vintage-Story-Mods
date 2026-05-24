@@ -212,7 +212,8 @@ public class CharacterSheetDialog : GuiDialog
 
         composer.EndClip()
             .AddVerticalScrollbar(OnNewScrollbarValue, ElementStdBounds.VerticalScrollbar(scrollClipBounds), "scrollbar")
-            .AddSmallButton(Lang.Get("Cancel"), OnCancel, ElementBounds.Fixed(0, buttonY, 120, buttonHeight));
+            .AddSmallButton(Lang.Get("Cancel"), OnCancel, ElementBounds.Fixed(0, buttonY, 120, buttonHeight))
+            .AddSmallButton(Lang.Get("thebasics:guide-button"), OnGuide, ElementBounds.Fixed(130, buttonY, 120, buttonHeight));
 
         if (_view?.CanEdit == true && _view.Success)
         {
@@ -548,6 +549,11 @@ public class CharacterSheetDialog : GuiDialog
 
         _onSave(request);
         return true;
+    }
+
+    private bool OnGuide()
+    {
+        return HandbookGuide.Open(capi, HandbookGuide.CharacterSheetPage);
     }
 
     private bool HasUnsavedChanges()
