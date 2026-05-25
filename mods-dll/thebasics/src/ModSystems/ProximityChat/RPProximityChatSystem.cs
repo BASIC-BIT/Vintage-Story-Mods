@@ -32,7 +32,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     public ProximityCheckUtils ProximityCheckUtils { get; set; }
     public TransformerSystem TransformerSystem { get; set; }
     private Th3EssentialsDiscordRelay _th3EssentialsDiscordRelay;
-    private bool _loggedExtensionHandlerFailure;
+    private readonly HashSet<string> _loggedExtensionHandlerFailures = new(StringComparer.Ordinal);
 
     public event EventHandler<ProximityChatMessageEventArgs> ProximityChatMessageProcessed;
 
@@ -75,7 +75,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             }
             catch (Exception ex)
             {
-                LogExtensionHandlerFailure(ex);
+                LogExtensionHandlerFailure(extensionHandler, ex);
             }
         }
     }
@@ -85,15 +85,28 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         _th3EssentialsDiscordRelay?.Relay(Config, args.RenderedMessage);
     }
 
-    private void LogExtensionHandlerFailure(Exception ex)
+    private void LogExtensionHandlerFailure(Delegate handler, Exception ex)
     {
-        if (_loggedExtensionHandlerFailure)
+        var handlerName = GetExtensionHandlerName(handler);
+        var failureKey = $"{handlerName}|{ex.GetType().FullName}";
+        if (!_loggedExtensionHandlerFailures.Add(failureKey))
         {
             return;
         }
 
-        _loggedExtensionHandlerFailure = true;
-        API?.Logger.Warning($"[THEBASICS] A proximity chat extension handler failed and was skipped: {ex.GetType().Name}.");
+        API?.Logger.Warning($"[THEBASICS] A proximity chat extension handler failed and was skipped: {handlerName} ({ex.GetType().Name}).");
+    }
+
+    private static string GetExtensionHandlerName(Delegate handler)
+    {
+        var declaringType = handler?.Method?.DeclaringType?.FullName;
+        var methodName = handler?.Method?.Name;
+        if (string.IsNullOrWhiteSpace(methodName))
+        {
+            return "unknown handler";
+        }
+
+        return string.IsNullOrWhiteSpace(declaringType) ? methodName : $"{declaringType}.{methodName}";
     }
 
     private void RegisterCommands()

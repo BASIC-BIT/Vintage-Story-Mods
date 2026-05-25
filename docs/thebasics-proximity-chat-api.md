@@ -33,7 +33,7 @@ Event handlers are isolated: if one add-on throws, The BASICs logs the failure o
 - `RenderedMessage`: The BASICs' trusted VTML-formatted log/chat representation.
 - `PlainTextMessage`: VTML-stripped text for non-VTML surfaces such as Discord/webhooks.
 - `Mode`: proximity mode when one applies.
-- `Language`: language metadata when one applies.
+- `Language`: language metadata when one applies; otherwise `null`.
 - `FromCommand`: whether the message originated from a The BASICs command path.
 
 ## Integration Guidance

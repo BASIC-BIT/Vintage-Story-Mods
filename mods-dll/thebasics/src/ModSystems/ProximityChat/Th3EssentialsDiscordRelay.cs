@@ -122,17 +122,24 @@ internal sealed class Th3EssentialsDiscordRelay
         return channelProperty?.GetValue(discord) != null;
     }
 
-    private static bool IsDiscordChatRelayEnabled(object discord)
+    private bool IsDiscordChatRelayEnabled(object discord)
     {
         var configField = discord.GetType().GetField("Config", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         var config = configField?.GetValue(discord);
         if (config == null)
         {
-            return true;
+            LogReflectionFailure("Th3Essentials Config field was not found");
+            return false;
         }
 
         var relayField = config.GetType().GetField("DiscordChatRelay", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        return relayField?.GetValue(config) is not bool enabled || enabled;
+        if (relayField?.GetValue(config) is not bool enabled)
+        {
+            LogReflectionFailure("Th3Essentials DiscordChatRelay field was not found");
+            return false;
+        }
+
+        return enabled;
     }
 
     private void LogUnavailable(string reason)

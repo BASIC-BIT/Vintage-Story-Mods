@@ -41,6 +41,22 @@ public class Th3EssentialsDiscordRelayTests
         discord.Messages.Should().BeEmpty();
     }
 
+    [Fact]
+    public void TryEnqueue_FailsClosedWhenTh3EssentialsConfigShapeChanges()
+    {
+        var relay = new Th3EssentialsDiscordRelay(null!);
+        var discordWithoutConfig = new FakeTh3DiscordWithoutConfig();
+        var discordWithoutRelayField = new FakeTh3DiscordWithoutRelayField();
+
+        var queuedWithoutConfig = relay.TryEnqueue(discordWithoutConfig, "Alice says hello.");
+        var queuedWithoutRelayField = relay.TryEnqueue(discordWithoutRelayField, "Bob says hello.");
+
+        queuedWithoutConfig.Should().BeFalse();
+        queuedWithoutRelayField.Should().BeFalse();
+        discordWithoutConfig.Messages.Should().BeEmpty();
+        discordWithoutRelayField.Messages.Should().BeEmpty();
+    }
+
     private sealed class FakeTh3Discord
     {
         private readonly ConcurrentQueue<string> sendQueue = new();
@@ -55,5 +71,24 @@ public class Th3EssentialsDiscordRelayTests
     public sealed class FakeDiscordConfig
     {
         public bool DiscordChatRelay = true;
+    }
+
+    private sealed class FakeTh3DiscordWithoutConfig
+    {
+        private readonly ConcurrentQueue<string> sendQueue = new();
+
+        public object? DiscordChannel { get; set; } = new();
+
+        public string[] Messages => sendQueue.ToArray();
+    }
+
+    private sealed class FakeTh3DiscordWithoutRelayField
+    {
+        private readonly ConcurrentQueue<string> sendQueue = new();
+
+        public object Config { get; } = new object();
+        public object? DiscordChannel { get; set; } = new();
+
+        public string[] Messages => sendQueue.ToArray();
     }
 }

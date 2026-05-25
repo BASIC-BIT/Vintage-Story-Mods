@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,7 +38,7 @@ public sealed class ProximityChatMessageEventArgs : EventArgs
     public string RenderedMessage { get; }
     public string PlainTextMessage { get; }
     public ProximityChatMode? Mode { get; }
-    public Language Language { get; }
+    public Language? Language { get; }
     public bool FromCommand { get; }
 
     internal static ProximityChatMessageEventArgs FromContext(MessageContext context, string renderedMessage)

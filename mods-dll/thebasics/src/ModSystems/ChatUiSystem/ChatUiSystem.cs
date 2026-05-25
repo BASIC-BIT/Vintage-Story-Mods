@@ -386,6 +386,8 @@ public class ChatUiSystem : ModSystem
 
         if (suppressDisabledAutoOpenError)
         {
+            _lastOwnCharacterSheetView = null;
+            _characterSheetDialog?.TryClose();
             _characterSheetOpenedFromCharacterDialog = false;
             return;
         }

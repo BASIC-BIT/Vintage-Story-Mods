@@ -45,7 +45,7 @@ public class ProximityChatExtensionApiTests
         captured.RenderedMessage.Should().Be("<strong>Alice</strong> whispers &lt;hello&gt;");
         captured.PlainTextMessage.Should().Be("Alice whispers <hello>");
         captured.Mode.Should().Be(ProximityChatMode.Whisper);
-        captured.Language.Name.Should().Be("Common");
+        captured.Language!.Name.Should().Be("Common");
         captured.FromCommand.Should().BeTrue();
     }
 
@@ -68,6 +68,26 @@ public class ProximityChatExtensionApiTests
         system.PublishProximityChatMessageProcessed(context, "(OOC) Alice: hello");
 
         invokedAfterFailure.Should().BeTrue();
+    }
+
+    [Fact]
+    public void PublishProximityChatMessageProcessed_AllowsAbsentLanguageMetadata()
+    {
+        var system = new RPProximityChatSystem();
+        ProximityChatMessageEventArgs captured = null!;
+        system.ProximityChatMessageProcessed += (_, args) => captured = args;
+
+        var context = new MessageContext
+        {
+            Message = "waves",
+            SendingPlayer = CreatePlayer("sender", "Alice"),
+            GroupId = 42,
+        };
+        context.SetFlag(MessageContext.IS_EMOTE);
+
+        system.PublishProximityChatMessageProcessed(context, "Alice waves");
+
+        captured.Language.Should().BeNull();
     }
 
     private static IServerPlayer CreatePlayer(string uid, string name)
