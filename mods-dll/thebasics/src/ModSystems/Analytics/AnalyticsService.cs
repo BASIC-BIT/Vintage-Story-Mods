@@ -112,13 +112,13 @@ public static class AnalyticsService
             ["headshot_url_allowed"] = config.HeadshotUrlAllowed,
             ["use_custom_nametag_renderer"] = config.UseCustomNametagRenderer,
             ["enable_rp_character_slots"] = config.EnableRpCharacterSlots,
-            ["max_rp_character_slots_bucket"] = BucketCount(config.MaxRpCharacterSlots),
+            ["max_rp_character_slots_bucket"] = AnalyticsBuckets.Count(config.MaxRpCharacterSlots),
             ["enable_admin_notes"] = config.EnableAdminNotes,
             ["enable_structured_admin_notes"] = config.EnableStructuredAdminNotes,
             ["enable_admin_note_ledger"] = config.EnableAdminNoteLedger,
             ["enable_player_notes"] = config.EnablePlayerNotes,
-            ["character_sheet_field_count_bucket"] = BucketCount(config.CharacterSheetFields?.Count ?? 0),
-            ["language_count_bucket"] = BucketCount(config.Languages?.Count ?? 0)
+            ["character_sheet_field_count_bucket"] = AnalyticsBuckets.Count(config.CharacterSheetFields?.Count ?? 0),
+            ["language_count_bucket"] = AnalyticsBuckets.Count(config.Languages?.Count ?? 0)
         });
     }
 
@@ -145,17 +145,4 @@ public static class AnalyticsService
         }
     }
 
-    private static string BucketCount(int count)
-    {
-        return count switch
-        {
-            <= 0 => "0",
-            <= 5 => "1-5",
-            <= 10 => "6-10",
-            <= 20 => "11-20",
-            <= 50 => "21-50",
-            <= 100 => "51-100",
-            _ => "101+"
-        };
-    }
 }

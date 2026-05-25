@@ -499,8 +499,12 @@ function validatePayload(payload) {
 }
 
 function normalizeEvent(event, envelope) {
-  if (!isPlainObject(event) || !hasOnlyKeys(event, ALLOWED_EVENT_KEYS) || !ALLOWED_EVENTS.has(event.name)) {
+  if (!isPlainObject(event) || !ALLOWED_EVENTS.has(event.name)) {
     return invalid("invalid_event_name");
+  }
+
+  if (!hasOnlyKeys(event, ALLOWED_EVENT_KEYS)) {
+    return invalid("unknown_event_key");
   }
 
   const timestampMs = typeof event.timestamp === "string" && event.timestamp.length <= 64

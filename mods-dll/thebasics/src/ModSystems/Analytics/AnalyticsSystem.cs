@@ -187,6 +187,12 @@ public class AnalyticsSystem : BaseBasicModSystem
         _analyticsConfig.ConsentLevel = AnalyticsConsentLevels.Normalize(consentLevel);
         _analyticsConfig.ConsentVersionAccepted = AnalyticsConsentLevels.CurrentConsentVersion;
 
+        if (previousAllowsPersonalizedAnalytics &&
+            !AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel))
+        {
+            _analyticsConfig.PlayerPseudonymSalt = string.Empty;
+        }
+
         if (_analyticsConfig.AllowsRemoteAnalytics())
         {
             EnsureServerInstallId();
