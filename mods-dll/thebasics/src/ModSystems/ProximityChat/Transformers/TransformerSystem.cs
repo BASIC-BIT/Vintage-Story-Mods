@@ -125,23 +125,21 @@ public class TransformerSystem
     }
 
     // TODO: Refactor common usage with ICSpeechFormatTransformer
-    private void LogChatMessage(MessageContext context)
+    private string BuildChatLogMessage(MessageContext context)
     {
         var nickname = context.GetMetadata(MessageContext.FORMATTED_NAME, context.SendingPlayer?.PlayerName ?? "unknown");
 
         if (context.HasFlag(MessageContext.IS_OOC))
         {
-            _chatSystem.API.Logger.Chat($"(OOC) {nickname}: {context.Message}");
-            return;
+            return $"(OOC) {nickname}: {context.Message}";
         }
 
         if (context.HasFlag(MessageContext.IS_GLOBAL_OOC))
         {
-            _chatSystem.API.Logger.Chat($"(GOOC) {nickname}: {context.Message}");
-            return;
+            return $"(GOOC) {nickname}: {context.Message}";
         }
 
-        _chatSystem.API.Logger.Chat(FormatInCharacterLogMessage(context, nickname));
+        return FormatInCharacterLogMessage(context, nickname);
     }
 
     private string FormatInCharacterLogMessage(MessageContext context, string nickname)
@@ -227,7 +225,9 @@ public class TransformerSystem
             return;
         }
 
-        LogChatMessage(context);
+        var logMessage = BuildChatLogMessage(context);
+        _chatSystem.API.Logger.Chat(logMessage);
+        _chatSystem.PublishProximityChatMessageProcessed(context, logMessage);
         context.SetMetadata(ChatMessageLoggedMetadataKey, true);
     }
 

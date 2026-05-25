@@ -7,6 +7,8 @@ namespace thebasics.Models;
 [ProtoContract]
 public class CharacterSheetViewMessage
 {
+    public const string ErrorCodeDisabled = "disabled";
+
     [ProtoMember(1)]
     [DefaultValue(true)]
     public bool Success { get; set; } = true;
@@ -59,4 +61,7 @@ public class CharacterSheetViewMessage
     /// </summary>
     [ProtoMember(15)]
     public bool CanEditHeadshot { get; set; }
+
+    [ProtoMember(16)]
+    public string ErrorCode { get; set; } = string.Empty;
 }

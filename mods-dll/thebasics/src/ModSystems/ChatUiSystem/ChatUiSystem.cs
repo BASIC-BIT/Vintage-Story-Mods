@@ -339,10 +339,7 @@ public class ChatUiSystem : ModSystem
 
         if (!message.Success || message.IsErrorResponse)
         {
-            _pendingCharacterSheetSave = false;
-            _pendingCharacterSheetOpenFromCharacterDialog = false;
-            _characterSheetMessageDialog?.TryClose();
-            _api.TriggerIngameError(_api.World, "charsheet", message.Message);
+            HandleCharacterSheetErrorMessage(message);
             return;
         }
 
@@ -377,6 +374,26 @@ public class ChatUiSystem : ModSystem
         _pendingCharacterSheetOpenFromCharacterDialog = false;
 
         OpenCharacterSheetDialog(message);
+    }
+
+    private static void HandleCharacterSheetErrorMessage(CharacterSheetViewMessage message)
+    {
+        var suppressDisabledAutoOpenError = _pendingCharacterSheetOpenFromCharacterDialog &&
+                                            message.ErrorCode == CharacterSheetViewMessage.ErrorCodeDisabled;
+
+        _pendingCharacterSheetSave = false;
+        _pendingCharacterSheetOpenFromCharacterDialog = false;
+
+        if (suppressDisabledAutoOpenError)
+        {
+            _lastOwnCharacterSheetView = null;
+            _characterSheetDialog?.TryClose();
+            _characterSheetOpenedFromCharacterDialog = false;
+            return;
+        }
+
+        _characterSheetMessageDialog?.TryClose();
+        _api.TriggerIngameError(_api.World, "charsheet", message.Message);
     }
 
     private static void OpenCharacterSheetDialog(CharacterSheetViewMessage message)
