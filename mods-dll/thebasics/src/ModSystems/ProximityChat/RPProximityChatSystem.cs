@@ -26,12 +26,12 @@ namespace thebasics.ModSystems.ProximityChat;
 
 public class RPProximityChatSystem : BaseBasicModSystem
 {
-    public int ProximityChatId;
-    public LanguageSystem LanguageSystem;
-    public DistanceObfuscationSystem DistanceObfuscationSystem;
+    public int ProximityChatId { get; set; }
+    public LanguageSystem LanguageSystem { get; set; }
+    public DistanceObfuscationSystem DistanceObfuscationSystem { get; set; }
     private IServerNetworkChannel _serverConfigChannel;
-    public ProximityCheckUtils ProximityCheckUtils;
-    public TransformerSystem TransformerSystem;
+    public ProximityCheckUtils ProximityCheckUtils { get; set; }
+    public TransformerSystem TransformerSystem { get; set; }
 
     // Ephemeral state; do not persist.
     private readonly System.Collections.Generic.Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new();
@@ -234,8 +234,18 @@ public class RPProximityChatSystem : BaseBasicModSystem
         API.ChatCommands.GetOrCreate("thebasics")
             .WithRootAlias("tb")
             .WithRootAlias("basic")
-            .WithDescription("The BASICs administration commands")
-            .RequiresPrivilege(Privilege.root)
+            .WithDescription(Lang.Get("thebasics:thebasics-cmd-desc"))
+            .RequiresPrivilege(Privilege.chat)
+            .BeginSubCommand("help")
+                .WithAlias("commands")
+                .WithDescription(Lang.Get("thebasics:thebasics-cmd-help-desc"))
+                .HandleWith(HandleTheBasicsHelpCommand)
+            .EndSubCommand()
+            .BeginSubCommand("guide")
+                .WithAlias("handbook")
+                .WithDescription(Lang.Get("thebasics:thebasics-cmd-guide-desc"))
+                .HandleWith(HandleTheBasicsGuideCommand)
+            .EndSubCommand()
             .BeginSubCommand("config")
                 .WithDescription("Open The BASICs config panel")
                 .RequiresPrivilege(Privilege.root)
@@ -267,7 +277,18 @@ public class RPProximityChatSystem : BaseBasicModSystem
                 .WithDescription("Reload The BASICs config from disk")
                 .RequiresPrivilege(Privilege.root)
                 .HandleWith(HandleReloadConfigCommand)
-            .EndSubCommand();
+            .EndSubCommand()
+            .HandleWith(HandleTheBasicsHelpCommand);
+    }
+
+    private static TextCommandResult HandleTheBasicsHelpCommand(TextCommandCallingArgs args)
+    {
+        return TextCommandResult.Success(Lang.Get("thebasics:thebasics-help"));
+    }
+
+    private static TextCommandResult HandleTheBasicsGuideCommand(TextCommandCallingArgs args)
+    {
+        return TextCommandResult.Success(Lang.Get("thebasics:thebasics-guide-link"));
     }
 
     private TextCommandResult HandleOpenConfigCommand(TextCommandCallingArgs args)
@@ -348,7 +369,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         };
     }
 
-    private TextCommandResult LanguageColorPreference(TextCommandCallingArgs args)
+    private static TextCommandResult LanguageColorPreference(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
         var preferences = player.GetChatVisualPreferences();
@@ -364,6 +385,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:chatprefs-langcolor-set", ChatHelper.OnOff(preferences.LanguageColorsEnabled)));
     }
 
+#pragma warning disable S1541 // Legacy command router retained until a dedicated chat-preferences refactor.
     private TextCommandResult ChatPreferences(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
@@ -418,6 +440,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
     }
 
+#pragma warning restore S1541
+
     private static string GetOptionalWord(TextCommandCallingArgs args, int index)
     {
         return args.Parsers.Count > index && !args.Parsers[index].IsMissing
@@ -425,7 +449,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             : null;
     }
 
-    private string BuildChatPreferencesStatus(ChatVisualPreferences preferences)
+    private static string BuildChatPreferencesStatus(ChatVisualPreferences preferences)
     {
         return Lang.Get(
             "thebasics:chatprefs-status",
@@ -481,6 +505,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:chatprefs-preset-set", preferences.ColorPreset));
     }
 
+#pragma warning disable S1541 // Legacy command validation retained until a dedicated chat-preferences refactor.
     private TextCommandResult SetLanguageColorOverride(IServerPlayer player, ChatVisualPreferences preferences, string languageIdentifier, string colorValue)
     {
         if (string.IsNullOrWhiteSpace(languageIdentifier))
@@ -515,6 +540,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         player.SetChatVisualPreferences(preferences);
         return Success(Lang.Get("thebasics:chatprefs-langcolor-override-set", ChatHelper.LangIdentifier(language, player), FormatColorSetting(ChatVisualPreferenceResolver.GetLanguageColor(language, player))));
     }
+
+#pragma warning restore S1541
 
     private static TextCommandResult SetColorOverride(
         IServerPlayer player,
@@ -791,6 +818,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _serverConfigChannel.SendPacket(response, player);
     }
 
+#pragma warning disable S1541 // Admin config save orchestration is intentionally deferred to a focused refactor.
     private void OnConfigAdminSaveMessage(IServerPlayer player, TheBasicsConfigAdminSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -864,7 +892,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         SendConfigAdminResult(player, true, messageText, changedKeys);
     }
+#pragma warning restore S1541
 
+#pragma warning disable S1541 // Admin config save orchestration is intentionally deferred to a focused refactor.
     private void OnLanguageConfigSaveMessage(IServerPlayer player, TheBasicsLanguageConfigSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -916,7 +946,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
             "Saved The BASICs language config. Online players were reconciled; renamed languages also reconcile for later joins until the next server restart.",
             LanguageConfigAdmin.BuildEntries(Config));
     }
+#pragma warning restore S1541
 
+#pragma warning disable S1541 // Admin config save orchestration is intentionally deferred to a focused refactor.
     private void OnCharacterSheetFieldConfigSaveMessage(IServerPlayer player, TheBasicsCharacterSheetFieldConfigSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -960,7 +992,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         SendCharacterSheetFieldConfigResult(player, true, "Saved The BASICs character sheet field config.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
     }
+#pragma warning restore S1541
 
+#pragma warning disable S1541 // Typing-state normalization is kept inline to preserve wire-compatibility behavior.
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
     {
         if (player?.Entity == null || message == null)
@@ -1004,8 +1038,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // Best-effort broadcast; clients without this message type will silently ignore it.
         _serverConfigChannel?.BroadcastPacket(message, player);
     }
+#pragma warning restore S1541
 
-    private void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)
+    private static void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)
     {
         player.SetLastSelectedGroupId(message.GroupId);
     }
@@ -1569,6 +1604,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return (gain, falloff);
     }
 
+#pragma warning disable S1541, S3776 // Chatter dispatch branches mirror RP mode semantics; deeper split is tracked as follow-up debt.
     internal void DispatchChatterForContext(MessageContext context)
     {
         if (_serverConfigChannel == null || !Config.EnableChatter)
@@ -1690,6 +1726,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             _serverConfigChannel.SendPacket(recipientMessage, recipient);
         }
     }
+#pragma warning restore S1541, S3776
 
     internal static int CountQuotedSpeechLength(string message)
     {
@@ -1940,16 +1977,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
             var newNickname = (string)fullArgs.Parsers[2].GetValue();
 
             // Validate nickname against conflicts and show warning to admin - always enforced unless forced
-            if (!isForced)
+            if (!isForced &&
+                !NicknameValidationUtils.ValidateNickname(attemptTarget, newNickname, API, Config, out string conflictingPlayer, out string conflictType))
             {
-                if (!NicknameValidationUtils.ValidateNickname(attemptTarget, newNickname, API, Config, out string conflictingPlayer, out string conflictType))
+                return new TextCommandResult
                 {
-                    return new TextCommandResult
-                    {
-                        Status = EnumCommandStatus.Error,
-                        StatusMessage = Lang.Get("thebasics:chat-nick-admin-conflict-warn", newNickname, conflictingPlayer, conflictType, attemptTarget.PlayerName),
-                    };
-                }
+                    Status = EnumCommandStatus.Error,
+                    StatusMessage = Lang.Get("thebasics:chat-nick-admin-conflict-warn", newNickname, conflictingPlayer, conflictType, attemptTarget.PlayerName),
+                };
             }
 
             attemptTarget.SetNickname(newNickname, Config);

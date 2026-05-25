@@ -1,4 +1,5 @@
 #nullable enable
+#pragma warning disable S1133 // Deprecated bridge method is retained for compatibility with older call sites.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -176,7 +177,7 @@ namespace thebasics.ModSystems.ProximityChat
                 }
                 else
                 {
-                    var newDefault = newPlayerLanguages.First();
+                    var newDefault = newPlayerLanguages[0];
                     player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-new-default", ChatHelper.LangIdentifier(language, player), ChatHelper.LangIdentifier(newDefault, player)), EnumChatType.Notification);
                     player.SetDefaultLanguage(newDefault);
                 }
@@ -316,7 +317,7 @@ namespace thebasics.ModSystems.ProximityChat
                 }
                 else
                 {
-                    var newDefault = newPlayerLanguages.First();
+                    var newDefault = newPlayerLanguages[0];
                     player?.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:lang-notify-admin-new-default", targetPlayer.PlayerName, ChatHelper.LangIdentifier(language, player), ChatVisualPreferenceResolver.FormatLanguageText(newDefault.Name, newDefault, player)), EnumChatType.Notification);
                     targetPlayer.SetDefaultLanguage(newDefault);
                 }
@@ -348,7 +349,7 @@ namespace thebasics.ModSystems.ProximityChat
             };
         }
 
-        private IServerPlayer GetCallerPlayer(TextCommandCallingArgs args)
+        private IServerPlayer? GetCallerPlayer(TextCommandCallingArgs args)
         {
             var playerUid = args.Caller.Player?.PlayerUID;
             return string.IsNullOrWhiteSpace(playerUid) ? null : API.GetPlayerByUID(playerUid);
@@ -468,9 +469,8 @@ namespace thebasics.ModSystems.ProximityChat
                 return;
             }
 
-            foreach (Match match in Regex.Matches(name, @"\w+"))
+            foreach (var word in Regex.Matches(name, @"\w+").Cast<Match>().Select(match => match.Value))
             {
-                var word = match.Value;
                 if (word.Length >= MinimumRecognizableNameLength)
                 {
                     words.Add(word);

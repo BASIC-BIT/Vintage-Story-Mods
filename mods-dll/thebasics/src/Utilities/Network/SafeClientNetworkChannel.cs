@@ -10,7 +10,7 @@ namespace thebasics.Utilities.Network
     /// Handles connection checking, retry mechanisms, and queue-based packet handling
     /// to prevent "Attempting to send data to a not connected channel" errors.
     /// </summary>
-    public class SafeClientNetworkChannel
+    public class SafeClientNetworkChannel : IDisposable
     {
         private readonly IClientNetworkChannel _channel;
         private readonly ICoreClientAPI _api;
@@ -19,6 +19,7 @@ namespace thebasics.Utilities.Network
 
         private bool _connectionRetryInProgress;
         private int _connectionRetryCount;
+        private bool _disposed;
 
         /// <summary>
         /// Configuration for the safe network channel behavior
@@ -249,8 +250,25 @@ namespace thebasics.Utilities.Network
         /// </summary>
         public void Dispose()
         {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (!disposing)
+            {
+                return;
+            }
+
             ClearPendingActions();
             ResetRetryState();
+            _disposed = true;
         }
     }
 }

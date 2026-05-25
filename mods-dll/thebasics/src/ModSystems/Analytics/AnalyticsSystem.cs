@@ -16,6 +16,7 @@ public class AnalyticsSystem : BaseBasicModSystem
     private const string AnalyticsCommand = "basicsanalytics";
     private const int ConsentPromptDelayMs = 3000;
     private const int ConsentPromptMaxAttempts = 10;
+    private const int ShutdownFlushTimeoutMs = 750;
 
     private AnalyticsConfig _analyticsConfig;
     private IServerNetworkChannel _analyticsChannel;
@@ -50,7 +51,11 @@ public class AnalyticsSystem : BaseBasicModSystem
         try
         {
             AnalyticsService.Track("server stopped", new Dictionary<string, object>());
-            AnalyticsService.FlushAsync().GetAwaiter().GetResult();
+            var flushTask = AnalyticsService.FlushAsync();
+            if (!flushTask.Wait(ShutdownFlushTimeoutMs) && _analyticsConfig?.DebugLogTelemetry == true)
+            {
+                API?.Logger.Warning("THEBASICS analytics: shutdown flush timed out; final event may be dropped.");
+            }
         }
         catch
         {
@@ -349,7 +354,7 @@ public class AnalyticsSystem : BaseBasicModSystem
         API.StoreModConfig(_analyticsConfig, AnalyticsConfigName);
     }
 
-    private void SendConsentPromptMessages(IServerPlayer player)
+    private static void SendConsentPromptMessages(IServerPlayer player)
     {
         player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:analytics-consent-prompt-intro"), EnumChatType.Notification);
         player.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:analytics-consent-prompt-privacy"), EnumChatType.Notification);

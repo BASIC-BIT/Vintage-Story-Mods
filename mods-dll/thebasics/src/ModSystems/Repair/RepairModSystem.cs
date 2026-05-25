@@ -25,46 +25,16 @@ namespace thebasics.ModSystems.Repair
             var player = (IServerPlayer)args.Caller.Player;
 
             var durabilityInput = (string)args[0];
-            var activeSlot = player.InventoryManager?.ActiveHotbarSlot;
-
-            if (activeSlot == null || activeSlot.Empty || activeSlot.Itemstack == null)
+            if (!TryGetRepairableStack(player, out var activeSlot, out var stack, out var maxDurability, out var errorKey))
             {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:repair-error-nothing-in-hand"),
-                };
-            }
-
-            var stack = activeSlot.Itemstack;
-            if (stack.Class == EnumItemClass.Block)
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:repair-error-is-block"),
-                };
-            }
-
-            var maxDurability = stack.Collectible?.GetMaxDurability(stack) ?? 0;
-            if (maxDurability <= 0)
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:repair-error-no-durability"),
-                };
+                return Error(errorKey);
             }
 
             if (!TryParseDurabilityInput(durabilityInput, maxDurability, out var durability, out var error, out var showPercentHint))
             {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = error == DurabilityInputError.Negative
-                        ? Lang.Get("thebasics:repair-error-negative-durability")
-                        : Lang.Get("thebasics:repair-error-invalid-durability"),
-                };
+                return Error(error == DurabilityInputError.Negative
+                    ? "thebasics:repair-error-negative-durability"
+                    : "thebasics:repair-error-invalid-durability");
             }
 
             stack.Attributes.SetInt("durability", durability);
@@ -82,6 +52,58 @@ namespace thebasics.ModSystems.Repair
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = message,
+            };
+        }
+
+        private static bool TryGetRepairableStack(
+            IServerPlayer player,
+            out ItemSlot activeSlot,
+            out ItemStack stack,
+            out int maxDurability,
+            out string errorKey)
+        {
+            activeSlot = player.InventoryManager?.ActiveHotbarSlot;
+            stack = activeSlot?.Itemstack;
+            maxDurability = GetMaxDurability(stack);
+
+            if (SlotHasNoItem(activeSlot, stack))
+            {
+                errorKey = "thebasics:repair-error-nothing-in-hand";
+                return false;
+            }
+
+            if (stack.Class == EnumItemClass.Block)
+            {
+                errorKey = "thebasics:repair-error-is-block";
+                return false;
+            }
+
+            if (maxDurability <= 0)
+            {
+                errorKey = "thebasics:repair-error-no-durability";
+                return false;
+            }
+
+            errorKey = null;
+            return true;
+        }
+
+        private static bool SlotHasNoItem(ItemSlot activeSlot, ItemStack stack)
+        {
+            return activeSlot == null || activeSlot.Empty || stack == null;
+        }
+
+        private static int GetMaxDurability(ItemStack stack)
+        {
+            return stack?.Collectible?.GetMaxDurability(stack) ?? 0;
+        }
+
+        private static TextCommandResult Error(string langKey)
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = Lang.Get(langKey),
             };
         }
 

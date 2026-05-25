@@ -1,3 +1,4 @@
+#pragma warning disable S1541, S3776 // Command/network orchestration needs behavior-preserving refactors, not opportunistic churn.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -47,7 +48,7 @@ public class PlayerNotesSystem : BaseBasicModSystem
             .WithAlias("anotes", "staffnotes")
             .WithDescription(Lang.Get("thebasics:notes-cmd-admin-desc"))
             .RequiresPrivilege(Config.AdminNotesPermission)
-            .WithArgs(new StringArgParser("arguments", false))
+            .WithArgs(new StringArgParser("player [open|list|add|view|edit|delete|ledger] ...", false))
             .HandleWith(HandleAdminNotesCommand);
 
         API.ChatCommands.GetOrCreate("notes")
@@ -118,6 +119,11 @@ public class PlayerNotesSystem : BaseBasicModSystem
 
         var raw = GetRawArgument(args);
         var targetQuery = PopToken(ref raw);
+        if (IsHelpToken(targetQuery))
+        {
+            return TextCommandResult.Success(Lang.Get("thebasics:notes-help-admin"));
+        }
+
         if (string.IsNullOrWhiteSpace(targetQuery))
         {
             return TextCommandResult.Error(Lang.Get("thebasics:notes-error-admin-usage"));
@@ -168,6 +174,11 @@ public class PlayerNotesSystem : BaseBasicModSystem
         var raw = GetRawArgument(args);
         PlayerNoteTarget target;
         var action = PopToken(ref raw).ToLowerInvariant();
+
+        if (IsHelpToken(action))
+        {
+            return TextCommandResult.Success(Lang.Get("thebasics:notes-help-personal"));
+        }
 
         if (action == "about")
         {
@@ -790,7 +801,7 @@ public class PlayerNotesSystem : BaseBasicModSystem
         return TryResolveTarget(targetUid, query, allowOffline: true, out var target, out error) ? target : null;
     }
 
-    private RpCharacterRecord GetActiveCharacter(IServerPlayer player)
+    private static RpCharacterRecord GetActiveCharacter(IServerPlayer player)
     {
         if (player == null)
         {
@@ -1073,6 +1084,11 @@ public class PlayerNotesSystem : BaseBasicModSystem
         var result = input.Substring(0, split);
         input = input.Substring(split + 1).TrimStart();
         return result;
+    }
+
+    private static bool IsHelpToken(string value)
+    {
+        return string.Equals(value, "help", StringComparison.OrdinalIgnoreCase) || value == "?";
     }
 
     private static string NormalizeScope(string scope)

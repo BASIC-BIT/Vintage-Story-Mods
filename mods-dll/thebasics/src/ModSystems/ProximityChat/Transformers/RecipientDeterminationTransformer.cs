@@ -36,21 +36,7 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         // Determine communication range based on chat mode and language
         var range = GetCommunicationRange(context);
 
-        // For placed environmental messages, use the hit position as the proximity origin
-        // so recipients are determined by distance to the bubble, not the sender.
-        BlockPos originPos;
-        if (context.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL) &&
-            context.TryGetMetadata(MessageContext.PLACED_POSITION, out Vec3d placedPos))
-        {
-            originPos = new BlockPos(
-                (int)System.Math.Floor(placedPos.X),
-                (int)System.Math.Floor(placedPos.Y),
-                (int)System.Math.Floor(placedPos.Z));
-        }
-        else
-        {
-            originPos = context.SendingPlayer.Entity.Pos.AsBlockPos;
-        }
+        var originPos = GetRecipientOrigin(context);
 
         // Find players within range
         var allPlayers = _chatSystem.API.World.AllOnlinePlayers;
@@ -58,30 +44,10 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         var requiresSignLineOfSight = lang == LanguageSystem.SignLanguage && _config.RequireLineOfSightForSignLanguage;
         var pendingSignLanguageRecipients = new List<IServerPlayer>();
 
-        var nearbyPlayers = allPlayers.Where(player =>
-        {
-            var serverPlayer = player as IServerPlayer;
-            if (serverPlayer == null) return false;
-
-            bool inRange = player.Entity.Pos.AsBlockPos.ManhattanDistance(originPos) < range;
-
-            // Special check for sign language - must be within line of sight
-            if (inRange && requiresSignLineOfSight)
-            {
-                var canSee = _proximityCheckUtils.CanSeePlayer(
-                    context.SendingPlayer,
-                    serverPlayer,
-                    useMultiPointTargets: true);
-                if (!canSee)
-                {
-                    pendingSignLanguageRecipients.Add(serverPlayer);
-                }
-
-                return canSee;
-            }
-
-            return inRange;
-        }).Cast<IServerPlayer>().ToList();
+        var nearbyPlayers = allPlayers
+            .OfType<IServerPlayer>()
+            .Where(player => CanReceive(context, player, originPos, range, requiresSignLineOfSight, pendingSignLanguageRecipients))
+            .ToList();
 
         if (pendingSignLanguageRecipients.Count > 0)
         {
@@ -100,6 +66,51 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         context.Recipients = nearbyPlayers;
 
         return context;
+    }
+
+    private static BlockPos GetRecipientOrigin(MessageContext context)
+    {
+        if (!context.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL) ||
+            !context.TryGetMetadata(MessageContext.PLACED_POSITION, out Vec3d placedPos))
+        {
+            return context.SendingPlayer.Entity.Pos.AsBlockPos;
+        }
+
+        return new BlockPos(
+            (int)System.Math.Floor(placedPos.X),
+            (int)System.Math.Floor(placedPos.Y),
+            (int)System.Math.Floor(placedPos.Z));
+    }
+
+    private bool CanReceive(
+        MessageContext context,
+        IServerPlayer player,
+        BlockPos originPos,
+        int range,
+        bool requiresSignLineOfSight,
+        List<IServerPlayer> pendingSignLanguageRecipients)
+    {
+        var inRange = player.Entity.Pos.AsBlockPos.ManhattanDistance(originPos) < range;
+        if (!inRange)
+        {
+            return false;
+        }
+
+        if (!requiresSignLineOfSight)
+        {
+            return true;
+        }
+
+        var canSee = _proximityCheckUtils.CanSeePlayer(
+            context.SendingPlayer,
+            player,
+            useMultiPointTargets: true);
+        if (!canSee)
+        {
+            pendingSignLanguageRecipients.Add(player);
+        }
+
+        return canSee;
     }
 
     private int GetCommunicationRange(MessageContext context)

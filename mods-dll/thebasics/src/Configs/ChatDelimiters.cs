@@ -35,7 +35,7 @@ namespace thebasics.Configs
             DefaultChatDelimiterIfUsingDefaultValues(SignLanguageQuote, "'", "'");
         }
 
-        private void DefaultChatDelimiterIfUsingDefaultValues(ChatDelimiter delimiter, string start, string end)
+        private static void DefaultChatDelimiterIfUsingDefaultValues(ChatDelimiter delimiter, string start, string end)
         {
             if (string.IsNullOrEmpty(delimiter.Start) && string.IsNullOrEmpty(delimiter.End))
             {

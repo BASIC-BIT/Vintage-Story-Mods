@@ -22,11 +22,11 @@ public static class RaycastUtils
             return null;
         }
 
-        var serverPos = player.Entity.ServerPos;
-        var eyePos = serverPos.XYZ.AddCopy(player.Entity.LocalEyePos);
+        var entityPos = player.Entity.Pos;
+        var eyePos = entityPos.XYZ.AddCopy(player.Entity.LocalEyePos);
 
-        // GetViewVector uses ServerPos.Pitch and ServerPos.Yaw to compute a unit direction.
-        var viewDir = serverPos.GetViewVector();
+        // GetViewVector uses the entity pitch and yaw to compute a unit direction.
+        var viewDir = entityPos.GetViewVector();
         var toPos = eyePos.AddCopy(
             viewDir.X * maxDistance,
             viewDir.Y * maxDistance,

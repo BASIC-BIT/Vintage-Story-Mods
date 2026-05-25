@@ -1,3 +1,4 @@
+#pragma warning disable S2325 // Public service API stays instance-oriented even when individual helpers do not use instance state.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -110,25 +111,40 @@ public class RpCharacterService
 
         foreach (var character in registry.Characters)
         {
-            character.CharacterId ??= string.Empty;
-            character.DisplayName ??= string.Empty;
-            character.SnapshotVersion = character.SnapshotVersion <= 0 ? 1 : character.SnapshotVersion;
-            character.Projection ??= CreateDefaultProjection();
-            character.Appearance ??= new RpCharacterAppearanceSnapshot();
-            character.Inventory ??= new RpCharacterInventorySnapshot();
-            character.Inventory.Inventories ??= new List<RpCharacterInventoryData>();
-            character.Body ??= new RpCharacterBodySnapshot();
-            character.Body.Health ??= new RpCharacterHealthSnapshot();
-            character.Body.Hunger ??= new RpCharacterHungerSnapshot();
-            character.Body.Position ??= new RpCharacterPositionSnapshot();
-            character.Body.PositionBeforeFalling ??= new RpCharacterPositionSnapshot();
-            character.Body.Spawn ??= new RpCharacterSpawnSnapshot();
-            character.Extensions ??= new List<RpCharacterExtensionSnapshot>();
-            character.Extensions.RemoveAll(extension => extension == null || string.IsNullOrWhiteSpace(extension.Key));
-            NormalizeProjection(character.Projection);
+            NormalizeCharacterRecord(character);
         }
 
         return registry;
+    }
+
+    private void NormalizeCharacterRecord(RpCharacterRecord character)
+    {
+        character.CharacterId ??= string.Empty;
+        character.DisplayName ??= string.Empty;
+        character.SnapshotVersion = character.SnapshotVersion <= 0 ? 1 : character.SnapshotVersion;
+        character.Projection ??= CreateDefaultProjection();
+        character.Appearance ??= new RpCharacterAppearanceSnapshot();
+        NormalizeInventorySnapshot(character);
+        NormalizeBodySnapshot(character);
+        character.Extensions ??= new List<RpCharacterExtensionSnapshot>();
+        character.Extensions.RemoveAll(extension => extension == null || string.IsNullOrWhiteSpace(extension.Key));
+        NormalizeProjection(character.Projection);
+    }
+
+    private static void NormalizeInventorySnapshot(RpCharacterRecord character)
+    {
+        character.Inventory ??= new RpCharacterInventorySnapshot();
+        character.Inventory.Inventories ??= new List<RpCharacterInventoryData>();
+    }
+
+    private static void NormalizeBodySnapshot(RpCharacterRecord character)
+    {
+        character.Body ??= new RpCharacterBodySnapshot();
+        character.Body.Health ??= new RpCharacterHealthSnapshot();
+        character.Body.Hunger ??= new RpCharacterHungerSnapshot();
+        character.Body.Position ??= new RpCharacterPositionSnapshot();
+        character.Body.PositionBeforeFalling ??= new RpCharacterPositionSnapshot();
+        character.Body.Spawn ??= new RpCharacterSpawnSnapshot();
     }
 
     public string GetActiveCharacterId(IServerPlayer player)
@@ -335,26 +351,38 @@ public class RpCharacterService
 
         IServerPlayerExtensions.SetModData(player, CharacterSheetKey, CloneSheet(projection.Sheet));
 
-        // Mirror the active character's headshot hash to the entity's "nametag" tree-attribute
-        // so vanilla's OnNameChanged listener automatically rebuilds the nametag texture when an
-        // RP character switch lands.
+        MirrorHeadshotHashToNametag(player, projection);
+        RestoreNicknameColor(player, projection.NicknameColor);
+        RestoreChatProjection(player, projection);
+    }
+
+    private static void MirrorHeadshotHashToNametag(IServerPlayer player, RpCharacterProjectionSnapshot projection)
+    {
         var headshotHash = projection.Sheet?.Headshot?.Hash ?? string.Empty;
         var attrs = player.Entity?.WatchedAttributes;
         var nametagTree = attrs?.GetTreeAttribute(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.NametagAttrTree);
-        if (attrs != null && nametagTree != null && nametagTree.GetString(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.HeadshotHashAttrKey) != headshotHash)
+        if (attrs == null || nametagTree == null || nametagTree.GetString(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.HeadshotHashAttrKey) == headshotHash)
         {
-            nametagTree.SetString(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.HeadshotHashAttrKey, headshotHash);
-            attrs.MarkPathDirty(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.NametagAttrTree);
-        }
-        if (string.IsNullOrWhiteSpace(projection.NicknameColor))
-        {
-            player.RemoveModdata(NicknameColorKey);
-        }
-        else
-        {
-            IServerPlayerExtensions.SetModData(player, NicknameColorKey, projection.NicknameColor);
+            return;
         }
 
+        nametagTree.SetString(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.HeadshotHashAttrKey, headshotHash);
+        attrs.MarkPathDirty(thebasics.ModSystems.CharacterSheets.CharacterSheetSystem.NametagAttrTree);
+    }
+
+    private static void RestoreNicknameColor(IServerPlayer player, string nicknameColor)
+    {
+        if (string.IsNullOrWhiteSpace(nicknameColor))
+        {
+            player.RemoveModdata(NicknameColorKey);
+            return;
+        }
+
+        IServerPlayerExtensions.SetModData(player, NicknameColorKey, nicknameColor);
+    }
+
+    private static void RestoreChatProjection(IServerPlayer player, RpCharacterProjectionSnapshot projection)
+    {
         player.SetLanguages(projection.Languages);
         IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", projection.DefaultLanguage);
         player.SetChatMode(projection.ChatMode);
@@ -429,7 +457,7 @@ public class RpCharacterService
         }
     }
 
-    private void SaveRegistry(IServerPlayer player, RpCharacterRegistry registry)
+    private static void SaveRegistry(IServerPlayer player, RpCharacterRegistry registry)
     {
         IServerPlayerExtensions.SetModData(player, CharacterSlotsKey, registry);
     }

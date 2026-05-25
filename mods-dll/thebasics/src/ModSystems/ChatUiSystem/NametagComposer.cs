@@ -35,7 +35,7 @@ internal static class NametagComposer
 
     public static LoadedTexture Compose(ICoreClientAPI capi, Options options)
     {
-        if (capi == null || options == null || string.IsNullOrWhiteSpace(options.Vtml))
+        if (!HasValidOptions(capi, options))
         {
             return null;
         }
@@ -44,60 +44,14 @@ internal static class NametagComposer
         ImageSurface frameSurface = null;
         try
         {
-            textSurface = RichTextTextureUtils.GenRichTextSurface(
-                capi,
-                options.Vtml,
-                options.BaseFont,
-                options.MaxTextWidthPx,
-                options.TextBackground);
+            textSurface = CreateTextSurface(capi, options);
             if (textSurface == null)
             {
                 return null;
             }
 
-            var hasHeadshot = options.HeadshotBitmap != null && options.HeadshotRenderSizePx > 0;
-            if (hasHeadshot)
-            {
-                // Decode failures here are recoverable — fall back to a text-only nametag rather than
-                // failing the whole render and showing nothing.
-                try
-                {
-                    frameSurface = BuildFramedHeadshotSurface(options.HeadshotBitmap, options.HeadshotRenderSizePx);
-                }
-                catch
-                {
-                    frameSurface = null;
-                }
-            }
-
-            var textWidth = textSurface.Width;
-            var textHeight = textSurface.Height;
-            var frameWidth = frameSurface?.Width ?? 0;
-            var frameHeight = frameSurface?.Height ?? 0;
-
-            var compositeWidth = frameWidth + (frameSurface != null ? InterElementGapPx : 0) + textWidth;
-            var compositeHeight = Math.Max(textHeight, frameHeight);
-
-            using var composite = new ImageSurface(Format.Argb32, compositeWidth, compositeHeight);
-            using var ctx = new Context(composite);
-
-            if (frameSurface != null)
-            {
-                var frameY = (compositeHeight - frameHeight) / 2;
-                ctx.SetSourceSurface(frameSurface, 0, frameY);
-                ctx.Rectangle(0, frameY, frameWidth, frameHeight);
-                ctx.Fill();
-            }
-
-            var textX = frameSurface != null ? frameWidth + InterElementGapPx : 0;
-            var textY = (compositeHeight - textHeight) / 2;
-            ctx.SetSourceSurface(textSurface, textX, textY);
-            ctx.Rectangle(textX, textY, textWidth, textHeight);
-            ctx.Fill();
-
-            var tex = new LoadedTexture(capi);
-            capi.Gui.LoadOrUpdateCairoTexture(composite, linearMag: false, ref tex);
-            return tex;
+            frameSurface = TryBuildFramedHeadshotSurface(options);
+            return BuildCompositeTexture(capi, textSurface, frameSurface);
         }
         catch
         {
@@ -108,6 +62,74 @@ internal static class NametagComposer
             textSurface?.Dispose();
             frameSurface?.Dispose();
         }
+    }
+
+    private static bool HasValidOptions(ICoreClientAPI capi, Options options)
+    {
+        return capi != null && options != null && !string.IsNullOrWhiteSpace(options.Vtml);
+    }
+
+    private static ImageSurface CreateTextSurface(ICoreClientAPI capi, Options options)
+    {
+        return RichTextTextureUtils.GenRichTextSurface(
+            capi,
+            options.Vtml,
+            options.BaseFont,
+            options.MaxTextWidthPx,
+            options.TextBackground);
+    }
+
+    private static ImageSurface TryBuildFramedHeadshotSurface(Options options)
+    {
+        if (options.HeadshotBitmap == null || options.HeadshotRenderSizePx <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return BuildFramedHeadshotSurface(options.HeadshotBitmap, options.HeadshotRenderSizePx);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static LoadedTexture BuildCompositeTexture(ICoreClientAPI capi, ImageSurface textSurface, ImageSurface frameSurface)
+    {
+        var textWidth = textSurface.Width;
+        var textHeight = textSurface.Height;
+        var frameWidth = frameSurface?.Width ?? 0;
+        var frameHeight = frameSurface?.Height ?? 0;
+        var compositeWidth = frameWidth + (frameSurface != null ? InterElementGapPx : 0) + textWidth;
+        var compositeHeight = Math.Max(textHeight, frameHeight);
+
+        using var composite = new ImageSurface(Format.Argb32, compositeWidth, compositeHeight);
+        using var ctx = new Context(composite);
+        DrawComposite(ctx, textSurface, frameSurface, compositeHeight);
+
+        var tex = new LoadedTexture(capi);
+        capi.Gui.LoadOrUpdateCairoTexture(composite, linearMag: false, ref tex);
+        return tex;
+    }
+
+    private static void DrawComposite(Context ctx, ImageSurface textSurface, ImageSurface frameSurface, int compositeHeight)
+    {
+        var frameWidth = frameSurface?.Width ?? 0;
+        if (frameSurface != null)
+        {
+            var frameY = (compositeHeight - frameSurface.Height) / 2;
+            ctx.SetSourceSurface(frameSurface, 0, frameY);
+            ctx.Rectangle(0, frameY, frameSurface.Width, frameSurface.Height);
+            ctx.Fill();
+        }
+
+        var textX = frameSurface != null ? frameWidth + InterElementGapPx : 0;
+        var textY = (compositeHeight - textSurface.Height) / 2;
+        ctx.SetSourceSurface(textSurface, textX, textY);
+        ctx.Rectangle(textX, textY, textSurface.Width, textSurface.Height);
+        ctx.Fill();
     }
 
     /// <summary>

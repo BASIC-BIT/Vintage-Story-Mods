@@ -96,7 +96,7 @@ public class AnalyticsConsentDialog : GuiDialog
         composer.AddRichtext(VtmlUtil.Richtextify(capi, VtmlUtils.EscapeVtml(text), CairoFont.WhiteSmallText()), bounds);
     }
 
-    private void AddHeading(GuiComposer composer, string text, ElementBounds bounds)
+    private static void AddHeading(GuiComposer composer, string text, ElementBounds bounds)
     {
         composer.AddStaticText(text, CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), bounds);
     }

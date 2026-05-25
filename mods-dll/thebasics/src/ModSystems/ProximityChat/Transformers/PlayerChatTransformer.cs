@@ -10,6 +10,31 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 public class PlayerChatTransformer : MessageTransformerBase
 {
+    private enum PlayerChatKind
+    {
+        Speech,
+        GlobalOoc,
+        Ooc,
+        Emote,
+        PlacedEnvironment,
+        Environment,
+        DisabledGlobalOoc
+    }
+
+    private readonly struct ParsedPlayerChat
+    {
+        public ParsedPlayerChat(PlayerChatKind kind, int prefixLength = 0, bool hasExplicitPrefix = false)
+        {
+            Kind = kind;
+            PrefixLength = prefixLength;
+            HasExplicitPrefix = hasExplicitPrefix;
+        }
+
+        public PlayerChatKind Kind { get; }
+        public int PrefixLength { get; }
+        public bool HasExplicitPrefix { get; }
+    }
+
     public PlayerChatTransformer(RPProximityChatSystem chatSystem) : base(chatSystem)
     {
     }
@@ -21,219 +46,228 @@ public class PlayerChatTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
+        var delimiters = _config.ChatDelimiters;
+        var parsed = ParseMessageKind(context, delimiters);
+
+        return parsed.Kind switch
+        {
+            PlayerChatKind.DisabledGlobalOoc => RejectDisabledGlobalOoc(context),
+            PlayerChatKind.GlobalOoc => ApplyGlobalOoc(context, delimiters, parsed.PrefixLength),
+            PlayerChatKind.Ooc => ApplyOoc(context, delimiters, parsed.PrefixLength),
+            PlayerChatKind.Emote => ApplyEmote(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
+            PlayerChatKind.PlacedEnvironment => ApplyPlacedEnvironment(context, delimiters, parsed.PrefixLength),
+            PlayerChatKind.Environment => ApplyEnvironment(context, delimiters, parsed.PrefixLength),
+            _ => ApplySpeech(context)
+        };
+    }
+
+    private ParsedPlayerChat ParseMessageKind(MessageContext context, ChatDelimiters delimiters)
+    {
         var content = context.Message;
-
-        static bool TryConsumeDelimiterAtStart(string text, string delimiter, out int consumeLength)
+        var hasGlobalOocPrefix = HasStartDelimiter(content, delimiters.GlobalOOC.Start, out var globalOocStartLen);
+        if (hasGlobalOocPrefix)
         {
-            consumeLength = 0;
-
-            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(delimiter))
-            {
-                return false;
-            }
-
-            var i = 0;
-            // Ignore leading combining/format characters; they can appear under temporal/drunk effects.
-            while (i < text.Length && ChatHelper.IsDecoratorChar(text[i]))
-            {
-                i++;
-            }
-
-            for (var d = 0; d < delimiter.Length; d++)
-            {
-                if (i >= text.Length || text[i] != delimiter[d])
-                {
-                    return false;
-                }
-                i++;
-
-                // Consume any decorators right after this delimiter character.
-                while (i < text.Length && ChatHelper.IsDecoratorChar(text[i]))
-                {
-                    i++;
-                }
-            }
-
-            consumeLength = i;
-            return true;
+            return _config.EnableGlobalOOC
+                ? new ParsedPlayerChat(PlayerChatKind.GlobalOoc, globalOocStartLen, hasExplicitPrefix: true)
+                : new ParsedPlayerChat(PlayerChatKind.DisabledGlobalOoc);
         }
 
-        static bool TryConsumeDelimiterAtEnd(string text, string delimiter, out int newLength)
+        if (HasStartDelimiter(content, delimiters.OOC.Start, out var oocStartLen))
         {
-            newLength = text?.Length ?? 0;
-
-            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(delimiter))
-            {
-                return false;
-            }
-
-            var i = text.Length - 1;
-            // Skip trailing decorators (keep them if delimiter doesn't match).
-            while (i >= 0 && ChatHelper.IsDecoratorChar(text[i]))
-            {
-                i--;
-            }
-
-            if (i < 0)
-            {
-                return false;
-            }
-
-            // Match delimiter backwards, skipping decorators between delimiter chars.
-            for (var d = delimiter.Length - 1; d >= 0; d--)
-            {
-                if (i < 0 || text[i] != delimiter[d])
-                {
-                    return false;
-                }
-                i--;
-                while (i >= 0 && ChatHelper.IsDecoratorChar(text[i]))
-                {
-                    i--;
-                }
-            }
-
-            newLength = i + 1;
-            return newLength >= 0 && newLength < text.Length;
+            return new ParsedPlayerChat(PlayerChatKind.Ooc, oocStartLen, hasExplicitPrefix: true);
         }
 
-        static string StripTrailingAll(string text, string delimiter)
+        if (HasStartDelimiter(content, delimiters.PlacedEnvironmental?.Start, out var placedEnvStartLen))
         {
-            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(delimiter))
-            {
-                return text;
-            }
+            return new ParsedPlayerChat(PlayerChatKind.PlacedEnvironment, placedEnvStartLen, hasExplicitPrefix: true);
+        }
 
-            while (TryConsumeDelimiterAtEnd(text, delimiter, out var newLength))
-            {
-                text = text[..newLength];
-            }
+        if (HasStartDelimiter(content, delimiters.Environmental.Start, out var envStartLen))
+        {
+            return new ParsedPlayerChat(PlayerChatKind.Environment, envStartLen, hasExplicitPrefix: true);
+        }
 
+        if (HasStartDelimiter(content, delimiters.Emote.Start, out var emoteStartLen))
+        {
+            return new ParsedPlayerChat(PlayerChatKind.Emote, emoteStartLen, hasExplicitPrefix: true);
+        }
+
+        if (context.SendingPlayer.GetEmoteMode())
+        {
+            return new ParsedPlayerChat(PlayerChatKind.Emote);
+        }
+
+        return new ParsedPlayerChat(PlayerChatKind.Speech);
+    }
+
+    private MessageContext RejectDisabledGlobalOoc(MessageContext context)
+    {
+        context.SendingPlayer?.SendMessage(
+            _chatSystem.ProximityChatId,
+            Lang.Get("thebasics:chat-gooc-disabled"),
+            EnumChatType.CommandError);
+        context.State = MessageContextState.STOP;
+        return context;
+    }
+
+    private static MessageContext ApplyGlobalOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength)
+    {
+        var updated = StripTrailingAll(context.Message[prefixLength..], delimiters.GlobalOOC.End);
+        context.SetFlag(MessageContext.IS_GLOBAL_OOC);
+        context.UpdateMessage(updated.Trim(), updateSpeech: false);
+        context.SetMetadata("clientData", (string)null);
+        return context;
+    }
+
+    private static MessageContext ApplyOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength)
+    {
+        var updated = context.Message[prefixLength..];
+        if (!string.IsNullOrEmpty(delimiters.OOC.End) && TryConsumeDelimiterAtEnd(updated, delimiters.OOC.End, out var newLen))
+        {
+            updated = updated[..newLen];
+        }
+
+        context.SetFlag(MessageContext.IS_OOC);
+        context.UpdateMessage(updated.Trim(), updateSpeech: false);
+        return context;
+    }
+
+    private static MessageContext ApplyEmote(MessageContext context, ChatDelimiters delimiters, int prefixLength, bool hasExplicitPrefix)
+    {
+        var endDelimiter = string.IsNullOrEmpty(delimiters.Emote.End)
+            ? delimiters.Emote.Start
+            : delimiters.Emote.End;
+        var updated = hasExplicitPrefix
+            ? StripTrailingAll(context.Message[prefixLength..], endDelimiter)
+            : context.Message;
+        context.SetFlag(MessageContext.IS_EMOTE);
+        context.UpdateMessage(updated.Trim(), updateSpeech: false);
+        return context;
+    }
+
+    private static MessageContext ApplyPlacedEnvironment(MessageContext context, ChatDelimiters delimiters, int prefixLength)
+    {
+        var updated = StripTrailingAll(context.Message[prefixLength..], delimiters.PlacedEnvironmental?.End);
+        if (string.IsNullOrEmpty(delimiters.PlacedEnvironmental?.End))
+        {
+            updated = StripTrailingAll(updated, delimiters.PlacedEnvironmental?.Start);
+        }
+
+        context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
+        context.SetFlag(MessageContext.IS_PLACED_ENVIRONMENTAL);
+        context.UpdateMessage(updated.Trim(), updateSpeech: false);
+        return context;
+    }
+
+    private static MessageContext ApplyEnvironment(MessageContext context, ChatDelimiters delimiters, int prefixLength)
+    {
+        var endDelimiter = string.IsNullOrEmpty(delimiters.Environmental.End)
+            ? delimiters.Environmental.Start
+            : delimiters.Environmental.End;
+        var updated = StripTrailingAll(context.Message[prefixLength..], endDelimiter);
+
+        context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
+        context.UpdateMessage(updated.Trim(), updateSpeech: false);
+        return context;
+    }
+
+    private static MessageContext ApplySpeech(MessageContext context)
+    {
+        context.SetFlag(MessageContext.IS_SPEECH);
+        context.UpdateMessage(context.Message.Trim());
+        return context;
+    }
+
+    private static bool HasStartDelimiter(string text, string delimiter, out int consumeLength)
+    {
+        consumeLength = 0;
+        return !string.IsNullOrEmpty(delimiter) && TryConsumeDelimiterAtStart(text, delimiter, out consumeLength);
+    }
+
+    private static bool TryConsumeDelimiterAtStart(string text, string delimiter, out int consumeLength)
+    {
+        consumeLength = 0;
+
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(delimiter))
+        {
+            return false;
+        }
+
+        var index = 0;
+        SkipDecoratorsForward(text, ref index);
+
+        for (var delimiterIndex = 0; delimiterIndex < delimiter.Length; delimiterIndex++)
+        {
+            if (index >= text.Length || text[index] != delimiter[delimiterIndex])
+            {
+                return false;
+            }
+            index++;
+            SkipDecoratorsForward(text, ref index);
+        }
+
+        consumeLength = index;
+        return true;
+    }
+
+    private static bool TryConsumeDelimiterAtEnd(string text, string delimiter, out int newLength)
+    {
+        newLength = text?.Length ?? 0;
+
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(delimiter))
+        {
+            return false;
+        }
+
+        var index = text.Length - 1;
+        SkipDecoratorsBackward(text, ref index);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        for (var delimiterIndex = delimiter.Length - 1; delimiterIndex >= 0; delimiterIndex--)
+        {
+            if (index < 0 || text[index] != delimiter[delimiterIndex])
+            {
+                return false;
+            }
+            index--;
+            SkipDecoratorsBackward(text, ref index);
+        }
+
+        newLength = index + 1;
+        return newLength >= 0 && newLength < text.Length;
+    }
+
+    private static void SkipDecoratorsForward(string text, ref int index)
+    {
+        while (index < text.Length && ChatHelper.IsDecoratorChar(text[index]))
+        {
+            index++;
+        }
+    }
+
+    private static void SkipDecoratorsBackward(string text, ref int index)
+    {
+        while (index >= 0 && ChatHelper.IsDecoratorChar(text[index]))
+        {
+            index--;
+        }
+    }
+
+    private static string StripTrailingAll(string text, string delimiter)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(delimiter))
+        {
             return text;
         }
 
-        // Check message type based on configured delimiters
-        var delimiters = _config.ChatDelimiters;
-        var globalOocStartLen = 0;
-        var oocStartLen = 0;
-        var placedEnvStartLen = 0;
-        var envStartLen = 0;
-        var emoteStartLen = 0;
-
-        var hasGlobalOocPrefix = !string.IsNullOrEmpty(delimiters.GlobalOOC.Start) && TryConsumeDelimiterAtStart(content, delimiters.GlobalOOC.Start, out globalOocStartLen);
-
-        // Global OOC delimiter was used, but the feature is disabled: deny and explain.
-        if (hasGlobalOocPrefix && !_config.EnableGlobalOOC)
+        while (TryConsumeDelimiterAtEnd(text, delimiter, out var newLength))
         {
-            context.SendingPlayer?.SendMessage(
-                _chatSystem.ProximityChatId,
-                Lang.Get("thebasics:chat-gooc-disabled"),
-                EnumChatType.CommandError
-            );
-            context.State = MessageContextState.STOP;
-            return context;
+            text = text[..newLength];
         }
 
-        var hasGlobalOocStart = _config.EnableGlobalOOC && hasGlobalOocPrefix;
-        var hasOocStart = !hasGlobalOocStart && !string.IsNullOrEmpty(delimiters.OOC.Start) && TryConsumeDelimiterAtStart(content, delimiters.OOC.Start, out oocStartLen);
-        // Check placed environmental (!!) BEFORE standard environmental (!) so the longer delimiter wins.
-        var hasPlacedEnvStart = !string.IsNullOrEmpty(delimiters.PlacedEnvironmental?.Start) && TryConsumeDelimiterAtStart(content, delimiters.PlacedEnvironmental.Start, out placedEnvStartLen);
-        var hasEnvironmentStart = !hasPlacedEnvStart && !string.IsNullOrEmpty(delimiters.Environmental.Start) && TryConsumeDelimiterAtStart(content, delimiters.Environmental.Start, out envStartLen);
-        var hasEmoteStart = !string.IsNullOrEmpty(delimiters.Emote.Start) && TryConsumeDelimiterAtStart(content, delimiters.Emote.Start, out emoteStartLen);
-
-        var isGlobalOoc = hasGlobalOocStart;
-        var isOOC = hasOocStart;
-        var isPlacedEnvironmentMessage = hasPlacedEnvStart;
-        var isEnvironmentMessage = hasEnvironmentStart;
-        var isEmote = hasEmoteStart || (context.SendingPlayer.GetEmoteMode() && !isOOC && !isGlobalOoc && !isEnvironmentMessage && !isPlacedEnvironmentMessage);
-
-        // Handle Global OOC - this will be processed normally by the server
-        if (isGlobalOoc)
-        {
-            var updated = content[globalOocStartLen..]; // Remove the leading delimiter
-            if (!string.IsNullOrEmpty(delimiters.GlobalOOC.End))
-            {
-                // Remove all trailing end delimiters
-                updated = StripTrailingAll(updated, delimiters.GlobalOOC.End);
-            }
-
-            context.SetFlag(MessageContext.IS_GLOBAL_OOC);
-            context.UpdateMessage(updated.Trim(), updateSpeech: false);
-
-            // Global OOC is not an in-world "visual cue"; suppress overhead bubbles.
-            context.SetMetadata("clientData", (string)null);
-        }
-        else if (isEmote)
-        {
-            if (hasEmoteStart)
-            {
-                content = content[emoteStartLen..]; // Remove the leading delimiter
-
-                // Emote delimiter does not require an end delimiter, but many players type *like this*.
-                // Strip any trailing delimiter(s) for nicer display.
-                if (!string.IsNullOrEmpty(delimiters.Emote.End))
-                {
-                    content = StripTrailingAll(content, delimiters.Emote.End);
-                }
-                else
-                {
-                    content = StripTrailingAll(content, delimiters.Emote.Start);
-                }
-            }
-            context.SetFlag(MessageContext.IS_EMOTE);
-            context.UpdateMessage(content.Trim(), updateSpeech: false);
-        }
-        else if (isOOC)
-        {
-            var updated = content[oocStartLen..]; // Remove the leading delimiter
-            if (!string.IsNullOrEmpty(delimiters.OOC.End) && TryConsumeDelimiterAtEnd(updated, delimiters.OOC.End, out var newLen))
-            {
-                // Remove a single trailing delimiter
-                updated = updated[..newLen];
-            }
-            context.SetFlag(MessageContext.IS_OOC);
-            context.UpdateMessage(updated.Trim(), updateSpeech: false);
-        }
-        else if (isPlacedEnvironmentMessage)
-        {
-            var updated = content[placedEnvStartLen..]; // Remove the "!!" delimiter
-
-            if (!string.IsNullOrEmpty(delimiters.PlacedEnvironmental?.End))
-            {
-                updated = StripTrailingAll(updated, delimiters.PlacedEnvironmental.End);
-            }
-            else if (!string.IsNullOrEmpty(delimiters.PlacedEnvironmental?.Start))
-            {
-                updated = StripTrailingAll(updated, delimiters.PlacedEnvironmental.Start);
-            }
-
-            context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
-            context.SetFlag(MessageContext.IS_PLACED_ENVIRONMENTAL);
-            context.UpdateMessage(updated.Trim(), updateSpeech: false);
-        }
-        else if (isEnvironmentMessage)
-        {
-            var updated = content[envStartLen..]; // Remove the delimiter
-
-            // Players sometimes type !like this! even when no end delimiter is configured.
-            if (!string.IsNullOrEmpty(delimiters.Environmental.End))
-            {
-                updated = StripTrailingAll(updated, delimiters.Environmental.End);
-            }
-            else
-            {
-                updated = StripTrailingAll(updated, delimiters.Environmental.Start);
-            }
-
-            context.SetFlag(MessageContext.IS_ENVIRONMENTAL);
-            context.UpdateMessage(updated.Trim(), updateSpeech: false);
-        }
-        else
-        {
-            context.SetFlag(MessageContext.IS_SPEECH);
-            context.UpdateMessage(content.Trim());
-        }
-
-        return context;
+        return text;
     }
 }

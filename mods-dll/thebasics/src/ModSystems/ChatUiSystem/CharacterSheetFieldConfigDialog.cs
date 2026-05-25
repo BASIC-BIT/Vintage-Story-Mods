@@ -1,3 +1,4 @@
+#pragma warning disable S107 // Dialog composition helpers pass UI geometry explicitly for readability at call sites.
 using System;
 using System.Collections.Generic;
 using System.Linq;

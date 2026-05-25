@@ -1,3 +1,4 @@
+#pragma warning disable S3267 // Transformer execution mutates context and short-circuits, so a LINQ pipeline would obscure control flow.
 using System.Collections.Generic;
 using thebasics.Configs;
 using thebasics.Extensions;
@@ -85,7 +86,7 @@ public class TransformerSystem
         };
     }
 
-    private MessageContext ExecuteTransformers(MessageContext context, List<MessageTransformerBase> transformers)
+    private static MessageContext ExecuteTransformers(MessageContext context, List<MessageTransformerBase> transformers)
     {
         foreach (var transformer in transformers)
         {
@@ -140,34 +141,38 @@ public class TransformerSystem
             return;
         }
 
+        _chatSystem.API.Logger.Chat(FormatInCharacterLogMessage(context, nickname));
+    }
+
+    private string FormatInCharacterLogMessage(MessageContext context, string nickname)
+    {
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
         var presentationMode = ProximityChatPresentationModes.Normalize(_chatSystem.Config.ProximityChatPresentationMode);
-
-        var outputMessage = context.Message;
-        var languageEnabled = _chatSystem.Config.EnableLanguageSystem && !_chatSystem.Config.DisableRPChat;
-        if (presentationMode == ProximityChatPresentationModes.Prose)
-        {
-            outputMessage = ChatHelper.FormatProseMessage(outputMessage, lang, _chatSystem.Config, languageEnabled, nicknameReplacement: nickname);
-            outputMessage = ChatHelper.ApplyFreeformAttribution(outputMessage, context.SendingPlayer, _chatSystem.Config);
-        }
-        else if (ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode))
-        {
-            outputMessage = ChatHelper.WrapSpeechQuotes(outputMessage, lang, _chatSystem.Config, languageEnabled);
-        }
-
+        var outputMessage = FormatLoggedSpeechBody(context, lang, presentationMode, nickname);
         var verb = GetProximityChatVerb(lang, mode);
 
-        outputMessage = presentationMode switch
+        return presentationMode switch
         {
             ProximityChatPresentationModes.SimpleSpeech => $"{nickname}: {outputMessage}",
             ProximityChatPresentationModes.PlainProximity => $"{nickname}: {outputMessage}",
             ProximityChatPresentationModes.Prose => outputMessage,
             _ => $"{nickname} {verb} {outputMessage}"
         };
+    }
 
-        // log message
-        _chatSystem.API.Logger.Chat(outputMessage);
+    private string FormatLoggedSpeechBody(MessageContext context, Language lang, string presentationMode, string nickname)
+    {
+        var languageEnabled = _chatSystem.Config.EnableLanguageSystem && !_chatSystem.Config.DisableRPChat;
+        if (presentationMode == ProximityChatPresentationModes.Prose)
+        {
+            var prose = ChatHelper.FormatProseMessage(context.Message, lang, _chatSystem.Config, languageEnabled, nicknameReplacement: nickname);
+            return ChatHelper.ApplyFreeformAttribution(prose, context.SendingPlayer, _chatSystem.Config);
+        }
+
+        return ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode)
+            ? ChatHelper.WrapSpeechQuotes(context.Message, lang, _chatSystem.Config, languageEnabled)
+            : context.Message;
     }
 
     /// <summary>

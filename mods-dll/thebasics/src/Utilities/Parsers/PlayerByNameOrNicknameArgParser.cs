@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using thebasics.Configs;
 using thebasics.Extensions;
 using Vintagestory.API.Common;
@@ -52,84 +53,88 @@ namespace thebasics.Utilities.Parsers
 
         public override EnumParseResult TryProcess(TextCommandCallingArgs args, Action<AsyncParseResults> onReady = null)
         {
-            var text = args.RawArgs.PopWord();
-
-            if (string.IsNullOrEmpty(text))
+            if (!TryReadTargetText(args, out var text, out var errorMessage))
             {
-                lastErrorMessage = Lang.Get("thebasics:parser-error-missing-player");
-
-                if (onReady != null)
-                {
-                    onReady(new AsyncParseResults { Status = EnumParseResultStatus.Error });
-                    return EnumParseResult.Deferred;
-                }
-
-                return EnumParseResult.Bad;
-            }
-
-            // Process quoted text if present
-            if (text.StartsWith('"'))
-            {
-                text = text[1..]; // Remove opening quote
-
-                // If it's already a complete quoted string (e.g. "nickname")
-                if (text.EndsWith('"'))
-                {
-                    text = text[..^1]; // Remove closing quote
-                }
-                else
-                {
-                    // Keep consuming words until we find the closing quote
-                    while (!text.EndsWith('"') && args.RawArgs.Length > 0)
-                    {
-                        text += " " + args.RawArgs.PopWord();
-                    }
-
-                    // If we found a closing quote, remove it
-                    if (text.EndsWith('"'))
-                    {
-                        text = text[..^1]; // Remove closing quote
-                    }
-                    else
-                    {
-                        lastErrorMessage = Lang.Get("thebasics:parser-error-missing-quote");
-
-                        if (onReady != null)
-                        {
-                            onReady(new AsyncParseResults { Status = EnumParseResultStatus.Error });
-                            return EnumParseResult.Deferred;
-                        }
-
-                        return EnumParseResult.Bad;
-                    }
-                }
+                lastErrorMessage = errorMessage;
+                return CompleteError(onReady);
             }
 
             text = text.Trim();
 
             // First, check if any online player matches by name or UID
-            foreach (IServerPlayer player in api.World.AllOnlinePlayers.OfType<IServerPlayer>())
+            var exactMatch = FindExactPlayer(text);
+
+            if (exactMatch != null)
             {
-                if (player.PlayerName.Equals(text, StringComparison.OrdinalIgnoreCase) ||
-                    player.PlayerUID.Equals(text, StringComparison.OrdinalIgnoreCase))
-                {
-                    players = new PlayerUidName[] { new PlayerUidName(player.PlayerUID, player.PlayerName) };
-
-                    if (onReady != null)
-                    {
-                        onReady(new AsyncParseResults
-                        {
-                            Status = EnumParseResultStatus.Ready,
-                            Data = players
-                        });
-                        return EnumParseResult.Deferred;
-                    }
-
-                    return EnumParseResult.Good;
-                }
+                players = new PlayerUidName[] { new PlayerUidName(exactMatch.PlayerUID, exactMatch.PlayerName) };
+                return CompleteReady(onReady, players);
             }
 
             // If no match by name, check by nickname
+            var matchedPlayers = FindPlayersByNickname(text);
+
+            // If we found players matching the nickname, use them
+            if (matchedPlayers.Count > 0)
+            {
+                players = matchedPlayers.ToArray();
+                return CompleteReady(onReady, players);
+            }
+
+            // If we get here, no player with the given name or nickname was found
+            lastErrorMessage = Lang.Get("thebasics:parser-error-player-not-found", text);
+            return CompleteError(onReady);
+        }
+
+        private static bool TryReadTargetText(TextCommandCallingArgs args, out string text, out string errorMessage)
+        {
+            text = args.RawArgs.PopWord();
+            errorMessage = null;
+
+            if (string.IsNullOrEmpty(text))
+            {
+                errorMessage = Lang.Get("thebasics:parser-error-missing-player");
+                return false;
+            }
+
+            if (!text.StartsWith('"'))
+            {
+                return true;
+            }
+
+            text = text[1..]; // Remove opening quote
+            if (text.EndsWith('"'))
+            {
+                text = text[..^1]; // Remove closing quote
+                return true;
+            }
+
+            var quotedText = new StringBuilder(text);
+            while (!quotedText.ToString().EndsWith('"') && args.RawArgs.Length > 0)
+            {
+                quotedText.Append(' ').Append(args.RawArgs.PopWord());
+            }
+
+            text = quotedText.ToString();
+            if (text.EndsWith('"'))
+            {
+                text = text[..^1]; // Remove closing quote
+                return true;
+            }
+
+            errorMessage = Lang.Get("thebasics:parser-error-missing-quote");
+            return false;
+        }
+
+        private IServerPlayer FindExactPlayer(string text)
+        {
+            return api.World.AllOnlinePlayers
+                .OfType<IServerPlayer>()
+                .FirstOrDefault(player => player.PlayerName.Equals(text, StringComparison.OrdinalIgnoreCase) ||
+                                          player.PlayerUID.Equals(text, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private List<PlayerUidName> FindPlayersByNickname(string text)
+        {
             var matchedPlayers = new List<PlayerUidName>();
 
             foreach (IServerPlayer player in api.World.AllOnlinePlayers.OfType<IServerPlayer>())
@@ -142,34 +147,33 @@ namespace thebasics.Utilities.Parsers
                 }
             }
 
-            // If we found players matching the nickname, use them
-            if (matchedPlayers.Count > 0)
+            return matchedPlayers;
+        }
+
+        private static EnumParseResult CompleteReady(Action<AsyncParseResults> onReady, PlayerUidName[] players = null)
+        {
+            if (onReady == null)
             {
-                players = matchedPlayers.ToArray();
-
-                if (onReady != null)
-                {
-                    onReady(new AsyncParseResults
-                    {
-                        Status = EnumParseResultStatus.Ready,
-                        Data = players
-                    });
-                    return EnumParseResult.Deferred;
-                }
-
                 return EnumParseResult.Good;
             }
 
-            // If we get here, no player with the given name or nickname was found
-            lastErrorMessage = Lang.Get("thebasics:parser-error-player-not-found", text);
-
-            if (onReady != null)
+            onReady(new AsyncParseResults
             {
-                onReady(new AsyncParseResults { Status = EnumParseResultStatus.Error });
-                return EnumParseResult.Deferred;
+                Status = EnumParseResultStatus.Ready,
+                Data = players
+            });
+            return EnumParseResult.Deferred;
+        }
+
+        private static EnumParseResult CompleteError(Action<AsyncParseResults> onReady)
+        {
+            if (onReady == null)
+            {
+                return EnumParseResult.Bad;
             }
 
-            return EnumParseResult.Bad;
+            onReady(new AsyncParseResults { Status = EnumParseResultStatus.Error });
+            return EnumParseResult.Deferred;
         }
     }
 }

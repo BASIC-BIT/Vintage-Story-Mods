@@ -41,47 +41,10 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
 
         if (presentationMode == ProximityChatPresentationModes.Prose)
         {
-            var messageToFormat = context.Message;
-            var hasDistanceFontSize = TryUnwrapDistanceFontSize(messageToFormat, out var unwrappedMessage, out var distanceFontSize);
-            if (hasDistanceFontSize)
-            {
-                messageToFormat = unwrappedMessage;
-            }
-
-            context.Message = ChatHelper.FormatProseMessage(
-                messageToFormat,
-                lang,
-                _config,
-                languageEnabled,
-                text => ProcessProseQuotedText(context, text, lang, languageEnabled),
-                nickname,
-                text => ChatVisualPreferenceResolver.FormatLanguageText(text, lang, context.ReceivingPlayer));
-
-            context.Message = ChatHelper.ApplyFreeformAttribution(context.Message, context.SendingPlayer, _config);
-            if (hasDistanceFontSize)
-            {
-                context.Message = $"<font size=\"{distanceFontSize}\">{context.Message}</font>";
-            }
-
-            return context;
+            return FormatProseSpeech(context, lang, languageEnabled, nickname);
         }
 
-        if (ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode))
-        {
-            context.Message = ChatHelper.WrapSpeechQuotes(context.Message, lang, _config, languageEnabled);
-        }
-
-        // Add Italics if sign language
-        if (languageEnabled && lang == LanguageSystem.SignLanguage)
-        {
-            context.Message = ChatHelper.Italic(context.Message);
-        }
-
-        // Add Lang color
-        if (languageEnabled)
-        {
-            context.Message = ChatVisualPreferenceResolver.FormatLanguageText(context.Message, lang, context.ReceivingPlayer);
-        }
+        context.Message = FormatSpeechBody(context, lang, languageEnabled, presentationMode);
 
         var verb = GetProximityChatVerb(lang, mode);
 
@@ -94,6 +57,54 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         };
 
         return context;
+    }
+
+    private MessageContext FormatProseSpeech(MessageContext context, Language lang, bool languageEnabled, string nickname)
+    {
+        var messageToFormat = context.Message;
+        var hasDistanceFontSize = TryUnwrapDistanceFontSize(messageToFormat, out var unwrappedMessage, out var distanceFontSize);
+        if (hasDistanceFontSize)
+        {
+            messageToFormat = unwrappedMessage;
+        }
+
+        context.Message = ChatHelper.FormatProseMessage(
+            messageToFormat,
+            lang,
+            _config,
+            languageEnabled,
+            text => ProcessProseQuotedText(context, text, lang, languageEnabled),
+            nickname,
+            text => ChatVisualPreferenceResolver.FormatLanguageText(text, lang, context.ReceivingPlayer));
+
+        context.Message = ChatHelper.ApplyFreeformAttribution(context.Message, context.SendingPlayer, _config);
+        if (hasDistanceFontSize)
+        {
+            context.Message = $"<font size=\"{distanceFontSize}\">{context.Message}</font>";
+        }
+
+        return context;
+    }
+
+    private string FormatSpeechBody(MessageContext context, Language lang, bool languageEnabled, string presentationMode)
+    {
+        var message = context.Message;
+        if (ProximityChatPresentationModes.UsesSpeechQuotes(presentationMode))
+        {
+            message = ChatHelper.WrapSpeechQuotes(message, lang, _config, languageEnabled);
+        }
+
+        if (!languageEnabled)
+        {
+            return message;
+        }
+
+        if (lang == LanguageSystem.SignLanguage)
+        {
+            message = ChatHelper.Italic(message);
+        }
+
+        return ChatVisualPreferenceResolver.FormatLanguageText(message, lang, context.ReceivingPlayer);
     }
 
     private string GetProximityChatVerb(Language lang, ProximityChatMode mode)

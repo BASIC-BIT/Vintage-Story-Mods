@@ -1,3 +1,4 @@
+#pragma warning disable S1168 // Null snapshots intentionally mean the corresponding tree is absent.
 using Vintagestory.API.Datastructures;
 
 namespace thebasics.ModSystems.RpCharacters;

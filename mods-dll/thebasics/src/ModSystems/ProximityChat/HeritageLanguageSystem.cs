@@ -399,31 +399,40 @@ public class HeritageLanguageSystem : BaseSubSystem
 
         _classTraitsCacheInitialized = true;
 
+        if (TryLoadClassTraitsFromCharacterSystem())
+        {
+            return;
+        }
+
+        LoadClassTraitsFromAssetFallback();
+    }
+
+    private bool TryLoadClassTraitsFromCharacterSystem()
+    {
         try
         {
             var characterSystem = API.ModLoader.GetModSystem<CharacterSystem>();
-            if (characterSystem?.characterClassesByCode != null)
+            if (characterSystem?.characterClassesByCode == null)
             {
-                foreach (var kvp in characterSystem.characterClassesByCode)
-                {
-                    if (!string.IsNullOrWhiteSpace(kvp.Key))
-                    {
-                        _classTraitCache[kvp.Key] = kvp.Value?.Traits ?? Array.Empty<string>();
-                    }
-                }
-
-                if (_classTraitCache.Count > 0)
-                {
-                    return;
-                }
+                return false;
             }
+
+            foreach (var kvp in characterSystem.characterClassesByCode.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)))
+            {
+                _classTraitCache[kvp.Key] = kvp.Value?.Traits ?? Array.Empty<string>();
+            }
+
+            return _classTraitCache.Count > 0;
         }
         catch (Exception ex)
         {
             API.Logger.Warning("[thebasics] HeritageLanguageSystem: failed loading class traits from CharacterSystem ({0}), falling back to asset load.", ex.Message);
-            // Fall back to asset loading.
+            return false;
         }
+    }
 
+    private void LoadClassTraitsFromAssetFallback()
+    {
         try
         {
             var classes = API.Assets.Get("config/characterclasses.json").ToObject<List<CharacterClass>>();
@@ -432,12 +441,9 @@ public class HeritageLanguageSystem : BaseSubSystem
                 return;
             }
 
-            foreach (var characterClass in classes)
+            foreach (var characterClass in classes.Where(characterClass => !string.IsNullOrWhiteSpace(characterClass.Code)))
             {
-                if (!string.IsNullOrWhiteSpace(characterClass.Code))
-                {
-                    _classTraitCache[characterClass.Code] = characterClass.Traits ?? Array.Empty<string>();
-                }
+                _classTraitCache[characterClass.Code] = characterClass.Traits ?? Array.Empty<string>();
             }
         }
         catch (Exception ex)
@@ -530,7 +536,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         player.SetDefaultLanguage(firstKnownConfigured ?? LanguageSystem.BabbleLang);
     }
 
-    private string GetModelDescriptor(string modelCode, string modelGroupCode)
+    private static string GetModelDescriptor(string modelCode, string modelGroupCode)
     {
         if (!string.IsNullOrWhiteSpace(modelGroupCode))
         {
@@ -550,7 +556,7 @@ public class HeritageLanguageSystem : BaseSubSystem
     /// via GrantedToModels (model-specific) or GrantedToModelGroups (group-level).
     /// Prefers the model-specific descriptor when the language matched on the model directly.
     /// </summary>
-    private string GetDescriptorForLanguage(Language language, string modelCode, string modelGroupCode, string[] modelVariants, string[] groupVariants)
+    private static string GetDescriptorForLanguage(Language language, string modelCode, string modelGroupCode, string[] modelVariants, string[] groupVariants)
     {
         var matchesModel = MatchesAny(language.GrantedToModels, modelVariants);
         var matchesGroup = MatchesAny(language.GrantedToModelGroups, groupVariants);
@@ -641,7 +647,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         _groupProperty = null;
     }
 
-    private void StorePlayerAppearance(IServerPlayer player, string modelCode, string modelGroupCode)
+    private static void StorePlayerAppearance(IServerPlayer player, string modelCode, string modelGroupCode)
     {
         if (string.IsNullOrWhiteSpace(modelCode))
         {
@@ -662,7 +668,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         }
     }
 
-    private void StorePlayerClass(IServerPlayer player, string? classCode)
+    private static void StorePlayerClass(IServerPlayer player, string? classCode)
     {
         if (string.IsNullOrWhiteSpace(classCode))
         {
@@ -674,7 +680,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         }
     }
 
-    private void StorePlayerTraits(IServerPlayer player, string[] traitCodes)
+    private static void StorePlayerTraits(IServerPlayer player, string[] traitCodes)
     {
         if (traitCodes.Length == 0)
         {
@@ -784,18 +790,7 @@ public class HeritageLanguageSystem : BaseSubSystem
             return false;
         }
 
-        foreach (var pattern in patternList)
-        {
-            foreach (var candidate in candidateList)
-            {
-                if (PatternMatchUtils.WildcardMatches(candidate, pattern))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return patternList.Any(pattern => candidateList.Any(candidate => PatternMatchUtils.WildcardMatches(candidate, pattern)));
     }
 
     private static IEnumerable<string> ExpandModelCodeVariants(string code)

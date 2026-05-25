@@ -21,7 +21,7 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
     private readonly ConcurrentQueue<AnalyticsEvent> _queue = new();
     private readonly HttpClient _httpClient;
     private int _isFlushing;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public RelayAnalyticsSink(ICoreServerAPI api, AnalyticsConfig config, Uri endpoint, string modVersion)
     {
@@ -59,9 +59,9 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
             return;
         }
 
+        var batch = new List<Dictionary<string, object>>();
         try
         {
-            var batch = new List<Dictionary<string, object>>();
             while (batch.Count < _config.MaxBatchEvents && _queue.TryDequeue(out var analyticsEvent))
             {
                 batch.Add(new Dictionary<string, object>
@@ -93,16 +93,27 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await _httpClient.PostAsync(_endpoint, content).ConfigureAwait(false);
 
-            if (_config.DebugLogTelemetry)
+            if (!_config.DebugLogTelemetry)
             {
-                _api.Logger.Notification($"THEBASICS analytics: flushed {batch.Count} event(s), relay status {(int)response.StatusCode}.");
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _api.Logger.Notification($"THEBASICS analytics: sent {batch.Count} event(s), relay status {(int)response.StatusCode}.");
+            }
+            else
+            {
+                _api.Logger.Warning($"THEBASICS analytics: relay rejected {batch.Count} event(s), status {(int)response.StatusCode}; batch dropped.");
             }
         }
         catch (Exception e)
         {
+            // Dequeued analytics batches are intentionally not requeued: telemetry must never
+            // grow an unbounded retry backlog or affect gameplay if the relay is unavailable.
             if (_config.DebugLogTelemetry)
             {
-                _api.Logger.Warning($"THEBASICS analytics: failed to flush events ({e.GetType().Name}).");
+                _api.Logger.Warning($"THEBASICS analytics: failed to send {batch.Count} event(s) ({e.GetType().Name}); batch dropped.");
             }
         }
         finally
