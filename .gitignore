@@ -22,6 +22,17 @@ AGENTS.local.md
 .env
 *.env
 
+# Terraform local state and secrets
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+!**/*.tfvars.example
+**/*.tfplan
+**/tfplan
+**/backend.hcl
+crash.log
+
 # Test results and coverage artifacts
 TestResults/
 coveragereport/

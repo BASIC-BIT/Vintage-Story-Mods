@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using thebasics.Extensions;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Extensions;
 using thebasics.ModSystems.PlayerStats.Models;
@@ -143,6 +144,8 @@ namespace thebasics.ModSystems.PlayerStats
             }
 
             targetPlayer.ClearPlayerStats();
+            AnalyticsService.TrackCommandUsed("clearstats", true);
+            AnalyticsService.TrackFeatureUsed("player_stats", "clear_all");
             return new TextCommandResult()
             {
                 Status = EnumCommandStatus.Success,
@@ -206,6 +209,8 @@ namespace thebasics.ModSystems.PlayerStats
             }
 
             targetPlayer.ClearPlayerStat(resolvedStat.Value);
+            AnalyticsService.TrackCommandUsed("clearstat", true);
+            AnalyticsService.TrackFeatureUsed("player_stats", "clear_one");
             return new TextCommandResult()
             {
                 Status = EnumCommandStatus.Success,
@@ -256,6 +261,9 @@ namespace thebasics.ModSystems.PlayerStats
                 var statTitle = stat.Value.LangKey != null ? Lang.Get(stat.Value.LangKey) : stat.Value.Title;
                 message.Append(ChatHelper.Build("\n", statTitle, ": ", statValue.ToString()));
             }
+
+            AnalyticsService.TrackCommandUsed("playerstats", true);
+            AnalyticsService.TrackFeatureUsed("player_stats", isOtherPlayer ? "view_other" : "view_own");
 
             return new TextCommandResult
             {

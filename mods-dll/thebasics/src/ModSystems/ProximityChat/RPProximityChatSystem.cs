@@ -5,6 +5,7 @@ using System.Linq;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.Notes;
@@ -359,6 +360,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
 
+        var chatProperties = AnalyticsService.ChatProperties("gooc");
+        AnalyticsService.TrackCommandUsed("gooc", true, properties: chatProperties);
+        AnalyticsService.TrackFeatureUsed("global_ooc", "send", properties: chatProperties);
+
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -376,6 +381,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         preferences.LanguageColorsEnabled = (bool)args.Parsers[0].GetValue();
         player.SetChatVisualPreferences(preferences);
+        AnalyticsService.TrackCommandUsed("langcolor", true);
+        AnalyticsService.TrackFeatureUsed("language_colors", preferences.LanguageColorsEnabled ? "enable" : "disable");
         return Success(Lang.Get("thebasics:chatprefs-langcolor-set", ChatHelper.OnOff(preferences.LanguageColorsEnabled)));
     }
 
@@ -423,6 +430,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
         };
 
         TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
+
+        var chatProperties = AnalyticsService.ChatProperties("ooc");
+        AnalyticsService.TrackCommandUsed("ooc", true, properties: chatProperties);
+        AnalyticsService.TrackFeatureUsed("ooc", "send", properties: chatProperties);
 
         return new TextCommandResult
         {
@@ -910,6 +921,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         attemptTarget.SetNicknameColor(newColorHex);
 
         SwapOutNameTag(attemptTarget);
+        AnalyticsService.TrackCommandUsed("adminsetnicknamecolor", true);
+        AnalyticsService.TrackFeatureUsed("nickname_color", "admin_set");
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -951,6 +964,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         }
         player.SetNicknameColor(colorHex);
         SwapOutNameTag(player);
+        AnalyticsService.TrackCommandUsed("nickcolor", true);
+        AnalyticsService.TrackFeatureUsed("nickname_color", "set");
 
         return new TextCommandResult
         {
@@ -1627,6 +1642,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             player.SetNickname(nickname, Config);
             SwapOutNameTag(player);
+            AnalyticsService.TrackCommandUsed("nickname", true);
+            AnalyticsService.TrackFeatureUsed("nickname", "set");
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -1686,6 +1703,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             attemptTarget.SetNickname(newNickname, Config);
             SwapOutNameTag(attemptTarget);
+            AnalyticsService.TrackCommandUsed("adminsetnickname", true);
+            AnalyticsService.TrackFeatureUsed("nickname", "admin_set");
 
             string forceMessage = isForced ? Lang.Get("thebasics:chat-nick-admin-forced") : "";
             return new TextCommandResult
@@ -1714,6 +1733,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // Process the entire pipeline
         TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
 
+        var chatProperties = AnalyticsService.ChatProperties("me");
+        AnalyticsService.TrackCommandUsed("me", true, properties: chatProperties);
+        AnalyticsService.TrackFeatureUsed("proximity_emote", "send", properties: chatProperties);
+
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1737,6 +1760,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         // Process the entire pipeline
         TransformerSystem.ProcessMessagePipeline(context, EnumChatType.Notification);
+
+        var chatProperties = AnalyticsService.ChatProperties("it");
+        AnalyticsService.TrackCommandUsed("it", true, properties: chatProperties);
+        AnalyticsService.TrackFeatureUsed("environment_message", "send", properties: chatProperties);
 
         return new TextCommandResult
         {
@@ -1765,6 +1792,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // either store the position or fall back to standard env.
         TransformerSystem.ProcessMessagePipeline(context, EnumChatType.Notification);
 
+        var chatProperties = AnalyticsService.ChatProperties("envhere");
+        AnalyticsService.TrackCommandUsed("envhere", true, properties: chatProperties);
+        AnalyticsService.TrackFeatureUsed("environment_message", "place", properties: chatProperties);
+
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1776,6 +1807,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var player = (IServerPlayer)args.Caller.Player;
         player.ClearNickname(Config);
         SwapOutNameTag(player);
+        AnalyticsService.TrackCommandUsed("clearnick", true);
+        AnalyticsService.TrackFeatureUsed("nickname", "clear");
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1788,6 +1821,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var player = (IServerPlayer)args.Caller.Player;
         player.ClearNicknameColor();
         SwapOutNameTag(player);
+        AnalyticsService.TrackCommandUsed("clearnickcolor", true);
+        AnalyticsService.TrackFeatureUsed("nickname_color", "clear");
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1823,6 +1858,11 @@ public class RPProximityChatSystem : BaseBasicModSystem
             // Process the entire pipeline
             TransformerSystem.ProcessMessagePipeline(context);
 
+            var modeName = mode.ToString().ToLowerInvariant();
+            var chatProperties = AnalyticsService.ChatProperties(modeName);
+            AnalyticsService.TrackCommandUsed(modeName, true, properties: chatProperties);
+            AnalyticsService.TrackFeatureUsed("proximity_chat", "send_" + modeName, properties: chatProperties);
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -1831,6 +1871,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         // If no message provided, just set the player's chat mode
         player.SetChatMode(mode);
+        AnalyticsService.TrackFeatureUsed("chat_mode", "set_" + mode.ToString().ToLowerInvariant(), properties: AnalyticsService.ChatProperties(mode.ToString().ToLowerInvariant()));
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1859,6 +1900,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // If no argument provided, toggle the current state
         var emoteMode = args.Parsers[0].IsMissing ? !player.GetEmoteMode() : (bool)args.Parsers[0].GetValue();
         player.SetEmoteMode(emoteMode);
+        AnalyticsService.TrackCommandUsed("emotemode", true);
+        AnalyticsService.TrackFeatureUsed("emote_mode", emoteMode ? "enable" : "disable");
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1872,6 +1915,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // If no argument provided, toggle the current state
         var rpTextEnabled = args.Parsers[0].IsMissing ? !player.GetRpTextEnabled() : (bool)args.Parsers[0].GetValue();
         player.SetRpTextEnabled(rpTextEnabled);
+        AnalyticsService.TrackCommandUsed("rptext", true);
+        AnalyticsService.TrackFeatureUsed("rp_text", rpTextEnabled ? "enable" : "disable");
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1894,6 +1939,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var newMode = args.Parsers[0].IsMissing ? !player.GetOOCEnabled() : (bool)args.Parsers[0].GetValue();
         player.SetOOCEnabled(newMode);
 
+        AnalyticsService.TrackCommandUsed("ooctoggle", true);
+        AnalyticsService.TrackFeatureUsed("ooc_mode", newMode ? "enable" : "disable");
+
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1915,6 +1963,8 @@ public class RPProximityChatSystem : BaseBasicModSystem
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
         var enabled = args.Parsers[0].IsMissing ? !player.GetChatterEnabled() : (bool)args.Parsers[0].GetValue();
         player.SetChatterEnabled(enabled);
+        AnalyticsService.TrackCommandUsed("chatter", true);
+        AnalyticsService.TrackFeatureUsed("chatter", enabled ? "enable" : "disable");
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1982,6 +2032,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
             // Process the message through the pipeline
             TransformerSystem?.ProcessMessagePipeline(context);
+            AnalyticsService.TrackFeatureUsed("proximity_chat", "send_chat_tab", properties: AnalyticsService.ChatProperties("chat_tab"));
         }
         catch (Exception e)
         {
