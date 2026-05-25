@@ -30,7 +30,9 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
         _config = config;
         _endpoint = endpoint;
         _modVersion = string.IsNullOrWhiteSpace(modVersion) ? "unknown" : modVersion;
-        _serverSessionId = string.IsNullOrWhiteSpace(serverSessionId) ? Guid.NewGuid().ToString("N") : serverSessionId;
+        _serverSessionId = AnalyticsPseudonymizer.IsHexString(serverSessionId, AnalyticsPseudonymizer.ServerSessionIdHexLength)
+            ? serverSessionId.ToLowerInvariant()
+            : AnalyticsPseudonymizer.NewHexId(16);
         _httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(5)
@@ -145,7 +147,7 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
             ["game_version"] = GameVersion.LongGameVersion,
             ["analytics_consent_level"] = _config.ConsentLevel,
             ["server_session_id"] = _serverSessionId,
-            ["online_player_count_bucket"] = BucketCount(GetOnlinePlayerCount())
+            ["online_player_count_bucket"] = AnalyticsBuckets.Count(GetOnlinePlayerCount())
         };
 
         if (properties != null)
@@ -189,19 +191,5 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
         }
 
         return value is Enum enumValue ? enumValue.ToString() : value.ToString();
-    }
-
-    private static string BucketCount(int count)
-    {
-        return count switch
-        {
-            <= 0 => "0",
-            <= 5 => "1-5",
-            <= 10 => "6-10",
-            <= 20 => "11-20",
-            <= 50 => "21-50",
-            <= 100 => "51-100",
-            _ => "101+"
-        };
     }
 }

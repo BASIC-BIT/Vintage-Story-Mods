@@ -4,7 +4,7 @@ This directory contains public-facing infrastructure as code for services that b
 
 ## Analytics Relay
 
-`terraform/stacks/thebasics-analytics-relay` deploys a Cloudflare Worker at `https://thebasics-analytics-relay.basic-bit-1001.workers.dev/v1/events/batch`. The mod sends only opt-in, allowlisted server-install analytics to this endpoint. The Worker validates the schema and forwards accepted batches to PostHog with the real project token kept out of the mod.
+`terraform/stacks/thebasics-analytics-relay` deploys a Cloudflare Worker at `https://thebasics-analytics-relay.basic-bit-1001.workers.dev/v1/events/batch`. The mod sends only opt-in, allowlisted server-install analytics to this endpoint. The Worker validates the schema and forwards accepted batches to PostHog with the real project token kept out of the mod and `$process_person_profile=false` on forwarded events.
 
 ## State Security
 

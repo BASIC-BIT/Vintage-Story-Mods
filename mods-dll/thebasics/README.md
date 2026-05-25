@@ -6,7 +6,7 @@
 
 ## Features
 
-The maintained feature inventory lives in [`docs/FEATURES.md`](docs/FEATURES.md). The release smoke-test matrix lives in [`docs/RELEASE_SMOKE_TEST.md`](docs/RELEASE_SMOKE_TEST.md).
+The maintained feature inventory lives in [`docs/FEATURES.md`](docs/FEATURES.md). The release smoke-test matrix lives in [`docs/RELEASE_SMOKE_TEST.md`](docs/RELEASE_SMOKE_TEST.md). Analytics consent and privacy details live in [`docs/ANALYTICS.md`](docs/ANALYTICS.md).
 
 High-level systems:
 

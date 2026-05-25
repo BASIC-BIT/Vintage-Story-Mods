@@ -6,10 +6,10 @@ This stack deploys the BASIC-owned intake endpoint used by The BASICs server-ins
 
 - Endpoint: `https://thebasics-analytics-relay.basic-bit-1001.workers.dev/v1/events/batch`
 - Client: The BASICs mod server process only, after root-admin opt-in.
-- Accepted event schema: allowlisted event names and property keys in `worker/analytics-relay.mjs`.
+- Accepted event schema: allowlisted event names, event-specific property keys, enum values, and ID formats in `worker/analytics-relay.mjs`.
 - Forwarding target: PostHog `/batch/` with `$process_person_profile=false`.
 
-The Worker rejects unknown event names, unknown properties, oversized batches, and malformed server install IDs. It does not accept chat text, command arguments, player names, player IDs, IPs, world names, seeds, coordinates, or raw config.
+The Worker rejects unknown event names, unknown envelope keys, unknown properties, event/property mismatches, oversized batches, malformed server install IDs, malformed server session IDs, and personalized properties sent without personalized consent. It does not accept chat text, command arguments, player names, raw player IDs, IPs, world names, seeds, coordinates, notes, bios, images, logs, stack traces, or raw config.
 
 ## Deploy
 

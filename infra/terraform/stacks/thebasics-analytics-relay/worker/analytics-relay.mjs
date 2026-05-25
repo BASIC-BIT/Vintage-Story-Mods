@@ -34,6 +34,11 @@ const ALLOWED_EVENTS = new Set([
 
 const ALLOWED_CONSENT_LEVELS = new Set(["server", "personalized"]);
 
+const PERSONALIZED_EVENTS = new Set([
+  "player session ended",
+  "player session started",
+]);
+
 const ALLOWED_PROPERTIES = new Set([
   "action",
   "allow_ooc_toggle",
@@ -429,24 +434,14 @@ export default {
     }
 
     const posthogHost = (env.POSTHOG_HOST || "https://us.i.posthog.com").replace(/\/+$/, "");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    let response;
-    try {
-      response = await fetch(`${posthogHost}/batch/`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          api_key: env.POSTHOG_PROJECT_TOKEN,
-          batch: validation.events,
-        }),
-        signal: controller.signal,
-      });
-    } catch {
-      return json({ error: "upstream_failed" }, 502);
-    } finally {
-      clearTimeout(timeout);
-    }
+    const response = await fetch(`${posthogHost}/batch/`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        api_key: env.POSTHOG_PROJECT_TOKEN,
+        batch: validation.events,
+      }),
+    });
 
     if (!response.ok) {
       return json({ error: "upstream_rejected" }, 502);
@@ -456,7 +451,7 @@ export default {
   },
 };
 
-function validatePayload(payload) {
+export function validatePayload(payload) {
   if (!isPlainObject(payload)) {
     return invalid("invalid_payload");
   }
@@ -517,6 +512,10 @@ function normalizeEvent(event, envelope) {
 
   if (!isPlainObject(event.properties)) {
     return invalid("invalid_event_properties");
+  }
+
+  if (PERSONALIZED_EVENTS.has(event.name) && envelope.consent_level !== "personalized") {
+    return invalid("personalized_event_without_consent");
   }
 
   if (!isPropertyCountAllowed(event.name, event.properties)) {

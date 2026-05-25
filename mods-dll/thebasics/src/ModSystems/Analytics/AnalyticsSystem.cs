@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using thebasics.Configs;
 using thebasics.Models;
 using Vintagestory.API.Common;
@@ -25,7 +23,7 @@ public class AnalyticsSystem : BaseBasicModSystem
     private long _flushListenerId;
     private readonly HashSet<string> _analyticsReadyPlayers = new();
     private readonly Dictionary<string, DateTime> _playerSessionStartsUtc = new(StringComparer.Ordinal);
-    private readonly string _serverSessionId = Guid.NewGuid().ToString("N");
+    private readonly string _serverSessionId = AnalyticsPseudonymizer.NewHexId(16);
 
     protected override void BasicStartServerSide()
     {
@@ -181,9 +179,6 @@ public class AnalyticsSystem : BaseBasicModSystem
     private TextCommandResult SetConsent(string consentLevel)
     {
         var previousConsent = _analyticsConfig.ConsentLevel;
-        var previousAllowsRemoteAnalytics = _analyticsConfig.AllowsRemoteAnalytics();
-        var previousAllowsPersonalizedAnalytics = previousAllowsRemoteAnalytics &&
-                                                 AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel);
         _analyticsConfig.ConsentLevel = AnalyticsConsentLevels.Normalize(consentLevel);
         _analyticsConfig.ConsentVersionAccepted = AnalyticsConsentLevels.CurrentConsentVersion;
 
@@ -198,10 +193,7 @@ public class AnalyticsSystem : BaseBasicModSystem
 
         StoreAnalyticsConfig();
         ConfigureAnalyticsSink();
-
-        var currentAllowsRemoteAnalytics = _analyticsConfig.AllowsRemoteAnalytics();
-        var currentAllowsPersonalizedAnalytics = currentAllowsRemoteAnalytics &&
-                                                AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel);
+        ResetTrackedPlayerSessions();
 
         if (_analyticsConfig.AllowsRemoteAnalytics())
         {
@@ -212,12 +204,6 @@ public class AnalyticsSystem : BaseBasicModSystem
                 ["personalized_analytics_requested"] = AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel)
             });
             AnalyticsService.TrackConfigSnapshot(Config);
-        }
-
-        if (previousAllowsRemoteAnalytics != currentAllowsRemoteAnalytics ||
-            previousAllowsPersonalizedAnalytics != currentAllowsPersonalizedAnalytics)
-        {
-            RebaselinePlayerSessionsForCurrentConsent();
         }
 
         return new TextCommandResult
@@ -348,17 +334,12 @@ public class AnalyticsSystem : BaseBasicModSystem
 
     private void TrackPlayerSessionStarted(IServerPlayer player)
     {
-        if (string.IsNullOrWhiteSpace(player?.PlayerUID))
+        if (!AnalyticsService.IsEnabled || !AllowsPlayerSessionAnalytics() || string.IsNullOrWhiteSpace(player?.PlayerUID))
         {
             return;
         }
 
         _playerSessionStartsUtc[player.PlayerUID] = DateTime.UtcNow;
-        if (!AnalyticsService.IsEnabled)
-        {
-            return;
-        }
-
         AnalyticsService.Track("player session started", BuildPlayerSessionProperties(player));
     }
 
@@ -369,13 +350,13 @@ public class AnalyticsSystem : BaseBasicModSystem
             return;
         }
 
-        if (!AnalyticsService.IsEnabled)
+        if (!AnalyticsService.IsEnabled || !AllowsPlayerSessionAnalytics())
         {
             return;
         }
 
         var properties = BuildPlayerSessionProperties(player);
-        properties["session_duration_bucket"] = BucketDuration(DateTime.UtcNow - startedUtc);
+        properties["session_duration_bucket"] = AnalyticsBuckets.Duration(DateTime.UtcNow - startedUtc);
         properties["session_end_reason"] = endReason;
         AnalyticsService.Track("player session ended", properties);
     }
@@ -393,25 +374,6 @@ public class AnalyticsSystem : BaseBasicModSystem
             if (player is IServerPlayer serverPlayer)
             {
                 TrackPlayerSessionEnded(serverPlayer, endReason);
-            }
-        }
-    }
-
-    private void RebaselinePlayerSessionsForCurrentConsent()
-    {
-        _playerSessionStartsUtc.Clear();
-
-        var players = API?.World?.AllOnlinePlayers;
-        if (players == null)
-        {
-            return;
-        }
-
-        foreach (var player in players)
-        {
-            if (player is IServerPlayer serverPlayer)
-            {
-                TrackPlayerSessionStarted(serverPlayer);
             }
         }
     }
@@ -436,8 +398,35 @@ public class AnalyticsSystem : BaseBasicModSystem
         }
 
         var salt = EnsurePlayerPseudonymSalt();
-        using var hmac = new HMACSHA256(Convert.FromHexString(salt));
-        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(player.PlayerUID))).ToLowerInvariant();
+        return AnalyticsPseudonymizer.CreatePlayerPseudonym(salt, player.PlayerUID);
+    }
+
+    private bool AllowsPlayerSessionAnalytics()
+    {
+        return AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig?.ConsentLevel);
+    }
+
+    private void ResetTrackedPlayerSessions()
+    {
+        _playerSessionStartsUtc.Clear();
+        if (!AnalyticsService.IsEnabled || !AllowsPlayerSessionAnalytics())
+        {
+            return;
+        }
+
+        var players = API?.World?.AllOnlinePlayers;
+        if (players == null)
+        {
+            return;
+        }
+
+        foreach (var player in players)
+        {
+            if (player is IServerPlayer serverPlayer)
+            {
+                TrackPlayerSessionStarted(serverPlayer);
+            }
+        }
     }
 
     private bool ShouldQueueConsentPrompt(IServerPlayer player)
@@ -465,18 +454,18 @@ public class AnalyticsSystem : BaseBasicModSystem
 
     private void EnsureServerInstallId()
     {
-        if (string.IsNullOrWhiteSpace(_analyticsConfig.ServerInstallId))
+        if (!AnalyticsPseudonymizer.IsHexString(_analyticsConfig.ServerInstallId, AnalyticsPseudonymizer.ServerInstallIdHexLength))
         {
-            _analyticsConfig.ServerInstallId = Guid.NewGuid().ToString("N");
+            _analyticsConfig.ServerInstallId = AnalyticsPseudonymizer.NewHexId(16);
             StoreAnalyticsConfig();
         }
     }
 
     private string EnsurePlayerPseudonymSalt()
     {
-        if (!IsHexString(_analyticsConfig.PlayerPseudonymSalt, 64))
+        if (!AnalyticsPseudonymizer.IsHexString(_analyticsConfig.PlayerPseudonymSalt, AnalyticsPseudonymizer.PlayerPseudonymSaltHexLength))
         {
-            _analyticsConfig.PlayerPseudonymSalt = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+            _analyticsConfig.PlayerPseudonymSalt = AnalyticsPseudonymizer.NewHexId(32);
             StoreAnalyticsConfig();
         }
 
@@ -597,36 +586,5 @@ public class AnalyticsSystem : BaseBasicModSystem
         }
 
         return endpoint.Scheme == Uri.UriSchemeHttps;
-    }
-
-    private static string BucketDuration(TimeSpan duration)
-    {
-        return duration.TotalMinutes switch
-        {
-            < 1 => "<1m",
-            < 5 => "1-5m",
-            < 30 => "5-30m",
-            < 120 => "30-120m",
-            _ => "120m+"
-        };
-    }
-
-    private static bool IsHexString(string value, int length)
-    {
-        if (value?.Length != length)
-        {
-            return false;
-        }
-
-        foreach (var c in value)
-        {
-            var isHex = c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
-            if (!isHex)
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 }

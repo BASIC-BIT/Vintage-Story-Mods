@@ -59,6 +59,9 @@ jobs:
       - name: Check Worker JavaScript syntax
         run: node --check "$RELAY_STACK_DIR/worker/analytics-relay.mjs"
 
+      - name: Test analytics relay contract
+        run: node --test "$RELAY_STACK_DIR/worker/analytics-relay.test.mjs"
+
       - name: Validate backend bootstrap stack
         working-directory: ${{ env.BOOTSTRAP_STACK_DIR }}
         run: |

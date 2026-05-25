@@ -349,6 +349,18 @@ Messages:
 - `ChatterSoundMessage`: server to clients, dispatches speaker entity, talk type, note count, volume, and pitch.
 - `PlacedEnvironmentMessage`: server to clients, dispatches placed bubble position and text.
 
+## Analytics
+
+The BASICs has opt-in analytics controlled by root admins with `/basicsanalytics` or `/thebasicsanalytics`. Fresh installs send no remote analytics until consent is saved.
+
+Consent levels:
+
+- `off` / `disabled`: no remote analytics.
+- `server`: anonymous server statistics, including allowlisted feature usage, command usage, config summaries, version data, server-session IDs, and coarse activity buckets.
+- `personalized`: full statistics, currently server statistics plus pseudonymous player session start/end events.
+
+The analytics relay rejects chat text, command arguments, player names, player IDs, nicknames, character names, bios, notes, images, coordinates, world names, seeds, server IPs, raw config, logs, and stack traces. See [`ANALYTICS.md`](ANALYTICS.md).
+
 ## Follow-Up Candidates
 
 - Add custom nested editors for variable-length config collections such as `Languages` and `CharacterSheetFields`.
