@@ -23,7 +23,7 @@ using Vintagestory.Server;
 
 namespace thebasics.ModSystems.ProximityChat;
 
-public class RPProximityChatSystem : BaseBasicModSystem
+public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChatApi
 {
     public int ProximityChatId { get; set; }
     public LanguageSystem LanguageSystem { get; set; }
@@ -31,6 +31,12 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private IServerNetworkChannel _serverConfigChannel;
     public ProximityCheckUtils ProximityCheckUtils { get; set; }
     public TransformerSystem TransformerSystem { get; set; }
+    private Th3EssentialsDiscordRelay _th3EssentialsDiscordRelay;
+    private bool _loggedExtensionHandlerFailure;
+
+    public event EventHandler<ProximityChatMessageEventArgs> ProximityChatMessageProcessed;
+
+    public int ProximityChatGroupId => ProximityChatId;
 
     // Ephemeral state; do not persist.
     private readonly System.Collections.Generic.Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new();
@@ -46,7 +52,48 @@ public class RPProximityChatSystem : BaseBasicModSystem
         DistanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
         ProximityCheckUtils = new ProximityCheckUtils(this, API, Config);
         TransformerSystem = new TransformerSystem(this, LanguageSystem, DistanceObfuscationSystem, ProximityCheckUtils);
+        _th3EssentialsDiscordRelay = new Th3EssentialsDiscordRelay(API);
+        ProximityChatMessageProcessed += RelayProcessedMessageToTh3Essentials;
         RefreshAllNameTags();
+    }
+
+    internal void PublishProximityChatMessageProcessed(MessageContext context, string renderedMessage)
+    {
+        var handlers = ProximityChatMessageProcessed;
+        if (handlers == null)
+        {
+            return;
+        }
+
+        var args = ProximityChatMessageEventArgs.FromContext(context, renderedMessage);
+        foreach (var extensionHandler in handlers.GetInvocationList())
+        {
+            try
+            {
+                var handler = (EventHandler<ProximityChatMessageEventArgs>)extensionHandler;
+                handler(this, args);
+            }
+            catch (Exception ex)
+            {
+                LogExtensionHandlerFailure(ex);
+            }
+        }
+    }
+
+    private void RelayProcessedMessageToTh3Essentials(object sender, ProximityChatMessageEventArgs args)
+    {
+        _th3EssentialsDiscordRelay?.Relay(Config, args.RenderedMessage);
+    }
+
+    private void LogExtensionHandlerFailure(Exception ex)
+    {
+        if (_loggedExtensionHandlerFailure)
+        {
+            return;
+        }
+
+        _loggedExtensionHandlerFailure = true;
+        API?.Logger.Warning($"[THEBASICS] A proximity chat extension handler failed and was skipped: {ex.GetType().Name}.");
     }
 
     private void RegisterCommands()

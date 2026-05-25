@@ -183,6 +183,19 @@ public class ConfigAdminSettingRegistryTests
         GetSetting("ChatterModeVolume.Yell").GetValue(config).Should().Be("1.4");
     }
 
+    [Fact]
+    public void TrySetValue_UpdatesTh3EssentialsDiscordRelayToggle()
+    {
+        var config = CreateConfig();
+        var setting = GetSetting("EnableTh3EssentialsDiscordRelay");
+
+        var success = setting.TrySetValue(config, "true", out var error);
+
+        success.Should().BeTrue(error);
+        config.EnableTh3EssentialsDiscordRelay.Should().BeTrue();
+        setting.GetValue(config).Should().Be("1");
+    }
+
     private static ModConfig CreateConfig()
     {
         var config = new ModConfig();

@@ -729,5 +729,9 @@ namespace thebasics.Configs
 
         [ProtoMember(122)]
         public int MaxPlayerNotesPerAuthor { get; set; } = 200;
+
+        // Opt-in because relaying proximity chat to Discord makes local RP chat globally visible.
+        [ProtoMember(123)]
+        public bool EnableTh3EssentialsDiscordRelay { get; set; } = false;
     }
 }
