@@ -18,17 +18,19 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
     private readonly AnalyticsConfig _config;
     private readonly Uri _endpoint;
     private readonly string _modVersion;
+    private readonly string _serverSessionId;
     private readonly ConcurrentQueue<AnalyticsEvent> _queue = new();
     private readonly HttpClient _httpClient;
     private int _isFlushing;
     private volatile bool _disposed;
 
-    public RelayAnalyticsSink(ICoreServerAPI api, AnalyticsConfig config, Uri endpoint, string modVersion)
+    public RelayAnalyticsSink(ICoreServerAPI api, AnalyticsConfig config, Uri endpoint, string modVersion, string serverSessionId)
     {
         _api = api;
         _config = config;
         _endpoint = endpoint;
         _modVersion = string.IsNullOrWhiteSpace(modVersion) ? "unknown" : modVersion;
+        _serverSessionId = string.IsNullOrWhiteSpace(serverSessionId) ? Guid.NewGuid().ToString("N") : serverSessionId;
         _httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(5)
@@ -142,6 +144,7 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
             ["mod_version"] = _modVersion,
             ["game_version"] = GameVersion.LongGameVersion,
             ["analytics_consent_level"] = _config.ConsentLevel,
+            ["server_session_id"] = _serverSessionId,
             ["online_player_count_bucket"] = BucketCount(GetOnlinePlayerCount())
         };
 

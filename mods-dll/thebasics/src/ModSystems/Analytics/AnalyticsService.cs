@@ -105,7 +105,20 @@ public static class AnalyticsService
             ["overhead_chat_bubble_mode"] = OverheadChatBubbleModes.Normalize(config.OverheadChatBubbleMode, config.DisableRpOverheadBubbles),
             ["proximity_chat_presentation_mode"] = ProximityChatPresentationModes.Normalize(config.ProximityChatPresentationMode),
             ["normalize_proximity_chat_text"] = config.NormalizeProximityChatText,
-            ["attribute_freeform_messages_to_player_name"] = config.AttributeFreeformMessagesToPlayerName
+            ["attribute_freeform_messages_to_player_name"] = config.AttributeFreeformMessagesToPlayerName,
+            ["enable_character_sheets"] = config.EnableCharacterSheets,
+            ["enable_character_headshots"] = config.EnableCharacterHeadshots,
+            ["show_headshot_in_nametag"] = config.ShowHeadshotInNametag,
+            ["headshot_url_allowed"] = config.HeadshotUrlAllowed,
+            ["use_custom_nametag_renderer"] = config.UseCustomNametagRenderer,
+            ["enable_rp_character_slots"] = config.EnableRpCharacterSlots,
+            ["max_rp_character_slots_bucket"] = BucketCount(config.MaxRpCharacterSlots),
+            ["enable_admin_notes"] = config.EnableAdminNotes,
+            ["enable_structured_admin_notes"] = config.EnableStructuredAdminNotes,
+            ["enable_admin_note_ledger"] = config.EnableAdminNoteLedger,
+            ["enable_player_notes"] = config.EnablePlayerNotes,
+            ["character_sheet_field_count_bucket"] = BucketCount(config.CharacterSheetFields?.Count ?? 0),
+            ["language_count_bucket"] = BucketCount(config.Languages?.Count ?? 0)
         });
     }
 
@@ -130,5 +143,19 @@ public static class AnalyticsService
         {
             eventProperties[property.Key] = property.Value;
         }
+    }
+
+    private static string BucketCount(int count)
+    {
+        return count switch
+        {
+            <= 0 => "0",
+            <= 5 => "1-5",
+            <= 10 => "6-10",
+            <= 20 => "11-20",
+            <= 50 => "21-50",
+            <= 100 => "51-100",
+            _ => "101+"
+        };
     }
 }
