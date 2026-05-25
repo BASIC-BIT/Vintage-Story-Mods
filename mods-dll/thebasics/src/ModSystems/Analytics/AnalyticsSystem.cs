@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using thebasics.Configs;
 using thebasics.Models;
 using Vintagestory.API.Common;
@@ -22,6 +24,8 @@ public class AnalyticsSystem : BaseBasicModSystem
     private IServerNetworkChannel _analyticsChannel;
     private long _flushListenerId;
     private readonly HashSet<string> _analyticsReadyPlayers = new();
+    private readonly Dictionary<string, DateTime> _playerSessionStartsUtc = new(StringComparer.Ordinal);
+    private readonly string _serverSessionId = Guid.NewGuid().ToString("N");
 
     protected override void BasicStartServerSide()
     {
@@ -50,6 +54,7 @@ public class AnalyticsSystem : BaseBasicModSystem
     {
         try
         {
+            TrackOpenPlayerSessionsEnded("server_stop");
             AnalyticsService.Track("server stopped", new Dictionary<string, object>());
             var flushTask = AnalyticsService.FlushAsync();
             if (!flushTask.Wait(ShutdownFlushTimeoutMs) && _analyticsConfig?.DebugLogTelemetry == true)
@@ -111,6 +116,10 @@ public class AnalyticsSystem : BaseBasicModSystem
         }
 
         EnsureServerInstallId();
+        if (AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel))
+        {
+            EnsurePlayerPseudonymSalt();
+        }
 
         if (!TryGetAnalyticsEndpoint(out var endpoint))
         {
@@ -119,7 +128,7 @@ public class AnalyticsSystem : BaseBasicModSystem
             return;
         }
 
-        AnalyticsService.Configure(new RelayAnalyticsSink(API, _analyticsConfig, endpoint, Mod.Info.Version));
+        AnalyticsService.Configure(new RelayAnalyticsSink(API, _analyticsConfig, endpoint, Mod.Info.Version, _serverSessionId));
     }
 
     private void RegisterCommands()
@@ -172,16 +181,33 @@ public class AnalyticsSystem : BaseBasicModSystem
     private TextCommandResult SetConsent(string consentLevel)
     {
         var previousConsent = _analyticsConfig.ConsentLevel;
+        var previousAllowsRemoteAnalytics = _analyticsConfig.AllowsRemoteAnalytics();
+        var previousAllowsPersonalizedAnalytics = previousAllowsRemoteAnalytics &&
+                                                 AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel);
         _analyticsConfig.ConsentLevel = AnalyticsConsentLevels.Normalize(consentLevel);
         _analyticsConfig.ConsentVersionAccepted = AnalyticsConsentLevels.CurrentConsentVersion;
+
+        if (previousAllowsPersonalizedAnalytics &&
+            !AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel))
+        {
+            _analyticsConfig.PlayerPseudonymSalt = string.Empty;
+        }
 
         if (_analyticsConfig.AllowsRemoteAnalytics())
         {
             EnsureServerInstallId();
+            if (AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel))
+            {
+                EnsurePlayerPseudonymSalt();
+            }
         }
 
         StoreAnalyticsConfig();
         ConfigureAnalyticsSink();
+
+        var currentAllowsRemoteAnalytics = _analyticsConfig.AllowsRemoteAnalytics();
+        var currentAllowsPersonalizedAnalytics = currentAllowsRemoteAnalytics &&
+                                                AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel);
 
         if (_analyticsConfig.AllowsRemoteAnalytics())
         {
@@ -192,6 +218,12 @@ public class AnalyticsSystem : BaseBasicModSystem
                 ["personalized_analytics_requested"] = AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel)
             });
             AnalyticsService.TrackConfigSnapshot(Config);
+        }
+
+        if (previousAllowsRemoteAnalytics != currentAllowsRemoteAnalytics ||
+            previousAllowsPersonalizedAnalytics != currentAllowsPersonalizedAnalytics)
+        {
+            RebaselinePlayerSessionsForCurrentConsent();
         }
 
         return new TextCommandResult
@@ -214,6 +246,8 @@ public class AnalyticsSystem : BaseBasicModSystem
 
     private void OnPlayerJoin(IServerPlayer player)
     {
+        TrackPlayerSessionStarted(player);
+
         if (!ShouldQueueConsentPrompt(player))
         {
             return;
@@ -310,10 +344,106 @@ public class AnalyticsSystem : BaseBasicModSystem
 
     private void OnPlayerDisconnect(IServerPlayer player)
     {
+        TrackPlayerSessionEnded(player, "disconnect");
+
         if (!string.IsNullOrWhiteSpace(player?.PlayerUID))
         {
             _analyticsReadyPlayers.Remove(player.PlayerUID);
         }
+    }
+
+    private void TrackPlayerSessionStarted(IServerPlayer player)
+    {
+        if (string.IsNullOrWhiteSpace(player?.PlayerUID))
+        {
+            return;
+        }
+
+        _playerSessionStartsUtc[player.PlayerUID] = DateTime.UtcNow;
+        if (!AnalyticsService.IsEnabled)
+        {
+            return;
+        }
+
+        AnalyticsService.Track("player session started", BuildPlayerSessionProperties(player));
+    }
+
+    private void TrackPlayerSessionEnded(IServerPlayer player, string endReason)
+    {
+        if (string.IsNullOrWhiteSpace(player?.PlayerUID) || !_playerSessionStartsUtc.Remove(player.PlayerUID, out var startedUtc))
+        {
+            return;
+        }
+
+        if (!AnalyticsService.IsEnabled)
+        {
+            return;
+        }
+
+        var properties = BuildPlayerSessionProperties(player);
+        properties["session_duration_bucket"] = BucketDuration(DateTime.UtcNow - startedUtc);
+        properties["session_end_reason"] = endReason;
+        AnalyticsService.Track("player session ended", properties);
+    }
+
+    private void TrackOpenPlayerSessionsEnded(string endReason)
+    {
+        var players = API?.World?.AllOnlinePlayers;
+        if (players == null)
+        {
+            return;
+        }
+
+        foreach (var player in players)
+        {
+            if (player is IServerPlayer serverPlayer)
+            {
+                TrackPlayerSessionEnded(serverPlayer, endReason);
+            }
+        }
+    }
+
+    private void RebaselinePlayerSessionsForCurrentConsent()
+    {
+        _playerSessionStartsUtc.Clear();
+
+        var players = API?.World?.AllOnlinePlayers;
+        if (players == null)
+        {
+            return;
+        }
+
+        foreach (var player in players)
+        {
+            if (player is IServerPlayer serverPlayer)
+            {
+                TrackPlayerSessionStarted(serverPlayer);
+            }
+        }
+    }
+
+    private Dictionary<string, object> BuildPlayerSessionProperties(IServerPlayer player)
+    {
+        var properties = new Dictionary<string, object>();
+        var pseudonymousPlayerId = BuildPseudonymousPlayerId(player);
+        if (!string.IsNullOrWhiteSpace(pseudonymousPlayerId))
+        {
+            properties["pseudonymous_player_id"] = pseudonymousPlayerId;
+        }
+
+        return properties;
+    }
+
+    private string BuildPseudonymousPlayerId(IServerPlayer player)
+    {
+        if (!AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig?.ConsentLevel) || string.IsNullOrWhiteSpace(player?.PlayerUID))
+        {
+            return null;
+        }
+
+        var salt = EnsurePlayerPseudonymSalt();
+        using var hmac = new HMACSHA256(Convert.FromHexString(salt));
+        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(player.PlayerUID))).ToLowerInvariant();
     }
 
     private bool ShouldQueueConsentPrompt(IServerPlayer player)
@@ -346,6 +476,17 @@ public class AnalyticsSystem : BaseBasicModSystem
             _analyticsConfig.ServerInstallId = Guid.NewGuid().ToString("N");
             StoreAnalyticsConfig();
         }
+    }
+
+    private string EnsurePlayerPseudonymSalt()
+    {
+        if (!IsHexString(_analyticsConfig.PlayerPseudonymSalt, 64))
+        {
+            _analyticsConfig.PlayerPseudonymSalt = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+            StoreAnalyticsConfig();
+        }
+
+        return _analyticsConfig.PlayerPseudonymSalt;
     }
 
     private void StoreAnalyticsConfig()
@@ -462,5 +603,36 @@ public class AnalyticsSystem : BaseBasicModSystem
         }
 
         return endpoint.Scheme == Uri.UriSchemeHttps;
+    }
+
+    private static string BucketDuration(TimeSpan duration)
+    {
+        return duration.TotalMinutes switch
+        {
+            < 1 => "<1m",
+            < 5 => "1-5m",
+            < 30 => "5-30m",
+            < 120 => "30-120m",
+            _ => "120m+"
+        };
+    }
+
+    private static bool IsHexString(string value, int length)
+    {
+        if (value?.Length != length)
+        {
+            return false;
+        }
+
+        foreach (var c in value)
+        {
+            var isHex = c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
+            if (!isHex)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

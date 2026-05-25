@@ -5,6 +5,7 @@ using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
@@ -12,6 +13,11 @@ namespace thebasics.Tests.ModSystems.ProximityChat;
 
 public class ChatPreferencesCommandHandlerTests
 {
+    public ChatPreferencesCommandHandlerTests()
+    {
+        EnsureLangInitialized();
+    }
+
     [Theory]
     [InlineData("labels")]
     [InlineData("languagelabels")]
@@ -132,5 +138,13 @@ public class ChatPreferencesCommandHandlerTests
         player.When(call => call.RemoveModdata(Arg.Any<string>()))
             .Do(call => modData.Remove(call.ArgAt<string>(0)));
         return player;
+    }
+
+    private static void EnsureLangInitialized()
+    {
+        var translationService = Substitute.For<ITranslationService>();
+        translationService.Get(Arg.Any<string>(), Arg.Any<object[]>()).Returns(call => call.ArgAt<string>(0));
+        Lang.AvailableLanguages["en"] = translationService;
+        Lang.ChangeLanguage("en");
     }
 }

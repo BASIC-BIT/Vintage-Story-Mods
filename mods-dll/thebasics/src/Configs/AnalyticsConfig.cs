@@ -15,6 +15,8 @@ public class AnalyticsConfig
 
     public string ServerInstallId { get; set; } = string.Empty;
 
+    public string PlayerPseudonymSalt { get; set; } = string.Empty;
+
     public string EndpointUrl { get; set; } = DefaultEndpointUrl;
 
     public bool PromptAdminsToOptIn { get; set; } = true;
@@ -67,7 +69,7 @@ public class AnalyticsConfig
 
 public static class AnalyticsConsentLevels
 {
-    public const int CurrentConsentVersion = 1;
+    public const int CurrentConsentVersion = 2;
 
     public const string Unknown = "unknown";
     public const string Disabled = "disabled";
