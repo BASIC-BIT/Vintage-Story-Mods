@@ -35,6 +35,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     // Ephemeral state; do not persist.
     private readonly System.Collections.Generic.Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new();
     private readonly Dictionary<string, string> _languageRenameMapForJoiningPlayers = new(StringComparer.OrdinalIgnoreCase);
+    private ChatPreferencesCommandHandler _chatPreferencesCommandHandler;
 
     protected override void BasicStartServerSide()
     {
@@ -378,62 +379,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:chatprefs-langcolor-set", ChatHelper.OnOff(preferences.LanguageColorsEnabled)));
     }
 
-#pragma warning disable S1541 // Legacy command router retained until a dedicated chat-preferences refactor.
     private TextCommandResult ChatPreferences(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
-        var setting = GetOptionalWord(args, 0)?.ToLowerInvariant();
-        var value = GetOptionalWord(args, 1);
-        var extra = GetOptionalWord(args, 2);
-        var preferences = player.GetChatVisualPreferences();
-
-        if (string.IsNullOrWhiteSpace(setting) || setting == "status")
-        {
-            return Success(BuildChatPreferencesStatus(preferences));
-        }
-
-        if (setting == "help")
-        {
-            return Success(Lang.Get("thebasics:chatprefs-help"));
-        }
-
-        switch (setting)
-        {
-            case "languagecolors":
-            case "langcolors":
-                return SetBooleanPreference(player, preferences, value, pref => pref.LanguageColorsEnabled, (pref, enabled) => pref.LanguageColorsEnabled = enabled, "thebasics:chatprefs-langcolor-status", "thebasics:chatprefs-langcolor-set");
-            case "labels":
-            case "languagelabels":
-                return SetBooleanPreference(player, preferences, value, pref => pref.ShowLanguageLabels, (pref, enabled) => pref.ShowLanguageLabels = enabled, "thebasics:chatprefs-labels-status", "thebasics:chatprefs-labels-set");
-            case "nickcolors":
-            case "nicknamecolors":
-                return SetBooleanPreference(player, preferences, value, pref => pref.NicknameColorsEnabled, (pref, enabled) => pref.NicknameColorsEnabled = enabled, "thebasics:chatprefs-nickcolors-status", "thebasics:chatprefs-nickcolors-set");
-            case "preset":
-                return SetColorPreset(player, preferences, value);
-            case "langcolor":
-            case "languagecolor":
-                return SetLanguageColorOverride(player, preferences, value, extra);
-            case "ooccolor":
-                return SetColorOverride(player, preferences, value, pref => pref.OocColorOverride, (pref, color) => pref.OocColorOverride = color, "thebasics:chatprefs-ooccolor-status", "thebasics:chatprefs-ooccolor-set");
-            case "gooccolor":
-            case "globalooccolor":
-                if (!Config.EnableGlobalOOC)
-                {
-                    return Error(Lang.Get("thebasics:chatprefs-gooc-disabled"));
-                }
-
-                return SetColorOverride(player, preferences, value, pref => pref.GlobalOocColorOverride, (pref, color) => pref.GlobalOocColorOverride = color, "thebasics:chatprefs-gooccolor-status", "thebasics:chatprefs-gooccolor-set");
-            case "emotecolor":
-                return SetColorOverride(player, preferences, value, pref => pref.EmoteColorOverride, (pref, color) => pref.EmoteColorOverride = color, "thebasics:chatprefs-emotecolor-status", "thebasics:chatprefs-emotecolor-set");
-            case "reset":
-                player.ClearChatVisualPreferences();
-                return Success(Lang.Get("thebasics:chatprefs-reset"));
-            default:
-                return Error(Lang.Get("thebasics:chatprefs-usage"));
-        }
+        _chatPreferencesCommandHandler ??= new ChatPreferencesCommandHandler(
+            Config,
+            identifier => LanguageSystem?.GetLangFromText(identifier, true, allowHidden: true));
+        return _chatPreferencesCommandHandler.Handle(player, GetOptionalWord(args, 0), GetOptionalWord(args, 1), GetOptionalWord(args, 2));
     }
-
-#pragma warning restore S1541
 
     private static string GetOptionalWord(TextCommandCallingArgs args, int index)
     {
@@ -442,179 +395,14 @@ public class RPProximityChatSystem : BaseBasicModSystem
             : null;
     }
 
-    private static string BuildChatPreferencesStatus(ChatVisualPreferences preferences)
-    {
-        return Lang.Get(
-            "thebasics:chatprefs-status",
-            ChatHelper.OnOff(preferences.LanguageColorsEnabled),
-            ChatHelper.OnOff(preferences.ShowLanguageLabels),
-            preferences.ColorPreset,
-            ChatHelper.OnOff(preferences.NicknameColorsEnabled));
-    }
-
-    private static string FormatColorSetting(string color)
-    {
-        return string.IsNullOrWhiteSpace(color) ? "default" : ChatHelper.Color(color, color);
-    }
-
-    private static TextCommandResult SetBooleanPreference(
-        IServerPlayer player,
-        ChatVisualPreferences preferences,
-        string value,
-        System.Func<ChatVisualPreferences, bool> getter,
-        System.Action<ChatVisualPreferences, bool> setter,
-        string statusKey,
-        string successKey)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return Success(Lang.Get(statusKey, ChatHelper.OnOff(getter(preferences))));
-        }
-
-        if (!TryParseOnOff(value, out var enabled))
-        {
-            return Error(Lang.Get("thebasics:chatprefs-error-onoff"));
-        }
-
-        setter(preferences, enabled);
-        player.SetChatVisualPreferences(preferences);
-        return Success(Lang.Get(successKey, ChatHelper.OnOff(enabled)));
-    }
-
-    private static TextCommandResult SetColorPreset(IServerPlayer player, ChatVisualPreferences preferences, string preset)
-    {
-        if (string.IsNullOrWhiteSpace(preset))
-        {
-            return Success(Lang.Get("thebasics:chatprefs-preset-status", preferences.ColorPreset));
-        }
-
-        if (!ChatVisualPreferenceResolver.IsValidPreset(preset))
-        {
-            return Error(Lang.Get("thebasics:chatprefs-error-preset", GetPresetList()));
-        }
-
-        preferences.ColorPreset = ChatVisualPreferenceResolver.NormalizePreset(preset);
-        player.SetChatVisualPreferences(preferences);
-        return Success(Lang.Get("thebasics:chatprefs-preset-set", preferences.ColorPreset));
-    }
-
-#pragma warning disable S1541 // Legacy command validation retained until a dedicated chat-preferences refactor.
-    private TextCommandResult SetLanguageColorOverride(IServerPlayer player, ChatVisualPreferences preferences, string languageIdentifier, string colorValue)
-    {
-        if (string.IsNullOrWhiteSpace(languageIdentifier))
-        {
-            return Error(Lang.Get("thebasics:chatprefs-langcolor-usage"));
-        }
-
-        var language = LanguageSystem?.GetLangFromText(languageIdentifier, true, allowHidden: true);
-        if (language == null)
-        {
-            return Error(Lang.Get("thebasics:lang-error-invalid", languageIdentifier));
-        }
-
-        preferences.LanguageColorOverrides ??= new System.Collections.Generic.List<ColorOverrideEntry>();
-        if (string.IsNullOrWhiteSpace(colorValue))
-        {
-            return Success(Lang.Get("thebasics:chatprefs-langcolor-override-status", ChatHelper.LangIdentifier(language, player), FormatColorSetting(ChatVisualPreferenceResolver.GetLanguageColor(language, player))));
-        }
-
-        preferences.LanguageColorOverrides.RemoveAll(entry => string.Equals(entry?.Key, language.Name, StringComparison.OrdinalIgnoreCase) || string.Equals(entry?.Key, language.Prefix, StringComparison.OrdinalIgnoreCase));
-
-        if (!string.Equals(colorValue, "default", StringComparison.OrdinalIgnoreCase))
-        {
-            if (!TryNormalizeColor(colorValue, out var color))
-            {
-                return Error(Lang.Get("thebasics:chat-error-invalid-color"));
-            }
-
-            preferences.LanguageColorOverrides.Add(new ColorOverrideEntry { Key = language.Name, Color = color });
-        }
-
-        player.SetChatVisualPreferences(preferences);
-        return Success(Lang.Get("thebasics:chatprefs-langcolor-override-set", ChatHelper.LangIdentifier(language, player), FormatColorSetting(ChatVisualPreferenceResolver.GetLanguageColor(language, player))));
-    }
-
-#pragma warning restore S1541
-
-    private static TextCommandResult SetColorOverride(
-        IServerPlayer player,
-        ChatVisualPreferences preferences,
-        string colorValue,
-        System.Func<ChatVisualPreferences, string> getter,
-        System.Action<ChatVisualPreferences, string> setter,
-        string statusKey,
-        string successKey)
-    {
-        if (string.IsNullOrWhiteSpace(colorValue))
-        {
-            return Success(Lang.Get(statusKey, FormatColorSetting(getter(preferences))));
-        }
-
-        string color = null;
-        if (!string.Equals(colorValue, "default", StringComparison.OrdinalIgnoreCase) && !TryNormalizeColor(colorValue, out color))
-        {
-            return Error(Lang.Get("thebasics:chat-error-invalid-color"));
-        }
-
-        setter(preferences, color);
-        player.SetChatVisualPreferences(preferences);
-        return Success(Lang.Get(successKey, FormatColorSetting(color)));
-    }
-
-    private static bool TryNormalizeColor(string colorValue, out string color)
-    {
-        color = null;
-        try
-        {
-            color = ColorToHex(ColorTranslator.FromHtml(colorValue));
-            return !string.IsNullOrWhiteSpace(color) && !color.Contains('<') && !color.Contains('>');
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static bool TryParseOnOff(string value, out bool enabled)
-    {
-        switch (value?.Trim().ToLowerInvariant())
-        {
-            case "on":
-            case "true":
-            case "yes":
-            case "1":
-                enabled = true;
-                return true;
-            case "off":
-            case "false":
-            case "no":
-            case "0":
-                enabled = false;
-                return true;
-            default:
-                enabled = false;
-                return false;
-        }
-    }
-
-    private static string GetPresetList()
-    {
-        return string.Join(", ", ChatVisualPreferencePresets.Default, ChatVisualPreferencePresets.HighContrast, ChatVisualPreferencePresets.ColorUniversal, ChatVisualPreferencePresets.Protanopia, ChatVisualPreferencePresets.Deuteranopia, ChatVisualPreferencePresets.Tritanopia, ChatVisualPreferencePresets.Monochrome);
-    }
-
-    private static string ColorToHex(Color color)
-    {
-        return $"#{color.R:X2}{color.G:X2}{color.B:X2}";
-    }
-
     private static TextCommandResult Success(string message)
     {
         return new TextCommandResult { Status = EnumCommandStatus.Success, StatusMessage = message };
     }
 
-    private static TextCommandResult Error(string message)
+    private static string ColorToHex(Color color)
     {
-        return new TextCommandResult { Status = EnumCommandStatus.Error, StatusMessage = message };
+        return $"#{color.R:X2}{color.G:X2}{color.B:X2}";
     }
 
     private TextCommandResult SendOOCMessage(TextCommandCallingArgs args)
@@ -807,7 +595,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
         _serverConfigChannel.SendPacket(response, player);
     }
 
-#pragma warning disable S1541 // Admin config save orchestration is intentionally deferred to a focused refactor.
     private void OnConfigAdminSaveMessage(IServerPlayer player, TheBasicsConfigAdminSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -816,58 +603,52 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        if (message?.ReloadFromDisk == true)
+        if (TryHandleConfigAdminReload(player, message))
         {
-            var before = CloneConfig(Config);
-            ReloadSharedConfigFromDisk(API);
-            var reloadChangedKeys = GetChangedConfigKeys(before, Config);
-            ApplyConfigChangeSideEffects(reloadChangedKeys);
-            BroadcastClientConfigs();
-            SendConfigAdminResult(player, true, $"Reloaded config from disk. Changed settings: {reloadChangedKeys.Count}.", reloadChangedKeys);
             return;
         }
 
-        var draft = CloneConfig(Config);
-        var errors = new List<string>();
-
-        foreach (var value in message?.Values ?? new List<ConfigAdminSettingValue>())
-        {
-            if (!ConfigAdminSettingRegistry.TryGet(value.Key, out var setting))
-            {
-                errors.Add($"Unknown setting: {value.Key}");
-                continue;
-            }
-
-            if (!setting.TrySetValue(draft, value.Value, out var error))
-            {
-                errors.Add(error);
-            }
-        }
-
-        if (errors.Count > 0)
+        if (!TryBuildConfigAdminDraft(message, out var draft, out var errors))
         {
             SendConfigAdminResult(player, false, string.Join("\n", errors), Array.Empty<string>());
             return;
+        }
+
+        SaveConfigAdminDraft(player, draft);
+    }
+
+    private bool TryHandleConfigAdminReload(IServerPlayer player, TheBasicsConfigAdminSaveMessage message)
+    {
+        if (message?.ReloadFromDisk != true)
+        {
+            return false;
+        }
+
+        var reloadChangedKeys = ReloadConfigAndGetChangedKeys();
+        SendConfigAdminResult(player, true, $"Reloaded config from disk. Changed settings: {reloadChangedKeys.Count}.", reloadChangedKeys);
+        return true;
+    }
+
+    private bool TryBuildConfigAdminDraft(TheBasicsConfigAdminSaveMessage message, out ModConfig draft, out List<string> errors)
+    {
+        draft = CloneConfig(Config);
+        errors = ConfigAdminSaveWorkflow.ApplyValues(draft, message?.Values);
+        if (errors.Count > 0)
+        {
+            return false;
         }
 
         if (message?.MarkReviewedKeys != null && message.MarkReviewedKeys.Count > 0)
         {
-            var reviewed = new HashSet<string>(draft.ReviewedConfigSettingKeys ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
-            foreach (var key in message.MarkReviewedKeys.Where(key => ConfigAdminSettingRegistry.TryGet(key, out _)))
-            {
-                reviewed.Add(key);
-            }
-
-            draft.ReviewedConfigSettingKeys = reviewed.OrderBy(key => key, StringComparer.OrdinalIgnoreCase).ToList();
+            ConfigAdminSaveWorkflow.MarkReviewedKeys(draft, message.MarkReviewedKeys);
         }
 
         errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(draft));
-        if (errors.Count > 0)
-        {
-            SendConfigAdminResult(player, false, string.Join("\n", errors), Array.Empty<string>());
-            return;
-        }
+        return errors.Count == 0;
+    }
 
+    private void SaveConfigAdminDraft(IServerPlayer player, ModConfig draft)
+    {
         var changedKeys = GetChangedConfigKeys(Config, draft);
         CopyConfigValues(draft, Config);
         SaveSharedConfig(API);
@@ -875,15 +656,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
         BroadcastClientConfigs();
 
         var restartRequired = GetRestartRequiredKeys(changedKeys);
-        var messageText = restartRequired.Count == 0
-            ? $"Saved The BASICs config. Live-applied settings: {changedKeys.Count}."
-            : $"Saved The BASICs config. Restart required for: {string.Join(", ", restartRequired)}.";
-
-        SendConfigAdminResult(player, true, messageText, changedKeys);
+        SendConfigAdminResult(player, true, ConfigAdminSaveWorkflow.BuildConfigSaveMessage(changedKeys, restartRequired), changedKeys);
     }
-#pragma warning restore S1541
 
-#pragma warning disable S1541 // Admin config save orchestration is intentionally deferred to a focused refactor.
     private void OnLanguageConfigSaveMessage(IServerPlayer player, TheBasicsLanguageConfigSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -892,32 +667,47 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        if (message?.ReloadFromDisk == true)
+        if (TryHandleLanguageConfigReload(player, message))
         {
-            var before = CloneConfig(Config);
-            ReloadSharedConfigFromDisk(API);
-            var reloadChangedKeys = GetChangedConfigKeys(before, Config);
-            ApplyConfigChangeSideEffects(reloadChangedKeys);
-            BroadcastClientConfigs();
-            SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {reloadChangedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config));
             return;
         }
 
-        var draft = CloneConfig(Config);
         var submittedLanguages = message?.Languages ?? new List<LanguageConfigEntryMessage>();
-        if (!LanguageConfigAdmin.TryApplyEntries(draft, submittedLanguages, out var errors))
+        if (!TryBuildLanguageConfigDraft(submittedLanguages, out var draft, out var errors))
         {
             SendLanguageConfigResult(player, false, string.Join("\n", errors), submittedLanguages);
             return;
+        }
+
+        SaveLanguageConfigDraft(player, draft, submittedLanguages);
+    }
+
+    private bool TryHandleLanguageConfigReload(IServerPlayer player, TheBasicsLanguageConfigSaveMessage message)
+    {
+        if (message?.ReloadFromDisk != true)
+        {
+            return false;
+        }
+
+        var changedKeys = ReloadConfigAndGetChangedKeys();
+        SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {changedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config));
+        return true;
+    }
+
+    private bool TryBuildLanguageConfigDraft(List<LanguageConfigEntryMessage> submittedLanguages, out ModConfig draft, out List<string> errors)
+    {
+        draft = CloneConfig(Config);
+        if (!LanguageConfigAdmin.TryApplyEntries(draft, submittedLanguages, out errors))
+        {
+            return false;
         }
 
         errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(draft));
-        if (errors.Count > 0)
-        {
-            SendLanguageConfigResult(player, false, string.Join("\n", errors), submittedLanguages);
-            return;
-        }
+        return errors.Count == 0;
+    }
 
+    private void SaveLanguageConfigDraft(IServerPlayer player, ModConfig draft, List<LanguageConfigEntryMessage> submittedLanguages)
+    {
         var renameMap = LanguageConfigAdmin.BuildRenameMap(submittedLanguages);
         TrackLanguageRenamesForJoiningPlayers(renameMap);
         CopyConfigValues(draft, Config);
@@ -935,9 +725,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
             "Saved The BASICs language config. Online players were reconciled; renamed languages also reconcile for later joins until the next server restart.",
             LanguageConfigAdmin.BuildEntries(Config));
     }
-#pragma warning restore S1541
 
-#pragma warning disable S1541 // Admin config save orchestration is intentionally deferred to a focused refactor.
     private void OnCharacterSheetFieldConfigSaveMessage(IServerPlayer player, TheBasicsCharacterSheetFieldConfigSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -946,32 +734,47 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        if (message?.ReloadFromDisk == true)
+        if (TryHandleCharacterSheetFieldConfigReload(player, message))
         {
-            var before = CloneConfig(Config);
-            ReloadSharedConfigFromDisk(API);
-            var reloadChangedKeys = GetChangedConfigKeys(before, Config);
-            ApplyConfigChangeSideEffects(reloadChangedKeys);
-            BroadcastClientConfigs();
-            SendCharacterSheetFieldConfigResult(player, true, $"Reloaded character sheet fields from disk. Changed settings: {reloadChangedKeys.Count}.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
             return;
         }
 
-        var draft = CloneConfig(Config);
         var submittedFields = message?.Fields ?? new List<CharacterSheetFieldConfigEntryMessage>();
-        if (!CharacterSheetFieldConfigAdmin.TryApplyEntries(draft, submittedFields, out var errors))
+        if (!TryBuildCharacterSheetFieldConfigDraft(submittedFields, out var draft, out var errors))
         {
             SendCharacterSheetFieldConfigResult(player, false, string.Join("\n", errors), submittedFields);
             return;
+        }
+
+        SaveCharacterSheetFieldConfigDraft(player, draft);
+    }
+
+    private bool TryHandleCharacterSheetFieldConfigReload(IServerPlayer player, TheBasicsCharacterSheetFieldConfigSaveMessage message)
+    {
+        if (message?.ReloadFromDisk != true)
+        {
+            return false;
+        }
+
+        var changedKeys = ReloadConfigAndGetChangedKeys();
+        SendCharacterSheetFieldConfigResult(player, true, $"Reloaded character sheet fields from disk. Changed settings: {changedKeys.Count}.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
+        return true;
+    }
+
+    private bool TryBuildCharacterSheetFieldConfigDraft(List<CharacterSheetFieldConfigEntryMessage> submittedFields, out ModConfig draft, out List<string> errors)
+    {
+        draft = CloneConfig(Config);
+        if (!CharacterSheetFieldConfigAdmin.TryApplyEntries(draft, submittedFields, out errors))
+        {
+            return false;
         }
 
         errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(draft));
-        if (errors.Count > 0)
-        {
-            SendCharacterSheetFieldConfigResult(player, false, string.Join("\n", errors), submittedFields);
-            return;
-        }
+        return errors.Count == 0;
+    }
 
+    private void SaveCharacterSheetFieldConfigDraft(IServerPlayer player, ModConfig draft)
+    {
         CopyConfigValues(draft, Config);
         SaveSharedConfig(API);
 
@@ -981,44 +784,62 @@ public class RPProximityChatSystem : BaseBasicModSystem
 
         SendCharacterSheetFieldConfigResult(player, true, "Saved The BASICs character sheet field config.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
     }
-#pragma warning restore S1541
 
-#pragma warning disable S1541 // Typing-state normalization is kept inline to preserve wire-compatibility behavior.
+    private HashSet<string> ReloadConfigAndGetChangedKeys()
+    {
+        var before = CloneConfig(Config);
+        ReloadSharedConfigFromDisk(API);
+        var changedKeys = GetChangedConfigKeys(before, Config);
+        ApplyConfigChangeSideEffects(changedKeys);
+        BroadcastClientConfigs();
+        return changedKeys;
+    }
+
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
     {
-        if (player?.Entity == null || message == null)
+        if (!TryPrepareTypingStateBroadcast(player, message, out var entityId, out var state))
         {
             return;
         }
 
-        // If the feature is disabled server-side, ignore.
-        if (Config?.EnableTypingIndicator != true)
+        UpdateTypingState(entityId, state);
+        BroadcastTypingState(player, message, entityId, state);
+    }
+
+    private bool TryPrepareTypingStateBroadcast(IServerPlayer player, ChatTypingStateMessage message, out long entityId, out ChatTypingIndicatorState state)
+    {
+        entityId = player?.Entity?.EntityId ?? 0;
+        state = ChatTypingIndicatorState.None;
+
+        if (message == null || entityId == 0 || Config?.EnableTypingIndicator != true)
         {
-            return;
+            return false;
         }
 
-        var entityId = player.Entity.EntityId;
-        if (entityId == 0)
-        {
-            return;
-        }
+        state = NormalizeTypingIndicatorState(message.State, message.IsTyping);
+        return true;
+    }
 
-        // Prefer the multi-state field; fall back to IsTyping for older clients.
-        var state = message.State;
-        if (state == ChatTypingIndicatorState.None)
-        {
-            state = message.IsTyping ? ChatTypingIndicatorState.Typing : ChatTypingIndicatorState.None;
-        }
+    internal static ChatTypingIndicatorState NormalizeTypingIndicatorState(ChatTypingIndicatorState state, bool isTyping)
+    {
+        return state == ChatTypingIndicatorState.None && isTyping
+            ? ChatTypingIndicatorState.Typing
+            : state;
+    }
 
+    private void UpdateTypingState(long entityId, ChatTypingIndicatorState state)
+    {
         if (state == ChatTypingIndicatorState.None)
         {
             _typingStatesByEntityId.Remove(entityId);
-        }
-        else
-        {
-            _typingStatesByEntityId[entityId] = state;
+            return;
         }
 
+        _typingStatesByEntityId[entityId] = state;
+    }
+
+    private void BroadcastTypingState(IServerPlayer player, ChatTypingStateMessage message, long entityId, ChatTypingIndicatorState state)
+    {
         // Server is authoritative for EntityId and keeps fields consistent.
         message.EntityId = entityId;
         message.State = state;
@@ -1027,7 +848,6 @@ public class RPProximityChatSystem : BaseBasicModSystem
         // Best-effort broadcast; clients without this message type will silently ignore it.
         _serverConfigChannel?.BroadcastPacket(message, player);
     }
-#pragma warning restore S1541
 
     private static void OnChannelSelected(IServerPlayer player, ChannelSelectedMessage message)
     {
@@ -1589,67 +1409,9 @@ public class RPProximityChatSystem : BaseBasicModSystem
         return (gain, falloff);
     }
 
-#pragma warning disable S1541, S3776 // Chatter dispatch branches mirror RP mode semantics; deeper split is tracked as follow-up debt.
     internal void DispatchChatterForContext(MessageContext context)
     {
         if (_serverConfigChannel == null || !Config.EnableChatter)
-        {
-            return;
-        }
-
-        var isSpeech = context.HasFlag(MessageContext.IS_SPEECH);
-        var isEmote = context.HasFlag(MessageContext.IS_EMOTE);
-
-        // Only chatter for speech messages and emotes with quoted speech
-        if (!isSpeech && !isEmote)
-        {
-            return;
-        }
-
-        // Sign language is silent — no chatter
-        if (context.TryGetMetadata(MessageContext.LANGUAGE, out Language lang) && lang == LanguageSystem.SignLanguage)
-        {
-            return;
-        }
-
-        // Determine the speech length for note count calculation.
-        // Note: for emotes, Phase 1 transformers (auto-capitalization, auto-punctuation) may
-        // have added a character or two to quoted segments. The logarithmic scaling absorbs
-        // this negligible difference.
-        int speechLength;
-        if (isSpeech)
-        {
-            if (!context.TryGetSpeechText(out var speechText) || string.IsNullOrWhiteSpace(speechText))
-            {
-                return;
-            }
-
-            if (ProximityChatPresentationModes.Normalize(Config.ProximityChatPresentationMode) == ProximityChatPresentationModes.Prose)
-            {
-                speechLength = CountQuotedSpeechLength(speechText);
-                if (speechLength == 0)
-                {
-                    return;
-                }
-            }
-            else
-            {
-                // Regular speech — use the full speech text
-                speechLength = speechText.Length;
-            }
-        }
-        else if (isEmote)
-        {
-            // Emote — extract quoted speech portions (same split logic as EmoteTransformer)
-            speechLength = CountQuotedSpeechLength(context.Message);
-
-            // Pure narration emote (no quoted speech) — no chatter
-            if (speechLength == 0)
-            {
-                return;
-            }
-        }
-        else
         {
             return;
         }
@@ -1660,74 +1422,26 @@ public class RPProximityChatSystem : BaseBasicModSystem
             return;
         }
 
-        var mode = context.GetMetadata(MessageContext.CHAT_MODE, player.GetChatMode());
-        var volume = Config.ChatterModeVolume.TryGetValue(mode, out var vol) ? vol : 0.8f;
-        var pitch = Config.ChatterModePitch.TryGetValue(mode, out var p) ? p : 1.0f;
-
-        // Use IdleShort for whisper, Idle for normal/yell
-        var talkType = mode == ProximityChatMode.Whisper
-            ? (int)Vintagestory.API.Util.EnumTalkType.IdleShort
-            : (int)Vintagestory.API.Util.EnumTalkType.Idle;
-
-        // Keep chatter as a short ambient cue, not a second voice line.
-        // "hi" (2) -> 2, "hello there" (11) -> 2, full sentence (32) -> 3, long messages cap at 4.
-        var noteCount = speechLength switch
+        if (!ChatterMessagePlanner.TryGetSpeechLength(context, Config, out var speechLength))
         {
-            <= 24 => 2,
-            <= 80 => 3,
-            _ => 4,
-        };
+            return;
+        }
 
-        var message = new ChatterSoundMessage
+        SendChatterToRecipients(context, player, ChatterMessagePlanner.CreateBaseMessage(player, context, Config, speechLength));
+    }
+
+    private void SendChatterToRecipients(MessageContext context, IServerPlayer player, ChatterSoundMessage message)
+    {
+        foreach (var recipient in context.Recipients.Where(recipient => recipient.GetChatterEnabled()))
         {
-            EntityId = player.Entity.EntityId,
-            TalkType = talkType,
-            NoteCount = noteCount,
-            Volume = volume,
-            Pitch = pitch,
-        };
-
-        foreach (var recipient in context.Recipients)
-        {
-            // Skip recipients who have opted out of chatter
-            if (!recipient.GetChatterEnabled())
-            {
-                continue;
-            }
-
-            var recipientMessage = message;
-            if (recipient.PlayerUID == player.PlayerUID)
-            {
-                recipientMessage = new ChatterSoundMessage
-                {
-                    EntityId = message.EntityId,
-                    TalkType = message.TalkType,
-                    NoteCount = message.NoteCount,
-                    Volume = message.Volume * Config.ChatterSelfVolumeMultiplier,
-                    Pitch = message.Pitch,
-                };
-            }
-
-            _serverConfigChannel.SendPacket(recipientMessage, recipient);
+            var recipientMessage = ChatterMessagePlanner.ForRecipient(message, recipient.PlayerUID == player.PlayerUID, Config.ChatterSelfVolumeMultiplier);
+            _serverConfigChannel?.SendPacket(recipientMessage, recipient);
         }
     }
-#pragma warning restore S1541, S3776
 
     internal static int CountQuotedSpeechLength(string message)
     {
-        if (string.IsNullOrEmpty(message))
-        {
-            return 0;
-        }
-
-        var segments = message.Split('"');
-        var speechLength = 0;
-        for (var i = 1; i < segments.Length; i += 2)
-        {
-            speechLength += segments[i].Length;
-        }
-
-        return speechLength;
+        return ChatterMessagePlanner.CountQuotedSpeechLength(message);
     }
 
     private void HookEvents()
