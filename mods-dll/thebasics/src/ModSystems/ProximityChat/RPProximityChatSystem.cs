@@ -35,6 +35,7 @@ public class RPProximityChatSystem : BaseBasicModSystem
     // Ephemeral state; do not persist.
     private readonly System.Collections.Generic.Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new();
     private readonly Dictionary<string, string> _languageRenameMapForJoiningPlayers = new(StringComparer.OrdinalIgnoreCase);
+    private ChatPreferencesCommandHandler _chatPreferencesCommandHandler;
 
     protected override void BasicStartServerSide()
     {
@@ -381,10 +382,10 @@ public class RPProximityChatSystem : BaseBasicModSystem
     private TextCommandResult ChatPreferences(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
-        var handler = new ChatPreferencesCommandHandler(
+        _chatPreferencesCommandHandler ??= new ChatPreferencesCommandHandler(
             Config,
             identifier => LanguageSystem?.GetLangFromText(identifier, true, allowHidden: true));
-        return handler.Handle(player, GetOptionalWord(args, 0), GetOptionalWord(args, 1), GetOptionalWord(args, 2));
+        return _chatPreferencesCommandHandler.Handle(player, GetOptionalWord(args, 0), GetOptionalWord(args, 1), GetOptionalWord(args, 2));
     }
 
     private static string GetOptionalWord(TextCommandCallingArgs args, int index)
