@@ -1,0 +1,166 @@
+name: Terraform Infra
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra-terraform.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra-terraform.yml'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Plan or apply the analytics relay stack'
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+  BOOTSTRAP_STACK_DIR: infra/terraform/bootstrap/thebasics-analytics-state
+  GITHUB_SETTINGS_STACK_DIR: infra/terraform/stacks/github-actions-settings
+  RELAY_STACK_DIR: infra/terraform/stacks/thebasics-analytics-relay
+
+concurrency:
+  group: terraform-infra-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Terraform and Worker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infra/terraform
+
+      - name: Check Worker JavaScript syntax
+        run: node --check "$RELAY_STACK_DIR/worker/analytics-relay.mjs"
+
+      - name: Validate backend bootstrap stack
+        working-directory: ${{ env.BOOTSTRAP_STACK_DIR }}
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validate analytics relay stack
+        working-directory: ${{ env.RELAY_STACK_DIR }}
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validate GitHub Actions settings stack
+        working-directory: ${{ env.GITHUB_SETTINGS_STACK_DIR }}
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+  deploy-analytics-relay:
+    name: Plan or apply analytics relay
+    needs: validate
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-2' }}
+      AWS_TERRAFORM_ROLE_ARN: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_KMS_KEY_ARN: ${{ vars.TF_STATE_KMS_KEY_ARN }}
+      TF_STATE_REGION: ${{ vars.TF_STATE_REGION || vars.AWS_REGION || 'us-east-2' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      TF_VAR_workers_dev_subdomain: ${{ vars.CLOUDFLARE_WORKERS_DEV_SUBDOMAIN || 'basic-bit-1001' }}
+      TF_VAR_posthog_project_token: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
+      TF_VAR_posthog_host: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
+
+    steps:
+      - name: Guard apply to main
+        if: ${{ inputs.action == 'apply' && github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Infra apply is only allowed from main. Re-run this workflow from main or choose action=plan."
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Check required configuration
+        run: |
+          missing=0
+          for name in \
+            AWS_TERRAFORM_ROLE_ARN \
+            TF_STATE_BUCKET \
+            TF_STATE_KMS_KEY_ARN \
+            CLOUDFLARE_API_TOKEN \
+            TF_VAR_cloudflare_account_id \
+            TF_VAR_workers_dev_subdomain \
+            TF_VAR_posthog_project_token
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required for analytics relay deployment."
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Configure AWS credentials for Terraform state
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Write backend config
+        working-directory: ${{ env.RELAY_STACK_DIR }}
+        run: |
+          cat > backend.hcl <<EOF
+          bucket       = "$TF_STATE_BUCKET"
+          key          = "thebasics-analytics/prod/terraform.tfstate"
+          region       = "$TF_STATE_REGION"
+          kms_key_id   = "$TF_STATE_KMS_KEY_ARN"
+          encrypt      = true
+          use_lockfile = true
+          EOF
+
+      - name: Initialize analytics relay backend
+        working-directory: ${{ env.RELAY_STACK_DIR }}
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Plan analytics relay
+        working-directory: ${{ env.RELAY_STACK_DIR }}
+        run: terraform plan -out=tfplan
+
+      - name: Apply analytics relay
+        if: ${{ inputs.action == 'apply' }}
+        working-directory: ${{ env.RELAY_STACK_DIR }}
+        run: terraform apply -auto-approve tfplan

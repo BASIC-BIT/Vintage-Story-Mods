@@ -1,0 +1,5 @@
+cloudflare_account_id = "replace-with-cloudflare-account-id"
+workers_dev_subdomain = "basic-bit-1001"
+
+# Export CLOUDFLARE_API_TOKEN in your shell rather than storing it here.
+posthog_project_token = "replace-with-posthog-project-token"

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using thebasics.Extensions;
+using thebasics.ModSystems.Analytics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -38,6 +39,8 @@ namespace thebasics.ModSystems.Repair
 
             stack.Attributes.SetInt("durability", durability);
             activeSlot.MarkDirty();
+            AnalyticsService.TrackCommandUsed("setdurability", true);
+            AnalyticsService.TrackFeatureUsed("repair", "set_durability");
 
             var message = Lang.Get("thebasics:repair-success-set", durability, maxDurability);
             if (showPercentHint)
