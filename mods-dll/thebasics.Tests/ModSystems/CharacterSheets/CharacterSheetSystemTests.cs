@@ -97,6 +97,38 @@ public class CharacterSheetSystemTests
     }
 
     [Fact]
+    public void BuildClientView_WhenCharacterSheetsDisabled_ReturnsDisabledErrorCode()
+    {
+        EnsureLangInitialized();
+        var player = CreatePlayer("player-1", "Alice");
+        var config = CreateConfig(new CharacterSheetFieldDefinition { Id = "summary", Label = "First Impression" });
+        config.EnableCharacterSheets = false;
+        var system = CreateSystem(player, config);
+
+        var view = system.BuildClientView(player, new CharacterSheetOpenRequest { Mode = CharacterSheetOpenRequest.ModeOwn });
+
+        view.Success.Should().BeFalse();
+        view.IsErrorResponse.Should().BeTrue();
+        view.ErrorCode.Should().Be(CharacterSheetViewMessage.ErrorCodeDisabled);
+    }
+
+    [Fact]
+    public void SaveClientFields_WhenCharacterSheetsDisabled_ReturnsDisabledErrorCode()
+    {
+        EnsureLangInitialized();
+        var player = CreatePlayer("player-1", "Alice");
+        var config = CreateConfig(new CharacterSheetFieldDefinition { Id = "summary", Label = "First Impression" });
+        config.EnableCharacterSheets = false;
+        var system = CreateSystem(player, config);
+
+        var view = system.SaveClientFields(player, CreateSaveRequest("summary", "Quiet and watchful"));
+
+        view.Success.Should().BeFalse();
+        view.IsErrorResponse.Should().BeTrue();
+        view.ErrorCode.Should().Be(CharacterSheetViewMessage.ErrorCodeDisabled);
+    }
+
+    [Fact]
     public void BuildClientView_ForViewWithoutTarget_ReturnsError()
     {
         EnsureLangInitialized();

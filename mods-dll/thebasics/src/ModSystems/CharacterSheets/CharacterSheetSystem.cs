@@ -200,7 +200,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
     {
         if (!Config.EnableCharacterSheets)
         {
-            return CreateErrorView(Lang.Get("thebasics:charsheet-gui-disabled"));
+            return CreateErrorView(Lang.Get("thebasics:charsheet-gui-disabled"), CharacterSheetViewMessage.ErrorCodeDisabled);
         }
 
         var mode = (request?.Mode ?? CharacterSheetOpenRequest.ModeOwn).Trim().ToLowerInvariant();
@@ -217,7 +217,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
     {
         if (!Config.EnableCharacterSheets)
         {
-            return CreateErrorView(Lang.Get("thebasics:charsheet-gui-disabled"));
+            return CreateErrorView(Lang.Get("thebasics:charsheet-gui-disabled"), CharacterSheetViewMessage.ErrorCodeDisabled);
         }
 
         var isAdminAction = request?.IsAdminAction == true;
@@ -1437,13 +1437,14 @@ public class CharacterSheetSystem : BaseBasicModSystem
         };
     }
 
-    private static CharacterSheetViewMessage CreateErrorView(string message)
+    private static CharacterSheetViewMessage CreateErrorView(string message, string errorCode = "")
     {
         return new CharacterSheetViewMessage
         {
             Success = false,
             IsErrorResponse = true,
-            Message = message
+            Message = message,
+            ErrorCode = errorCode ?? string.Empty
         };
     }
 }
