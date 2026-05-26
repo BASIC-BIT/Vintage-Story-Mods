@@ -38,14 +38,14 @@ public class ChatHistorySystem : BaseBasicModSystem
 
     public override void Dispose()
     {
-        _disposed = true;
         if (API != null)
         {
             API.Event.PlayerChat -= Event_PlayerChat;
             API.Event.GameWorldSave -= Event_GameWorldSave;
         }
 
-        FlushQueued(force: true);
+        FlushQueued();
+        _disposed = true;
         base.Dispose();
     }
 
@@ -85,7 +85,7 @@ public class ChatHistorySystem : BaseBasicModSystem
 
     public ChatHistoryQueryResult Query(ChatHistoryQuery query)
     {
-        FlushQueued(force: true);
+        FlushQueued();
         return _store.Query(query, Config.ChatHistorySearchMaxResults, Config.ChatHistorySearchMaxResults);
     }
 
@@ -107,7 +107,7 @@ public class ChatHistorySystem : BaseBasicModSystem
 
     public ChatHistoryRetentionResult ApplyRetention()
     {
-        FlushQueued(force: true);
+        FlushQueued();
         return _store.ApplyRetention(Config.ChatHistoryRetentionDays, Config.ChatHistoryMaxEntries, DateTime.UtcNow);
     }
 
@@ -193,6 +193,7 @@ public class ChatHistorySystem : BaseBasicModSystem
             return TextCommandResult.Error(Lang.Get("thebasics:chat-history-error-view-usage"));
         }
 
+        FlushQueued();
         var matches = _store.LoadAll()
             .Where(entry => (entry.Id ?? string.Empty).StartsWith(id, StringComparison.OrdinalIgnoreCase))
             .Take(2)
@@ -231,7 +232,7 @@ public class ChatHistorySystem : BaseBasicModSystem
         }
 
         var query = BuildExportQuery(raw);
-        FlushQueued(force: true);
+        FlushQueued();
         var result = _store.Export(query, BuildExportPath());
         API.Logger.Audit($"Admin {ActorLabel(actor)} exported {result.ExportedCount} chat history entries to {result.Path}.");
         return TextCommandResult.Success(Lang.Get("thebasics:chat-history-export-success", result.ExportedCount, result.Path));
@@ -261,7 +262,7 @@ public class ChatHistorySystem : BaseBasicModSystem
             return TextCommandResult.Success(Lang.Get("thebasics:chat-history-purge-confirm", $"before {date} confirm"));
         }
 
-        FlushQueued(force: true);
+        FlushQueued();
         var removed = _store.PurgeBefore(cutoff);
         API.Logger.Audit($"Admin {ActorLabel(actor)} purged {removed} chat history entries before {cutoff:O}.");
         return TextCommandResult.Success(Lang.Get("thebasics:chat-history-purge-success", removed));
@@ -274,7 +275,7 @@ public class ChatHistorySystem : BaseBasicModSystem
             return TextCommandResult.Success(Lang.Get("thebasics:chat-history-purge-confirm", "all confirm"));
         }
 
-        FlushQueued(force: true);
+        FlushQueued();
         var removed = _store.PurgeAll();
         API.Logger.Audit($"Admin {ActorLabel(actor)} purged all chat history entries; removed {removed} entries.");
         return TextCommandResult.Success(Lang.Get("thebasics:chat-history-purge-success", removed));
@@ -312,7 +313,7 @@ public class ChatHistorySystem : BaseBasicModSystem
         exportQuery.Offset = 0;
         exportQuery.Limit = 0;
 
-        FlushQueued(force: true);
+        FlushQueued();
         var export = _store.Export(exportQuery, BuildExportPath());
         API.Logger.Audit($"Admin {ActorLabel(player)} exported {export.ExportedCount} chat history entries to {export.Path} from the GUI.");
 
@@ -697,24 +698,21 @@ public class ChatHistorySystem : BaseBasicModSystem
 
     private void Event_GameWorldSave()
     {
-        FlushQueued(force: true);
+        FlushQueued();
         ApplyRetention();
     }
 
     private void FlushQueued()
     {
-        if (!_disposed)
+        if (_disposed)
         {
-            FlushQueued(force: false);
+            return;
         }
-    }
 
-    private void FlushQueued(bool force)
-    {
         List<ChatHistoryEntry> batch;
         lock (_pendingLock)
         {
-            if (_pending.Count == 0 || (!force && _pending.Count < 1))
+            if (_pending.Count == 0)
             {
                 return;
             }
