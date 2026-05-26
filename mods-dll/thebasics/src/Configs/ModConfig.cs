@@ -32,6 +32,7 @@ namespace thebasics.Configs
             InitializeCharacterSheetDefaults();
             InitializeGeneralFeatureDefaults();
             InitializeNotesDefaults();
+            InitializeChatHistoryDefaults();
         }
 
         private void InitializeProximityChatDefaults()
@@ -148,6 +149,16 @@ namespace thebasics.Configs
             MaxFreeformNoteLength = MaxFreeformNoteLength <= 0 ? 20000 : MaxFreeformNoteLength;
             MaxAdminNotesPerTarget = MaxAdminNotesPerTarget <= 0 ? 100 : MaxAdminNotesPerTarget;
             MaxPlayerNotesPerAuthor = MaxPlayerNotesPerAuthor <= 0 ? 200 : MaxPlayerNotesPerAuthor;
+        }
+
+        private void InitializeChatHistoryDefaults()
+        {
+            ChatHistoryPermission = string.IsNullOrWhiteSpace(ChatHistoryPermission) ? "commandplayer" : ChatHistoryPermission;
+            ChatHistoryManagePermission = string.IsNullOrWhiteSpace(ChatHistoryManagePermission) ? "commandplayer" : ChatHistoryManagePermission;
+            ChatHistoryRetentionDays = Math.Max(0, ChatHistoryRetentionDays);
+            ChatHistoryMaxEntries = Math.Max(0, ChatHistoryMaxEntries);
+            ChatHistorySearchMaxResults = ChatHistorySearchMaxResults <= 0 ? 100 : ChatHistorySearchMaxResults;
+            ChatHistoryFlushIntervalMilliseconds = ChatHistoryFlushIntervalMilliseconds <= 0 ? 1000 : Math.Max(100, ChatHistoryFlushIntervalMilliseconds);
         }
 
         private void InitializeCharacterSheetDefaults()
@@ -733,5 +744,31 @@ namespace thebasics.Configs
         // Opt-in because relaying proximity chat to Discord makes local RP chat globally visible.
         [ProtoMember(123)]
         public bool EnableTh3EssentialsDiscordRelay { get; set; } = false;
+
+        [ProtoMember(124)]
+        public bool EnableChatHistory { get; set; } = true;
+
+        [ProtoMember(125)]
+        public bool ChatHistoryCaptureNonBasicChat { get; set; } = true;
+
+        [ProtoMember(126)]
+        public string ChatHistoryPermission { get; set; } = "commandplayer";
+
+        [ProtoMember(127)]
+        public string ChatHistoryManagePermission { get; set; } = "commandplayer";
+
+        // 0 means keep forever by age.
+        [ProtoMember(128)]
+        public int ChatHistoryRetentionDays { get; set; }
+
+        // 0 means keep unlimited entries by count.
+        [ProtoMember(129)]
+        public int ChatHistoryMaxEntries { get; set; }
+
+        [ProtoMember(130)]
+        public int ChatHistorySearchMaxResults { get; set; } = 100;
+
+        [ProtoMember(131)]
+        public int ChatHistoryFlushIntervalMilliseconds { get; set; } = 1000;
     }
 }

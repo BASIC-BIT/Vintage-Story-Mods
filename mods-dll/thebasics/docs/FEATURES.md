@@ -15,6 +15,41 @@ The mod currently loads these server-side systems:
 
 It also loads the client-side `ChatUiSystem` for config sync, chat UI patches, speech bubbles, typing indicators, placed environmental bubbles, RPTTS dispatch, and chatter playback.
 
+## Chat History Search
+
+Features:
+
+- Optional server-side chat history capture controlled by `EnableChatHistory`.
+- Captures The BASICs RP chat with canonical sender text, source/kind metadata, recipient counts, language/mode metadata, and sender/placed positions when available.
+- Optional capture of non-BASICs player chat through Vintage Story's `PlayerChat` event when `ChatHistoryCaptureNonBasicChat=true`.
+- JSONL storage under server mod data, with corrupt-line recovery during reads.
+- Permission-gated GUI search opened with `/chatlog` or `/chathistory`.
+- Text command backup for recent/search/player/view, plus export and purge management.
+- Retention can keep forever, cap by age, cap by total entry count, or purge manually.
+
+Commands:
+
+- `/chatlog` or `/chathistory`: open the GUI search surface for player callers.
+- `/chatlog recent [count]`
+- `/chatlog search <text>`
+- `/chatlog player <player> [count]`
+- `/chatlog view <id>`
+- `/chatlog export [all|search <text>|player <player>|recent [count]]`
+- `/chatlog purge retention confirm`
+- `/chatlog purge before <date> confirm`
+- `/chatlog purge all confirm`
+
+Primary config areas:
+
+- `EnableChatHistory`
+- `ChatHistoryCaptureNonBasicChat`
+- `ChatHistoryPermission`
+- `ChatHistoryManagePermission`
+- `ChatHistoryRetentionDays`
+- `ChatHistoryMaxEntries`
+- `ChatHistorySearchMaxResults`
+- `ChatHistoryFlushIntervalMilliseconds`
+
 ## Default Configuration Philosophy
 
 Version 5.5.0 shifts the generated/default config toward showcasing RP-server features out of the box. Existing explicit values in `ModConfig/the_basics.json` are still respected, but new configs and missing keys now default to these feature-forward behaviors:

@@ -7,6 +7,8 @@ using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.AdminConfig;
+using thebasics.ModSystems.ChatHistory;
+using thebasics.ModSystems.ChatHistory.Models;
 using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.Notes;
 using thebasics.ModSystems.Notes.Models;
@@ -533,6 +535,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .RegisterMessageType<TheBasicsNotesOpenRequest>()
             .RegisterMessageType<TheBasicsNotesSaveMessage>()
             .RegisterMessageType<TheBasicsNotesViewMessage>()
+            .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
+            .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
@@ -547,6 +551,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .SetMessageHandler<TheBasicsCharacterSheetFieldConfigSaveMessage>(OnCharacterSheetFieldConfigSaveMessage)
             .SetMessageHandler<TheBasicsNotesOpenRequest>(OnNotesOpenRequest)
             .SetMessageHandler<TheBasicsNotesSaveMessage>(OnNotesSaveMessage)
+            .SetMessageHandler<TheBasicsChatHistoryQueryRequest>(OnChatHistoryQueryRequest)
             .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
     }
 
@@ -564,6 +569,17 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         if (viewer == null || view == null || _serverConfigChannel == null) return;
         _serverConfigChannel.SendPacket(view, viewer);
+    }
+
+    public void PushChatHistoryResult(IServerPlayer viewer, TheBasicsChatHistoryResultMessage view)
+    {
+        if (viewer == null || view == null || _serverConfigChannel == null) return;
+        _serverConfigChannel.SendPacket(view, viewer);
+    }
+
+    public void RecordChatHistory(MessageContext context, string formattedMessage)
+    {
+        API.ModLoader.GetModSystem<ChatHistorySystem>()?.RecordBasicChat(context, formattedMessage);
     }
 
     private void OnNotesOpenRequest(IServerPlayer player, TheBasicsNotesOpenRequest message)
@@ -584,6 +600,17 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         {
             Success = false,
             Message = Lang.Get("thebasics:notes-error-disabled")
+        };
+        _serverConfigChannel.SendPacket(response, player);
+    }
+
+    private void OnChatHistoryQueryRequest(IServerPlayer player, TheBasicsChatHistoryQueryRequest message)
+    {
+        var historySystem = API.ModLoader.GetModSystem<ChatHistorySystem>();
+        var response = historySystem?.HandleGuiRequest(player, message) ?? new TheBasicsChatHistoryResultMessage
+        {
+            Success = false,
+            Message = Lang.Get("thebasics:chat-history-disabled")
         };
         _serverConfigChannel.SendPacket(response, player);
     }
