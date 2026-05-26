@@ -36,6 +36,8 @@ New guide/help strings in non-English locale files intentionally use English fal
 - `/adminsetnick <player> <nickname>` - Set another player's RP nickname.
 - `/adminsetnickcolor <player> <color>` - Set another player's nickname color.
 - `/adminaddlang`, `/adminremovelang`, `/adminlistlang` - Manage player languages when the language system is enabled.
+- `/chatlog` or `/chathistory` - Open the permission-gated chat history search GUI.
+- `/chatlog recent|search|player|view|export|purge` - Use text-mode chat history search, export, and purge commands.
 
 ## Server Operator Commands
 

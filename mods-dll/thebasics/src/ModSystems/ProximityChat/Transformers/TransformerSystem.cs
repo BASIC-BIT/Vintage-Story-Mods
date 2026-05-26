@@ -127,6 +127,11 @@ public class TransformerSystem
     // TODO: Refactor common usage with ICSpeechFormatTransformer
     private string BuildChatLogMessage(MessageContext context)
     {
+        return FormatChatLogMessage(context);
+    }
+
+    private string FormatChatLogMessage(MessageContext context)
+    {
         var nickname = context.GetMetadata(MessageContext.FORMATTED_NAME, context.SendingPlayer?.PlayerName ?? "unknown");
 
         if (context.HasFlag(MessageContext.IS_OOC))
@@ -184,8 +189,15 @@ public class TransformerSystem
         var hasImmediateRecipients = context.Recipients != null && context.Recipients.Count > 0;
         var hasPendingSignLanguageRecipients = HasPendingSignLanguageRecipients(context);
 
-        // If processing was stopped or no current/pending recipients were determined, we're done
-        if (context.State != MessageContextState.CONTINUE || (!hasImmediateRecipients && !hasPendingSignLanguageRecipients))
+        if (context.State != MessageContextState.CONTINUE)
+        {
+            return;
+        }
+
+        LogChatMessageOnce(context);
+
+        // History/logging happens even when no one can hear the message; delivery still stops here.
+        if (!hasImmediateRecipients && !hasPendingSignLanguageRecipients)
         {
             return;
         }
@@ -194,8 +206,6 @@ public class TransformerSystem
         {
             _chatSystem.DispatchSpeechForContext(context);
             _chatSystem.DispatchChatterForContext(context);
-
-            LogChatMessageOnce(context);
 
             // ----- PHASE 2: Process for each recipient (content transformation) -----
             foreach (var recipient in context.Recipients)
@@ -228,6 +238,7 @@ public class TransformerSystem
         var logMessage = BuildChatLogMessage(context);
         _chatSystem.API.Logger.Chat(logMessage);
         _chatSystem.PublishProximityChatMessageProcessed(context, logMessage);
+        _chatSystem.RecordChatHistory(context, logMessage);
         context.SetMetadata(ChatMessageLoggedMetadataKey, true);
     }
 

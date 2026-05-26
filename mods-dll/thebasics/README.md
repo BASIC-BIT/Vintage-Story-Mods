@@ -15,6 +15,7 @@ High-level systems:
  * Server save notifications.
  * Sleep notifications.
  * Player stat tracking for deaths, player kills, NPC kills, block breaks, and distance travelled.
+ * Permission-gated chat history search for staff, with GUI search, text command backup, export, and retention/purge controls.
  * TPA (teleport request) system with optional temporal gear cost, cooldowns, timeouts, and privileges.
  * Admin repair utility for setting item durability.
 

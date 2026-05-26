@@ -13,6 +13,7 @@ using HarmonyLib;
 using thebasics.Configs;
 using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
+using thebasics.ModSystems.ChatHistory.Models;
 using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.Notes.Models;
 using thebasics.Utilities;
@@ -48,6 +49,7 @@ public class ChatUiSystem : ModSystem
     private static LanguageConfigDialog _languageConfigDialog;
     private static CharacterSheetFieldConfigDialog _characterSheetFieldConfigDialog;
     private static PlayerNotesDialog _playerNotesDialog;
+    private static ChatHistoryDialog _chatHistoryDialog;
     private static bool _pendingCharacterSheetSave;
     private static bool _pendingCharacterSheetOpenFromCharacterDialog;
     private static bool _suppressNextCharacterDialogSheetOpen;
@@ -299,6 +301,8 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsNotesOpenRequest>()
             .RegisterMessageType<TheBasicsNotesSaveMessage>()
             .RegisterMessageType<TheBasicsNotesViewMessage>()
+            .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
+            .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
@@ -313,7 +317,8 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<CharacterSheetViewMessage>(OnCharacterSheetViewMessage)
             .SetMessageHandler<HeadshotUploadResult>(OnHeadshotUploadResult)
             .SetMessageHandler<HeadshotFetchResult>(OnHeadshotFetchResult)
-            .SetMessageHandler<TheBasicsNotesViewMessage>(OnNotesViewMessage);
+            .SetMessageHandler<TheBasicsNotesViewMessage>(OnNotesViewMessage)
+            .SetMessageHandler<TheBasicsChatHistoryResultMessage>(OnChatHistoryResultMessage);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
@@ -1022,6 +1027,17 @@ public class ChatUiSystem : ModSystem
         OpenPlayerNotesDialog(message);
     }
 
+    private static void OnChatHistoryResultMessage(TheBasicsChatHistoryResultMessage message)
+    {
+        if (message?.Success == false && _chatHistoryDialog == null)
+        {
+            ShowConfigAdminChatMessage(message.Message);
+            return;
+        }
+
+        OpenChatHistoryDialog(message);
+    }
+
     private static void ShowLanguageConfigChatMessage(string message)
     {
         if (!string.IsNullOrWhiteSpace(message))
@@ -1133,6 +1149,33 @@ public class ChatUiSystem : ModSystem
     private static void OnPlayerNotesClosed()
     {
         _playerNotesDialog = null;
+    }
+
+    private static void OpenChatHistoryDialog(TheBasicsChatHistoryResultMessage message)
+    {
+        if (_api == null || message == null)
+        {
+            return;
+        }
+
+        if (_chatHistoryDialog == null)
+        {
+            _chatHistoryDialog = new ChatHistoryDialog(_api, message, SendChatHistoryQueryRequest, SendChatHistoryExportRequest, OnChatHistoryClosed);
+        }
+        else
+        {
+            _chatHistoryDialog.SetView(message);
+        }
+
+        if (!_chatHistoryDialog.IsOpened())
+        {
+            _chatHistoryDialog.TryOpen();
+        }
+    }
+
+    private static void OnChatHistoryClosed()
+    {
+        _chatHistoryDialog = null;
     }
 
     private static void UpdateConfigAdminDraft(IEnumerable<ConfigAdminSettingValue> values, IEnumerable<string> reviewedKeys, string statusMessage)
@@ -1558,6 +1601,20 @@ public class ChatUiSystem : ModSystem
     {
         message ??= new TheBasicsNotesSaveMessage();
         message.Reload = true;
+        _safeNetworkChannel?.SendPacketSafely(message);
+    }
+
+    private static void SendChatHistoryQueryRequest(TheBasicsChatHistoryQueryRequest message)
+    {
+        message ??= new TheBasicsChatHistoryQueryRequest();
+        message.Export = false;
+        _safeNetworkChannel?.SendPacketSafely(message);
+    }
+
+    private static void SendChatHistoryExportRequest(TheBasicsChatHistoryQueryRequest message)
+    {
+        message ??= new TheBasicsChatHistoryQueryRequest();
+        message.Export = true;
         _safeNetworkChannel?.SendPacketSafely(message);
     }
 

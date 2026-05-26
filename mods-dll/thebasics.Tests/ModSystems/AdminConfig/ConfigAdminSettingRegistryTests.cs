@@ -196,6 +196,23 @@ public class ConfigAdminSettingRegistryTests
         setting.GetValue(config).Should().Be("1");
     }
 
+    [Fact]
+    public void ChatHistorySettings_AreRegisteredAndValidateRanges()
+    {
+        var config = CreateConfig();
+
+        GetSetting("EnableChatHistory").TrySetValue(config, "false", out var boolError).Should().BeTrue(boolError);
+        GetSetting("ChatHistoryPermission").TrySetValue(config, "chatlog", out var permissionError).Should().BeTrue(permissionError);
+        GetSetting("ChatHistoryRetentionDays").TrySetValue(config, "30", out var retentionError).Should().BeTrue(retentionError);
+        var invalid = GetSetting("ChatHistorySearchMaxResults").TrySetValue(config, "0", out var maxResultsError);
+
+        config.EnableChatHistory.Should().BeFalse();
+        config.ChatHistoryPermission.Should().Be("chatlog");
+        config.ChatHistoryRetentionDays.Should().Be(30);
+        invalid.Should().BeFalse();
+        maxResultsError.Should().Contain("whole number from 1 to 1000");
+    }
+
     private static ModConfig CreateConfig()
     {
         var config = new ModConfig();
