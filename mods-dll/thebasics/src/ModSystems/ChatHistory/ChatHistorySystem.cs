@@ -432,7 +432,8 @@ public class ChatHistorySystem : BaseBasicModSystem
     {
         var savegameId = ChatHistoryStore.SanitizePathPart(API.WorldManager?.SaveGame?.SavegameIdentifier ?? "default");
         var dir = Path.Combine(API.GetOrCreateDataPath("ModData"), "thebasics", "chat-history-exports", savegameId);
-        var filename = "chat-history-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".jsonl";
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fffffff", CultureInfo.InvariantCulture);
+        var filename = $"chat-history-{timestamp}-{Guid.NewGuid():N}.jsonl";
         return Path.Combine(dir, filename);
     }
 
@@ -601,7 +602,7 @@ public class ChatHistorySystem : BaseBasicModSystem
             return;
         }
 
-        if (consumed?.value == true || IsManagedByTheBasics(channelId))
+        if (consumed?.value == true || IsHandledByTheBasics(byPlayer, channelId))
         {
             return;
         }
@@ -731,10 +732,10 @@ public class ChatHistorySystem : BaseBasicModSystem
         }
     }
 
-    private bool IsManagedByTheBasics(int channelId)
+    private bool IsHandledByTheBasics(IServerPlayer player, int channelId)
     {
         var chatSystem = API.ModLoader.GetModSystem<RPProximityChatSystem>();
-        return chatSystem != null && channelId == chatSystem.ProximityChatId;
+        return chatSystem != null && channelId == chatSystem.ProximityChatId && player.GetRpTextEnabled();
     }
 
     private string ResolveChannelName(int channelId)
