@@ -1,0 +1,11 @@
+{
+  ingredientPattern: "_N_,PGP,_N_",
+  ingredients: {
+    "N": { type: "item", code: "game:metalnailsandstrips-*", quantity: 1 },
+    "P": { type: "block", code: "game:rockpolished-*", name: "rock", allowedVariants: ["andesite", "chalk", "chert", "conglomerate", "limestone", "claystone", "granite", "sandstone", "shale", "basalt", "peridotite", "phyllite", "slate", "redmarble", "whitemarble", "greenmarble", "bauxite", "suevite", "kimberlite"] },
+    "G": { type: "item", code: "game:gear-temporal", quantity: 1 }
+  },
+  width: 3,
+  height: 3,
+  output: { type: "block", code: "pocketwaystone", quantity: 1 }
+}

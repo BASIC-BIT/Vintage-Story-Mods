@@ -1,0 +1,221 @@
+using System.Collections.Generic;
+using System.Threading;
+using DimensionLib.Api;
+using DimensionLib.Commands;
+using DimensionLib.Network;
+using DimensionLib.Services;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
+
+namespace DimensionLib.Core;
+
+public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
+{
+    public const string ModId = "dimensionlib";
+    public const int FirstPrototypeDimension = 3;
+
+    private DimensionLibServerService _serverService;
+    private DimensionVisualSystem _visualSystem;
+    private ICoreClientAPI _clientApi;
+
+    public int PrimaryDimensionPlaneId => FirstPrototypeDimension;
+
+    public IReadOnlyCollection<Dimension> Dimensions => _serverService?.Dimensions ?? System.Array.Empty<Dimension>();
+
+    public IReadOnlyCollection<string> GeneratorIds => _serverService?.GeneratorIds ?? System.Array.Empty<string>();
+
+    public Dimension DebugDimension => _serverService?.DebugDimension;
+
+    public override void Start(ICoreAPI api)
+    {
+        base.Start(api);
+        api.ObjectCache["dimensionlib:api"] = this;
+    }
+
+    public override void StartServerSide(ICoreServerAPI api)
+    {
+        var serverChannel = api.Network.RegisterChannel(ModId)
+            .RegisterMessageType<DimensionTransferMessage>()
+            .RegisterMessageType<DimensionVisualTuningMessage>();
+
+        _serverService = new DimensionLibServerService(api, serverChannel);
+        _serverService.Start();
+        new DimensionLibCommandRegistrar(api, _serverService).Register();
+        api.Logger.Notification("DimensionLib registered debug dimension commands. Use /dlib enter-spike as root.");
+    }
+
+    public override void StartClientSide(ICoreClientAPI api)
+    {
+        _clientApi = api;
+        api.Network.RegisterChannel(ModId)
+            .RegisterMessageType<DimensionTransferMessage>()
+            .RegisterMessageType<DimensionVisualTuningMessage>()
+            .SetMessageHandler<DimensionTransferMessage>(OnDimensionTransferMessage)
+            .SetMessageHandler<DimensionVisualTuningMessage>(OnDimensionVisualTuningMessage);
+
+        _visualSystem = new DimensionVisualSystem(api);
+        _visualSystem.Start();
+    }
+
+    public override void Dispose()
+    {
+        _serverService?.Dispose();
+        _visualSystem?.Dispose();
+        base.Dispose();
+    }
+
+    public DimensionLibResult<Dimension> RegisterDimension(DimensionSpec spec)
+    {
+        EnsureServerReady();
+        return _serverService.RegisterDimension(spec);
+    }
+
+    public DimensionLibResult<Dimension> GetDimension(string dimensionId)
+    {
+        EnsureServerReady();
+        return _serverService.GetDimension(dimensionId);
+    }
+
+    public DimensionLibResult<Dimension> GetDimensionAt(BlockPos pos)
+    {
+        EnsureServerReady();
+        return _serverService.GetDimensionAt(pos);
+    }
+
+    public bool IsDimensionPrepared(string dimensionId)
+    {
+        EnsureServerReady();
+        return _serverService.IsDimensionPrepared(dimensionId);
+    }
+
+    public bool IsDimensionOrphaned(string dimensionId)
+    {
+        EnsureServerReady();
+        return _serverService.IsDimensionOrphaned(dimensionId);
+    }
+
+    public DimensionLibResult RegisterPolicyProvider(string ownerModId, IDimensionPolicyProvider provider)
+    {
+        EnsureServerReady();
+        return _serverService.RegisterPolicyProvider(ownerModId, provider);
+    }
+
+    public DimensionLibResult RegisterGenerator(IDimensionGenerator generator)
+    {
+        EnsureServerReady();
+        return _serverService.RegisterGenerator(generator);
+    }
+
+    public DimensionLibResult PrepareDimension(string dimensionId, IBlockVolumeSource source = null, IServerPlayer sendToPlayer = null, CancellationToken token = default)
+    {
+        EnsureServerReady();
+        return _serverService.PrepareDimension(dimensionId, source, sendToPlayer, token);
+    }
+
+    public DimensionLibResult PrepareGeneratedDimension(string dimensionId, IServerPlayer sendToPlayer = null, CancellationToken token = default)
+    {
+        EnsureServerReady();
+        return _serverService.PrepareGeneratedDimension(dimensionId, sendToPlayer, token);
+    }
+
+    public DimensionLibResult<string> ValidateDimension(string dimensionId)
+    {
+        EnsureServerReady();
+        return _serverService.ValidateDimension(dimensionId);
+    }
+
+    public DimensionLibResult ForceSendDimension(string dimensionId, IServerPlayer player)
+    {
+        EnsureServerReady();
+        return _serverService.ForceSendDimension(dimensionId, player);
+    }
+
+    public DimensionLibResult<DimensionLocation> CaptureLocation(IServerPlayer player)
+    {
+        EnsureServerReady();
+        return _serverService.CaptureLocation(player);
+    }
+
+    public DimensionLibResult TeleportToDimension(IServerPlayer player, string dimensionId, DimensionTeleportOptions options = null)
+    {
+        EnsureServerReady();
+        return _serverService.TeleportToDimension(player, dimensionId, options);
+    }
+
+    public DimensionLibResult TeleportToLocation(IServerPlayer player, DimensionLocation location)
+    {
+        EnsureServerReady();
+        return _serverService.TeleportToLocation(player, location);
+    }
+
+    public DimensionLibResult ReturnPlayer(IServerPlayer player)
+    {
+        EnsureServerReady();
+        return _serverService.ReturnPlayer(player);
+    }
+
+    public DimensionLibResult ReleaseDimension(string dimensionId, DimensionReleaseMode mode = DimensionReleaseMode.ForgetOnly)
+    {
+        EnsureServerReady();
+        return _serverService.ReleaseDimension(dimensionId, mode);
+    }
+
+    public DimensionLibResult PrepareDebugDimension(IServerPlayer player = null)
+    {
+        EnsureServerReady();
+        return _serverService.PrepareDebugDimension(player);
+    }
+
+    public DimensionLibResult EnterDebugDimension(IServerPlayer player)
+    {
+        EnsureServerReady();
+        return _serverService.EnterDebugDimension(player);
+    }
+
+    public DimensionLibResult ExitDebugDimension(IServerPlayer player)
+    {
+        EnsureServerReady();
+        return _serverService.ReturnPlayer(player);
+    }
+
+    private void OnDimensionTransferMessage(DimensionTransferMessage message)
+    {
+        var entity = _clientApi?.World.Player?.Entity;
+        if (entity == null)
+        {
+            return;
+        }
+
+        entity.Pos.SetPos(message.X, message.Y, message.Z);
+        entity.Pos.Yaw = message.Yaw;
+        entity.Pos.Pitch = message.Pitch;
+        entity.Pos.Roll = message.Roll;
+        entity.Pos.Motion.Set(0, 0, 0);
+        entity.PositionBeforeFalling.Set(message.X, message.Y, message.Z);
+        entity.ChangeDimension(message.DimensionPlaneId);
+        _visualSystem?.SetActiveProfile(message.DimensionPlaneId, message.DimensionId, message.VisualProfileId, message.MinimumSceneLight);
+
+        for (var cx = message.ChunkX; cx < message.ChunkX + message.ChunkSizeX; cx++)
+        {
+            for (var cz = message.ChunkZ; cz < message.ChunkZ + message.ChunkSizeZ; cz++)
+            {
+                _clientApi.World.SetChunkColumnVisible(cx, cz, message.DimensionPlaneId);
+            }
+        }
+    }
+
+    private void OnDimensionVisualTuningMessage(DimensionVisualTuningMessage message)
+    {
+        _visualSystem?.ApplyTuning(message);
+    }
+
+    private void EnsureServerReady()
+    {
+        if (_serverService == null)
+        {
+            throw new System.InvalidOperationException("DimensionLib server services are not available on this side.");
+        }
+    }
+}

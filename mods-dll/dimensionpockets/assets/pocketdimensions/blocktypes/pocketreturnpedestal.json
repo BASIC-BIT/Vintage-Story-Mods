@@ -1,0 +1,30 @@
+{
+  code: "pocketreturnpedestal",
+  class: "PocketReturnPedestalBlock",
+  blockmaterial: "Stone",
+  drawtype: "json",
+  faceCullMode: "NeverCull",
+  shape: { base: "pocketdimensions:block/pocketreturnpedestal" },
+  textures: {
+    stone: { base: "pocketdimensions:block/pocketwaystone-stone" },
+    trim: { base: "pocketdimensions:block/pocketwaystone-trim" },
+    accent: { base: "pocketdimensions:block/pocketwaystone-accent" }
+  },
+  sideopaque: { all: false },
+  sideao: { all: false },
+  sidesolid: { all: false },
+  collisionbox: { x1: 0.15, y1: 0, z1: 0.15, x2: 0.85, y2: 1.0, z2: 0.85 },
+  selectionbox: { x1: 0.1, y1: 0, z1: 0.1, x2: 0.9, y2: 1.5, z2: 0.9 },
+  replaceable: 0,
+  resistance: 10000,
+  requiredMiningTier: 10,
+  lightAbsorption: 0,
+  drops: [],
+  sounds: {
+    walk: "game:walk/stone",
+    place: "game:block/rock-place",
+    byTool: {
+      "Pickaxe": { hit: "game:block/rock-hit-pickaxe", break: "game:block/rock-break-pickaxe" }
+    }
+  }
+}
