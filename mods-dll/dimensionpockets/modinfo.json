@@ -1,0 +1,15 @@
+{
+  "type": "code",
+  "modid": "pocketdimensions",
+  "name": "Pocket Dimensions",
+  "authors": [
+    "BASIC"
+  ],
+  "description": "Admin-managed pocket dimensions powered by DimensionLib.",
+  "version": "0.1.0",
+  "dependencies": {
+    "game": "",
+    "dimensionlib": "0.1.0"
+  },
+  "side": "universal"
+}

@@ -1,0 +1,127 @@
+{
+  "editor": {
+    "allAngles": false,
+    "entityTextureMode": false
+  },
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "stone": "pocketdimensions:block/pocketwaystone-stone",
+    "trim": "pocketdimensions:block/pocketwaystone-trim",
+    "accent": "pocketdimensions:block/pocketwaystone-accent"
+  },
+  "elements": [
+    {
+      "name": "BaseSlab",
+      "from": [3.0, 0.0, 3.0],
+      "to": [13.0, 2.0, 13.0],
+      "rotationOrigin": [3.0, 0.0, 3.0],
+      "faces": {
+        "north": { "texture": "#stone", "uv": [0.0, 0.0, 10.0, 2.0] },
+        "east": { "texture": "#stone", "uv": [0.0, 0.0, 10.0, 2.0] },
+        "south": { "texture": "#stone", "uv": [0.0, 0.0, 10.0, 2.0] },
+        "west": { "texture": "#stone", "uv": [0.0, 0.0, 10.0, 2.0] },
+        "up": { "texture": "#stone", "uv": [0.0, 0.0, 10.0, 10.0] },
+        "down": { "texture": "#stone", "uv": [0.0, 0.0, 10.0, 10.0] }
+      }
+    },
+    {
+      "name": "RaisedPlinth",
+      "from": [4.0, 2.0, 4.0],
+      "to": [12.0, 3.5, 12.0],
+      "rotationOrigin": [4.0, 2.0, 4.0],
+      "faces": {
+        "north": { "texture": "#trim", "uv": [0.0, 0.0, 8.0, 1.5] },
+        "east": { "texture": "#trim", "uv": [0.0, 0.0, 8.0, 1.5] },
+        "south": { "texture": "#trim", "uv": [0.0, 0.0, 8.0, 1.5] },
+        "west": { "texture": "#trim", "uv": [0.0, 0.0, 8.0, 1.5] },
+        "up": { "texture": "#trim", "uv": [0.0, 0.0, 8.0, 8.0] },
+        "down": { "texture": "#trim", "uv": [0.0, 0.0, 8.0, 8.0] }
+      }
+    },
+    {
+      "name": "UprightCore",
+      "from": [5.0, 3.5, 5.0],
+      "to": [11.0, 11.0, 11.0],
+      "rotationOrigin": [5.0, 3.5, 5.0],
+      "faces": {
+        "north": { "texture": "#stone", "uv": [0.0, 0.0, 6.0, 7.5] },
+        "east": { "texture": "#stone", "uv": [0.0, 0.0, 6.0, 7.5] },
+        "south": { "texture": "#stone", "uv": [0.0, 0.0, 6.0, 7.5] },
+        "west": { "texture": "#stone", "uv": [0.0, 0.0, 6.0, 7.5] },
+        "up": { "texture": "#stone", "uv": [0.0, 0.0, 6.0, 6.0] },
+        "down": { "texture": "#stone", "uv": [0.0, 0.0, 6.0, 6.0] }
+      }
+    },
+    {
+      "name": "FrontPlate",
+      "from": [4.5, 5.0, 3.8],
+      "to": [11.5, 10.0, 5.2],
+      "rotationOrigin": [4.5, 5.0, 3.8],
+      "faces": {
+        "north": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 5.0] },
+        "east": { "texture": "#trim", "uv": [0.0, 0.0, 1.5, 5.0] },
+        "south": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 5.0] },
+        "west": { "texture": "#trim", "uv": [0.0, 0.0, 1.5, 5.0] },
+        "up": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 1.5] },
+        "down": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 1.5] }
+      }
+    },
+    {
+      "name": "AccentInlay",
+      "from": [6.0, 6.2, 3.55],
+      "to": [10.0, 8.6, 3.85],
+      "rotationOrigin": [6.0, 6.2, 3.55],
+      "faces": {
+        "north": { "texture": "#accent", "uv": [0.0, 0.0, 4.0, 2.5] },
+        "east": { "texture": "#accent", "uv": [0.0, 0.0, 0.5, 2.5] },
+        "south": { "texture": "#accent", "uv": [0.0, 0.0, 4.0, 2.5] },
+        "west": { "texture": "#accent", "uv": [0.0, 0.0, 0.5, 2.5] },
+        "up": { "texture": "#accent", "uv": [0.0, 0.0, 4.0, 0.5] },
+        "down": { "texture": "#accent", "uv": [0.0, 0.0, 4.0, 0.5] }
+      }
+    },
+    {
+      "name": "BackRidge",
+      "from": [5.5, 4.0, 10.5],
+      "to": [10.5, 11.8, 12.0],
+      "rotationOrigin": [5.5, 4.0, 10.5],
+      "faces": {
+        "north": { "texture": "#trim", "uv": [0.0, 0.0, 5.0, 8.0] },
+        "east": { "texture": "#trim", "uv": [0.0, 0.0, 1.5, 8.0] },
+        "south": { "texture": "#trim", "uv": [0.0, 0.0, 5.0, 8.0] },
+        "west": { "texture": "#trim", "uv": [0.0, 0.0, 1.5, 8.0] },
+        "up": { "texture": "#trim", "uv": [0.0, 0.0, 5.0, 1.5] },
+        "down": { "texture": "#trim", "uv": [0.0, 0.0, 5.0, 1.5] }
+      }
+    },
+    {
+      "name": "TopCap",
+      "from": [4.5, 11.0, 4.5],
+      "to": [11.5, 12.5, 11.5],
+      "rotationOrigin": [4.5, 11.0, 4.5],
+      "faces": {
+        "north": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 1.5] },
+        "east": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 1.5] },
+        "south": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 1.5] },
+        "west": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 1.5] },
+        "up": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 7.0] },
+        "down": { "texture": "#trim", "uv": [0.0, 0.0, 7.0, 7.0] }
+      }
+    },
+    {
+      "name": "TopSocket",
+      "from": [6.5, 12.5, 6.5],
+      "to": [9.5, 14.0, 9.5],
+      "rotationOrigin": [6.5, 12.5, 6.5],
+      "faces": {
+        "north": { "texture": "#accent", "uv": [0.0, 0.0, 3.0, 1.5] },
+        "east": { "texture": "#accent", "uv": [0.0, 0.0, 3.0, 1.5] },
+        "south": { "texture": "#accent", "uv": [0.0, 0.0, 3.0, 1.5] },
+        "west": { "texture": "#accent", "uv": [0.0, 0.0, 3.0, 1.5] },
+        "up": { "texture": "#accent", "uv": [0.0, 0.0, 3.0, 3.0] },
+        "down": { "texture": "#accent", "uv": [0.0, 0.0, 3.0, 3.0] }
+      }
+    }
+  ]
+}

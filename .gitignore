@@ -58,6 +58,10 @@ fetch-logs.log
 package.log
 winscp*.log
 
+# Structurizr local UI/search artifacts
+docs/architecture/.structurizr/
+docs/architecture/workspace.json
+
 # Downloaded logs directory contents (but keep structure)
 logs/**/
 !logs/.gitkeep

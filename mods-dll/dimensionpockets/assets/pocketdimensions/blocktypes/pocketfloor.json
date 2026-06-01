@@ -1,0 +1,31 @@
+{
+  code: "pocketfloor",
+  blockmaterial: "Stone",
+  drawtype: "cube",
+  shape: { base: "game:block/basic/cube" },
+  creativeinventory: { "general": ["*"], "terrain": ["*"] },
+  textures: {
+    all: { base: "pocketdimensions:block/pocketfloor" }
+  },
+  replaceable: 90,
+  resistance: 31337,
+  requiredMiningTier: 2,
+  lightAbsorption: 99,
+  sounds: {
+    walk: "game:walk/stone",
+    byTool: {
+      "Pickaxe": { hit: "game:block/rock-hit-pickaxe", break: "game:block/rock-break-pickaxe" }
+    }
+  },
+  drops: [
+    { type: "block", code: "pocketfloor", quantity: { avg: 1, var: 0 } }
+  ],
+  heldTpIdleAnimation: "holdbothhandslarge",
+  heldRightReadyAnimation: "heldblockready",
+  heldTpUseAnimation: "twohandplaceblock",
+  tpHandTransform: {
+    translation: { x: -1.23, y: -0.91, z: -0.8 },
+    rotation: { x: -2, y: 25, z: -78 },
+    scale: 0.4
+  }
+}

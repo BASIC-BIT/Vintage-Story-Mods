@@ -36,6 +36,10 @@ If the toolbox repo is present next to this repo, also read:
 
 OpenCode skills under `.opencode/skills/` are first-class workflow assets for this repository. When a task matches a skill, follow it and update it in the same PR as workflow changes.
 
+## DimensionLib Product Direction
+
+For DimensionLib or Pocket Dimensions work, read `mods-dll/dimensionlib/docs/PRODUCT_DIRECTION.md` before adding gameplay-facing features. Keep DimensionLib focused on reusable mechanics and put Waystones, portals, lore, recipes, models, chooser UIs, and server-facing product flows in Pocket Dimensions or a future utility layer until repeated consumers justify promotion.
+
 ## Context Management
 
 - Keep `AGENTS.md` durable: repository policy, stable workflows, architecture, build/test commands, and long-lived safety rules.
