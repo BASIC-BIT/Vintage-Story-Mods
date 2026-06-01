@@ -103,7 +103,7 @@ public class AnalyticsSystem : BaseBasicModSystem
         catch (Exception e)
         {
             API.Server.LogError($"The BASICs: Failed to load analytics config '{AnalyticsConfigName}'. Remote analytics disabled. (Exception type: {e.GetType().Name})");
-            AnalyticsService.TrackFailure("analytics_config", "load", "warning", "load_failed_remote_disabled", e);
+            // Without a readable analytics config, we cannot verify prior opt-in consent.
             analyticsConfig = new AnalyticsConfig();
         }
 

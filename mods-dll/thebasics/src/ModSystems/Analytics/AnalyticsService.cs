@@ -21,10 +21,10 @@ public static class AnalyticsService
     public static void Configure(IAnalyticsSink sink, bool allowErrorTelemetry = false)
     {
         var next = sink ?? NoopAnalyticsSink.Instance;
+        var previous = Interlocked.Exchange(ref _sink, next);
         _allowErrorTelemetry = allowErrorTelemetry;
         _errorTelemetryConfigured = true;
 
-        var previous = Interlocked.Exchange(ref _sink, next);
         if (!ReferenceEquals(previous, NoopAnalyticsSink.Instance))
         {
             previous.Dispose();
@@ -185,8 +185,6 @@ public static class AnalyticsService
     public static void Shutdown()
     {
         Configure(NoopAnalyticsSink.Instance);
-        ClearPendingFailures();
-        _allowErrorTelemetry = false;
         _errorTelemetryConfigured = false;
     }
 
