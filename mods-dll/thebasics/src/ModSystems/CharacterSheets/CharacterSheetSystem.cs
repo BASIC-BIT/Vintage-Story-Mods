@@ -7,6 +7,7 @@ using System.Text;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.Utilities;
 using thebasics.Utilities.Parsers;
@@ -320,12 +321,14 @@ public class CharacterSheetSystem : BaseBasicModSystem
         var result = HeadshotPipeline.Normalize(inputBytes, options);
         if (!result.Ok)
         {
+            TrackHeadshotUploadFailure(result.ErrorCode);
             return HeadshotUploadFail(target.PlayerUID, HeadshotPipeline.GetErrorMessage(result.ErrorCode, maxKb));
         }
 
         var characterId = target.GetActiveRpCharacterId();
         if (!_headshotStore.TryWrite(target.PlayerUID, characterId, result.PngBytes))
         {
+            TrackHeadshotUploadFailure("write_failed");
             return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-write"));
         }
 
@@ -342,6 +345,8 @@ public class CharacterSheetSystem : BaseBasicModSystem
         // Hash from ComputeSha256Hex is always 64 hex chars.
         API.Logger.Audit($"{(isAdminAction ? "Admin" : "Player")} {sender.PlayerName} uploaded headshot for {target.PlayerName} ({result.PngBytes.Length} bytes, hash {result.Hash[..8]}).");
 
+        AnalyticsService.TrackFeatureUsed("character_headshot", "upload");
+
         return new HeadshotUploadResult
         {
             Success = true,
@@ -349,6 +354,16 @@ public class CharacterSheetSystem : BaseBasicModSystem
             Metadata = data.Headshot,
             Message = Lang.Get("thebasics:headshot-upload-success")
         };
+    }
+
+    private static void TrackHeadshotUploadFailure(string resultCode)
+    {
+        var normalizedResultCode = string.IsNullOrWhiteSpace(resultCode) ? "failure" : resultCode;
+        AnalyticsService.TrackFeatureUsed("character_headshot", "upload", false, normalizedResultCode);
+        if (normalizedResultCode == HeadshotErrorCodes.Exception || normalizedResultCode == "write_failed")
+        {
+            AnalyticsService.TrackFailure("character_headshot", "upload", "error", normalizedResultCode);
+        }
     }
 
     internal HeadshotFetchResult HandleHeadshotFetch(IServerPlayer sender, HeadshotFetchRequest request)

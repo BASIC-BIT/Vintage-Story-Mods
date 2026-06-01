@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using thebasics.Configs;
+using thebasics.ModSystems.Analytics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -163,6 +164,7 @@ namespace thebasics.ModSystems
                 repaired.InitializeDefaultsIfNeeded();
                 api.StoreModConfig(repaired, ConfigName);
                 LogConfigRepairOnce(api);
+                AnalyticsService.TrackFailure("config", "load", "warning", "json_string_repaired");
                 return repaired;
             }
             catch
@@ -188,6 +190,7 @@ namespace thebasics.ModSystems
             {
                 _loggedConfigLoadFailure = true;
                 api.Server.LogError($"The BASICs: Failed to load mod config '{ConfigName}'. Using defaults. (Exception type: {exception.GetType().Name})");
+                AnalyticsService.TrackFailure("config", "load", "critical", "load_failed_using_defaults", exception);
             }
 
             var config = new ModConfig();

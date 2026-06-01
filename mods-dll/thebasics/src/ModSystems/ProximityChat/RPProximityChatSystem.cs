@@ -708,6 +708,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (!TryBuildConfigAdminDraft(message, out var draft, out var errors))
         {
+            TrackConfigEditorFailure("config_admin", "save", errors.Count);
             SendConfigAdminResult(player, false, string.Join("\n", errors), Array.Empty<string>());
             return;
         }
@@ -723,6 +724,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         var reloadChangedKeys = ReloadConfigAndGetChangedKeys();
+        AnalyticsService.TrackFeatureUsed("config_admin", "reload");
         SendConfigAdminResult(player, true, $"Reloaded config from disk. Changed settings: {reloadChangedKeys.Count}.", reloadChangedKeys);
         return true;
     }
@@ -754,6 +756,11 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         BroadcastClientConfigs();
 
         var restartRequired = GetRestartRequiredKeys(changedKeys);
+        AnalyticsService.TrackFeatureUsed("config_admin", "save", properties: new Dictionary<string, object>
+        {
+            ["changed_settings_bucket"] = AnalyticsBuckets.Count(changedKeys.Count),
+            ["restart_required_settings_bucket"] = AnalyticsBuckets.Count(restartRequired.Count)
+        });
         SendConfigAdminResult(player, true, ConfigAdminSaveWorkflow.BuildConfigSaveMessage(changedKeys, restartRequired), changedKeys);
     }
 
@@ -773,6 +780,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var submittedLanguages = message?.Languages ?? new List<LanguageConfigEntryMessage>();
         if (!TryBuildLanguageConfigDraft(submittedLanguages, out var draft, out var errors))
         {
+            TrackConfigEditorFailure("language_config", "save", errors.Count);
             SendLanguageConfigResult(player, false, string.Join("\n", errors), submittedLanguages);
             return;
         }
@@ -788,6 +796,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         var changedKeys = ReloadConfigAndGetChangedKeys();
+        AnalyticsService.TrackFeatureUsed("language_config", "reload");
         SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {changedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config));
         return true;
     }
@@ -817,6 +826,10 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();
 
+        AnalyticsService.TrackFeatureUsed("language_config", "save", properties: new Dictionary<string, object>
+        {
+            ["language_count_bucket"] = AnalyticsBuckets.Count(Config.Languages?.Count ?? 0)
+        });
         SendLanguageConfigResult(
             player,
             true,
@@ -840,6 +853,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var submittedFields = message?.Fields ?? new List<CharacterSheetFieldConfigEntryMessage>();
         if (!TryBuildCharacterSheetFieldConfigDraft(submittedFields, out var draft, out var errors))
         {
+            TrackConfigEditorFailure("character_sheet_fields", "save", errors.Count);
             SendCharacterSheetFieldConfigResult(player, false, string.Join("\n", errors), submittedFields);
             return;
         }
@@ -855,6 +869,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         var changedKeys = ReloadConfigAndGetChangedKeys();
+        AnalyticsService.TrackFeatureUsed("character_sheet_fields", "reload");
         SendCharacterSheetFieldConfigResult(player, true, $"Reloaded character sheet fields from disk. Changed settings: {changedKeys.Count}.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
         return true;
     }
@@ -880,7 +895,22 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();
 
+        AnalyticsService.TrackFeatureUsed("character_sheet_fields", "save", properties: new Dictionary<string, object>
+        {
+            ["field_count_bucket"] = AnalyticsBuckets.Count(Config.CharacterSheetFields?.Count ?? 0)
+        });
         SendCharacterSheetFieldConfigResult(player, true, "Saved The BASICs character sheet field config.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
+    }
+
+    private static void TrackConfigEditorFailure(string featureName, string action, int errorCount)
+    {
+        var properties = new Dictionary<string, object>
+        {
+            ["error_count_bucket"] = AnalyticsBuckets.Count(errorCount)
+        };
+
+        AnalyticsService.TrackFeatureUsed(featureName, action, false, "validation_failed", properties);
+        AnalyticsService.TrackFailure(featureName, action, "warning", "validation_failed", properties: properties);
     }
 
     private HashSet<string> ReloadConfigAndGetChangedKeys()
@@ -2125,6 +2155,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         {
             // Never crash the server on player chat.
             API.Logger.Error($"THEBASICS - Error processing proxchat message: {e}");
+            AnalyticsService.TrackFailure("proximity_chat", "chat_tab_pipeline", "error", "pipeline_exception", e);
         }
     }
 
