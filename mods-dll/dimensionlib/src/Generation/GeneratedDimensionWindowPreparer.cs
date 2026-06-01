@@ -12,10 +12,13 @@ namespace DimensionLib.Generation;
 
 internal sealed class GeneratedDimensionWindowPreparer
 {
+    private const int MaxPendingStandardOverworldColumns = 4;
+
     private readonly ICoreServerAPI _api;
     private readonly DimensionChunkService _chunkService;
     private readonly ChunkColumnMaterializer _materializer;
     private readonly PreparedDimensionTracker _preparedDimensions;
+    private readonly HashSet<string> _pendingStandardOverworldColumns = new HashSet<string>(StringComparer.Ordinal);
 
     public GeneratedDimensionWindowPreparer(
         ICoreServerAPI api,
@@ -88,6 +91,68 @@ internal sealed class GeneratedDimensionWindowPreparer
 
         _preparedDimensions.MarkDimensionPrepared(dimension.DimensionId);
         return DimensionLibResult.Ok($"Prepared {prepared} lazy chunk column(s) for dimension '{dimension.DimensionId}'.");
+    }
+
+    public DimensionLibResult PrepareStandardOverworldSourceWindow(Dimension dimension, int centerLocalChunkX, int centerLocalChunkZ, int radiusChunks, IServerPlayer sendToPlayer, CancellationToken token, int maxColumns)
+    {
+        var candidates = BuildLazyGenerationCandidates(dimension, centerLocalChunkX, centerLocalChunkZ, radiusChunks);
+        var queued = 0;
+        var prepared = 0;
+        var pending = 0;
+        try
+        {
+            foreach (var candidate in candidates)
+            {
+                token.ThrowIfCancellationRequested();
+                if (_preparedDimensions.IsChunkPrepared(dimension.DimensionId, candidate.X, candidate.Y))
+                {
+                    prepared++;
+                    continue;
+                }
+
+                if (IsStandardOverworldColumnPending(dimension, candidate.X, candidate.Y))
+                {
+                    pending++;
+                    continue;
+                }
+
+                if (queued >= maxColumns || queued + pending >= MaxPendingStandardOverworldColumns)
+                {
+                    continue;
+                }
+
+                QueueStandardOverworldColumnMaterialization(dimension, candidate.X, candidate.Y, sendToPlayer);
+                queued++;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return DimensionLibResult.Fail($"Preparing standard overworld source window for '{dimension.DimensionId}' was canceled.", "prepare-canceled");
+        }
+        catch (Exception ex)
+        {
+            _api.Logger.Warning("[DimensionLib] Failed to request standard overworld source window for '{0}': {1}", dimension.DimensionId, ex.Message);
+            return DimensionLibResult.Fail($"Failed to request standard overworld source window for '{dimension.DimensionId}'.", "prepare-failed");
+        }
+
+        if (prepared > 0)
+        {
+            _preparedDimensions.MarkDimensionPrepared(dimension.DimensionId);
+        }
+
+        if (queued > 0 || pending > 0)
+        {
+            _api.Logger.Notification(
+                "[DimensionLib] Standard overworld source window for '{0}' around local chunk {1},{2}: queued={3}, pending={4}, prepared={5}.",
+                dimension.DimensionId,
+                centerLocalChunkX,
+                centerLocalChunkZ,
+                queued,
+                pending,
+                prepared);
+        }
+
+        return DimensionLibResult.Ok($"Standard overworld source window for dimension '{dimension.DimensionId}': queued={queued}, pending={pending}, prepared={prepared}.");
     }
 
     public Vec2i ResolveCenterLocalChunk(Dimension dimension, IServerPlayer player)
@@ -166,5 +231,96 @@ internal sealed class GeneratedDimensionWindowPreparer
     private static int ClampInt(int value, int min, int max)
     {
         return value < min ? min : value > max ? max : value;
+    }
+
+    private void QueueStandardOverworldColumnMaterialization(Dimension dimension, int localChunkX, int localChunkZ, IServerPlayer sendToPlayer)
+    {
+        var pendingKey = PendingStandardOverworldColumnKey(dimension, localChunkX, localChunkZ);
+        if (!_pendingStandardOverworldColumns.Add(pendingKey))
+        {
+            return;
+        }
+
+        var sourceChunkX = dimension.ChunkX + localChunkX;
+        var sourceChunkZ = dimension.ChunkZ + localChunkZ;
+        _api.WorldManager.PeekChunkColumn(sourceChunkX, sourceChunkZ, new ChunkPeekOptions
+        {
+            UntilPass = EnumWorldGenPass.Done,
+            OnGenerated = columns => CompleteStandardOverworldColumnMaterialization(dimension, localChunkX, localChunkZ, sourceChunkX, sourceChunkZ, sendToPlayer, columns),
+        });
+    }
+
+    private void CompleteStandardOverworldColumnMaterialization(Dimension dimension, int localChunkX, int localChunkZ, int sourceChunkX, int sourceChunkZ, IServerPlayer sendToPlayer, Dictionary<Vec2i, IServerChunk[]> columns)
+    {
+        var pendingKey = PendingStandardOverworldColumnKey(dimension, localChunkX, localChunkZ);
+        try
+        {
+            if (!TryGetPeekedColumn(columns, sourceChunkX, sourceChunkZ, out var sourceChunks))
+            {
+                _api.Logger.Warning("[DimensionLib] Standard overworld source column {0},{1} was not returned for '{2}' local chunk {3},{4}.", sourceChunkX, sourceChunkZ, dimension.DimensionId, localChunkX, localChunkZ);
+                return;
+            }
+
+            if (!_chunkService.TryMaterializeLocalChunkColumnFromSource(dimension, localChunkX, localChunkZ, sourceChunks))
+            {
+                _api.Logger.Warning("[DimensionLib] Failed to materialize standard overworld source column {0},{1} into '{2}' local chunk {3},{4}.", sourceChunkX, sourceChunkZ, dimension.DimensionId, localChunkX, localChunkZ);
+                return;
+            }
+
+            var preparedChunk = new Vec2i(localChunkX, localChunkZ);
+            _chunkService.RelightWindow(dimension, new[] { preparedChunk });
+            _preparedDimensions.MarkChunkPrepared(dimension.DimensionId, localChunkX, localChunkZ);
+            _preparedDimensions.MarkDimensionPrepared(dimension.DimensionId);
+            if (sendToPlayer != null)
+            {
+                _chunkService.ForceSendLocalChunkColumn(dimension, sendToPlayer, localChunkX, localChunkZ);
+            }
+
+            _api.Logger.Notification(
+                "[DimensionLib] Materialized standard overworld source column {0},{1} into '{2}' local chunk {3},{4}.",
+                sourceChunkX,
+                sourceChunkZ,
+                dimension.DimensionId,
+                localChunkX,
+                localChunkZ);
+        }
+        catch (Exception ex)
+        {
+            _api.Logger.Warning("[DimensionLib] Failed to materialize standard overworld source column {0},{1} for '{2}': {3}", sourceChunkX, sourceChunkZ, dimension.DimensionId, ex.Message);
+        }
+        finally
+        {
+            _pendingStandardOverworldColumns.Remove(pendingKey);
+        }
+    }
+
+    private bool IsStandardOverworldColumnPending(Dimension dimension, int localChunkX, int localChunkZ)
+    {
+        return _pendingStandardOverworldColumns.Contains(PendingStandardOverworldColumnKey(dimension, localChunkX, localChunkZ));
+    }
+
+    private static bool TryGetPeekedColumn(Dictionary<Vec2i, IServerChunk[]> columns, int sourceChunkX, int sourceChunkZ, out IServerChunk[] sourceChunks)
+    {
+        sourceChunks = null;
+        if (columns == null)
+        {
+            return false;
+        }
+
+        foreach (var entry in columns)
+        {
+            if (entry.Key.X == sourceChunkX && entry.Key.Y == sourceChunkZ)
+            {
+                sourceChunks = entry.Value;
+                return sourceChunks != null;
+            }
+        }
+
+        return false;
+    }
+
+    private static string PendingStandardOverworldColumnKey(Dimension dimension, int localChunkX, int localChunkZ)
+    {
+        return $"{dimension.DimensionId}:{localChunkX}:{localChunkZ}";
     }
 }

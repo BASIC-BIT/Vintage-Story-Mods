@@ -9,6 +9,7 @@ internal static class BuiltInTestDimensionFactory
     public const string DebugDimensionId = "dimensionlib:debug-spike";
     public const string OverworldOppositeDimensionId = "dimensionlib:test-overworld-opposite";
     public const string NetherCavernDimensionId = "dimensionlib:test-nether-cavern";
+    public const string VanillaOverworldWindowDimensionId = "dimensionlib:test-vanilla-overworld-window";
 
     public static DimensionSpec DebugDimensionSpec()
     {
@@ -34,7 +35,8 @@ internal static class BuiltInTestDimensionFactory
     {
         return string.Equals(dimension.OwnerModId, DimensionLibModSystem.ModId, StringComparison.Ordinal) &&
             ((normalizedTestId == "overworld-opposite" && string.Equals(dimension.GeneratorId, DimensionGeneratorIds.OverworldOpposite, StringComparison.Ordinal)) ||
-            (normalizedTestId == "nether-cavern" && string.Equals(dimension.GeneratorId, DimensionGeneratorIds.NetherCavern, StringComparison.Ordinal)));
+            (normalizedTestId == "nether-cavern" && string.Equals(dimension.GeneratorId, DimensionGeneratorIds.NetherCavern, StringComparison.Ordinal)) ||
+            (normalizedTestId == "vanilla-overworld" && string.Equals(dimension.GeneratorId, DimensionGeneratorIds.StandardOverworldWindow, StringComparison.Ordinal)));
     }
 
     public static bool TryCreateTestDimensionSpec(string testId, string dimensionId, int? sizeChunks, long? seed, out DimensionSpec spec, out string normalizedTestId)
@@ -87,6 +89,32 @@ internal static class BuiltInTestDimensionFactory
                     VisualSettings = CreateNetherCavernVisualSettings(),
                     Seed = seed ?? 2026052902,
                     Kind = DimensionKind.Pocket,
+                    AccessPolicy = DimensionAccessPolicy.AdminOnly,
+                    Mutability = DimensionMutability.Mutable,
+                    IsTransient = true,
+                };
+                return true;
+
+            case "vanilla":
+            case "vanilla-overworld":
+            case "standard-overworld":
+            case "overworld-window":
+                normalizedTestId = "vanilla-overworld";
+                var vanillaSize = sizeChunks.HasValue ? Math.Max(3, Math.Min(4096, sizeChunks.Value)) : 256;
+                spec = new DimensionSpec
+                {
+                    DimensionId = string.IsNullOrWhiteSpace(dimensionId) ? VanillaOverworldWindowDimensionId : dimensionId.Trim(),
+                    OwnerModId = DimensionLibModSystem.ModId,
+                    DimensionPlaneId = DimensionLibModSystem.FirstPrototypeDimension + 1,
+                    Placement = DimensionPlacement.Explicit,
+                    ChunkX = 0,
+                    ChunkZ = 0,
+                    ChunkSizeX = vanillaSize,
+                    ChunkSizeZ = vanillaSize,
+                    SpawnY = 160,
+                    GeneratorId = DimensionGeneratorIds.StandardOverworldWindow,
+                    Seed = seed ?? 0,
+                    Kind = DimensionKind.Overworld,
                     AccessPolicy = DimensionAccessPolicy.AdminOnly,
                     Mutability = DimensionMutability.Mutable,
                     IsTransient = true,

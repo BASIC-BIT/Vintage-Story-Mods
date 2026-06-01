@@ -223,7 +223,7 @@ In-game verification:
 - Confirm selection outline matches `selectionbox`.
 - Confirm collision matches `collisionbox`.
 - Confirm adjacent faces are not culled incorrectly.
-- Confirm right-clicking the return pedestal returns to the linked external Waystone endpoint.
+- Confirm right-clicking the return pedestal returns to the linked external Waystone endpoint after Waystone entry and to the captured command-entry point after `/pocket enter`.
 - Confirm player breaking is denied for `pocketdimensions:pocketreturnpedestal`.
 
 Do not mark the prop done based only on "looks okay." The prop needs clean logs, correct package contents, correct block code at the managed return location, correct selection/collision behavior, and retained right-click behavior.

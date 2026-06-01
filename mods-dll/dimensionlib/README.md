@@ -11,6 +11,7 @@ The goal is to give other mods a stable, boring API for alternate spaces without
 - Create, relight, and force-send backing chunk columns.
 - Register generator profiles and prepare generated dimensions.
 - Materialize blocks from an `IBlockVolumeSource` into a dimension.
+- Prototype `standard` overworld source windows for testing large overworld-like dimensions without owning vanilla generator code.
 - Move a player into a dimension or to an explicit captured location.
 - Apply basic client ambience, fog, sky cover, and minimum scene light while inside generated dimensions.
 
@@ -78,7 +79,7 @@ Debug commands require `root` privilege:
 - `/dlib prepare-spike`
 - `/dlib enter-spike`
 - `/dlib exit-spike`
-- `/dlib create-test <overworld-opposite|nether-cavern> [dimensionId] [sizeChunks] [seed]`
+- `/dlib create-test <overworld-opposite|nether-cavern|vanilla-overworld> [dimensionId] [sizeChunks] [seed]`
 - `/dlib generators`
 - `/dlib prepare <dimensionId>`
 - `/dlib send <dimensionId>`
@@ -111,7 +112,9 @@ These steps require a server with DimensionLib loaded and a root/admin player:
 7. Run `/dlib release dimensionlib:debug-spike orphan confirm` and confirm `/dlib list` marks it orphaned until the mod re-registers it.
 8. Run `/dlib create-test overworld-opposite`, then `/dlib enter dimensionlib:test-overworld-opposite`, and confirm rolling terrain with a darker reversed-time ambience.
 9. Run `/dlib create-test nether-cavern`, then `/dlib enter dimensionlib:test-nether-cavern`, and confirm a generated cavern with floor and ceiling terrain, an opaque red sky cover, and readable low-light areas.
-10. Run `/dlib validate` inside each generated dimension and confirm `spawnFeetBlockId=0`, `spawnHeadBlockId=0`, and a nonzero `spawnFloorBlockId`.
-11. If nether readability is poor, use `/dlib visual preset clear`, `/dlib visual preset thin`, and exact-key `/dlib visual set <key> <value>` commands to tune fog, sky cover, ambient color, and client-only light lift live without regenerating terrain.
-12. For sealed cavern terrain-lighting experiments only, use `/dlib light-floor dimensionlib:test-nether-cavern <level>` to manually write a low blocklight floor into already-prepared air cells and resend prepared chunks. This is debug tooling, not DimensionLib public API or default generated-dimension behavior.
-13. From a dedicated-server console, use `/dlib create-test <type> ...` followed by `/dlib enter-player <playerName> <dimensionId>` for non-interactive QA clients.
+10. Run `/dlib create-test vanilla-overworld dimensionlib:test-vanilla-overworld-window 256`, wait briefly for the standard overworld source column to materialize, then `/dlib enter dimensionlib:test-vanilla-overworld-window` and confirm the dimension uses normal Vintage Story overworld terrain at the sparse backing coordinates.
+11. For a lazy-generation stress test, create a large bounded window such as `/dlib create-test vanilla-overworld dimensionlib:test-big-overworld 1024`. This registers a 1024x1024 chunk claim but only requests a tiny initial window; generation expands lazily around online players.
+12. Run `/dlib validate` inside each generated dimension and confirm expected bounds, prepared chunk counts, and spawn block ids. Standard overworld source windows may need a manual `/dlib tp <dimensionId> x y z` if the fixed prototype spawn Y is underground or airborne at the generated backing coordinates.
+13. If nether readability is poor, use `/dlib visual preset clear`, `/dlib visual preset thin`, and exact-key `/dlib visual set <key> <value>` commands to tune fog, sky cover, ambient color, and client-only light lift live without regenerating terrain.
+14. For sealed cavern terrain-lighting experiments only, use `/dlib light-floor dimensionlib:test-nether-cavern <level>` to manually write a low blocklight floor into already-prepared air cells and resend prepared chunks. This is debug tooling, not DimensionLib public API or default generated-dimension behavior.
+15. From a dedicated-server console, use `/dlib create-test <type> ...` followed by `/dlib enter-player <playerName> <dimensionId>` for non-interactive QA clients.

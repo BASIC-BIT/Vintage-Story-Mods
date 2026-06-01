@@ -4,5 +4,6 @@ public enum DimensionKind
 {
     Pocket,
     Projection,
+    Overworld,
     Debug,
 }

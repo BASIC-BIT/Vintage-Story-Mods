@@ -30,6 +30,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private PocketDimensionsConfig _config = new PocketDimensionsConfig();
     private readonly Dictionary<string, PocketWaystoneLink> _linksByEndpointId = new Dictionary<string, PocketWaystoneLink>(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _activeIngressByPlayer = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<string, DimensionLocation>> _unanchoredReturnsByPlayer = new Dictionary<string, Dictionary<string, DimensionLocation>>(StringComparer.Ordinal);
 
     public override double ExecuteOrder()
     {
@@ -82,13 +83,13 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     public bool CanEnter(IServerPlayer player, Dimension dimension, out string reason)
     {
         reason = string.Empty;
-        return CanAccessPocket(player, dimension, _config.EnterPrivilege, out reason);
+        return CanAccessPocket(player, dimension, out reason);
     }
 
     public bool CanUseBlock(IServerPlayer player, Dimension dimension, BlockSelection blockSelection, out string reason)
     {
         reason = string.Empty;
-        return CanAccessPocket(player, dimension, _config.EnterPrivilege, out reason);
+        return CanAccessPocket(player, dimension, out reason);
     }
 
     public bool CanMutateBlock(IServerPlayer player, Dimension dimension, BlockSelection blockSelection, DimensionBlockMutationKind mutationKind, out string reason)
@@ -100,7 +101,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return false;
         }
 
-        return CanAccessPocket(player, dimension, _config.EnterPrivilege, out reason);
+        return CanAccessPocket(player, dimension, out reason);
     }
 
     public string DisplayName(string dimensionId)
@@ -118,6 +119,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         if (blockSelection?.Position == null)
         {
             return DimensionLibResult.Fail("This Waystone is not bound to a Pocket Dimension yet.", "pocketwaystone-unbound");
+        }
+
+        if (!HasPrivilege(player, _config.UseWaystonePrivilege))
+        {
+            return DimensionLibResult.Fail($"Missing privilege '{_config.UseWaystonePrivilege}'.", "missing-waystone-use-privilege");
         }
 
         var blockEntity = _api.World.BlockAccessor.GetBlockEntity(blockSelection.Position) as PocketWaystoneBlockEntity;
@@ -173,16 +179,37 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return ensured;
         }
 
-        var activeEndpoint = TryGetActiveIngressEndpoint(player, dimension.DimensionId, out var endpointId);
-        if (!activeEndpoint && !TryGetSingleLinkedEndpoint(dimension.DimensionId, out endpointId, out var linkError))
+        DimensionLibResult<DimensionLocation> returnLocation;
+        string successMessage;
+        if (TryGetActiveIngressEndpoint(player, dimension.DimensionId, out var endpointId))
         {
-            return DimensionLibResult.Fail(linkError, "missing-pocket-waystone-link");
-        }
+            returnLocation = ResolveReturnLocation(dimension, endpointId, player);
+            if (!returnLocation.Success)
+            {
+                return DimensionLibResult.Fail(returnLocation.Message, returnLocation.ErrorCode);
+            }
 
-        var returnLocation = ResolveReturnLocation(dimension, endpointId, player);
-        if (!returnLocation.Success)
+            successMessage = $"Returned from pocket '{DisplayName(dimension.DimensionId)}' via linked Waystone.";
+        }
+        else if (TryGetUnanchoredReturn(player, dimension.DimensionId, out var unanchoredReturn))
         {
-            return DimensionLibResult.Fail(returnLocation.Message, returnLocation.ErrorCode);
+            returnLocation = DimensionLibResult<DimensionLocation>.Ok(unanchoredReturn);
+            successMessage = $"Returned from pocket '{DisplayName(dimension.DimensionId)}' to your command entry point.";
+        }
+        else
+        {
+            if (!TryGetSingleLinkedEndpoint(dimension.DimensionId, out endpointId, out var linkError))
+            {
+                return DimensionLibResult.Fail(linkError, "missing-pocket-waystone-link");
+            }
+
+            returnLocation = ResolveReturnLocation(dimension, endpointId, player);
+            if (!returnLocation.Success)
+            {
+                return DimensionLibResult.Fail(returnLocation.Message, returnLocation.ErrorCode);
+            }
+
+            successMessage = $"Returned from pocket '{DisplayName(dimension.DimensionId)}' via linked Waystone.";
         }
 
         var returned = _dimensionLib.TeleportToLocation(player, returnLocation.Value);
@@ -191,12 +218,9 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return returned;
         }
 
-        if (activeEndpoint)
-        {
-            ClearActiveIngress(player, dimension.DimensionId);
-        }
-
-        return DimensionLibResult.Ok($"Returned from pocket '{DisplayName(dimension.DimensionId)}' via linked Waystone.");
+        ClearActiveIngress(player, dimension.DimensionId);
+        ClearUnanchoredReturn(player, dimension.DimensionId);
+        return DimensionLibResult.Ok(successMessage);
     }
 
     public void ForgetWaystoneEndpoint(string endpointId)
@@ -224,7 +248,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
                 .EndSubCommand()
             .BeginSubCommand("exit")
                 .WithDescription("Return from the current pocket dimension")
-                .RequiresPrivilege(_config.EnterPrivilege)
+                .RequiresPrivilege(_config.ExitPrivilege)
                 .RequiresPlayer()
                 .HandleWith(HandleExit)
                 .EndSubCommand()
@@ -339,9 +363,13 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return ToCommandResult(ensured);
         }
 
-        TryGetSingleLinkedEndpoint(lookup.Value.DimensionId, out var endpointId, out _);
+        var returnLocation = _dimensionLib.CaptureLocation(player);
+        if (!returnLocation.Success)
+        {
+            return ToCommandResult(returnLocation);
+        }
 
-        return ToCommandResult(EnterPocket(player, lookup.Value, endpointId));
+        return ToCommandResult(EnterPocket(player, lookup.Value, endpointId: null, unanchoredReturn: returnLocation.Value));
     }
 
     private TextCommandResult HandleExit(TextCommandCallingArgs args)
@@ -481,7 +509,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             : PreparePocket(dimension, player, "Prepared pocket infrastructure.");
     }
 
-    private DimensionLibResult EnterPocket(IServerPlayer player, Dimension dimension, string endpointId)
+    private DimensionLibResult EnterPocket(IServerPlayer player, Dimension dimension, string endpointId, DimensionLocation unanchoredReturn = null)
     {
         var entered = _dimensionLib.TeleportToDimension(player, dimension.DimensionId, new DimensionTeleportOptions { RecordReturn = false });
         if (!entered.Success)
@@ -492,7 +520,15 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         if (!string.IsNullOrWhiteSpace(endpointId))
         {
             SetActiveIngress(player, dimension.DimensionId, endpointId);
+            ClearUnanchoredReturn(player, dimension.DimensionId);
             return DimensionLibResult.Ok($"Entered pocket '{DisplayName(dimension.DimensionId)}'.");
+        }
+
+        if (unanchoredReturn != null)
+        {
+            ClearActiveIngress(player, dimension.DimensionId);
+            SetUnanchoredReturn(player, dimension.DimensionId, unanchoredReturn);
+            return DimensionLibResult.Ok($"Entered pocket '{DisplayName(dimension.DimensionId)}'. Return pedestal will return you to your command entry point.");
         }
 
         return DimensionLibResult.Ok($"Entered pocket '{DisplayName(dimension.DimensionId)}'. Return pedestal has no active Waystone ingress for this command entry.");
@@ -519,6 +555,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     {
         _linksByEndpointId.Clear();
         _activeIngressByPlayer.Clear();
+        _unanchoredReturnsByPlayer.Clear();
 
         var state = _linkStore.Load();
         foreach (var link in state.Links)
@@ -530,6 +567,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         {
             _activeIngressByPlayer[playerEntry.Key] = new Dictionary<string, string>(playerEntry.Value, StringComparer.Ordinal);
         }
+
+        foreach (var playerEntry in state.UnanchoredReturnsByPlayer)
+        {
+            _unanchoredReturnsByPlayer[playerEntry.Key] = new Dictionary<string, DimensionLocation>(playerEntry.Value, StringComparer.Ordinal);
+        }
     }
 
     private void SaveLinkState()
@@ -538,6 +580,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         {
             Links = _linksByEndpointId.Values.ToList(),
             ActiveIngressByPlayer = _activeIngressByPlayer,
+            UnanchoredReturnsByPlayer = _unanchoredReturnsByPlayer,
         });
     }
 
@@ -607,7 +650,8 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             RemoveActiveIngressReferences(endpointId);
         }
 
-        if (removedEndpoints.Length > 0)
+        var removedReturns = RemoveUnanchoredReturnReferences(dimensionId);
+        if (removedEndpoints.Length > 0 || removedReturns)
         {
             SaveLinkState();
         }
@@ -649,6 +693,53 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         SaveLinkState();
     }
 
+    private void SetUnanchoredReturn(IServerPlayer player, string dimensionId, DimensionLocation location)
+    {
+        if (location == null)
+        {
+            return;
+        }
+
+        var playerKey = PlayerKey(player);
+        if (!_unanchoredReturnsByPlayer.TryGetValue(playerKey, out var returnsByPocket))
+        {
+            returnsByPocket = new Dictionary<string, DimensionLocation>(StringComparer.Ordinal);
+            _unanchoredReturnsByPlayer[playerKey] = returnsByPocket;
+        }
+
+        returnsByPocket[dimensionId] = CloneLocation(location);
+        SaveLinkState();
+    }
+
+    private bool TryGetUnanchoredReturn(IServerPlayer player, string dimensionId, out DimensionLocation location)
+    {
+        location = null;
+        if (!_unanchoredReturnsByPlayer.TryGetValue(PlayerKey(player), out var returnsByPocket) || !returnsByPocket.TryGetValue(dimensionId, out var storedLocation))
+        {
+            return false;
+        }
+
+        location = CloneLocation(storedLocation);
+        return true;
+    }
+
+    private void ClearUnanchoredReturn(IServerPlayer player, string dimensionId)
+    {
+        var playerKey = PlayerKey(player);
+        if (!_unanchoredReturnsByPlayer.TryGetValue(playerKey, out var returnsByPocket))
+        {
+            return;
+        }
+
+        returnsByPocket.Remove(dimensionId);
+        if (returnsByPocket.Count == 0)
+        {
+            _unanchoredReturnsByPlayer.Remove(playerKey);
+        }
+
+        SaveLinkState();
+    }
+
     private void RemoveActiveIngressReferences(string endpointId)
     {
         foreach (var playerKey in _activeIngressByPlayer.Keys.ToArray())
@@ -664,6 +755,42 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
                 _activeIngressByPlayer.Remove(playerKey);
             }
         }
+    }
+
+    private bool RemoveUnanchoredReturnReferences(string dimensionId)
+    {
+        var removed = false;
+        foreach (var playerKey in _unanchoredReturnsByPlayer.Keys.ToArray())
+        {
+            var returnsByPocket = _unanchoredReturnsByPlayer[playerKey];
+            removed |= returnsByPocket.Remove(dimensionId);
+            if (returnsByPocket.Count == 0)
+            {
+                _unanchoredReturnsByPlayer.Remove(playerKey);
+            }
+        }
+
+        return removed;
+    }
+
+    private static DimensionLocation CloneLocation(DimensionLocation location)
+    {
+        if (location == null)
+        {
+            return null;
+        }
+
+        return new DimensionLocation
+        {
+            DimensionId = location.DimensionId,
+            DimensionPlaneId = location.DimensionPlaneId,
+            X = location.X,
+            Y = location.Y,
+            Z = location.Z,
+            Yaw = location.Yaw,
+            Pitch = location.Pitch,
+            Roll = location.Roll,
+        };
     }
 
     private bool TryGetSingleLinkedEndpoint(string dimensionId, out string endpointId, out string message)
@@ -753,7 +880,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         return dimension != null && string.Equals(dimension.OwnerModId, ModId, StringComparison.Ordinal);
     }
 
-    private bool CanAccessPocket(IServerPlayer player, Dimension dimension, string privilege, out string reason)
+    private bool CanAccessPocket(IServerPlayer player, Dimension dimension, out string reason)
     {
         if (!IsOwnedPocket(dimension))
         {
@@ -761,14 +888,21 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return false;
         }
 
-        if (player?.HasPrivilege(privilege) == true)
+        if (HasPrivilege(player, _config.EnterPrivilege) || HasPrivilege(player, _config.UseWaystonePrivilege))
         {
             reason = string.Empty;
             return true;
         }
 
-        reason = $"Missing privilege '{privilege}'.";
+        reason = string.Equals(_config.EnterPrivilege, _config.UseWaystonePrivilege, StringComparison.Ordinal)
+            ? $"Missing privilege '{_config.EnterPrivilege}'."
+            : $"Missing privilege '{_config.EnterPrivilege}' or '{_config.UseWaystonePrivilege}'.";
         return false;
+    }
+
+    private static bool HasPrivilege(IServerPlayer player, string privilege)
+    {
+        return player?.HasPrivilege(privilege) == true;
     }
 
     private bool IsProtectedPocketBlock(BlockSelection blockSelection)
@@ -1042,6 +1176,10 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         public string EnterPrivilege { get; set; } = Privilege.root;
 
+        public string ExitPrivilege { get; set; } = Privilege.root;
+
+        public string UseWaystonePrivilege { get; set; } = Privilege.root;
+
         public string BindPrivilege { get; set; } = Privilege.root;
 
         public string ReleasePrivilege { get; set; } = Privilege.root;
@@ -1056,6 +1194,8 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         {
             CreatePrivilege = NormalizePrivilege(CreatePrivilege, Privilege.root);
             EnterPrivilege = NormalizePrivilege(EnterPrivilege, Privilege.root);
+            ExitPrivilege = NormalizePrivilege(ExitPrivilege, Privilege.root);
+            UseWaystonePrivilege = NormalizePrivilege(UseWaystonePrivilege, EnterPrivilege);
             BindPrivilege = NormalizePrivilege(BindPrivilege, Privilege.root);
             ReleasePrivilege = NormalizePrivilege(ReleasePrivilege, Privilege.root);
             MaxSizeChunks = ClampInt(MaxSizeChunks, 1, 64);

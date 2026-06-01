@@ -8,6 +8,21 @@ DimensionLib should be boring infrastructure. It should provide safe, reusable m
 
 Pocket Dimensions is the first product layer. It should prove useful gameplay flows on top of DimensionLib before any convenience helper is promoted into the library.
 
+## Surface Design Principles
+
+Simplicity and understanding are product goals for DimensionLib. A small, obvious surface that mod authors can reason about is more valuable than a broad surface that hides engine quirks behind clever helpers.
+
+Before adding any new public API, command, generator hook, visual capability, or transfer capability, answer these gates in the change itself or nearby documentation:
+
+- What concrete consumer needs this now?
+- Can the same behavior be expressed with the existing `Dimension`, location, generator, policy, or preparation primitives?
+- Is the mechanism explainable in one or two sentences to a mod author?
+- Is the behavior durable engine mechanics, or product-specific fantasy/UX that belongs in Pocket Dimensions or a future utility layer?
+- Does the feature make the pit of success clearer, or does it add another way to do the same thing?
+- What is the fallback or demotion path if the abstraction proves too broad?
+
+Prefer transparent mechanics over hidden magic. If DimensionLib must use a bridge or workaround, name it as such and keep it behind the smallest internal seam until a stable product requirement justifies promotion.
+
 ## Personas
 
 - Mod authors need small, stable APIs they can call from blocks, items, commands, UIs, generators, and portals.
@@ -20,6 +35,7 @@ Pocket Dimensions is the first product layer. It should prove useful gameplay fl
 
 - Dimension registration, sparse backing allocation, lookup, validation, persistence, release, and orphan handling.
 - Chunk preparation, materialization, relighting, and force-send mechanics.
+- Standard-overworld source window experiments that validate bounded alternate spaces and lazy generation without owning vanilla generator code.
 - Location and transfer primitives: describe locations, capture a player's current location, teleport to a location, teleport into a dimension, and sync client visuals.
 - Policy extension points for consumer-owned entry, block use, and block mutation rules.
 - Explicit visual/environment settings and client-side application primitives.
@@ -30,6 +46,7 @@ Pocket Dimensions is the first product layer. It should prove useful gameplay fl
 - Pocket-specific commands or chooser UIs.
 - Server-specific lore names such as shrines, altars, mirrors, machines, elevators, or rifts.
 - Gameplay balance for who can create, enter, bind, or release a dimension.
+- A forked/copy-owned implementation of vanilla overworld generation until a Mystcraft-style product actually needs tweakable vanilla-like world rules.
 
 ## Pocket Dimensions Owns
 
@@ -39,6 +56,19 @@ Pocket Dimensions is the first product layer. It should prove useful gameplay fl
 - Product rules such as indestructible floors and protected return pedestals.
 - Lightly themed defaults that remain easy for server owners to override.
 - The real Pocket Waystone prop design, documented in `mods-dll/dimensionpockets/docs/WAYSTONE_PROP_GUIDE.md`.
+
+## Mystcraft Direction
+
+Mystcraft-style dimensions should eventually feel vanilla-like while allowing authored/tweakable world rules. The near-term DimensionLib task is not to copy vanilla worldgen wholesale; it is to prove the mechanics needed by that future work:
+
+- Bounded regions that can be very large without eager generation.
+- Lazy chunk-window preparation around players.
+- Transfers into standard-overworld source dimensions.
+- Diagnostics that show prepared chunk counts, backing bounds, and generator identity.
+
+The preferred long-term direction is true engine-supported native worldgen for alternate dimensions if Vintage Story exposes a maintainable path. The current `PeekChunkColumn` source-window materialization is a public-API bridge for proving lazy bounded generation; do not treat it as the final architecture or expand it into a broad copied-worldgen framework without a fresh design review.
+
+If `standard` overworld source windows prove viable but insufficient, a later Mystcraft layer can copy or wrap vanilla systems with a clearer reason: alternate seed/rules/climate/structures. Keep that copied/tweakable generator outside DimensionLib until the stable mechanics and product requirements are clearer.
 
 ## Likely Utility Layer
 
@@ -87,4 +117,4 @@ Waystones should come before portals. A Waystone is a single block interaction w
 
 ## Promotion Rule
 
-Prove a feature in Pocket Dimensions first. Promote only the stable, lore-neutral mechanics to DimensionLib or a utility mod after the code has at least one concrete second consumer or an obvious repeated integration pattern.
+Prove a feature in Pocket Dimensions first. Promote only the stable, lore-neutral mechanics to DimensionLib or a utility mod after the code has at least one concrete second consumer or an obvious repeated integration pattern. When in doubt, keep the core surface smaller and document the tradeoff rather than adding another public capability.

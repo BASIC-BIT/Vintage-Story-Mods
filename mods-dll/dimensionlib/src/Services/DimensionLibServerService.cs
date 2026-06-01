@@ -26,6 +26,8 @@ public sealed class DimensionLibServerService : IDisposable
     private const int InitialGeneratedChunkBudget = 1;
     private const int LazyGeneratedChunkBudgetPerTick = 1;
     private const int TemporalStabilityTickMs = 250;
+    private const int PreparedChunkSendTickMs = 250;
+    private const int PreparedChunkSendColumnsPerTick = 2;
 
     private readonly ICoreServerAPI _api;
     private readonly DimensionManifestService _manifestService;
@@ -46,8 +48,10 @@ public sealed class DimensionLibServerService : IDisposable
     private readonly DimensionGeneratorRegistry _generators = new DimensionGeneratorRegistry();
     private readonly DimensionDiagnosticService _diagnostics;
     private readonly DimensionRegistry _dimensions = new DimensionRegistry(DimensionLibModSystem.FirstPrototypeDimension);
+    private readonly Dictionary<string, PreparedChunkSendQueue> _preparedChunkSendQueues = new Dictionary<string, PreparedChunkSendQueue>(StringComparer.Ordinal);
     private long _temporalStabilityListenerId;
     private long _lazyGenerationListenerId;
+    private long _preparedChunkSendListenerId;
     private bool _started;
 
     public DimensionLibServerService(ICoreServerAPI api, IServerNetworkChannel serverChannel)
@@ -75,7 +79,7 @@ public sealed class DimensionLibServerService : IDisposable
 
     public IReadOnlyCollection<Dimension> Dimensions => _dimensions.Dimensions;
 
-    public IReadOnlyCollection<string> GeneratorIds => _generators.GeneratorIds;
+    public IReadOnlyCollection<string> GeneratorIds => _generators.GeneratorIds.Concat(new[] { DimensionGeneratorIds.StandardOverworldWindow }).ToArray();
 
     public Dimension DebugDimension => _dimensions.GetRequired(DebugDimensionId);
 
@@ -93,6 +97,7 @@ public sealed class DimensionLibServerService : IDisposable
         _api.Event.PlayerNowPlaying += OnPlayerNowPlaying;
         _temporalStabilityListenerId = _api.Event.RegisterGameTickListener(OnTemporalStabilityTick, TemporalStabilityTickMs);
         _lazyGenerationListenerId = _api.Event.RegisterGameTickListener(OnLazyGenerationTick, 1000);
+        _preparedChunkSendListenerId = _api.Event.RegisterGameTickListener(OnPreparedChunkSendTick, PreparedChunkSendTickMs);
         _started = true;
     }
 
@@ -115,6 +120,12 @@ public sealed class DimensionLibServerService : IDisposable
             {
                 _api.Event.UnregisterGameTickListener(_lazyGenerationListenerId);
                 _lazyGenerationListenerId = 0;
+            }
+
+            if (_preparedChunkSendListenerId != 0)
+            {
+                _api.Event.UnregisterGameTickListener(_preparedChunkSendListenerId);
+                _preparedChunkSendListenerId = 0;
             }
 
             _started = false;
@@ -230,6 +241,11 @@ public sealed class DimensionLibServerService : IDisposable
         }
 
         var dimension = lookup.Value;
+        if (IsStandardOverworldSourceDimension(dimension))
+        {
+            return PrepareStandardOverworldSourceDimensionWindow(dimension, sendToPlayer, token, InitialGeneratedChunkRadius, InitialGeneratedChunkBudget);
+        }
+
         if (string.IsNullOrWhiteSpace(dimension.GeneratorId))
         {
             return DimensionLibResult.Fail($"Dimension '{dimension.DimensionId}' has no generator id.", "missing-dimension-generator");
@@ -247,19 +263,38 @@ public sealed class DimensionLibServerService : IDisposable
     {
         if (!TryCreateTestDimensionSpec(testId, dimensionId, sizeChunks, seed, out var spec, out var normalizedTestId))
         {
-            return DimensionLibResult.Fail("Test dimension must be 'overworld-opposite' or 'nether-cavern'.", "unknown-test-dimension");
+            return DimensionLibResult.Fail("Test dimension must be 'overworld-opposite', 'nether-cavern', or 'vanilla-overworld'.", "unknown-test-dimension");
+        }
+
+        if (string.Equals(spec.GeneratorId, DimensionGeneratorIds.StandardOverworldWindow, StringComparison.Ordinal))
+        {
+            var mapChunkSizeX = _api.WorldManager.MapSizeX / Vintagestory.API.Config.GlobalConstants.ChunkSize;
+            var mapChunkSizeZ = _api.WorldManager.MapSizeZ / Vintagestory.API.Config.GlobalConstants.ChunkSize;
+            if (spec.ChunkSizeX > mapChunkSizeX || spec.ChunkSizeZ > mapChunkSizeZ)
+            {
+                return DimensionLibResult.Fail($"Standard overworld source window {spec.ChunkSizeX}x{spec.ChunkSizeZ} chunks exceeds this world's map size {mapChunkSizeX}x{mapChunkSizeZ} chunks.", "standard-overworld-source-window-too-large");
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(dimensionId))
         {
             if (_dimensions.TryGet(spec.DimensionId, out var existing))
             {
-                spec.ChunkX = existing.ChunkX;
-                spec.ChunkZ = existing.ChunkZ;
-                if (!sizeChunks.HasValue)
+                if (IsBuiltInTestDimension(existing, normalizedTestId) && !DimensionSpecValidator.SameClaim(existing, spec))
                 {
-                    spec.ChunkSizeX = existing.ChunkSizeX;
-                    spec.ChunkSizeZ = existing.ChunkSizeZ;
+                    _dimensions.Remove(existing.DimensionId);
+                    _manifestService.Remove(existing.DimensionId);
+                    _preparedDimensions.RemoveDimension(existing.DimensionId);
+                }
+                else
+                {
+                    spec.ChunkX = existing.ChunkX;
+                    spec.ChunkZ = existing.ChunkZ;
+                    if (!sizeChunks.HasValue)
+                    {
+                        spec.ChunkSizeX = existing.ChunkSizeX;
+                        spec.ChunkSizeZ = existing.ChunkSizeZ;
+                    }
                 }
             }
         }
@@ -306,10 +341,22 @@ public sealed class DimensionLibServerService : IDisposable
 
         if (!string.IsNullOrWhiteSpace(lookup.Value.GeneratorId))
         {
-            var prepared = PrepareGeneratedDimensionWindow(lookup.Value.DimensionId, _generatedWindowPreparer.GetAllowedChunkRadius(player, FallbackLazyGeneratedChunkRadius, InitialGeneratedChunkRadius), player, default, InitialGeneratedChunkBudget);
+            var radius = _generatedWindowPreparer.GetAllowedChunkRadius(player, FallbackLazyGeneratedChunkRadius, InitialGeneratedChunkRadius);
+            var prepared = IsStandardOverworldSourceDimension(lookup.Value)
+                ? PrepareStandardOverworldSourceDimensionWindow(lookup.Value, player, default, radius, InitialGeneratedChunkBudget)
+                : PrepareGeneratedDimensionWindow(lookup.Value.DimensionId, radius, player, default, InitialGeneratedChunkBudget);
             if (!prepared.Success)
             {
                 return prepared;
+            }
+
+            if (IsStandardOverworldSourceDimension(lookup.Value))
+            {
+                var center = _generatedWindowPreparer.ResolveCenterLocalChunk(lookup.Value, player);
+                if (!_preparedDimensions.IsChunkPrepared(lookup.Value.DimensionId, center.X, center.Y))
+                {
+                    return DimensionLibResult.Fail($"Standard overworld source chunks for '{lookup.Value.DimensionId}' are still preparing. Retry /dlib enter {lookup.Value.DimensionId} in a few seconds.", "standard-overworld-source-loading");
+                }
             }
         }
 
@@ -434,11 +481,6 @@ public sealed class DimensionLibServerService : IDisposable
         }
 
         options ??= new DimensionTeleportOptions();
-        if (options.ForceSendDimension)
-        {
-            ForceSend(dimension, player);
-        }
-
         if (options.RecordReturn && _returnPositions.ShouldRecord(player, IsInsideDimensionLibDimension))
         {
             _returnPositions.Record(player);
@@ -463,6 +505,10 @@ public sealed class DimensionLibServerService : IDisposable
             options.Pitch ?? player.Entity.Pos.Pitch,
             options.Roll ?? player.Entity.Pos.Roll,
             dimension);
+        if (options.ForceSendDimension)
+        {
+            QueuePreparedChunksNear(dimension, player, options.X ?? dimension.SpawnX, options.Z ?? dimension.SpawnZ);
+        }
 
         return DimensionLibResult.Ok($"Teleported {player.PlayerName} to dimension '{dimension.DimensionId}'.");
     }
@@ -506,12 +552,15 @@ public sealed class DimensionLibServerService : IDisposable
             {
                 return DimensionLibResult.Fail($"Dimension '{visibleDimension.DimensionId}' has not been prepared yet.", "dimension-not-prepared");
             }
-
-            ForceSend(visibleDimension, player);
         }
 
         _transferService.MovePlayer(player, location.DimensionPlaneId, location.X, location.Y, location.Z, location.Yaw, location.Pitch, location.Roll);
         _transferService.SyncClientTransfer(player, location.DimensionPlaneId, location.X, location.Y, location.Z, location.Yaw, location.Pitch, location.Roll, visibleDimension);
+        if (visibleDimension != null)
+        {
+            QueuePreparedChunksNear(visibleDimension, player, location.X, location.Z);
+        }
+
         return DimensionLibResult.Ok($"Teleported {player.PlayerName} to saved location.");
     }
 
@@ -571,6 +620,11 @@ public sealed class DimensionLibServerService : IDisposable
         }
 
         var dimension = lookup.Value;
+        if (IsStandardOverworldSourceDimension(dimension))
+        {
+            return PrepareStandardOverworldSourceDimensionWindow(dimension, sendToPlayer, token, radiusChunks, maxColumns);
+        }
+
         if (string.IsNullOrWhiteSpace(dimension.GeneratorId))
         {
             return DimensionLibResult.Fail($"Dimension '{dimension.DimensionId}' has no generator id.", "missing-dimension-generator");
@@ -590,6 +644,12 @@ public sealed class DimensionLibServerService : IDisposable
 
         var center = _generatedWindowPreparer.ResolveCenterLocalChunk(dimension, sendToPlayer);
         return _generatedWindowPreparer.PrepareWindow(dimension, source, center.X, center.Y, radiusChunks, sendToPlayer, token, maxColumns);
+    }
+
+    private DimensionLibResult PrepareStandardOverworldSourceDimensionWindow(Dimension dimension, IServerPlayer sendToPlayer, CancellationToken token, int radiusChunks, int maxColumns)
+    {
+        var center = _generatedWindowPreparer.ResolveCenterLocalChunk(dimension, sendToPlayer);
+        return _generatedWindowPreparer.PrepareStandardOverworldSourceWindow(dimension, center.X, center.Y, radiusChunks, sendToPlayer, token, maxColumns);
     }
 
     public DimensionLibResult EnterDebugDimension(IServerPlayer player)
@@ -621,14 +681,68 @@ public sealed class DimensionLibServerService : IDisposable
             return;
         }
 
-        LoadPreparedChunkColumns(dimension);
-        ForceSend(dimension, player);
+        QueuePreparedChunksNear(dimension, player, player.Entity.Pos.X, player.Entity.Pos.Z);
         _transferService.SyncClientTransfer(player, dimension.DimensionPlaneId, player.Entity.Pos.X, player.Entity.Pos.Y, player.Entity.Pos.Z, player.Entity.Pos.Yaw, player.Entity.Pos.Pitch, player.Entity.Pos.Roll, dimension);
     }
 
     private void OnLazyGenerationTick(float dt)
     {
         _generatedStreamer.Tick(dt);
+    }
+
+    private void OnPreparedChunkSendTick(float dt)
+    {
+        if (_preparedChunkSendQueues.Count == 0)
+        {
+            return;
+        }
+
+        var keys = _preparedChunkSendQueues.Keys.ToArray();
+        foreach (var key in keys)
+        {
+            if (!_preparedChunkSendQueues.TryGetValue(key, out var queue))
+            {
+                continue;
+            }
+
+            if (!_dimensions.TryGet(queue.DimensionId, out var dimension))
+            {
+                _preparedChunkSendQueues.Remove(key);
+                continue;
+            }
+
+            var player = _api.World.AllOnlinePlayers.OfType<IServerPlayer>().FirstOrDefault(candidate => string.Equals(candidate.PlayerUID, queue.PlayerUid, StringComparison.Ordinal));
+            if (player?.Entity?.Pos == null || player.Entity.Pos.Dimension != dimension.DimensionPlaneId)
+            {
+                _preparedChunkSendQueues.Remove(key);
+                continue;
+            }
+
+            var chunksToSend = queue.Chunks
+                .Where(chunk => !queue.SentChunkKeys.Contains(PreparedChunkSendQueue.ChunkKey(chunk)))
+                .OrderBy(chunk => DistanceSquared(chunk, dimension, player.Entity.Pos.X, player.Entity.Pos.Z))
+                .ThenBy(chunk => chunk.X)
+                .ThenBy(chunk => chunk.Y)
+                .Take(PreparedChunkSendColumnsPerTick)
+                .ToArray();
+            if (chunksToSend.Length == 0)
+            {
+                _preparedChunkSendQueues.Remove(key);
+                continue;
+            }
+
+            foreach (var chunk in chunksToSend)
+            {
+                _chunkService.LoadLocalChunkColumn(dimension, chunk.X, chunk.Y);
+                _chunkService.ForceSendLocalChunkColumn(dimension, player, chunk.X, chunk.Y);
+                queue.SentChunkKeys.Add(PreparedChunkSendQueue.ChunkKey(chunk));
+            }
+
+            if (queue.SentChunkKeys.Count >= queue.Chunks.Count)
+            {
+                _preparedChunkSendQueues.Remove(key);
+            }
+        }
     }
 
     private Dimension ResolveDimensionForSelection(BlockSelection blockSel)
@@ -669,15 +783,62 @@ public sealed class DimensionLibServerService : IDisposable
         return _dimensions.TryGetAt(pos, out dimension);
     }
 
-    private void LoadPreparedChunkColumns(Dimension dimension)
+    private void QueuePreparedChunksNear(Dimension dimension, IServerPlayer player, double centerX, double centerZ)
     {
-        if (_preparedDimensions.TryGetPartialPreparedLocalChunks(dimension, out var preparedChunks))
+        if (player?.Entity == null || dimension == null)
         {
-            _chunkService.LoadLocalChunkColumns(dimension, preparedChunks);
             return;
         }
 
-        _chunkService.LoadAllChunkColumns(dimension);
+        var chunks = _preparedDimensions.GetPreparedLocalChunks(dimension)
+            .OrderBy(chunk => DistanceSquared(chunk, dimension, centerX, centerZ))
+            .ThenBy(chunk => chunk.X)
+            .ThenBy(chunk => chunk.Y)
+            .ToList();
+        if (chunks.Count == 0)
+        {
+            return;
+        }
+
+        player.CurrentChunkSentRadius = 0;
+        _preparedChunkSendQueues[PreparedChunkSendQueueKey(player.PlayerUID, dimension.DimensionId)] = new PreparedChunkSendQueue(player.PlayerUID, dimension.DimensionId, chunks);
+    }
+
+    private static string PreparedChunkSendQueueKey(string playerUid, string dimensionId)
+    {
+        return $"{playerUid}:{dimensionId}";
+    }
+
+    private static int DistanceSquared(Vec2i chunk, Dimension dimension, double centerX, double centerZ)
+    {
+        var centerLocalChunkX = (int)Math.Floor((centerX - dimension.MinBlockX) / Vintagestory.API.Config.GlobalConstants.ChunkSize);
+        var centerLocalChunkZ = (int)Math.Floor((centerZ - dimension.MinBlockZ) / Vintagestory.API.Config.GlobalConstants.ChunkSize);
+        var dx = chunk.X - ClampInt(centerLocalChunkX, 0, dimension.ChunkSizeX - 1);
+        var dz = chunk.Y - ClampInt(centerLocalChunkZ, 0, dimension.ChunkSizeZ - 1);
+        return dx * dx + dz * dz;
+    }
+
+    private sealed class PreparedChunkSendQueue
+    {
+        public PreparedChunkSendQueue(string playerUid, string dimensionId, List<Vec2i> chunks)
+        {
+            PlayerUid = playerUid;
+            DimensionId = dimensionId;
+            Chunks = chunks;
+        }
+
+        public string PlayerUid { get; }
+
+        public string DimensionId { get; }
+
+        public List<Vec2i> Chunks { get; }
+
+        public HashSet<long> SentChunkKeys { get; } = new HashSet<long>();
+
+        public static long ChunkKey(Vec2i chunk)
+        {
+            return ((long)chunk.X << 32) | (uint)chunk.Y;
+        }
     }
 
     private void LoadPersistedDimensions()
@@ -707,6 +868,11 @@ public sealed class DimensionLibServerService : IDisposable
     private static bool IsBuiltInTestDimension(Dimension dimension, string normalizedTestId)
     {
         return BuiltInTestDimensionFactory.IsBuiltInTestDimension(dimension, normalizedTestId);
+    }
+
+    private static bool IsStandardOverworldSourceDimension(Dimension dimension)
+    {
+        return string.Equals(dimension?.GeneratorId, DimensionGeneratorIds.StandardOverworldWindow, StringComparison.Ordinal);
     }
 
     private static int ClampInt(int value, int min, int max)

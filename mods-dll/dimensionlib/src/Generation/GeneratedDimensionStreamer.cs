@@ -1,4 +1,5 @@
 using System.Linq;
+using DimensionLib.Api;
 using DimensionLib.Services;
 using Vintagestory.API.Server;
 
@@ -42,19 +43,30 @@ internal sealed class GeneratedDimensionStreamer
                 continue;
             }
 
-            if (!_generators.TryGet(dimension.GeneratorId, out var generator))
-            {
-                continue;
-            }
-
             var localChunk = _windowPreparer.ResolveLocalChunk(dimension, entity.Pos.X, entity.Pos.Z);
-            var source = generator.CreateSource(dimension);
             var radius = _windowPreparer.GetAllowedChunkRadius(player, _fallbackRadius, _minimumRadius);
-            var result = _windowPreparer.PrepareWindow(dimension, source, localChunk.X, localChunk.Y, radius, player, default, _budgetPerTick);
+            var result = IsStandardOverworldSourceDimension(dimension)
+                ? _windowPreparer.PrepareStandardOverworldSourceWindow(dimension, localChunk.X, localChunk.Y, radius, player, default, _budgetPerTick)
+                : PrepareGeneratedWindow(dimension, localChunk.X, localChunk.Y, radius, player);
             if (!result.Success)
             {
                 _api.Logger.Warning("[DimensionLib] Lazy generation tick failed for '{0}': {1}", dimension.DimensionId, result.Message);
             }
         }
+    }
+
+    private DimensionLibResult PrepareGeneratedWindow(DimensionLib.Api.Dimension dimension, int localChunkX, int localChunkZ, int radius, IServerPlayer player)
+    {
+        if (!_generators.TryGet(dimension.GeneratorId, out var generator))
+        {
+            return DimensionLibResult.Fail($"Generator '{dimension.GeneratorId}' is not registered.", "unknown-generator");
+        }
+
+        return _windowPreparer.PrepareWindow(dimension, generator.CreateSource(dimension), localChunkX, localChunkZ, radius, player, default, _budgetPerTick);
+    }
+
+    private static bool IsStandardOverworldSourceDimension(DimensionLib.Api.Dimension dimension)
+    {
+        return string.Equals(dimension.GeneratorId, DimensionGeneratorIds.StandardOverworldWindow, System.StringComparison.Ordinal);
     }
 }

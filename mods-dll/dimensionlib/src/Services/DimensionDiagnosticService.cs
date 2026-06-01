@@ -41,7 +41,12 @@ internal sealed class DimensionDiagnosticService
 
         if (!string.IsNullOrWhiteSpace(dimension.GeneratorId))
         {
-            if (!_generators.TryGet(dimension.GeneratorId, out var generator))
+            if (string.Equals(dimension.GeneratorId, DimensionGeneratorIds.StandardOverworldWindow, StringComparison.Ordinal))
+            {
+                lines.Add("generatorStatus=standard-overworld-source-window");
+                lines.Add("source=vanilla-standard-worldgen-peek-materialized");
+            }
+            else if (!_generators.TryGet(dimension.GeneratorId, out var generator))
             {
                 lines.Add($"generatorStatus=missing:{dimension.GeneratorId}");
             }

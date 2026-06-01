@@ -38,7 +38,7 @@ OpenCode skills under `.opencode/skills/` are first-class workflow assets for th
 
 ## DimensionLib Product Direction
 
-For DimensionLib or Pocket Dimensions work, read `mods-dll/dimensionlib/docs/PRODUCT_DIRECTION.md` before adding gameplay-facing features. Keep DimensionLib focused on reusable mechanics and put Waystones, portals, lore, recipes, models, chooser UIs, and server-facing product flows in Pocket Dimensions or a future utility layer until repeated consumers justify promotion.
+For DimensionLib or Pocket Dimensions work, read `mods-dll/dimensionlib/docs/PRODUCT_DIRECTION.md` before adding gameplay-facing features or new public surfaces. Keep DimensionLib focused on simple, understandable, consumable mechanics; question every new API, command, generator hook, visual capability, or transfer capability against the documented surface-design gates. Put Waystones, portals, lore, recipes, models, chooser UIs, and server-facing product flows in Pocket Dimensions or a future utility layer until repeated consumers justify promotion.
 
 ## Context Management
 

@@ -21,6 +21,7 @@ The minimum game-changing consumer-mod use case is:
 - Sparse region allocation and overlap validation.
 - Manifest persistence and orphan handling.
 - Chunk creation, materialization, relight, force-send, and lazy generated-window preparation.
+- A root-only `standard` overworld source window experiment for validating large overworld-like dimensions without owning vanilla generator code in DimensionLib.
 - Player transfer and return-position storage.
 - Basic access/mutation policy hooks.
 - Root-only `/dlib` debug and maintenance commands for developers, admins, and QA. These should validate and inspect the library, not become gameplay/admin products.
@@ -36,6 +37,8 @@ The minimum game-changing consumer-mod use case is:
 ## Not Core MVP
 
 - Nether-specific worldgen quality.
+- Forked or copied vanilla overworld generation.
+- Independent alternate-overworld seeds, climate rules, or worldgen rule packs.
 - Pocket-dimension gameplay/admin features.
 - Portals, teleporters, keys, ritual blocks, or in-game assets.
 - Biomes, large lava oceans, generated structures, and polished terrain algorithms.
@@ -52,6 +55,7 @@ Good consumer/demo candidates:
 
 - Pocket dimensions: create a void room / isolated build zone and teleport players in/out.
 - Nether prototype: stress-test generated dimensions, baked light policies, and explicit visual settings.
+- Vanilla overworld window: stress-test lazy standard-overworld source materialization and very large finite bounds before any Mystcraft-style copied/tweakable worldgen work.
 
 Pocket dimensions are likely the first valuable follow-on mod, not a DimensionLib core feature.
 
@@ -112,6 +116,7 @@ Avoid adding helpers just because a single consumer mod wants them. Start with e
 ## Recommended Near-Term Work Order
 
 1. Keep Pocket Dimensions small and use it to judge whether the public API is pleasant enough.
-2. Keep Nether generator and visual experiments as internal validation, not release-critical polish.
-3. Promote repeated consumer boilerplate only after it appears in more than one consumer mod.
-4. Only then decide whether to expose visual/light registration APIs or carve Nether into a separate mod.
+2. Use the vanilla-overworld source window to test whether a second overworld-like dimension can be bounded, lazily generated, transferred into, and streamed without owning vanilla's generator code.
+3. Keep Nether generator and visual experiments as internal validation, not release-critical polish.
+4. Promote repeated consumer boilerplate only after it appears in more than one consumer mod.
+5. Only then decide whether to expose visual/light registration APIs, carve Nether into a separate mod, or start a Mystcraft-style copied/tweakable overworld generator.
