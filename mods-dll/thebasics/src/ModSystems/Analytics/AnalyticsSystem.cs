@@ -32,8 +32,7 @@ public class AnalyticsSystem : BaseBasicModSystem
         _analyticsConfig = LoadAnalyticsConfig();
         RegisterNetworkChannel();
         ConfigureAnalyticsSink();
-        TrackPreviousUncleanShutdownIfNeeded();
-        MarkCurrentServerSessionActive();
+        TrackServerSessionStartup();
         RegisterCommands();
         HookEvents();
 
@@ -141,6 +140,20 @@ public class AnalyticsSystem : BaseBasicModSystem
         }
 
         AnalyticsService.Configure(new RelayAnalyticsSink(API, _analyticsConfig, endpoint, Mod.Info.Version, _serverSessionId), _analyticsConfig.AllowErrorTelemetry);
+    }
+
+    private void TrackServerSessionStartup()
+    {
+        try
+        {
+            TrackPreviousUncleanShutdownIfNeeded();
+            MarkCurrentServerSessionActive();
+        }
+        catch (Exception e)
+        {
+            API.Logger.Warning($"THEBASICS analytics: failed to update startup crash sentinel ({e.GetType().Name}); continuing without crash detection for this session.");
+            AnalyticsService.TrackFailure("analytics", "startup_sentinel", "warning", "update_failed", e);
+        }
     }
 
     private void TrackPreviousUncleanShutdownIfNeeded()
