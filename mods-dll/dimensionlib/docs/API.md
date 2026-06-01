@@ -97,9 +97,9 @@ Owner mods can register an `IDimensionPolicyProvider` for richer rules. Dimensio
 
 ## Visual Environment
 
-`DimensionSpec.VisualSettings` carries explicit ambience, fog, cloud, sky-cover, light-lift, cave-fog suppression, and ambient chunk-light settings. There are no public named visual presets; consumers set the fields they want. `DimensionVisualSettings.MinimumSceneLight` adds a per-dimension post-process light lift for sealed or non-solar spaces. DimensionLib renders this as a client-only ambient lift after final composition because Vintage Story's built-in `minlight` shader uniform is an input black point, not an output brightness floor. It does not create physical block light, affect mobs, or change the saved chunk lightmap.
+`DimensionSpec.VisualSettings` carries explicit ambience, fog, cloud, sky-cover, light-lift, and cave-fog suppression settings. There are no public named visual presets; consumers set the fields they want. `DimensionVisualSettings.MinimumSceneLight` adds a per-dimension post-process light lift for sealed or non-solar spaces. DimensionLib renders this as a client-only ambient lift after final composition because Vintage Story's built-in `minlight` shader uniform is an input black point, not an output brightness floor. It does not create physical block light, affect mobs, or change the saved chunk lightmap.
 
-See `RENDER_EFFECTS.md` for current research notes on sky replacement, vanilla cave-fog suppression, sealed-dimension light policy, and possible custom depth-aware fog passes.
+See `RENDER_EFFECTS.md` for current research notes on sky replacement, vanilla cave-fog suppression, sealed-dimension lighting, and possible custom depth-aware fog passes.
 
 Use `VisualSettings = null` for normal Vintage Story visuals, or `MinimumSceneLight = 0` inside explicit settings to avoid client-side light lift. Prefer explicit visual tuning before generated light blocks. Generated light sources should only be considered if they are true ambient world features: dynamically fitted to the room, non-interactable, and isolated from gameplay/mod interactions.
 
@@ -112,25 +112,23 @@ Root debug commands expose temporary live visual tuning for the current client:
 
 Current tuning keys are exact debug names, not public API: `fogdensity`, `flatfogdensity`, `fogweight`, `fogdensityweight`, `flatfogdensityweight`, `fogred`, `foggreen`, `fogblue`, `ambientred`, `ambientgreen`, `ambientblue`, `ambientweight`, `scenebrightness`, `scenebrightnessweight`, `fogbrightness`, `fogbrightnessweight`, `skyred`, `skygreen`, `skyblue`, `skyalpha`, `minlight`, `liftmult`, `liftmax`, `liftred`, `liftgreen`, and `liftblue`.
 
-`/dlib light-floor` is a separate experiment for sealed generated caverns. It writes a low blocklight floor into air cells in already-prepared chunks, then resends chunk columns. It does not create blocks, block entities, drops, collisions, selections, or interactable light sources. It does affect chunk light-level data and should become a first-class dimension ambient-light rule before it is treated as production behavior.
-
-The built-in nether-cavern generator now also applies an experimental synthetic sunlight floor to generated air cells in the cavern's vertical band. Vintage Story's terrain ambient path depends on the sunlight channel, so blocklight alone does not recover enough distant surface detail in fully sealed spaces. This is still chunk light data, not generated light blocks.
+`/dlib light-floor` is a separate root-only debug experiment for sealed generated caverns. It writes a low blocklight floor into air cells in already-prepared chunks, then resends chunk columns. It does not create blocks, block entities, drops, collisions, selections, or interactable light sources. It does affect chunk light-level data and is intentionally not part of `DimensionVisualSettings` or automatic generated-dimension behavior.
 
 The current nether-cavern visual hypotheses are:
 
-- Fog and flat fog should remain low until the sealed-dimension light policy is measured.
-- Sealed dimensions need explicit ambient-light settings; the current built-in cavern fixture tests an air-cell blocklight floor plus a synthetic sunlight floor.
+- Fog and flat fog should remain conservative until sealed-dimension lighting is understood.
+- Baked chunk-light floors are suspected workaround code; keep them quarantined to debug tooling until proven necessary.
 - Client-only post-process light lift can raise blacks but cannot recover texture detail that chunk lighting rendered too dark.
 - Generated block emitters are not acceptable unless they are non-interactive, room-fitted environmental features.
 
-Current experimental nether defaults use an air-cell blocklight floor of `7`, an air-cell synthetic sunlight floor of `2`, minimum scene light `0.08`, vanilla `blackfogincaves` suppression, and darker warm-red visuals: sky `(0.035, 0.0035, 0.002, alpha 1.0)`, fog color `(0.24, 0.045, 0.018)` at weight `0.16`, fog density `0.0016` at weight `0.16`, flat fog density `0` at weight `0`, ambient color `(0.74, 0.34, 0.20)` at weight `0.48`, scene brightness `1.0` at weight `0.45`, and fog brightness `0.95` at weight `0.20`.
+Current experimental nether defaults use minimum scene light `0.08`, vanilla `blackfogincaves` suppression, and darker warm-red visuals: sky `(0.035, 0.0035, 0.002, alpha 1.0)`, fog color `(0.24, 0.045, 0.018)` at weight `0.16`, fog density `0.0016` at weight `0.16`, flat fog density `0` at weight `0`, ambient color `(0.74, 0.34, 0.20)` at weight `0.48`, scene brightness `1.0` at weight `0.45`, and fog brightness `0.95` at weight `0.20`.
 
 ## Built-In Creation Lab
 
 The current built-in generators are intentionally small litmus tests:
 
 - `DimensionGeneratorIds.OverworldOpposite`: rolling overworld-like terrain with darker explicit visual settings.
-- `DimensionGeneratorIds.NetherCavern`: floor and ceiling terrain with optional lava pockets and red cavern explicit visual/light settings.
+- `DimensionGeneratorIds.NetherCavern`: floor and ceiling terrain with optional lava pockets and red cavern explicit visual settings.
 
 Root debug commands expose these as `/dlib create-test <type> [dimensionId] [sizeChunks] [seed]`. Dedicated-server console QA can pair this with `/dlib enter-player <playerName> <dimensionId>` to move an online test client without interacting with the client window. They are not final gameplay generators; they prove the DimensionLib path from spec -> generator -> block source -> materialization -> transfer -> explicit visual settings.
 

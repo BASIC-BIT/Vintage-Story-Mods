@@ -58,7 +58,7 @@ public sealed class DimensionLibServerService : IDisposable
         _materializer = new ChunkColumnMaterializer(api);
         _debugPlatformBuilder = new DebugDimensionPlatformBuilder(api);
         _lightFloorApplier = new ChunkLightFloorApplier(api);
-        _generatedWindowPreparer = new GeneratedDimensionWindowPreparer(api, _chunkService, _materializer, _lightFloorApplier, _preparedDimensions);
+        _generatedWindowPreparer = new GeneratedDimensionWindowPreparer(api, _chunkService, _materializer, _preparedDimensions);
         _generatedStreamer = new GeneratedDimensionStreamer(api, _dimensions, _generators, _generatedWindowPreparer, FallbackLazyGeneratedChunkRadius, InitialGeneratedChunkRadius, LazyGeneratedChunkBudgetPerTick);
         _policyProviders = new PolicyProviderRegistry();
         _accessService = new DimensionAccessService(_policyProviders, IsDimensionOrphaned);
@@ -393,7 +393,7 @@ public sealed class DimensionLibServerService : IDisposable
             return DimensionLibResult.Fail($"Dimension '{dimension.DimensionId}' has no prepared chunks.", "dimension-not-prepared");
         }
 
-        var updatedLights = _lightFloorApplier.ApplyBlocklightFloor(dimension, level, chunks, DimensionLightPolicy.For(dimension));
+        var updatedLights = _lightFloorApplier.ApplyBlocklightFloor(dimension, level, chunks);
         var sentPlayers = 0;
         foreach (var player in _api.World.AllOnlinePlayers.OfType<IServerPlayer>())
         {
@@ -406,7 +406,7 @@ public sealed class DimensionLibServerService : IDisposable
             sentPlayers++;
         }
 
-        return DimensionLibResult.Ok($"Applied ambient light floor {level} to {updatedLights} air light cell(s) in {chunks.Length} chunk column(s) for '{dimension.DimensionId}' and resent to {sentPlayers} player(s).");
+        return DimensionLibResult.Ok($"Applied debug blocklight floor {level} to {updatedLights} air light cell(s) in {chunks.Length} chunk column(s) for '{dimension.DimensionId}' and resent to {sentPlayers} player(s).");
     }
 
     public DimensionLibResult TeleportToDimension(IServerPlayer player, string dimensionId, DimensionTeleportOptions options = null)

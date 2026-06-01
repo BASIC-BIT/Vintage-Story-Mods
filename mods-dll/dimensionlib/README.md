@@ -12,7 +12,7 @@ The goal is to give other mods a stable, boring API for alternate spaces without
 - Register generator profiles and prepare generated dimensions.
 - Materialize blocks from an `IBlockVolumeSource` into a dimension.
 - Move a player into a dimension or to an explicit captured location.
-- Apply basic client ambience, fog, sky cover, minimum scene light, and experimental generated light floors while inside generated dimensions.
+- Apply basic client ambience, fog, sky cover, and minimum scene light while inside generated dimensions.
 
 ## Mod Author API
 
@@ -113,5 +113,5 @@ These steps require a server with DimensionLib loaded and a root/admin player:
 9. Run `/dlib create-test nether-cavern`, then `/dlib enter dimensionlib:test-nether-cavern`, and confirm a generated cavern with floor and ceiling terrain, an opaque red sky cover, and readable low-light areas.
 10. Run `/dlib validate` inside each generated dimension and confirm `spawnFeetBlockId=0`, `spawnHeadBlockId=0`, and a nonzero `spawnFloorBlockId`.
 11. If nether readability is poor, use `/dlib visual preset clear`, `/dlib visual preset thin`, and exact-key `/dlib visual set <key> <value>` commands to tune fog, sky cover, ambient color, and client-only light lift live without regenerating terrain.
-12. For sealed cavern terrain-lighting experiments, use `/dlib light-floor dimensionlib:test-nether-cavern <level>` to write a low blocklight floor into air cells and resend prepared chunks. The built-in nether-cavern fixture also applies a synthetic sunlight floor in the cavern's vertical band during generation through explicit visual/light settings. These are not generated light blocks, but they do intentionally affect chunk light-level data.
+12. For sealed cavern terrain-lighting experiments only, use `/dlib light-floor dimensionlib:test-nether-cavern <level>` to manually write a low blocklight floor into already-prepared air cells and resend prepared chunks. This is debug tooling, not DimensionLib public API or default generated-dimension behavior.
 13. From a dedicated-server console, use `/dlib create-test <type> ...` followed by `/dlib enter-player <playerName> <dimensionId>` for non-interactive QA clients.

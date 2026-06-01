@@ -96,13 +96,7 @@ internal static class DimensionSpecValidator
         settings.LightLiftRed = Clamp01(settings.LightLiftRed);
         settings.LightLiftGreen = Clamp01(settings.LightLiftGreen);
         settings.LightLiftBlue = Clamp01(settings.LightLiftBlue);
-        settings.AmbientBlockLightFloor = ClampInt(settings.AmbientBlockLightFloor, 0, 31);
-        settings.AmbientSunlightFloor = ClampInt(settings.AmbientSunlightFloor, 0, 31);
         settings.LerpSpeed = ClampFloat(settings.LerpSpeed <= 0f ? 0.08f : settings.LerpSpeed, 0.001f, 10f);
-        if (settings.AmbientLightMaxYOffset < settings.AmbientLightMinYOffset)
-        {
-            settings.AmbientLightMaxYOffset = settings.AmbientLightMinYOffset;
-        }
     }
 
     private static float Clamp01(float value)
@@ -115,8 +109,4 @@ internal static class DimensionSpecValidator
         return value < min ? min : value > max ? max : value;
     }
 
-    private static int ClampInt(int value, int min, int max)
-    {
-        return value < min ? min : value > max ? max : value;
-    }
 }

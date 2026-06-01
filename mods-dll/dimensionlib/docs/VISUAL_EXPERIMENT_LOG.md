@@ -51,7 +51,7 @@ Generator variables:
 
 - A 9x9 dark-backdrop test dimension (`dimensionlib:qa-nether-darkbackdrop-20260530`, seed `20260535`, package `47450CE...`) froze Profile2 after teleport. Keep visual tuning on 5x5 until lazy generation/performance is fixed separately.
 - Full-height synthetic light writes previously froze Profile2. Bounded vertical-band light writes avoided that issue in 5x5 tests.
-- Attempt H found the spawn-lighting root cause: `DimensionLightPolicy.For()` treated any positive `MinimumSceneLight` as a complete policy override, disabling nether `BlocklightFloor` and `SyntheticSunlightFloor`. Fix keeps minimum scene light while preserving baked nether floors.
+- Attempt H previously found a bug in the now-removed baked-light policy path: positive `MinimumSceneLight` disabled the nether `BlocklightFloor` and `SyntheticSunlightFloor`. This remains historical evidence only; baked light floors are no longer automatic defaults or public visual settings.
 
 ## Next Experiment Template
 

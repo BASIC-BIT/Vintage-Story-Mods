@@ -56,7 +56,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
                     tags "API,Extension Point"
                 }
 
-                visualSettings = component "DimensionVisualSettings" "Explicit public visual/environment fields for ambient, fog, sky cover, light lift, cave-fog suppression, and light floors." "C# model" {
+                visualSettings = component "DimensionVisualSettings" "Explicit public visual/environment fields for ambient, fog, sky cover, light lift, and cave-fog suppression." "C# model" {
                     tags "API,Visual"
                 }
             }
@@ -128,7 +128,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
                     tags "Core,Experimental"
                 }
 
-                lightPolicy = component "DimensionLightPolicy / ChunkLightFloorApplier" "Experimental sealed-space baked light floor policy and application." "C# service" {
+                debugLightFloor = component "ChunkLightFloorApplier" "Root-only debug command helper for manually applying blocklight floors to prepared chunks; not automatic public API." "C# debug service" {
                     tags "Experimental"
                 }
 
@@ -265,8 +265,8 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
         serverService -> transferService "Teleports players and syncs clients"
         transferService -> returnStore "Records and resolves return positions"
         transferService -> vsServerApi "Moves players and sends packets"
-        transferService -> clientVisuals "Sends DimensionTransferMessage with visual settings and light data" "network channel"
-        transferService -> visualSystem "Sends DimensionTransferMessage with visual settings and light data" "network channel"
+        transferService -> clientVisuals "Sends DimensionTransferMessage with visual settings data" "network channel"
+        transferService -> visualSystem "Sends DimensionTransferMessage with visual settings data" "network channel"
         serverService -> policyRegistry "Registers owner policy providers"
         serverService -> accessService "Checks enter/use/mutate access"
         accessService -> policyRegistry "Finds owner provider"
@@ -276,7 +276,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
         serverService -> generatorRegistry "Registers and resolves generators"
         generatorRegistry -> generatorApi "Stores implementations of"
         serverService -> generatedPreparer "Prepares generated chunk windows"
-        generatedPreparer -> lightPolicy "Applies experimental sealed-space light floors"
+        dlibCommands -> debugLightFloor "Can manually apply debug blocklight floors"
         serverService -> diagnostics "Builds validation reports"
         dlibCommands -> serverService "Invokes debug and maintenance operations"
         builtInFixtures -> generatorApi "Implements internal test generators"

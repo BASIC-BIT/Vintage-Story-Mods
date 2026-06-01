@@ -100,18 +100,6 @@ public sealed class DimensionVisualSettings
     public float LightLiftBlue { get; set; } = 1f;
 
     [ProtoMember(31)]
-    public int AmbientBlockLightFloor { get; set; }
-
-    [ProtoMember(32)]
-    public int AmbientSunlightFloor { get; set; }
-
-    [ProtoMember(33)]
-    public int AmbientLightMinYOffset { get; set; }
-
-    [ProtoMember(34)]
-    public int AmbientLightMaxYOffset { get; set; } = int.MaxValue;
-
-    [ProtoMember(35)]
     public float LerpSpeed { get; set; } = 0.08f;
 
     public DimensionVisualSettings Clone()

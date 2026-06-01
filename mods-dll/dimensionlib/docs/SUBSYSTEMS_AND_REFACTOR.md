@@ -10,8 +10,8 @@ The refactor goal is not to redesign public API yet. The goal is to split intern
 - Do not make baked visual or generator tuning changes during pure refactor commits.
 - Keep `/dlib` behavior stable while moving command handling out of core service classes.
 - Every extracted module needs a short responsibility comment or doc section.
-- After any visual/generator/light-policy experiment, update `VISUAL_EXPERIMENT_LOG.md` and pause for human feedback.
-- Use fresh dimensions after changing generated chunks, chunk light policy, or generator shape.
+- After any visual/generator/light experiment, update `VISUAL_EXPERIMENT_LOG.md` and pause for human feedback.
+- Use fresh dimensions after changing generated chunks, chunk lighting experiments, or generator shape.
 
 ## Current Subsystems
 
@@ -141,34 +141,28 @@ Why:
 - The 9x9 freeze and earlier full-height light-write freeze need isolated measurement around generation, relight, force-send, and client receipt.
 - Materialization should not know about transfer policy, visual settings, or access control.
 
-### Baked Light Policy
+### Debug Light Floor Experiment
 
 Current file:
 
-- `src/Lighting/DimensionLightPolicy.cs`
 - `src/Lighting/ChunkLightFloorApplier.cs`
 - `src/Services/DimensionLibServerService.cs`
 
 Responsibilities today:
 
-- Resolve the current built-in nether generated light policy.
-- Write blocklight/sunlight floors into selected cells.
-- Keep debug `/dlib light-floor` command target behavior.
+- Keep root-only debug `/dlib light-floor` command behavior.
+- Manually write a blocklight floor into already-prepared air cells and resend chunks.
+- Avoid making baked chunk-light floors part of public visual settings or default generated-dimension behavior.
 
 Current split:
 
-- `Lighting/DimensionLightPolicy`: resolves per-dimension generated light policy.
-- `Lighting/ChunkLightFloorApplier`: writes blocklight/sunlight floors into selected cells.
+- `Lighting/ChunkLightFloorApplier`: writes manual debug blocklight floors into selected prepared chunks.
 - `Services/DimensionLibServerService`: command-facing orchestration and online-player resend after debug floor changes.
-
-Remaining possible split:
-
-- `Lighting/DimensionLightPolicyIds`: named built-in policies, separate from visual settings, if policy count grows.
 
 Why:
 
 - Spawn darkness, fullbright terrain, fog perception, and performance are all entangled with baked light writes.
-- Light policy must stay an explicit independent variable, not a side effect of a named visual preset.
+- Baked chunk-light floors are currently suspected workaround code and should stay quarantined as debug tooling until proven necessary.
 
 Important constraint:
 
@@ -357,7 +351,7 @@ Work order:
 2. Extract prepared chunk key ownership. Done.
 3. Extract `DimensionManifestService` around `DimensionRegionStore`. Done.
 4. Extract `DimensionChunkService`, `ChunkColumnMaterializer`, and generated-window preparation. Done.
-5. Extract `DimensionLightPolicy` and `ChunkLightFloorApplier` with current constants unchanged. Done.
+5. Extract and then narrow `ChunkLightFloorApplier` to root-only debug tooling; no automatic light-floor policy remains. Done.
 6. Extract protection and policy-provider services. Done.
 7. Extract transfer/return-position services. Done.
 8. Extract generator registry and visual tuning broadcasting. Done.
@@ -418,7 +412,7 @@ Required pause:
 
 ## Immediate Open Questions
 
-- Should baked light policy be associated with a new `LightPolicyId`, or should it remain internal until stable?
+- Is `/dlib light-floor` still worth keeping as debug tooling, or should baked chunk-light floor experiments be removed entirely?
 - Should `/dlib visual` tune one client only, all online clients, or require explicit target syntax?
 - Should the nether generator keep a custom spawn-light rule separate from broader cavern lighting?
 - Should visual experiments get a minimal debug HUD/log line showing active profile and effective fog/light values?

@@ -30,7 +30,7 @@ The minimum game-changing consumer-mod use case is:
 ## Optional But Useful For MVP
 
 - Minimal explicit visual settings support if it is needed to make non-overworld dimensions usable.
-- Diagnostic command output for prepared state, bounds, generator id, visual settings, and light policy.
+- Diagnostic command output for prepared state, bounds, generator id, and visual settings.
 - A small demo/consumer mod in the repo that uses public API only. Current example: Pocket Dimensions in `mods-dll/dimensionpockets`.
 
 ## Not Core MVP
@@ -89,7 +89,7 @@ Nether is not cleanly separable yet because it crosses three areas:
 
 - Generator/content code: `NetherCavernDimensionGenerator`, `NetherCavernGenerationProfile`, and `dimensionlib:netherrock` assets. These are good candidates for a demo/consumer mod.
 - Visual environment code: public `DimensionVisualSettings`, `VisualSettingsMapper`, `DimensionVisualSystem`, and `/dlib visual` tuning. These are core-owned and expose explicit per-spec fields rather than a named preset registry.
-- Light policy code: `DimensionLightPolicy.NetherCavern` and baked light-floor application. This is still core-owned and does not have a public policy registration API.
+- Debug light-floor tooling: `/dlib light-floor` and `ChunkLightFloorApplier`. This is root-only experimentation, not public API or default generated-dimension behavior.
 
 Because only the generator seam is public today, a full Nether split would currently require either:
 

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using DimensionLib.Api;
 using DimensionLib.Generation;
-using DimensionLib.Lighting;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -33,7 +32,7 @@ internal sealed class DimensionDiagnosticService
             $"spawn=({dimension.SpawnX:0.#},{dimension.SpawnY},{dimension.SpawnZ:0.#})",
             $"generator={dimension.GeneratorId ?? "none"}",
             $"visualSettings={(dimension.VisualSettings == null ? "none" : "explicit")}",
-            $"minimumSceneLight={DimensionLightPolicy.For(dimension).MinimumSceneLight:0.###}",
+            $"minimumSceneLight={dimension.MinimumSceneLight:0.###}",
             $"seed={dimension.Seed}",
             $"prepared={_preparedDimensions.IsDimensionPrepared(dimension.DimensionId)}",
             $"preparedChunks={_preparedDimensions.GetPreparedChunkCount(dimension)}/{dimension.ChunkSizeX * dimension.ChunkSizeZ}",

@@ -151,10 +151,6 @@ internal static class BuiltInTestDimensionFactory
             LightLiftRed = 0.85f,
             LightLiftGreen = 0.42f,
             LightLiftBlue = 0.24f,
-            AmbientBlockLightFloor = 7,
-            AmbientSunlightFloor = 2,
-            AmbientLightMinYOffset = -48,
-            AmbientLightMaxYOffset = 128,
         };
     }
 }

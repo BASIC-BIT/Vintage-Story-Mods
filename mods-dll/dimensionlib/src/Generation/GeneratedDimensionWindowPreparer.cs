@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using DimensionLib.Api;
-using DimensionLib.Lighting;
 using DimensionLib.Services;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
@@ -16,20 +15,17 @@ internal sealed class GeneratedDimensionWindowPreparer
     private readonly ICoreServerAPI _api;
     private readonly DimensionChunkService _chunkService;
     private readonly ChunkColumnMaterializer _materializer;
-    private readonly ChunkLightFloorApplier _lightFloorApplier;
     private readonly PreparedDimensionTracker _preparedDimensions;
 
     public GeneratedDimensionWindowPreparer(
         ICoreServerAPI api,
         DimensionChunkService chunkService,
         ChunkColumnMaterializer materializer,
-        ChunkLightFloorApplier lightFloorApplier,
         PreparedDimensionTracker preparedDimensions)
     {
         _api = api;
         _chunkService = chunkService;
         _materializer = materializer;
-        _lightFloorApplier = lightFloorApplier;
         _preparedDimensions = preparedDimensions;
     }
 
@@ -77,30 +73,12 @@ internal sealed class GeneratedDimensionWindowPreparer
         if (prepared > 0)
         {
             _chunkService.RelightWindow(dimension, newlyPreparedChunks);
-            var lightPolicy = DimensionLightPolicy.For(dimension);
-            var blocklightCells = 0;
-            var sunlightCells = 0;
-            if (lightPolicy.BlocklightFloor > 0)
-            {
-                blocklightCells = _lightFloorApplier.ApplyBlocklightFloor(dimension, lightPolicy.BlocklightFloor, newlyPreparedChunks, lightPolicy);
-            }
-
-            if (lightPolicy.SunlightFloor > 0)
-            {
-                sunlightCells = _lightFloorApplier.ApplySunlightFloor(dimension, lightPolicy.SunlightFloor, newlyPreparedChunks, lightPolicy);
-            }
-
             _api.Logger.Notification(
-                "[DimensionLib] Prepared {0} generated chunk column(s) for '{1}' around local chunk {2},{3}; light policy minScene={4:0.###}, blockFloor={5}, sunlightFloor={6}, blockCells={7}, sunCells={8}.",
+                "[DimensionLib] Prepared {0} generated chunk column(s) for '{1}' around local chunk {2},{3}.",
                 prepared,
                 dimension.DimensionId,
                 centerLocalChunkX,
-                centerLocalChunkZ,
-                lightPolicy.MinimumSceneLight,
-                lightPolicy.BlocklightFloor,
-                lightPolicy.SunlightFloor,
-                blocklightCells,
-                sunlightCells);
+                centerLocalChunkZ);
 
             if (sendToPlayer != null)
             {

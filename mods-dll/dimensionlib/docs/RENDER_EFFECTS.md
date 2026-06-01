@@ -34,13 +34,15 @@ Vintage Story terrain expects chunk light data, not just ambient color:
 
 For sealed dimensions, zero sunlight means ambient color alone cannot recover terrain detail. Lava and blocklight are local and will still fall off quickly.
 
-The current air-cell blocklight floor improves nearby readability, but terrain ambient still depends on the sunlight channel. The built-in nether-cavern settings therefore also apply an experimental synthetic sunlight floor to generated air cells in the cavern's vertical band. The more correct DimensionLib model is probably a first-class ambient-light policy for generated dimensions:
+Historical experiments wrote air-cell blocklight and sunlight floors into generated chunks to improve sealed-cavern readability. That path made the terrain more readable but also risked fullbright/flat results and started turning a workaround into API surface. DimensionLib no longer applies baked chunk-light floors automatically, and those fields are not part of `DimensionVisualSettings`.
+
+If chunk-light floors ever return, they should be treated as a separate, deliberately reviewed ambient-light model for generated dimensions, not as visual settings:
 
 - Optional synthetic skylight channel for sealed dimensions.
 - Optional blocklight floor for air cells where that is the desired visual model.
 - No generated fake light source blocks unless they are deliberate, non-interactable world features.
 
-Fresh QA on 2026-05-30 showed an air-cell sunlight floor of `16`, and then `5` with a high blocklight floor, made distant nether terrain readable but too close to fullbright. The current default is intentionally much lower and should be judged in a fresh dimension because already-baked chunks keep their older light values.
+Fresh QA on 2026-05-30 showed an air-cell sunlight floor of `16`, and then `5` with a high blocklight floor, made distant nether terrain readable but too close to fullbright. Keep this as evidence, not as a default implementation direction.
 
 The generator also needs to keep the cavern ceiling low enough that the opaque background does not read as a huge open red skybox.
 
@@ -74,7 +76,7 @@ A first DimensionLib custom fog pass should probably be a fullscreen depth-aware
 Possible future internal pieces:
 
 - `SkyReplacement`: color, gradient, texture, opacity, cloud policy.
-- `AmbientLight`: synthetic skylight level, blocklight floor, color temperature.
+- `AmbientLight`: synthetic skylight level, blocklight floor, color temperature, only if a future design proves this is necessary.
 - `Fog`: vanilla ambient fog values plus optional custom depth-curve pass.
 - `PostEffect`: color grading, shimmer, distortion, vignette, or other dimension-specific effects.
 - `Suppression`: vanilla cave fog, temporal instability visuals, vanilla clouds, sun/moon visibility.
@@ -90,5 +92,5 @@ Possible public API direction later:
 1. Use `VISUAL_EXPERIMENT_LOG.md` for every visual attempt.
 2. Change one independent variable per attempt whenever possible.
 3. After each screenshot, pause for human subjective feedback before changing code or defaults again.
-4. Promote successful behavior into a named ambient-light policy instead of hardcoded built-in-generator constants.
-5. Prototype a custom depth-aware fog pass only if the lighting policy still cannot produce a soft readable distance falloff.
+4. Do not promote chunk-light floor behavior unless it survives a deliberate API/design review.
+5. Prototype a custom depth-aware fog pass only if normal visual settings cannot produce a soft readable distance falloff.
