@@ -32,6 +32,8 @@ public class AnalyticsSystem : BaseBasicModSystem
         _analyticsConfig = LoadAnalyticsConfig();
         RegisterNetworkChannel();
         ConfigureAnalyticsSink();
+        TrackPreviousUncleanShutdownIfNeeded();
+        MarkCurrentServerSessionActive();
         RegisterCommands();
         HookEvents();
 
@@ -67,6 +69,15 @@ public class AnalyticsSystem : BaseBasicModSystem
             // Best-effort only.
         }
 
+        try
+        {
+            MarkCurrentServerSessionStopped();
+        }
+        catch
+        {
+            // Best-effort only.
+        }
+
         if (_flushListenerId != 0)
         {
             API?.World?.UnregisterGameTickListener(_flushListenerId);
@@ -93,6 +104,7 @@ public class AnalyticsSystem : BaseBasicModSystem
         catch (Exception e)
         {
             API.Server.LogError($"The BASICs: Failed to load analytics config '{AnalyticsConfigName}'. Remote analytics disabled. (Exception type: {e.GetType().Name})");
+            AnalyticsService.TrackFailure("analytics_config", "load", "warning", "load_failed_remote_disabled", e);
             analyticsConfig = new AnalyticsConfig();
         }
 
@@ -128,7 +140,45 @@ public class AnalyticsSystem : BaseBasicModSystem
             return;
         }
 
-        AnalyticsService.Configure(new RelayAnalyticsSink(API, _analyticsConfig, endpoint, Mod.Info.Version, _serverSessionId));
+        AnalyticsService.Configure(new RelayAnalyticsSink(API, _analyticsConfig, endpoint, Mod.Info.Version, _serverSessionId), _analyticsConfig.AllowErrorTelemetry);
+    }
+
+    private void TrackPreviousUncleanShutdownIfNeeded()
+    {
+        if (string.IsNullOrWhiteSpace(_analyticsConfig.ActiveServerSessionId))
+        {
+            return;
+        }
+
+        AnalyticsService.TrackFailure(
+            "server",
+            "startup",
+            "critical",
+            "previous_session_unclean",
+            recovered: true,
+            properties: new Dictionary<string, object>
+            {
+                ["previous_session_age_bucket"] = BucketElapsedSince(_analyticsConfig.ActiveServerSessionStartedUtc)
+            });
+    }
+
+    private void MarkCurrentServerSessionActive()
+    {
+        _analyticsConfig.ActiveServerSessionId = _serverSessionId;
+        _analyticsConfig.ActiveServerSessionStartedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+        StoreAnalyticsConfig();
+    }
+
+    private void MarkCurrentServerSessionStopped()
+    {
+        if (_analyticsConfig == null)
+        {
+            return;
+        }
+
+        _analyticsConfig.ActiveServerSessionId = string.Empty;
+        _analyticsConfig.ActiveServerSessionStartedUtc = string.Empty;
+        StoreAnalyticsConfig();
     }
 
     private void RegisterCommands()
@@ -615,6 +665,17 @@ public class AnalyticsSystem : BaseBasicModSystem
             < 120 => "30-120m",
             _ => "120m+"
         };
+    }
+
+    private static string BucketElapsedSince(string startedUtc)
+    {
+        if (!DateTime.TryParse(startedUtc, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var started))
+        {
+            return "unknown";
+        }
+
+        var duration = DateTime.UtcNow - started.ToUniversalTime();
+        return duration < TimeSpan.Zero ? "unknown" : BucketDuration(duration);
     }
 
     private static bool IsHexString(string value, int length)

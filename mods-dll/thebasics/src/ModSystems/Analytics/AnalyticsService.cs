@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using thebasics.Configs;
@@ -8,17 +9,34 @@ namespace thebasics.ModSystems.Analytics;
 
 public static class AnalyticsService
 {
+    private const int MaxPendingFailureEvents = 25;
     private static IAnalyticsSink _sink = NoopAnalyticsSink.Instance;
+    private static readonly Queue<PendingAnalyticsEvent> PendingFailureEvents = new();
+    private static readonly object PendingFailureLock = new();
+    private static volatile bool _allowErrorTelemetry;
+    private static volatile bool _errorTelemetryConfigured;
 
     public static bool IsEnabled => _sink.IsEnabled;
 
-    public static void Configure(IAnalyticsSink sink)
+    public static void Configure(IAnalyticsSink sink, bool allowErrorTelemetry = false)
     {
-        var previous = Interlocked.Exchange(ref _sink, sink ?? NoopAnalyticsSink.Instance);
+        var next = sink ?? NoopAnalyticsSink.Instance;
+        _allowErrorTelemetry = allowErrorTelemetry;
+        _errorTelemetryConfigured = true;
+
+        var previous = Interlocked.Exchange(ref _sink, next);
         if (!ReferenceEquals(previous, NoopAnalyticsSink.Instance))
         {
             previous.Dispose();
         }
+
+        if (!allowErrorTelemetry || !next.IsEnabled)
+        {
+            ClearPendingFailures();
+            return;
+        }
+
+        FlushPendingFailures(next);
     }
 
     public static void Track(string eventName, IDictionary<string, object> properties = null)
@@ -56,6 +74,43 @@ public static class AnalyticsService
         };
         AddProperties(eventProperties, properties);
         Track("feature used", eventProperties);
+    }
+
+    public static void TrackFailure(string area, string operation, string severity, string result, Exception exception = null, bool recovered = true, IDictionary<string, object> properties = null)
+    {
+        var eventProperties = new Dictionary<string, object>
+        {
+            ["area"] = NormalizeLabel(area, "unknown"),
+            ["operation"] = NormalizeLabel(operation, "unknown"),
+            ["severity"] = NormalizeLabel(severity, "error"),
+            ["result"] = NormalizeLabel(result, "failure"),
+            ["success"] = false,
+            ["recovered"] = recovered
+        };
+
+        if (exception != null)
+        {
+            eventProperties["exception_type"] = exception.GetType().Name;
+        }
+
+        AddProperties(eventProperties, properties);
+
+        if (!_allowErrorTelemetry)
+        {
+            if (!_errorTelemetryConfigured)
+            {
+                QueuePendingFailure(eventProperties);
+            }
+
+            return;
+        }
+
+        if (!IsEnabled)
+        {
+            return;
+        }
+
+        Track("mod failure", eventProperties);
     }
 
     public static IDictionary<string, object> ChatProperties(string chatType)
@@ -130,6 +185,9 @@ public static class AnalyticsService
     public static void Shutdown()
     {
         Configure(NoopAnalyticsSink.Instance);
+        ClearPendingFailures();
+        _allowErrorTelemetry = false;
+        _errorTelemetryConfigured = false;
     }
 
     private static void AddProperties(Dictionary<string, object> eventProperties, IDictionary<string, object> properties)
@@ -143,6 +201,72 @@ public static class AnalyticsService
         {
             eventProperties[property.Key] = property.Value;
         }
+    }
+
+    private static string NormalizeLabel(string value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+    }
+
+    private static void QueuePendingFailure(Dictionary<string, object> properties)
+    {
+        lock (PendingFailureLock)
+        {
+            while (PendingFailureEvents.Count >= MaxPendingFailureEvents)
+            {
+                PendingFailureEvents.Dequeue();
+            }
+
+            PendingFailureEvents.Enqueue(new PendingAnalyticsEvent("mod failure", properties));
+        }
+    }
+
+    private static void FlushPendingFailures(IAnalyticsSink sink)
+    {
+        List<PendingAnalyticsEvent> pending;
+        lock (PendingFailureLock)
+        {
+            if (PendingFailureEvents.Count == 0)
+            {
+                return;
+            }
+
+            pending = PendingFailureEvents.ToList();
+            PendingFailureEvents.Clear();
+        }
+
+        foreach (var analyticsEvent in pending)
+        {
+            try
+            {
+                sink.Track(analyticsEvent.Name, analyticsEvent.Properties);
+            }
+            catch
+            {
+                // Analytics must never affect gameplay.
+            }
+        }
+    }
+
+    private static void ClearPendingFailures()
+    {
+        lock (PendingFailureLock)
+        {
+            PendingFailureEvents.Clear();
+        }
+    }
+
+    private sealed class PendingAnalyticsEvent
+    {
+        public PendingAnalyticsEvent(string name, IDictionary<string, object> properties)
+        {
+            Name = name;
+            Properties = new Dictionary<string, object>(properties);
+        }
+
+        public string Name { get; }
+
+        public IDictionary<string, object> Properties { get; }
     }
 
 }

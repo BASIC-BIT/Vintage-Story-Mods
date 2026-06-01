@@ -17,6 +17,10 @@ public class AnalyticsConfig
 
     public string PlayerPseudonymSalt { get; set; } = string.Empty;
 
+    public string ActiveServerSessionId { get; set; } = string.Empty;
+
+    public string ActiveServerSessionStartedUtc { get; set; } = string.Empty;
+
     public string EndpointUrl { get; set; } = DefaultEndpointUrl;
 
     public bool PromptAdminsToOptIn { get; set; } = true;
@@ -42,6 +46,8 @@ public class AnalyticsConfig
     public void InitializeDefaultsIfNeeded()
     {
         ConsentLevel = AnalyticsConsentLevels.Normalize(ConsentLevel);
+        ActiveServerSessionId = ActiveServerSessionId?.Trim() ?? string.Empty;
+        ActiveServerSessionStartedUtc = ActiveServerSessionStartedUtc?.Trim() ?? string.Empty;
         var endpointUrl = EndpointUrl?.Trim();
         EndpointUrl = string.IsNullOrWhiteSpace(endpointUrl) ||
                       string.Equals(endpointUrl, LegacyCloudflareZoneEndpointUrl, StringComparison.OrdinalIgnoreCase)
