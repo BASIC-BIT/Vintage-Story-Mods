@@ -4,7 +4,7 @@ Pocket Dimensions is a deliberately small consumer mod for DimensionLib. It is b
 
 Command privileges are configurable in `ModConfig/pocket_dimensions.json`. Defaults require `root`:
 
-- `/pocket create <name> [sizeChunks] [spawnY]` registers and prepares a persistent pocket dimension with a full indestructible matte grid floor, a protected center-adjacent return pedestal, sparse DimensionLib allocation, and the `dimensionlib:pocket-void` visual profile.
+- `/pocket create <name> [sizeChunks] [spawnY]` registers and prepares a persistent pocket dimension with a full indestructible matte grid floor, a protected center-adjacent return pedestal, sparse DimensionLib allocation, and explicit dark-void visual settings.
 - `/pocket enter <name>` idempotently ensures managed pocket infrastructure and teleports you in. If the pocket has exactly one linked external Waystone, that endpoint is used as the command-entry return target.
 - `/pocket exit` returns you through the active ingress Waystone for the current pocket, or through the single linked Waystone when there is no active ingress.
 - `/pocket list` lists pockets owned by this mod.

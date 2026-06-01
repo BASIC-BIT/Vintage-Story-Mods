@@ -61,7 +61,7 @@ Persisted dimension metadata includes:
 - Dimension id and owner mod id.
 - Dimension plane id and backing chunk rectangle.
 - Spawn Y and derived spawn X/Z.
-- Generator id, visual profile id, minimum scene light, and seed.
+- Generator id, explicit visual settings, and seed.
 - Dimension kind, access policy, mutability, and transient flag.
 - Orphaned state.
 
@@ -97,11 +97,11 @@ Owner mods can register an `IDimensionPolicyProvider` for richer rules. Dimensio
 
 ## Visual Environment
 
-`DimensionSpec.VisualProfileId` selects the client ambience profile. `dimensionlib:pocket-void` provides a dark static sky cover, hides sun/moon similarly to the nether test profile, removes fog/clouds, and applies neutral ambient lighting for pocket spaces. `DimensionSpec.MinimumSceneLight` can add a per-dimension post-process light lift for sealed or non-solar spaces. DimensionLib renders this as a client-only ambient lift after final composition because Vintage Story's built-in `minlight` shader uniform is an input black point, not an output brightness floor. It does not create physical block light, affect mobs, or change the saved chunk lightmap.
+`DimensionSpec.VisualSettings` carries explicit ambience, fog, cloud, sky-cover, light-lift, cave-fog suppression, and ambient chunk-light settings. There are no public named visual presets; consumers set the fields they want. `DimensionVisualSettings.MinimumSceneLight` adds a per-dimension post-process light lift for sealed or non-solar spaces. DimensionLib renders this as a client-only ambient lift after final composition because Vintage Story's built-in `minlight` shader uniform is an input black point, not an output brightness floor. It does not create physical block light, affect mobs, or change the saved chunk lightmap.
 
 See `RENDER_EFFECTS.md` for current research notes on sky replacement, vanilla cave-fog suppression, sealed-dimension light policy, and possible custom depth-aware fog passes.
 
-Use `MinimumSceneLight = 0` for normal Vintage Story lighting. Prefer visual/profile tuning before generated light blocks. Generated light sources should only be considered if they are true ambient world features: dynamically fitted to the room, non-interactable, and isolated from gameplay/mod interactions.
+Use `VisualSettings = null` for normal Vintage Story visuals, or `MinimumSceneLight = 0` inside explicit settings to avoid client-side light lift. Prefer explicit visual tuning before generated light blocks. Generated light sources should only be considered if they are true ambient world features: dynamically fitted to the room, non-interactable, and isolated from gameplay/mod interactions.
 
 Root debug commands expose temporary live visual tuning for the current client:
 
@@ -119,7 +119,7 @@ The built-in nether-cavern generator now also applies an experimental synthetic 
 The current nether-cavern visual hypotheses are:
 
 - Fog and flat fog should remain low until the sealed-dimension light policy is measured.
-- Sealed dimensions need a first-class ambient-light model; the current built-in nether profile is testing an air-cell blocklight floor plus a synthetic sunlight floor.
+- Sealed dimensions need explicit ambient-light settings; the current built-in cavern fixture tests an air-cell blocklight floor plus a synthetic sunlight floor.
 - Client-only post-process light lift can raise blacks but cannot recover texture detail that chunk lighting rendered too dark.
 - Generated block emitters are not acceptable unless they are non-interactive, room-fitted environmental features.
 
@@ -129,10 +129,10 @@ Current experimental nether defaults use an air-cell blocklight floor of `7`, an
 
 The current built-in generators are intentionally small litmus tests:
 
-- `DimensionGeneratorIds.OverworldOpposite`: rolling overworld-like terrain with a darker opposite-day visual profile.
-- `DimensionGeneratorIds.NetherCavern`: floor and ceiling terrain with optional lava pockets and a red cavern visual profile.
+- `DimensionGeneratorIds.OverworldOpposite`: rolling overworld-like terrain with darker explicit visual settings.
+- `DimensionGeneratorIds.NetherCavern`: floor and ceiling terrain with optional lava pockets and red cavern explicit visual/light settings.
 
-Root debug commands expose these as `/dlib create-test <type> [dimensionId] [sizeChunks] [seed]`. Dedicated-server console QA can pair this with `/dlib enter-player <playerName> <dimensionId>` to move an online test client without interacting with the client window. They are not final gameplay generators; they prove the DimensionLib path from spec -> generator -> block source -> materialization -> transfer -> visual profile.
+Root debug commands expose these as `/dlib create-test <type> [dimensionId] [sizeChunks] [seed]`. Dedicated-server console QA can pair this with `/dlib enter-player <playerName> <dimensionId>` to move an online test client without interacting with the client window. They are not final gameplay generators; they prove the DimensionLib path from spec -> generator -> block source -> materialization -> transfer -> explicit visual settings.
 
 Useful validation commands:
 
@@ -160,8 +160,8 @@ Replay-specific guidance:
 - Registry persistence is JSON-manifest based, not a database.
 - Read-only protection covers player break/place/use hooks, not every possible world mutation source.
 - Materialization currently writes solid block IDs only.
-- Visual profile selection is currently driven by DimensionLib transfers, not by a robust client-side dimension registry/resync path.
+- Visual settings are currently synced by DimensionLib transfers, not by a robust client-side dimension registry/resync path.
 - Region allocation intentionally provides only sparse placement. It does not provide dense packing, named neighborhoods, or lifecycle cleanup policy yet.
-- Calendar, season, and weather are still global VS systems; the opposite-day test is visual, not a true per-dimension calendar.
+- Calendar, season, and weather are still global VS systems; the overworld-opposite test is visual, not a true per-dimension calendar.
 
 These limits are intentional. They keep the first API small while leaving clear extension points for persistence, protection, block entities, and per-dimension visuals.

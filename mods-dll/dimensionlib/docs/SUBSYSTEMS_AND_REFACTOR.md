@@ -139,7 +139,7 @@ Remaining possible split:
 Why:
 
 - The 9x9 freeze and earlier full-height light-write freeze need isolated measurement around generation, relight, force-send, and client receipt.
-- Materialization should not know about transfer policy, visual profiles, or access control.
+- Materialization should not know about transfer policy, visual settings, or access control.
 
 ### Baked Light Policy
 
@@ -163,12 +163,12 @@ Current split:
 
 Remaining possible split:
 
-- `Lighting/DimensionLightPolicyIds`: named built-in policies, separate from visual profiles, if policy count grows.
+- `Lighting/DimensionLightPolicyIds`: named built-in policies, separate from visual settings, if policy count grows.
 
 Why:
 
 - Spawn darkness, fullbright terrain, fog perception, and performance are all entangled with baked light writes.
-- Light policy must become an explicit independent variable, not a side effect of `VisualProfileId == NetherCavern`.
+- Light policy must stay an explicit independent variable, not a side effect of a named visual preset.
 
 Important constraint:
 
@@ -214,7 +214,7 @@ Responsibilities today:
 
 - Record return positions.
 - Move entities between dimensions.
-- Sync transfer and visual profile state to clients.
+- Sync transfer and visual settings state to clients.
 - Re-sync prepared dimensions on player join.
 - Suppress server-side temporal stability loss.
 
@@ -275,17 +275,17 @@ Current file:
 
 Responsibilities today:
 
-- Active profile tracking.
+- Active visual settings tracking.
 - Ambient modifier creation.
 - Opaque sky/background renderer.
 - Minimum-scene-light overlay.
 - Vanilla cave-fog suppression.
 - Temporal visual suppression.
-- Debug tuning key store and presets.
+- Debug tuning key store and presets for live experiments.
 
 Current split:
 
-- `ClientVisuals/VisualProfileRegistry`: named defaults and descriptors.
+- `ClientVisuals/VisualSettingsMapper`: maps explicit settings into Vintage Story ambient/fog/sky/lift values.
 - `ClientVisuals/AmbientModifierController`: ambient/fog/cloud/brightness modifier lifecycle.
 - `ClientVisuals/ScreenColorOverlayRenderer`: shared opaque sky cover and post-composition lift renderer.
 - `ClientVisuals/VanillaEffectSuppressor`: `blackfogincaves`, temporal instability, cloud policy.
@@ -376,7 +376,7 @@ Verification after each extraction:
 Work order:
 
 1. Extract `VisualTuningState`. Done.
-2. Extract `VisualProfileRegistry` with current defaults unchanged. Done.
+2. Replace the old named-profile registry with explicit `VisualSettingsMapper`. Done.
 3. Extract `AmbientModifierController`. Done.
 4. Extract shared screen-color overlay renderer. Done.
 5. Extract `VanillaEffectSuppressor`. Done.
@@ -385,7 +385,7 @@ Verification after each extraction:
 
 - Build succeeds.
 - Client log shows `dimensionlib-skycover` shader loads.
-- A transfer into a test dimension still activates the expected profile.
+- A transfer into a test dimension still activates the expected visual settings.
 
 ### Phase 4: Generator Decomposition Without Behavior Changes
 

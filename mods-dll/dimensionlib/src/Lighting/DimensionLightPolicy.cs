@@ -5,12 +5,6 @@ namespace DimensionLib.Lighting;
 
 internal sealed class DimensionLightPolicy
 {
-    private const float NetherCavernMinimumSceneLight = 0.08f;
-    private const int NetherCavernAmbientBlockLightFloor = 7;
-    private const int NetherCavernAmbientSunlightFloor = 2;
-    private const int NetherCavernAmbientLightMinYOffset = -48;
-    private const int NetherCavernAmbientLightMaxYOffset = 128;
-
     private DimensionLightPolicy(float minimumSceneLight, int blocklightFloor, int sunlightFloor, int minYOffset, int maxYOffset)
     {
         MinimumSceneLight = minimumSceneLight;
@@ -37,33 +31,28 @@ internal sealed class DimensionLightPolicy
             return None;
         }
 
-        var basePolicy = string.Equals(dimension.VisualProfileId, DimensionVisualProfileIds.NetherCavern, StringComparison.Ordinal)
-            ? NetherCavern
-            : None;
-
-        if (dimension.MinimumSceneLight > 0f)
+        var settings = dimension.VisualSettings;
+        if (settings != null)
         {
             return new DimensionLightPolicy(
-                ClampFloat(dimension.MinimumSceneLight, 0f, 0.8f),
-                basePolicy.BlocklightFloor,
-                basePolicy.SunlightFloor,
-                basePolicy.MinYOffset,
-                basePolicy.MaxYOffset);
+                ClampFloat(settings.MinimumSceneLight, 0f, 0.8f),
+                ClampInt(settings.AmbientBlockLightFloor, 0, 31),
+                ClampInt(settings.AmbientSunlightFloor, 0, 31),
+                settings.AmbientLightMinYOffset,
+                settings.AmbientLightMaxYOffset < settings.AmbientLightMinYOffset ? settings.AmbientLightMinYOffset : settings.AmbientLightMaxYOffset);
         }
 
-        return basePolicy;
+        return None;
     }
 
     public static DimensionLightPolicy None { get; } = new DimensionLightPolicy(0f, 0, 0, 0, int.MaxValue);
 
-    public static DimensionLightPolicy NetherCavern { get; } = new DimensionLightPolicy(
-        NetherCavernMinimumSceneLight,
-        NetherCavernAmbientBlockLightFloor,
-        NetherCavernAmbientSunlightFloor,
-        NetherCavernAmbientLightMinYOffset,
-        NetherCavernAmbientLightMaxYOffset);
-
     private static float ClampFloat(float value, float min, float max)
+    {
+        return value < min ? min : value > max ? max : value;
+    }
+
+    private static int ClampInt(int value, int min, int max)
     {
         return value < min ? min : value > max ? max : value;
     }

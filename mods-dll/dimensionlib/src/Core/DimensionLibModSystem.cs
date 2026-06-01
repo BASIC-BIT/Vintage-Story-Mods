@@ -195,7 +195,7 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
         entity.Pos.Motion.Set(0, 0, 0);
         entity.PositionBeforeFalling.Set(message.X, message.Y, message.Z);
         entity.ChangeDimension(message.DimensionPlaneId);
-        _visualSystem?.SetActiveProfile(message.DimensionPlaneId, message.DimensionId, message.VisualProfileId, message.MinimumSceneLight);
+        _visualSystem?.SetActiveVisualSettings(message.DimensionPlaneId, message.DimensionId, message.VisualSettings);
 
         for (var cx = message.ChunkX; cx < message.ChunkX + message.ChunkSizeX; cx++)
         {

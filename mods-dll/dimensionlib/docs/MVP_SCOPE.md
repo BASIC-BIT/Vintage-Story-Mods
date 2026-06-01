@@ -29,8 +29,8 @@ The minimum game-changing consumer-mod use case is:
 
 ## Optional But Useful For MVP
 
-- Minimal visual profile support if it is needed to make non-overworld dimensions usable.
-- Diagnostic command output for prepared state, bounds, generator id, visual id, and light policy.
+- Minimal explicit visual settings support if it is needed to make non-overworld dimensions usable.
+- Diagnostic command output for prepared state, bounds, generator id, visual settings, and light policy.
 - A small demo/consumer mod in the repo that uses public API only. Current example: Pocket Dimensions in `mods-dll/dimensionpockets`.
 
 ## Not Core MVP
@@ -51,7 +51,7 @@ A demo mod should prove that DimensionLib is easy to consume. It can be bundled 
 Good consumer/demo candidates:
 
 - Pocket dimensions: create a void room / isolated build zone and teleport players in/out.
-- Nether prototype: stress-test generated dimensions, baked light policies, and visual profiles.
+- Nether prototype: stress-test generated dimensions, baked light policies, and explicit visual settings.
 
 Pocket dimensions are likely the first valuable follow-on mod, not a DimensionLib core feature.
 
@@ -79,7 +79,7 @@ The next implementation pass should make the boundary explicit:
 
 - Keep a tiny built-in debug/void fixture in DimensionLib.
 - Keep root commands focused on debug, diagnostics, and QA workflows.
-- Move Nether generator/profile/commands into a separate demo mod once the public API can support it cleanly.
+- Move Nether generator, visual settings, and commands into a separate demo mod once the public API can support it cleanly.
 - Move pocket-dimension/admin-room functionality into a separate consumer mod.
 - Avoid adding new public API only to satisfy one Nether visual or terrain idea.
 
@@ -88,12 +88,12 @@ The next implementation pass should make the boundary explicit:
 Nether is not cleanly separable yet because it crosses three areas:
 
 - Generator/content code: `NetherCavernDimensionGenerator`, `NetherCavernGenerationProfile`, and `dimensionlib:netherrock` assets. These are good candidates for a demo/consumer mod.
-- Visual profile code: `DimensionVisualProfileIds.NetherCavern`, `VisualProfileRegistry`, `DimensionVisualSystem`, and `/dlib visual` tuning. These are still core-owned and do not have a public registration API.
+- Visual environment code: public `DimensionVisualSettings`, `VisualSettingsMapper`, `DimensionVisualSystem`, and `/dlib visual` tuning. These are core-owned and expose explicit per-spec fields rather than a named preset registry.
 - Light policy code: `DimensionLightPolicy.NetherCavern` and baked light-floor application. This is still core-owned and does not have a public policy registration API.
 
 Because only the generator seam is public today, a full Nether split would currently require either:
 
-- Adding new public APIs for client visual profiles and baked light policies now.
+- Adding new public APIs for named visual presets and baked light policies now.
 - Keeping Nether visuals/light policies inside DimensionLib while moving only terrain generation out.
 
 Neither is ideal for the MVP. The safer next step is to keep Nether as an internal stress fixture while validating the public generator, preparation, transfer, protection, and persistence APIs. Split only when the missing seams are clearly needed by more than one consumer.
@@ -102,8 +102,8 @@ Neither is ideal for the MVP. The safer next step is to keep Nether as an intern
 
 These are candidates, not commitments:
 
-- Register visual profile descriptors from a consumer mod.
-- Register baked light policies independently from visual profile ids.
+- Provide reusable visual-setting recipes only if repeated consumer-mod code proves noisy.
+- Register baked light policies independently from visual settings.
 - Provide a reusable dimension spec builder if repeated consumer-mod code proves noisy.
 - Provide a sample consumer mod that depends on DimensionLib and uses only public APIs.
 

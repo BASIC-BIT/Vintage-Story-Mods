@@ -20,8 +20,7 @@ public sealed class DimensionVisualSystem : IRenderer
     private int _tuningRevision;
     private int? _activeDimensionPlaneId;
     private string _activeDimensionId;
-    private string _activeProfileId;
-    private float _activeMinimumSceneLight;
+    private DimensionVisualSettings _activeSettings;
 
     public DimensionVisualSystem(ICoreClientAPI api)
     {
@@ -63,7 +62,7 @@ public sealed class DimensionVisualSystem : IRenderer
     {
         if (stage == EnumRenderStage.Before)
         {
-            _vanillaEffectSuppressor.SuppressVanillaCaveFog(ShouldApplyVisualEnvironment());
+            _vanillaEffectSuppressor.SuppressVanillaCaveFog(ShouldApplyVisualEnvironment() && _activeSettings?.SuppressVanillaCaveFog == true);
             return;
         }
 
@@ -81,14 +80,13 @@ public sealed class DimensionVisualSystem : IRenderer
         _overlayRenderer.RenderSkyCover(GetSkyCoverColor());
     }
 
-    public void SetActiveProfile(int dimensionPlaneId, string dimensionId, string visualProfileId, float minimumSceneLight)
+    public void SetActiveVisualSettings(int dimensionPlaneId, string dimensionId, DimensionVisualSettings visualSettings)
     {
-        if (string.IsNullOrWhiteSpace(visualProfileId))
+        if (visualSettings == null)
         {
             _activeDimensionPlaneId = null;
             _activeDimensionId = null;
-            _activeProfileId = null;
-            _activeMinimumSceneLight = 0f;
+            _activeSettings = null;
             _ambientModifierController.Remove();
             LogVisualState("transfer-clear");
             return;
@@ -96,8 +94,8 @@ public sealed class DimensionVisualSystem : IRenderer
 
         _activeDimensionPlaneId = dimensionPlaneId;
         _activeDimensionId = string.IsNullOrWhiteSpace(dimensionId) ? null : dimensionId.Trim();
-        _activeProfileId = visualProfileId.Trim();
-        _activeMinimumSceneLight = Clamp(minimumSceneLight, 0f, 0.8f);
+        _activeSettings = visualSettings.Clone();
+        _activeSettings.MinimumSceneLight = Clamp(_activeSettings.MinimumSceneLight, 0f, 0.8f);
         UpdateAmbientModifier();
         LogVisualState("transfer");
     }
@@ -181,41 +179,39 @@ public sealed class DimensionVisualSystem : IRenderer
 
     private bool ShouldRenderSkyCover()
     {
-        return ShouldApplyVisualEnvironment() &&
-            (string.Equals(_activeProfileId, DimensionVisualProfileIds.NetherCavern, StringComparison.Ordinal) ||
-            string.Equals(_activeProfileId, DimensionVisualProfileIds.PocketVoid, StringComparison.Ordinal));
+        return ShouldApplyVisualEnvironment() && _activeSettings?.RenderSkyCover == true;
     }
 
     private bool UpdateAmbientModifier()
     {
-        return _ambientModifierController.Update(_activeDimensionPlaneId, _activeProfileId, _tuningRevision, _tuning);
+        return _ambientModifierController.Update(_activeDimensionPlaneId, _activeSettings, _tuningRevision, _tuning);
     }
 
     private void RenderMinimumSceneLightOverlay()
     {
-        var effectiveMinimumSceneLight = _tuning.Get("minlight", _activeMinimumSceneLight);
+        var effectiveMinimumSceneLight = _tuning.Get("minlight", _activeSettings?.MinimumSceneLight ?? 0f);
         if (!ShouldApplyVisualEnvironment() || effectiveMinimumSceneLight <= 0f)
         {
             return;
         }
 
         var strength = Clamp(effectiveMinimumSceneLight * _tuning.Get("liftmult", 1.0f), 0f, _tuning.Get("liftmax", 0.3f));
-        var liftColor = VisualProfileRegistry.GetDefaultLightLiftColor(_activeProfileId);
+        var liftColor = VisualSettingsMapper.GetLightLiftColor(_activeSettings, _tuning);
         _overlayRenderer.RenderMinimumLightLift(new Vec4f(
-            _tuning.Get("liftred", liftColor.X),
-            _tuning.Get("liftgreen", liftColor.Y),
-            _tuning.Get("liftblue", liftColor.Z),
+            liftColor.X,
+            liftColor.Y,
+            liftColor.Z,
             strength));
     }
 
     private Vec4f GetSkyCoverColor()
     {
-        var skyColor = VisualProfileRegistry.GetDefaultSkyColor(_activeProfileId);
+        var skyColor = VisualSettingsMapper.GetSkyColor(_activeSettings, _tuning);
         return new Vec4f(
-            _tuning.Get("skyred", skyColor.X),
-            _tuning.Get("skygreen", skyColor.Y),
-            _tuning.Get("skyblue", skyColor.Z),
-            _tuning.Get("skyalpha", 1.0f));
+            skyColor.X,
+            skyColor.Y,
+            skyColor.Z,
+            VisualSettingsMapper.GetSkyAlpha(_activeSettings, _tuning));
     }
 
     private void LogVisualState(string reason)
@@ -226,18 +222,19 @@ public sealed class DimensionVisualSystem : IRenderer
     private string BuildVisualStateSummary(string reason)
     {
         var playerDimension = _api.World.Player?.Entity?.Pos.Dimension;
-        var minimumSceneLight = _tuning.Get("minlight", _activeMinimumSceneLight);
+        var settings = _activeSettings ?? new DimensionVisualSettings();
+        var minimumSceneLight = _tuning.Get("minlight", settings.MinimumSceneLight);
         var liftStrength = Clamp(minimumSceneLight * _tuning.Get("liftmult", 1.0f), 0f, _tuning.Get("liftmax", 0.3f));
         var sky = GetSkyCoverColor();
 
         return string.Format(
             CultureInfo.InvariantCulture,
-            "[DimensionLib] Visual state ({0}): playerDim={1}, activePlane={2}, dimension={3}, profile={4}, applies={5}, ambientApplied={6}, minimumSceneLight={7:0.###}, liftStrength={8:0.###}, sky=({9:0.###},{10:0.###},{11:0.###},{12:0.###}), fog=({13:0.###},{14:0.###},{15:0.###}) weight={16:0.###} density={17:0.####} densityWeight={18:0.###} flatDensity={19:0.####} flatWeight={20:0.###}, ambient=({21:0.###},{22:0.###},{23:0.###}) weight={24:0.###}, sceneBrightness={25:0.###} sceneWeight={26:0.###}, fogBrightness={27:0.###} fogBrightnessWeight={28:0.###}, overrides={29}",
+            "[DimensionLib] Visual state ({0}): playerDim={1}, activePlane={2}, dimension={3}, visualSettings={4}, applies={5}, ambientApplied={6}, minimumSceneLight={7:0.###}, liftStrength={8:0.###}, sky=({9:0.###},{10:0.###},{11:0.###},{12:0.###}), fog=({13:0.###},{14:0.###},{15:0.###}) weight={16:0.###} density={17:0.####} densityWeight={18:0.###} flatDensity={19:0.####} flatWeight={20:0.###}, ambient=({21:0.###},{22:0.###},{23:0.###}) weight={24:0.###}, sceneBrightness={25:0.###} sceneWeight={26:0.###}, fogBrightness={27:0.###} fogBrightnessWeight={28:0.###}, overrides={29}",
             reason,
             playerDimension.HasValue ? playerDimension.Value.ToString(CultureInfo.InvariantCulture) : "none",
             _activeDimensionPlaneId.HasValue ? _activeDimensionPlaneId.Value.ToString(CultureInfo.InvariantCulture) : "none",
             _activeDimensionId ?? "none",
-            _activeProfileId ?? "none",
+            _activeSettings == null ? "none" : "explicit",
             ShouldApplyVisualEnvironment(),
             _ambientModifierController.IsApplied,
             minimumSceneLight,
@@ -246,22 +243,22 @@ public sealed class DimensionVisualSystem : IRenderer
             sky.Y,
             sky.Z,
             sky.W,
-            _tuning.Get("fogred", 0.24f),
-            _tuning.Get("foggreen", 0.045f),
-            _tuning.Get("fogblue", 0.018f),
-            _tuning.Get("fogweight", 0.16f),
-            _tuning.Get("fogdensity", 0.0016f),
-            _tuning.Get("fogdensityweight", 0.16f),
-            _tuning.Get("flatfogdensity", 0f),
-            _tuning.Get("flatfogdensityweight", 0f),
-            _tuning.Get("ambientred", 0.74f),
-            _tuning.Get("ambientgreen", 0.34f),
-            _tuning.Get("ambientblue", 0.2f),
-            _tuning.Get("ambientweight", 0.48f),
-            _tuning.Get("scenebrightness", 1.0f),
-            _tuning.Get("scenebrightnessweight", 0.45f),
-            _tuning.Get("fogbrightness", 0.95f),
-            _tuning.Get("fogbrightnessweight", 0.2f),
+            _tuning.Get("fogred", settings.FogRed),
+            _tuning.Get("foggreen", settings.FogGreen),
+            _tuning.Get("fogblue", settings.FogBlue),
+            _tuning.Get("fogweight", settings.FogColorWeight),
+            _tuning.Get("fogdensity", settings.FogDensity),
+            _tuning.Get("fogdensityweight", settings.FogDensityWeight),
+            _tuning.Get("flatfogdensity", settings.FlatFogDensity),
+            _tuning.Get("flatfogdensityweight", settings.FlatFogDensityWeight),
+            _tuning.Get("ambientred", settings.AmbientRed),
+            _tuning.Get("ambientgreen", settings.AmbientGreen),
+            _tuning.Get("ambientblue", settings.AmbientBlue),
+            _tuning.Get("ambientweight", settings.AmbientColorWeight),
+            _tuning.Get("scenebrightness", settings.SceneBrightness),
+            _tuning.Get("scenebrightnessweight", settings.SceneBrightnessWeight),
+            _tuning.Get("fogbrightness", settings.FogBrightness),
+            _tuning.Get("fogbrightnessweight", settings.FogBrightnessWeight),
             _tuning.DescribeOverrides());
     }
 

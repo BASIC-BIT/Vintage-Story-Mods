@@ -13,7 +13,7 @@ This directory contains Structurizr DSL diagrams for DimensionLib and Pocket Dim
 - `DimensionLibContainers`: container-level view of DimensionLib plus direct consumers and Vintage Story APIs/storage.
 - `DimensionLibPublicApi`: public API surface for consumer mods.
 - `DimensionLibServerRuntime`: server-side implementation behind `IDimensionLibApi`.
-- `DimensionLibClientVisuals`: client-side visual profile renderer path.
+- `DimensionLibClientVisuals`: client-side explicit visual settings renderer path.
 - `PocketDimensionsComponents`: Pocket Dimensions command/config/persistence/policy/source/assets and how it consumes DimensionLib.
 - `CreatePocketFlow`: dynamic create/materialize flow.
 - `EnterPocketFlow`: dynamic enter/return/visual-sync flow.

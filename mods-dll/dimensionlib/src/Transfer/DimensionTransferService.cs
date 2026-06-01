@@ -1,5 +1,4 @@
 using DimensionLib.Api;
-using DimensionLib.Lighting;
 using DimensionLib.Network;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Server;
@@ -39,8 +38,7 @@ internal sealed class DimensionTransferService
             Pitch = pitch,
             Roll = roll,
             DimensionId = visibleDimension?.DimensionId,
-            VisualProfileId = visibleDimension?.VisualProfileId,
-            MinimumSceneLight = DimensionLightPolicy.For(visibleDimension).MinimumSceneLight,
+            VisualSettings = visibleDimension?.VisualSettings?.Clone(),
             ChunkX = visibleDimension?.ChunkX ?? 0,
             ChunkZ = visibleDimension?.ChunkZ ?? 0,
             ChunkSizeX = visibleDimension?.ChunkSizeX ?? 0,

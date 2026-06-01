@@ -13,7 +13,7 @@ The reusable center is not Mystcraft-style page grammar. The reusable center is 
 - Allocate safe dimension planes and backing rectangular DimensionRegions.
 - Create, load, fill, relight, send, protect, and unload dimension chunk columns.
 - Move players/entities safely between normal world and alternate dimensions.
-- Provide client visual profiles for fog, ambient color, clouds, and later sky overrides.
+- Provide explicit client visual settings for fog, ambient color, clouds, and later sky overrides.
 - Materialize a read-only or mutable block volume from a generator, schematic, or replay snapshot source.
 
 MystStory should sit on top of that. The replay/world-diff work should also sit on top of that, but only at the projection/materialization layer.
@@ -221,7 +221,7 @@ License note: use these mods for design inspiration, not code copying. Mystcraft
 
 Prefer these integration points before Harmony patches:
 
-- Public API service and events for Dimension creation, materialization, visual profiles, and teleport lifecycle.
+- Public API service and events for Dimension creation, materialization, explicit visual settings, and teleport lifecycle.
 - Explicit Dimension and backing-region ownership metadata.
 - Claims/protection integration through VS land claim APIs or DimensionLib's own block-access policy.
 - Client `PlayerDimensionChanged` and Dimension detection hooks for visuals.
@@ -269,7 +269,7 @@ Current scaffold state:
 - Added `/dlib list`, `/dlib inspect`, and `/dlib release <dimensionId> [orphan|forget|clear] confirm`.
 - Added `mods-dll/dimensionlib/docs/API.md` as the first contributor-facing API note.
 - Added a client ambient/fog modifier while the local player is in dimension `3`.
-- Added generator/profile fields (`GeneratorId`, `VisualProfileId`, `Seed`) to `DimensionSpec` and persisted dimensions.
+- Added generator/visual fields (`GeneratorId`, `VisualSettings`, `Seed`) to `DimensionSpec` and persisted dimensions.
 - Added `IDimensionGenerator` and built-in test generators for `overworld-opposite` and `nether-cavern`.
 - Added `/dlib create-test <type> [dimensionId] [sizeChunks] [seed]`, `/dlib generators`, `/dlib prepare <dimensionId>`, `/dlib send <dimensionId>`, `/dlib enter <dimensionId>`, `/dlib exit`, and `/dlib validate [dimensionId]` as the first creation lab.
 - Added generator source-bounds validation and spawn block sampling so generated dimensions can be checked before manual visual QA.
@@ -284,7 +284,7 @@ Replace the debug-only spike with stable services:
 - Dimension registry and storage.
 - Generator/materializer interfaces.
 - Safe teleporter.
-- Client visual profile system.
+- Client visual settings system.
 - Read-only policy hook.
 
 ### M2: Replay Projection Consumer

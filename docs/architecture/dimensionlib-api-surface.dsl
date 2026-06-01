@@ -56,7 +56,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
                     tags "API,Extension Point"
                 }
 
-                visualIds = component "DimensionVisualProfileIds" "Public visual profile identifiers including debug, opposite-day, nether-cavern, and pocket-void." "C# constants" {
+                visualSettings = component "DimensionVisualSettings" "Explicit public visual/environment fields for ambient, fog, sky cover, light lift, cave-fog suppression, and light floors." "C# model" {
                     tags "API,Visual"
                 }
             }
@@ -100,7 +100,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
                     tags "Core"
                 }
 
-                transferService = component "DimensionTransferService" "Moves players, force-sends chunks, and syncs client visual profile data." "C# service/network" {
+                transferService = component "DimensionTransferService" "Moves players, force-sends chunks, and syncs client visual settings data." "C# service/network" {
                     tags "Core"
                 }
 
@@ -145,14 +145,14 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
                 }
             }
 
-            clientVisuals = container "Client Visuals" "Client-side visual profile application, sky cover, and minimum scene light overlay." "C# renderers/network" {
+            clientVisuals = container "Client Visuals" "Client-side explicit visual settings application, sky cover, and minimum scene light overlay." "C# renderers/network" {
                 tags "Visual"
 
-                visualSystem = component "DimensionVisualSystem" "Receives transfer/tuning messages, tracks active profile, and coordinates visual renderers." "C# renderer" {
+                visualSystem = component "DimensionVisualSystem" "Receives transfer/tuning messages, tracks active visual settings, and coordinates visual renderers." "C# renderer" {
                     tags "Visual"
                 }
 
-                profileRegistry = component "VisualProfileRegistry" "Defines built-in visual profile ambient/fog/sky/lift defaults." "C# registry" {
+                visualSettingsMapper = component "VisualSettingsMapper" "Maps explicit DimensionVisualSettings fields into Vintage Story ambient/fog/sky/lift values." "C# mapper" {
                     tags "Visual"
                 }
 
@@ -164,7 +164,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
                     tags "Visual"
                 }
 
-                vanillaSuppressor = component "VanillaEffectSuppressor" "Suppresses inherited temporal/cave-fog effects for active DimensionLib profiles." "C# service" {
+                vanillaSuppressor = component "VanillaEffectSuppressor" "Suppresses inherited temporal/cave-fog effects for active DimensionLib visual settings." "C# service" {
                     tags "Visual"
                 }
 
@@ -265,8 +265,8 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
         serverService -> transferService "Teleports players and syncs clients"
         transferService -> returnStore "Records and resolves return positions"
         transferService -> vsServerApi "Moves players and sends packets"
-        transferService -> clientVisuals "Sends DimensionTransferMessage with visual profile and light data" "network channel"
-        transferService -> visualSystem "Sends DimensionTransferMessage with visual profile and light data" "network channel"
+        transferService -> clientVisuals "Sends DimensionTransferMessage with visual settings and light data" "network channel"
+        transferService -> visualSystem "Sends DimensionTransferMessage with visual settings and light data" "network channel"
         serverService -> policyRegistry "Registers owner policy providers"
         serverService -> accessService "Checks enter/use/mutate access"
         accessService -> policyRegistry "Finds owner provider"
@@ -282,8 +282,8 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
         builtInFixtures -> generatorApi "Implements internal test generators"
 
         clientVisuals -> vsClientApi "Uses render stages, ambient manager, shaders, and client world visibility"
-        visualSystem -> profileRegistry "Resolves profile defaults"
-        visualSystem -> ambientController "Applies profile ambient state"
+        visualSystem -> visualSettingsMapper "Maps explicit visual settings"
+        visualSystem -> ambientController "Applies ambient visual settings"
         visualSystem -> overlayRenderer "Renders sky cover and minimum-light lift"
         visualSystem -> vanillaSuppressor "Suppresses inherited vanilla effects"
         visualTuning -> visualSystem "Updates debug tuning state"
@@ -310,7 +310,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
             autoLayout lr
         }
 
-        component clientVisuals "DimensionLibClientVisuals" "Client visual profile application surface." {
+        component clientVisuals "DimensionLibClientVisuals" "Client visual settings application surface." {
             include *
             autoLayout lr
         }
@@ -350,9 +350,9 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
             serverService -> accessService "CanEnter"
             accessService -> policyApi "Owner policy check"
             serverService -> chunkService "Force-send prepared columns"
-            serverService -> transferService "Move player and sync profile"
+            serverService -> transferService "Move player and sync visual settings"
             transferService -> visualSystem "DimensionTransferMessage"
-            visualSystem -> ambientController "Apply pocket-void ambient"
+            visualSystem -> ambientController "Apply pocket ambient settings"
             visualSystem -> overlayRenderer "Render static dark sky and light lift"
             player -> pocketReturnPedestal "Right-clicks return pedestal"
             pocketReturnPedestal -> pocketModSystem "ReturnFromPocket"

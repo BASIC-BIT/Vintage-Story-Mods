@@ -302,12 +302,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             ChunkSizeX = sizeChunks,
             ChunkSizeZ = sizeChunks,
             SpawnY = spawnY,
-            VisualProfileId = DimensionVisualProfileIds.PocketVoid,
+            VisualSettings = CreatePocketVisualSettings(),
             Kind = DimensionKind.Pocket,
             AccessPolicy = DimensionAccessPolicy.OwnerOnly,
             Mutability = DimensionMutability.Mutable,
             IsTransient = false,
-            MinimumSceneLight = PocketMinimumSceneLight,
         };
 
         var registered = _dimensionLib.RegisterDimension(spec);
@@ -866,20 +865,50 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             ChunkSizeZ = dimension.ChunkSizeZ,
             SpawnY = dimension.SpawnY,
             GeneratorId = dimension.GeneratorId,
-            VisualProfileId = dimension.VisualProfileId,
+            VisualSettings = dimension.VisualSettings?.Clone(),
             Seed = dimension.Seed,
             Kind = dimension.Kind,
             AccessPolicy = dimension.AccessPolicy,
             Mutability = dimension.Mutability,
             IsTransient = dimension.IsTransient,
-            MinimumSceneLight = dimension.MinimumSceneLight,
         };
     }
 
     private static void ApplyPocketVisualDefaults(DimensionSpec spec)
     {
-        spec.VisualProfileId = DimensionVisualProfileIds.PocketVoid;
-        spec.MinimumSceneLight = PocketMinimumSceneLight;
+        spec.VisualSettings = CreatePocketVisualSettings();
+    }
+
+    private static DimensionVisualSettings CreatePocketVisualSettings()
+    {
+        return new DimensionVisualSettings
+        {
+            RenderSkyCover = true,
+            SkyRed = 0.012f,
+            SkyGreen = 0.013f,
+            SkyBlue = 0.015f,
+            SkyAlpha = 1f,
+            FogRed = 0.018f,
+            FogGreen = 0.02f,
+            FogBlue = 0.024f,
+            FogColorWeight = 0.45f,
+            AmbientRed = 0.58f,
+            AmbientGreen = 0.60f,
+            AmbientBlue = 0.64f,
+            AmbientColorWeight = 0.70f,
+            FogDensityWeight = 1.0f,
+            FlatFogDensityWeight = 1.0f,
+            CloudDensityWeight = 0.8f,
+            CloudBrightnessWeight = 0.8f,
+            SceneBrightness = 1.05f,
+            SceneBrightnessWeight = 0.45f,
+            FogBrightness = 0.65f,
+            FogBrightnessWeight = 0.35f,
+            MinimumSceneLight = PocketMinimumSceneLight,
+            LightLiftRed = 0.60f,
+            LightLiftGreen = 0.62f,
+            LightLiftBlue = 0.66f,
+        };
     }
 
     private static TextCommandResult ToCommandResult(DimensionLibResult result)

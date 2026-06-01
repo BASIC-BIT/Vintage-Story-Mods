@@ -25,7 +25,7 @@ public sealed class DimensionSpec
 
     public string GeneratorId { get; set; }
 
-    public string VisualProfileId { get; set; }
+    public DimensionVisualSettings VisualSettings { get; set; }
 
     public long Seed { get; set; }
 
@@ -36,11 +36,6 @@ public sealed class DimensionSpec
     public DimensionMutability Mutability { get; set; } = DimensionMutability.Mutable;
 
     public bool IsTransient { get; set; } = true;
-
-    /// <summary>
-    /// Per-dimension post-process lightness floor for sealed or non-solar spaces. 0 keeps normal VS lighting.
-    /// </summary>
-    public float MinimumSceneLight { get; set; }
 
     public Dimension ToDimension()
     {
@@ -54,12 +49,11 @@ public sealed class DimensionSpec
             ChunkSizeZ,
             SpawnY,
             GeneratorId,
-            VisualProfileId,
+            VisualSettings?.Clone(),
             Seed,
             Kind,
             AccessPolicy,
             Mutability,
-            IsTransient,
-            MinimumSceneLight);
+            IsTransient);
     }
 }

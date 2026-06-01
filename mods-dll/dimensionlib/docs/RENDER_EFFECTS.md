@@ -34,7 +34,7 @@ Vintage Story terrain expects chunk light data, not just ambient color:
 
 For sealed dimensions, zero sunlight means ambient color alone cannot recover terrain detail. Lava and blocklight are local and will still fall off quickly.
 
-The current air-cell blocklight floor improves nearby readability, but terrain ambient still depends on the sunlight channel. The built-in nether-cavern profile therefore also applies an experimental synthetic sunlight floor to generated air cells in the cavern's vertical band. The more correct DimensionLib model is probably a first-class ambient-light policy for generated dimensions:
+The current air-cell blocklight floor improves nearby readability, but terrain ambient still depends on the sunlight channel. The built-in nether-cavern settings therefore also apply an experimental synthetic sunlight floor to generated air cells in the cavern's vertical band. The more correct DimensionLib model is probably a first-class ambient-light policy for generated dimensions:
 
 - Optional synthetic skylight channel for sealed dimensions.
 - Optional blocklight floor for air cells where that is the desired visual model.
@@ -48,7 +48,7 @@ The generator also needs to keep the cavern ceiling low enough that the opaque b
 
 Vintage Story has a built-in `blackfogincaves` ambient modifier. The client raises this modifier when local sunlight is low. In sealed generated dimensions, that can make distance fog mix toward black and produce the current hard transition from nearby detail to silhouettes.
 
-DimensionLib currently neutralizes this modifier while the player is inside a DimensionLib dimension with a custom visual profile. This is separate from tuning `fogdensity` and `flatfogdensity`.
+DimensionLib currently neutralizes this modifier while the player is inside a DimensionLib dimension with explicit visual settings that request cave-fog suppression. This is separate from tuning `fogdensity` and `flatfogdensity`.
 
 ## Custom Fog Engine
 
@@ -69,9 +69,9 @@ Useful built-in patterns:
 
 A first DimensionLib custom fog pass should probably be a fullscreen depth-aware alpha overlay that does not sample scene color. This avoids framebuffer feedback while giving control over fog curve, color, and softness.
 
-## Render Profile Shape
+## Visual Environment Shape
 
-Possible future internal profile pieces:
+Possible future internal pieces:
 
 - `SkyReplacement`: color, gradient, texture, opacity, cloud policy.
 - `AmbientLight`: synthetic skylight level, blocklight floor, color temperature.
@@ -81,7 +81,7 @@ Possible future internal profile pieces:
 
 Possible public API direction later:
 
-- Keep stable public API at the level of named render profile ids and strongly typed profile descriptors.
+- Keep the stable public API at the level of explicit `DimensionVisualSettings` fields unless repeated consumer code proves a reusable recipe layer is needed.
 - Keep low-level shader knobs internal/debug until the model is proven.
 - Expose live tuning through `/dlib visual` or a future in-game editor before freezing public API.
 

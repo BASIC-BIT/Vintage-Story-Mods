@@ -32,7 +32,7 @@ internal sealed class DimensionDiagnosticService
             $"blocks=({dimension.MinBlockX},{dimension.MinBlockZ})..({dimension.MaxBlockX},{dimension.MaxBlockZ})",
             $"spawn=({dimension.SpawnX:0.#},{dimension.SpawnY},{dimension.SpawnZ:0.#})",
             $"generator={dimension.GeneratorId ?? "none"}",
-            $"visual={dimension.VisualProfileId ?? "none"}",
+            $"visualSettings={(dimension.VisualSettings == null ? "none" : "explicit")}",
             $"minimumSceneLight={DimensionLightPolicy.For(dimension).MinimumSceneLight:0.###}",
             $"seed={dimension.Seed}",
             $"prepared={_preparedDimensions.IsDimensionPrepared(dimension.DimensionId)}",

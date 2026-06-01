@@ -22,7 +22,7 @@ Pocket Dimensions is the first product layer. It should prove useful gameplay fl
 - Chunk preparation, materialization, relighting, and force-send mechanics.
 - Location and transfer primitives: describe locations, capture a player's current location, teleport to a location, teleport into a dimension, and sync client visuals.
 - Policy extension points for consumer-owned entry, block use, and block mutation rules.
-- Visual profile identifiers and client-side profile application primitives.
+- Explicit visual/environment settings and client-side application primitives.
 
 ## DimensionLib Does Not Own
 

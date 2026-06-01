@@ -1,7 +1,6 @@
 using System;
 using DimensionLib.Api;
 using DimensionLib.Core;
-using DimensionLib.Lighting;
 
 namespace DimensionLib.Lab;
 
@@ -24,7 +23,6 @@ internal static class BuiltInTestDimensionFactory
             ChunkSizeX = 3,
             ChunkSizeZ = 3,
             SpawnY = 92,
-            VisualProfileId = DimensionVisualProfileIds.Debug,
             Kind = DimensionKind.Debug,
             AccessPolicy = DimensionAccessPolicy.AdminOnly,
             Mutability = DimensionMutability.Mutable,
@@ -47,7 +45,6 @@ internal static class BuiltInTestDimensionFactory
         {
             case "overworld":
             case "opposite":
-            case "opposite-day":
             case "overworld-opposite":
                 normalizedTestId = "overworld-opposite";
                 var overworldSize = requestedSize ?? 5;
@@ -62,7 +59,7 @@ internal static class BuiltInTestDimensionFactory
                     ChunkSizeZ = overworldSize,
                     SpawnY = 108,
                     GeneratorId = DimensionGeneratorIds.OverworldOpposite,
-                    VisualProfileId = DimensionVisualProfileIds.OppositeDay,
+                    VisualSettings = CreateOppositeDayVisualSettings(),
                     Seed = seed ?? 2026052901,
                     Kind = DimensionKind.Pocket,
                     AccessPolicy = DimensionAccessPolicy.AdminOnly,
@@ -87,8 +84,7 @@ internal static class BuiltInTestDimensionFactory
                     ChunkSizeZ = netherSize,
                     SpawnY = 68,
                     GeneratorId = DimensionGeneratorIds.NetherCavern,
-                    VisualProfileId = DimensionVisualProfileIds.NetherCavern,
-                    MinimumSceneLight = DimensionLightPolicy.NetherCavern.MinimumSceneLight,
+                    VisualSettings = CreateNetherCavernVisualSettings(),
                     Seed = seed ?? 2026052902,
                     Kind = DimensionKind.Pocket,
                     AccessPolicy = DimensionAccessPolicy.AdminOnly,
@@ -101,5 +97,64 @@ internal static class BuiltInTestDimensionFactory
                 spec = null;
                 return false;
         }
+    }
+
+    private static DimensionVisualSettings CreateOppositeDayVisualSettings()
+    {
+        return new DimensionVisualSettings
+        {
+            FogRed = 0.12f,
+            FogGreen = 0.14f,
+            FogBlue = 0.28f,
+            FogColorWeight = 0.65f,
+            AmbientRed = 0.2f,
+            AmbientGreen = 0.22f,
+            AmbientBlue = 0.42f,
+            AmbientColorWeight = 0.55f,
+            FogDensity = 0.026f,
+            FogDensityWeight = 0.45f,
+            FlatFogDensity = 0.025f,
+            FlatFogDensityWeight = 0.45f,
+            CloudDensity = 0.9f,
+            CloudDensityWeight = 0.5f,
+            CloudBrightness = 0.35f,
+            CloudBrightnessWeight = 0.35f,
+        };
+    }
+
+    private static DimensionVisualSettings CreateNetherCavernVisualSettings()
+    {
+        return new DimensionVisualSettings
+        {
+            RenderSkyCover = true,
+            SkyRed = 0.035f,
+            SkyGreen = 0.0035f,
+            SkyBlue = 0.002f,
+            SkyAlpha = 1f,
+            FogRed = 0.24f,
+            FogGreen = 0.045f,
+            FogBlue = 0.018f,
+            FogColorWeight = 0.16f,
+            AmbientRed = 0.74f,
+            AmbientGreen = 0.34f,
+            AmbientBlue = 0.2f,
+            AmbientColorWeight = 0.48f,
+            FogDensity = 0.0016f,
+            FogDensityWeight = 0.16f,
+            CloudDensityWeight = 0.7f,
+            CloudBrightnessWeight = 0.7f,
+            SceneBrightness = 1.0f,
+            SceneBrightnessWeight = 0.45f,
+            FogBrightness = 0.95f,
+            FogBrightnessWeight = 0.2f,
+            MinimumSceneLight = 0.08f,
+            LightLiftRed = 0.85f,
+            LightLiftGreen = 0.42f,
+            LightLiftBlue = 0.24f,
+            AmbientBlockLightFloor = 7,
+            AmbientSunlightFloor = 2,
+            AmbientLightMinYOffset = -48,
+            AmbientLightMaxYOffset = 128,
+        };
     }
 }

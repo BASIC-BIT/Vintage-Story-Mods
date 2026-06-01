@@ -15,13 +15,12 @@ public sealed class Dimension
         int chunkSizeZ,
         int spawnY,
         string generatorId = null,
-        string visualProfileId = null,
+        DimensionVisualSettings visualSettings = null,
         long seed = 0,
         DimensionKind kind = DimensionKind.Pocket,
         DimensionAccessPolicy accessPolicy = DimensionAccessPolicy.OwnerOnly,
         DimensionMutability mutability = DimensionMutability.Mutable,
-        bool isTransient = true,
-        float minimumSceneLight = 0f)
+        bool isTransient = true)
     {
         DimensionId = dimensionId;
         OwnerModId = ownerModId;
@@ -32,13 +31,12 @@ public sealed class Dimension
         ChunkSizeZ = chunkSizeZ;
         SpawnY = spawnY;
         GeneratorId = generatorId;
-        VisualProfileId = visualProfileId;
+        VisualSettings = visualSettings?.Clone();
         Seed = seed;
         Kind = kind;
         AccessPolicy = accessPolicy;
         Mutability = mutability;
         IsTransient = isTransient;
-        MinimumSceneLight = minimumSceneLight;
     }
 
     public string DimensionId { get; }
@@ -59,7 +57,7 @@ public sealed class Dimension
 
     public string GeneratorId { get; }
 
-    public string VisualProfileId { get; }
+    public DimensionVisualSettings VisualSettings { get; }
 
     public long Seed { get; }
 
@@ -71,7 +69,7 @@ public sealed class Dimension
 
     public bool IsTransient { get; }
 
-    public float MinimumSceneLight { get; }
+    public float MinimumSceneLight => VisualSettings?.MinimumSceneLight ?? 0f;
 
     public int MinBlockX => ChunkX * GlobalConstants.ChunkSize;
 

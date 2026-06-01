@@ -1,4 +1,5 @@
 using ProtoBuf;
+using DimensionLib.Api;
 
 namespace DimensionLib.Network;
 
@@ -42,8 +43,5 @@ public sealed class DimensionTransferMessage
     public string DimensionId { get; set; }
 
     [ProtoMember(13)]
-    public string VisualProfileId { get; set; }
-
-    [ProtoMember(14)]
-    public float MinimumSceneLight { get; set; }
+    public DimensionVisualSettings VisualSettings { get; set; }
 }

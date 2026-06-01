@@ -1,4 +1,5 @@
 using System;
+using DimensionLib.Api;
 using Vintagestory.API.Client;
 
 namespace DimensionLib.ClientVisuals;
@@ -10,7 +11,7 @@ internal sealed class AmbientModifierController
     private readonly ICoreClientAPI _api;
     private bool _applied;
     private int _appliedTuningRevision = -1;
-    private string _appliedProfileId;
+    private DimensionVisualSettings _appliedSettings;
 
     public AmbientModifierController(ICoreClientAPI api)
     {
@@ -19,12 +20,12 @@ internal sealed class AmbientModifierController
 
     public bool IsApplied => _applied;
 
-    public bool Update(int? activeDimensionPlaneId, string activeProfileId, int tuningRevision, VisualTuningState tuning)
+    public bool Update(int? activeDimensionPlaneId, DimensionVisualSettings activeSettings, int tuningRevision, VisualTuningState tuning)
     {
         var player = _api.World.Player;
-        if (activeDimensionPlaneId.HasValue && player?.Entity?.Pos.Dimension == activeDimensionPlaneId.Value)
+        if (activeDimensionPlaneId.HasValue && activeSettings != null && player?.Entity?.Pos.Dimension == activeDimensionPlaneId.Value)
         {
-            return Apply(activeProfileId, tuningRevision, tuning);
+            return Apply(activeSettings, tuningRevision, tuning);
         }
 
         return Remove();
@@ -39,14 +40,14 @@ internal sealed class AmbientModifierController
 
         _api.Ambient.CurrentModifiers.Remove(ModifierKey);
         _applied = false;
-        _appliedProfileId = null;
+        _appliedSettings = null;
         _appliedTuningRevision = -1;
         return true;
     }
 
-    private bool Apply(string profileId, int tuningRevision, VisualTuningState tuning)
+    private bool Apply(DimensionVisualSettings settings, int tuningRevision, VisualTuningState tuning)
     {
-        if (_applied && string.Equals(_appliedProfileId, profileId, StringComparison.Ordinal) && _appliedTuningRevision == tuningRevision)
+        if (_applied && ReferenceEquals(_appliedSettings, settings) && _appliedTuningRevision == tuningRevision)
         {
             return false;
         }
@@ -56,11 +57,11 @@ internal sealed class AmbientModifierController
             Remove();
         }
 
-        var modifier = VisualProfileRegistry.CreateModifier(profileId, tuning).EnsurePopulated();
+        var modifier = VisualSettingsMapper.CreateModifier(settings, tuning).EnsurePopulated();
 
         _api.Ambient.CurrentModifiers[ModifierKey] = modifier;
         _applied = true;
-        _appliedProfileId = profileId;
+        _appliedSettings = settings;
         _appliedTuningRevision = tuningRevision;
         return true;
     }

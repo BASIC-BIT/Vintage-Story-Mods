@@ -30,7 +30,7 @@ public sealed class DimensionRegionManifestEntry
 
     public string GeneratorId { get; set; }
 
-    public string VisualProfileId { get; set; }
+    public DimensionVisualSettings VisualSettings { get; set; }
 
     public long Seed { get; set; }
 
@@ -41,8 +41,6 @@ public sealed class DimensionRegionManifestEntry
     public DimensionMutability Mutability { get; set; }
 
     public bool IsTransient { get; set; }
-
-    public float MinimumSceneLight { get; set; }
 
     public bool IsOrphaned { get; set; }
 
@@ -65,13 +63,12 @@ public sealed class DimensionRegionManifestEntry
             ChunkSizeZ = dimension.ChunkSizeZ,
             SpawnY = dimension.SpawnY,
             GeneratorId = dimension.GeneratorId,
-            VisualProfileId = dimension.VisualProfileId,
+            VisualSettings = dimension.VisualSettings?.Clone(),
             Seed = dimension.Seed,
             Kind = dimension.Kind,
             AccessPolicy = dimension.AccessPolicy,
             Mutability = dimension.Mutability,
             IsTransient = dimension.IsTransient,
-            MinimumSceneLight = dimension.MinimumSceneLight,
             IsOrphaned = isOrphaned,
             CreatedUtc = string.IsNullOrWhiteSpace(existing?.CreatedUtc) ? nowUtc : existing.CreatedUtc,
             UpdatedUtc = nowUtc,
@@ -90,12 +87,11 @@ public sealed class DimensionRegionManifestEntry
             ChunkSizeZ,
             SpawnY,
             GeneratorId,
-            VisualProfileId,
+            VisualSettings?.Clone(),
             Seed,
             Kind,
             AccessPolicy,
             Mutability,
-            IsTransient,
-            MinimumSceneLight);
+            IsTransient);
     }
 }

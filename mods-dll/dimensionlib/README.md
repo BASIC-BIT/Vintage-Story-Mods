@@ -55,8 +55,13 @@ var registered = dimensionLib.RegisterDimension(new DimensionSpec
     ChunkSizeZ = 3,
     SpawnY = 90,
     GeneratorId = DimensionGeneratorIds.OverworldOpposite,
-    VisualProfileId = DimensionVisualProfileIds.OppositeDay,
-    MinimumSceneLight = 0.0f,
+    VisualSettings = new DimensionVisualSettings
+    {
+        FogRed = 0.12f,
+        FogGreen = 0.14f,
+        FogBlue = 0.28f,
+        FogColorWeight = 0.65f,
+    },
     Seed = 12345,
     Kind = DimensionKind.Pocket,
     AccessPolicy = DimensionAccessPolicy.OwnerOnly,
@@ -104,9 +109,9 @@ These steps require a server with DimensionLib loaded and a root/admin player:
 5. Place and break a block as root to confirm admin interaction still works in the mutable debug dimension.
 6. Run `/dlib exit-spike` and confirm the player returns to the recorded origin.
 7. Run `/dlib release dimensionlib:debug-spike orphan confirm` and confirm `/dlib list` marks it orphaned until the mod re-registers it.
-8. Run `/dlib create-test overworld-opposite`, then `/dlib enter dimensionlib:test-overworld-opposite`, and confirm rolling terrain with a darker opposite-day ambience.
+8. Run `/dlib create-test overworld-opposite`, then `/dlib enter dimensionlib:test-overworld-opposite`, and confirm rolling terrain with a darker reversed-time ambience.
 9. Run `/dlib create-test nether-cavern`, then `/dlib enter dimensionlib:test-nether-cavern`, and confirm a generated cavern with floor and ceiling terrain, an opaque red sky cover, and readable low-light areas.
 10. Run `/dlib validate` inside each generated dimension and confirm `spawnFeetBlockId=0`, `spawnHeadBlockId=0`, and a nonzero `spawnFloorBlockId`.
 11. If nether readability is poor, use `/dlib visual preset clear`, `/dlib visual preset thin`, and exact-key `/dlib visual set <key> <value>` commands to tune fog, sky cover, ambient color, and client-only light lift live without regenerating terrain.
-12. For sealed cavern terrain-lighting experiments, use `/dlib light-floor dimensionlib:test-nether-cavern <level>` to write a low blocklight floor into air cells and resend prepared chunks. The built-in nether-cavern profile also applies a synthetic sunlight floor in the cavern's vertical band during generation. These are not generated light blocks, but they do intentionally affect chunk light-level data.
+12. For sealed cavern terrain-lighting experiments, use `/dlib light-floor dimensionlib:test-nether-cavern <level>` to write a low blocklight floor into air cells and resend prepared chunks. The built-in nether-cavern fixture also applies a synthetic sunlight floor in the cavern's vertical band during generation through explicit visual/light settings. These are not generated light blocks, but they do intentionally affect chunk light-level data.
 13. From a dedicated-server console, use `/dlib create-test <type> ...` followed by `/dlib enter-player <playerName> <dimensionId>` for non-interactive QA clients.
