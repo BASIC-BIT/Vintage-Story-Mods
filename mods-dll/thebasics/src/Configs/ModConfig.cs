@@ -1,6 +1,7 @@
 #pragma warning disable S1133 // Deprecated config members are retained for live config compatibility.
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json;
 using ProtoBuf;
 using thebasics.Configs;
@@ -165,7 +166,14 @@ namespace thebasics.Configs
         {
             CharacterSheetSetPermission = string.IsNullOrWhiteSpace(CharacterSheetSetPermission) ? "chat" : CharacterSheetSetPermission;
             CharacterSheetAdminPermission = string.IsNullOrWhiteSpace(CharacterSheetAdminPermission) ? "commandplayer" : CharacterSheetAdminPermission;
-            CharacterSheetFields ??= CreateDefaultCharacterSheetFields();
+            CharacterSheetFields = CharacterSheetFields?
+                .Where(field => field != null)
+                .ToList();
+
+            if (CharacterSheetFields == null || CharacterSheetFields.Count == 0)
+            {
+                CharacterSheetFields = CreateDefaultCharacterSheetFields();
+            }
 
             foreach (var field in CharacterSheetFields)
             {
@@ -175,16 +183,51 @@ namespace thebasics.Configs
 
         private static void NormalizeCharacterSheetField(CharacterSheetFieldDefinition field)
         {
-            field.Id ??= string.Empty;
-            field.Label ??= field.Id;
-            field.Description ??= string.Empty;
-            field.Type = string.IsNullOrWhiteSpace(field.Type) ? CharacterSheetFieldTypes.String : field.Type.ToLowerInvariant();
-            field.Options ??= new List<string>();
-            field.BindTo ??= string.Empty;
-            field.Visibility = string.IsNullOrWhiteSpace(field.Visibility) ? CharacterSheetFieldVisibilities.Public : field.Visibility.ToLowerInvariant();
+            field.Id = TrimOrEmpty(field.Id);
+            field.Label = NormalizeCharacterSheetLabel(field.Id, field.Label);
+            field.Description = TrimOrEmpty(field.Description);
+            field.Type = NormalizeCharacterSheetType(field.Type);
+            field.Options = NormalizeCharacterSheetOptions(field.Options);
+            field.BindTo = TrimOrEmpty(field.BindTo);
+            field.Visibility = NormalizeCharacterSheetVisibility(field.Visibility);
             field.EditorRows = field.EditorRows < 0 ? 0 : field.EditorRows;
             field.LayoutSection = ResolveCharacterSheetLayoutSection(field);
             field.Width = CharacterSheetFieldWidths.Normalize(field.Width);
+        }
+
+        private static string TrimOrEmpty(string value)
+        {
+            return value?.Trim() ?? string.Empty;
+        }
+
+        private static string NormalizeCharacterSheetLabel(string id, string label)
+        {
+            var normalized = TrimOrEmpty(label);
+            return string.IsNullOrWhiteSpace(normalized) ? id : normalized;
+        }
+
+        private static string NormalizeCharacterSheetType(string type)
+        {
+            var normalized = TrimOrEmpty(type);
+            return string.IsNullOrWhiteSpace(normalized)
+                ? CharacterSheetFieldTypes.String
+                : normalized.ToLowerInvariant();
+        }
+
+        private static IList<string> NormalizeCharacterSheetOptions(IEnumerable<string> options)
+        {
+            return options?
+                .Where(option => !string.IsNullOrWhiteSpace(option))
+                .Select(option => option.Trim())
+                .ToList() ?? new List<string>();
+        }
+
+        private static string NormalizeCharacterSheetVisibility(string visibility)
+        {
+            var normalized = TrimOrEmpty(visibility);
+            return string.IsNullOrWhiteSpace(normalized)
+                ? CharacterSheetFieldVisibilities.Public
+                : normalized.ToLowerInvariant();
         }
 
         private static string ResolveCharacterSheetLayoutSection(CharacterSheetFieldDefinition field)
