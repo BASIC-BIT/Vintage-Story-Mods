@@ -210,6 +210,20 @@ public class CharacterSheetFieldConfigAdminTests
         config.CharacterSheetFields.Should().Contain(field => field.Id == "fullName");
     }
 
+    [Fact]
+    public void InitializeDefaultsIfNeeded_RestoresDefaultCharacterSheetFieldsWhenOnlyNullEntries()
+    {
+        var config = new ModConfig
+        {
+            CharacterSheetFields = new List<CharacterSheetFieldDefinition> { null! }
+        };
+
+        config.InitializeDefaultsIfNeeded();
+
+        config.CharacterSheetFields.Should().NotBeEmpty();
+        config.CharacterSheetFields.Should().Contain(field => field.Id == "fullName");
+    }
+
     [Theory]
     [InlineData("Full Name", "full-name")]
     [InlineData("  Nickname  ", "nickname")]
