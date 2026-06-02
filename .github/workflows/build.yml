@@ -12,14 +12,40 @@ env:
   DOTNET_VERSION: "10.0.x"
 
 jobs:
+  validate-architecture:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Validate Structurizr DSL
+      run: |
+        docker run --rm \
+          -v "${{ github.workspace }}/docs/architecture:/usr/local/structurizr" \
+          structurizr/cli validate \
+          -workspace /usr/local/structurizr/dimensionlib-api-surface.dsl
+
   build:
+    needs: validate-architecture
+    if: ${{ always() }}
     runs-on: windows-latest
     permissions:
       actions: read
       contents: read
       pull-requests: write
-    
+
     steps:
+    - name: Require architecture validation
+      run: |
+        if ("${{ needs.validate-architecture.result }}" -ne "success") {
+          Write-Host "Structurizr architecture validation failed or did not complete." -ForegroundColor Red
+          exit 1
+        }
+      shell: pwsh
+
     - name: Checkout repository
       uses: actions/checkout@v4
       

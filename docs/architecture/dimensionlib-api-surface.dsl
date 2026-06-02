@@ -1,4 +1,4 @@
-workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket Dimensions consumer mod." {
+workspace "DimensionLib API Surface" "C4 model for DimensionLib, Pocket Dimensions, and Cavern Dimension Demo consumer mods." {
     model {
         serverAdmin = person "Server Admin / QA" "Runs root/admin commands to create, inspect, enter, and release dimensions."
         modAuthor = person "Mod Author" "Builds mods that consume DimensionLib."
@@ -140,7 +140,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
                     tags "Command,Experimental"
                 }
 
-                builtInFixtures = component "Built-in Test Fixtures" "Debug spike, overworld-opposite, and nether-cavern stress fixtures." "C# generators/assets" {
+                builtInFixtures = component "Built-in Test Fixtures" "Debug spike, overworld-opposite, and standard-overworld source-window stress fixtures." "C# generators" {
                     tags "Experimental"
                 }
             }
@@ -216,14 +216,47 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
             }
         }
 
-        futureConsumer = softwareSystem "Future Consumer Mods" "Examples: Mystcraft-like ages, Nether-like dimensions, replay previews, portal/device mods, and worldgen integrations." {
+        cavernDemo = softwareSystem "Cavern Dimension Demo" "Demo consumer mod that owns cavern terrain generation, visual settings, and demo assets through the DimensionLib public API." {
+            cavernRuntime = container "Cavern Dimension Demo Mod" "Root-only demo commands plus a public-API generator implementation for cavern stress testing." "C# ModSystem" {
+                tags "Consumer,Experimental"
+
+                cavernModSystem = component "CavernDimensionModSystem" "Resolves IDimensionLibApi, registers the cavern generator, and registers /caverndemo commands." "C# ModSystem" {
+                    tags "Consumer,Experimental"
+                }
+
+                cavernCommands = component "/caverndemo Commands" "Root-only create, prepare, and enter commands for demo cavern dimensions." "Vintage Story chat commands" {
+                    tags "Command,Consumer,Experimental"
+                }
+
+                cavernGenerator = component "CavernDimensionGenerator" "IDimensionGenerator implementation that creates cavern block sources from registered dimension metadata." "C# generator" {
+                    tags "Consumer,Extension Point,Experimental"
+                }
+
+                cavernSource = component "CavernBlockSource" "IBlockVolumeSource that fills floor, ceiling, columns, lava pools, lavafalls, and spawn clearance." "C# block source" {
+                    tags "Consumer,Extension Point,Experimental"
+                }
+
+                cavernProfile = component "CavernGenerationProfile" "Demo-local procedural terrain parameters for floor, ceiling, lava, columns, and spawn shaping." "C# model" {
+                    tags "Consumer,Experimental"
+                }
+
+                cavernAssets = component "Cavern Assets" "Demo-owned cavernrock block and lang assets. These are intentionally not shipped by DimensionLib." "Vintage Story assets" {
+                    tags "Asset,Consumer,Experimental"
+                }
+            }
+        }
+
+        futureConsumer = softwareSystem "Future Consumer Mods" "Examples: Mystcraft-like ages, lava-cavern dimensions, replay previews, portal/device mods, and worldgen integrations." {
             tags "External,Consumer"
         }
 
         modAuthor -> idimensionLibApi "Reads and calls public API" "C#"
         modAuthor -> pocketRuntime "Uses as copyable consumer example" "C#"
+        modAuthor -> cavernRuntime "Uses as copyable generator consumer example" "C#"
         serverAdmin -> pocketCommands "Runs pocket management commands" "Vintage Story chat/console"
+        serverAdmin -> cavernCommands "Runs cavern demo commands" "Vintage Story chat/console"
         player -> pocketCommands "Uses enter/exit when allowed" "Vintage Story chat"
+        player -> cavernCommands "Uses enter command during root/QA smoke tests" "Vintage Story chat"
         player -> pocketWaystone "Right-clicks bound external Waystones" "Vintage Story block interaction"
         player -> pocketReturnPedestal "Right-clicks generated return pedestal" "Vintage Story block interaction"
 
@@ -244,6 +277,16 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
         pocketModSystem -> idimensionLibApi "Calls TeleportToDimension and TeleportToLocation" "C# calls"
         pocketPolicy -> pocketReturnPedestal "Prevents player breaks"
         pocketAssets -> vsAssetSystem "Provides blocktypes, lang, and texture assets"
+
+        cavernCommands -> cavernModSystem "Dispatches commands to"
+        cavernModSystem -> cavernGenerator "Registers generator"
+        cavernModSystem -> idimensionLibApi "Registers generator and dimensions; prepares and teleports demo players" "C# calls"
+        cavernGenerator -> generatorApi "Implements"
+        cavernGenerator -> cavernSource "Creates source for dimension"
+        cavernSource -> blockSourceApi "Implements"
+        cavernSource -> cavernProfile "Uses procedural parameters"
+        cavernSource -> cavernAssets "Uses cavernrock block ids"
+        cavernAssets -> vsAssetSystem "Provides blocktypes and lang assets"
 
         idimensionLibApi -> dimensionLibModSystem "Implemented by"
         dimensionLibModSystem -> serverService "Delegates server operations to"
@@ -275,6 +318,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
         protectionAdapter -> vsServerApi "Subscribes to place/break/use events"
         serverService -> generatorRegistry "Registers and resolves generators"
         generatorRegistry -> generatorApi "Stores implementations of"
+        generatorRegistry -> cavernGenerator "Resolves registered cavern generator by id"
         serverService -> generatedPreparer "Prepares generated chunk windows"
         dlibCommands -> debugLightFloor "Can manually apply debug blocklight floors"
         serverService -> diagnostics "Builds validation reports"
@@ -291,12 +335,12 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
 
     views {
         systemLandscape "DimensionLibLandscape" "DimensionLib, Pocket Dimensions, and external actors/systems." {
-            include serverAdmin modAuthor player vintageStory dimensionLib pocketDimensions futureConsumer
+            include serverAdmin modAuthor player vintageStory dimensionLib pocketDimensions cavernDemo futureConsumer
             autoLayout lr
         }
 
         container dimensionLib "DimensionLibContainers" "DimensionLib containers and direct consumers." {
-            include serverAdmin modAuthor player vsServerApi vsClientApi vsWorldStorage pocketRuntime futureConsumer publicApi serverRuntime clientVisuals
+            include serverAdmin modAuthor player vsServerApi vsClientApi vsWorldStorage pocketRuntime cavernRuntime futureConsumer publicApi serverRuntime clientVisuals
             autoLayout lr
         }
 
@@ -316,6 +360,11 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
         }
 
         component pocketRuntime "PocketDimensionsComponents" "Pocket Dimensions consumer API usage and product surface." {
+            include *
+            autoLayout lr
+        }
+
+        component cavernRuntime "CavernDemoComponents" "Cavern Dimension Demo consumer API usage and generator surface." {
             include *
             autoLayout lr
         }
@@ -360,6 +409,32 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib and the Pocket D
             pocketModSystem -> idimensionLibApi "TeleportToLocation"
             serverService -> transferService "Move player to linked Waystone location"
             pocketModSystem -> pocketLinkStore "Clear active ingress"
+            autoLayout lr
+        }
+
+        dynamic cavernRuntime "CreateCavernFlow" "Create, prepare, and enter a generated cavern demo dimension." {
+            serverAdmin -> cavernCommands "Runs /caverndemo create qa-cavern 5 2026052902"
+            cavernCommands -> cavernModSystem "Dispatches create"
+            cavernModSystem -> idimensionLibApi "RegisterDimension(spec with dimensioncavern:cavern generator)"
+            idimensionLibApi -> dimensionLibModSystem "API facade call"
+            dimensionLibModSystem -> serverService "RegisterDimension"
+            serverService -> sparseAllocator "Assign sparse backing chunks"
+            serverService -> registry "Store registered Dimension"
+            serverService -> manifestService "Persist manifest"
+            cavernModSystem -> idimensionLibApi "PrepareGeneratedDimension"
+            serverService -> generatorRegistry "Resolve dimensioncavern:cavern"
+            generatorRegistry -> cavernGenerator "CreateSource(dimension)"
+            cavernGenerator -> cavernSource "Create source"
+            serverService -> generatedPreparer "Prepare generated window"
+            generatedPreparer -> materializer "Materialize generated source"
+            materializer -> blockSourceApi "FillColumn"
+            cavernSource -> cavernProfile "Sample terrain parameters"
+            cavernSource -> cavernAssets "Resolve cavernrock/lava ids"
+            materializer -> chunkWriter "SetBlock cavern terrain cells"
+            chunkWriter -> vsServerApi "Write backing blocks"
+            serverService -> chunkService "Relight and mark prepared"
+            cavernModSystem -> idimensionLibApi "TeleportToDimension"
+            serverService -> transferService "Move player and sync visual settings"
             autoLayout lr
         }
 
