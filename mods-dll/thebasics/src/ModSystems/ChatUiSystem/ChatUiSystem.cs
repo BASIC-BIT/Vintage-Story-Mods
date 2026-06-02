@@ -1097,13 +1097,18 @@ public class ChatUiSystem : ModSystem
         }
 
         var entries = (fields ?? Array.Empty<CharacterSheetFieldConfigEntryMessage>()).ToList();
+        if (!success)
+        {
+            ShowConfigAdminChatMessage(message);
+        }
+
         if (_characterSheetFieldConfigDialog == null)
         {
-            _characterSheetFieldConfigDialog = new CharacterSheetFieldConfigDialog(_api, entries, message, success, SendCharacterSheetFieldConfigSaveRequest, SendCharacterSheetFieldConfigReload, OnCharacterSheetFieldConfigClosed);
+            _characterSheetFieldConfigDialog = new CharacterSheetFieldConfigDialog(_api, entries, SendCharacterSheetFieldConfigSaveRequest, SendCharacterSheetFieldConfigReload, OnCharacterSheetFieldConfigClosed);
         }
         else
         {
-            _characterSheetFieldConfigDialog.SetView(entries, message, success);
+            _characterSheetFieldConfigDialog.SetView(entries, success);
         }
 
         if (!_characterSheetFieldConfigDialog.IsOpened())
