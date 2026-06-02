@@ -1,6 +1,6 @@
 # DimensionLib MVP Scope
 
-DimensionLib's first release should be a small, reliable library for mods that create and operate custom dimensions. Nether visuals, pocket-dimension gameplay, portals, admin rooms, and advanced worldgen are valuable, but they should validate the API rather than become core library scope.
+DimensionLib's first release should be a small, reliable library for mods that create and operate custom dimensions. Cavern visuals, pocket-dimension gameplay, portals, admin rooms, and advanced worldgen are valuable, but they should validate the API from consumer mods rather than become core library scope.
 
 ## Release Goal
 
@@ -32,11 +32,11 @@ The minimum game-changing consumer-mod use case is:
 
 - Minimal explicit visual settings support if it is needed to make non-overworld dimensions usable.
 - Diagnostic command output for prepared state, bounds, generator id, and visual settings.
-- A small demo/consumer mod in the repo that uses public API only. Current example: Pocket Dimensions in `mods-dll/dimensionpockets`.
+- Small demo/consumer mods in the repo that use public API only. Current examples: Pocket Dimensions in `mods-dll/dimensionpockets` and Cavern Dimension Demo in `mods-dll/dimensioncavern`.
 
 ## Not Core MVP
 
-- Nether-specific worldgen quality.
+- Cavern-demo worldgen quality.
 - Forked or copied vanilla overworld generation.
 - Independent alternate-overworld seeds, climate rules, or worldgen rule packs.
 - Pocket-dimension gameplay/admin features.
@@ -54,18 +54,18 @@ A demo mod should prove that DimensionLib is easy to consume. It can be bundled 
 Good consumer/demo candidates:
 
 - Pocket dimensions: create a void room / isolated build zone and teleport players in/out.
-- Nether prototype: stress-test generated dimensions, baked light policies, and explicit visual settings.
+- Cavern demo: stress-test generated dimensions and explicit visual settings without shipping content from DimensionLib.
 - Vanilla overworld window: stress-test lazy standard-overworld source materialization and very large finite bounds before any Mystcraft-style copied/tweakable worldgen work.
 
 Pocket dimensions are likely the first valuable follow-on mod, not a DimensionLib core feature.
 
-If a feature is only needed by Nether polish, keep it in a demo/consumer mod or behind an internal test fixture until another mod needs the same primitive.
+If a feature is only needed by Cavern Demo polish, keep it in that consumer mod until another mod needs the same primitive.
 
 ## Split Criteria
 
 Move code out of core DimensionLib when:
 
-- It is content-specific (`nether`, lava pools, ceiling shape, pillar density, mood tuning).
+- It is content-specific (lava pools, ceiling shape, pillar density, mood tuning, custom blocks).
 - It can be implemented using the public API without privileged internals.
 - It does not need to participate in region allocation, persistence, transfer, or protection mechanics.
 
@@ -77,32 +77,25 @@ Keep code in core DimensionLib when:
 
 ## Immediate Recommendation
 
-Do not keep improving Nether as if it were DimensionLib's product scope. Use Nether only as an API stress test unless/until it is split into a separate consumer mod.
+Do not keep improving cavern content as if it were DimensionLib's product scope. Use the Cavern Dimension Demo only as an API stress test.
 
 The next implementation pass should make the boundary explicit:
 
 - Keep a tiny built-in debug/void fixture in DimensionLib.
 - Keep root commands focused on debug, diagnostics, and QA workflows.
-- Move Nether generator, visual settings, and commands into a separate demo mod once the public API can support it cleanly.
+- Keep cavern generator, visual settings, blocks, and commands in the separate Cavern Dimension Demo mod.
 - Move pocket-dimension/admin-room functionality into a separate consumer mod.
-- Avoid adding new public API only to satisfy one Nether visual or terrain idea.
+- Avoid adding new public API only to satisfy one Cavern Demo visual or terrain idea.
 
 ## Current Split Assessment
 
-Nether is not cleanly separable yet because it crosses three areas:
+Cavern content is split from DimensionLib:
 
-- Generator/content code: `NetherCavernDimensionGenerator`, `NetherCavernGenerationProfile`, and `dimensionlib:netherrock` assets. These are good candidates for a demo/consumer mod.
+- Generator/content code: `CavernDimensionGenerator`, `CavernGenerationProfile`, and `dimensioncavern:cavernrock` assets live in `mods-dll/dimensioncavern`.
 - Visual environment code: public `DimensionVisualSettings`, `VisualSettingsMapper`, `DimensionVisualSystem`, and `/dlib visual` tuning. These are core-owned and expose explicit per-spec fields rather than a named preset registry.
 - Debug light-floor tooling: `/dlib light-floor` and `ChunkLightFloorApplier`. This is root-only experimentation, not public API or default generated-dimension behavior.
 
-Because only the generator seam is public today, a full Nether split would currently require either:
-
-- Adding new public APIs for named visual presets and baked light policies now.
-- Keeping Nether visuals/light policies inside DimensionLib while moving only terrain generation out.
-
-Neither is ideal for the MVP. The safer next step is to keep Nether as an internal stress fixture while validating the public generator, preparation, transfer, protection, and persistence APIs. Split only when the missing seams are clearly needed by more than one consumer.
-
-## Public API Gaps Exposed By Nether
+## Public API Gaps Exposed By Cavern Demo
 
 These are candidates, not commitments:
 
@@ -117,6 +110,6 @@ Avoid adding helpers just because a single consumer mod wants them. Start with e
 
 1. Keep Pocket Dimensions small and use it to judge whether the public API is pleasant enough.
 2. Use the vanilla-overworld source window to test whether a second overworld-like dimension can be bounded, lazily generated, transferred into, and streamed without owning vanilla's generator code.
-3. Keep Nether generator and visual experiments as internal validation, not release-critical polish.
+3. Keep Cavern Demo generator and visual experiments in the demo mod, not release-critical DimensionLib polish.
 4. Promote repeated consumer boilerplate only after it appears in more than one consumer mod.
-5. Only then decide whether to expose visual/light registration APIs, carve Nether into a separate mod, or start a Mystcraft-style copied/tweakable overworld generator.
+5. Only then decide whether to expose visual/light registration APIs or start a Mystcraft-style copied/tweakable overworld generator.

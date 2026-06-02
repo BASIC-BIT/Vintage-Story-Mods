@@ -64,7 +64,7 @@ internal sealed class DimensionLibCommandRegistrar
                 })
                 .EndSubCommand()
             .BeginSubCommand("create-test")
-                .WithDescription("Create and prepare a built-in test dimension: overworld-opposite, nether-cavern, or vanilla-overworld")
+                .WithDescription("Create and prepare a built-in test dimension: overworld-opposite or vanilla-overworld")
                 .WithArgs(new StringArgParser("type [dimensionId] [sizeChunks] [seed]", true))
                 .HandleWith(HandleCreateTestDimension)
                 .EndSubCommand()

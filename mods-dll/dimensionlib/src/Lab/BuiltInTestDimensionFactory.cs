@@ -8,7 +8,6 @@ internal static class BuiltInTestDimensionFactory
 {
     public const string DebugDimensionId = "dimensionlib:debug-spike";
     public const string OverworldOppositeDimensionId = "dimensionlib:test-overworld-opposite";
-    public const string NetherCavernDimensionId = "dimensionlib:test-nether-cavern";
     public const string VanillaOverworldWindowDimensionId = "dimensionlib:test-vanilla-overworld-window";
 
     public static DimensionSpec DebugDimensionSpec()
@@ -35,7 +34,6 @@ internal static class BuiltInTestDimensionFactory
     {
         return string.Equals(dimension.OwnerModId, DimensionLibModSystem.ModId, StringComparison.Ordinal) &&
             ((normalizedTestId == "overworld-opposite" && string.Equals(dimension.GeneratorId, DimensionGeneratorIds.OverworldOpposite, StringComparison.Ordinal)) ||
-            (normalizedTestId == "nether-cavern" && string.Equals(dimension.GeneratorId, DimensionGeneratorIds.NetherCavern, StringComparison.Ordinal)) ||
             (normalizedTestId == "vanilla-overworld" && string.Equals(dimension.GeneratorId, DimensionGeneratorIds.StandardOverworldWindow, StringComparison.Ordinal)));
     }
 
@@ -63,31 +61,6 @@ internal static class BuiltInTestDimensionFactory
                     GeneratorId = DimensionGeneratorIds.OverworldOpposite,
                     VisualSettings = CreateOppositeDayVisualSettings(),
                     Seed = seed ?? 2026052901,
-                    Kind = DimensionKind.Pocket,
-                    AccessPolicy = DimensionAccessPolicy.AdminOnly,
-                    Mutability = DimensionMutability.Mutable,
-                    IsTransient = true,
-                };
-                return true;
-
-            case "nether":
-            case "cavern":
-            case "nether-cavern":
-                normalizedTestId = "nether-cavern";
-                var netherSize = requestedSize ?? 9;
-                spec = new DimensionSpec
-                {
-                    DimensionId = string.IsNullOrWhiteSpace(dimensionId) ? NetherCavernDimensionId : dimensionId.Trim(),
-                    OwnerModId = DimensionLibModSystem.ModId,
-                    DimensionPlaneId = DimensionLibModSystem.FirstPrototypeDimension,
-                    ChunkX = 16,
-                    ChunkZ = 0,
-                    ChunkSizeX = netherSize,
-                    ChunkSizeZ = netherSize,
-                    SpawnY = 68,
-                    GeneratorId = DimensionGeneratorIds.NetherCavern,
-                    VisualSettings = CreateNetherCavernVisualSettings(),
-                    Seed = seed ?? 2026052902,
                     Kind = DimensionKind.Pocket,
                     AccessPolicy = DimensionAccessPolicy.AdminOnly,
                     Mutability = DimensionMutability.Mutable,
@@ -147,38 +120,6 @@ internal static class BuiltInTestDimensionFactory
             CloudDensityWeight = 0.5f,
             CloudBrightness = 0.35f,
             CloudBrightnessWeight = 0.35f,
-        };
-    }
-
-    private static DimensionVisualSettings CreateNetherCavernVisualSettings()
-    {
-        return new DimensionVisualSettings
-        {
-            RenderSkyCover = true,
-            SkyRed = 0.035f,
-            SkyGreen = 0.0035f,
-            SkyBlue = 0.002f,
-            SkyAlpha = 1f,
-            FogRed = 0.24f,
-            FogGreen = 0.045f,
-            FogBlue = 0.018f,
-            FogColorWeight = 0.16f,
-            AmbientRed = 0.74f,
-            AmbientGreen = 0.34f,
-            AmbientBlue = 0.2f,
-            AmbientColorWeight = 0.48f,
-            FogDensity = 0.0016f,
-            FogDensityWeight = 0.16f,
-            CloudDensityWeight = 0.7f,
-            CloudBrightnessWeight = 0.7f,
-            SceneBrightness = 1.0f,
-            SceneBrightnessWeight = 0.45f,
-            FogBrightness = 0.95f,
-            FogBrightnessWeight = 0.2f,
-            MinimumSceneLight = 0.08f,
-            LightLiftRed = 0.85f,
-            LightLiftGreen = 0.42f,
-            LightLiftBlue = 0.24f,
         };
     }
 }

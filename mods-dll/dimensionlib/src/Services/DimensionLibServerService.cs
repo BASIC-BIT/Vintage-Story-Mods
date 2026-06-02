@@ -20,7 +20,6 @@ public sealed class DimensionLibServerService : IDisposable
 {
     public const string DebugDimensionId = "dimensionlib:debug-spike";
     public const string OverworldOppositeDimensionId = "dimensionlib:test-overworld-opposite";
-    public const string NetherCavernDimensionId = "dimensionlib:test-nether-cavern";
     private const int InitialGeneratedChunkRadius = 1;
     private const int FallbackLazyGeneratedChunkRadius = 2;
     private const int InitialGeneratedChunkBudget = 1;
@@ -263,7 +262,7 @@ public sealed class DimensionLibServerService : IDisposable
     {
         if (!TryCreateTestDimensionSpec(testId, dimensionId, sizeChunks, seed, out var spec, out var normalizedTestId))
         {
-            return DimensionLibResult.Fail("Test dimension must be 'overworld-opposite', 'nether-cavern', or 'vanilla-overworld'.", "unknown-test-dimension");
+            return DimensionLibResult.Fail("Test dimension must be 'overworld-opposite' or 'vanilla-overworld'. Cavern terrain lives in the Cavern Dimension Demo mod.", "unknown-test-dimension");
         }
 
         if (string.Equals(spec.GeneratorId, DimensionGeneratorIds.StandardOverworldWindow, StringComparison.Ordinal))
@@ -885,7 +884,6 @@ public sealed class DimensionLibServerService : IDisposable
     private void RegisterBuiltInGenerators()
     {
         RegisterGenerator(new OverworldOppositeDimensionGenerator(_api));
-        RegisterGenerator(new NetherCavernDimensionGenerator(_api));
     }
 
     private static bool TryCreateTestDimensionSpec(string testId, string dimensionId, int? sizeChunks, long? seed, out DimensionSpec spec, out string normalizedTestId)

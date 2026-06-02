@@ -1,8 +1,8 @@
-namespace DimensionLib.Generation;
+namespace DimensionCavern;
 
-internal sealed class NetherCavernGenerationProfile
+internal sealed class CavernGenerationProfile
 {
-    public static readonly NetherCavernGenerationProfile Default = new NetherCavernGenerationProfile();
+    public static readonly CavernGenerationProfile Default = new CavernGenerationProfile();
 
     public int SpawnPlateauRadius { get; } = 5;
     public int SpawnPlateauBlendDistance { get; } = 10;

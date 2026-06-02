@@ -56,7 +56,7 @@ Suggested initial reservation:
 
 A user-facing bounded alternate space. It has a stable Dimension ID, owner mod ID, generation/profile metadata, protection policy, lifecycle state, and a backing rectangular chunk allocation.
 
-This is the scalable abstraction. MystStory Ages, replay projections, Nether-like mods, dungeons, and test spaces can all be Dimensions without consuming one engine dimension ID each.
+This is the scalable abstraction. MystStory Ages, replay projections, lava-cavern mods, dungeons, and test spaces can all be Dimensions without consuming one engine dimension ID each.
 
 ### DimensionRegion
 
@@ -93,7 +93,7 @@ Later scope:
 - Per-dimension particle ambience.
 - Dimension editor GUI: a live in-game visual/world editor with sliders for profile values, immediate preview, preset save/load, and eventual terrain/generator parameter editing.
 
-Current nether-cavern visual hypotheses:
+Current cavern visual hypotheses:
 
 - Fog density and flat fog may be too high for a sealed cavern and may hide surface detail before the player can evaluate block palette or terrain shape.
 - Fog color/weight may be too red, turning terrain into silhouettes even if actual brightness is adequate.
@@ -101,7 +101,7 @@ Current nether-cavern visual hypotheses:
 - Client-only light lift can raise blacks but cannot recreate texture information lost in chunk lighting, so it should remain a debug/tuning variable rather than the primary solution.
 - Live tuning on 2026-05-30 showed that clearing fog/redness improves the background, but terrain surfaces remain mostly black; neutral post-process lift and strong ambient/scene-brightness modifiers also do not recover enough surface detail. This points at chunk lightmap/terrain shader inputs rather than fog alone.
 - Historical experiment: non-block ambient light floors written directly into chunk light data for generated cavern air cells. This avoided generated light blocks, but it still affected light-level data and should stay out of public API/default behavior unless a future design proves it is necessary.
-- 2026-05-30 result: lightmap floor level `8` plus thin warm visuals produced readable nether terrain. Baked visual defaults: sky `(0.16, 0.018, 0.004, alpha 0.62)`, fog color `(0.22, 0.045, 0.014)` at weight `0.05`, fog density `0.00025` at weight `0.02`, ambient `(0.70, 0.24, 0.10)` at weight `0.35`.
+- 2026-05-30 result: lightmap floor level `8` plus thin warm visuals produced readable cavern terrain. Baked visual defaults: sky `(0.16, 0.018, 0.004, alpha 0.62)`, fog color `(0.22, 0.045, 0.014)` at weight `0.05`, fog density `0.00025` at weight `0.02`, ambient `(0.70, 0.24, 0.10)` at weight `0.35`.
 - Generated light blocks are not an acceptable default solution. They should only be revisited if DimensionLib can model them as true ambient world features: dynamically fitted to rooms, non-interactable, non-colliding, non-dropping, and isolated from gameplay/mod side effects.
 
 ## Proposed API Boundaries
@@ -123,7 +123,7 @@ Current nether-cavern visual hypotheses:
 
 - MystStory page grammar, books, progression, research, or instability content.
 - Replay timeline storage, diff format, or incident-replay UI.
-- Specific Nether/Mystcraft/Thaumcraft clone content.
+- Specific cavern/Mystcraft/Thaumcraft clone content.
 - Broad compatibility hacks for every mod. It should expose explicit integration points first.
 
 ### Contributor API Principles
@@ -270,7 +270,7 @@ Current scaffold state:
 - Added `mods-dll/dimensionlib/docs/API.md` as the first contributor-facing API note.
 - Added a client ambient/fog modifier while the local player is in dimension `3`.
 - Added generator/visual fields (`GeneratorId`, `VisualSettings`, `Seed`) to `DimensionSpec` and persisted dimensions.
-- Added `IDimensionGenerator` and built-in test generators for `overworld-opposite` and `nether-cavern`.
+- Added `IDimensionGenerator` and built-in test generators for `overworld-opposite` and a cavern prototype. The cavern generator and assets later moved to the separate Cavern Dimension Demo consumer mod.
 - Added `/dlib create-test <type> [dimensionId] [sizeChunks] [seed]`, `/dlib generators`, `/dlib prepare <dimensionId>`, `/dlib send <dimensionId>`, `/dlib enter <dimensionId>`, `/dlib exit`, and `/dlib validate [dimensionId]` as the first creation lab.
 - Added generator source-bounds validation and spawn block sampling so generated dimensions can be checked before manual visual QA.
 - Wired `dimensionlib` into `Vintage-Story-Mods.sln`.

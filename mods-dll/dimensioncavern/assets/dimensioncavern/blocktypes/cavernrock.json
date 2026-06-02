@@ -1,5 +1,5 @@
 {
-  code: "netherrock",
+  code: "cavernrock",
   blockmaterial: "Stone",
   drawtype: "cube",
   shape: { base: "game:block/basic/cube" },
@@ -18,7 +18,7 @@
     }
   },
   drops: [
-    { type: "block", code: "netherrock", quantity: { avg: 1, var: 0 } }
+    { type: "block", code: "cavernrock", quantity: { avg: 1, var: 0 } }
   ],
   heldTpIdleAnimation: "holdbothhandslarge",
   heldRightReadyAnimation: "heldblockready",

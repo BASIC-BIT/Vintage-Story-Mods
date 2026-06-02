@@ -39,9 +39,9 @@ DimensionLib persists the dimension manifest to `ModData/dimensionlib/regions.js
 
 The current protection layer blocks normal player block placement, breaking, and block use in read-only or inaccessible dimensions through public server events. Root users bypass DimensionLib's generic checks, while owner policy providers can still veto block use or mutation for product invariants. Non-player world mutations are not fully sandboxed yet.
 
-See `docs/API.md` for the contributor-facing API boundary, current limits, and projection guidance. See `docs/PRODUCT_DIRECTION.md` before promoting gameplay-facing features into DimensionLib. See `docs/SUBSYSTEMS_AND_REFACTOR.md` before changing DimensionLib internals or nether visual/generator behavior.
+See `docs/API.md` for the contributor-facing API boundary, current limits, and projection guidance. See `docs/PRODUCT_DIRECTION.md` before promoting gameplay-facing features into DimensionLib. See `docs/SUBSYSTEMS_AND_REFACTOR.md` before changing DimensionLib internals.
 
-The repo also includes `mods-dll/dimensionpockets`, the Pocket Dimensions consumer mod. It uses only the public `IDimensionLibApi` surface to create, prepare, enter, inspect, capture explicit return locations for, and release pocket dimensions. Treat it as the first copyable integration example before promoting new convenience helpers into DimensionLib core.
+The repo also includes `mods-dll/dimensionpockets`, the Pocket Dimensions consumer mod, and `mods-dll/dimensioncavern`, a demo cavern generator. They use only the public `IDimensionLibApi` surface. Treat them as copyable integration examples before promoting new convenience helpers into DimensionLib core.
 
 Example registration:
 
@@ -79,7 +79,7 @@ Debug commands require `root` privilege:
 - `/dlib prepare-spike`
 - `/dlib enter-spike`
 - `/dlib exit-spike`
-- `/dlib create-test <overworld-opposite|nether-cavern|vanilla-overworld> [dimensionId] [sizeChunks] [seed]`
+- `/dlib create-test <overworld-opposite|vanilla-overworld> [dimensionId] [sizeChunks] [seed]`
 - `/dlib generators`
 - `/dlib prepare <dimensionId>`
 - `/dlib send <dimensionId>`
@@ -111,10 +111,8 @@ These steps require a server with DimensionLib loaded and a root/admin player:
 6. Run `/dlib exit-spike` and confirm the player returns to the recorded origin.
 7. Run `/dlib release dimensionlib:debug-spike orphan confirm` and confirm `/dlib list` marks it orphaned until the mod re-registers it.
 8. Run `/dlib create-test overworld-opposite`, then `/dlib enter dimensionlib:test-overworld-opposite`, and confirm rolling terrain with a darker reversed-time ambience.
-9. Run `/dlib create-test nether-cavern`, then `/dlib enter dimensionlib:test-nether-cavern`, and confirm a generated cavern with floor and ceiling terrain, an opaque red sky cover, and readable low-light areas.
-10. Run `/dlib create-test vanilla-overworld dimensionlib:test-vanilla-overworld-window 256`, wait briefly for the standard overworld source column to materialize, then `/dlib enter dimensionlib:test-vanilla-overworld-window` and confirm the dimension uses normal Vintage Story overworld terrain at the sparse backing coordinates.
-11. For a lazy-generation stress test, create a large bounded window such as `/dlib create-test vanilla-overworld dimensionlib:test-big-overworld 1024`. This registers a 1024x1024 chunk claim but only requests a tiny initial window; generation expands lazily around online players.
-12. Run `/dlib validate` inside each generated dimension and confirm expected bounds, prepared chunk counts, and spawn block ids. Standard overworld source windows may need a manual `/dlib tp <dimensionId> x y z` if the fixed prototype spawn Y is underground or airborne at the generated backing coordinates.
-13. If nether readability is poor, use `/dlib visual preset clear`, `/dlib visual preset thin`, and exact-key `/dlib visual set <key> <value>` commands to tune fog, sky cover, ambient color, and client-only light lift live without regenerating terrain.
-14. For sealed cavern terrain-lighting experiments only, use `/dlib light-floor dimensionlib:test-nether-cavern <level>` to manually write a low blocklight floor into already-prepared air cells and resend prepared chunks. This is debug tooling, not DimensionLib public API or default generated-dimension behavior.
-15. From a dedicated-server console, use `/dlib create-test <type> ...` followed by `/dlib enter-player <playerName> <dimensionId>` for non-interactive QA clients.
+9. Run `/dlib create-test vanilla-overworld dimensionlib:test-vanilla-overworld-window 256`, wait briefly for the standard overworld source column to materialize, then `/dlib enter dimensionlib:test-vanilla-overworld-window` and confirm the dimension uses normal Vintage Story overworld terrain at the sparse backing coordinates.
+10. For a lazy-generation stress test, create a large bounded window such as `/dlib create-test vanilla-overworld dimensionlib:test-big-overworld 1024`. This registers a 1024x1024 chunk claim but only requests a tiny initial window; generation expands lazily around online players.
+11. Run `/dlib validate` inside each generated dimension and confirm expected bounds, prepared chunk counts, and spawn block ids. Standard overworld source windows may need a manual `/dlib tp <dimensionId> x y z` if the fixed prototype spawn Y is underground or airborne at the generated backing coordinates.
+12. For sealed generated-dimension lighting experiments only, use `/dlib light-floor <dimensionId> <level>` to manually write a low blocklight floor into already-prepared air cells and resend prepared chunks. This is debug tooling, not DimensionLib public API or default generated-dimension behavior.
+13. From a dedicated-server console, use `/dlib create-test <type> ...` followed by `/dlib enter-player <playerName> <dimensionId>` for non-interactive QA clients.

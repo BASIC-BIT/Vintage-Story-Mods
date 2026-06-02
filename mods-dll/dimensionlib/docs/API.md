@@ -114,21 +114,20 @@ Current tuning keys are exact debug names, not public API: `fogdensity`, `flatfo
 
 `/dlib light-floor` is a separate root-only debug experiment for sealed generated caverns. It writes a low blocklight floor into air cells in already-prepared chunks, then resends chunk columns. It does not create blocks, block entities, drops, collisions, selections, or interactable light sources. It does affect chunk light-level data and is intentionally not part of `DimensionVisualSettings` or automatic generated-dimension behavior.
 
-The current nether-cavern visual hypotheses are:
+Content-specific cavern visual hypotheses now live in the Cavern Dimension Demo mod. DimensionLib keeps only the reusable visual settings fields and transfer/apply mechanics.
 
 - Fog and flat fog should remain conservative until sealed-dimension lighting is understood.
 - Baked chunk-light floors are suspected workaround code; keep them quarantined to debug tooling until proven necessary.
 - Client-only post-process light lift can raise blacks but cannot recover texture detail that chunk lighting rendered too dark.
 - Generated block emitters are not acceptable unless they are non-interactive, room-fitted environmental features.
 
-Current experimental nether defaults use minimum scene light `0.08`, vanilla `blackfogincaves` suppression, and darker warm-red visuals: sky `(0.035, 0.0035, 0.002, alpha 1.0)`, fog color `(0.24, 0.045, 0.018)` at weight `0.16`, fog density `0.0016` at weight `0.16`, flat fog density `0` at weight `0`, ambient color `(0.74, 0.34, 0.20)` at weight `0.48`, scene brightness `1.0` at weight `0.45`, and fog brightness `0.95` at weight `0.20`.
+Demo content may set minimum scene light, sky cover, fog, ambient, and light lift values through `DimensionVisualSettings` without adding presets or domain-specific values to DimensionLib.
 
 ## Built-In Creation Lab
 
 The current built-in generators are intentionally small litmus tests:
 
 - `DimensionGeneratorIds.OverworldOpposite`: rolling overworld-like terrain with darker explicit visual settings.
-- `DimensionGeneratorIds.NetherCavern`: floor and ceiling terrain with optional lava pockets and red cavern explicit visual settings.
 
 Root debug commands expose these as `/dlib create-test <type> [dimensionId] [sizeChunks] [seed]`. Dedicated-server console QA can pair this with `/dlib enter-player <playerName> <dimensionId>` to move an online test client without interacting with the client window. They are not final gameplay generators; they prove the DimensionLib path from spec -> generator -> block source -> materialization -> transfer -> explicit visual settings.
 

@@ -6,7 +6,7 @@ Reusable Vintage Story rendering findings are also summarized in `../../../docs/
 
 ## Current Finding
 
-The nether-cavern visual stack should not rely on a translucent sky overlay to hide the sun and moon. The safer model is:
+Cavern-style consumer mods should not rely on a translucent sky overlay to hide the sun and moon. The safer model is:
 
 - Render an opaque DimensionLib sky/background replacement after vanilla sky, sun, and moon renderers.
 - Let terrain render after that replacement so terrain still naturally occludes the background.
@@ -42,7 +42,7 @@ If chunk-light floors ever return, they should be treated as a separate, deliber
 - Optional blocklight floor for air cells where that is the desired visual model.
 - No generated fake light source blocks unless they are deliberate, non-interactable world features.
 
-Fresh QA on 2026-05-30 showed an air-cell sunlight floor of `16`, and then `5` with a high blocklight floor, made distant nether terrain readable but too close to fullbright. Keep this as evidence, not as a default implementation direction.
+Fresh QA on 2026-05-30 showed an air-cell sunlight floor of `16`, and then `5` with a high blocklight floor, made distant cavern terrain readable but too close to fullbright. Keep this as evidence, not as a default implementation direction.
 
 The generator also needs to keep the cavern ceiling low enough that the opaque background does not read as a huge open red skybox.
 

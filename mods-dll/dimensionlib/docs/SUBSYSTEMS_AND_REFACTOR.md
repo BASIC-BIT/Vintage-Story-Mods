@@ -1,6 +1,6 @@
 # DimensionLib Subsystems And Refactor Plan
 
-DimensionLib has reached the point where nether visual iteration is blocked by architecture. Too many unrelated pieces are currently coupled inside `DimensionLibServerService`, `DimensionVisualSystem`, and `BuiltInDimensionGenerators`. This document defines the subsystem boundaries before more visual tuning happens.
+DimensionLib reached the point where cavern visual iteration was blocked by architecture. Too many unrelated pieces were coupled inside `DimensionLibServerService`, `DimensionVisualSystem`, and built-in generators. This document defines the subsystem boundaries before more tuning happens.
 
 The refactor goal is not to redesign public API yet. The goal is to split internal responsibilities so each experiment can change one module at a time with explicit variables, logs, and human feedback.
 
@@ -38,7 +38,7 @@ Responsibilities:
 Refactor stance:
 
 - Keep this layer boring and small.
-- Do not add nether-specific concepts here until they become stable cross-mod features.
+- Do not add content-specific cavern concepts here until they become stable cross-mod features.
 
 ### Mod Entry Point And Public Facade
 
@@ -226,7 +226,7 @@ Remaining possible split:
 Why:
 
 - Client visuals depend on transfer messages today, so transfer bugs can masquerade as visual bugs.
-- Return-position behavior is reusable and should not live beside nether test code.
+- Return-position behavior is reusable and should not live beside content-specific test code.
 
 ### Built-In Generators And Test Labs
 
@@ -234,9 +234,7 @@ Current files:
 
 - `src/Generation/BuiltInBlockSource.cs`
 - `src/Generation/Noise/ValueNoise2D.cs`
-- `src/Generation/NetherCavernGenerationProfile.cs`
 - `src/Generation/OverworldOppositeDimensionGenerator.cs`
-- `src/Generation/NetherCavernDimensionGenerator.cs`
 - `src/Generation/DimensionGeneratorRegistry.cs`
 - `src/Generation/GeneratedDimensionWindowPreparer.cs`
 - `src/Generation/GeneratedDimensionStreamer.cs`
@@ -248,17 +246,16 @@ Responsibilities today:
 - Generator registration types.
 - Shared value-noise helpers.
 - Overworld opposite generator.
-- Nether cavern generator.
-- Named nether cavern generation profile values.
+- Public generator registry and generic generated-dimension streaming.
 - Test-dimension specs and debug-platform filling.
 
 Remaining target split:
 
-- Additional generator profiles only when a new controlled experiment needs them.
+- Keep content-specific generators in consumer/demo mods, such as `mods-dll/dimensioncavern`.
 
 Why:
 
-- The current nether generator changed too many variables per pass: floor shape, ceiling shape, lava, columns, sky exposure, spawn plateau, and lighting all moved together.
+- Cavern generator experiments changed too many variables per pass: floor shape, ceiling shape, lava, columns, sky exposure, spawn plateau, and lighting all moved together.
 - Generator shape needs its own experiment series independent of client atmosphere.
 
 ### Client Visual Environment
@@ -362,7 +359,7 @@ Verification after each extraction:
 
 - Build succeeds.
 - Public `IDimensionLibApi` signatures unchanged.
-- `/dlib create-test nether-cavern <fresh-id> 5 <seed>` still creates and teleports.
+- `/caverndemo create <fresh-id> 5 <seed>` still creates and teleports when the demo mod is loaded.
 - Do not judge visuals during this phase except for obvious regressions.
 
 ### Phase 3: Client Visual Decomposition Without Behavior Changes
@@ -385,9 +382,9 @@ Verification after each extraction:
 
 Work order:
 
-1. Split overworld and nether generators into separate files. Done.
+1. Split content-specific cavern generation out of DimensionLib into `mods-dll/dimensioncavern`. Done.
 2. Extract shared noise helpers. Done.
-3. Extract nether generator parameters into a named config object. Done.
+3. Extract cavern generator parameters into a named config object. Done.
 4. Add a generator-debug output path if needed so attempted shapes are documented before screenshot QA.
 
 Verification:
@@ -414,5 +411,5 @@ Required pause:
 
 - Is `/dlib light-floor` still worth keeping as debug tooling, or should baked chunk-light floor experiments be removed entirely?
 - Should `/dlib visual` tune one client only, all online clients, or require explicit target syntax?
-- Should the nether generator keep a custom spawn-light rule separate from broader cavern lighting?
+- Should the Cavern Demo keep a custom spawn-light rule separate from broader cavern lighting?
 - Should visual experiments get a minimal debug HUD/log line showing active profile and effective fog/light values?
