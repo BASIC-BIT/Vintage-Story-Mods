@@ -17,7 +17,6 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     private const double DialogWidth = 980;
     private const double ContentWidth = DialogWidth - 48;
     private const double PanelHeight = 470;
-    private const double StatusHeight = 56;
     private const double FieldHeight = 28;
     private const double FieldRowHeight = 55;
     private readonly Action<List<CharacterSheetFieldConfigEntryMessage>> _onSave;
@@ -27,8 +26,6 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     private readonly Dictionary<string, GuiElementDropDown> _dropDowns = new(StringComparer.OrdinalIgnoreCase);
     private List<CharacterSheetFieldConfigEntryMessage> _fields;
     private List<CharacterSheetFieldConfigEntryMessage> _lastLoadedFields;
-    private string _message;
-    private bool _success;
     private int _selectedIndex;
     private bool _closing;
     private bool _forceClose;
@@ -38,16 +35,12 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     public CharacterSheetFieldConfigDialog(
         ICoreClientAPI capi,
         List<CharacterSheetFieldConfigEntryMessage> fields,
-        string message,
-        bool success,
         Action<List<CharacterSheetFieldConfigEntryMessage>> onSave,
         Action onReload,
         Action onClose) : base(capi)
     {
         _fields = EnsureDraft(fields);
         _lastLoadedFields = _fields.Select(CloneEntry).ToList();
-        _message = message;
-        _success = success;
         _onSave = onSave;
         _onReload = onReload;
         _onClose = onClose;
@@ -62,16 +55,14 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
     public override double DrawOrder => 0.27;
 
-    public void SetView(List<CharacterSheetFieldConfigEntryMessage> fields, string message, bool success)
+    public void SetView(List<CharacterSheetFieldConfigEntryMessage> fields, bool updateBaseline)
     {
         _fields = EnsureDraft(fields);
-        if (success)
+        if (updateBaseline)
         {
             _lastLoadedFields = _fields.Select(CloneEntry).ToList();
         }
 
-        _message = message;
-        _success = success;
         _selectedIndex = ClampSelectedIndex(_selectedIndex);
         ComposeDialog();
     }
@@ -107,10 +98,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         _suspendCallbacks = true;
 
         var contentTop = GuiStyle.TitleBarHeight + 10;
-        var helpHeight = 58;
-        var helpBounds = ElementBounds.Fixed(0, contentTop, ContentWidth, helpHeight);
-        var statusBounds = ElementBounds.Fixed(0, helpBounds.fixedY + helpHeight + 6, ContentWidth, StatusHeight);
-        var panelY = statusBounds.fixedY + StatusHeight + 10;
+        var panelY = contentTop;
         var leftPanelWidth = 250;
         var panelGap = 15;
         var rightPanelX = leftPanelWidth + panelGap;
@@ -130,8 +118,6 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
             .AddInset(leftPanelBounds.FlatCopy().FixedGrow(3).WithFixedOffset(-3, -3), 3)
             .AddInset(rightPanelBounds.FlatCopy().FixedGrow(3).WithFixedOffset(-3, -3), 3);
 
-        AddRichtext(composer, VtmlUtils.EscapeVtml(Lang.Get("thebasics:charsheet-field-config-help")), helpBounds);
-        AddStatus(composer, statusBounds);
         AddFieldList(composer, leftPanelBounds);
         AddSelectedFieldEditor(composer, rightPanelBounds);
 
@@ -141,17 +127,6 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
         SingleComposer = composer.EndChildElements().Compose(focusFirstElement: false);
         _suspendCallbacks = false;
-    }
-
-    private void AddStatus(GuiComposer composer, ElementBounds bounds)
-    {
-        var message = Lang.Get("thebasics:charsheet-field-config-status-ready");
-        if (!string.IsNullOrWhiteSpace(_message))
-        {
-            message = _success ? _message : Lang.Get("thebasics:charsheet-field-config-error-prefix", _message);
-        }
-
-        AddRichtext(composer, VtmlUtils.EscapeVtml(message), bounds);
     }
 
     private void AddFieldList(GuiComposer composer, ElementBounds panelBounds)
@@ -387,8 +362,6 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
             AutoGenerateId = true
         });
         _selectedIndex = _fields.Count - 1;
-        _message = Lang.Get("thebasics:charsheet-field-config-added-draft");
-        _success = true;
         ComposeDialog();
         return true;
     }
@@ -398,9 +371,6 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         CaptureSelectedInputToDraft();
         if (_fields.Count <= 1 || _selectedIndex < 0 || _selectedIndex >= _fields.Count)
         {
-            _message = Lang.Get("thebasics:charsheet-field-config-delete-last");
-            _success = false;
-            ComposeDialog();
             return true;
         }
 
@@ -420,16 +390,11 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     {
         if (_fields.Count <= 1 || index < 0 || index >= _fields.Count)
         {
-            _message = Lang.Get("thebasics:charsheet-field-config-delete-last");
-            _success = false;
-            ComposeDialog();
             return;
         }
 
         _fields.RemoveAt(index);
         _selectedIndex = ClampSelectedIndex(index);
-        _message = Lang.Get("thebasics:charsheet-field-config-deleted-draft");
-        _success = true;
         ComposeDialog();
     }
 
@@ -479,8 +444,6 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
         (_fields[_selectedIndex], _fields[nextIndex]) = (_fields[nextIndex], _fields[_selectedIndex]);
         _selectedIndex = nextIndex;
-        _message = Lang.Get("thebasics:charsheet-field-config-moved-draft");
-        _success = true;
         ComposeDialog();
         return true;
     }
@@ -802,11 +765,6 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         {
             AddTooltip(composer, "tooltip-label-" + Math.Abs((text + bounds.fixedX + bounds.fixedY).GetHashCode()), bounds, tooltip);
         }
-    }
-
-    private void AddRichtext(GuiComposer composer, string vtmlCode, ElementBounds bounds)
-    {
-        composer.AddRichtext(VtmlUtil.Richtextify(capi, vtmlCode, CairoFont.WhiteSmallText()), bounds);
     }
 
     private static void AddTooltip(GuiComposer composer, string key, ElementBounds bounds, string text)

@@ -169,6 +169,61 @@ public class CharacterSheetFieldConfigAdminTests
         roundTripped.Fields[0].ShowInLook.Should().BeFalse();
     }
 
+    [Fact]
+    public void InitializeDefaultsIfNeeded_DropsMalformedCharacterSheetEntries()
+    {
+        var config = new ModConfig
+        {
+            CharacterSheetFields = new List<CharacterSheetFieldDefinition>
+            {
+                null!,
+                new()
+                {
+                    Id = " summary ",
+                    Label = " Summary ",
+                    Type = $" {CharacterSheetFieldTypes.Option} ",
+                    Options = new List<string> { " Calm ", null!, "", "Guarded" }
+                }
+            }
+        };
+
+        config.InitializeDefaultsIfNeeded();
+
+        config.CharacterSheetFields.Should().ContainSingle();
+        config.CharacterSheetFields[0].Id.Should().Be("summary");
+        config.CharacterSheetFields[0].Label.Should().Be("Summary");
+        config.CharacterSheetFields[0].Type.Should().Be(CharacterSheetFieldTypes.Option);
+        config.CharacterSheetFields[0].Options.Should().Equal("Calm", "Guarded");
+    }
+
+    [Fact]
+    public void InitializeDefaultsIfNeeded_RestoresDefaultCharacterSheetFieldsWhenEmpty()
+    {
+        var config = new ModConfig
+        {
+            CharacterSheetFields = new List<CharacterSheetFieldDefinition>()
+        };
+
+        config.InitializeDefaultsIfNeeded();
+
+        config.CharacterSheetFields.Should().NotBeEmpty();
+        config.CharacterSheetFields.Should().Contain(field => field.Id == "fullName");
+    }
+
+    [Fact]
+    public void InitializeDefaultsIfNeeded_RestoresDefaultCharacterSheetFieldsWhenOnlyNullEntries()
+    {
+        var config = new ModConfig
+        {
+            CharacterSheetFields = new List<CharacterSheetFieldDefinition> { null! }
+        };
+
+        config.InitializeDefaultsIfNeeded();
+
+        config.CharacterSheetFields.Should().NotBeEmpty();
+        config.CharacterSheetFields.Should().Contain(field => field.Id == "fullName");
+    }
+
     [Theory]
     [InlineData("Full Name", "full-name")]
     [InlineData("  Nickname  ", "nickname")]
