@@ -212,7 +212,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             successMessage = $"Returned from pocket '{DisplayName(dimension.DimensionId)}' via linked Waystone.";
         }
 
-        var returned = _dimensionLib.TeleportToLocation(player, returnLocation.Value);
+        var returned = TeleportToReturnLocationOrOverworld(player, returnLocation.Value, ref successMessage);
         if (!returned.Success)
         {
             return returned;
@@ -221,6 +221,80 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         ClearActiveIngress(player, dimension.DimensionId);
         ClearUnanchoredReturn(player, dimension.DimensionId);
         return DimensionLibResult.Ok(successMessage);
+    }
+
+    private DimensionLibResult TeleportToReturnLocationOrOverworld(IServerPlayer player, DimensionLocation location, ref string successMessage)
+    {
+        if (TryGetUnavailableReturnTargetReason(location, out var unavailableReason))
+        {
+            return TeleportToOverworldFallback(player, unavailableReason, ref successMessage);
+        }
+
+        var returned = _dimensionLib.TeleportToLocation(player, location);
+        if (!returned.Success && IsUnavailableReturnTargetError(returned.ErrorCode))
+        {
+            return TeleportToOverworldFallback(player, returned.Message, ref successMessage);
+        }
+
+        return returned;
+    }
+
+    private bool TryGetUnavailableReturnTargetReason(DimensionLocation location, out string reason)
+    {
+        reason = string.Empty;
+        if (location == null || string.IsNullOrWhiteSpace(location.DimensionId))
+        {
+            return false;
+        }
+
+        var lookup = _dimensionLib.GetDimension(location.DimensionId);
+        if (!lookup.Success)
+        {
+            reason = $"return target dimension '{DisplayName(location.DimensionId)}' is not registered";
+            return true;
+        }
+
+        if (_dimensionLib.IsDimensionOrphaned(location.DimensionId))
+        {
+            reason = $"return target dimension '{DisplayName(location.DimensionId)}' is orphaned";
+            return true;
+        }
+
+        return false;
+    }
+
+    private DimensionLibResult TeleportToOverworldFallback(IServerPlayer player, string unavailableReason, ref string successMessage)
+    {
+        var fallback = CreateOverworldFallbackLocation(player);
+        var returned = _dimensionLib.TeleportToLocation(player, fallback);
+        if (!returned.Success)
+        {
+            return returned;
+        }
+
+        successMessage = $"{successMessage} Warning: {unavailableReason}; returned to overworld spawn instead.";
+        return DimensionLibResult.Ok(successMessage);
+    }
+
+    private DimensionLocation CreateOverworldFallbackLocation(IServerPlayer player)
+    {
+        var spawn = _api.World.DefaultSpawnPosition;
+        return new DimensionLocation
+        {
+            DimensionPlaneId = 0,
+            X = spawn.X,
+            Y = spawn.Y,
+            Z = spawn.Z,
+            Yaw = player?.Entity?.Pos?.Yaw ?? 0,
+            Pitch = player?.Entity?.Pos?.Pitch ?? 0,
+            Roll = player?.Entity?.Pos?.Roll ?? 0,
+        };
+    }
+
+    private static bool IsUnavailableReturnTargetError(string errorCode)
+    {
+        return string.Equals(errorCode, "unknown-location-dimension", StringComparison.Ordinal) ||
+            string.Equals(errorCode, "dimension-orphaned", StringComparison.Ordinal);
     }
 
     public void ForgetWaystoneEndpoint(string endpointId)
