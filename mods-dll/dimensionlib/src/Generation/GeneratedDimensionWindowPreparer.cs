@@ -98,7 +98,7 @@ internal sealed class GeneratedDimensionWindowPreparer
         var candidates = BuildLazyGenerationCandidates(dimension, centerLocalChunkX, centerLocalChunkZ, radiusChunks);
         var queued = 0;
         var prepared = 0;
-        var pending = 0;
+        var pending = CountPendingStandardOverworldColumns(dimension);
         try
         {
             foreach (var candidate in candidates)
@@ -112,11 +112,10 @@ internal sealed class GeneratedDimensionWindowPreparer
 
                 if (IsStandardOverworldColumnPending(dimension, candidate.X, candidate.Y))
                 {
-                    pending++;
                     continue;
                 }
 
-                if (queued >= maxColumns || queued + pending >= MaxPendingStandardOverworldColumns)
+                if (queued >= maxColumns || pending + queued >= MaxPendingStandardOverworldColumns)
                 {
                     continue;
                 }
@@ -299,6 +298,12 @@ internal sealed class GeneratedDimensionWindowPreparer
         return _pendingStandardOverworldColumns.Contains(PendingStandardOverworldColumnKey(dimension, localChunkX, localChunkZ));
     }
 
+    private int CountPendingStandardOverworldColumns(Dimension dimension)
+    {
+        var prefix = PendingStandardOverworldColumnKeyPrefix(dimension);
+        return _pendingStandardOverworldColumns.Count(key => key.StartsWith(prefix, StringComparison.Ordinal));
+    }
+
     private static bool TryGetPeekedColumn(Dictionary<Vec2i, IServerChunk[]> columns, int sourceChunkX, int sourceChunkZ, out IServerChunk[] sourceChunks)
     {
         sourceChunks = null;
@@ -321,6 +326,11 @@ internal sealed class GeneratedDimensionWindowPreparer
 
     private static string PendingStandardOverworldColumnKey(Dimension dimension, int localChunkX, int localChunkZ)
     {
-        return $"{dimension.DimensionId}:{localChunkX}:{localChunkZ}";
+        return $"{PendingStandardOverworldColumnKeyPrefix(dimension)}{localChunkX}:{localChunkZ}";
+    }
+
+    private static string PendingStandardOverworldColumnKeyPrefix(Dimension dimension)
+    {
+        return $"{dimension.DimensionId}:";
     }
 }

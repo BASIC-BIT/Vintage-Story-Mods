@@ -718,9 +718,10 @@ public sealed class DimensionLibServerService : IDisposable
                 continue;
             }
 
+            var centerLocalChunk = _generatedWindowPreparer.ResolveLocalChunk(dimension, player.Entity.Pos.X, player.Entity.Pos.Z);
             var chunksToSend = queue.Chunks
                 .Where(chunk => !queue.SentChunkKeys.Contains(PreparedChunkSendQueue.ChunkKey(chunk)))
-                .OrderBy(chunk => DistanceSquared(chunk, dimension, player.Entity.Pos.X, player.Entity.Pos.Z))
+                .OrderBy(chunk => DistanceSquared(chunk, centerLocalChunk))
                 .ThenBy(chunk => chunk.X)
                 .ThenBy(chunk => chunk.Y)
                 .Take(PreparedChunkSendColumnsPerTick)
@@ -790,8 +791,11 @@ public sealed class DimensionLibServerService : IDisposable
             return;
         }
 
+        var centerLocalChunk = _generatedWindowPreparer.ResolveLocalChunk(dimension, centerX, centerZ);
+        var sendRadius = _generatedWindowPreparer.GetAllowedChunkRadius(player, FallbackLazyGeneratedChunkRadius, InitialGeneratedChunkRadius);
         var chunks = _preparedDimensions.GetPreparedLocalChunks(dimension)
-            .OrderBy(chunk => DistanceSquared(chunk, dimension, centerX, centerZ))
+            .Where(chunk => Math.Abs(chunk.X - centerLocalChunk.X) <= sendRadius && Math.Abs(chunk.Y - centerLocalChunk.Y) <= sendRadius)
+            .OrderBy(chunk => DistanceSquared(chunk, centerLocalChunk))
             .ThenBy(chunk => chunk.X)
             .ThenBy(chunk => chunk.Y)
             .ToList();
@@ -809,12 +813,10 @@ public sealed class DimensionLibServerService : IDisposable
         return $"{playerUid}:{dimensionId}";
     }
 
-    private static int DistanceSquared(Vec2i chunk, Dimension dimension, double centerX, double centerZ)
+    private static int DistanceSquared(Vec2i chunk, Vec2i centerLocalChunk)
     {
-        var centerLocalChunkX = (int)Math.Floor((centerX - dimension.MinBlockX) / Vintagestory.API.Config.GlobalConstants.ChunkSize);
-        var centerLocalChunkZ = (int)Math.Floor((centerZ - dimension.MinBlockZ) / Vintagestory.API.Config.GlobalConstants.ChunkSize);
-        var dx = chunk.X - ClampInt(centerLocalChunkX, 0, dimension.ChunkSizeX - 1);
-        var dz = chunk.Y - ClampInt(centerLocalChunkZ, 0, dimension.ChunkSizeZ - 1);
+        var dx = chunk.X - centerLocalChunk.X;
+        var dz = chunk.Y - centerLocalChunk.Y;
         return dx * dx + dz * dz;
     }
 
