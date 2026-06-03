@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using DimensionLib.Api;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace DimensionLib.Services;
@@ -10,6 +11,7 @@ internal sealed class DimensionRegistry
 {
     private readonly int _firstAllowedDimensionPlaneId;
     private readonly Dictionary<string, Dimension> _dimensionsById = new Dictionary<string, Dimension>(StringComparer.Ordinal);
+    private readonly Dictionary<int, Dictionary<long, Dimension>> _dimensionsByChunkByPlaneId = new Dictionary<int, Dictionary<long, Dimension>>();
     private readonly HashSet<string> _orphanedDimensionIds = new HashSet<string>(StringComparer.Ordinal);
 
     public DimensionRegistry(int firstAllowedDimensionPlaneId)
@@ -42,7 +44,9 @@ internal sealed class DimensionRegistry
             }
 
             var updated = spec.ToDimension();
+            RemoveFromSpatialIndex(existing);
             _dimensionsById[updated.DimensionId] = updated;
+            AddToSpatialIndex(updated);
             _orphanedDimensionIds.Remove(updated.DimensionId);
             return DimensionLibResult<Dimension>.Ok(updated, "Dimension already registered; metadata refreshed.");
         }
@@ -55,6 +59,7 @@ internal sealed class DimensionRegistry
         }
 
         _dimensionsById.Add(dimension.DimensionId, dimension);
+        AddToSpatialIndex(dimension);
         _orphanedDimensionIds.Remove(dimension.DimensionId);
         return DimensionLibResult<Dimension>.Ok(dimension, "Dimension registered.");
     }
@@ -78,8 +83,7 @@ internal sealed class DimensionRegistry
             return DimensionLibResult<Dimension>.Fail("Position is required.", "missing-position");
         }
 
-        var dimension = _dimensionsById.Values.FirstOrDefault(candidate => candidate.ContainsBlock(pos));
-        return dimension != null
+        return TryGetIndexedAt(pos, out var dimension)
             ? DimensionLibResult<Dimension>.Ok(dimension)
             : DimensionLibResult<Dimension>.Fail("No DimensionLib dimension contains that position.", "no-dimension-at-position");
     }
@@ -98,8 +102,7 @@ internal sealed class DimensionRegistry
             return false;
         }
 
-        dimension = _dimensionsById.Values.FirstOrDefault(candidate => candidate.ContainsBlock(pos));
-        return dimension != null;
+        return TryGetIndexedAt(pos, out dimension);
     }
 
     public bool IsOrphaned(string dimensionId)
@@ -131,16 +134,94 @@ internal sealed class DimensionRegistry
         }
 
         dimensionId = dimensionId.Trim();
+        if (_dimensionsById.TryGetValue(dimensionId, out var existing))
+        {
+            RemoveFromSpatialIndex(existing);
+        }
+
         _dimensionsById.Remove(dimensionId);
         _orphanedDimensionIds.Remove(dimensionId);
     }
 
     public void Load(Dimension dimension, bool isOrphaned)
     {
+        if (_dimensionsById.TryGetValue(dimension.DimensionId, out var existing))
+        {
+            RemoveFromSpatialIndex(existing);
+        }
+
         _dimensionsById[dimension.DimensionId] = dimension;
+        AddToSpatialIndex(dimension);
         if (isOrphaned)
         {
             _orphanedDimensionIds.Add(dimension.DimensionId);
         }
+    }
+
+    private bool TryGetIndexedAt(BlockPos pos, out Dimension dimension)
+    {
+        dimension = null;
+        if (pos == null || !_dimensionsByChunkByPlaneId.TryGetValue(pos.dimension, out var dimensionsByChunk))
+        {
+            return false;
+        }
+
+        var chunkX = FloorDiv(pos.X, GlobalConstants.ChunkSize);
+        var chunkZ = FloorDiv(pos.Z, GlobalConstants.ChunkSize);
+        if (!dimensionsByChunk.TryGetValue(ChunkKey(chunkX, chunkZ), out var candidate) || !candidate.ContainsBlock(pos))
+        {
+            return false;
+        }
+
+        dimension = candidate;
+        return true;
+    }
+
+    private void AddToSpatialIndex(Dimension dimension)
+    {
+        if (!_dimensionsByChunkByPlaneId.TryGetValue(dimension.DimensionPlaneId, out var dimensionsByChunk))
+        {
+            dimensionsByChunk = new Dictionary<long, Dimension>();
+            _dimensionsByChunkByPlaneId[dimension.DimensionPlaneId] = dimensionsByChunk;
+        }
+
+        for (var chunkX = dimension.ChunkX; chunkX < dimension.ChunkX + dimension.ChunkSizeX; chunkX++)
+        {
+            for (var chunkZ = dimension.ChunkZ; chunkZ < dimension.ChunkZ + dimension.ChunkSizeZ; chunkZ++)
+            {
+                dimensionsByChunk[ChunkKey(chunkX, chunkZ)] = dimension;
+            }
+        }
+    }
+
+    private void RemoveFromSpatialIndex(Dimension dimension)
+    {
+        if (!_dimensionsByChunkByPlaneId.TryGetValue(dimension.DimensionPlaneId, out var dimensionsByChunk))
+        {
+            return;
+        }
+
+        for (var chunkX = dimension.ChunkX; chunkX < dimension.ChunkX + dimension.ChunkSizeX; chunkX++)
+        {
+            for (var chunkZ = dimension.ChunkZ; chunkZ < dimension.ChunkZ + dimension.ChunkSizeZ; chunkZ++)
+            {
+                dimensionsByChunk.Remove(ChunkKey(chunkX, chunkZ));
+            }
+        }
+
+        if (dimensionsByChunk.Count == 0)
+        {
+            _dimensionsByChunkByPlaneId.Remove(dimension.DimensionPlaneId);
+        }
+    }
+
+    private static int FloorDiv(int value, int divisor)
+    {
+        return value >= 0 ? value / divisor : (value - divisor + 1) / divisor;
+    }
+
+    private static long ChunkKey(int chunkX, int chunkZ)
+    {
+        return ((long)chunkX << 32) | (uint)chunkZ;
     }
 }

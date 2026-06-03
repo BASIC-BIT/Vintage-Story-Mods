@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using DimensionLib.Api;
 using Vintagestory.API.Common;
@@ -13,6 +14,7 @@ public sealed class CavernDimensionGenerator : IDimensionGenerator
     private readonly ICoreServerAPI _api;
     private readonly int _wallId;
     private readonly int _lavaId;
+    private readonly Dictionary<string, CachedSource> _sourcesByDimensionId = new Dictionary<string, CachedSource>(StringComparer.Ordinal);
 
     public CavernDimensionGenerator(ICoreServerAPI api, string generatorId)
     {
@@ -26,7 +28,14 @@ public sealed class CavernDimensionGenerator : IDimensionGenerator
 
     public IBlockVolumeSource CreateSource(Dimension dimension)
     {
-        return new CavernBlockSource(dimension, GeneratorId, _wallId, _lavaId, _api.WorldManager.MapSizeY);
+        if (_sourcesByDimensionId.TryGetValue(dimension.DimensionId, out var cached) && ReferenceEquals(cached.Dimension, dimension))
+        {
+            return cached.Source;
+        }
+
+        var source = new CavernBlockSource(dimension, GeneratorId, _wallId, _lavaId, _api.WorldManager.MapSizeY);
+        _sourcesByDimensionId[dimension.DimensionId] = new CachedSource(dimension, source);
+        return source;
     }
 
     private int ResolveBlockId(params string[] codes)
@@ -41,6 +50,19 @@ public sealed class CavernDimensionGenerator : IDimensionGenerator
         }
 
         return 0;
+    }
+
+    private sealed class CachedSource
+    {
+        public CachedSource(Dimension dimension, IBlockVolumeSource source)
+        {
+            Dimension = dimension;
+            Source = source;
+        }
+
+        public Dimension Dimension { get; }
+
+        public IBlockVolumeSource Source { get; }
     }
 }
 
