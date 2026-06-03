@@ -27,33 +27,6 @@ internal sealed class DimensionLibCommandRegistrar
             .WithAlias("dimensionlib")
             .WithDescription("DimensionLib debug and maintenance commands")
             .RequiresPrivilege(Privilege.root)
-            .BeginSubCommand("prepare-spike")
-                .WithDescription("Create, fill, relight, and send the prototype dimension")
-                .RequiresPlayer()
-                .HandleWith(args =>
-                {
-                    var player = (IServerPlayer)args.Caller.Player;
-                    return ToCommandResult(_service.PrepareDebugDimension(player));
-                })
-                .EndSubCommand()
-            .BeginSubCommand("enter-spike")
-                .WithDescription("Enter the prototype dimension")
-                .RequiresPlayer()
-                .HandleWith(args =>
-                {
-                    var player = (IServerPlayer)args.Caller.Player;
-                    return ToCommandResult(_service.EnterDebugDimension(player));
-                })
-                .EndSubCommand()
-            .BeginSubCommand("exit-spike")
-                .WithDescription("Return from the prototype dimension")
-                .RequiresPlayer()
-                .HandleWith(args =>
-                {
-                    var player = (IServerPlayer)args.Caller.Player;
-                    return ToCommandResult(_service.ReturnPlayer(player));
-                })
-                .EndSubCommand()
             .BeginSubCommand("exit")
                 .WithDescription("Return from the last DimensionLib transfer")
                 .RequiresPlayer()
@@ -62,11 +35,6 @@ internal sealed class DimensionLibCommandRegistrar
                     var player = (IServerPlayer)args.Caller.Player;
                     return ToCommandResult(_service.ReturnPlayer(player));
                 })
-                .EndSubCommand()
-            .BeginSubCommand("create-test")
-                .WithDescription("Create and prepare a built-in test dimension: overworld-opposite or vanilla-overworld")
-                .WithArgs(new StringArgParser("type [dimensionId] [sizeChunks] [seed]", true))
-                .HandleWith(HandleCreateTestDimension)
                 .EndSubCommand()
             .BeginSubCommand("prepare")
                 .WithDescription("Prepare a DimensionLib dimension without entering it")
@@ -130,43 +98,11 @@ internal sealed class DimensionLibCommandRegistrar
                 .WithArgs(new StringArgParser("status|reset|set <key> <value>", true))
                 .HandleWith(HandleVisualTuning)
                 .EndSubCommand()
-            .BeginSubCommand("light-floor")
-                .WithDescription("Apply an experimental non-block ambient light floor to a prepared dimension")
-                .WithArgs(new StringArgParser("dimensionId level", true))
-                .HandleWith(HandleLightFloor)
-                .EndSubCommand()
             .BeginSubCommand("release")
                 .WithDescription("Release a registered DimensionLib dimension")
                 .WithArgs(new StringArgParser("dimensionId [orphan|forget|clear] confirm", true))
                 .HandleWith(HandleReleaseDimension)
                 .EndSubCommand();
-    }
-
-    private TextCommandResult HandleCreateTestDimension(TextCommandCallingArgs args)
-    {
-        var raw = (string)args[0] ?? string.Empty;
-        var cmdArgs = new CmdArgs(raw);
-        var testId = cmdArgs.PopWord(string.Empty);
-        var second = cmdArgs.PopWord(null);
-        string dimensionId = null;
-        string sizeText;
-        if (int.TryParse(second, out _))
-        {
-            sizeText = second;
-        }
-        else
-        {
-            dimensionId = second;
-            sizeText = cmdArgs.PopWord(null);
-        }
-
-        var seedText = cmdArgs.PopWord(null);
-
-        int? sizeChunks = int.TryParse(sizeText, out var parsedSize) ? parsedSize : null;
-        long? seed = long.TryParse(seedText, out var parsedSeed) ? parsedSeed : null;
-
-        var player = args.Caller.Player as IServerPlayer;
-        return ToCommandResult(_service.CreateTestDimension(testId, dimensionId, sizeChunks, seed, player));
     }
 
     private TextCommandResult HandleEnterPlayerDimension(TextCommandCallingArgs args)
@@ -374,20 +310,6 @@ internal sealed class DimensionLibCommandRegistrar
         var raw = (string)args[0] ?? string.Empty;
         var player = args.Caller.Player as IServerPlayer;
         return ToCommandResult(_service.SendVisualTuning(player, raw));
-    }
-
-    private TextCommandResult HandleLightFloor(TextCommandCallingArgs args)
-    {
-        var raw = (string)args[0] ?? string.Empty;
-        var cmdArgs = new CmdArgs(raw);
-        var dimensionId = cmdArgs.PopWord(string.Empty);
-        var levelText = cmdArgs.PopWord(string.Empty);
-        if (string.IsNullOrWhiteSpace(dimensionId) || !int.TryParse(levelText, out var level))
-        {
-            return TextCommandResult.Error("Usage: /dlib light-floor <dimensionId> <level 0..31>");
-        }
-
-        return ToCommandResult(_service.ApplyAmbientLightFloor(dimensionId, level));
     }
 
     private string BuildDimensionList()

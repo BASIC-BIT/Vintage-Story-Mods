@@ -37,7 +37,7 @@ Projection consumers such as replay systems should implement `IBlockVolumeSource
 
 DimensionLib persists the dimension manifest to `ModData/dimensionlib/regions.json`. It persists claims and policy metadata, not generated terrain recipes, replay timelines, or owner-mod state.
 
-The current protection layer blocks normal player block placement, breaking, and block use in read-only or inaccessible dimensions through public server events. Root users bypass DimensionLib's generic checks, while owner policy providers can still veto block use or mutation for product invariants. Non-player world mutations are not fully sandboxed yet.
+The current protection layer blocks normal player block placement, breaking, and block use in read-only or inaccessible dimensions through public server events. Root users bypass DimensionLib's generic and owner-provider checks; owner policy providers can veto block use or mutation for normal players to enforce product invariants. Non-player world mutations are not fully sandboxed yet.
 
 See `docs/API.md` for the contributor-facing API boundary, current limits, and projection guidance. See `docs/PRODUCT_DIRECTION.md` before promoting gameplay-facing features into DimensionLib. See `docs/SUBSYSTEMS_AND_REFACTOR.md` before changing DimensionLib internals.
 
@@ -55,16 +55,13 @@ var registered = dimensionLib.RegisterDimension(new DimensionSpec
     ChunkSizeX = 3,
     ChunkSizeZ = 3,
     SpawnY = 90,
-    GeneratorId = DimensionGeneratorIds.OverworldOpposite,
     VisualSettings = new DimensionVisualSettings
     {
-        FogRed = 0.12f,
-        FogGreen = 0.14f,
-        FogBlue = 0.28f,
-        FogColorWeight = 0.65f,
+        Fog = new DimensionFogVisualSettings
+        {
+            Color = new DimensionWeightedColor(new DimensionColor3(0.12f, 0.14f, 0.28f), 0.65f),
+        },
     },
-    Seed = 12345,
-    Kind = DimensionKind.Pocket,
     AccessPolicy = DimensionAccessPolicy.OwnerOnly,
     Mutability = DimensionMutability.Mutable,
 });
@@ -76,10 +73,6 @@ Set `Placement = DimensionPlacement.Explicit` and provide `ChunkX`/`ChunkZ` only
 
 Debug commands require `root` privilege:
 
-- `/dlib prepare-spike`
-- `/dlib enter-spike`
-- `/dlib exit-spike`
-- `/dlib create-test <overworld-opposite|vanilla-overworld> [dimensionId] [sizeChunks] [seed]`
 - `/dlib generators`
 - `/dlib prepare <dimensionId>`
 - `/dlib send <dimensionId>`
@@ -91,10 +84,9 @@ Debug commands require `root` privilege:
 - `/dlib list`
 - `/dlib inspect`
 - `/dlib validate [dimensionId]`
+- `/dlib visual status`
 - `/dlib visual reset`
-- `/dlib visual preset <clear|thin|default>`
 - `/dlib visual set <key> <value>`
-- `/dlib light-floor <dimensionId> <level>`
 - `/dlib release <dimensionId> [orphan|forget|clear] confirm`
 
 The alias `/dimensionlib` is also registered. The `tp` commands use absolute engine coordinates. Omit `x y z` to use the target's default spawn (`overworld`) or DimensionLib dimension spawn.
@@ -103,16 +95,12 @@ The alias `/dimensionlib` is also registered. The `tp` commands use absolute eng
 
 These steps require a server with DimensionLib loaded and a root/admin player:
 
-1. Run `/dlib prepare-spike`.
-2. Run `/dlib list` and confirm `dimensionlib:debug-spike` is registered, prepared, and not orphaned.
-3. Run `/dlib enter-spike` and confirm the player arrives on the generated platform in dimension plane `3`.
-4. Run `/dlib inspect` inside the dimension and confirm the reported bounds and policy match the debug dimension.
-5. Place and break a block as root to confirm admin interaction still works in the mutable debug dimension.
-6. Run `/dlib exit-spike` and confirm the player returns to the recorded origin.
-7. Run `/dlib release dimensionlib:debug-spike orphan confirm` and confirm `/dlib list` marks it orphaned until the mod re-registers it.
-8. Run `/dlib create-test overworld-opposite`, then `/dlib enter dimensionlib:test-overworld-opposite`, and confirm rolling terrain with a darker reversed-time ambience.
-9. Run `/dlib create-test vanilla-overworld dimensionlib:test-vanilla-overworld-window 256`, wait briefly for the standard overworld source column to materialize, then `/dlib enter dimensionlib:test-vanilla-overworld-window` and confirm the dimension uses normal Vintage Story overworld terrain at the sparse backing coordinates.
-10. For a lazy-generation stress test, create a large bounded window such as `/dlib create-test vanilla-overworld dimensionlib:test-big-overworld 1024`. This registers a 1024x1024 chunk claim but only requests a tiny initial window; generation expands lazily around online players.
-11. Run `/dlib validate` inside each generated dimension and confirm expected bounds, prepared chunk counts, and spawn block ids. Standard overworld source windows may need a manual `/dlib tp <dimensionId> x y z` if the fixed prototype spawn Y is underground or airborne at the generated backing coordinates.
-12. For sealed generated-dimension lighting experiments only, use `/dlib light-floor <dimensionId> <level>` to manually write a low blocklight floor into already-prepared air cells and resend prepared chunks. This is debug tooling, not DimensionLib public API or default generated-dimension behavior.
-13. From a dedicated-server console, use `/dlib create-test <type> ...` followed by `/dlib enter-player <playerName> <dimensionId>` for non-interactive QA clients.
+1. With Pocket Dimensions loaded, run `/pocket create smoke 3` or use another consumer mod to register and prepare a disposable DimensionLib dimension.
+2. Run `/dlib list` and confirm the dimension is registered, prepared, and not orphaned.
+3. Run `/dlib enter <dimensionId>` and confirm the player arrives inside the consumer-created dimension.
+4. Run `/dlib inspect` inside the dimension and confirm the reported bounds and policy match the consumer spec.
+5. Run `/dlib validate` and confirm expected bounds, prepared chunk counts, and spawn block samples.
+6. Run `/dlib tp overworld` and confirm the player can recover to the overworld spawn.
+7. Run `/dlib tp <dimensionId>` without coordinates and confirm the player returns to the dimension spawn.
+8. Run `/dlib visual status` and check the client log for the active visual state snapshot.
+9. For disposable dimensions only, run `/dlib release <dimensionId> orphan confirm` and confirm `/dlib list` marks it orphaned until the owner mod re-registers it.

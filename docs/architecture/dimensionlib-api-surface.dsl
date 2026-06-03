@@ -128,20 +128,12 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib, Pocket Dimensio
                     tags "Core,Experimental"
                 }
 
-                debugLightFloor = component "ChunkLightFloorApplier" "Root-only debug command helper for manually applying blocklight floors to prepared chunks; not automatic public API." "C# debug service" {
-                    tags "Experimental"
-                }
-
                 diagnostics = component "DimensionDiagnosticService" "Validates metadata, source/generator bounds, prepared state, and spawn samples." "C# service" {
                     tags "Core"
                 }
 
-                dlibCommands = component "/dlib Commands" "Root-only debug, diagnostic, QA, and maintenance command tree." "Vintage Story chat commands" {
+                dlibCommands = component "/dlib Commands" "Root-only diagnostic, QA, and maintenance command tree for registered consumer dimensions." "Vintage Story chat commands" {
                     tags "Command,Experimental"
-                }
-
-                builtInFixtures = component "Built-in Test Fixtures" "Debug spike, overworld-opposite, and standard-overworld source-window stress fixtures." "C# generators" {
-                    tags "Experimental"
                 }
             }
 

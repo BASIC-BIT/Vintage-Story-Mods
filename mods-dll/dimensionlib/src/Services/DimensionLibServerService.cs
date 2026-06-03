@@ -6,8 +6,6 @@ using DimensionLib.Api;
 using DimensionLib.Core;
 using DimensionLib.Effects;
 using DimensionLib.Generation;
-using DimensionLib.Lab;
-using DimensionLib.Lighting;
 using DimensionLib.Protection;
 using DimensionLib.Transfer;
 using Vintagestory.API.Common;
@@ -18,8 +16,6 @@ namespace DimensionLib.Services;
 
 public sealed class DimensionLibServerService : IDisposable
 {
-    public const string DebugDimensionId = "dimensionlib:debug-spike";
-    public const string OverworldOppositeDimensionId = "dimensionlib:test-overworld-opposite";
     private const int InitialGeneratedChunkRadius = 1;
     private const int FallbackLazyGeneratedChunkRadius = 2;
     private const int InitialGeneratedChunkBudget = 1;
@@ -32,8 +28,6 @@ public sealed class DimensionLibServerService : IDisposable
     private readonly DimensionManifestService _manifestService;
     private readonly DimensionChunkService _chunkService;
     private readonly ChunkColumnMaterializer _materializer;
-    private readonly DebugDimensionPlatformBuilder _debugPlatformBuilder;
-    private readonly ChunkLightFloorApplier _lightFloorApplier;
     private readonly GeneratedDimensionWindowPreparer _generatedWindowPreparer;
     private readonly GeneratedDimensionStreamer _generatedStreamer;
     private readonly PolicyProviderRegistry _policyProviders;
@@ -59,8 +53,6 @@ public sealed class DimensionLibServerService : IDisposable
         _manifestService = new DimensionManifestService(api);
         _chunkService = new DimensionChunkService(api);
         _materializer = new ChunkColumnMaterializer(api);
-        _debugPlatformBuilder = new DebugDimensionPlatformBuilder(api);
-        _lightFloorApplier = new ChunkLightFloorApplier(api);
         _generatedWindowPreparer = new GeneratedDimensionWindowPreparer(api, _chunkService, _materializer, _preparedDimensions);
         _generatedStreamer = new GeneratedDimensionStreamer(api, _dimensions, _generators, _generatedWindowPreparer, FallbackLazyGeneratedChunkRadius, InitialGeneratedChunkRadius, LazyGeneratedChunkBudgetPerTick);
         _policyProviders = new PolicyProviderRegistry();
@@ -71,16 +63,12 @@ public sealed class DimensionLibServerService : IDisposable
         _visualTuningBroadcaster = new VisualTuningBroadcaster(api, serverChannel);
         _temporalStabilityGuard = new TemporalStabilityGuard(api, IsInsideDimensionLibDimension);
         _diagnostics = new DimensionDiagnosticService(api, _generators, _preparedDimensions);
-        RegisterBuiltInGenerators();
         LoadPersistedDimensions();
-        RegisterDimension(DebugDimensionSpec());
     }
 
     public IReadOnlyCollection<Dimension> Dimensions => _dimensions.Dimensions;
 
     public IReadOnlyCollection<string> GeneratorIds => _generators.GeneratorIds.Concat(new[] { DimensionGeneratorIds.StandardOverworldWindow }).ToArray();
-
-    public Dimension DebugDimension => _dimensions.GetRequired(DebugDimensionId);
 
     public void Start()
     {
@@ -258,67 +246,6 @@ public sealed class DimensionLibServerService : IDisposable
         return PrepareDimension(dimension.DimensionId, generator.CreateSource(dimension), sendToPlayer, token);
     }
 
-    public DimensionLibResult CreateTestDimension(string testId, string dimensionId = null, int? sizeChunks = null, long? seed = null, IServerPlayer player = null, CancellationToken token = default)
-    {
-        if (!TryCreateTestDimensionSpec(testId, dimensionId, sizeChunks, seed, out var spec, out var normalizedTestId))
-        {
-            return DimensionLibResult.Fail("Test dimension must be 'overworld-opposite' or 'vanilla-overworld'. Cavern terrain lives in the Cavern Dimension Demo mod.", "unknown-test-dimension");
-        }
-
-        if (string.Equals(spec.GeneratorId, DimensionGeneratorIds.StandardOverworldWindow, StringComparison.Ordinal))
-        {
-            var mapChunkSizeX = _api.WorldManager.MapSizeX / Vintagestory.API.Config.GlobalConstants.ChunkSize;
-            var mapChunkSizeZ = _api.WorldManager.MapSizeZ / Vintagestory.API.Config.GlobalConstants.ChunkSize;
-            if (spec.ChunkSizeX > mapChunkSizeX || spec.ChunkSizeZ > mapChunkSizeZ)
-            {
-                return DimensionLibResult.Fail($"Standard overworld source window {spec.ChunkSizeX}x{spec.ChunkSizeZ} chunks exceeds this world's map size {mapChunkSizeX}x{mapChunkSizeZ} chunks.", "standard-overworld-source-window-too-large");
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(dimensionId))
-        {
-            if (_dimensions.TryGet(spec.DimensionId, out var existing))
-            {
-                if (IsBuiltInTestDimension(existing, normalizedTestId) && !DimensionSpecValidator.SameClaim(existing, spec))
-                {
-                    _dimensions.Remove(existing.DimensionId);
-                    _manifestService.Remove(existing.DimensionId);
-                    _preparedDimensions.RemoveDimension(existing.DimensionId);
-                }
-                else
-                {
-                    spec.ChunkX = existing.ChunkX;
-                    spec.ChunkZ = existing.ChunkZ;
-                    if (!sizeChunks.HasValue)
-                    {
-                        spec.ChunkSizeX = existing.ChunkSizeX;
-                        spec.ChunkSizeZ = existing.ChunkSizeZ;
-                    }
-                }
-            }
-        }
-        else if (_dimensions.TryGet(spec.DimensionId, out var existing) && !DimensionSpecValidator.SameClaim(existing, spec) && IsBuiltInTestDimension(existing, normalizedTestId))
-        {
-            _dimensions.Remove(existing.DimensionId);
-            _manifestService.Remove(existing.DimensionId);
-            _preparedDimensions.RemoveDimension(existing.DimensionId);
-        }
-
-        var registered = RegisterDimension(spec);
-        if (!registered.Success)
-        {
-            return DimensionLibResult.Fail(registered.Message, registered.ErrorCode);
-        }
-
-        var prepared = PrepareGeneratedDimensionWindow(spec.DimensionId, InitialGeneratedChunkRadius, player, token, InitialGeneratedChunkBudget);
-        if (!prepared.Success)
-        {
-            return prepared;
-        }
-
-        return DimensionLibResult.Ok($"Created test dimension '{normalizedTestId}' as '{spec.DimensionId}' with lazy chunk generation. Use /dlib enter {spec.DimensionId}.");
-    }
-
     public DimensionLibResult<string> ValidateDimension(string dimensionId)
     {
         var lookup = GetDimension(dimensionId);
@@ -360,23 +287,6 @@ public sealed class DimensionLibServerService : IDisposable
         }
 
         return TeleportToDimension(player, lookup.Value.DimensionId);
-    }
-
-    public DimensionLibResult PrepareDebugDimension(IServerPlayer player = null)
-    {
-        var dimension = DebugDimension;
-        _chunkService.CreateChunkColumns(dimension);
-        _debugPlatformBuilder.Fill(dimension);
-        _debugPlatformBuilder.LogSample(dimension);
-        _chunkService.Relight(dimension);
-        _preparedDimensions.MarkAllChunksPrepared(dimension);
-        _preparedDimensions.MarkDimensionPrepared(dimension.DimensionId);
-        if (player != null)
-        {
-            ForceSend(dimension, player);
-        }
-
-        return DimensionLibResult.Ok("Prepared DimensionLib debug dimension.");
     }
 
     public DimensionLibResult ForceSendDimension(string dimensionId, IServerPlayer player)
@@ -421,38 +331,6 @@ public sealed class DimensionLibServerService : IDisposable
         var pos = player.Entity.Pos;
         var dimensionId = TryGetDimensionAtPosition(pos.AsBlockPos, out var dimension) ? dimension.DimensionId : null;
         return DimensionLibResult<DimensionLocation>.Ok(DimensionLocation.From(pos, dimensionId));
-    }
-
-    public DimensionLibResult ApplyAmbientLightFloor(string dimensionId, int level)
-    {
-        var lookup = GetDimension(dimensionId);
-        if (!lookup.Success)
-        {
-            return DimensionLibResult.Fail(lookup.Message, lookup.ErrorCode);
-        }
-
-        var dimension = lookup.Value;
-        level = ClampInt(level, 0, 31);
-        var chunks = _preparedDimensions.GetPreparedLocalChunks(dimension).ToArray();
-        if (chunks.Length == 0)
-        {
-            return DimensionLibResult.Fail($"Dimension '{dimension.DimensionId}' has no prepared chunks.", "dimension-not-prepared");
-        }
-
-        var updatedLights = _lightFloorApplier.ApplyBlocklightFloor(dimension, level, chunks);
-        var sentPlayers = 0;
-        foreach (var player in _api.World.AllOnlinePlayers.OfType<IServerPlayer>())
-        {
-            if (player?.Entity?.Pos == null || player.Entity.Pos.Dimension != dimension.DimensionPlaneId)
-            {
-                continue;
-            }
-
-            _chunkService.ForceSendLocalChunkColumns(dimension, player, chunks);
-            sentPlayers++;
-        }
-
-        return DimensionLibResult.Ok($"Applied debug blocklight floor {level} to {updatedLights} air light cell(s) in {chunks.Length} chunk column(s) for '{dimension.DimensionId}' and resent to {sentPlayers} player(s).");
     }
 
     public DimensionLibResult TeleportToDimension(IServerPlayer player, string dimensionId, DimensionTeleportOptions options = null)
@@ -649,12 +527,6 @@ public sealed class DimensionLibServerService : IDisposable
     {
         var center = _generatedWindowPreparer.ResolveCenterLocalChunk(dimension, sendToPlayer);
         return _generatedWindowPreparer.PrepareStandardOverworldSourceWindow(dimension, center.X, center.Y, radiusChunks, sendToPlayer, token, maxColumns);
-    }
-
-    public DimensionLibResult EnterDebugDimension(IServerPlayer player)
-    {
-        var prepare = PrepareDebugDimension(player);
-        return prepare.Success ? TeleportToDimension(player, DebugDimensionId) : prepare;
     }
 
     private void ForceSend(Dimension dimension, IServerPlayer player)
@@ -876,33 +748,8 @@ public sealed class DimensionLibServerService : IDisposable
         _manifestService.Save(_dimensions.Values, IsDimensionOrphaned, _preparedDimensions.GetPreparedChunkKeys);
     }
 
-    private static DimensionSpec DebugDimensionSpec()
-    {
-        return BuiltInTestDimensionFactory.DebugDimensionSpec();
-    }
-
-    private static bool IsBuiltInTestDimension(Dimension dimension, string normalizedTestId)
-    {
-        return BuiltInTestDimensionFactory.IsBuiltInTestDimension(dimension, normalizedTestId);
-    }
-
     private static bool IsStandardOverworldSourceDimension(Dimension dimension)
     {
         return string.Equals(dimension?.GeneratorId, DimensionGeneratorIds.StandardOverworldWindow, StringComparison.Ordinal);
-    }
-
-    private static int ClampInt(int value, int min, int max)
-    {
-        return value < min ? min : value > max ? max : value;
-    }
-
-    private void RegisterBuiltInGenerators()
-    {
-        RegisterGenerator(new OverworldOppositeDimensionGenerator(_api));
-    }
-
-    private static bool TryCreateTestDimensionSpec(string testId, string dimensionId, int? sizeChunks, long? seed, out DimensionSpec spec, out string normalizedTestId)
-    {
-        return BuiltInTestDimensionFactory.TryCreateTestDimensionSpec(testId, dimensionId, sizeChunks, seed, out spec, out normalizedTestId);
     }
 }

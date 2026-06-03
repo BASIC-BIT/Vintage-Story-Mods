@@ -62,7 +62,7 @@ Persisted dimension metadata includes:
 - Dimension plane id and backing chunk rectangle.
 - Spawn Y and derived spawn X/Z.
 - Generator id, explicit visual settings, and seed.
-- Dimension kind, access policy, mutability, and transient flag.
+- Access policy, mutability, and transient flag.
 - Orphaned state.
 
 Transient dimensions are marked orphaned when loaded from disk. The owning mod reactivates them by registering the same dimension id and bounds during startup. Orphaned dimensions are retained in the manifest so admins can inspect or explicitly release them instead of DimensionLib silently forgetting chunks that may still exist on disk.
@@ -91,45 +91,40 @@ DimensionLib currently enforces the first layer of protection through server hoo
 - `TeleportToDimension(...)` checks access policy before moving the player.
 - `ForceSendDimension(...)` checks access policy before sending dimension chunks.
 
-Root users bypass DimensionLib's generic entry/read-only checks. Owner policy providers are still evaluated before the root bypass for block use and mutation, so consumer mods can enforce product invariants such as unbreakable pocket floors. DimensionLib materialization also writes through the server block accessor and is not blocked by player interaction hooks.
+Root users bypass DimensionLib's generic entry/read-only checks and owner-provider checks. Owner policy providers can enforce product invariants such as unbreakable pocket floors for normal players. DimensionLib materialization also writes through the server block accessor and is not blocked by player interaction hooks.
 
 Owner mods can register an `IDimensionPolicyProvider` for richer rules. DimensionLib calls the provider for `OwnerOnly` entry decisions and for extra mutable-dimension block-use/mutation checks. The provider does not override core read-only or orphaned-dimension protection for normal players.
 
 ## Visual Environment
 
-`DimensionSpec.VisualSettings` carries explicit ambience, fog, cloud, sky-cover, light-lift, and cave-fog suppression settings. There are no public named visual presets; consumers set the fields they want. `DimensionVisualSettings.MinimumSceneLight` adds a per-dimension post-process light lift for sealed or non-solar spaces. DimensionLib renders this as a client-only ambient lift after final composition because Vintage Story's built-in `minlight` shader uniform is an input black point, not an output brightness floor. It does not create physical block light, affect mobs, or change the saved chunk lightmap.
+`DimensionSpec.VisualSettings` carries explicit ambience, fog, cloud, sky-cover, light-lift, and cave-fog suppression settings. There are no public named visual presets; consumers set the fields they want. `DimensionVisualSettings.Scene.MinimumLight` adds a per-dimension post-process light lift for sealed or non-solar spaces. DimensionLib renders this as a client-only ambient lift after final composition because Vintage Story's built-in `minlight` shader uniform is an input black point, not an output brightness floor. It does not create physical block light, affect mobs, or change the saved chunk lightmap.
 
 See `RENDER_EFFECTS.md` for current research notes on sky replacement, vanilla cave-fog suppression, sealed-dimension lighting, and possible custom depth-aware fog passes.
 
-Use `VisualSettings = null` for normal Vintage Story visuals, or `MinimumSceneLight = 0` inside explicit settings to avoid client-side light lift. Prefer explicit visual tuning before generated light blocks. Generated light sources should only be considered if they are true ambient world features: dynamically fitted to the room, non-interactable, and isolated from gameplay/mod interactions.
+Use `VisualSettings = null` for normal Vintage Story visuals, or `Scene.MinimumLight = 0` inside explicit settings to avoid client-side light lift. Prefer explicit visual tuning before generated light blocks. Generated light sources should only be considered if they are true ambient world features: dynamically fitted to the room, non-interactable, and isolated from gameplay/mod interactions.
 
 Root debug commands expose temporary live visual tuning for the current client:
 
+- `/dlib visual status`
 - `/dlib visual reset`
-- `/dlib visual preset <clear|thin|default>`
 - `/dlib visual set <key> <value>`
-- `/dlib light-floor <dimensionId> <level>`
 
 Current tuning keys are exact debug names, not public API: `fogdensity`, `flatfogdensity`, `fogweight`, `fogdensityweight`, `flatfogdensityweight`, `fogred`, `foggreen`, `fogblue`, `ambientred`, `ambientgreen`, `ambientblue`, `ambientweight`, `scenebrightness`, `scenebrightnessweight`, `fogbrightness`, `fogbrightnessweight`, `skyred`, `skygreen`, `skyblue`, `skyalpha`, `minlight`, `liftmult`, `liftmax`, `liftred`, `liftgreen`, and `liftblue`.
-
-`/dlib light-floor` is a separate root-only debug experiment for sealed generated caverns. It writes a low blocklight floor into air cells in already-prepared chunks, then resends chunk columns. It does not create blocks, block entities, drops, collisions, selections, or interactable light sources. It does affect chunk light-level data and is intentionally not part of `DimensionVisualSettings` or automatic generated-dimension behavior.
 
 Content-specific cavern visual hypotheses now live in the Cavern Dimension Demo mod. DimensionLib keeps only the reusable visual settings fields and transfer/apply mechanics.
 
 - Fog and flat fog should remain conservative until sealed-dimension lighting is understood.
-- Baked chunk-light floors are suspected workaround code; keep them quarantined to debug tooling until proven necessary.
+- Baked chunk-light floors are suspected workaround code and are not part of DimensionLib core.
 - Client-only post-process light lift can raise blacks but cannot recover texture detail that chunk lighting rendered too dark.
 - Generated block emitters are not acceptable unless they are non-interactive, room-fitted environmental features.
 
 Demo content may set minimum scene light, sky cover, fog, ambient, and light lift values through `DimensionVisualSettings` without adding presets or domain-specific values to DimensionLib.
 
-## Built-In Creation Lab
+## Generator And Diagnostic Commands
 
-The current built-in generators are intentionally small litmus tests:
+DimensionLib does not ship built-in gameplay or lab generators. Consumers register `IDimensionGenerator` implementations, set `DimensionSpec.GeneratorId`, and then use DimensionLib's prepare/enter/send/validate mechanics. `DimensionGeneratorIds.StandardOverworldWindow` remains a narrow built-in source id for mods that deliberately need bounded vanilla-overworld source projection without owning vanilla generator code.
 
-- `DimensionGeneratorIds.OverworldOpposite`: rolling overworld-like terrain with darker explicit visual settings.
-
-Root debug commands expose these as `/dlib create-test <type> [dimensionId] [sizeChunks] [seed]`. Dedicated-server console QA can pair this with `/dlib enter-player <playerName> <dimensionId>` to move an online test client without interacting with the client window. They are not final gameplay generators; they prove the DimensionLib path from spec -> generator -> block source -> materialization -> transfer -> explicit visual settings.
+Root commands operate on dimensions that a consumer mod has already registered:
 
 Useful validation commands:
 
@@ -159,6 +154,6 @@ Replay-specific guidance:
 - Materialization currently writes solid block IDs only.
 - Visual settings are currently synced by DimensionLib transfers, not by a robust client-side dimension registry/resync path.
 - Region allocation intentionally provides only sparse placement. It does not provide dense packing, named neighborhoods, or lifecycle cleanup policy yet.
-- Calendar, season, and weather are still global VS systems; the overworld-opposite test is visual, not a true per-dimension calendar.
+- Calendar, season, and weather are still global VS systems; DimensionLib does not provide per-dimension calendars yet.
 
 These limits are intentional. They keep the first API small while leaving clear extension points for persistence, protection, block entities, and per-dimension visuals.

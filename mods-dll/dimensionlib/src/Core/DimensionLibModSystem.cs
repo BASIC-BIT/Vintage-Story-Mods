@@ -41,7 +41,7 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
         _serverService = new DimensionLibServerService(api, serverChannel);
         _serverService.Start();
         new DimensionLibCommandRegistrar(api, _serverService).Register();
-        api.Logger.Notification("DimensionLib registered debug dimension commands. Use /dlib enter-spike as root.");
+        api.Logger.Notification("DimensionLib registered root maintenance commands under /dlib.");
     }
 
     public override void StartClientSide(ICoreClientAPI api)

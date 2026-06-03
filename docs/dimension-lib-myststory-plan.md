@@ -257,8 +257,8 @@ Implement a temporary debug command in a `dimensionlib` code mod:
 Current scaffold state:
 
 - Added `mods-dll/dimensionlib` as a universal SDK-style code mod.
-- Added root-only debug commands: `/dlib prepare-spike`, `/dlib enter-spike`, `/dlib exit-spike`, with `/dimensionlib` alias.
-- Added a temporary 3x3 chunk Dimension in dimension plane `3` at chunk `0,0`, with a generated platform and spawn at Y `92`.
+- Retired the early root-only spike commands; `/dimensionlib` remains an alias for `/dlib` maintenance commands.
+- Reserved dimension plane `3` as the first prototype plane; DimensionLib no longer auto-registers a debug dimension.
 - Added a public API/model surface: `IDimensionLibApi`, `DimensionSpec`, `Dimension`, `DimensionLibResult`, `DimensionTeleportOptions`, `BlockVolumeBounds`, `IBlockVolumeSource`, and `IChunkColumnWriter`.
 - Added Dimension registration with duplicate-ID and backing-region overlap validation.
 - Added versioned JSON manifest persistence under `ModData/dimensionlib/regions.json`.
@@ -270,8 +270,8 @@ Current scaffold state:
 - Added `mods-dll/dimensionlib/docs/API.md` as the first contributor-facing API note.
 - Added a client ambient/fog modifier while the local player is in dimension `3`.
 - Added generator/visual fields (`GeneratorId`, `VisualSettings`, `Seed`) to `DimensionSpec` and persisted dimensions.
-- Added `IDimensionGenerator` and built-in test generators for `overworld-opposite` and a cavern prototype. The cavern generator and assets later moved to the separate Cavern Dimension Demo consumer mod.
-- Added `/dlib create-test <type> [dimensionId] [sizeChunks] [seed]`, `/dlib generators`, `/dlib prepare <dimensionId>`, `/dlib send <dimensionId>`, `/dlib enter <dimensionId>`, `/dlib exit`, and `/dlib validate [dimensionId]` as the first creation lab.
+- Added `IDimensionGenerator`; content-specific generators now live in consumer/demo mods such as Cavern Dimension Demo.
+- Kept `/dlib generators`, `/dlib prepare <dimensionId>`, `/dlib send <dimensionId>`, `/dlib enter <dimensionId>`, `/dlib exit`, and `/dlib validate [dimensionId]` for registered consumer dimensions.
 - Added generator source-bounds validation and spawn block sampling so generated dimensions can be checked before manual visual QA.
 - Wired `dimensionlib` into `Vintage-Story-Mods.sln`.
 

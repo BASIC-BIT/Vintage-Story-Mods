@@ -141,33 +141,6 @@ Why:
 - The 9x9 freeze and earlier full-height light-write freeze need isolated measurement around generation, relight, force-send, and client receipt.
 - Materialization should not know about transfer policy, visual settings, or access control.
 
-### Debug Light Floor Experiment
-
-Current file:
-
-- `src/Lighting/ChunkLightFloorApplier.cs`
-- `src/Services/DimensionLibServerService.cs`
-
-Responsibilities today:
-
-- Keep root-only debug `/dlib light-floor` command behavior.
-- Manually write a blocklight floor into already-prepared air cells and resend chunks.
-- Avoid making baked chunk-light floors part of public visual settings or default generated-dimension behavior.
-
-Current split:
-
-- `Lighting/ChunkLightFloorApplier`: writes manual debug blocklight floors into selected prepared chunks.
-- `Services/DimensionLibServerService`: command-facing orchestration and online-player resend after debug floor changes.
-
-Why:
-
-- Spawn darkness, fullbright terrain, fog perception, and performance are all entangled with baked light writes.
-- Baked chunk-light floors are currently suspected workaround code and should stay quarantined as debug tooling until proven necessary.
-
-Important constraint:
-
-- Generated fake light blocks remain rejected as a default mechanism. If they are ever tested, they must be deliberate environmental features with no collision, interaction, drops, or gameplay leakage.
-
 ### Access Control And Protection
 
 Current file:
@@ -228,26 +201,22 @@ Why:
 - Client visuals depend on transfer messages today, so transfer bugs can masquerade as visual bugs.
 - Return-position behavior is reusable and should not live beside content-specific test code.
 
-### Built-In Generators And Test Labs
+### Generator Registry And Streaming
 
 Current files:
 
 - `src/Generation/BuiltInBlockSource.cs`
 - `src/Generation/Noise/ValueNoise2D.cs`
-- `src/Generation/OverworldOppositeDimensionGenerator.cs`
 - `src/Generation/DimensionGeneratorRegistry.cs`
 - `src/Generation/GeneratedDimensionWindowPreparer.cs`
 - `src/Generation/GeneratedDimensionStreamer.cs`
-- `src/Lab/BuiltInTestDimensionFactory.cs`
-- `src/Lab/DebugDimensionPlatformBuilder.cs`
 
 Responsibilities today:
 
 - Generator registration types.
 - Shared value-noise helpers.
-- Overworld opposite generator.
-- Public generator registry and generic generated-dimension streaming.
-- Test-dimension specs and debug-platform filling.
+- Public generator registry and generic generated-dimension streaming for consumer-registered dimensions.
+- Standard-overworld source-window preparation for consumers that deliberately use `DimensionGeneratorIds.StandardOverworldWindow`.
 
 Remaining target split:
 
@@ -272,7 +241,7 @@ Responsibilities today:
 - Minimum-scene-light overlay.
 - Vanilla cave-fog suppression.
 - Temporal visual suppression.
-- Debug tuning key store and presets for live experiments.
+- Debug tuning key store and validation for live experiments.
 
 Current split:
 
@@ -280,7 +249,7 @@ Current split:
 - `ClientVisuals/AmbientModifierController`: ambient/fog/cloud/brightness modifier lifecycle.
 - `ClientVisuals/ScreenColorOverlayRenderer`: shared opaque sky cover and post-composition lift renderer.
 - `ClientVisuals/VanillaEffectSuppressor`: `blackfogincaves`, temporal instability, cloud policy.
-- `ClientVisuals/VisualTuningState`: debug keys/presets and validation.
+- `ClientVisuals/VisualTuningState`: debug keys and validation.
 - `Services/DimensionVisualSystem`: high-level coordinator only.
 
 Why:
@@ -348,11 +317,11 @@ Work order:
 2. Extract prepared chunk key ownership. Done.
 3. Extract `DimensionManifestService` around `DimensionRegionStore`. Done.
 4. Extract `DimensionChunkService`, `ChunkColumnMaterializer`, and generated-window preparation. Done.
-5. Extract and then narrow `ChunkLightFloorApplier` to root-only debug tooling; no automatic light-floor policy remains. Done.
+5. Remove baked light-floor debug tooling from DimensionLib core. Done.
 6. Extract protection and policy-provider services. Done.
 7. Extract transfer/return-position services. Done.
 8. Extract generator registry and visual tuning broadcasting. Done.
-9. Extract diagnostics, built-in test dimension factory, debug platform builder, and temporal-stability guard. Done.
+9. Extract diagnostics and temporal-stability guard. Done.
 10. Extract lazy generated-column streaming loop. Done.
 
 Verification after each extraction:
@@ -396,10 +365,9 @@ Verification:
 
 Work:
 
-- Resume visual/generator/light experiments one variable at a time.
+- Resume visual and generator experiments one variable at a time.
 - First likely experiments after refactor:
   - Verify whether ambient fog is applied at all with an exaggerated debug fog-only profile.
-  - Verify spawn lighting independently from global floor lighting.
   - Verify sky replacement independently from terrain lighting.
   - Verify generator enclosure independently from sky/fog.
 
@@ -409,7 +377,6 @@ Required pause:
 
 ## Immediate Open Questions
 
-- Is `/dlib light-floor` still worth keeping as debug tooling, or should baked chunk-light floor experiments be removed entirely?
 - Should `/dlib visual` tune one client only, all online clients, or require explicit target syntax?
 - Should the Cavern Demo keep a custom spawn-light rule separate from broader cavern lighting?
 - Should visual experiments get a minimal debug HUD/log line showing active profile and effective fog/light values?

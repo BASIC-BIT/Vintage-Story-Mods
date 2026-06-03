@@ -93,7 +93,7 @@ Cavern content is split from DimensionLib:
 
 - Generator/content code: `CavernDimensionGenerator`, `CavernGenerationProfile`, and `dimensioncavern:cavernrock` assets live in `mods-dll/dimensioncavern`.
 - Visual environment code: public `DimensionVisualSettings`, `VisualSettingsMapper`, `DimensionVisualSystem`, and `/dlib visual` tuning. These are core-owned and expose explicit per-spec fields rather than a named preset registry.
-- Debug light-floor tooling: `/dlib light-floor` and `ChunkLightFloorApplier`. This is root-only experimentation, not public API or default generated-dimension behavior.
+- Baked light-floor tooling has been removed from DimensionLib core. Keep future lighting experiments in consumer/demo code until a repeated reusable primitive appears.
 
 ## Public API Gaps Exposed By Cavern Demo
 
@@ -109,7 +109,7 @@ Avoid adding helpers just because a single consumer mod wants them. Start with e
 ## Recommended Near-Term Work Order
 
 1. Keep Pocket Dimensions small and use it to judge whether the public API is pleasant enough.
-2. Use the vanilla-overworld source window to test whether a second overworld-like dimension can be bounded, lazily generated, transferred into, and streamed without owning vanilla's generator code.
+2. Keep the vanilla-overworld source window as a reusable primitive, but expose stress tests through consumer/demo code rather than a built-in `/dlib create-test` lab.
 3. Keep Cavern Demo generator and visual experiments in the demo mod, not release-critical DimensionLib polish.
 4. Promote repeated consumer boilerplate only after it appears in more than one consumer mod.
 5. Only then decide whether to expose visual/light registration APIs or start a Mystcraft-style copied/tweakable overworld generator.
