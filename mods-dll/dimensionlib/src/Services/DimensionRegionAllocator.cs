@@ -69,7 +69,6 @@ internal static class DimensionRegionAllocator
             spec.GeneratorId,
             spec.VisualSettings?.Clone(),
             spec.Seed,
-            spec.Kind,
             spec.AccessPolicy,
             spec.Mutability,
             spec.IsTransient);

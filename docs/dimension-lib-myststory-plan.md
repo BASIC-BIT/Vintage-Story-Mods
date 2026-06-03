@@ -134,7 +134,7 @@ Current cavern visual hypotheses:
 - Keep fuzzy/gameplay interpretation in consuming mods. DimensionLib should only validate explicit dimension specs, dimension-plane choices, bounds, materialization calls, and transfer requests.
 - Prefer small interfaces that expose mechanics, not policy: `IBlockVolumeSource` answers block materialization; replay decides what timestamp means and MystStory decides what pages mean.
 - Document current limits near the API. A small honest API is better than a broad surface that implies more protection or block-entity fidelity than exists.
-- Preserve future compatibility by treating dimension metadata (`Kind`, `AccessPolicy`, `Mutability`, `IsTransient`) as stable policy concepts that can gain deeper enforcement over time.
+- Preserve future compatibility by treating dimension metadata (`AccessPolicy`, `Mutability`, `IsTransient`) as stable policy concepts that can gain deeper enforcement over time.
 
 ## Replay/World-Diff Integration
 

@@ -29,8 +29,6 @@ public sealed class DimensionSpec
 
     public long Seed { get; set; }
 
-    public DimensionKind Kind { get; set; } = DimensionKind.Pocket;
-
     public DimensionAccessPolicy AccessPolicy { get; set; } = DimensionAccessPolicy.OwnerOnly;
 
     public DimensionMutability Mutability { get; set; } = DimensionMutability.Mutable;
@@ -51,7 +49,6 @@ public sealed class DimensionSpec
             GeneratorId,
             VisualSettings?.Clone(),
             Seed,
-            Kind,
             AccessPolicy,
             Mutability,
             IsTransient);

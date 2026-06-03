@@ -17,7 +17,6 @@ public sealed class Dimension
         string generatorId = null,
         DimensionVisualSettings visualSettings = null,
         long seed = 0,
-        DimensionKind kind = DimensionKind.Pocket,
         DimensionAccessPolicy accessPolicy = DimensionAccessPolicy.OwnerOnly,
         DimensionMutability mutability = DimensionMutability.Mutable,
         bool isTransient = true)
@@ -33,7 +32,6 @@ public sealed class Dimension
         GeneratorId = generatorId;
         VisualSettings = visualSettings?.Clone();
         Seed = seed;
-        Kind = kind;
         AccessPolicy = accessPolicy;
         Mutability = mutability;
         IsTransient = isTransient;
@@ -60,8 +58,6 @@ public sealed class Dimension
     public DimensionVisualSettings VisualSettings { get; }
 
     public long Seed { get; }
-
-    public DimensionKind Kind { get; }
 
     public DimensionAccessPolicy AccessPolicy { get; }
 

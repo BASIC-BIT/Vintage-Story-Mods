@@ -34,8 +34,6 @@ public sealed class DimensionRegionManifestEntry
 
     public long Seed { get; set; }
 
-    public DimensionKind Kind { get; set; }
-
     public DimensionAccessPolicy AccessPolicy { get; set; }
 
     public DimensionMutability Mutability { get; set; }
@@ -65,7 +63,6 @@ public sealed class DimensionRegionManifestEntry
             GeneratorId = dimension.GeneratorId,
             VisualSettings = dimension.VisualSettings?.Clone(),
             Seed = dimension.Seed,
-            Kind = dimension.Kind,
             AccessPolicy = dimension.AccessPolicy,
             Mutability = dimension.Mutability,
             IsTransient = dimension.IsTransient,
@@ -96,7 +93,6 @@ public sealed class DimensionRegionManifestEntry
             GeneratorId = GeneratorId,
             VisualSettings = VisualSettings?.Clone(),
             Seed = Seed,
-            Kind = Kind,
             AccessPolicy = AccessPolicy,
             Mutability = Mutability,
             IsTransient = IsTransient,

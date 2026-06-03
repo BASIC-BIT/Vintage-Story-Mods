@@ -124,7 +124,6 @@ public sealed class CavernDimensionModSystem : ModSystem
             GeneratorId = GeneratorId,
             VisualSettings = CreateCavernVisualSettings(),
             Seed = seed ?? 2026052902,
-            Kind = DimensionKind.Pocket,
             AccessPolicy = DimensionAccessPolicy.AdminOnly,
             Mutability = DimensionMutability.Mutable,
             IsTransient = true,

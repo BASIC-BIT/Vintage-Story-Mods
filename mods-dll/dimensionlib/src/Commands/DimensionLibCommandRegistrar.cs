@@ -399,7 +399,7 @@ internal sealed class DimensionLibCommandRegistrar
         }
 
         return string.Join("\n", dimensions.Select(dimension =>
-            $"{dimension.DimensionId}: owner={dimension.OwnerModId}, plane={dimension.DimensionPlaneId}, chunks=({dimension.ChunkX},{dimension.ChunkZ}) {dimension.ChunkSizeX}x{dimension.ChunkSizeZ}, generator={dimension.GeneratorId ?? "none"}, visual={(dimension.VisualSettings == null ? "none" : "explicit")}, kind={dimension.Kind}, mutability={dimension.Mutability}, access={dimension.AccessPolicy}, prepared={_service.IsDimensionPrepared(dimension.DimensionId)}, orphaned={_service.IsDimensionOrphaned(dimension.DimensionId)}"));
+            $"{dimension.DimensionId}: owner={dimension.OwnerModId}, plane={dimension.DimensionPlaneId}, chunks=({dimension.ChunkX},{dimension.ChunkZ}) {dimension.ChunkSizeX}x{dimension.ChunkSizeZ}, generator={dimension.GeneratorId ?? "none"}, visual={(dimension.VisualSettings == null ? "none" : "explicit")}, mutability={dimension.Mutability}, access={dimension.AccessPolicy}, prepared={_service.IsDimensionPrepared(dimension.DimensionId)}, orphaned={_service.IsDimensionOrphaned(dimension.DimensionId)}"));
     }
 
     private string BuildDimensionInspection(IServerPlayer player)
@@ -411,7 +411,7 @@ internal sealed class DimensionLibCommandRegistrar
         }
 
         var dimension = lookup.Value;
-        return $"{dimension.DimensionId}: owner={dimension.OwnerModId}, plane={dimension.DimensionPlaneId}, chunks=({dimension.ChunkX},{dimension.ChunkZ}) {dimension.ChunkSizeX}x{dimension.ChunkSizeZ}, blocks=({dimension.MinBlockX},{dimension.MinBlockZ})..({dimension.MaxBlockX},{dimension.MaxBlockZ}), spawn=({dimension.SpawnX:0.#},{dimension.SpawnY},{dimension.SpawnZ:0.#}), generator={dimension.GeneratorId ?? "none"}, visual={(dimension.VisualSettings == null ? "none" : "explicit")}, seed={dimension.Seed}, kind={dimension.Kind}, mutability={dimension.Mutability}, access={dimension.AccessPolicy}, prepared={_service.IsDimensionPrepared(dimension.DimensionId)}, orphaned={_service.IsDimensionOrphaned(dimension.DimensionId)}";
+        return $"{dimension.DimensionId}: owner={dimension.OwnerModId}, plane={dimension.DimensionPlaneId}, chunks=({dimension.ChunkX},{dimension.ChunkZ}) {dimension.ChunkSizeX}x{dimension.ChunkSizeZ}, blocks=({dimension.MinBlockX},{dimension.MinBlockZ})..({dimension.MaxBlockX},{dimension.MaxBlockZ}), spawn=({dimension.SpawnX:0.#},{dimension.SpawnY},{dimension.SpawnZ:0.#}), generator={dimension.GeneratorId ?? "none"}, visual={(dimension.VisualSettings == null ? "none" : "explicit")}, seed={dimension.Seed}, mutability={dimension.Mutability}, access={dimension.AccessPolicy}, prepared={_service.IsDimensionPrepared(dimension.DimensionId)}, orphaned={_service.IsDimensionOrphaned(dimension.DimensionId)}";
     }
 
     private static bool TryParseReleaseMode(string value, out DimensionReleaseMode mode)
