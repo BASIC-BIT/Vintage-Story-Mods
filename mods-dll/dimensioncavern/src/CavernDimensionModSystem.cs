@@ -74,6 +74,17 @@ public sealed class CavernDimensionModSystem : ModSystem
             return ToCommandResult(Prepare(dimensionId, player, $"Cavern dimension '{dimensionId}' already exists; prepared existing dimension."));
         }
 
+        if (existing.Success)
+        {
+            var refreshed = _dimensionLib.RegisterDimension(ToSpec(existing.Value));
+            if (!refreshed.Success)
+            {
+                return ToCommandResult(refreshed);
+            }
+
+            return ToCommandResult(Prepare(dimensionId, player, $"Cavern dimension '{dimensionId}' refreshed and prepared."));
+        }
+
         var registered = _dimensionLib.RegisterDimension(CreateSpec(dimensionId, sizeChunks, seed));
         if (!registered.Success)
         {
@@ -126,6 +137,27 @@ public sealed class CavernDimensionModSystem : ModSystem
             AccessPolicy = DimensionAccessPolicy.AdminOnly,
             Mutability = DimensionMutability.Mutable,
             IsTransient = true,
+        };
+    }
+
+    private static DimensionSpec ToSpec(Dimension dimension)
+    {
+        return new DimensionSpec
+        {
+            DimensionId = dimension.DimensionId,
+            OwnerModId = dimension.OwnerModId,
+            DimensionPlaneId = dimension.DimensionPlaneId,
+            ChunkX = dimension.ChunkX,
+            ChunkZ = dimension.ChunkZ,
+            ChunkSizeX = dimension.ChunkSizeX,
+            ChunkSizeZ = dimension.ChunkSizeZ,
+            SpawnY = dimension.SpawnY,
+            GeneratorId = dimension.GeneratorId,
+            VisualSettings = dimension.VisualSettings?.Clone(),
+            Seed = dimension.Seed,
+            AccessPolicy = dimension.AccessPolicy,
+            Mutability = dimension.Mutability,
+            IsTransient = dimension.IsTransient,
         };
     }
 
