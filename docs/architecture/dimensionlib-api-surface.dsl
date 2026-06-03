@@ -313,7 +313,6 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib, Pocket Dimensio
         visualSystem -> ambientController "Applies ambient visual settings"
         visualSystem -> overlayRenderer "Renders sky cover and minimum-light lift"
         visualSystem -> vanillaSuppressor "Suppresses inherited vanilla effects"
-        visualTuning -> visualSystem "Updates debug tuning state"
     }
 
     views {
