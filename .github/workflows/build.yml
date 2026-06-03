@@ -33,6 +33,7 @@ jobs:
         set -euo pipefail
 
         mkdir -p "$RUNNER_TEMP/structurizr-data"
+        chmod 777 "$RUNNER_TEMP/structurizr-data"
         docker run -d --name structurizr-validation \
           -p 8080:8080 \
           -v "$RUNNER_TEMP/structurizr-data:/usr/local/structurizr" \
