@@ -28,6 +28,56 @@ jobs:
           structurizr/cli validate \
           -workspace /usr/local/structurizr/dimensionlib-api-surface.dsl
 
+    - name: Validate Structurizr Local workspace load
+      run: |
+        set -euo pipefail
+
+        mkdir -p "$RUNNER_TEMP/structurizr-data"
+        docker run -d --name structurizr-validation \
+          -p 8080:8080 \
+          -v "$RUNNER_TEMP/structurizr-data:/usr/local/structurizr" \
+          -v "${{ github.workspace }}/docs/architecture/dimensionlib-api-surface.dsl:/usr/local/structurizr/workspace.dsl:ro" \
+          structurizr/structurizr
+
+        cleanup() {
+          docker rm -f structurizr-validation >/dev/null 2>&1 || true
+        }
+        trap cleanup EXIT
+
+        loaded=false
+        for attempt in {1..60}; do
+          if curl -fsS http://localhost:8080/api/workspace/1 -o workspace-response.json; then
+            loaded=true
+            break
+          fi
+          echo "Waiting for Structurizr Local API ($attempt/60)..."
+          sleep 2
+        done
+
+        if [ "$loaded" != "true" ]; then
+          docker logs structurizr-validation || true
+          echo "Structurizr Local did not respond with a workspace payload." >&2
+          exit 1
+        fi
+
+        python3 - <<'PY' || { docker logs structurizr-validation || true; exit 1; }
+        import json
+        import sys
+
+        with open("workspace-response.json", "r", encoding="utf-8") as response_file:
+            data = json.load(response_file)
+
+        if data.get("success") is False:
+            print(data.get("message", "Structurizr workspace API returned success=false"), file=sys.stderr)
+            sys.exit(1)
+
+        has_wrapped_workspace = "workspace" in data
+        has_direct_workspace = "model" in data and "views" in data
+        if not has_wrapped_workspace and not has_direct_workspace:
+            print("Structurizr workspace API did not return a recognizable workspace payload.", file=sys.stderr)
+            sys.exit(1)
+        PY
+
   build:
     needs: validate-architecture
     if: ${{ always() }}

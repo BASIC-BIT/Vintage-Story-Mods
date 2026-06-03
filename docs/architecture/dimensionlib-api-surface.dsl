@@ -320,6 +320,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib, Pocket Dimensio
         generatorRegistry -> generatorApi "Stores implementations of"
         generatorRegistry -> cavernGenerator "Resolves registered cavern generator by id"
         serverService -> generatedPreparer "Prepares generated chunk windows"
+        generatedPreparer -> materializer "Materializes generated source columns"
         dlibCommands -> debugLightFloor "Can manually apply debug blocklight floors"
         serverService -> diagnostics "Builds validation reports"
         dlibCommands -> serverService "Invokes debug and maintenance operations"
