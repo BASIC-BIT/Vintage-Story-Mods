@@ -360,13 +360,15 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib, Pocket Dimensio
             autoLayout lr
         }
 
-        component pocketRuntime "PocketDimensionsComponents" "Pocket Dimensions consumer API usage and product surface." {
-            include *
+        // Consumer static views stay scoped to consumer-owned components and immediate API seams;
+        // dynamic views below show the full end-to-end DimensionLib call chain.
+        component pocketRuntime "PocketDimensionsComponents" "Pocket Dimensions internals and the immediate DimensionLib/Vintage Story seams it consumes." {
+            include serverAdmin player pocketModSystem pocketCommands pocketConfig pocketLinkStore pocketPolicy pocketSource pocketWaystone pocketReturnPedestal pocketAssets idimensionLibApi policyApi blockSourceApi vsWorldStorage vsAssetSystem
             autoLayout lr
         }
 
-        component cavernRuntime "CavernDemoComponents" "Cavern Dimension Demo consumer API usage and generator surface." {
-            include *
+        component cavernRuntime "CavernDemoComponents" "Cavern Dimension Demo internals and the immediate DimensionLib/Vintage Story seams it consumes." {
+            include serverAdmin cavernModSystem cavernCommands cavernGenerator cavernSource cavernProfile cavernAssets idimensionLibApi generatorApi blockSourceApi vsAssetSystem
             autoLayout lr
         }
 
