@@ -61,37 +61,6 @@ internal sealed class VisualTuningState
         return true;
     }
 
-    public bool ApplyPreset(string presetId)
-    {
-        switch (NormalizeKey(presetId))
-        {
-            case "default":
-                Reset();
-                return true;
-            case "clear":
-                Reset();
-                TrySet("fogdensity", 0f);
-                TrySet("flatfogdensity", 0f);
-                TrySet("fogweight", 0f);
-                TrySet("fogdensityweight", 0f);
-                TrySet("flatfogdensityweight", 0f);
-                TrySet("minlight", 0f);
-                TrySet("skyalpha", 0.25f);
-                return true;
-            case "thin":
-                Reset();
-                TrySet("fogdensity", 0.0004f);
-                TrySet("flatfogdensity", 0f);
-                TrySet("fogweight", 0.04f);
-                TrySet("fogdensityweight", 0.02f);
-                TrySet("minlight", 0f);
-                TrySet("skyalpha", 0.4f);
-                return true;
-            default:
-                return false;
-        }
-    }
-
     public string DescribeOverrides()
     {
         return _values.Count == 0

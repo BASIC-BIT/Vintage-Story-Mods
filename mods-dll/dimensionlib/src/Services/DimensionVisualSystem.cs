@@ -120,20 +120,6 @@ public sealed class DimensionVisualSystem : IRenderer
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(message.PresetId))
-        {
-            if (_tuning.ApplyPreset(message.PresetId))
-            {
-                OnTuningChanged($"preset {message.PresetId}");
-            }
-            else
-            {
-                _api.Logger.Warning("[DimensionLib] Unknown visual tuning preset '{0}'.", message.PresetId);
-            }
-
-            return;
-        }
-
         if (!string.IsNullOrWhiteSpace(message.Key))
         {
             if (_tuning.TrySet(message.Key, message.Value))

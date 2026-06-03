@@ -9,14 +9,11 @@ public sealed class DimensionVisualTuningMessage
     public bool Reset { get; set; }
 
     [ProtoMember(2)]
-    public string PresetId { get; set; }
-
-    [ProtoMember(3)]
     public string Key { get; set; }
 
-    [ProtoMember(4)]
+    [ProtoMember(3)]
     public float Value { get; set; }
 
-    [ProtoMember(5)]
+    [ProtoMember(4)]
     public bool Status { get; set; }
 }

@@ -34,7 +34,7 @@ internal sealed class VisualTuningBroadcaster
         var action = cmdArgs.PopWord(string.Empty).Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(action))
         {
-            return DimensionLibResult.Fail("Usage: /dlib visual status | reset | preset <clear|thin|default> | set <key> <value>", "missing-visual-action");
+            return DimensionLibResult.Fail("Usage: /dlib visual status | reset | set <key> <value>", "missing-visual-action");
         }
 
         if (action == "status")
@@ -49,21 +49,9 @@ internal sealed class VisualTuningBroadcaster
             return DimensionLibResult.Ok($"Reset DimensionLib visual tuning on {recipients.Length} client(s).");
         }
 
-        if (action == "preset")
-        {
-            var presetId = cmdArgs.PopWord(string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(presetId))
-            {
-                return DimensionLibResult.Fail("Usage: /dlib visual preset <clear|thin|default>", "missing-visual-preset");
-            }
-
-            SendMessage(new DimensionVisualTuningMessage { PresetId = presetId }, recipients);
-            return DimensionLibResult.Ok($"Sent DimensionLib visual preset '{presetId}' to {recipients.Length} client(s).");
-        }
-
         if (action != "set")
         {
-            return DimensionLibResult.Fail("Usage: /dlib visual status | reset | preset <clear|thin|default> | set <key> <value>", "unknown-visual-action");
+            return DimensionLibResult.Fail("Usage: /dlib visual status | reset | set <key> <value>", "unknown-visual-action");
         }
 
         var key = cmdArgs.PopWord(string.Empty).Trim();

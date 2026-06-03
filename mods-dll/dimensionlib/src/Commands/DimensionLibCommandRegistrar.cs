@@ -127,7 +127,7 @@ internal sealed class DimensionLibCommandRegistrar
                 .EndSubCommand()
             .BeginSubCommand("visual")
                 .WithDescription("Live-tune the current client's DimensionLib visual settings")
-                .WithArgs(new StringArgParser("status|reset|preset <id>|set <key> <value>", true))
+                .WithArgs(new StringArgParser("status|reset|set <key> <value>", true))
                 .HandleWith(HandleVisualTuning)
                 .EndSubCommand()
             .BeginSubCommand("light-floor")
