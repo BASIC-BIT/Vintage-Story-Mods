@@ -16,8 +16,6 @@ public interface IDimensionLibApi
 
     IReadOnlyCollection<string> GeneratorIds { get; }
 
-    Dimension DebugDimension { get; }
-
     DimensionLibResult<Dimension> RegisterDimension(DimensionSpec spec);
 
     DimensionLibResult<Dimension> GetDimension(string dimensionId);
@@ -49,10 +47,4 @@ public interface IDimensionLibApi
     DimensionLibResult ReturnPlayer(IServerPlayer player);
 
     DimensionLibResult ReleaseDimension(string dimensionId, DimensionReleaseMode mode = DimensionReleaseMode.ForgetOnly);
-
-    DimensionLibResult PrepareDebugDimension(IServerPlayer player = null);
-
-    DimensionLibResult EnterDebugDimension(IServerPlayer player);
-
-    DimensionLibResult ExitDebugDimension(IServerPlayer player);
 }

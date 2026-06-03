@@ -62,7 +62,7 @@ public sealed class DimensionVisualSystem : IRenderer
     {
         if (stage == EnumRenderStage.Before)
         {
-            _vanillaEffectSuppressor.SuppressVanillaCaveFog(ShouldApplyVisualEnvironment() && _activeSettings?.SuppressVanillaCaveFog == true);
+            _vanillaEffectSuppressor.SuppressVanillaCaveFog(ShouldApplyVisualEnvironment() && _activeSettings?.Fog.SuppressVanillaCaveFog == true);
             return;
         }
 
@@ -95,7 +95,7 @@ public sealed class DimensionVisualSystem : IRenderer
         _activeDimensionPlaneId = dimensionPlaneId;
         _activeDimensionId = string.IsNullOrWhiteSpace(dimensionId) ? null : dimensionId.Trim();
         _activeSettings = visualSettings.Clone();
-        _activeSettings.MinimumSceneLight = Clamp(_activeSettings.MinimumSceneLight, 0f, 0.8f);
+        _activeSettings.Scene.MinimumLight = Clamp(_activeSettings.Scene.MinimumLight, 0f, 0.8f);
         UpdateAmbientModifier();
         LogVisualState("transfer");
     }
@@ -179,7 +179,7 @@ public sealed class DimensionVisualSystem : IRenderer
 
     private bool ShouldRenderSkyCover()
     {
-        return ShouldApplyVisualEnvironment() && _activeSettings?.RenderSkyCover == true;
+        return ShouldApplyVisualEnvironment() && _activeSettings?.Sky.RenderCover == true;
     }
 
     private bool UpdateAmbientModifier()
@@ -189,7 +189,7 @@ public sealed class DimensionVisualSystem : IRenderer
 
     private void RenderMinimumSceneLightOverlay()
     {
-        var effectiveMinimumSceneLight = _tuning.Get("minlight", _activeSettings?.MinimumSceneLight ?? 0f);
+        var effectiveMinimumSceneLight = _tuning.Get("minlight", _activeSettings?.Scene.MinimumLight ?? 0f);
         if (!ShouldApplyVisualEnvironment() || effectiveMinimumSceneLight <= 0f)
         {
             return;
@@ -223,7 +223,7 @@ public sealed class DimensionVisualSystem : IRenderer
     {
         var playerDimension = _api.World.Player?.Entity?.Pos.Dimension;
         var settings = _activeSettings ?? new DimensionVisualSettings();
-        var minimumSceneLight = _tuning.Get("minlight", settings.MinimumSceneLight);
+        var minimumSceneLight = _tuning.Get("minlight", settings.Scene.MinimumLight);
         var liftStrength = Clamp(minimumSceneLight * _tuning.Get("liftmult", 1.0f), 0f, _tuning.Get("liftmax", 0.3f));
         var sky = GetSkyCoverColor();
 
@@ -243,22 +243,22 @@ public sealed class DimensionVisualSystem : IRenderer
             sky.Y,
             sky.Z,
             sky.W,
-            _tuning.Get("fogred", settings.FogRed),
-            _tuning.Get("foggreen", settings.FogGreen),
-            _tuning.Get("fogblue", settings.FogBlue),
-            _tuning.Get("fogweight", settings.FogColorWeight),
-            _tuning.Get("fogdensity", settings.FogDensity),
-            _tuning.Get("fogdensityweight", settings.FogDensityWeight),
-            _tuning.Get("flatfogdensity", settings.FlatFogDensity),
-            _tuning.Get("flatfogdensityweight", settings.FlatFogDensityWeight),
-            _tuning.Get("ambientred", settings.AmbientRed),
-            _tuning.Get("ambientgreen", settings.AmbientGreen),
-            _tuning.Get("ambientblue", settings.AmbientBlue),
-            _tuning.Get("ambientweight", settings.AmbientColorWeight),
-            _tuning.Get("scenebrightness", settings.SceneBrightness),
-            _tuning.Get("scenebrightnessweight", settings.SceneBrightnessWeight),
-            _tuning.Get("fogbrightness", settings.FogBrightness),
-            _tuning.Get("fogbrightnessweight", settings.FogBrightnessWeight),
+            _tuning.Get("fogred", settings.Fog.Color.Value.Red),
+            _tuning.Get("foggreen", settings.Fog.Color.Value.Green),
+            _tuning.Get("fogblue", settings.Fog.Color.Value.Blue),
+            _tuning.Get("fogweight", settings.Fog.Color.Weight),
+            _tuning.Get("fogdensity", settings.Fog.Density.Value),
+            _tuning.Get("fogdensityweight", settings.Fog.Density.Weight),
+            _tuning.Get("flatfogdensity", settings.Fog.FlatDensity.Value),
+            _tuning.Get("flatfogdensityweight", settings.Fog.FlatDensity.Weight),
+            _tuning.Get("ambientred", settings.Ambient.Color.Value.Red),
+            _tuning.Get("ambientgreen", settings.Ambient.Color.Value.Green),
+            _tuning.Get("ambientblue", settings.Ambient.Color.Value.Blue),
+            _tuning.Get("ambientweight", settings.Ambient.Color.Weight),
+            _tuning.Get("scenebrightness", settings.Scene.Brightness.Value),
+            _tuning.Get("scenebrightnessweight", settings.Scene.Brightness.Weight),
+            _tuning.Get("fogbrightness", settings.Fog.Brightness.Value),
+            _tuning.Get("fogbrightnessweight", settings.Fog.Brightness.Weight),
             _tuning.DescribeOverrides());
     }
 

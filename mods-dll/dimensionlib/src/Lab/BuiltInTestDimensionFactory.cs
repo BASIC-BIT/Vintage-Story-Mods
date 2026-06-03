@@ -101,22 +101,21 @@ internal static class BuiltInTestDimensionFactory
     {
         return new DimensionVisualSettings
         {
-            FogRed = 0.12f,
-            FogGreen = 0.14f,
-            FogBlue = 0.28f,
-            FogColorWeight = 0.65f,
-            AmbientRed = 0.2f,
-            AmbientGreen = 0.22f,
-            AmbientBlue = 0.42f,
-            AmbientColorWeight = 0.55f,
-            FogDensity = 0.026f,
-            FogDensityWeight = 0.45f,
-            FlatFogDensity = 0.025f,
-            FlatFogDensityWeight = 0.45f,
-            CloudDensity = 0.9f,
-            CloudDensityWeight = 0.5f,
-            CloudBrightness = 0.35f,
-            CloudBrightnessWeight = 0.35f,
+            Fog = new DimensionFogVisualSettings
+            {
+                Color = new DimensionWeightedColor(new DimensionColor3(0.12f, 0.14f, 0.28f), 0.65f),
+                Density = new DimensionWeightedFloat(0.026f, 0.45f),
+                FlatDensity = new DimensionWeightedFloat(0.025f, 0.45f),
+            },
+            Ambient = new DimensionAmbientVisualSettings
+            {
+                Color = new DimensionWeightedColor(new DimensionColor3(0.2f, 0.22f, 0.42f), 0.55f),
+            },
+            Clouds = new DimensionCloudVisualSettings
+            {
+                Density = new DimensionWeightedFloat(0.9f, 0.5f),
+                Brightness = new DimensionWeightedFloat(0.35f, 0.35f),
+            },
         };
     }
 }

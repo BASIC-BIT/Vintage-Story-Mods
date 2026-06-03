@@ -10,17 +10,25 @@ internal static class VisualSettingsMapper
     {
         settings ??= new DimensionVisualSettings();
         tuning ??= new VisualTuningState();
+        var fog = settings.Fog;
+        var ambient = settings.Ambient;
+        var clouds = settings.Clouds;
+        var scene = settings.Scene;
 
         return new AmbientModifier
         {
-            FogColor = WeightedFloatArray.New(new[] { tuning.Get("fogred", settings.FogRed), tuning.Get("foggreen", settings.FogGreen), tuning.Get("fogblue", settings.FogBlue) }, tuning.Get("fogweight", settings.FogColorWeight)),
-            AmbientColor = WeightedFloatArray.New(new[] { tuning.Get("ambientred", settings.AmbientRed), tuning.Get("ambientgreen", settings.AmbientGreen), tuning.Get("ambientblue", settings.AmbientBlue) }, tuning.Get("ambientweight", settings.AmbientColorWeight)),
-            FogDensity = WeightedFloat.New(tuning.Get("fogdensity", settings.FogDensity), tuning.Get("fogdensityweight", settings.FogDensityWeight)),
-            FlatFogDensity = WeightedFloat.New(tuning.Get("flatfogdensity", settings.FlatFogDensity), tuning.Get("flatfogdensityweight", settings.FlatFogDensityWeight)),
-            CloudDensity = WeightedFloat.New(tuning.Get("clouddensity", settings.CloudDensity), tuning.Get("clouddensityweight", settings.CloudDensityWeight)),
-            CloudBrightness = WeightedFloat.New(tuning.Get("cloudbrightness", settings.CloudBrightness), tuning.Get("cloudbrightnessweight", settings.CloudBrightnessWeight)),
-            SceneBrightness = WeightedFloat.New(tuning.Get("scenebrightness", settings.SceneBrightness), tuning.Get("scenebrightnessweight", settings.SceneBrightnessWeight)),
-            FogBrightness = WeightedFloat.New(tuning.Get("fogbrightness", settings.FogBrightness), tuning.Get("fogbrightnessweight", settings.FogBrightnessWeight)),
+            FogColor = WeightedFloatArray.New(
+                new[] { tuning.Get("fogred", fog.Color.Value.Red), tuning.Get("foggreen", fog.Color.Value.Green), tuning.Get("fogblue", fog.Color.Value.Blue) },
+                tuning.Get("fogweight", fog.Color.Weight)),
+            AmbientColor = WeightedFloatArray.New(
+                new[] { tuning.Get("ambientred", ambient.Color.Value.Red), tuning.Get("ambientgreen", ambient.Color.Value.Green), tuning.Get("ambientblue", ambient.Color.Value.Blue) },
+                tuning.Get("ambientweight", ambient.Color.Weight)),
+            FogDensity = WeightedFloat.New(tuning.Get("fogdensity", fog.Density.Value), tuning.Get("fogdensityweight", fog.Density.Weight)),
+            FlatFogDensity = WeightedFloat.New(tuning.Get("flatfogdensity", fog.FlatDensity.Value), tuning.Get("flatfogdensityweight", fog.FlatDensity.Weight)),
+            CloudDensity = WeightedFloat.New(tuning.Get("clouddensity", clouds.Density.Value), tuning.Get("clouddensityweight", clouds.Density.Weight)),
+            CloudBrightness = WeightedFloat.New(tuning.Get("cloudbrightness", clouds.Brightness.Value), tuning.Get("cloudbrightnessweight", clouds.Brightness.Weight)),
+            SceneBrightness = WeightedFloat.New(tuning.Get("scenebrightness", scene.Brightness.Value), tuning.Get("scenebrightnessweight", scene.Brightness.Weight)),
+            FogBrightness = WeightedFloat.New(tuning.Get("fogbrightness", fog.Brightness.Value), tuning.Get("fogbrightnessweight", fog.Brightness.Weight)),
             LerpSpeed = WeightedFloat.New(tuning.Get("lerpspeed", settings.LerpSpeed), 1f),
         };
     }
@@ -30,16 +38,16 @@ internal static class VisualSettingsMapper
         settings ??= new DimensionVisualSettings();
         tuning ??= new VisualTuningState();
         return new Vec3f(
-            tuning.Get("skyred", settings.SkyRed),
-            tuning.Get("skygreen", settings.SkyGreen),
-            tuning.Get("skyblue", settings.SkyBlue));
+            tuning.Get("skyred", settings.Sky.Color.Red),
+            tuning.Get("skygreen", settings.Sky.Color.Green),
+            tuning.Get("skyblue", settings.Sky.Color.Blue));
     }
 
     public static float GetSkyAlpha(DimensionVisualSettings settings, VisualTuningState tuning)
     {
         settings ??= new DimensionVisualSettings();
         tuning ??= new VisualTuningState();
-        return tuning.Get("skyalpha", settings.SkyAlpha);
+        return tuning.Get("skyalpha", settings.Sky.Color.Alpha);
     }
 
     public static Vec3f GetLightLiftColor(DimensionVisualSettings settings, VisualTuningState tuning)
@@ -47,8 +55,8 @@ internal static class VisualSettingsMapper
         settings ??= new DimensionVisualSettings();
         tuning ??= new VisualTuningState();
         return new Vec3f(
-            tuning.Get("liftred", settings.LightLiftRed),
-            tuning.Get("liftgreen", settings.LightLiftGreen),
-            tuning.Get("liftblue", settings.LightLiftBlue));
+            tuning.Get("liftred", settings.Scene.LightLift.Red),
+            tuning.Get("liftgreen", settings.Scene.LightLift.Green),
+            tuning.Get("liftblue", settings.Scene.LightLift.Blue));
     }
 }

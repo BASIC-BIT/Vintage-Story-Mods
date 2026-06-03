@@ -26,8 +26,6 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
 
     public IReadOnlyCollection<string> GeneratorIds => _serverService?.GeneratorIds ?? System.Array.Empty<string>();
 
-    public Dimension DebugDimension => _serverService?.DebugDimension;
-
     public override void Start(ICoreAPI api)
     {
         base.Start(api);
@@ -160,24 +158,6 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     {
         EnsureServerReady();
         return _serverService.ReleaseDimension(dimensionId, mode);
-    }
-
-    public DimensionLibResult PrepareDebugDimension(IServerPlayer player = null)
-    {
-        EnsureServerReady();
-        return _serverService.PrepareDebugDimension(player);
-    }
-
-    public DimensionLibResult EnterDebugDimension(IServerPlayer player)
-    {
-        EnsureServerReady();
-        return _serverService.EnterDebugDimension(player);
-    }
-
-    public DimensionLibResult ExitDebugDimension(IServerPlayer player)
-    {
-        EnsureServerReady();
-        return _serverService.ReturnPlayer(player);
     }
 
     private void OnDimensionTransferMessage(DimensionTransferMessage message)

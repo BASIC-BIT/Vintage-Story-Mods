@@ -65,7 +65,7 @@ public sealed class Dimension
 
     public bool IsTransient { get; }
 
-    public float MinimumSceneLight => VisualSettings?.MinimumSceneLight ?? 0f;
+    public float MinimumSceneLight => VisualSettings?.Scene.MinimumLight ?? 0f;
 
     public int MinBlockX => ChunkX * GlobalConstants.ChunkSize;
 

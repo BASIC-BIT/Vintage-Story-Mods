@@ -134,31 +134,32 @@ public sealed class CavernDimensionModSystem : ModSystem
     {
         return new DimensionVisualSettings
         {
-            RenderSkyCover = true,
-            SkyRed = 0.035f,
-            SkyGreen = 0.0035f,
-            SkyBlue = 0.002f,
-            SkyAlpha = 1f,
-            FogRed = 0.24f,
-            FogGreen = 0.045f,
-            FogBlue = 0.018f,
-            FogColorWeight = 0.16f,
-            AmbientRed = 0.74f,
-            AmbientGreen = 0.34f,
-            AmbientBlue = 0.2f,
-            AmbientColorWeight = 0.48f,
-            FogDensity = 0.0016f,
-            FogDensityWeight = 0.16f,
-            CloudDensityWeight = 0.7f,
-            CloudBrightnessWeight = 0.7f,
-            SceneBrightness = 1.0f,
-            SceneBrightnessWeight = 0.45f,
-            FogBrightness = 0.95f,
-            FogBrightnessWeight = 0.2f,
-            MinimumSceneLight = 0.08f,
-            LightLiftRed = 0.85f,
-            LightLiftGreen = 0.42f,
-            LightLiftBlue = 0.24f,
+            Sky = new DimensionSkyVisualSettings
+            {
+                RenderCover = true,
+                Color = new DimensionColor4(0.035f, 0.0035f, 0.002f),
+            },
+            Fog = new DimensionFogVisualSettings
+            {
+                Color = new DimensionWeightedColor(new DimensionColor3(0.24f, 0.045f, 0.018f), 0.16f),
+                Density = new DimensionWeightedFloat(0.0016f, 0.16f),
+                Brightness = new DimensionWeightedFloat(0.95f, 0.2f),
+            },
+            Ambient = new DimensionAmbientVisualSettings
+            {
+                Color = new DimensionWeightedColor(new DimensionColor3(0.74f, 0.34f, 0.2f), 0.48f),
+            },
+            Clouds = new DimensionCloudVisualSettings
+            {
+                Density = new DimensionWeightedFloat(0f, 0.7f),
+                Brightness = new DimensionWeightedFloat(0f, 0.7f),
+            },
+            Scene = new DimensionSceneVisualSettings
+            {
+                Brightness = new DimensionWeightedFloat(1.0f, 0.45f),
+                MinimumLight = 0.08f,
+                LightLift = new DimensionColor3(0.85f, 0.42f, 0.24f),
+            },
         };
     }
 

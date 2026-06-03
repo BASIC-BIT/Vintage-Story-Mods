@@ -1124,31 +1124,33 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     {
         return new DimensionVisualSettings
         {
-            RenderSkyCover = true,
-            SkyRed = 0.012f,
-            SkyGreen = 0.013f,
-            SkyBlue = 0.015f,
-            SkyAlpha = 1f,
-            FogRed = 0.018f,
-            FogGreen = 0.02f,
-            FogBlue = 0.024f,
-            FogColorWeight = 0.45f,
-            AmbientRed = 0.58f,
-            AmbientGreen = 0.60f,
-            AmbientBlue = 0.64f,
-            AmbientColorWeight = 0.70f,
-            FogDensityWeight = 1.0f,
-            FlatFogDensityWeight = 1.0f,
-            CloudDensityWeight = 0.8f,
-            CloudBrightnessWeight = 0.8f,
-            SceneBrightness = 1.05f,
-            SceneBrightnessWeight = 0.45f,
-            FogBrightness = 0.65f,
-            FogBrightnessWeight = 0.35f,
-            MinimumSceneLight = PocketMinimumSceneLight,
-            LightLiftRed = 0.60f,
-            LightLiftGreen = 0.62f,
-            LightLiftBlue = 0.66f,
+            Sky = new DimensionSkyVisualSettings
+            {
+                RenderCover = true,
+                Color = new DimensionColor4(0.012f, 0.013f, 0.015f),
+            },
+            Fog = new DimensionFogVisualSettings
+            {
+                Color = new DimensionWeightedColor(new DimensionColor3(0.018f, 0.02f, 0.024f), 0.45f),
+                Density = new DimensionWeightedFloat(0f, 1.0f),
+                FlatDensity = new DimensionWeightedFloat(0f, 1.0f),
+                Brightness = new DimensionWeightedFloat(0.65f, 0.35f),
+            },
+            Ambient = new DimensionAmbientVisualSettings
+            {
+                Color = new DimensionWeightedColor(new DimensionColor3(0.58f, 0.60f, 0.64f), 0.70f),
+            },
+            Clouds = new DimensionCloudVisualSettings
+            {
+                Density = new DimensionWeightedFloat(0f, 0.8f),
+                Brightness = new DimensionWeightedFloat(0f, 0.8f),
+            },
+            Scene = new DimensionSceneVisualSettings
+            {
+                Brightness = new DimensionWeightedFloat(1.05f, 0.45f),
+                MinimumLight = PocketMinimumSceneLight,
+                LightLift = new DimensionColor3(0.60f, 0.62f, 0.66f),
+            },
         };
     }
 
