@@ -1,0 +1,15 @@
+{
+  "type": "code",
+  "modid": "dimensioncavern",
+  "name": "Cavern Dimension Demo",
+  "authors": [
+    "BASIC"
+  ],
+  "description": "Demo cavern dimension powered by DimensionLib.",
+  "version": "0.1.0",
+  "dependencies": {
+    "game": "",
+    "dimensionlib": "0.1.0"
+  },
+  "side": "universal"
+}

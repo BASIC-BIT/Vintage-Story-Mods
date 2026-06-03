@@ -12,14 +12,91 @@ env:
   DOTNET_VERSION: "10.0.x"
 
 jobs:
+  validate-architecture:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Validate Structurizr DSL
+      run: |
+        docker run --rm \
+          -v "${{ github.workspace }}/docs/architecture:/usr/local/structurizr" \
+          structurizr/cli validate \
+          -workspace /usr/local/structurizr/dimensionlib-api-surface.dsl
+
+    - name: Validate Structurizr Local workspace load
+      run: |
+        set -euo pipefail
+
+        mkdir -p "$RUNNER_TEMP/structurizr-data"
+        chmod 777 "$RUNNER_TEMP/structurizr-data"
+        docker run -d --name structurizr-validation \
+          -p 8080:8080 \
+          -v "$RUNNER_TEMP/structurizr-data:/usr/local/structurizr" \
+          -v "${{ github.workspace }}/docs/architecture/dimensionlib-api-surface.dsl:/usr/local/structurizr/workspace.dsl:ro" \
+          structurizr/structurizr local
+
+        cleanup() {
+          docker rm -f structurizr-validation >/dev/null 2>&1 || true
+        }
+        trap cleanup EXIT
+
+        loaded=false
+        for attempt in {1..60}; do
+          if curl -fsS http://localhost:8080/api/workspace/1 -o workspace-response.json; then
+            loaded=true
+            break
+          fi
+          echo "Waiting for Structurizr Local API ($attempt/60)..."
+          sleep 2
+        done
+
+        if [ "$loaded" != "true" ]; then
+          docker logs structurizr-validation || true
+          echo "Structurizr Local did not respond with a workspace payload." >&2
+          exit 1
+        fi
+
+        python3 - <<'PY' || { docker logs structurizr-validation || true; exit 1; }
+        import json
+        import sys
+
+        with open("workspace-response.json", "r", encoding="utf-8") as response_file:
+            data = json.load(response_file)
+
+        if data.get("success") is False:
+            print(data.get("message", "Structurizr workspace API returned success=false"), file=sys.stderr)
+            sys.exit(1)
+
+        has_wrapped_workspace = "workspace" in data
+        has_direct_workspace = "model" in data and "views" in data
+        if not has_wrapped_workspace and not has_direct_workspace:
+            print("Structurizr workspace API did not return a recognizable workspace payload.", file=sys.stderr)
+            sys.exit(1)
+        PY
+
   build:
+    needs: validate-architecture
+    if: ${{ always() }}
     runs-on: windows-latest
     permissions:
       actions: read
       contents: read
       pull-requests: write
-    
+
     steps:
+    - name: Require architecture validation
+      run: |
+        if ("${{ needs.validate-architecture.result }}" -ne "success") {
+          Write-Host "Structurizr architecture validation failed or did not complete." -ForegroundColor Red
+          exit 1
+        }
+      shell: pwsh
+
     - name: Checkout repository
       uses: actions/checkout@v4
       
@@ -180,16 +257,57 @@ jobs:
       shell: pwsh
       
     - name: Restore Dependencies
-      run: dotnet restore mods-dll/thebasics.Tests/thebasics.Tests.csproj
-      
-    - name: Build The BASICs
       run: |
-        Write-Host "Building The BASICs mod and tests..." -ForegroundColor Yellow
-        dotnet build mods-dll/thebasics.Tests/thebasics.Tests.csproj --configuration Release --no-restore --verbosity normal
+        $projects = @(
+          "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
+          "mods-dll/dimensionlib/dimensionlib.csproj",
+          "mods-dll/dimensionpockets/dimensionpockets.csproj",
+          "mods-dll/dimensioncavern/dimensioncavern.csproj"
+        )
+
+        foreach ($project in $projects) {
+          dotnet restore $project
+          if (-not $?) {
+            exit 1
+          }
+        }
+      shell: pwsh
+
+    - name: Build Code Mods
+      run: |
+        Write-Host "Building code mods and tests..." -ForegroundColor Yellow
+
+        $projects = @(
+          "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
+          "mods-dll/dimensionlib/dimensionlib.csproj",
+          "mods-dll/dimensionpockets/dimensionpockets.csproj",
+          "mods-dll/dimensioncavern/dimensioncavern.csproj"
+        )
+
+        foreach ($project in $projects) {
+          dotnet build $project --configuration Release --no-restore --verbosity normal
+          if (-not $?) {
+            exit 1
+          }
+        }
       shell: pwsh
 
     - name: Check Formatting
-      run: dotnet format whitespace mods-dll/thebasics.Tests/thebasics.Tests.csproj --verify-no-changes
+      run: |
+        $projects = @(
+          "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
+          "mods-dll/dimensionlib/dimensionlib.csproj",
+          "mods-dll/dimensionpockets/dimensionpockets.csproj",
+          "mods-dll/dimensioncavern/dimensioncavern.csproj"
+        )
+
+        foreach ($project in $projects) {
+          dotnet format whitespace $project --verify-no-changes
+          if (-not $?) {
+            exit 1
+          }
+        }
+      shell: pwsh
       continue-on-error: false
 
     - name: Run Tests with Coverage
@@ -350,7 +468,7 @@ jobs:
       if: always()
       run: |
         pip install lizard
-        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/
+        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/
       shell: bash
 
     - name: Test Build Output
@@ -358,35 +476,50 @@ jobs:
       run: |
         Write-Host "Checking build outputs..." -ForegroundColor Yellow
         
-        # Check main production mod
-        $dllPath = "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll"
-        if (Test-Path $dllPath) {
-          Write-Host "thebasics.dll built successfully" -ForegroundColor Green
-          $size = (Get-Item $dllPath).Length
-          Write-Host "  Size: $($size / 1KB) KB" -ForegroundColor Gray
-        } else {
-          Write-Host "thebasics.dll not found at expected location: $dllPath" -ForegroundColor Red
-          exit 1
+        $dllPaths = @(
+          "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll",
+          "mods-dll\dimensionlib\bin\Release\net10.0\dimensionlib.dll",
+          "mods-dll\dimensionpockets\bin\Release\net10.0\pocketdimensions.dll",
+          "mods-dll\dimensioncavern\bin\Release\net10.0\dimensioncavern.dll"
+        )
+
+        foreach ($dllPath in $dllPaths) {
+          if (Test-Path $dllPath) {
+            Write-Host "$dllPath built successfully" -ForegroundColor Green
+            $size = (Get-Item $dllPath).Length
+            Write-Host "  Size: $($size / 1KB) KB" -ForegroundColor Gray
+          } else {
+            Write-Host "Expected DLL not found at: $dllPath" -ForegroundColor Red
+            exit 1
+          }
         }
         
       shell: pwsh
       
 
-    - name: Package Main Mod
+    - name: Package Code Mods
       if: success()
       run: |
         Write-Host "Creating distribution packages..." -ForegroundColor Yellow
-        
-        # Run the package script for thebasics
-        Push-Location "mods-dll\thebasics"
-        try {
-          & ".\scripts\package.ps1"
-          Write-Host "thebasics packaged successfully" -ForegroundColor Green
-        } catch {
-          Write-Host "Error: thebasics packaging failed: $_" -ForegroundColor Red
-          exit 1
-        } finally {
-          Pop-Location
+
+        $modDirs = @(
+          "mods-dll\thebasics",
+          "mods-dll\dimensionlib",
+          "mods-dll\dimensionpockets",
+          "mods-dll\dimensioncavern"
+        )
+
+        foreach ($modDir in $modDirs) {
+          Push-Location $modDir
+          try {
+            & ".\scripts\package.ps1"
+            Write-Host "$modDir packaged successfully" -ForegroundColor Green
+          } catch {
+            Write-Host "Error: $modDir packaging failed: $_" -ForegroundColor Red
+            exit 1
+          } finally {
+            Pop-Location
+          }
         }
       shell: pwsh
       
@@ -413,6 +546,6 @@ jobs:
       with:
         name: mod-packages-${{ steps.mod_version.outputs.version }}
         path: |
-          mods-dll/*/thebasics_*.zip
+          mods-dll/*/*.zip
           mods/*/*.zip
         retention-days: 30 

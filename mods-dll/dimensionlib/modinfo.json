@@ -1,0 +1,14 @@
+{
+  "type": "code",
+  "modid": "dimensionlib",
+  "name": "DimensionLib",
+  "authors": [
+    "BASIC"
+  ],
+  "description": "Shared pocket-dimension lifecycle and projection infrastructure for Vintage Story mods.",
+  "version": "0.1.0",
+  "dependencies": {
+    "game": ""
+  },
+  "side": "universal"
+}

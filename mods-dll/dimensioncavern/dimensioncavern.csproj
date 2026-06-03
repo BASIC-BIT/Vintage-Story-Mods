@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>dimensioncavern</AssemblyName>
+    <RootNamespace>DimensionCavern</RootNamespace>
+    <LangVersion>default</LangVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(GITHUB_ACTIONS)' != 'true' And '$(SkipPostBuildPackage)' != 'true'">
+    <Exec Command="powershell -NoProfile -NonInteractive -Command &quot;&amp; { &amp; '$(ProjectDir)scripts\package.ps1' }&quot;" IgnoreExitCode="true" />
+  </Target>
+
+  <ItemGroup>
+    <Reference Include="VintagestoryAPI">
+      <HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\dimensionlib\dimensionlib.csproj" Private="False" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="modinfo.json" />
+    <Content Include="README.md" />
+    <Content Include="assets\**\*" />
+    <Content Include="scripts\package.ps1" />
+    <Content Include="dimensioncavern.csproj" />
+  </ItemGroup>
+</Project>
