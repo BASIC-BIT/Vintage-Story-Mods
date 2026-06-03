@@ -313,10 +313,8 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib, Pocket Dimensio
         generatorRegistry -> cavernGenerator "Resolves registered cavern generator by id"
         serverService -> generatedPreparer "Prepares generated chunk windows"
         generatedPreparer -> materializer "Materializes generated source columns"
-        dlibCommands -> debugLightFloor "Can manually apply debug blocklight floors"
         serverService -> diagnostics "Builds validation reports"
-        dlibCommands -> serverService "Invokes debug and maintenance operations"
-        builtInFixtures -> generatorApi "Implements internal test generators"
+        dlibCommands -> serverService "Invokes diagnostic and maintenance operations"
 
         clientVisuals -> vsClientApi "Uses render stages, ambient manager, shaders, and client world visibility"
         visualSystem -> visualSettingsMapper "Maps explicit visual settings"
