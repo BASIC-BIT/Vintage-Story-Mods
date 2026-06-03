@@ -40,3 +40,15 @@ RPProximityChatSystem::DispatchChatterForContext
 
 # Lizard treats the admin config registry's file-level setting definitions as one global block.
 *global*
+
+# DimensionLib immutable metadata record has a deliberately wide constructor mirroring persisted fields.
+Dimension::Dimension
+
+# DimensionLib command registration is long but mostly declarative command tree wiring.
+DimensionLibCommandRegistrar::Register
+
+# Network sync method mirrors the transfer packet fields and Vintage Story player state inputs.
+DimensionTransferService::SyncClientTransfer
+
+# Cavern spike helper samples several terrain inputs; keep local until a second generator needs it.
+CavernBlockSource::AddSpikes
