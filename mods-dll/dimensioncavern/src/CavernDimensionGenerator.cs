@@ -11,24 +11,41 @@ namespace DimensionCavern;
 public sealed class CavernDimensionGenerator : IDimensionGenerator
 {
     private readonly ICoreServerAPI _api;
+    private readonly int _wallId;
+    private readonly int _lavaId;
 
     public CavernDimensionGenerator(ICoreServerAPI api, string generatorId)
     {
         _api = api;
         GeneratorId = generatorId;
+        _wallId = ResolveBlockId("dimensioncavern:cavernrock", "rock-basalt", "rock-granite");
+        _lavaId = ResolveBlockId("lava-still-7", "lava-still-6", "lava");
     }
 
     public string GeneratorId { get; }
 
     public IBlockVolumeSource CreateSource(Dimension dimension)
     {
-        return new CavernBlockSource(_api, dimension, GeneratorId);
+        return new CavernBlockSource(dimension, GeneratorId, _wallId, _lavaId, _api.WorldManager.MapSizeY);
+    }
+
+    private int ResolveBlockId(params string[] codes)
+    {
+        foreach (var code in codes)
+        {
+            var block = _api.World.GetBlock(new AssetLocation(code));
+            if (block != null && block.BlockId != 0)
+            {
+                return block.BlockId;
+            }
+        }
+
+        return 0;
     }
 }
 
 internal sealed class CavernBlockSource : IBlockVolumeSource
 {
-    private readonly ICoreServerAPI _api;
     private readonly Dimension _dimension;
     private readonly int _mapSizeY;
     private readonly int _seed;
@@ -37,20 +54,19 @@ internal sealed class CavernBlockSource : IBlockVolumeSource
     private readonly int _roughId;
     private readonly int _lavaId;
 
-    public CavernBlockSource(ICoreServerAPI api, Dimension dimension, string sourceId)
+    public CavernBlockSource(Dimension dimension, string sourceId, int wallId, int lavaId, int mapSizeY)
     {
-        _api = api;
         _dimension = dimension;
         SourceId = sourceId;
-        _mapSizeY = api.WorldManager.MapSizeY;
+        _mapSizeY = mapSizeY;
         _seed = unchecked((int)(dimension.Seed ^ (dimension.Seed >> 32)));
         Bounds = new BlockVolumeBounds(
             dimension.ChunkSizeX * GlobalConstants.ChunkSize,
             _mapSizeY,
             dimension.ChunkSizeZ * GlobalConstants.ChunkSize);
-        _wallId = ResolveBlockId("dimensioncavern:cavernrock", "rock-basalt", "rock-granite");
+        _wallId = wallId;
         _roughId = _wallId;
-        _lavaId = ResolveBlockId("lava-still-7", "lava-still-6", "lava");
+        _lavaId = lavaId;
     }
 
     public string SourceId { get; }
@@ -105,11 +121,6 @@ internal sealed class CavernBlockSource : IBlockVolumeSource
                     }
                 }
 
-                for (var y = floorY + 1; y < ceilingY; y++)
-                {
-                    writer.SetBlock(0, localPos.Set(localX, y, localZ));
-                }
-
                 if (isColumn)
                 {
                     for (var y = floorY + 1; y < ceilingY; y++)
@@ -120,6 +131,11 @@ internal sealed class CavernBlockSource : IBlockVolumeSource
                 }
                 else
                 {
+                    for (var y = floorY + 1; y < ceilingY; y++)
+                    {
+                        writer.SetBlock(0, localPos.Set(localX, y, localZ));
+                    }
+
                     AddSpikes(writer, localPos, localX, localZ, worldX, worldZ, floorY, ceilingY, hasLavaPool, distanceToSpawn);
                     if (hasLavaFall)
                     {
@@ -248,20 +264,6 @@ internal sealed class CavernBlockSource : IBlockVolumeSource
         var dx = _dimension.MinBlockX + localX - _dimension.SpawnX;
         var dz = _dimension.MinBlockZ + localZ - _dimension.SpawnZ;
         return Math.Sqrt(dx * dx + dz * dz);
-    }
-
-    private int ResolveBlockId(params string[] codes)
-    {
-        foreach (var code in codes)
-        {
-            var block = _api.World.GetBlock(new AssetLocation(code));
-            if (block != null && block.BlockId != 0)
-            {
-                return block.BlockId;
-            }
-        }
-
-        return 0;
     }
 
     private int ApplySpawnPlateau(int height, int localX, int localZ, int floorY, int radius, int blendDistance, double dropPerBlock)
