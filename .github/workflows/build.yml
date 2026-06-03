@@ -37,7 +37,7 @@ jobs:
           -p 8080:8080 \
           -v "$RUNNER_TEMP/structurizr-data:/usr/local/structurizr" \
           -v "${{ github.workspace }}/docs/architecture/dimensionlib-api-surface.dsl:/usr/local/structurizr/workspace.dsl:ro" \
-          structurizr/structurizr
+          structurizr/structurizr local
 
         cleanup() {
           docker rm -f structurizr-validation >/dev/null 2>&1 || true
