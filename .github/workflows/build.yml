@@ -257,16 +257,57 @@ jobs:
       shell: pwsh
       
     - name: Restore Dependencies
-      run: dotnet restore mods-dll/thebasics.Tests/thebasics.Tests.csproj
-      
-    - name: Build The BASICs
       run: |
-        Write-Host "Building The BASICs mod and tests..." -ForegroundColor Yellow
-        dotnet build mods-dll/thebasics.Tests/thebasics.Tests.csproj --configuration Release --no-restore --verbosity normal
+        $projects = @(
+          "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
+          "mods-dll/dimensionlib/dimensionlib.csproj",
+          "mods-dll/dimensionpockets/dimensionpockets.csproj",
+          "mods-dll/dimensioncavern/dimensioncavern.csproj"
+        )
+
+        foreach ($project in $projects) {
+          dotnet restore $project
+          if (-not $?) {
+            exit 1
+          }
+        }
+      shell: pwsh
+
+    - name: Build Code Mods
+      run: |
+        Write-Host "Building code mods and tests..." -ForegroundColor Yellow
+
+        $projects = @(
+          "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
+          "mods-dll/dimensionlib/dimensionlib.csproj",
+          "mods-dll/dimensionpockets/dimensionpockets.csproj",
+          "mods-dll/dimensioncavern/dimensioncavern.csproj"
+        )
+
+        foreach ($project in $projects) {
+          dotnet build $project --configuration Release --no-restore --verbosity normal
+          if (-not $?) {
+            exit 1
+          }
+        }
       shell: pwsh
 
     - name: Check Formatting
-      run: dotnet format whitespace mods-dll/thebasics.Tests/thebasics.Tests.csproj --verify-no-changes
+      run: |
+        $projects = @(
+          "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
+          "mods-dll/dimensionlib/dimensionlib.csproj",
+          "mods-dll/dimensionpockets/dimensionpockets.csproj",
+          "mods-dll/dimensioncavern/dimensioncavern.csproj"
+        )
+
+        foreach ($project in $projects) {
+          dotnet format whitespace $project --verify-no-changes
+          if (-not $?) {
+            exit 1
+          }
+        }
+      shell: pwsh
       continue-on-error: false
 
     - name: Run Tests with Coverage
@@ -427,7 +468,7 @@ jobs:
       if: always()
       run: |
         pip install lizard
-        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/
+        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/
       shell: bash
 
     - name: Test Build Output
@@ -435,35 +476,50 @@ jobs:
       run: |
         Write-Host "Checking build outputs..." -ForegroundColor Yellow
         
-        # Check main production mod
-        $dllPath = "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll"
-        if (Test-Path $dllPath) {
-          Write-Host "thebasics.dll built successfully" -ForegroundColor Green
-          $size = (Get-Item $dllPath).Length
-          Write-Host "  Size: $($size / 1KB) KB" -ForegroundColor Gray
-        } else {
-          Write-Host "thebasics.dll not found at expected location: $dllPath" -ForegroundColor Red
-          exit 1
+        $dllPaths = @(
+          "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll",
+          "mods-dll\dimensionlib\bin\Release\net10.0\dimensionlib.dll",
+          "mods-dll\dimensionpockets\bin\Release\net10.0\pocketdimensions.dll",
+          "mods-dll\dimensioncavern\bin\Release\net10.0\dimensioncavern.dll"
+        )
+
+        foreach ($dllPath in $dllPaths) {
+          if (Test-Path $dllPath) {
+            Write-Host "$dllPath built successfully" -ForegroundColor Green
+            $size = (Get-Item $dllPath).Length
+            Write-Host "  Size: $($size / 1KB) KB" -ForegroundColor Gray
+          } else {
+            Write-Host "Expected DLL not found at: $dllPath" -ForegroundColor Red
+            exit 1
+          }
         }
         
       shell: pwsh
       
 
-    - name: Package Main Mod
+    - name: Package Code Mods
       if: success()
       run: |
         Write-Host "Creating distribution packages..." -ForegroundColor Yellow
-        
-        # Run the package script for thebasics
-        Push-Location "mods-dll\thebasics"
-        try {
-          & ".\scripts\package.ps1"
-          Write-Host "thebasics packaged successfully" -ForegroundColor Green
-        } catch {
-          Write-Host "Error: thebasics packaging failed: $_" -ForegroundColor Red
-          exit 1
-        } finally {
-          Pop-Location
+
+        $modDirs = @(
+          "mods-dll\thebasics",
+          "mods-dll\dimensionlib",
+          "mods-dll\dimensionpockets",
+          "mods-dll\dimensioncavern"
+        )
+
+        foreach ($modDir in $modDirs) {
+          Push-Location $modDir
+          try {
+            & ".\scripts\package.ps1"
+            Write-Host "$modDir packaged successfully" -ForegroundColor Green
+          } catch {
+            Write-Host "Error: $modDir packaging failed: $_" -ForegroundColor Red
+            exit 1
+          } finally {
+            Pop-Location
+          }
         }
       shell: pwsh
       
@@ -490,6 +546,6 @@ jobs:
       with:
         name: mod-packages-${{ steps.mod_version.outputs.version }}
         path: |
-          mods-dll/*/thebasics_*.zip
+          mods-dll/*/*.zip
           mods/*/*.zip
         retention-days: 30 

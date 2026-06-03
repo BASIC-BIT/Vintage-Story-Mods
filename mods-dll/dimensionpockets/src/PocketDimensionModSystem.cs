@@ -88,8 +88,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
     public bool CanUseBlock(IServerPlayer player, Dimension dimension, BlockSelection blockSelection, out string reason)
     {
-        reason = string.Empty;
-        return CanAccessPocket(player, dimension, out reason);
+        return CanUsePocketBlock(player, dimension, out reason);
     }
 
     public bool CanMutateBlock(IServerPlayer player, Dimension dimension, BlockSelection blockSelection, DimensionBlockMutationKind mutationKind, out string reason)
@@ -101,7 +100,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return false;
         }
 
-        return CanAccessPocket(player, dimension, out reason);
+        return CanMutatePocketBlock(player, dimension, out reason);
     }
 
     public string DisplayName(string dimensionId)
@@ -974,6 +973,34 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         return false;
     }
 
+    private bool CanUsePocketBlock(IServerPlayer player, Dimension dimension, out string reason)
+    {
+        return HasOwnedPocketPrivilege(player, dimension, _config.UsePocketBlocksPrivilege, "use blocks inside this pocket", out reason);
+    }
+
+    private bool CanMutatePocketBlock(IServerPlayer player, Dimension dimension, out string reason)
+    {
+        return HasOwnedPocketPrivilege(player, dimension, _config.MutatePocketBlocksPrivilege, "modify blocks inside this pocket", out reason);
+    }
+
+    private static bool HasOwnedPocketPrivilege(IServerPlayer player, Dimension dimension, string privilege, string action, out string reason)
+    {
+        if (!IsOwnedPocket(dimension))
+        {
+            reason = "Dimension is not owned by Pocket Dimensions.";
+            return false;
+        }
+
+        if (HasPrivilege(player, privilege))
+        {
+            reason = string.Empty;
+            return true;
+        }
+
+        reason = $"Missing privilege '{privilege}' to {action}.";
+        return false;
+    }
+
     private static bool HasPrivilege(IServerPlayer player, string privilege)
     {
         return player?.HasPrivilege(privilege) == true;
@@ -1254,6 +1281,10 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         public string UseWaystonePrivilege { get; set; } = Privilege.root;
 
+        public string UsePocketBlocksPrivilege { get; set; } = Privilege.root;
+
+        public string MutatePocketBlocksPrivilege { get; set; } = Privilege.root;
+
         public string BindPrivilege { get; set; } = Privilege.root;
 
         public string ReleasePrivilege { get; set; } = Privilege.root;
@@ -1270,6 +1301,8 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             EnterPrivilege = NormalizePrivilege(EnterPrivilege, Privilege.root);
             ExitPrivilege = NormalizePrivilege(ExitPrivilege, Privilege.root);
             UseWaystonePrivilege = NormalizePrivilege(UseWaystonePrivilege, EnterPrivilege);
+            UsePocketBlocksPrivilege = NormalizePrivilege(UsePocketBlocksPrivilege, Privilege.root);
+            MutatePocketBlocksPrivilege = NormalizePrivilege(MutatePocketBlocksPrivilege, Privilege.root);
             BindPrivilege = NormalizePrivilege(BindPrivilege, Privilege.root);
             ReleasePrivilege = NormalizePrivilege(ReleasePrivilege, Privilege.root);
             MaxSizeChunks = ClampInt(MaxSizeChunks, 1, 64);

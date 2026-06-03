@@ -7,7 +7,7 @@
   textures: {
     all: { base: "pocketdimensions:block/pocketfloor" }
   },
-  replaceable: 90,
+  replaceable: 0,
   resistance: 31337,
   requiredMiningTier: 2,
   lightAbsorption: 99,

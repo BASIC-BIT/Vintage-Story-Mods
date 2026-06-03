@@ -846,12 +846,27 @@ public sealed class DimensionLibServerService : IDisposable
     {
         foreach (var entry in _manifestService.LoadEntries())
         {
-            var dimension = entry.ToDimension();
+            var spec = entry.ToSpec();
+            var validation = DimensionSpecValidator.Validate(spec, DimensionLibModSystem.FirstPrototypeDimension);
+            if (!validation.Success)
+            {
+                _api.Logger.Warning("[DimensionLib] Skipping persisted dimension '{0}': {1}", entry.DimensionId ?? "<missing>", validation.Message);
+                continue;
+            }
+
+            var dimension = spec.ToDimension();
+            var collision = _dimensions.Values.FirstOrDefault(other => DimensionSpecValidator.RegionsOverlap(other, dimension));
+            if (collision != null)
+            {
+                _api.Logger.Warning("[DimensionLib] Skipping persisted dimension '{0}' because it overlaps '{1}'.", dimension.DimensionId, collision.DimensionId);
+                continue;
+            }
+
             _dimensions.Load(dimension, entry.IsOrphaned || dimension.IsTransient);
 
             if (entry.PreparedChunkKeys?.Count > 0)
             {
-                _preparedDimensions.LoadPreparedChunks(dimension.DimensionId, entry.PreparedChunkKeys);
+                _preparedDimensions.LoadPreparedChunks(dimension, entry.PreparedChunkKeys);
             }
         }
     }

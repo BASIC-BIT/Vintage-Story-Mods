@@ -83,16 +83,30 @@ internal sealed class PreparedDimensionTracker
             : new List<long>();
     }
 
-    public void LoadPreparedChunks(string dimensionId, IEnumerable<long> preparedChunkKeys)
+    public void LoadPreparedChunks(Dimension dimension, IEnumerable<long> preparedChunkKeys)
     {
-        var preparedChunks = preparedChunkKeys?.ToList();
-        if (string.IsNullOrWhiteSpace(dimensionId) || preparedChunks == null || preparedChunks.Count == 0)
+        if (dimension == null || string.IsNullOrWhiteSpace(dimension.DimensionId) || preparedChunkKeys == null)
         {
             return;
         }
 
-        _preparedChunkKeysByDimensionId[dimensionId] = new HashSet<long>(preparedChunks);
-        _preparedDimensionIds.Add(dimensionId);
+        var preparedChunks = new HashSet<long>();
+        foreach (var key in preparedChunkKeys)
+        {
+            DecodeChunkKey(key, out var localChunkX, out var localChunkZ);
+            if (localChunkX >= 0 && localChunkX < dimension.ChunkSizeX && localChunkZ >= 0 && localChunkZ < dimension.ChunkSizeZ)
+            {
+                preparedChunks.Add(key);
+            }
+        }
+
+        if (preparedChunks.Count == 0)
+        {
+            return;
+        }
+
+        _preparedChunkKeysByDimensionId[dimension.DimensionId] = preparedChunks;
+        _preparedDimensionIds.Add(dimension.DimensionId);
     }
 
     public bool TryGetPartialPreparedLocalChunks(Dimension dimension, out Vec2i[] chunks)

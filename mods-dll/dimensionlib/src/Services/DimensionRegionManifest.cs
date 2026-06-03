@@ -77,21 +77,29 @@ public sealed class DimensionRegionManifestEntry
 
     public Dimension ToDimension()
     {
-        return new Dimension(
-            DimensionId,
-            OwnerModId,
-            DimensionPlaneId,
-            ChunkX,
-            ChunkZ,
-            ChunkSizeX,
-            ChunkSizeZ,
-            SpawnY,
-            GeneratorId,
-            VisualSettings?.Clone(),
-            Seed,
-            Kind,
-            AccessPolicy,
-            Mutability,
-            IsTransient);
+        return ToSpec().ToDimension();
+    }
+
+    public DimensionSpec ToSpec()
+    {
+        return new DimensionSpec
+        {
+            DimensionId = DimensionId,
+            OwnerModId = OwnerModId,
+            DimensionPlaneId = DimensionPlaneId,
+            Placement = DimensionPlacement.Explicit,
+            ChunkX = ChunkX,
+            ChunkZ = ChunkZ,
+            ChunkSizeX = ChunkSizeX,
+            ChunkSizeZ = ChunkSizeZ,
+            SpawnY = SpawnY,
+            GeneratorId = GeneratorId,
+            VisualSettings = VisualSettings?.Clone(),
+            Seed = Seed,
+            Kind = Kind,
+            AccessPolicy = AccessPolicy,
+            Mutability = Mutability,
+            IsTransient = IsTransient,
+        };
     }
 }

@@ -19,6 +19,8 @@ Config defaults:
 - `EnterPrivilege`: `root`
 - `ExitPrivilege`: `root`
 - `UseWaystonePrivilege`: `root`
+- `UsePocketBlocksPrivilege`: `root`
+- `MutatePocketBlocksPrivilege`: `root`
 - `BindPrivilege`: `root`
 - `ReleasePrivilege`: `root`
 - `DefaultSizeChunks`: `3`
@@ -39,7 +41,7 @@ It intentionally uses only public DimensionLib API calls:
 
 Keep this mod simple. If a helper seems broadly useful, prove it here first before promoting it into DimensionLib core.
 
-Pocket floor and generated return pedestal blocks are protected by the mod's `IDimensionPolicyProvider`: players can build inside mutable pockets, but `pocketdimensions:pocketfloor` and `pocketdimensions:pocketreturnpedestal` cannot be broken through normal player block-breaking hooks.
+Pocket floor and generated return pedestal blocks are protected by the mod's `IDimensionPolicyProvider`: players with `MutatePocketBlocksPrivilege` can build inside mutable pockets, but `pocketdimensions:pocketfloor` and `pocketdimensions:pocketreturnpedestal` cannot be broken through normal player block-breaking hooks. The pocket floor is also non-replaceable so ordinary placement cannot overwrite the generated floor.
 
 Externally placed `pocketdimensions:pocketwaystone` blocks are craftable, breakable, and bindable. Bind one with `/pocket bind <name>` while looking at it, then right-click it to enter that pocket. Breaking a bound external Waystone drops the block and clears the binding data.
 
