@@ -28,15 +28,11 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib, Pocket Dimensio
             publicApi = container "Public API" "Consumer-facing C# API surface in DimensionLib.Api." "C# API" {
                 tags "API"
 
-                idimensionLibApi = component "IDimensionLibApi" "Server-side facade for registration, lookup, preparation, validation, force-send, teleport, return, release, policy providers, and generators." "C# interface" {
+                idimensionLibApi = component "IDimensionLibApi" "Server-side facade for registration, lookup, preparation, validation, teleport, return, release, policy providers, and generators." "C# interface" {
                     tags "API"
                 }
 
                 dimensionSpec = component "DimensionSpec / Dimension" "Public dimension declaration and immutable registered dimension metadata. Normal specs auto-allocate sparse backing chunks." "C# records/classes" {
-                    tags "API,Model"
-                }
-
-                placementModel = component "DimensionPlacement" "AutomaticSparse default with Explicit for debug/fixed backing layouts." "C# enum" {
                     tags "API,Model"
                 }
 
@@ -140,7 +136,7 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib, Pocket Dimensio
             clientVisuals = container "Client Visuals" "Client-side explicit visual settings application, sky cover, and minimum scene light overlay." "C# renderers/network" {
                 tags "Visual"
 
-                visualSystem = component "DimensionVisualSystem" "Receives transfer/tuning messages, tracks active visual settings, and coordinates visual renderers." "C# renderer" {
+                visualSystem = component "DimensionVisualSystem" "Receives transfer messages, tracks active visual settings, and coordinates visual renderers." "C# renderer" {
                     tags "Visual"
                 }
 
@@ -158,10 +154,6 @@ workspace "DimensionLib API Surface" "C4 model for DimensionLib, Pocket Dimensio
 
                 vanillaSuppressor = component "VanillaEffectSuppressor" "Suppresses inherited temporal/cave-fog effects for active DimensionLib visual settings." "C# service" {
                     tags "Visual"
-                }
-
-                visualTuning = component "VisualTuningState / VisualTuningBroadcaster" "Root-only live tuning path for visual experiments." "C# debug tooling" {
-                    tags "Visual,Experimental"
                 }
             }
         }

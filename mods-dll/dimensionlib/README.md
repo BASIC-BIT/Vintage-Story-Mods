@@ -29,7 +29,6 @@ The main contract is `IDimensionLibApi`:
 - `CaptureLocation(player)` captures the player's current engine position and optional visible DimensionLib id.
 - `TeleportToLocation(player, location)` moves a player to an explicit captured location and syncs DimensionLib visuals when applicable.
 - `ReturnPlayer(player)` returns the player to the last recorded origin and remains a transitional helper for simple debug flows.
-- `ForceSendDimension(dimensionId, player)` sends the dimension's chunk columns without teleporting.
 - `RegisterPolicyProvider(ownerModId, provider)` lets an owner mod enforce richer `OwnerOnly` entry/use/mutation rules.
 - `ReleaseDimension(dimensionId, mode)` marks a dimension orphaned, forgets the manifest record, or clears blocks and forgets it.
 
@@ -67,7 +66,7 @@ var registered = dimensionLib.RegisterDimension(new DimensionSpec
 });
 ```
 
-Set `Placement = DimensionPlacement.Explicit` and provide `ChunkX`/`ChunkZ` only for debug fixtures or mods with a deliberate backing-region layout.
+New dimensions are assigned sparse backing coordinates automatically. Consumers should preserve the returned `Dimension` or ask DimensionLib for it again instead of choosing backing chunks directly.
 
 ## Debug Commands
 
@@ -75,7 +74,6 @@ Debug commands require `root` privilege:
 
 - `/dlib generators`
 - `/dlib prepare <dimensionId>`
-- `/dlib send <dimensionId>`
 - `/dlib enter <dimensionId>`
 - `/dlib enter-player <playerName> <dimensionId>`
 - `/dlib tp <dimensionId|overworld> [x y z]`
@@ -84,9 +82,6 @@ Debug commands require `root` privilege:
 - `/dlib list`
 - `/dlib inspect`
 - `/dlib validate [dimensionId]`
-- `/dlib visual status`
-- `/dlib visual reset`
-- `/dlib visual set <key> <value>`
 - `/dlib release <dimensionId> [orphan|forget|clear] confirm`
 
 The alias `/dimensionlib` is also registered. The `tp` commands use absolute engine coordinates. Omit `x y z` to use the target's default spawn (`overworld`) or DimensionLib dimension spawn.
@@ -102,5 +97,4 @@ These steps require a server with DimensionLib loaded and a root/admin player:
 5. Run `/dlib validate` and confirm expected bounds, prepared chunk counts, and spawn block samples.
 6. Run `/dlib tp overworld` and confirm the player can recover to the overworld spawn.
 7. Run `/dlib tp <dimensionId>` without coordinates and confirm the player returns to the dimension spawn.
-8. Run `/dlib visual status` and check the client log for the active visual state snapshot.
-9. For disposable dimensions only, run `/dlib release <dimensionId> orphan confirm` and confirm `/dlib list` marks it orphaned until the owner mod re-registers it.
+8. For disposable dimensions only, run `/dlib release <dimensionId> orphan confirm` and confirm `/dlib list` marks it orphaned until the owner mod re-registers it.

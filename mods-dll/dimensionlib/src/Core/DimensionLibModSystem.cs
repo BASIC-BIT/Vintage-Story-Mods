@@ -35,8 +35,7 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     public override void StartServerSide(ICoreServerAPI api)
     {
         var serverChannel = api.Network.RegisterChannel(ModId)
-            .RegisterMessageType<DimensionTransferMessage>()
-            .RegisterMessageType<DimensionVisualTuningMessage>();
+            .RegisterMessageType<DimensionTransferMessage>();
 
         _serverService = new DimensionLibServerService(api, serverChannel);
         _serverService.Start();
@@ -49,9 +48,7 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
         _clientApi = api;
         api.Network.RegisterChannel(ModId)
             .RegisterMessageType<DimensionTransferMessage>()
-            .RegisterMessageType<DimensionVisualTuningMessage>()
-            .SetMessageHandler<DimensionTransferMessage>(OnDimensionTransferMessage)
-            .SetMessageHandler<DimensionVisualTuningMessage>(OnDimensionVisualTuningMessage);
+            .SetMessageHandler<DimensionTransferMessage>(OnDimensionTransferMessage);
 
         _visualSystem = new DimensionVisualSystem(api);
         _visualSystem.Start();
@@ -124,12 +121,6 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
         return _serverService.ValidateDimension(dimensionId);
     }
 
-    public DimensionLibResult ForceSendDimension(string dimensionId, IServerPlayer player)
-    {
-        EnsureServerReady();
-        return _serverService.ForceSendDimension(dimensionId, player);
-    }
-
     public DimensionLibResult<DimensionLocation> CaptureLocation(IServerPlayer player)
     {
         EnsureServerReady();
@@ -184,11 +175,6 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
                 _clientApi.World.SetChunkColumnVisible(cx, cz, message.DimensionPlaneId);
             }
         }
-    }
-
-    private void OnDimensionVisualTuningMessage(DimensionVisualTuningMessage message)
-    {
-        _visualSystem?.ApplyTuning(message);
     }
 
     private void EnsureServerReady()

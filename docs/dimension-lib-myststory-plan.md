@@ -271,7 +271,7 @@ Current scaffold state:
 - Added a client ambient/fog modifier while the local player is in dimension `3`.
 - Added generator/visual fields (`GeneratorId`, `VisualSettings`, `Seed`) to `DimensionSpec` and persisted dimensions.
 - Added `IDimensionGenerator`; content-specific generators now live in consumer/demo mods such as Cavern Dimension Demo.
-- Kept `/dlib generators`, `/dlib prepare <dimensionId>`, `/dlib send <dimensionId>`, `/dlib enter <dimensionId>`, `/dlib exit`, and `/dlib validate [dimensionId]` for registered consumer dimensions.
+- Kept `/dlib generators`, `/dlib prepare <dimensionId>`, `/dlib enter <dimensionId>`, `/dlib exit`, and `/dlib validate [dimensionId]` for registered consumer dimensions.
 - Added generator source-bounds validation and spawn block sampling so generated dimensions can be checked before manual visual QA.
 - Wired `dimensionlib` into `Vintage-Story-Mods.sln`.
 

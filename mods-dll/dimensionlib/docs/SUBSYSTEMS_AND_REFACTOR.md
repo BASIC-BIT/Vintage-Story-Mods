@@ -205,7 +205,6 @@ Why:
 
 Current files:
 
-- `src/Generation/BuiltInBlockSource.cs`
 - `src/Generation/Noise/ValueNoise2D.cs`
 - `src/Generation/DimensionGeneratorRegistry.cs`
 - `src/Generation/GeneratedDimensionWindowPreparer.cs`
@@ -241,7 +240,6 @@ Responsibilities today:
 - Minimum-scene-light overlay.
 - Vanilla cave-fog suppression.
 - Temporal visual suppression.
-- Debug tuning key store and validation for live experiments.
 
 Current split:
 
@@ -249,7 +247,6 @@ Current split:
 - `ClientVisuals/AmbientModifierController`: ambient/fog/cloud/brightness modifier lifecycle.
 - `ClientVisuals/ScreenColorOverlayRenderer`: shared opaque sky cover and post-composition lift renderer.
 - `ClientVisuals/VanillaEffectSuppressor`: `blackfogincaves`, temporal instability, cloud policy.
-- `ClientVisuals/VisualTuningState`: debug keys and validation.
 - `Services/DimensionVisualSystem`: high-level coordinator only.
 
 Why:
@@ -320,7 +317,7 @@ Work order:
 5. Remove baked light-floor debug tooling from DimensionLib core. Done.
 6. Extract protection and policy-provider services. Done.
 7. Extract transfer/return-position services. Done.
-8. Extract generator registry and visual tuning broadcasting. Done.
+8. Extract generator registry and remove visual tuning broadcasting. Done.
 9. Extract diagnostics and temporal-stability guard. Done.
 10. Extract lazy generated-column streaming loop. Done.
 
@@ -335,7 +332,7 @@ Verification after each extraction:
 
 Work order:
 
-1. Extract `VisualTuningState`. Done.
+1. Remove live visual tuning state after explicit visual settings stabilized. Done.
 2. Replace the old named-profile registry with explicit `VisualSettingsMapper`. Done.
 3. Extract `AmbientModifierController`. Done.
 4. Extract shared screen-color overlay renderer. Done.
@@ -377,6 +374,5 @@ Required pause:
 
 ## Immediate Open Questions
 
-- Should `/dlib visual` tune one client only, all online clients, or require explicit target syntax?
 - Should the Cavern Demo keep a custom spawn-light rule separate from broader cavern lighting?
-- Should visual experiments get a minimal debug HUD/log line showing active profile and effective fog/light values?
+- Should future visual experiments get a separate experiment tool or minimal debug HUD/log line showing active profile and effective fog/light values?

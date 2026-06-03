@@ -117,7 +117,6 @@ public sealed class CavernDimensionModSystem : ModSystem
             DimensionId = dimensionId,
             OwnerModId = ModId,
             DimensionPlaneId = _dimensionLib.PrimaryDimensionPlaneId,
-            Placement = DimensionPlacement.AutomaticSparse,
             ChunkSizeX = size,
             ChunkSizeZ = size,
             SpawnY = 68,

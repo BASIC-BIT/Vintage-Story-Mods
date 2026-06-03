@@ -85,7 +85,7 @@ Possible public API direction later:
 
 - Keep the stable public API at the level of explicit `DimensionVisualSettings` fields unless repeated consumer code proves a reusable recipe layer is needed.
 - Keep low-level shader knobs internal/debug until the model is proven.
-- Expose live tuning through `/dlib visual` or a future in-game editor before freezing public API.
+- Prototype live tuning outside the public command/API surface before freezing new visual abstractions.
 
 ## Recommended Next Implementation Order
 

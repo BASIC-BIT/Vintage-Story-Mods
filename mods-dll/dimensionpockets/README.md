@@ -1,6 +1,6 @@
 # Pocket Dimensions
 
-Pocket Dimensions is a deliberately small consumer mod for DimensionLib. It is both a playable admin utility and the first integration example for `IDimensionLibApi`.
+Pocket Dimensions is a playable admin utility built on DimensionLib and a concrete integration example for `IDimensionLibApi`.
 
 Command privileges are configurable in `ModConfig/pocket_dimensions.json`. Defaults require `root`:
 
@@ -27,9 +27,9 @@ Config defaults:
 - `MaxSizeChunks`: `16`
 - `DefaultSpawnY`: `0`, meaning use half the map height
 
-The useful example file is `src/PocketDimensionModSystem.cs`.
+The main implementation is `src/PocketDimensionModSystem.cs`.
 
-It intentionally uses only public DimensionLib API calls:
+It uses only public DimensionLib API calls:
 
 - `RegisterPolicyProvider`
 - `RegisterDimension`
@@ -39,7 +39,7 @@ It intentionally uses only public DimensionLib API calls:
 - `ReleaseDimension`
 - `Dimensions`, `GetDimension`, `GetDimensionAt`, and `IsDimensionPrepared`
 
-Keep this mod simple. If a helper seems broadly useful, prove it here first before promoting it into DimensionLib core.
+Keep DimensionLib integration direct here. If a helper seems broadly useful, prove it in this product mod before promoting it into DimensionLib core.
 
 Pocket floor and generated return pedestal blocks are protected by the mod's `IDimensionPolicyProvider`: players with `MutatePocketBlocksPrivilege` can build inside mutable pockets, but `pocketdimensions:pocketfloor` and `pocketdimensions:pocketreturnpedestal` cannot be broken through normal player block-breaking hooks. The pocket floor is also non-replaceable so ordinary placement cannot overwrite the generated floor.
 
@@ -49,7 +49,7 @@ Right-clicking a bound external Waystone requires `UseWaystonePrivilege`, record
 
 Waystone links, active ingress choices, and command-entry return locations are persisted to `ModData/pocketdimensions/waystone-links.json`. The store contains endpoint links plus the minimal `player -> pocket -> endpoint` and `player -> pocket -> location` active-trip state needed for return pedestal recovery across restarts. A successful pedestal or `/pocket exit` return clears the player-specific return state for that pocket.
 
-The current Waystone model is a first-pass neutral JSON prop with generated stone, trim, and accent textures. See `docs/WAYSTONE_PROP_GUIDE.md` for design direction, model authoring rules, and the verification checklist.
+The Waystone model is a neutral JSON prop with generated stone, trim, and accent textures. See `docs/WAYSTONE_PROP_GUIDE.md` for design direction, model authoring rules, and the verification checklist.
 
 Current crafting recipe:
 

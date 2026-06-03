@@ -11,8 +11,6 @@ public sealed class DimensionSpec
 
     public int DimensionPlaneId { get; set; } = 3;
 
-    public DimensionPlacement Placement { get; set; } = DimensionPlacement.AutomaticSparse;
-
     public int ChunkX { get; set; }
 
     public int ChunkZ { get; set; }

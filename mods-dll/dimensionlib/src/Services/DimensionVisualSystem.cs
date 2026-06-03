@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using DimensionLib.Api;
 using DimensionLib.ClientVisuals;
-using DimensionLib.Network;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 
@@ -16,8 +15,6 @@ public sealed class DimensionVisualSystem : IRenderer
     private readonly ScreenColorOverlayRenderer _overlayRenderer;
     private readonly VanillaEffectSuppressor _vanillaEffectSuppressor;
     private long _listenerId;
-    private readonly VisualTuningState _tuning = new VisualTuningState();
-    private int _tuningRevision;
     private int? _activeDimensionPlaneId;
     private string _activeDimensionId;
     private DimensionVisualSettings _activeSettings;
@@ -100,53 +97,6 @@ public sealed class DimensionVisualSystem : IRenderer
         LogVisualState("transfer");
     }
 
-    public void ApplyTuning(DimensionVisualTuningMessage message)
-    {
-        if (message == null)
-        {
-            return;
-        }
-
-        if (message.Reset)
-        {
-            _tuning.Reset();
-            OnTuningChanged("reset");
-            return;
-        }
-
-        if (message.Status)
-        {
-            LogVisualState("status-request");
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(message.Key))
-        {
-            if (_tuning.TrySet(message.Key, message.Value))
-            {
-                OnTuningChanged($"{message.Key}={message.Value:0.###}");
-            }
-            else
-            {
-                _api.Logger.Warning("[DimensionLib] Unknown visual tuning key '{0}'.", message.Key);
-            }
-        }
-    }
-
-    private void OnTuningChanged(string description)
-    {
-        _tuningRevision++;
-        if (_ambientModifierController.IsApplied)
-        {
-            _ambientModifierController.Remove();
-        }
-
-        _overlayRenderer.ResetFailures();
-        _api.Logger.Notification("[DimensionLib] Applied visual tuning: {0}", description);
-        UpdateAmbientModifier();
-        LogVisualState($"tuning {description}");
-    }
-
     private bool ShouldApplyVisualEnvironment()
     {
         var player = _api.World.Player;
@@ -170,19 +120,19 @@ public sealed class DimensionVisualSystem : IRenderer
 
     private bool UpdateAmbientModifier()
     {
-        return _ambientModifierController.Update(_activeDimensionPlaneId, _activeSettings, _tuningRevision, _tuning);
+        return _ambientModifierController.Update(_activeDimensionPlaneId, _activeSettings);
     }
 
     private void RenderMinimumSceneLightOverlay()
     {
-        var effectiveMinimumSceneLight = _tuning.Get("minlight", _activeSettings?.Scene.MinimumLight ?? 0f);
+        var effectiveMinimumSceneLight = _activeSettings?.Scene.MinimumLight ?? 0f;
         if (!ShouldApplyVisualEnvironment() || effectiveMinimumSceneLight <= 0f)
         {
             return;
         }
 
-        var strength = Clamp(effectiveMinimumSceneLight * _tuning.Get("liftmult", 1.0f), 0f, _tuning.Get("liftmax", 0.3f));
-        var liftColor = VisualSettingsMapper.GetLightLiftColor(_activeSettings, _tuning);
+        var strength = Clamp(effectiveMinimumSceneLight, 0f, 0.3f);
+        var liftColor = VisualSettingsMapper.GetLightLiftColor(_activeSettings);
         _overlayRenderer.RenderMinimumLightLift(new Vec4f(
             liftColor.X,
             liftColor.Y,
@@ -192,12 +142,12 @@ public sealed class DimensionVisualSystem : IRenderer
 
     private Vec4f GetSkyCoverColor()
     {
-        var skyColor = VisualSettingsMapper.GetSkyColor(_activeSettings, _tuning);
+        var skyColor = VisualSettingsMapper.GetSkyColor(_activeSettings);
         return new Vec4f(
             skyColor.X,
             skyColor.Y,
             skyColor.Z,
-            VisualSettingsMapper.GetSkyAlpha(_activeSettings, _tuning));
+            VisualSettingsMapper.GetSkyAlpha(_activeSettings));
     }
 
     private void LogVisualState(string reason)
@@ -209,13 +159,13 @@ public sealed class DimensionVisualSystem : IRenderer
     {
         var playerDimension = _api.World.Player?.Entity?.Pos.Dimension;
         var settings = _activeSettings ?? new DimensionVisualSettings();
-        var minimumSceneLight = _tuning.Get("minlight", settings.Scene.MinimumLight);
-        var liftStrength = Clamp(minimumSceneLight * _tuning.Get("liftmult", 1.0f), 0f, _tuning.Get("liftmax", 0.3f));
+        var minimumSceneLight = settings.Scene.MinimumLight;
+        var liftStrength = Clamp(minimumSceneLight, 0f, 0.3f);
         var sky = GetSkyCoverColor();
 
         return string.Format(
             CultureInfo.InvariantCulture,
-            "[DimensionLib] Visual state ({0}): playerDim={1}, activePlane={2}, dimension={3}, visualSettings={4}, applies={5}, ambientApplied={6}, minimumSceneLight={7:0.###}, liftStrength={8:0.###}, sky=({9:0.###},{10:0.###},{11:0.###},{12:0.###}), fog=({13:0.###},{14:0.###},{15:0.###}) weight={16:0.###} density={17:0.####} densityWeight={18:0.###} flatDensity={19:0.####} flatWeight={20:0.###}, ambient=({21:0.###},{22:0.###},{23:0.###}) weight={24:0.###}, sceneBrightness={25:0.###} sceneWeight={26:0.###}, fogBrightness={27:0.###} fogBrightnessWeight={28:0.###}, overrides={29}",
+            "[DimensionLib] Visual state ({0}): playerDim={1}, activePlane={2}, dimension={3}, visualSettings={4}, applies={5}, ambientApplied={6}, minimumSceneLight={7:0.###}, liftStrength={8:0.###}, sky=({9:0.###},{10:0.###},{11:0.###},{12:0.###}), fog=({13:0.###},{14:0.###},{15:0.###}) weight={16:0.###} density={17:0.####} densityWeight={18:0.###} flatDensity={19:0.####} flatWeight={20:0.###}, ambient=({21:0.###},{22:0.###},{23:0.###}) weight={24:0.###}, sceneBrightness={25:0.###} sceneWeight={26:0.###}, fogBrightness={27:0.###} fogBrightnessWeight={28:0.###}",
             reason,
             playerDimension.HasValue ? playerDimension.Value.ToString(CultureInfo.InvariantCulture) : "none",
             _activeDimensionPlaneId.HasValue ? _activeDimensionPlaneId.Value.ToString(CultureInfo.InvariantCulture) : "none",
@@ -229,23 +179,22 @@ public sealed class DimensionVisualSystem : IRenderer
             sky.Y,
             sky.Z,
             sky.W,
-            _tuning.Get("fogred", settings.Fog.Color.Value.Red),
-            _tuning.Get("foggreen", settings.Fog.Color.Value.Green),
-            _tuning.Get("fogblue", settings.Fog.Color.Value.Blue),
-            _tuning.Get("fogweight", settings.Fog.Color.Weight),
-            _tuning.Get("fogdensity", settings.Fog.Density.Value),
-            _tuning.Get("fogdensityweight", settings.Fog.Density.Weight),
-            _tuning.Get("flatfogdensity", settings.Fog.FlatDensity.Value),
-            _tuning.Get("flatfogdensityweight", settings.Fog.FlatDensity.Weight),
-            _tuning.Get("ambientred", settings.Ambient.Color.Value.Red),
-            _tuning.Get("ambientgreen", settings.Ambient.Color.Value.Green),
-            _tuning.Get("ambientblue", settings.Ambient.Color.Value.Blue),
-            _tuning.Get("ambientweight", settings.Ambient.Color.Weight),
-            _tuning.Get("scenebrightness", settings.Scene.Brightness.Value),
-            _tuning.Get("scenebrightnessweight", settings.Scene.Brightness.Weight),
-            _tuning.Get("fogbrightness", settings.Fog.Brightness.Value),
-            _tuning.Get("fogbrightnessweight", settings.Fog.Brightness.Weight),
-            _tuning.DescribeOverrides());
+            settings.Fog.Color.Value.Red,
+            settings.Fog.Color.Value.Green,
+            settings.Fog.Color.Value.Blue,
+            settings.Fog.Color.Weight,
+            settings.Fog.Density.Value,
+            settings.Fog.Density.Weight,
+            settings.Fog.FlatDensity.Value,
+            settings.Fog.FlatDensity.Weight,
+            settings.Ambient.Color.Value.Red,
+            settings.Ambient.Color.Value.Green,
+            settings.Ambient.Color.Value.Blue,
+            settings.Ambient.Color.Weight,
+            settings.Scene.Brightness.Value,
+            settings.Scene.Brightness.Weight,
+            settings.Fog.Brightness.Value,
+            settings.Fog.Brightness.Weight);
     }
 
     private static float Clamp(float value, float min, float max)

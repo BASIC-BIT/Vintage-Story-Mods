@@ -42,12 +42,6 @@ internal sealed class DimensionLibCommandRegistrar
                 .RequiresPlayer()
                 .HandleWith(HandlePrepareDimension)
                 .EndSubCommand()
-            .BeginSubCommand("send")
-                .WithDescription("Force-send a prepared DimensionLib dimension without entering it")
-                .WithArgs(new StringArgParser("dimensionId", true))
-                .RequiresPlayer()
-                .HandleWith(HandleSendDimension)
-                .EndSubCommand()
             .BeginSubCommand("generators")
                 .WithDescription("List registered DimensionLib generators")
                 .HandleWith(_ => TextCommandResult.Success(BuildGeneratorList()))
@@ -92,11 +86,6 @@ internal sealed class DimensionLibCommandRegistrar
                 .WithArgs(new StringArgParser("dimensionId", false))
                 .RequiresPlayer()
                 .HandleWith(HandleValidateDimension)
-                .EndSubCommand()
-            .BeginSubCommand("visual")
-                .WithDescription("Live-tune the current client's DimensionLib visual settings")
-                .WithArgs(new StringArgParser("status|reset|set <key> <value>", true))
-                .HandleWith(HandleVisualTuning)
                 .EndSubCommand()
             .BeginSubCommand("release")
                 .WithDescription("Release a registered DimensionLib dimension")
@@ -228,18 +217,6 @@ internal sealed class DimensionLibCommandRegistrar
         return ToCommandResult(result);
     }
 
-    private TextCommandResult HandleSendDimension(TextCommandCallingArgs args)
-    {
-        var dimensionId = ((string)args[0])?.Trim();
-        if (string.IsNullOrWhiteSpace(dimensionId))
-        {
-            return TextCommandResult.Error("Usage: /dlib send <dimensionId>");
-        }
-
-        var player = (IServerPlayer)args.Caller.Player;
-        return ToCommandResult(_service.ForceSendDimension(dimensionId, player));
-    }
-
     private TextCommandResult HandleValidateDimension(TextCommandCallingArgs args)
     {
         var dimensionId = ((string)args[0])?.Trim();
@@ -303,13 +280,6 @@ internal sealed class DimensionLibCommandRegistrar
         }
 
         return ToCommandResult(_service.ReleaseDimension(dimensionId, mode));
-    }
-
-    private TextCommandResult HandleVisualTuning(TextCommandCallingArgs args)
-    {
-        var raw = (string)args[0] ?? string.Empty;
-        var player = args.Caller.Player as IServerPlayer;
-        return ToCommandResult(_service.SendVisualTuning(player, raw));
     }
 
     private string BuildDimensionList()

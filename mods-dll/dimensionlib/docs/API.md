@@ -33,7 +33,7 @@ Consuming mods own:
 7. Call `TeleportToLocation(...)` when the player should move to a captured source point, linked endpoint, or another explicit destination.
 8. `ReturnPlayer(...)` remains a transitional prototype helper for simple debug flows. New product code should prefer explicit locations and consumer-owned links.
 
-`mods-dll/dimensionpockets/src/PocketDimensionModSystem.cs` is the current minimal consumer example. It intentionally keeps the integration compact and uses only public API calls, including `RegisterPolicyProvider`, `RegisterDimension`, `PrepareDimension`, `TeleportToDimension`, `TeleportToLocation`, `ReleaseDimension`, and dimension lookup helpers.
+`mods-dll/dimensionpockets/src/PocketDimensionModSystem.cs` is the current integration consumer and releasable product mod. It uses only public API calls, including `RegisterPolicyProvider`, `RegisterDimension`, `PrepareDimension`, `TeleportToDimension`, `TeleportToLocation`, `ReleaseDimension`, and dimension lookup helpers.
 
 ## Future Location API Direction
 
@@ -77,7 +77,7 @@ Release modes:
 
 `RegisterDimension(spec)` intentionally places normal new dimensions on a sparse grid with large gaps between backing chunk rectangles. It does not attempt dense fallback packing; if the sparse scan fails, the API returns `no-free-region` rather than silently placing unrelated dimensions next door.
 
-Set `DimensionSpec.Placement = DimensionPlacement.Explicit` only for debug fixtures or mods that have a deliberate backing-region layout. Explicit specs must provide `ChunkX` and `ChunkZ` and still go through overlap validation.
+New dimensions are assigned sparse backing coordinates automatically. `DimensionSpec.ChunkX` and `ChunkZ` are backing coordinates for persisted/idempotent re-registration, not a placement API for new consumer dimensions.
 
 This spacing is a core DimensionLib behavior because adjacent backing rectangles can bleed visually and can involve online players in neighboring dimensions. Chunk unloading and cleanup are separate lifecycle concerns and should not be relied on to hide nearby dimensions.
 
@@ -89,7 +89,6 @@ DimensionLib currently enforces the first layer of protection through server hoo
 - `CanUseBlock` denies non-root block use in read-only dimensions and dimensions the player cannot enter.
 - `BreakBlock` sets `EnumHandling.PreventDefault` as a fallback if a break reaches the break hook.
 - `TeleportToDimension(...)` checks access policy before moving the player.
-- `ForceSendDimension(...)` checks access policy before sending dimension chunks.
 
 Root users bypass DimensionLib's generic entry/read-only checks and owner-provider checks. Owner policy providers can enforce product invariants such as unbreakable pocket floors for normal players. DimensionLib materialization also writes through the server block accessor and is not blocked by player interaction hooks.
 
@@ -103,14 +102,6 @@ See `RENDER_EFFECTS.md` for current research notes on sky replacement, vanilla c
 
 Use `VisualSettings = null` for normal Vintage Story visuals, or `Scene.MinimumLight = 0` inside explicit settings to avoid client-side light lift. Prefer explicit visual tuning before generated light blocks. Generated light sources should only be considered if they are true ambient world features: dynamically fitted to the room, non-interactable, and isolated from gameplay/mod interactions.
 
-Root debug commands expose temporary live visual tuning for the current client:
-
-- `/dlib visual status`
-- `/dlib visual reset`
-- `/dlib visual set <key> <value>`
-
-Current tuning keys are exact debug names, not public API: `fogdensity`, `flatfogdensity`, `fogweight`, `fogdensityweight`, `flatfogdensityweight`, `fogred`, `foggreen`, `fogblue`, `ambientred`, `ambientgreen`, `ambientblue`, `ambientweight`, `scenebrightness`, `scenebrightnessweight`, `fogbrightness`, `fogbrightnessweight`, `skyred`, `skygreen`, `skyblue`, `skyalpha`, `minlight`, `liftmult`, `liftmax`, `liftred`, `liftgreen`, and `liftblue`.
-
 Content-specific cavern visual hypotheses now live in the Cavern Dimension Demo mod. DimensionLib keeps only the reusable visual settings fields and transfer/apply mechanics.
 
 - Fog and flat fog should remain conservative until sealed-dimension lighting is understood.
@@ -122,7 +113,7 @@ Demo content may set minimum scene light, sky cover, fog, ambient, and light lif
 
 ## Generator And Diagnostic Commands
 
-DimensionLib does not ship built-in gameplay or lab generators. Consumers register `IDimensionGenerator` implementations, set `DimensionSpec.GeneratorId`, and then use DimensionLib's prepare/enter/send/validate mechanics. `DimensionGeneratorIds.StandardOverworldWindow` remains a narrow built-in source id for mods that deliberately need bounded vanilla-overworld source projection without owning vanilla generator code.
+DimensionLib does not ship built-in gameplay or lab generators. Consumers register `IDimensionGenerator` implementations, set `DimensionSpec.GeneratorId`, and then use DimensionLib's prepare/enter/validate mechanics. `DimensionGeneratorIds.StandardOverworldWindow` remains a narrow built-in source id for mods that deliberately need bounded vanilla-overworld source projection without owning vanilla generator code.
 
 Root commands operate on dimensions that a consumer mod has already registered:
 
@@ -130,7 +121,6 @@ Useful validation commands:
 
 - `/dlib generators`: list registered generator IDs.
 - `/dlib prepare <dimensionId>`: prepare generated content without teleporting.
-- `/dlib send <dimensionId>`: force-send a prepared dimension without teleporting.
 - `/dlib enter-player <playerName> <dimensionId>`: send an online player into a prepared or generated dimension from the server console.
 - `/dlib tp <dimensionId|overworld> [x y z]`: root-only manual recovery teleport for the current player. Coordinates are absolute; omitted coordinates use the target spawn.
 - `/dlib tp-player <playerName> <dimensionId|overworld> [x y z]`: server-console/admin recovery teleport for an online player.

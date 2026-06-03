@@ -92,7 +92,7 @@ The next implementation pass should make the boundary explicit:
 Cavern content is split from DimensionLib:
 
 - Generator/content code: `CavernDimensionGenerator`, `CavernGenerationProfile`, and `dimensioncavern:cavernrock` assets live in `mods-dll/dimensioncavern`.
-- Visual environment code: public `DimensionVisualSettings`, `VisualSettingsMapper`, `DimensionVisualSystem`, and `/dlib visual` tuning. These are core-owned and expose explicit per-spec fields rather than a named preset registry.
+- Visual environment code: public `DimensionVisualSettings`, `VisualSettingsMapper`, and `DimensionVisualSystem`. These are core-owned and expose explicit per-spec fields rather than a named preset registry or live debug command surface.
 - Baked light-floor tooling has been removed from DimensionLib core. Keep future lighting experiments in consumer/demo code until a repeated reusable primitive appears.
 
 ## Public API Gaps Exposed By Cavern Demo

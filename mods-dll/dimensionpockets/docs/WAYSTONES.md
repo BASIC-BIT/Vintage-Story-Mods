@@ -1,8 +1,8 @@
 # Pocket Waystones
 
-Pocket Waystones are the first in-game affordance for Pocket Dimensions. They make pockets useful without requiring players to type commands.
+Pocket Waystones let players enter bound pocket dimensions without typing commands.
 
-## Current Slice
+## Current Behavior
 
 - Each newly prepared pocket gets a protected `pocketdimensions:pocketreturnpedestal` near the center spawn area.
 - The return pedestal is protected by Pocket Dimensions policy and is not breakable through normal player block-breaking hooks.
@@ -11,7 +11,7 @@ Pocket Waystones are the first in-game affordance for Pocket Dimensions. They ma
 - Externally placed Waystones are craftable, breakable, and bindable with `/pocket bind <name>`.
 - Right-clicking a bound external Waystone records that endpoint as the player's active ingress for the destination pocket, idempotently ensures pocket infrastructure, and calls DimensionLib's `TeleportToDimension(player, dimensionId, RecordReturn=false)` primitive.
 - The Waystone is intentionally product-layer code; DimensionLib should provide location/link and transfer primitives, not Waystone lore or assets.
-- The current model is a first-pass neutral JSON prop with dedicated generated stone, trim, and accent textures. See `WAYSTONE_PROP_GUIDE.md` for the prop design, modeling, and verification plan.
+- The Waystone model is a neutral JSON prop with dedicated generated stone, trim, and accent textures. See `WAYSTONE_PROP_GUIDE.md` for the prop design, modeling, and verification plan.
 
 ## Placement Rule
 

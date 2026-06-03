@@ -35,7 +35,6 @@ public sealed class DimensionLibServerService : IDisposable
     private readonly BlockInteractionProtectionAdapter _blockProtectionAdapter;
     private readonly ReturnPositionStore _returnPositions;
     private readonly DimensionTransferService _transferService;
-    private readonly VisualTuningBroadcaster _visualTuningBroadcaster;
     private readonly TemporalStabilityGuard _temporalStabilityGuard;
     private readonly PreparedDimensionTracker _preparedDimensions = new PreparedDimensionTracker();
     private readonly DimensionGeneratorRegistry _generators = new DimensionGeneratorRegistry();
@@ -60,7 +59,6 @@ public sealed class DimensionLibServerService : IDisposable
         _blockProtectionAdapter = new BlockInteractionProtectionAdapter(_accessService, ResolveDimensionForSelection);
         _returnPositions = new ReturnPositionStore(api.Logger);
         _transferService = new DimensionTransferService(serverChannel);
-        _visualTuningBroadcaster = new VisualTuningBroadcaster(api, serverChannel);
         _temporalStabilityGuard = new TemporalStabilityGuard(api, IsInsideDimensionLibDimension);
         _diagnostics = new DimensionDiagnosticService(api, _generators, _preparedDimensions);
         LoadPersistedDimensions();
@@ -129,7 +127,7 @@ public sealed class DimensionLibServerService : IDisposable
             return DimensionLibResult<Dimension>.Fail(validation.Message, validation.ErrorCode);
         }
 
-        if (!_dimensions.TryGet(spec.DimensionId, out _) && spec.Placement == DimensionPlacement.AutomaticSparse && !DimensionRegionAllocator.TryAssignSparseRegion(spec, _dimensions.Values))
+        if (!_dimensions.TryGet(spec.DimensionId, out _) && !DimensionRegionAllocator.TryAssignSparseRegion(spec, _dimensions.Values))
         {
             return DimensionLibResult<Dimension>.Fail("No free sparse DimensionLib region was found.", "no-free-region");
         }
@@ -287,38 +285,6 @@ public sealed class DimensionLibServerService : IDisposable
         }
 
         return TeleportToDimension(player, lookup.Value.DimensionId);
-    }
-
-    public DimensionLibResult ForceSendDimension(string dimensionId, IServerPlayer player)
-    {
-        if (player == null)
-        {
-            return DimensionLibResult.Fail("Player is required.", "missing-player");
-        }
-
-        var lookup = GetDimension(dimensionId);
-        if (!lookup.Success)
-        {
-            return DimensionLibResult.Fail(lookup.Message, lookup.ErrorCode);
-        }
-
-        if (!_accessService.CanEnter(player, lookup.Value, out var reason))
-        {
-            return DimensionLibResult.Fail(reason, "access-denied");
-        }
-
-        if (!IsDimensionPrepared(lookup.Value.DimensionId))
-        {
-            return DimensionLibResult.Fail($"Dimension '{lookup.Value.DimensionId}' has not been prepared yet.", "dimension-not-prepared");
-        }
-
-        ForceSend(lookup.Value, player);
-        return DimensionLibResult.Ok($"Sent dimension '{lookup.Value.DimensionId}' to {player.PlayerName}.");
-    }
-
-    public DimensionLibResult SendVisualTuning(IServerPlayer player, string raw)
-    {
-        return _visualTuningBroadcaster.Send(player, raw);
     }
 
     public DimensionLibResult<DimensionLocation> CaptureLocation(IServerPlayer player)

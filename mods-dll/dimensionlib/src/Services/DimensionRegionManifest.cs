@@ -84,7 +84,6 @@ public sealed class DimensionRegionManifestEntry
             DimensionId = DimensionId,
             OwnerModId = OwnerModId,
             DimensionPlaneId = DimensionPlaneId,
-            Placement = DimensionPlacement.Explicit,
             ChunkX = ChunkX,
             ChunkZ = ChunkZ,
             ChunkSizeX = ChunkSizeX,

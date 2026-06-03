@@ -36,8 +36,6 @@ public interface IDimensionLibApi
 
     DimensionLibResult<string> ValidateDimension(string dimensionId);
 
-    DimensionLibResult ForceSendDimension(string dimensionId, IServerPlayer player);
-
     DimensionLibResult<DimensionLocation> CaptureLocation(IServerPlayer player);
 
     DimensionLibResult TeleportToDimension(IServerPlayer player, string dimensionId, DimensionTeleportOptions options = null);
