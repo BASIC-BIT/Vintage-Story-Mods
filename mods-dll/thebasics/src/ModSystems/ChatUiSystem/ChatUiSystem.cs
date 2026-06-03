@@ -76,6 +76,7 @@ public class ChatUiSystem : ModSystem
     private static string _configAdminStatusMessage;
     private static string _configAdminSelectedGroup;
     private static GuiDialogConfirm _configAdminUnsavedCloseConfirm;
+    private static bool _configAdminOpenQueued;
     private static bool _returnToConfigAdminAfterLanguageDialog;
     private static bool _returnToConfigAdminAfterCharacterSheetFieldDialog;
 
@@ -1210,6 +1211,7 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
+        _configAdminOpenQueued = false;
         _configAdminDialog?.TryCloseWithoutPrompt();
         _configAdminDialog = new ConfirmingConfigAdminDialog(
             BuildConfigAdminDialogSettings(),
@@ -1219,6 +1221,27 @@ public class ChatUiSystem : ModSystem
             ConfirmConfigAdminDiscard,
             OnConfigAdminDialogClosed);
         _configAdminDialog.TryOpen(withFocus: false);
+    }
+
+    private static void QueueConfigAdminDialogOpen()
+    {
+        if (_api == null || _configAdminOpenQueued)
+        {
+            return;
+        }
+
+        _configAdminOpenQueued = true;
+        var dialogToReplace = _configAdminDialog;
+        _api.Event.RegisterCallback(_ =>
+        {
+            _configAdminOpenQueued = false;
+            if (_api == null || dialogToReplace == null || _configAdminDialog != dialogToReplace || !dialogToReplace.IsOpened())
+            {
+                return;
+            }
+
+            OpenConfigAdminDialog();
+        }, 1, true);
     }
 
     private static void OnConfigAdminDialogClosed()
@@ -1504,7 +1527,7 @@ public class ChatUiSystem : ModSystem
                 break;
             case "group-select":
                 _configAdminSelectedGroup = NormalizeConfigAdminGroup(value, GetConfigAdminGroups());
-                OpenConfigAdminDialog();
+                QueueConfigAdminDialogOpen();
                 break;
             default:
                 if (ConfigAdminSettingRegistry.TryGet(code, out _))
@@ -2169,6 +2192,7 @@ public class ChatUiSystem : ModSystem
             _configAdminDraft.Clear();
             _configAdminReviewedKeys.Clear();
             _configAdminSelectedGroup = null;
+            _configAdminOpenQueued = false;
             _configAdminStatusMessage = null;
 
             // Clear static typing indicator state to prevent stale data on reconnect/world reload.
