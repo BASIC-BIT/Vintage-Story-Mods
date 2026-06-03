@@ -19,11 +19,11 @@ internal static class DimensionRegionAllocator
         {
             for (var x = 0; x <= maxChunkCoordinate; x += step)
             {
-                spec.ChunkX = x;
-                spec.ChunkZ = z;
-                var candidate = spec.ToDimension();
+                var candidate = ToDimensionAt(spec, x, z);
                 if (!existing.Any(dimension => DimensionSpecValidator.RegionsOverlap(dimension, candidate)))
                 {
+                    spec.ChunkX = x;
+                    spec.ChunkZ = z;
                     return true;
                 }
             }
@@ -40,16 +40,38 @@ internal static class DimensionRegionAllocator
         {
             for (var slotX = 0; slotX < SparseSlotsPerAxis; slotX++)
             {
-                spec.ChunkX = SparseStartChunk + slotX * stride;
-                spec.ChunkZ = SparseStartChunk + slotZ * stride;
-                var candidate = spec.ToDimension();
+                var chunkX = SparseStartChunk + slotX * stride;
+                var chunkZ = SparseStartChunk + slotZ * stride;
+                var candidate = ToDimensionAt(spec, chunkX, chunkZ);
                 if (!existing.Any(dimension => DimensionSpecValidator.RegionsOverlap(dimension, candidate)))
                 {
+                    spec.ChunkX = chunkX;
+                    spec.ChunkZ = chunkZ;
                     return true;
                 }
             }
         }
 
         return false;
+    }
+
+    private static Dimension ToDimensionAt(DimensionSpec spec, int chunkX, int chunkZ)
+    {
+        return new Dimension(
+            spec.DimensionId,
+            spec.OwnerModId,
+            spec.DimensionPlaneId,
+            chunkX,
+            chunkZ,
+            spec.ChunkSizeX,
+            spec.ChunkSizeZ,
+            spec.SpawnY,
+            spec.GeneratorId,
+            spec.VisualSettings?.Clone(),
+            spec.Seed,
+            spec.Kind,
+            spec.AccessPolicy,
+            spec.Mutability,
+            spec.IsTransient);
     }
 }

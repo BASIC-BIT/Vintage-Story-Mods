@@ -66,15 +66,15 @@ internal sealed class DimensionAccessService
             return false;
         }
 
+        if (player.HasPrivilege(Privilege.root))
+        {
+            return true;
+        }
+
         var hasProvider = _policyProviders.TryGet(dimension, out var provider);
         if (hasProvider && !provider.CanUseBlock(player, dimension, blockSel, out reason))
         {
             return false;
-        }
-
-        if (player.HasPrivilege(Privilege.root))
-        {
-            return true;
         }
 
         if (!CanEnter(player, dimension, out reason))
@@ -100,15 +100,15 @@ internal sealed class DimensionAccessService
             return false;
         }
 
+        if (player.HasPrivilege(Privilege.root))
+        {
+            return true;
+        }
+
         var hasProvider = _policyProviders.TryGet(dimension, out var provider);
         if (hasProvider && !provider.CanMutateBlock(player, dimension, blockSel, mutationKind, out reason))
         {
             return false;
-        }
-
-        if (player.HasPrivilege(Privilege.root))
-        {
-            return true;
         }
 
         if (!CanEnter(player, dimension, out reason))

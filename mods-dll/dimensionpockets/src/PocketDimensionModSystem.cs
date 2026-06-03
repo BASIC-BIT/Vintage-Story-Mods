@@ -199,7 +199,15 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         {
             if (!TryGetSingleLinkedEndpoint(dimension.DimensionId, out endpointId, out var linkError))
             {
-                return DimensionLibResult.Fail(linkError, "missing-pocket-waystone-link");
+                successMessage = $"Returned from pocket '{DisplayName(dimension.DimensionId)}'.";
+                var fallback = TeleportToOverworldFallback(player, linkError, ref successMessage);
+                if (fallback.Success)
+                {
+                    ClearActiveIngress(player, dimension.DimensionId);
+                    ClearUnanchoredReturn(player, dimension.DimensionId);
+                }
+
+                return fallback;
             }
 
             returnLocation = ResolveReturnLocation(dimension, endpointId, player);
