@@ -383,7 +383,7 @@ jobs:
         $lsExitCode = $LASTEXITCODE
         if ($lsExitCode -eq 0) {
           Write-Host "Tag already exists on origin; skipping tag creation." -ForegroundColor Green
-        } elseif ($lsExitCode -eq 1) {
+        } elseif ($lsExitCode -eq 2) {
           git tag $tagName $sourceCommit
           git push origin "refs/tags/$tagName"
           Write-Host "Tag created and pushed successfully" -ForegroundColor Green

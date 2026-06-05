@@ -9,6 +9,7 @@ This document explains how to create releases using the automated GitHub Actions
 3. **Run Workflow**: Click "Run workflow" and fill in the inputs:
    - **New Version**: Enter the semantic version (e.g., `5.1.1`, `6.0.0-rc.1`)
    - **Pre-release**: Check if this is a pre-release version (optional)
+   - **Persist Version Commit**: Push version file updates to the default branch (optional; requires `RELEASE_PUSH_TOKEN`)
    - **Release Notes**: Add custom release notes or leave empty for auto-generated notes (optional)
 
 ## What the Workflow Does
@@ -19,11 +20,13 @@ The release workflow automatically:
 2. **Updates** version numbers in:
    - `mods-dll/thebasics/modinfo.json`
    - `mods-dll/thebasics/Properties/AssemblyInfo.cs`
-3. **Commits** the version changes to the master branch
+3. **Creates** a local release source commit for versioned packaging and tagging
 4. **Builds** the project using the existing build system
 5. **Packages** the mod into a versioned zip file (`thebasics-vX.X.X.zip`)
 6. **Creates** a Git tag (e.g., `V5.1.1`)
 7. **Publishes** a GitHub release with the packaged mod as an attachment
+
+By default, the workflow does not push version file changes back to the default branch. To persist those changes, enable **Persist Version Commit** and ensure `RELEASE_PUSH_TOKEN` is configured.
 
 ## Version Format
 
@@ -40,15 +43,16 @@ Each release includes:
 ## Prerequisites
 
 The workflow requires:
-- Access to the `master` branch
+- Access to the repository default branch
 - `VS_DEPS_TOKEN` secret (for build dependencies)
 - Write permissions for the repository
+- `RELEASE_PUSH_TOKEN` secret only when **Persist Version Commit** is enabled
 
 ## Troubleshooting
 
 If the workflow fails:
 1. Check the version format is correct
-2. Ensure the `master` branch is up to date
+2. Ensure the default branch is up to date
 3. Verify the `VS_DEPS_TOKEN` secret is set
 4. Check the build logs for specific errors
 
@@ -59,4 +63,4 @@ If you need to create a release manually:
 2. Commit and push changes
 3. Run the build process locally
 4. Create a GitHub release manually
-5. Upload the packaged mod file 
+5. Upload the packaged mod file
