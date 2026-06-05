@@ -813,5 +813,10 @@ namespace thebasics.Configs
 
         [ProtoMember(131)]
         public int ChatHistoryFlushIntervalMilliseconds { get; set; } = 1000;
+
+        // Vanilla lifecycle messages are always suppressed from proximity chat; this controls
+        // whether death messages are intentionally re-sent to nearby players afterward.
+        [ProtoMember(132)]
+        public bool EnableNearbyDeathMessagesInProximityChat { get; set; } = true;
     }
 }

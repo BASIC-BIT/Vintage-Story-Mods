@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using HarmonyLib;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
@@ -36,6 +37,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     public TransformerSystem TransformerSystem { get; set; }
     private Th3EssentialsDiscordRelay _th3EssentialsDiscordRelay;
     private readonly HashSet<string> _loggedExtensionHandlerFailures = new(StringComparer.Ordinal);
+    private Harmony _serverHarmony;
 
     public event EventHandler<ProximityChatMessageEventArgs> ProximityChatMessageProcessed;
 
@@ -51,6 +53,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         HookEvents();
         RegisterCommands();
         SetupProximityGroup();
+        ApplyServerPatches();
 
         LanguageSystem = new LanguageSystem(this, API, Config);
         DistanceObfuscationSystem = new DistanceObfuscationSystem(this, API, Config);
@@ -87,6 +90,19 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private void RelayProcessedMessageToTh3Essentials(object sender, ProximityChatMessageEventArgs args)
     {
         _th3EssentialsDiscordRelay?.Relay(Config, args.RenderedMessage);
+    }
+
+    private void ApplyServerPatches()
+    {
+        _serverHarmony ??= new Harmony($"{Mod.Info.ModID}.server.proximitychat");
+        ProximityLifecycleMessageFilter.Apply(_serverHarmony, API, Config, ProximityChatId);
+    }
+
+    public override void Dispose()
+    {
+        ProximityLifecycleMessageFilter.Unpatch(_serverHarmony);
+        _serverHarmony = null;
+        base.Dispose();
     }
 
     private void LogExtensionHandlerFailure(Delegate handler, Exception ex)
