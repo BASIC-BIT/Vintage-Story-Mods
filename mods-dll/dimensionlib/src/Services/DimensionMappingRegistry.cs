@@ -26,9 +26,7 @@ internal sealed class DimensionMappingRegistry
                 return DimensionLibResult<DimensionMapping>.Fail($"Mapping id '{spec.MappingId}' is already registered with different endpoints or transform.", "mapping-id-conflict");
             }
 
-            var updated = spec.ToMapping();
-            _mappingsById[updated.MappingId] = updated;
-            return DimensionLibResult<DimensionMapping>.Ok(updated, "Mapping already registered; metadata refreshed.");
+            return DimensionLibResult<DimensionMapping>.Ok(existing, "Mapping already registered.");
         }
 
         var mapping = spec.ToMapping();
@@ -46,5 +44,28 @@ internal sealed class DimensionMappingRegistry
         return _mappingsById.TryGetValue(mappingId.Trim(), out var mapping)
             ? DimensionLibResult<DimensionMapping>.Ok(mapping)
             : DimensionLibResult<DimensionMapping>.Fail($"Mapping '{mappingId}' is not registered.", "unknown-mapping");
+    }
+
+    public int RemoveForDimension(string dimensionId)
+    {
+        if (string.IsNullOrWhiteSpace(dimensionId))
+        {
+            return 0;
+        }
+
+        dimensionId = dimensionId.Trim();
+        var mappingIds = _mappingsById.Values
+            .Where(mapping =>
+                string.Equals(mapping.SourceDimensionId, dimensionId, StringComparison.Ordinal) ||
+                string.Equals(mapping.TargetDimensionId, dimensionId, StringComparison.Ordinal))
+            .Select(mapping => mapping.MappingId)
+            .ToArray();
+
+        foreach (var mappingId in mappingIds)
+        {
+            _mappingsById.Remove(mappingId);
+        }
+
+        return mappingIds.Length;
     }
 }

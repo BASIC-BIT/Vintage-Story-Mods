@@ -28,7 +28,7 @@ public class DimensionMappingRegistryTests
         var result = registry.Register(ValidSpec());
 
         result.Success.Should().BeTrue();
-        result.Message.Should().Contain("already registered");
+        result.Message.Should().Be("Mapping already registered.");
     }
 
     [Fact]
@@ -54,6 +54,26 @@ public class DimensionMappingRegistryTests
 
         result.Success.Should().BeFalse();
         result.ErrorCode.Should().Be("unknown-mapping");
+    }
+
+    [Fact]
+    public void RemoveForDimension_RemovesMappingsForEitherEndpoint()
+    {
+        var registry = new DimensionMappingRegistry();
+        registry.Register(ValidSpec()).Success.Should().BeTrue();
+        registry.Register(new DimensionMappingSpec
+        {
+            MappingId = "test:other",
+            OwnerModId = "test",
+            SourceDimensionId = "test:other-source",
+            TargetDimensionId = "test:other-target",
+        }).Success.Should().BeTrue();
+
+        var removed = registry.RemoveForDimension(" test:target ");
+
+        removed.Should().Be(1);
+        registry.Get("test:mapping").Success.Should().BeFalse();
+        registry.Get("test:other").Success.Should().BeTrue();
     }
 
     private static DimensionMappingSpec ValidSpec()

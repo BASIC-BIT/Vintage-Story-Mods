@@ -489,11 +489,6 @@ public sealed class DimensionLibServerService : IDisposable
             return DimensionLibResult.Fail($"Dimension '{to.DimensionId}' is orphaned.", "dimension-orphaned");
         }
 
-        if (!IsDimensionPrepared(to.DimensionId))
-        {
-            return DimensionLibResult.Fail($"Dimension '{to.DimensionId}' has not been prepared yet.", "dimension-not-prepared");
-        }
-
         var mapped = DimensionMappingResolver.MapLocalPosition(mapping.Transform, from, to, player.Entity.Pos.X, player.Entity.Pos.Y, player.Entity.Pos.Z, reverse, options);
         var destination = new DimensionLocation
         {
@@ -515,6 +510,12 @@ public sealed class DimensionLibServerService : IDisposable
         if (!_accessService.CanEnter(player, to, out var reason))
         {
             return DimensionLibResult.Fail(reason, "access-denied");
+        }
+
+        var prepared = PrepareMappedDestinationIfNeeded(to, destination, player);
+        if (!prepared.Success)
+        {
+            return prepared;
         }
 
         if (options.RequireCollisionFreeDestination && DestinationWouldCollide(player, destination))
@@ -568,8 +569,55 @@ public sealed class DimensionLibServerService : IDisposable
         _dimensions.Remove(dimension.DimensionId);
         _manifestService.Remove(dimension.DimensionId);
         _preparedDimensions.RemoveDimension(dimension.DimensionId);
+        _mappings.RemoveForDimension(dimension.DimensionId);
         SaveManifest();
         return DimensionLibResult.Ok($"Released dimension '{dimension.DimensionId}' with mode {mode}.");
+    }
+
+    private DimensionLibResult PrepareMappedDestinationIfNeeded(Dimension dimension, DimensionLocation destination, IServerPlayer player)
+    {
+        if (string.IsNullOrWhiteSpace(dimension.GeneratorId))
+        {
+            return IsDimensionPrepared(dimension.DimensionId)
+                ? DimensionLibResult.Ok()
+                : DimensionLibResult.Fail($"Dimension '{dimension.DimensionId}' has not been prepared yet.", "dimension-not-prepared");
+        }
+
+        var localChunk = _generatedWindowPreparer.ResolveLocalChunk(dimension, destination.X, destination.Z);
+        if (_preparedDimensions.IsChunkPrepared(dimension.DimensionId, localChunk.X, localChunk.Y))
+        {
+            return DimensionLibResult.Ok();
+        }
+
+        var radius = _generatedWindowPreparer.GetAllowedChunkRadius(player, FallbackLazyGeneratedChunkRadius, InitialGeneratedChunkRadius);
+        var prepared = IsStandardOverworldSourceDimension(dimension)
+            ? _generatedWindowPreparer.PrepareStandardOverworldSourceWindow(dimension, localChunk.X, localChunk.Y, radius, player, default, InitialGeneratedChunkBudget)
+            : PrepareGeneratedDestinationWindow(dimension, localChunk.X, localChunk.Y, radius, player, default, InitialGeneratedChunkBudget);
+        if (!prepared.Success)
+        {
+            return prepared;
+        }
+
+        return _preparedDimensions.IsChunkPrepared(dimension.DimensionId, localChunk.X, localChunk.Y)
+            ? DimensionLibResult.Ok()
+            : DimensionLibResult.Fail($"Mapped destination chunks for '{dimension.DimensionId}' are still preparing. Retry the transfer in a few seconds.", "mapped-destination-loading");
+    }
+
+    private DimensionLibResult PrepareGeneratedDestinationWindow(Dimension dimension, int localChunkX, int localChunkZ, int radiusChunks, IServerPlayer sendToPlayer, CancellationToken token, int maxColumns)
+    {
+        if (!_generators.TryGet(dimension.GeneratorId, out var generator))
+        {
+            return DimensionLibResult.Fail($"Generator '{dimension.GeneratorId}' is not registered.", "unknown-generator");
+        }
+
+        var source = generator.CreateSource(dimension);
+        var sourceValidation = BlockVolumeSourceValidator.ValidateBounds(dimension, source);
+        if (!sourceValidation.Success)
+        {
+            return sourceValidation;
+        }
+
+        return _generatedWindowPreparer.PrepareWindow(dimension, source, localChunkX, localChunkZ, radiusChunks, sendToPlayer, token, maxColumns);
     }
 
     private DimensionLibResult PrepareGeneratedDimensionWindow(string dimensionId, int radiusChunks, IServerPlayer sendToPlayer = null, CancellationToken token = default, int maxColumns = int.MaxValue)

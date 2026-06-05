@@ -329,7 +329,9 @@ jobs:
         dotnet test mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj `
           --configuration Release `
           --no-build `
-          --verbosity normal
+          --verbosity normal `
+          --collect:"XPlat Code Coverage" `
+          --results-directory TestResults
       shell: pwsh
 
     - name: Generate Coverage Report
