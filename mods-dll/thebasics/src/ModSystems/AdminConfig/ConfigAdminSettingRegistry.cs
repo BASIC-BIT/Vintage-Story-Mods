@@ -55,6 +55,13 @@ public static class ConfigAdminSettingRegistry
 
     private static void AddScalarSettings(List<ConfigAdminSettingDefinition> settings)
     {
+        AddCoreScalarSettings(settings);
+        AddServerNotificationScalarSettings(settings);
+        AddRemainingScalarSettings(settings);
+    }
+
+    private static void AddCoreScalarSettings(List<ConfigAdminSettingDefinition> settings)
+    {
         settings.AddRange(new[]
         {
             Bool("EnableChatter", "Chat/RP", "Enable chatter sounds", "Play seraph voice chatter for speech messages.", ConfigAdminReloadBehavior.Live, c => c.EnableChatter, (c, v) => c.EnableChatter = v),
@@ -99,15 +106,30 @@ public static class ConfigAdminSettingRegistry
             Decimal("TpaCooldownInGameHours", "TPA", "TPA cooldown hours", "Cooldown length in in-game hours.", ConfigAdminReloadBehavior.Live, (c => c.TpaCooldownInGameHours, (c, v) => c.TpaCooldownInGameHours = v), (0, 720)),
             Bool("TpaUseTimeout", "TPA", "Use TPA timeout", "Expire pending TPA requests after a timeout.", ConfigAdminReloadBehavior.Live, c => c.TpaUseTimeout, (c, v) => c.TpaUseTimeout = v),
             Decimal("TpaTimeoutMinutes", "TPA", "TPA timeout minutes", "Real minutes before pending TPA requests expire.", ConfigAdminReloadBehavior.Live, (c => c.TpaTimeoutMinutes, (c, v) => c.TpaTimeoutMinutes = v), (0.1, 1440)),
+        });
+    }
+
+    private static void AddServerNotificationScalarSettings(List<ConfigAdminSettingDefinition> settings)
+    {
+        settings.AddRange(new[]
+        {
             Bool("SendServerSaveAnnouncement", "Server Notifications", "Announce save start", "Notify players when a server save starts.", ConfigAdminReloadBehavior.Live, c => c.SendServerSaveAnnouncement, (c, v) => c.SendServerSaveAnnouncement = v),
             Bool("SendServerSaveFinishedAnnouncement", "Server Notifications", "Announce save finish", "Notify players when a server save finishes.", ConfigAdminReloadBehavior.Live, c => c.SendServerSaveFinishedAnnouncement, (c, v) => c.SendServerSaveFinishedAnnouncement = v),
             Bool("ServerSaveAnnouncementAsNotification", "Server Notifications", "Save start as popup", "Use notification popup for save start.", ConfigAdminReloadBehavior.Live, c => c.ServerSaveAnnouncementAsNotification, (c, v) => c.ServerSaveAnnouncementAsNotification = v),
             Bool("ServerSaveFinishedAsNotification", "Server Notifications", "Save finish as popup", "Use notification popup for save finish.", ConfigAdminReloadBehavior.Live, c => c.ServerSaveFinishedAsNotification, (c, v) => c.ServerSaveFinishedAsNotification = v),
             Text("TEXT_ServerSaveAnnouncement", "Server Notifications", "Save start text", "Text sent when a server save starts.", ConfigAdminReloadBehavior.Live, c => c.TEXT_ServerSaveAnnouncement, (c, v) => c.TEXT_ServerSaveAnnouncement = v),
             Text("TEXT_ServerSaveFinished", "Server Notifications", "Save finish text", "Text sent when a server save finishes.", ConfigAdminReloadBehavior.Live, c => c.TEXT_ServerSaveFinished, (c, v) => c.TEXT_ServerSaveFinished = v),
+            Bool("EnableNearbyDeathMessagesInProximityChat", "Server Notifications", "Nearby death messages in proximity", "Suppress vanilla join/leave/death lifecycle spam from proximity, then re-send death messages only to nearby players.", ConfigAdminReloadBehavior.Live, c => c.EnableNearbyDeathMessagesInProximityChat, (c, v) => c.EnableNearbyDeathMessagesInProximityChat = v),
             Bool("EnableSleepNotifications", "Server Notifications", "Enable sleep notifications", "Notify players when enough players are sleeping.", ConfigAdminReloadBehavior.Live, c => c.EnableSleepNotifications, (c, v) => c.EnableSleepNotifications = v),
             Decimal("SleepNotificationThreshold", "Server Notifications", "Sleep notification threshold", "Fraction of online players sleeping before notifying.", ConfigAdminReloadBehavior.Live, (c => c.SleepNotificationThreshold, (c, v) => c.SleepNotificationThreshold = v), (0, 1)),
             Text("TEXT_SleepNotification", "Server Notifications", "Sleep notification text", "Text sent when enough players are sleeping.", ConfigAdminReloadBehavior.Live, c => c.TEXT_SleepNotification, (c, v) => c.TEXT_SleepNotification = v),
+        });
+    }
+
+    private static void AddRemainingScalarSettings(List<ConfigAdminSettingDefinition> settings)
+    {
+        settings.AddRange(new[]
+        {
             Bool("DebugMode", "Diagnostics", "Debug mode", "Enable The BASICs diagnostic logging.", ConfigAdminReloadBehavior.Live, c => c.DebugMode, (c, v) => c.DebugMode = v),
             Bool("EnableRpCharacterSlots", "Characters", "Enable RP character slots", "Enable full RP character slots with per-character identity, appearance, inventory, body state, and position. Requires character sheets to be enabled.", ConfigAdminReloadBehavior.RestartRequired, c => c.EnableRpCharacterSlots, (c, v) => c.EnableRpCharacterSlots = v),
             Int("MaxRpCharacterSlots", "Characters", "Max RP character slots", "Maximum active RP character slots per account.", ConfigAdminReloadBehavior.Live, (c => c.MaxRpCharacterSlots, (c, v) => c.MaxRpCharacterSlots = v), (1, 20)),
