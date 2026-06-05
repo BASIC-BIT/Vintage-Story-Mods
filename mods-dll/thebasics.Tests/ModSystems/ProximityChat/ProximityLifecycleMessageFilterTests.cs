@@ -1,7 +1,9 @@
 using FluentAssertions;
+using NSubstitute;
 using thebasics.ModSystems.ProximityChat;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.Server;
 
 namespace thebasics.Tests.ModSystems.ProximityChat;
 
@@ -24,21 +26,41 @@ public class ProximityLifecycleMessageFilterTests
     [Fact]
     public void ShouldSendToPlayerGroup_returns_false_for_effective_proximity_group()
     {
-        ProximityLifecycleMessageFilter.ConfigureForTests(42);
-
         var membership = new PlayerGroupMembership { GroupUid = 42 };
 
-        ProximityLifecycleMessageFilter.ShouldSendToPlayerGroup(membership).Should().BeFalse();
+        ProximityLifecycleMessageFilter.ShouldSendToPlayerGroup(membership, effectiveProximityGroupId: 42).Should().BeFalse();
     }
 
     [Fact]
     public void ShouldSendToPlayerGroup_returns_true_for_other_group()
     {
-        ProximityLifecycleMessageFilter.ConfigureForTests(42);
-
         var membership = new PlayerGroupMembership { GroupUid = 7 };
 
-        ProximityLifecycleMessageFilter.ShouldSendToPlayerGroup(membership).Should().BeTrue();
+        ProximityLifecycleMessageFilter.ShouldSendToPlayerGroup(membership, effectiveProximityGroupId: 42).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsRecipientInGroup_returns_true_for_matching_membership()
+    {
+        var player = CreatePlayerWithGroups(42);
+
+        ProximityLifecycleMessageFilter.IsRecipientInGroup(player, groupId: 42).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsRecipientInGroup_returns_false_for_missing_membership()
+    {
+        var player = CreatePlayerWithGroups(7);
+
+        ProximityLifecycleMessageFilter.IsRecipientInGroup(player, groupId: 42).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsRecipientInGroup_allows_general_chat_without_membership()
+    {
+        var player = CreatePlayerWithGroups();
+
+        ProximityLifecycleMessageFilter.IsRecipientInGroup(player, GlobalConstants.GeneralChatGroup).Should().BeTrue();
     }
 
     [Fact]
@@ -80,5 +102,12 @@ public class ProximityLifecycleMessageFilterTests
     public void ShouldReemitNearbyDeathMessage_returns_false_for_join_leave()
     {
         ProximityLifecycleMessageFilter.ShouldReemitNearbyDeathMessage(EnumChatType.JoinLeave, enabled: true).Should().BeFalse();
+    }
+
+    private static IServerPlayer CreatePlayerWithGroups(params int[] groupIds)
+    {
+        var player = Substitute.For<IServerPlayer>();
+        player.Groups.Returns(groupIds.Select(groupId => new PlayerGroupMembership { GroupUid = groupId }).ToArray());
+        return player;
     }
 }

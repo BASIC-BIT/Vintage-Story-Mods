@@ -15,6 +15,8 @@ namespace thebasics.ModSystems.ProximityChat;
 
 internal static class ProximityLifecycleMessageFilter
 {
+    private readonly record struct FilterState(ICoreServerAPI Api, ModConfig Config, int? EffectiveProximityGroupId);
+
     private static readonly object Sync = new();
     private static ICoreServerAPI _api;
     private static ModConfig _config;
@@ -99,37 +101,46 @@ internal static class ProximityLifecycleMessageFilter
 
     private static bool PrefixJoinLeaveDeathMessage(ServerMain __instance, string message, EnumChatType chatType, IServerPlayer player)
     {
-        if (!ShouldHandle(chatType, player))
+        var state = GetStateSnapshot();
+        if (!ShouldHandle(chatType, player, state))
         {
             return true;
         }
 
         try
         {
-            SendLifecycleMessageOutsideProximity(__instance, message, chatType, player);
+            SendLifecycleMessageOutsideProximity(__instance, message, chatType, player, state.EffectiveProximityGroupId.GetValueOrDefault());
         }
         catch (Exception ex)
         {
-            _api?.Logger.Warning($"THEBASICS: Failed while filtering vanilla lifecycle message from proximity chat; falling back to vanilla routing: {ex.GetType().Name}.");
+            state.Api?.Logger.Warning($"THEBASICS: Failed while filtering vanilla lifecycle message from proximity chat; falling back to vanilla routing: {ex.GetType().Name}.");
             return true;
         }
 
         try
         {
-            SendNearbyDeathMessageIfEnabled(message, chatType, player);
+            SendNearbyDeathMessageIfEnabled(message, chatType, player, state);
         }
         catch (Exception ex)
         {
-            _api?.Logger.Warning($"THEBASICS: Suppressed vanilla lifecycle message from proximity chat, but failed to re-send nearby death message: {ex.GetType().Name}.");
+            state.Api?.Logger.Warning($"THEBASICS: Suppressed vanilla lifecycle message from proximity chat, but failed to re-send nearby death message: {ex.GetType().Name}.");
         }
 
         return false;
     }
 
-    private static bool ShouldHandle(EnumChatType chatType, IServerPlayer player)
+    private static FilterState GetStateSnapshot()
+    {
+        lock (Sync)
+        {
+            return new FilterState(_api, _config, _effectiveProximityGroupId);
+        }
+    }
+
+    private static bool ShouldHandle(EnumChatType chatType, IServerPlayer player, FilterState state)
     {
         return player != null &&
-               _effectiveProximityGroupId.HasValue &&
+               state.EffectiveProximityGroupId.HasValue &&
                IsLifecycleMessageType(chatType);
     }
 
@@ -138,10 +149,10 @@ internal static class ProximityLifecycleMessageFilter
         return chatType == EnumChatType.JoinLeave || chatType == EnumChatType.Notification;
     }
 
-    private static void SendLifecycleMessageOutsideProximity(ServerMain server, string message, EnumChatType chatType, IServerPlayer player)
+    private static void SendLifecycleMessageOutsideProximity(ServerMain server, string message, EnumChatType chatType, IServerPlayer player, int effectiveProximityGroupId)
     {
         var exceptPlayer = chatType == EnumChatType.JoinLeave ? player : null;
-        foreach (var membership in (player.Groups ?? Array.Empty<PlayerGroupMembership>()).Where(ShouldSendToPlayerGroup))
+        foreach (var membership in (player.Groups ?? Array.Empty<PlayerGroupMembership>()).Where(membership => ShouldSendToPlayerGroup(membership, effectiveProximityGroupId)))
         {
             server.SendMessageToGroup(membership.GroupUid, message, chatType, exceptPlayer);
         }
@@ -149,20 +160,20 @@ internal static class ProximityLifecycleMessageFilter
         if (ShouldSendPublicGeneralMessage(
                 server?.Clients.Count ?? int.MaxValue,
                 MagicNum.PublicJoinLeaveDeathMessagesThreshold,
-                _effectiveProximityGroupId == GlobalConstants.GeneralChatGroup))
+                effectiveProximityGroupId == GlobalConstants.GeneralChatGroup))
         {
             server.SendMessageToGeneral(message, chatType, exceptPlayer);
         }
     }
 
-    internal static bool ShouldSendToPlayerGroup(PlayerGroupMembership membership)
+    internal static bool ShouldSendToPlayerGroup(PlayerGroupMembership membership, int? effectiveProximityGroupId)
     {
-        return membership != null && ShouldSendToGroup(membership.GroupUid);
+        return membership != null && ShouldSendToGroup(membership.GroupUid, effectiveProximityGroupId);
     }
 
-    internal static bool ShouldSendToGroup(int groupId)
+    internal static bool ShouldSendToGroup(int groupId, int? effectiveProximityGroupId)
     {
-        return !_effectiveProximityGroupId.HasValue || groupId != _effectiveProximityGroupId.Value;
+        return !effectiveProximityGroupId.HasValue || groupId != effectiveProximityGroupId.Value;
     }
 
     internal static bool ShouldSendPublicGeneralMessage(int connectedClientCount, int publicMessageThreshold, bool generalIsProximity)
@@ -170,49 +181,64 @@ internal static class ProximityLifecycleMessageFilter
         return !generalIsProximity && connectedClientCount < publicMessageThreshold;
     }
 
-    private static void SendNearbyDeathMessageIfEnabled(string message, EnumChatType chatType, IServerPlayer player)
+    private static void SendNearbyDeathMessageIfEnabled(string message, EnumChatType chatType, IServerPlayer player, FilterState state)
     {
-        if (!TryPrepareNearbyDeathMessage(chatType, player, out var groupId, out var origin, out var range))
+        if (!TryPrepareNearbyDeathMessage(chatType, player, state, out var groupId, out var origin, out var range))
         {
             return;
         }
 
-        foreach (var recipient in GetNearbyRecipients(origin, range))
+        foreach (var recipient in GetNearbyRecipients(state.Api, groupId, origin, range))
         {
             recipient.SendMessage(groupId, message, chatType);
         }
     }
 
-    private static bool TryPrepareNearbyDeathMessage(EnumChatType chatType, IServerPlayer player, out int groupId, out BlockPos origin, out int range)
+    private static bool TryPrepareNearbyDeathMessage(EnumChatType chatType, IServerPlayer player, FilterState state, out int groupId, out BlockPos origin, out int range)
     {
-        groupId = _effectiveProximityGroupId ?? 0;
+        groupId = state.EffectiveProximityGroupId ?? 0;
         origin = null;
         range = 0;
 
-        if (!ShouldReemitNearbyDeathMessage(chatType, _config?.EnableNearbyDeathMessagesInProximityChat == true) ||
-            !_effectiveProximityGroupId.HasValue ||
-            _api?.World == null ||
+        if (!ShouldReemitNearbyDeathMessage(chatType, state.Config?.EnableNearbyDeathMessagesInProximityChat == true) ||
+            !state.EffectiveProximityGroupId.HasValue ||
+            state.Api?.World == null ||
             player?.Entity == null)
         {
             return false;
         }
 
         origin = player.Entity.Pos.AsBlockPos;
-        range = GetNearbyDeathMessageRange(_config);
+        range = GetNearbyDeathMessageRange(state.Config);
         return true;
     }
 
-    private static IEnumerable<IServerPlayer> GetNearbyRecipients(BlockPos origin, int range)
+    private static IEnumerable<IServerPlayer> GetNearbyRecipients(ICoreServerAPI api, int groupId, BlockPos origin, int range)
     {
-        return _api.World.AllOnlinePlayers
+        return api.World.AllOnlinePlayers
             .OfType<IServerPlayer>()
-            .Where(recipient => IsNearbyRecipient(recipient, origin, range));
+            .Where(recipient => IsNearbyRecipient(recipient, origin, range) && IsRecipientInGroup(recipient, groupId));
     }
 
     private static bool IsNearbyRecipient(IServerPlayer recipient, BlockPos origin, int range)
     {
         return recipient?.Entity?.Pos != null &&
                recipient.Entity.Pos.AsBlockPos.ManhattanDistance(origin) < range;
+    }
+
+    internal static bool IsRecipientInGroup(IServerPlayer recipient, int groupId)
+    {
+        if (recipient == null)
+        {
+            return false;
+        }
+
+        if (groupId == GlobalConstants.GeneralChatGroup)
+        {
+            return true;
+        }
+
+        return recipient.Groups?.Any(membership => membership?.GroupUid == groupId) == true;
     }
 
     internal static bool ShouldReemitNearbyDeathMessage(EnumChatType chatType, bool enabled)
@@ -230,10 +256,5 @@ internal static class ProximityLifecycleMessageFilter
         }
 
         return 35;
-    }
-
-    internal static void ConfigureForTests(int? effectiveProximityGroupId)
-    {
-        _effectiveProximityGroupId = effectiveProximityGroupId;
     }
 }
