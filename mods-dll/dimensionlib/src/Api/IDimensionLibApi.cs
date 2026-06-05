@@ -14,6 +14,8 @@ public interface IDimensionLibApi
 
     IReadOnlyCollection<Dimension> Dimensions { get; }
 
+    IReadOnlyCollection<DimensionMapping> Mappings { get; }
+
     IReadOnlyCollection<string> GeneratorIds { get; }
 
     DimensionLibResult<Dimension> RegisterDimension(DimensionSpec spec);
@@ -21,6 +23,10 @@ public interface IDimensionLibApi
     DimensionLibResult<Dimension> GetDimension(string dimensionId);
 
     DimensionLibResult<Dimension> GetDimensionAt(BlockPos pos);
+
+    DimensionLibResult<DimensionMapping> RegisterMapping(DimensionMappingSpec spec);
+
+    DimensionLibResult<DimensionMapping> GetMapping(string mappingId);
 
     bool IsDimensionPrepared(string dimensionId);
 
@@ -41,6 +47,8 @@ public interface IDimensionLibApi
     DimensionLibResult TeleportToDimension(IServerPlayer player, string dimensionId, DimensionTeleportOptions options = null);
 
     DimensionLibResult TeleportToLocation(IServerPlayer player, DimensionLocation location);
+
+    DimensionLibResult TeleportAcrossMapping(IServerPlayer player, string mappingId, DimensionMappingTeleportOptions options = null);
 
     DimensionLibResult ReturnPlayer(IServerPlayer player);
 

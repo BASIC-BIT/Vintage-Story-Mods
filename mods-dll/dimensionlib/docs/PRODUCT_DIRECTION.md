@@ -37,6 +37,7 @@ Prefer transparent mechanics over hidden magic. If DimensionLib must use a bridg
 - Chunk preparation, materialization, relighting, and force-send mechanics.
 - Standard-overworld source window experiments that validate bounded alternate spaces and lazy generation without owning vanilla generator code.
 - Location and transfer primitives: describe locations, capture a player's current location, teleport to a location, teleport into a dimension, and sync client visuals.
+- Coordinate mapping primitives that let owner mods relate multiple registered dimensions as one cohesive space without owning product-specific triggers.
 - Policy extension points for consumer-owned entry, block use, and block mutation rules.
 - Explicit visual/environment settings and client-side application primitives.
 
@@ -45,6 +46,7 @@ Prefer transparent mechanics over hidden magic. If DimensionLib must use a bridg
 - Waystone blocks, portal blocks, recipes, lore, models, textures, or progression.
 - Pocket-specific commands or chooser UIs.
 - Server-specific lore names such as shrines, altars, mirrors, machines, elevators, or rifts.
+- Trigger UX for mapped transfers, including ability items, hotkeys, portal blocks, elevator controls, sounds, particles, cooldowns, and lore.
 - Gameplay balance for who can create, enter, bind, or release a dimension.
 - A forked/copy-owned implementation of vanilla overworld generation until a Mystcraft-style product actually needs tweakable vanilla-like world rules.
 
@@ -99,6 +101,8 @@ This matters because Pocket Dimensions is likely to grow beyond player-only trav
 - Machine-focused generated dimensions with world rules chosen for a purpose, such as wind, sun, temperature, resources, or other environment traits.
 
 Design these as links between locations/endpoints. Do not bake the assumption that the only flow is "a player returns to wherever they were." Player return is one consumer of the more general location/link model.
+
+Dimension mappings are the first promoted location/link primitive: a small, reusable way to map player-local coordinates from one registered dimension into another. The concrete consumer need is Devastation-style paired spaces and scaled dimension travel. The over-promotion risk is turning DimensionLib into a portal/product framework, so core owns only scale/offset coordinate mapping and transfer validation; consumer mods own triggers, content, UI, cooldowns, visuals beyond explicit settings, and gameplay rules. If the abstraction proves too broad, consumers can ignore mappings and continue using explicit `DimensionLocation` transfers.
 
 ## Pocket Dimensions Roadmap
 

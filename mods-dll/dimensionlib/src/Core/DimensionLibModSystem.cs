@@ -24,6 +24,8 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
 
     public IReadOnlyCollection<Dimension> Dimensions => _serverService?.Dimensions ?? System.Array.Empty<Dimension>();
 
+    public IReadOnlyCollection<DimensionMapping> Mappings => _serverService?.Mappings ?? System.Array.Empty<DimensionMapping>();
+
     public IReadOnlyCollection<string> GeneratorIds => _serverService?.GeneratorIds ?? System.Array.Empty<string>();
 
     public override void Start(ICoreAPI api)
@@ -77,6 +79,18 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     {
         EnsureServerReady();
         return _serverService.GetDimensionAt(pos);
+    }
+
+    public DimensionLibResult<DimensionMapping> RegisterMapping(DimensionMappingSpec spec)
+    {
+        EnsureServerReady();
+        return _serverService.RegisterMapping(spec);
+    }
+
+    public DimensionLibResult<DimensionMapping> GetMapping(string mappingId)
+    {
+        EnsureServerReady();
+        return _serverService.GetMapping(mappingId);
     }
 
     public bool IsDimensionPrepared(string dimensionId)
@@ -137,6 +151,12 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     {
         EnsureServerReady();
         return _serverService.TeleportToLocation(player, location);
+    }
+
+    public DimensionLibResult TeleportAcrossMapping(IServerPlayer player, string mappingId, DimensionMappingTeleportOptions options = null)
+    {
+        EnsureServerReady();
+        return _serverService.TeleportAcrossMapping(player, mappingId, options);
     }
 
     public DimensionLibResult ReturnPlayer(IServerPlayer player)
