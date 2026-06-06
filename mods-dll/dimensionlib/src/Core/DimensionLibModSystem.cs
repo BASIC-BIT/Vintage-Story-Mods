@@ -16,6 +16,7 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     public const string ModId = "dimensionlib";
     public const int FirstPrototypeDimension = 3;
 
+    private readonly HashSet<string> _visibleChunkColumns = new HashSet<string>(System.StringComparer.Ordinal);
     private DimensionLibServerService _serverService;
     private DimensionVisualSystem _visualSystem;
     private ICoreClientAPI _clientApi;
@@ -60,6 +61,7 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     {
         _serverService?.Dispose();
         _visualSystem?.Dispose();
+        _visibleChunkColumns.Clear();
         base.Dispose();
     }
 
@@ -192,8 +194,17 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
         {
             for (var cz = message.ChunkZ; cz < message.ChunkZ + message.ChunkSizeZ; cz++)
             {
-                _clientApi.World.SetChunkColumnVisible(cx, cz, message.DimensionPlaneId);
+                MarkChunkColumnVisible(cx, cz, message.DimensionPlaneId);
             }
+        }
+    }
+
+    private void MarkChunkColumnVisible(int chunkX, int chunkZ, int dimensionPlaneId)
+    {
+        var key = $"{dimensionPlaneId}:{chunkX}:{chunkZ}";
+        if (_visibleChunkColumns.Add(key))
+        {
+            _clientApi.World.SetChunkColumnVisible(chunkX, chunkZ, dimensionPlaneId);
         }
     }
 
