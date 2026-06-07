@@ -9,6 +9,7 @@ using DimensionLib.Generation;
 using DimensionLib.Protection;
 using DimensionLib.Transfer;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -38,6 +39,7 @@ public sealed class DimensionLibServerService : IDisposable
     private readonly TemporalStabilityGuard _temporalStabilityGuard;
     private readonly PreparedDimensionTracker _preparedDimensions = new PreparedDimensionTracker();
     private readonly DimensionGeneratorRegistry _generators = new DimensionGeneratorRegistry();
+    private readonly DimensionMappingRegistry _mappings = new DimensionMappingRegistry();
     private readonly DimensionDiagnosticService _diagnostics;
     private readonly DimensionRegistry _dimensions = new DimensionRegistry(DimensionLibModSystem.FirstPrototypeDimension);
     private readonly Dictionary<string, PreparedChunkSendQueue> _preparedChunkSendQueues = new Dictionary<string, PreparedChunkSendQueue>(StringComparer.Ordinal);
@@ -65,6 +67,8 @@ public sealed class DimensionLibServerService : IDisposable
     }
 
     public IReadOnlyCollection<Dimension> Dimensions => _dimensions.Dimensions;
+
+    public IReadOnlyCollection<DimensionMapping> Mappings => _mappings.Mappings;
 
     public IReadOnlyCollection<string> GeneratorIds => _generators.GeneratorIds.Concat(new[] { DimensionGeneratorIds.StandardOverworldWindow }).ToArray();
 
@@ -149,6 +153,40 @@ public sealed class DimensionLibServerService : IDisposable
     public DimensionLibResult<Dimension> GetDimensionAt(BlockPos pos)
     {
         return _dimensions.GetAt(pos);
+    }
+
+    public DimensionLibResult<DimensionMapping> RegisterMapping(DimensionMappingSpec spec)
+    {
+        var validation = DimensionMappingSpecValidator.Validate(spec);
+        if (!validation.Success)
+        {
+            return DimensionLibResult<DimensionMapping>.Fail(validation.Message, validation.ErrorCode);
+        }
+
+        var source = GetDimension(spec.SourceDimensionId);
+        if (!source.Success)
+        {
+            return DimensionLibResult<DimensionMapping>.Fail(source.Message, source.ErrorCode);
+        }
+
+        var target = GetDimension(spec.TargetDimensionId);
+        if (!target.Success)
+        {
+            return DimensionLibResult<DimensionMapping>.Fail(target.Message, target.ErrorCode);
+        }
+
+        var result = _mappings.Register(spec);
+        if (result.Success)
+        {
+            SaveManifest();
+        }
+
+        return result;
+    }
+
+    public DimensionLibResult<DimensionMapping> GetMapping(string mappingId)
+    {
+        return _mappings.Get(mappingId);
     }
 
     public bool IsDimensionPrepared(string dimensionId)
@@ -407,6 +445,93 @@ public sealed class DimensionLibServerService : IDisposable
         return DimensionLibResult.Ok($"Teleported {player.PlayerName} to saved location.");
     }
 
+    public DimensionLibResult TeleportAcrossMapping(IServerPlayer player, string mappingId, DimensionMappingTeleportOptions options = null)
+    {
+        if (player?.Entity == null)
+        {
+            return DimensionLibResult.Fail("Online player is required.", "missing-player");
+        }
+
+        var mappingLookup = GetMapping(mappingId);
+        if (!mappingLookup.Success)
+        {
+            return DimensionLibResult.Fail(mappingLookup.Message, mappingLookup.ErrorCode);
+        }
+
+        var mapping = mappingLookup.Value;
+        var sourceLookup = GetDimension(mapping.SourceDimensionId);
+        if (!sourceLookup.Success)
+        {
+            return DimensionLibResult.Fail(sourceLookup.Message, sourceLookup.ErrorCode);
+        }
+
+        var targetLookup = GetDimension(mapping.TargetDimensionId);
+        if (!targetLookup.Success)
+        {
+            return DimensionLibResult.Fail(targetLookup.Message, targetLookup.ErrorCode);
+        }
+
+        options ??= new DimensionMappingTeleportOptions();
+        var playerBlockPos = player.Entity.Pos.AsBlockPos;
+        var source = sourceLookup.Value;
+        var target = targetLookup.Value;
+        var startsInSource = source.ContainsBlock(playerBlockPos);
+        var startsInTarget = target.ContainsBlock(playerBlockPos);
+        if (!startsInSource && !startsInTarget)
+        {
+            return DimensionLibResult.Fail($"Player is not inside either endpoint for mapping '{mapping.MappingId}'.", "not-in-mapped-dimension");
+        }
+
+        if (startsInTarget && !mapping.Bidirectional)
+        {
+            return DimensionLibResult.Fail($"Mapping '{mapping.MappingId}' is not bidirectional.", "mapping-not-bidirectional");
+        }
+
+        var reverse = startsInTarget && !startsInSource;
+        var from = reverse ? target : source;
+        var to = reverse ? source : target;
+        if (IsDimensionOrphaned(to.DimensionId))
+        {
+            return DimensionLibResult.Fail($"Dimension '{to.DimensionId}' is orphaned.", "dimension-orphaned");
+        }
+
+        var mapped = DimensionMappingResolver.MapLocalPosition(mapping.Transform, from, to, player.Entity.Pos.X, player.Entity.Pos.Y, player.Entity.Pos.Z, reverse, options);
+        var destination = new DimensionLocation
+        {
+            DimensionId = to.DimensionId,
+            DimensionPlaneId = to.DimensionPlaneId,
+            X = mapped.X,
+            Y = mapped.Y,
+            Z = mapped.Z,
+            Yaw = player.Entity.Pos.Yaw,
+            Pitch = player.Entity.Pos.Pitch,
+            Roll = player.Entity.Pos.Roll,
+        };
+
+        if (!to.ContainsBlock(destination.AsBlockPos()) || destination.Y < 0 || destination.Y >= _api.WorldManager.MapSizeY)
+        {
+            return DimensionLibResult.Fail($"Mapping '{mapping.MappingId}' resolves outside dimension '{to.DimensionId}'.", "mapped-location-out-of-bounds");
+        }
+
+        if (!_accessService.CanEnter(player, to, out var reason))
+        {
+            return DimensionLibResult.Fail(reason, "access-denied");
+        }
+
+        var prepared = PrepareMappedDestinationIfNeeded(to, destination, player);
+        if (!prepared.Success)
+        {
+            return prepared;
+        }
+
+        if (options.RequireCollisionFreeDestination && DestinationWouldCollide(player, destination))
+        {
+            return DimensionLibResult.Fail($"Mapping '{mapping.MappingId}' target is blocked.", "mapped-location-blocked");
+        }
+
+        return TeleportToLocation(player, destination);
+    }
+
     public DimensionLibResult ReturnPlayer(IServerPlayer player)
     {
         if (player?.Entity == null)
@@ -438,6 +563,7 @@ public sealed class DimensionLibServerService : IDisposable
         {
             _dimensions.MarkOrphaned(dimension.DimensionId);
             _preparedDimensions.UnmarkDimension(dimension.DimensionId);
+            _mappings.RemoveForDimension(dimension.DimensionId);
             SaveManifest();
             return DimensionLibResult.Ok($"Marked dimension '{dimension.DimensionId}' orphaned.");
         }
@@ -450,8 +576,55 @@ public sealed class DimensionLibServerService : IDisposable
         _dimensions.Remove(dimension.DimensionId);
         _manifestService.Remove(dimension.DimensionId);
         _preparedDimensions.RemoveDimension(dimension.DimensionId);
+        _mappings.RemoveForDimension(dimension.DimensionId);
         SaveManifest();
         return DimensionLibResult.Ok($"Released dimension '{dimension.DimensionId}' with mode {mode}.");
+    }
+
+    private DimensionLibResult PrepareMappedDestinationIfNeeded(Dimension dimension, DimensionLocation destination, IServerPlayer player)
+    {
+        if (string.IsNullOrWhiteSpace(dimension.GeneratorId))
+        {
+            return IsDimensionPrepared(dimension.DimensionId)
+                ? DimensionLibResult.Ok()
+                : DimensionLibResult.Fail($"Dimension '{dimension.DimensionId}' has not been prepared yet.", "dimension-not-prepared");
+        }
+
+        var localChunk = _generatedWindowPreparer.ResolveLocalChunk(dimension, destination.X, destination.Z);
+        if (_preparedDimensions.IsChunkPrepared(dimension.DimensionId, localChunk.X, localChunk.Y))
+        {
+            return DimensionLibResult.Ok();
+        }
+
+        var radius = _generatedWindowPreparer.GetAllowedChunkRadius(player, FallbackLazyGeneratedChunkRadius, InitialGeneratedChunkRadius);
+        var prepared = IsStandardOverworldSourceDimension(dimension)
+            ? _generatedWindowPreparer.PrepareStandardOverworldSourceWindow(dimension, localChunk.X, localChunk.Y, radius, player, default, InitialGeneratedChunkBudget)
+            : PrepareGeneratedDestinationWindow(dimension, localChunk.X, localChunk.Y, radius, player, default, InitialGeneratedChunkBudget);
+        if (!prepared.Success)
+        {
+            return prepared;
+        }
+
+        return _preparedDimensions.IsChunkPrepared(dimension.DimensionId, localChunk.X, localChunk.Y)
+            ? DimensionLibResult.Ok()
+            : DimensionLibResult.Fail($"Mapped destination chunks for '{dimension.DimensionId}' are still preparing. Retry the transfer in a few seconds.", "mapped-destination-loading");
+    }
+
+    private DimensionLibResult PrepareGeneratedDestinationWindow(Dimension dimension, int localChunkX, int localChunkZ, int radiusChunks, IServerPlayer sendToPlayer, CancellationToken token, int maxColumns)
+    {
+        if (!_generators.TryGet(dimension.GeneratorId, out var generator))
+        {
+            return DimensionLibResult.Fail($"Generator '{dimension.GeneratorId}' is not registered.", "unknown-generator");
+        }
+
+        var source = generator.CreateSource(dimension);
+        var sourceValidation = BlockVolumeSourceValidator.ValidateBounds(dimension, source);
+        if (!sourceValidation.Success)
+        {
+            return sourceValidation;
+        }
+
+        return _generatedWindowPreparer.PrepareWindow(dimension, source, localChunkX, localChunkZ, radiusChunks, sendToPlayer, token, maxColumns);
     }
 
     private DimensionLibResult PrepareGeneratedDimensionWindow(string dimensionId, int radiusChunks, IServerPlayer sendToPlayer = null, CancellationToken token = default, int maxColumns = int.MaxValue)
@@ -605,6 +778,15 @@ public sealed class DimensionLibServerService : IDisposable
         return TryGetDimensionAtPosition(location.AsBlockPos(), out var dimension) ? dimension : null;
     }
 
+    private bool DestinationWouldCollide(IServerPlayer player, DimensionLocation destination)
+    {
+        var collisionPos = new Vec3d(
+            destination.X,
+            destination.Y + destination.DimensionPlaneId * GlobalConstants.DimensionSizeInChunks * GlobalConstants.ChunkSize,
+            destination.Z);
+        return _api.World.CollisionTester.IsColliding(_api.World.BlockAccessor, player.Entity.CollisionBox.Clone(), collisionPos, alsoCheckTouch: false);
+    }
+
     private bool IsInsideDimensionLibDimension(BlockPos pos)
     {
         return TryGetDimensionAtPosition(pos, out _);
@@ -632,6 +814,7 @@ public sealed class DimensionLibServerService : IDisposable
         var sendRadius = _generatedWindowPreparer.GetAllowedChunkRadius(player, FallbackLazyGeneratedChunkRadius, InitialGeneratedChunkRadius);
         var chunks = _preparedDimensions.GetPreparedLocalChunks(dimension)
             .Where(chunk => Math.Abs(chunk.X - centerLocalChunk.X) <= sendRadius && Math.Abs(chunk.Y - centerLocalChunk.Y) <= sendRadius)
+            .Where(chunk => !_chunkService.HasPlayerReceivedLocalChunkColumn(dimension, player, chunk.X, chunk.Y))
             .OrderBy(chunk => DistanceSquared(chunk, centerLocalChunk))
             .ThenBy(chunk => chunk.X)
             .ThenBy(chunk => chunk.Y)
@@ -641,7 +824,6 @@ public sealed class DimensionLibServerService : IDisposable
             return;
         }
 
-        player.CurrentChunkSentRadius = 0;
         _preparedChunkSendQueues[PreparedChunkSendQueueKey(player.PlayerUID, dimension.DimensionId)] = new PreparedChunkSendQueue(player.PlayerUID, dimension.DimensionId, chunks);
     }
 
@@ -707,11 +889,69 @@ public sealed class DimensionLibServerService : IDisposable
                 _preparedDimensions.LoadPreparedChunks(dimension, entry.PreparedChunkKeys);
             }
         }
+
+        LoadPersistedMappings();
+    }
+
+    private void LoadPersistedMappings()
+    {
+        foreach (var entry in _manifestService.LoadMappingEntries())
+        {
+            var spec = entry.ToSpec();
+            var validation = DimensionMappingSpecValidator.Validate(spec);
+            if (!validation.Success)
+            {
+                _api.Logger.Warning("[DimensionLib] Skipping persisted mapping '{0}': {1}", entry.MappingId ?? "<missing>", validation.Message);
+                continue;
+            }
+
+            if (!_dimensions.TryGet(spec.SourceDimensionId, out var source) || !_dimensions.TryGet(spec.TargetDimensionId, out var target))
+            {
+                _api.Logger.Warning("[DimensionLib] Skipping persisted mapping '{0}' because one or both endpoint dimensions are missing.", spec.MappingId);
+                continue;
+            }
+
+            if (spec.IsTransient || source.IsTransient || target.IsTransient || _dimensions.IsOrphaned(source.DimensionId) || _dimensions.IsOrphaned(target.DimensionId))
+            {
+                continue;
+            }
+
+            var result = _mappings.Register(spec);
+            if (!result.Success)
+            {
+                _api.Logger.Warning("[DimensionLib] Skipping persisted mapping '{0}': {1}", spec.MappingId, result.Message);
+            }
+        }
     }
 
     private void SaveManifest()
     {
-        _manifestService.Save(_dimensions.Values, IsDimensionOrphaned, _preparedDimensions.GetPreparedChunkKeys);
+        _manifestService.Save(_dimensions.Values, GetPersistentMappings(), IsDimensionOrphaned, _preparedDimensions.GetPreparedChunkKeys);
+    }
+
+    private DimensionMapping[] GetPersistentMappings()
+    {
+        return _mappings.Mappings
+            .Where(ShouldPersistMapping)
+            .ToArray();
+    }
+
+    private bool ShouldPersistMapping(DimensionMapping mapping)
+    {
+        if (mapping == null || mapping.IsTransient)
+        {
+            return false;
+        }
+
+        if (!_dimensions.TryGet(mapping.SourceDimensionId, out var source) || !_dimensions.TryGet(mapping.TargetDimensionId, out var target))
+        {
+            return false;
+        }
+
+        return !source.IsTransient &&
+            !target.IsTransient &&
+            !_dimensions.IsOrphaned(source.DimensionId) &&
+            !_dimensions.IsOrphaned(target.DimensionId);
     }
 
     private static bool IsStandardOverworldSourceDimension(Dimension dimension)

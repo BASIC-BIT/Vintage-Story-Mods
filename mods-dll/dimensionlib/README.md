@@ -8,6 +8,7 @@ The goal is to give other mods a stable, boring API for alternate spaces without
 
 - Reserve dimension plane `3` for the first prototype plane.
 - Register finite dimensions with owner metadata and automatic sparse backing allocation.
+- Register owner-defined mappings between dimensions for paired spaces, scaled travel, and cohesive multi-dimension structures.
 - Create, relight, and force-send backing chunk columns.
 - Register generator profiles and prepare generated dimensions.
 - Materialize blocks from an `IBlockVolumeSource` into a dimension.
@@ -28,13 +29,15 @@ The main contract is `IDimensionLibApi`:
 - `TeleportToDimension(player, dimensionId, options)` moves a player into a prepared dimension and can record a return point.
 - `CaptureLocation(player)` captures the player's current engine position and optional visible DimensionLib id.
 - `TeleportToLocation(player, location)` moves a player to an explicit captured location and syncs DimensionLib visuals when applicable.
+- `RegisterMapping(spec)` registers a source/target dimension coordinate mapping owned by a consumer mod.
+- `TeleportAcrossMapping(player, mappingId, options)` maps the player's local position to the paired dimension, applies an optional destination-local offset, validates the target, and transfers the player.
 - `ReturnPlayer(player)` returns the player to the last recorded origin and remains a transitional helper for simple debug flows.
 - `RegisterPolicyProvider(ownerModId, provider)` lets an owner mod enforce richer `OwnerOnly` entry/use/mutation rules.
 - `ReleaseDimension(dimensionId, mode)` marks a dimension orphaned, forgets the manifest record, or clears blocks and forgets it.
 
 Projection consumers such as replay systems should implement `IBlockVolumeSource` and keep their own storage/query logic. DimensionLib asks the source to fill a local chunk column through an `IChunkColumnWriter`; it does not own replay timestamps, diffs, retention, or event overlays.
 
-DimensionLib persists the dimension manifest to `ModData/dimensionlib/regions.json`. It persists claims and policy metadata, not generated terrain recipes, replay timelines, or owner-mod state.
+DimensionLib persists the dimension manifest to `ModData/dimensionlib/regions.json`. It persists dimension claims, policy metadata, and non-transient mappings between non-transient dimensions. It does not persist generated terrain recipes, replay timelines, or owner-mod state.
 
 The current protection layer blocks normal player block placement, breaking, and block use in read-only or inaccessible dimensions through public server events. Root users bypass DimensionLib's generic and owner-provider checks; owner policy providers can veto block use or mutation for normal players to enforce product invariants. Non-player world mutations are not fully sandboxed yet.
 
@@ -67,6 +70,29 @@ var registered = dimensionLib.RegisterDimension(new DimensionSpec
 ```
 
 New dimensions are assigned sparse backing coordinates automatically. Consumers should preserve the returned `Dimension` or ask DimensionLib for it again instead of choosing backing chunks directly.
+
+Example mapped transfer:
+
+```csharp
+dimensionLib.RegisterMapping(new DimensionMappingSpec
+{
+    MappingId = "mymod:tower-present-past",
+    OwnerModId = "mymod",
+    SourceDimensionId = "mymod:tower-present",
+    TargetDimensionId = "mymod:tower-past",
+    Bidirectional = true,
+    Transform = DimensionMappingTransform.Identity(),
+});
+
+dimensionLib.TeleportAcrossMapping(player, "mymod:tower-present-past", new DimensionMappingTeleportOptions
+{
+    OffsetX = 1,
+});
+```
+
+Mapping transforms operate on local coordinates inside the source dimension. A transform scale such as `ScaleX = 0.125` and `ScaleZ = 0.125` can express Nether-style compressed travel, while the per-call offset is applied in destination-local coordinates after the transform.
+
+Mappings are durable by default and are saved with the dimension manifest when both endpoint dimensions are durable. Set `DimensionMappingSpec.IsTransient = true` for QA, temporary, or per-session mappings that the owner mod will recreate as needed.
 
 ## Debug Commands
 

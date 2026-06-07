@@ -63,6 +63,28 @@ internal sealed class DimensionChunkService
         return true;
     }
 
+    public bool HasPlayerReceivedLocalChunkColumn(Dimension dimension, IServerPlayer player, int localChunkX, int localChunkZ)
+    {
+        if (player == null)
+        {
+            return false;
+        }
+
+        var chunkX = dimension.ChunkX + localChunkX;
+        var chunkZ = dimension.ChunkZ + localChunkZ;
+        var dimensionChunkOffset = dimension.DimensionPlaneId * GlobalConstants.DimensionSizeInChunks;
+        var verticalChunks = (_api.WorldManager.MapSizeY + GlobalConstants.ChunkSize - 1) / GlobalConstants.ChunkSize;
+        for (var chunkY = 0; chunkY < verticalChunks; chunkY++)
+        {
+            if (!_api.WorldManager.HasChunk(chunkX, dimensionChunkOffset + chunkY, chunkZ, player))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public bool TryMaterializeLocalChunkColumnFromSource(Dimension dimension, int localChunkX, int localChunkZ, IServerChunk[] sourceChunks)
     {
         if (sourceChunks == null || sourceChunks.Length == 0)

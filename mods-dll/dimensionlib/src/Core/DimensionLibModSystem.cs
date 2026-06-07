@@ -16,6 +16,7 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     public const string ModId = "dimensionlib";
     public const int FirstPrototypeDimension = 3;
 
+    private readonly HashSet<string> _visibleChunkColumns = new HashSet<string>(System.StringComparer.Ordinal);
     private DimensionLibServerService _serverService;
     private DimensionVisualSystem _visualSystem;
     private ICoreClientAPI _clientApi;
@@ -23,6 +24,8 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     public int PrimaryDimensionPlaneId => FirstPrototypeDimension;
 
     public IReadOnlyCollection<Dimension> Dimensions => _serverService?.Dimensions ?? System.Array.Empty<Dimension>();
+
+    public IReadOnlyCollection<DimensionMapping> Mappings => _serverService?.Mappings ?? System.Array.Empty<DimensionMapping>();
 
     public IReadOnlyCollection<string> GeneratorIds => _serverService?.GeneratorIds ?? System.Array.Empty<string>();
 
@@ -58,6 +61,7 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     {
         _serverService?.Dispose();
         _visualSystem?.Dispose();
+        _visibleChunkColumns.Clear();
         base.Dispose();
     }
 
@@ -77,6 +81,18 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
     {
         EnsureServerReady();
         return _serverService.GetDimensionAt(pos);
+    }
+
+    public DimensionLibResult<DimensionMapping> RegisterMapping(DimensionMappingSpec spec)
+    {
+        EnsureServerReady();
+        return _serverService.RegisterMapping(spec);
+    }
+
+    public DimensionLibResult<DimensionMapping> GetMapping(string mappingId)
+    {
+        EnsureServerReady();
+        return _serverService.GetMapping(mappingId);
     }
 
     public bool IsDimensionPrepared(string dimensionId)
@@ -139,6 +155,12 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
         return _serverService.TeleportToLocation(player, location);
     }
 
+    public DimensionLibResult TeleportAcrossMapping(IServerPlayer player, string mappingId, DimensionMappingTeleportOptions options = null)
+    {
+        EnsureServerReady();
+        return _serverService.TeleportAcrossMapping(player, mappingId, options);
+    }
+
     public DimensionLibResult ReturnPlayer(IServerPlayer player)
     {
         EnsureServerReady();
@@ -172,8 +194,17 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
         {
             for (var cz = message.ChunkZ; cz < message.ChunkZ + message.ChunkSizeZ; cz++)
             {
-                _clientApi.World.SetChunkColumnVisible(cx, cz, message.DimensionPlaneId);
+                MarkChunkColumnVisible(cx, cz, message.DimensionPlaneId);
             }
+        }
+    }
+
+    private void MarkChunkColumnVisible(int chunkX, int chunkZ, int dimensionPlaneId)
+    {
+        var key = $"{dimensionPlaneId}:{chunkX}:{chunkZ}";
+        if (_visibleChunkColumns.Add(key))
+        {
+            _clientApi.World.SetChunkColumnVisible(chunkX, chunkZ, dimensionPlaneId);
         }
     }
 

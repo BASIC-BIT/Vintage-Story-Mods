@@ -11,6 +11,7 @@ internal sealed class DimensionManifestService
     private readonly ICoreServerAPI _api;
     private readonly DimensionRegionStore _store;
     private readonly Dictionary<string, DimensionRegionManifestEntry> _entriesById = new Dictionary<string, DimensionRegionManifestEntry>(StringComparer.Ordinal);
+    private readonly Dictionary<string, DimensionMappingManifestEntry> _mappingEntriesById = new Dictionary<string, DimensionMappingManifestEntry>(StringComparer.Ordinal);
 
     public DimensionManifestService(ICoreServerAPI api)
     {
@@ -21,6 +22,8 @@ internal sealed class DimensionManifestService
     public IEnumerable<DimensionRegionManifestEntry> LoadEntries()
     {
         var manifest = _store.Load();
+        _entriesById.Clear();
+        _mappingEntriesById.Clear();
         foreach (var entry in manifest.Dimensions ?? new List<DimensionRegionManifestEntry>())
         {
             if (string.IsNullOrWhiteSpace(entry.DimensionId))
@@ -31,6 +34,21 @@ internal sealed class DimensionManifestService
             _entriesById[entry.DimensionId] = entry;
             yield return entry;
         }
+
+        foreach (var entry in manifest.Mappings ?? new List<DimensionMappingManifestEntry>())
+        {
+            if (string.IsNullOrWhiteSpace(entry.MappingId))
+            {
+                continue;
+            }
+
+            _mappingEntriesById[entry.MappingId] = entry;
+        }
+    }
+
+    public IEnumerable<DimensionMappingManifestEntry> LoadMappingEntries()
+    {
+        return _mappingEntriesById.Values.ToArray();
     }
 
     public void Remove(string dimensionId)
@@ -41,7 +59,7 @@ internal sealed class DimensionManifestService
         }
     }
 
-    public void Save(IEnumerable<Dimension> dimensions, Func<string, bool> isDimensionOrphaned, Func<Dimension, List<long>> getPreparedChunkKeys)
+    public void Save(IEnumerable<Dimension> dimensions, IEnumerable<DimensionMapping> mappings, Func<string, bool> isDimensionOrphaned, Func<Dimension, List<long>> getPreparedChunkKeys)
     {
         try
         {
@@ -54,6 +72,13 @@ internal sealed class DimensionManifestService
                 entry.PreparedChunkKeys = getPreparedChunkKeys(dimension);
                 _entriesById[dimension.DimensionId] = entry;
                 manifest.Dimensions.Add(entry);
+            }
+
+            foreach (var mapping in mappings.OrderBy(mapping => mapping.MappingId, StringComparer.Ordinal))
+            {
+                var entry = DimensionMappingManifestEntry.FromMapping(mapping);
+                _mappingEntriesById[mapping.MappingId] = entry;
+                manifest.Mappings.Add(entry);
             }
 
             _store.Save(manifest);

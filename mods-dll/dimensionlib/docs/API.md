@@ -13,6 +13,7 @@ DimensionLib owns:
 - Materialization from caller-provided block sources.
 - Generator profile registration and generated-dimension preparation.
 - Safe location-based transfer into, out of, and between dimensions.
+- Owner-registered coordinate mappings between prepared dimensions.
 - Dimension metadata needed for protection, visual/environment profiles, and future persistence.
 
 Consuming mods own:
@@ -31,7 +32,9 @@ Consuming mods own:
 5. Call `CaptureLocation(...)` only if the consumer intentionally needs an explicit source point for a later transfer.
 6. Call `TeleportToDimension(...)` when the player should enter.
 7. Call `TeleportToLocation(...)` when the player should move to a captured source point, linked endpoint, or another explicit destination.
-8. `ReturnPlayer(...)` remains a transitional prototype helper for simple debug flows. New product code should prefer explicit locations and consumer-owned links.
+8. Register a `DimensionMappingSpec` when two dimensions should behave like mapped versions of one cohesive space.
+9. Call `TeleportAcrossMapping(...)` from a consumer-owned item, block, hotkey, portal, or command when the player should move through that mapped relationship.
+10. `ReturnPlayer(...)` remains a transitional prototype helper for simple debug flows. New product code should prefer explicit locations, mappings, and consumer-owned links.
 
 `mods-dll/dimensionpockets/src/PocketDimensionModSystem.cs` is the current integration consumer and releasable product mod. It uses only public API calls, including `RegisterPolicyProvider`, `RegisterDimension`, `PrepareDimension`, `TeleportToDimension`, `TeleportToLocation`, `ReleaseDimension`, and dimension lookup helpers.
 
@@ -48,13 +51,30 @@ Candidate concepts:
 
 Avoid broad API names that imply player-only behavior if the primitive could later support Waystones, pocket teleporter items, mechanical power transfer, item/fluid links, quantum chest endpoints, or generated-world machine anchors.
 
+## Dimension Mappings
+
+`DimensionMappingSpec` describes how local coordinates in one registered DimensionLib dimension map into another registered DimensionLib dimension. This is core infrastructure for paired spaces such as present/past rooms, floor stacks backed by separate dimensions, compressed-travel spaces, and other cases where multiple dimensions should feel spatially related.
+
+Mappings are intentionally lore-neutral. DimensionLib does not create portal blocks, hotkeys, ability items, room content, recipes, sounds, or UI. Consumers own those triggers and call `TeleportAcrossMapping(...)` when their product rules say a transfer should happen.
+
+The first mapping transform is scale plus offset:
+
+- `ScaleX`, `ScaleY`, and `ScaleZ` map source-local coordinates into target-local coordinates. Identity mapping uses `1, 1, 1`.
+- `OffsetX`, `OffsetY`, and `OffsetZ` on `DimensionMappingTransform` are persistent mapping offsets applied as part of the registered mapping.
+- `DimensionMappingTeleportOptions.OffsetX/Y/Z` are per-call destination-local offsets applied after the mapping transform. Use these for portals or paired controls that should place the player beside the mathematically equivalent point.
+- Bidirectional mappings use the inverse transform when the player starts in the target dimension.
+
+`TeleportAcrossMapping(...)` resolves whether the player is in the mapping source or, for bidirectional mappings, the mapping target. It then validates that the destination is inside the mapped dimension, checks target access/prepared state, optionally requires a collision-free destination, and delegates to the normal location transfer path so chunk visibility and visuals stay synchronized.
+
+Mappings are durable by default. DimensionLib persists non-transient mappings in the region manifest when both endpoint dimensions are registered, non-transient, and not orphaned. Set `DimensionMappingSpec.IsTransient = true` for QA, temporary, or per-session links that the owner mod should recreate at runtime. DimensionLib still does not persist consumer-owned triggers, labels, portal blocks, hotkeys, cooldowns, or other product state.
+
 ## Dimension IDs
 
 Use stable namespaced IDs such as `myststory:age-0000123` or `thebasics:replay-preview-<session>`. DimensionLib treats duplicate registration with the same bounds as idempotent, but rejects duplicate IDs with different bounds or owners.
 
 ## Persistence
 
-DimensionLib persists the dimension registry to `ModData/dimensionlib/regions.json`. It does not persist generated source definitions or replay timelines.
+DimensionLib persists the dimension registry and durable mapping registry to `ModData/dimensionlib/regions.json`. It does not persist generated source definitions, replay timelines, or consumer-owned trigger/link product state.
 
 Persisted dimension metadata includes:
 
@@ -64,6 +84,15 @@ Persisted dimension metadata includes:
 - Generator id, explicit visual settings, and seed.
 - Access policy, mutability, and transient flag.
 - Orphaned state.
+
+Persisted mapping metadata includes:
+
+- Mapping id and owner mod id.
+- Source and target dimension ids.
+- Bidirectionality.
+- Scale/offset transform.
+
+Mappings marked transient, mappings that reference transient dimensions, and mappings that reference orphaned dimensions are not saved. Releasing or orphaning a dimension removes runtime mappings that reference it.
 
 Transient dimensions are marked orphaned when loaded from disk. The owning mod reactivates them by registering the same dimension id and bounds during startup. Orphaned dimensions are retained in the manifest so admins can inspect or explicitly release them instead of DimensionLib silently forgetting chunks that may still exist on disk.
 
@@ -140,10 +169,12 @@ Replay-specific guidance:
 ## Current Limits
 
 - Registry persistence is JSON-manifest based, not a database.
+- Dimension mappings persist only simple durable scale/offset relationships; consumer product state remains owner-owned.
 - Read-only protection covers player break/place/use hooks, not every possible world mutation source.
 - Materialization currently writes solid block IDs only.
 - Visual settings are currently synced by DimensionLib transfers, not by a robust client-side dimension registry/resync path.
 - Region allocation intentionally provides only sparse placement. It does not provide dense packing, named neighborhoods, or lifecycle cleanup policy yet.
 - Calendar, season, and weather are still global VS systems; DimensionLib does not provide per-dimension calendars yet.
+- Mapping transforms support scale and offset, not arbitrary rotation, curves, graph routing, or custom transform callbacks yet.
 
 These limits are intentional. They keep the first API small while leaving clear extension points for persistence, protection, block entities, and per-dimension visuals.

@@ -260,6 +260,7 @@ jobs:
       run: |
         $projects = @(
           "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
+          "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
           "mods-dll/dimensioncavern/dimensioncavern.csproj"
@@ -279,6 +280,7 @@ jobs:
 
         $projects = @(
           "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
+          "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
           "mods-dll/dimensioncavern/dimensioncavern.csproj"
@@ -296,6 +298,7 @@ jobs:
       run: |
         $projects = @(
           "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
+          "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
           "mods-dll/dimensioncavern/dimensioncavern.csproj"
@@ -310,13 +313,23 @@ jobs:
       shell: pwsh
       continue-on-error: false
 
-    - name: Run Tests with Coverage
+    - name: Run The BASICs Tests with Coverage
       run: |
         dotnet test mods-dll/thebasics.Tests/thebasics.Tests.csproj `
           --configuration Release `
           --no-build `
           --verbosity normal `
           --settings mods-dll/thebasics.Tests/coverlet.runsettings `
+          --collect:"XPlat Code Coverage" `
+          --results-directory TestResults
+      shell: pwsh
+
+    - name: Run DimensionLib Tests
+      run: |
+        dotnet test mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj `
+          --configuration Release `
+          --no-build `
+          --verbosity normal `
           --collect:"XPlat Code Coverage" `
           --results-directory TestResults
       shell: pwsh
