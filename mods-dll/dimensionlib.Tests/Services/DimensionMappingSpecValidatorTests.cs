@@ -75,7 +75,7 @@ public class DimensionMappingSpecValidatorTests
     }
 
     [Fact]
-    public void SameMapping_ComparesEndpointsBidirectionalityAndTransform()
+    public void SameMapping_ComparesEndpointsBidirectionalityTransformAndPersistenceMode()
     {
         var spec = ValidSpec();
         spec.Transform.ScaleX = 0.125;
@@ -83,6 +83,9 @@ public class DimensionMappingSpecValidatorTests
 
         DimensionMappingSpecValidator.SameMapping(mapping, spec).Should().BeTrue();
         spec.Transform.OffsetX = 1;
+        DimensionMappingSpecValidator.SameMapping(mapping, spec).Should().BeFalse();
+        spec.Transform.OffsetX = 0;
+        spec.IsTransient = true;
         DimensionMappingSpecValidator.SameMapping(mapping, spec).Should().BeFalse();
     }
 

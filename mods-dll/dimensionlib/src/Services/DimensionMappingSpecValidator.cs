@@ -47,6 +47,7 @@ internal static class DimensionMappingSpecValidator
             string.Equals(existing.SourceDimensionId, spec.SourceDimensionId, StringComparison.Ordinal) &&
             string.Equals(existing.TargetDimensionId, spec.TargetDimensionId, StringComparison.Ordinal) &&
             existing.Bidirectional == spec.Bidirectional &&
+            existing.IsTransient == spec.IsTransient &&
             SameTransform(existing.Transform, spec.Transform);
     }
 

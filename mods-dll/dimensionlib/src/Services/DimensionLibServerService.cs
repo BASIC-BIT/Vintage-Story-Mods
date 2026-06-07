@@ -175,7 +175,13 @@ public sealed class DimensionLibServerService : IDisposable
             return DimensionLibResult<DimensionMapping>.Fail(target.Message, target.ErrorCode);
         }
 
-        return _mappings.Register(spec);
+        var result = _mappings.Register(spec);
+        if (result.Success)
+        {
+            SaveManifest();
+        }
+
+        return result;
     }
 
     public DimensionLibResult<DimensionMapping> GetMapping(string mappingId)
@@ -557,6 +563,7 @@ public sealed class DimensionLibServerService : IDisposable
         {
             _dimensions.MarkOrphaned(dimension.DimensionId);
             _preparedDimensions.UnmarkDimension(dimension.DimensionId);
+            _mappings.RemoveForDimension(dimension.DimensionId);
             SaveManifest();
             return DimensionLibResult.Ok($"Marked dimension '{dimension.DimensionId}' orphaned.");
         }
@@ -807,6 +814,7 @@ public sealed class DimensionLibServerService : IDisposable
         var sendRadius = _generatedWindowPreparer.GetAllowedChunkRadius(player, FallbackLazyGeneratedChunkRadius, InitialGeneratedChunkRadius);
         var chunks = _preparedDimensions.GetPreparedLocalChunks(dimension)
             .Where(chunk => Math.Abs(chunk.X - centerLocalChunk.X) <= sendRadius && Math.Abs(chunk.Y - centerLocalChunk.Y) <= sendRadius)
+            .Where(chunk => !_chunkService.HasPlayerReceivedLocalChunkColumn(dimension, player, chunk.X, chunk.Y))
             .OrderBy(chunk => DistanceSquared(chunk, centerLocalChunk))
             .ThenBy(chunk => chunk.X)
             .ThenBy(chunk => chunk.Y)
@@ -816,7 +824,6 @@ public sealed class DimensionLibServerService : IDisposable
             return;
         }
 
-        player.CurrentChunkSentRadius = 0;
         _preparedChunkSendQueues[PreparedChunkSendQueueKey(player.PlayerUID, dimension.DimensionId)] = new PreparedChunkSendQueue(player.PlayerUID, dimension.DimensionId, chunks);
     }
 
@@ -882,11 +889,69 @@ public sealed class DimensionLibServerService : IDisposable
                 _preparedDimensions.LoadPreparedChunks(dimension, entry.PreparedChunkKeys);
             }
         }
+
+        LoadPersistedMappings();
+    }
+
+    private void LoadPersistedMappings()
+    {
+        foreach (var entry in _manifestService.LoadMappingEntries())
+        {
+            var spec = entry.ToSpec();
+            var validation = DimensionMappingSpecValidator.Validate(spec);
+            if (!validation.Success)
+            {
+                _api.Logger.Warning("[DimensionLib] Skipping persisted mapping '{0}': {1}", entry.MappingId ?? "<missing>", validation.Message);
+                continue;
+            }
+
+            if (!_dimensions.TryGet(spec.SourceDimensionId, out var source) || !_dimensions.TryGet(spec.TargetDimensionId, out var target))
+            {
+                _api.Logger.Warning("[DimensionLib] Skipping persisted mapping '{0}' because one or both endpoint dimensions are missing.", spec.MappingId);
+                continue;
+            }
+
+            if (spec.IsTransient || source.IsTransient || target.IsTransient || _dimensions.IsOrphaned(source.DimensionId) || _dimensions.IsOrphaned(target.DimensionId))
+            {
+                continue;
+            }
+
+            var result = _mappings.Register(spec);
+            if (!result.Success)
+            {
+                _api.Logger.Warning("[DimensionLib] Skipping persisted mapping '{0}': {1}", spec.MappingId, result.Message);
+            }
+        }
     }
 
     private void SaveManifest()
     {
-        _manifestService.Save(_dimensions.Values, IsDimensionOrphaned, _preparedDimensions.GetPreparedChunkKeys);
+        _manifestService.Save(_dimensions.Values, GetPersistentMappings(), IsDimensionOrphaned, _preparedDimensions.GetPreparedChunkKeys);
+    }
+
+    private DimensionMapping[] GetPersistentMappings()
+    {
+        return _mappings.Mappings
+            .Where(ShouldPersistMapping)
+            .ToArray();
+    }
+
+    private bool ShouldPersistMapping(DimensionMapping mapping)
+    {
+        if (mapping == null || mapping.IsTransient)
+        {
+            return false;
+        }
+
+        if (!_dimensions.TryGet(mapping.SourceDimensionId, out var source) || !_dimensions.TryGet(mapping.TargetDimensionId, out var target))
+        {
+            return false;
+        }
+
+        return !source.IsTransient &&
+            !target.IsTransient &&
+            !_dimensions.IsOrphaned(source.DimensionId) &&
+            !_dimensions.IsOrphaned(target.DimensionId);
     }
 
     private static bool IsStandardOverworldSourceDimension(Dimension dimension)

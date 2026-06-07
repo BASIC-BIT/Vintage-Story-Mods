@@ -37,7 +37,7 @@ The main contract is `IDimensionLibApi`:
 
 Projection consumers such as replay systems should implement `IBlockVolumeSource` and keep their own storage/query logic. DimensionLib asks the source to fill a local chunk column through an `IChunkColumnWriter`; it does not own replay timestamps, diffs, retention, or event overlays.
 
-DimensionLib persists the dimension manifest to `ModData/dimensionlib/regions.json`. It persists claims and policy metadata, not generated terrain recipes, replay timelines, or owner-mod state.
+DimensionLib persists the dimension manifest to `ModData/dimensionlib/regions.json`. It persists dimension claims, policy metadata, and non-transient mappings between non-transient dimensions. It does not persist generated terrain recipes, replay timelines, or owner-mod state.
 
 The current protection layer blocks normal player block placement, breaking, and block use in read-only or inaccessible dimensions through public server events. Root users bypass DimensionLib's generic and owner-provider checks; owner policy providers can veto block use or mutation for normal players to enforce product invariants. Non-player world mutations are not fully sandboxed yet.
 
@@ -91,6 +91,8 @@ dimensionLib.TeleportAcrossMapping(player, "mymod:tower-present-past", new Dimen
 ```
 
 Mapping transforms operate on local coordinates inside the source dimension. A transform scale such as `ScaleX = 0.125` and `ScaleZ = 0.125` can express Nether-style compressed travel, while the per-call offset is applied in destination-local coordinates after the transform.
+
+Mappings are durable by default and are saved with the dimension manifest when both endpoint dimensions are durable. Set `DimensionMappingSpec.IsTransient = true` for QA, temporary, or per-session mappings that the owner mod will recreate as needed.
 
 ## Debug Commands
 

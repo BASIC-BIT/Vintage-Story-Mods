@@ -8,6 +8,8 @@ public sealed class DimensionRegionManifest
     public int SchemaVersion { get; set; } = 1;
 
     public List<DimensionRegionManifestEntry> Dimensions { get; set; } = new List<DimensionRegionManifestEntry>();
+
+    public List<DimensionMappingManifestEntry> Mappings { get; set; } = new List<DimensionMappingManifestEntry>();
 }
 
 public sealed class DimensionRegionManifestEntry
@@ -94,6 +96,51 @@ public sealed class DimensionRegionManifestEntry
             Seed = Seed,
             AccessPolicy = AccessPolicy,
             Mutability = Mutability,
+            IsTransient = IsTransient,
+        };
+    }
+}
+
+public sealed class DimensionMappingManifestEntry
+{
+    public string MappingId { get; set; }
+
+    public string OwnerModId { get; set; }
+
+    public string SourceDimensionId { get; set; }
+
+    public string TargetDimensionId { get; set; }
+
+    public bool Bidirectional { get; set; } = true;
+
+    public DimensionMappingTransform Transform { get; set; }
+
+    public bool IsTransient { get; set; }
+
+    public static DimensionMappingManifestEntry FromMapping(DimensionMapping mapping)
+    {
+        return new DimensionMappingManifestEntry
+        {
+            MappingId = mapping.MappingId,
+            OwnerModId = mapping.OwnerModId,
+            SourceDimensionId = mapping.SourceDimensionId,
+            TargetDimensionId = mapping.TargetDimensionId,
+            Bidirectional = mapping.Bidirectional,
+            Transform = mapping.Transform,
+            IsTransient = mapping.IsTransient,
+        };
+    }
+
+    public DimensionMappingSpec ToSpec()
+    {
+        return new DimensionMappingSpec
+        {
+            MappingId = MappingId,
+            OwnerModId = OwnerModId,
+            SourceDimensionId = SourceDimensionId,
+            TargetDimensionId = TargetDimensionId,
+            Bidirectional = Bidirectional,
+            Transform = Transform?.Clone(),
             IsTransient = IsTransient,
         };
     }

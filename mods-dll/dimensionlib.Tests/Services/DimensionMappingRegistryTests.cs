@@ -46,6 +46,20 @@ public class DimensionMappingRegistryTests
     }
 
     [Fact]
+    public void Register_RejectsSameIdWithDifferentPersistenceMode()
+    {
+        var registry = new DimensionMappingRegistry();
+        registry.Register(ValidSpec()).Success.Should().BeTrue();
+        var changed = ValidSpec();
+        changed.IsTransient = true;
+
+        var result = registry.Register(changed);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("mapping-id-conflict");
+    }
+
+    [Fact]
     public void Get_RejectsUnknownMapping()
     {
         var registry = new DimensionMappingRegistry();

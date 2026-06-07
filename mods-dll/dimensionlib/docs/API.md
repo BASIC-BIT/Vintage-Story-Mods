@@ -66,7 +66,7 @@ The first mapping transform is scale plus offset:
 
 `TeleportAcrossMapping(...)` resolves whether the player is in the mapping source or, for bidirectional mappings, the mapping target. It then validates that the destination is inside the mapped dimension, checks target access/prepared state, optionally requires a collision-free destination, and delegates to the normal location transfer path so chunk visibility and visuals stay synchronized.
 
-Mappings are owner-registered runtime metadata. DimensionLib does not persist them in the region manifest; consumer mods should persist their own site/link definitions and register mappings after their dimensions are registered.
+Mappings are durable by default. DimensionLib persists non-transient mappings in the region manifest when both endpoint dimensions are registered, non-transient, and not orphaned. Set `DimensionMappingSpec.IsTransient = true` for QA, temporary, or per-session links that the owner mod should recreate at runtime. DimensionLib still does not persist consumer-owned triggers, labels, portal blocks, hotkeys, cooldowns, or other product state.
 
 ## Dimension IDs
 
@@ -74,7 +74,7 @@ Use stable namespaced IDs such as `myststory:age-0000123` or `thebasics:replay-p
 
 ## Persistence
 
-DimensionLib persists the dimension registry to `ModData/dimensionlib/regions.json`. It does not persist generated source definitions or replay timelines.
+DimensionLib persists the dimension registry and durable mapping registry to `ModData/dimensionlib/regions.json`. It does not persist generated source definitions, replay timelines, or consumer-owned trigger/link product state.
 
 Persisted dimension metadata includes:
 
@@ -84,6 +84,15 @@ Persisted dimension metadata includes:
 - Generator id, explicit visual settings, and seed.
 - Access policy, mutability, and transient flag.
 - Orphaned state.
+
+Persisted mapping metadata includes:
+
+- Mapping id and owner mod id.
+- Source and target dimension ids.
+- Bidirectionality.
+- Scale/offset transform.
+
+Mappings marked transient, mappings that reference transient dimensions, and mappings that reference orphaned dimensions are not saved. Releasing or orphaning a dimension removes runtime mappings that reference it.
 
 Transient dimensions are marked orphaned when loaded from disk. The owning mod reactivates them by registering the same dimension id and bounds during startup. Orphaned dimensions are retained in the manifest so admins can inspect or explicitly release them instead of DimensionLib silently forgetting chunks that may still exist on disk.
 
@@ -160,7 +169,7 @@ Replay-specific guidance:
 ## Current Limits
 
 - Registry persistence is JSON-manifest based, not a database.
-- Dimension mappings are runtime registrations owned by consumers, not manifest-persisted DimensionLib state.
+- Dimension mappings persist only simple durable scale/offset relationships; consumer product state remains owner-owned.
 - Read-only protection covers player break/place/use hooks, not every possible world mutation source.
 - Materialization currently writes solid block IDs only.
 - Visual settings are currently synced by DimensionLib transfers, not by a robust client-side dimension registry/resync path.

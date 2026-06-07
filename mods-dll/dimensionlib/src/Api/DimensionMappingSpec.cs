@@ -17,6 +17,8 @@ public sealed class DimensionMappingSpec
 
     public DimensionMappingTransform Transform { get; set; } = DimensionMappingTransform.Identity();
 
+    public bool IsTransient { get; set; }
+
     public DimensionMapping ToMapping()
     {
         return new DimensionMapping(
@@ -25,6 +27,7 @@ public sealed class DimensionMappingSpec
             SourceDimensionId,
             TargetDimensionId,
             Bidirectional,
-            Transform?.Clone());
+            Transform?.Clone(),
+            IsTransient);
     }
 }

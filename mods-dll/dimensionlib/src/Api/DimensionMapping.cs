@@ -10,7 +10,8 @@ public sealed class DimensionMapping
         string sourceDimensionId,
         string targetDimensionId,
         bool bidirectional = true,
-        DimensionMappingTransform transform = null)
+        DimensionMappingTransform transform = null,
+        bool isTransient = false)
     {
         MappingId = mappingId;
         OwnerModId = ownerModId;
@@ -18,6 +19,7 @@ public sealed class DimensionMapping
         TargetDimensionId = targetDimensionId;
         Bidirectional = bidirectional;
         _transform = (transform ?? DimensionMappingTransform.Identity()).Clone();
+        IsTransient = isTransient;
     }
 
     public string MappingId { get; }
@@ -31,4 +33,6 @@ public sealed class DimensionMapping
     public bool Bidirectional { get; }
 
     public DimensionMappingTransform Transform => _transform.Clone();
+
+    public bool IsTransient { get; }
 }

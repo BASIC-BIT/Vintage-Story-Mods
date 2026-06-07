@@ -48,9 +48,27 @@ public class DimensionMappingTests
         var mapping = spec.ToMapping();
 
         mapping.Bidirectional.Should().BeTrue();
+        mapping.IsTransient.Should().BeFalse();
         mapping.Transform.ScaleX.Should().Be(1);
         mapping.Transform.ScaleY.Should().Be(1);
         mapping.Transform.ScaleZ.Should().Be(1);
+    }
+
+    [Fact]
+    public void SpecToMapping_PreservesTransientFlag()
+    {
+        var spec = new DimensionMappingSpec
+        {
+            MappingId = "test:mapping",
+            OwnerModId = "test",
+            SourceDimensionId = "test:source",
+            TargetDimensionId = "test:target",
+            IsTransient = true,
+        };
+
+        var mapping = spec.ToMapping();
+
+        mapping.IsTransient.Should().BeTrue();
     }
 
     [Fact]

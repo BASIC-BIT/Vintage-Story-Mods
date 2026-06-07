@@ -86,4 +86,44 @@ public class DimensionRegionManifestTests
         spec.Mutability.Should().Be(entry.Mutability);
         spec.IsTransient.Should().BeFalse();
     }
+
+    [Fact]
+    public void MappingEntry_RoundTripsMappingSpec()
+    {
+        var mapping = new DimensionMapping(
+            "test:mapping",
+            "test-owner",
+            "test:source",
+            "test:target",
+            bidirectional: false,
+            transform: new DimensionMappingTransform
+            {
+                ScaleX = 0.5,
+                ScaleY = 1,
+                ScaleZ = 2,
+                OffsetX = 3,
+                OffsetY = 4,
+                OffsetZ = 5,
+            },
+            isTransient: true);
+
+        var entry = DimensionMappingManifestEntry.FromMapping(mapping);
+        var spec = entry.ToSpec();
+
+        entry.MappingId.Should().Be("test:mapping");
+        entry.OwnerModId.Should().Be("test-owner");
+        entry.SourceDimensionId.Should().Be("test:source");
+        entry.TargetDimensionId.Should().Be("test:target");
+        entry.Bidirectional.Should().BeFalse();
+        entry.IsTransient.Should().BeTrue();
+        entry.Transform.ScaleX.Should().Be(0.5);
+        spec.MappingId.Should().Be(entry.MappingId);
+        spec.OwnerModId.Should().Be(entry.OwnerModId);
+        spec.SourceDimensionId.Should().Be(entry.SourceDimensionId);
+        spec.TargetDimensionId.Should().Be(entry.TargetDimensionId);
+        spec.Bidirectional.Should().BeFalse();
+        spec.IsTransient.Should().BeTrue();
+        spec.Transform.ScaleZ.Should().Be(2);
+        spec.Transform.OffsetZ.Should().Be(5);
+    }
 }
