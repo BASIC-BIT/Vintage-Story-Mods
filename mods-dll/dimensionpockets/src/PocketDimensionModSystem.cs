@@ -393,62 +393,32 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         var targetIndex = layer.Index + direction;
-        var targetLayer = FindLayer(stack, targetIndex);
-        var createdTargetLayer = false;
-        if (targetLayer == null)
+        var target = ResolveElevatorTargetLayer(player, stack, layer, targetIndex, direction, createMissingLayer);
+        if (!target.Success)
         {
-            if (!createMissingLayer)
-            {
-                if (!HasPrivilege(player, _config.CreatePrivilege))
-                {
-                    return DimensionLibResult.Fail($"Missing privilege '{_config.CreatePrivilege}' to create a new pocket layer.", "missing-layer-create-privilege");
-                }
-
-                PromptLayerCreation(player, stack, layer.Index, targetIndex, direction);
-                return DimensionLibResult.Ok($"Confirm creating layer {FormatLayer(targetIndex)} to continue.");
-            }
-
-            if (!HasPrivilege(player, _config.CreatePrivilege))
-            {
-                return DimensionLibResult.Fail($"Missing privilege '{_config.CreatePrivilege}' to create a new pocket layer.", "missing-layer-create-privilege");
-            }
-
-            var created = CreateLayer(stack, targetIndex, player);
-            if (!created.Success)
-            {
-                return DimensionLibResult.Fail(created.Message, created.ErrorCode);
-            }
-
-            targetLayer = created.Value;
-            createdTargetLayer = true;
-            layer = FindLayer(stack, dimension.DimensionId);
+            return DimensionLibResult.Fail(target.Message, target.ErrorCode);
         }
 
-        var mappingId = direction > 0 ? layer.UpMappingId : layer.DownMappingId;
-        if (string.IsNullOrWhiteSpace(mappingId))
+        if (target.Value.TargetLayer == null)
         {
-            var linked = EnsureAdjacentMapping(stack, Math.Min(layer.Index, targetIndex), Math.Max(layer.Index, targetIndex));
-            if (!linked.Success)
-            {
-                return DimensionLibResult.Fail(linked.Message, linked.ErrorCode);
-            }
-
-            mappingId = direction > 0 ? layer.UpMappingId : layer.DownMappingId;
+            return DimensionLibResult.Ok(target.Message);
         }
 
-        var mapped = _dimensionLib.ResolveMappedLocation(CreateLocation(player, dimension.DimensionId), mappingId, new DimensionMappingTeleportOptions { RequireCollisionFreeDestination = false });
+        layer = FindLayer(stack, dimension.DimensionId);
+        var mappingIdResult = ResolveElevatorMapping(stack, layer, targetIndex, direction);
+        if (!mappingIdResult.Success)
+        {
+            return DimensionLibResult.Fail(mappingIdResult.Message, mappingIdResult.ErrorCode);
+        }
+
+        var mapped = _dimensionLib.ResolveMappedLocation(CreateLocation(player, dimension.DimensionId), mappingIdResult.Value, new DimensionMappingTeleportOptions { RequireCollisionFreeDestination = false });
         if (!mapped.Success)
         {
             return DimensionLibResult.Fail(mapped.Message, mapped.ErrorCode);
         }
 
         var destination = mapped.Value.Location;
-        var targetElevatorPos = new BlockPos(
-            (int)Math.Floor(destination.X),
-            (int)Math.Floor(destination.Y - playerOffsetY),
-            (int)Math.Floor(destination.Z),
-            destination.DimensionPlaneId);
-        var landing = EnsureElevatorLanding(targetElevatorPos, createdTargetLayer);
+        var landing = EnsureElevatorLanding(ToElevatorPos(destination, playerOffsetY), target.Value.CreatedTargetLayer);
         if (!landing.Success)
         {
             return landing;
@@ -460,7 +430,65 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return traveled;
         }
 
-        return DimensionLibResult.Ok($"Moved to {DisplayName(targetLayer.DimensionId)} layer {FormatLayer(targetLayer.Index)}.");
+        return DimensionLibResult.Ok($"Moved to {DisplayName(target.Value.TargetLayer.DimensionId)} layer {FormatLayer(target.Value.TargetLayer.Index)}.");
+    }
+
+    private DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)> ResolveElevatorTargetLayer(
+        IServerPlayer player,
+        PocketLayerStack stack,
+        PocketLayerRef sourceLayer,
+        int targetIndex,
+        int direction,
+        bool createMissingLayer)
+    {
+        var targetLayer = FindLayer(stack, targetIndex);
+        if (targetLayer != null)
+        {
+            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Ok((targetLayer, false));
+        }
+
+        if (!HasPrivilege(player, _config.CreatePrivilege))
+        {
+            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Fail($"Missing privilege '{_config.CreatePrivilege}' to create a new pocket layer.", "missing-layer-create-privilege");
+        }
+
+        if (!createMissingLayer)
+        {
+            PromptLayerCreation(player, stack, sourceLayer.Index, targetIndex, direction);
+            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Ok((null, false), $"Confirm creating layer {FormatLayer(targetIndex)} to continue.");
+        }
+
+        var created = CreateLayer(stack, targetIndex, player);
+        return created.Success
+            ? DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Ok((created.Value, true))
+            : DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Fail(created.Message, created.ErrorCode);
+    }
+
+    private DimensionLibResult<string> ResolveElevatorMapping(PocketLayerStack stack, PocketLayerRef layer, int targetIndex, int direction)
+    {
+        var mappingId = direction > 0 ? layer.UpMappingId : layer.DownMappingId;
+        if (!string.IsNullOrWhiteSpace(mappingId))
+        {
+            return DimensionLibResult<string>.Ok(mappingId);
+        }
+
+        var linked = EnsureAdjacentMapping(stack, Math.Min(layer.Index, targetIndex), Math.Max(layer.Index, targetIndex));
+        if (!linked.Success)
+        {
+            return DimensionLibResult<string>.Fail(linked.Message, linked.ErrorCode);
+        }
+
+        mappingId = direction > 0 ? layer.UpMappingId : layer.DownMappingId;
+        return DimensionLibResult<string>.Ok(mappingId);
+    }
+
+    private static BlockPos ToElevatorPos(DimensionLocation destination, double playerOffsetY)
+    {
+        return new BlockPos(
+            (int)Math.Floor(destination.X),
+            (int)Math.Floor(destination.Y - playerOffsetY),
+            (int)Math.Floor(destination.Z),
+            destination.DimensionPlaneId);
     }
 
     private void OnElevatorTravelRequest(IServerPlayer player, PocketElevatorTravelRequest request)
