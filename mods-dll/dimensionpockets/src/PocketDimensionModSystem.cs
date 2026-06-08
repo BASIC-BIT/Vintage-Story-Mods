@@ -389,7 +389,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return DimensionLibResult.Fail($"Missing privilege '{_config.UseElevatorPrivilege}'.", "missing-elevator-use-privilege");
         }
 
-        if (!TryFindStandingElevator(player, out var elevatorPos, out var playerOffsetY))
+        if (!TryFindStandingElevator(player, out var elevatorPos, out _))
         {
             return DimensionLibResult.Fail("Stand on a Pocket Elevator first.", "not-on-pocket-elevator");
         }
@@ -427,14 +427,14 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return DimensionLibResult.Fail(mappingIdResult.Message, mappingIdResult.ErrorCode);
         }
 
-        var mapped = _dimensionLib.ResolveMappedLocation(CreateLocation(player, dimension.DimensionId), mappingIdResult.Value, new DimensionMappingTeleportOptions { RequireCollisionFreeDestination = false });
-        if (!mapped.Success)
+        var destinations = ResolveElevatorDestinations(player, elevatorPos, dimension.DimensionId, mappingIdResult.Value);
+        if (!destinations.Success)
         {
-            return DimensionLibResult.Fail(mapped.Message, mapped.ErrorCode);
+            return DimensionLibResult.Fail(destinations.Message, destinations.ErrorCode);
         }
 
-        var destination = mapped.Value.Location;
-        var targetElevatorPos = ToElevatorPos(destination, playerOffsetY);
+        var destination = destinations.Value.Destination;
+        var targetElevatorPos = destinations.Value.TargetElevatorPos;
         if (placeMissingElevator && !HasPrivilege(player, _config.MutatePocketBlocksPrivilege))
         {
             return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator on the target layer.", "missing-elevator-place-privilege");
@@ -473,6 +473,25 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         return DimensionLibResult.Ok($"Moved to {DisplayName(target.Value.TargetLayer.DimensionId)} layer {FormatLayer(target.Value.TargetLayer.Index)}.");
+    }
+
+    private DimensionLibResult<(DimensionLocation Destination, BlockPos TargetElevatorPos)> ResolveElevatorDestinations(
+        IServerPlayer player,
+        BlockPos elevatorPos,
+        string dimensionId,
+        string mappingId)
+    {
+        var options = new DimensionMappingTeleportOptions { RequireCollisionFreeDestination = false };
+        var mappedPlayer = _dimensionLib.ResolveMappedLocation(CreateLocation(player, dimensionId), mappingId, options);
+        if (!mappedPlayer.Success)
+        {
+            return DimensionLibResult<(DimensionLocation Destination, BlockPos TargetElevatorPos)>.Fail(mappedPlayer.Message, mappedPlayer.ErrorCode);
+        }
+
+        var mappedElevator = _dimensionLib.ResolveMappedLocation(CreateBlockLocation(elevatorPos, dimensionId), mappingId, options);
+        return mappedElevator.Success
+            ? DimensionLibResult<(DimensionLocation Destination, BlockPos TargetElevatorPos)>.Ok((mappedPlayer.Value.Location, ToBlockPos(mappedElevator.Value.Location)))
+            : DimensionLibResult<(DimensionLocation Destination, BlockPos TargetElevatorPos)>.Fail(mappedElevator.Message, mappedElevator.ErrorCode);
     }
 
     private DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)> ResolveElevatorTargetLayer(
@@ -524,11 +543,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         return DimensionLibResult<string>.Ok(mappingId);
     }
 
-    private static BlockPos ToElevatorPos(DimensionLocation destination, double playerOffsetY)
+    private static BlockPos ToBlockPos(DimensionLocation destination)
     {
         return new BlockPos(
             (int)Math.Floor(destination.X),
-            (int)Math.Floor(destination.Y - playerOffsetY),
+            (int)Math.Floor(destination.Y),
             (int)Math.Floor(destination.Z),
             destination.DimensionPlaneId);
     }
@@ -1038,6 +1057,18 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             Yaw = player.Entity.Pos.Yaw,
             Pitch = player.Entity.Pos.Pitch,
             Roll = player.Entity.Pos.Roll,
+        };
+    }
+
+    private static DimensionLocation CreateBlockLocation(BlockPos pos, string dimensionId)
+    {
+        return new DimensionLocation
+        {
+            DimensionId = dimensionId,
+            DimensionPlaneId = pos.dimension,
+            X = pos.X,
+            Y = pos.Y,
+            Z = pos.Z,
         };
     }
 
