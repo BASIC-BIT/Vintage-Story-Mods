@@ -14,6 +14,8 @@ Command privileges are configurable in `ModConfig/pocket_dimensions.json`. Defau
 - `/pocket unbind` clears the binding from the placed Pocket Waystone you are looking at.
 - `/pocket release <name> confirm` marks the pocket orphaned through DimensionLib.
 
+Press `Ctrl+Shift+P` to open the Pocket Directory. The directory lists pockets and layers visible to your current privileges, marks the current layer, and lets you teleport to available layers without typing `/pocket enter`. Players with `CreatePrivilege` also get a **New Pocket** form with display name, slug, size chunks, and spawn Y fields. Server permissions still decide whether the directory shows any spaces and whether creation or teleport buttons are available.
+
 Config defaults:
 
 - `CreatePrivilege`: `root`
@@ -56,6 +58,8 @@ Right-clicking a bound external Waystone requires `UseWaystonePrivilege`, record
 Waystone links, active ingress choices, and command-entry return locations are persisted to `ModData/pocketdimensions/waystone-links.json`. The store contains endpoint links plus the minimal `player -> pocket -> endpoint` and `player -> pocket -> location` active-trip state needed for return pedestal recovery across restarts. A successful pedestal or `/pocket exit` return clears the player-specific return state for that pocket.
 
 Pocket layers are also persisted in `waystone-links.json`. Existing pockets become layer stacks when entered, inspected, or used by the HUD. Press `PageUp` or `PageDown` while standing on a Pocket Elevator to move to the adjacent layer. If that layer does not exist and the player has `CreatePrivilege`, the client asks for confirmation before creating the layer, registering a durable DimensionLib mapping, generating the central elevator, and continuing the transfer. New layers use signed indexes such as `Layer 0`, `Layer +1`, and `Layer -1`.
+
+New layer stacks record the creating player's UID/name when available. Existing stacks without owner metadata continue to load as server/global stacks. The Pocket Directory uses this metadata only for display today; future capability policies can use it for owner/member workflows.
 
 Elevators validate the mapped destination before transfer. By default the target layer must have a Pocket Elevator at the mapped landing and two clear blocks above it. If an existing target layer is clear but missing that elevator, the client asks whether to place one before continuing; if the mapped landing is blocked, the transfer fails with a blocked-way error. Newly created layers auto-place the matching landing elevator so the confirmed creation flow can complete. The `ClearHeadroomOnly` and `AutoPlaceElevatorIfMissing` modes relax that rule for servers that prefer more seamless movement.
 

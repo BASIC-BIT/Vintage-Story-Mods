@@ -217,6 +217,10 @@ internal sealed class PocketLayerStack
 
     public string DisplayName { get; set; }
 
+    public string OwnerPlayerUid { get; set; }
+
+    public string OwnerPlayerName { get; set; }
+
     public int SizeChunks { get; set; }
 
     public int SpawnY { get; set; }
@@ -227,6 +231,8 @@ internal sealed class PocketLayerStack
     {
         StackId = StackId?.Trim();
         DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? StackId : DisplayName.Trim();
+        OwnerPlayerUid = string.IsNullOrWhiteSpace(OwnerPlayerUid) ? null : OwnerPlayerUid.Trim();
+        OwnerPlayerName = string.IsNullOrWhiteSpace(OwnerPlayerName) ? null : OwnerPlayerName.Trim();
         SizeChunks = Math.Max(1, SizeChunks);
         SpawnY = Math.Max(1, SpawnY);
         Layers = (Layers ?? new List<PocketLayerRef>())
