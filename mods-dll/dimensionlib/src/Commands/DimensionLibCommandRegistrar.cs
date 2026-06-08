@@ -219,10 +219,10 @@ internal sealed class DimensionLibCommandRegistrar
 
     private TextCommandResult HandleValidateDimension(TextCommandCallingArgs args)
     {
+        var player = (IServerPlayer)args.Caller.Player;
         var dimensionId = ((string)args[0])?.Trim();
         if (string.IsNullOrWhiteSpace(dimensionId))
         {
-            var player = (IServerPlayer)args.Caller.Player;
             var lookup = _service.GetDimensionAt(player.Entity.Pos.AsBlockPos);
             if (!lookup.Success)
             {
@@ -232,7 +232,7 @@ internal sealed class DimensionLibCommandRegistrar
             dimensionId = lookup.Value.DimensionId;
         }
 
-        var result = _service.ValidateDimension(dimensionId);
+        var result = _service.ValidateDimension(dimensionId, player);
         return result.Success ? TextCommandResult.Success(result.Value) : TextCommandResult.Error(result.Message, result.ErrorCode);
     }
 

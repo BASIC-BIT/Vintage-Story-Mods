@@ -32,16 +32,33 @@ internal static class DimensionRegionAllocator
         return false;
     }
 
-    public static bool TryAssignSparseRegion(DimensionSpec spec, IEnumerable<Dimension> existingDimensions)
+    public static bool TryAssignSparseRegion(DimensionSpec spec, IEnumerable<Dimension> existingDimensions, int maxChunkX = int.MaxValue, int maxChunkZ = int.MaxValue)
     {
         var existing = existingDimensions?.ToArray() ?? Array.Empty<Dimension>();
         var stride = Math.Max(SparseStrideChunks, Math.Max(spec.ChunkSizeX, spec.ChunkSizeZ) + 1);
+        var maxStartChunkX = maxChunkX - spec.ChunkSizeX;
+        var maxStartChunkZ = maxChunkZ - spec.ChunkSizeZ;
+        if (maxStartChunkX < SparseStartChunk || maxStartChunkZ < SparseStartChunk)
+        {
+            return false;
+        }
+
         for (var slotZ = 0; slotZ < SparseSlotsPerAxis; slotZ++)
         {
+            var chunkZ = SparseStartChunk + slotZ * stride;
+            if (chunkZ > maxStartChunkZ)
+            {
+                break;
+            }
+
             for (var slotX = 0; slotX < SparseSlotsPerAxis; slotX++)
             {
                 var chunkX = SparseStartChunk + slotX * stride;
-                var chunkZ = SparseStartChunk + slotZ * stride;
+                if (chunkX > maxStartChunkX)
+                {
+                    break;
+                }
+
                 var candidate = ToDimensionAt(spec, chunkX, chunkZ);
                 if (!existing.Any(dimension => DimensionSpecValidator.RegionsOverlap(dimension, candidate)))
                 {

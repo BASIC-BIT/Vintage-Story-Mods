@@ -12,6 +12,9 @@ internal sealed class PocketDirectoryDialog : GuiDialog
     private const double ContentWidth = DialogWidth - 48;
     private const double PanelHeight = 360;
     private const int MaxVisibleStacks = 8;
+    private const int MaxStackLabelLength = 28;
+    private const int MaxHeaderLabelLength = 42;
+    private const int MaxLocationTextLength = 96;
 
     private readonly Action _onRefresh;
     private readonly Action<string> _onTeleport;
@@ -22,6 +25,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
     private string _selectedStackId;
     private int _stackScrollIndex;
     private int _layerScrollIndex;
+    private int _layerPageSize = 1;
 
     public PocketDirectoryDialog(
         ICoreClientAPI capi,
@@ -131,8 +135,8 @@ internal sealed class PocketDirectoryDialog : GuiDialog
             return "No accessible pockets yet.";
         }
 
-        var createText = _state.CanCreatePocket ? "You can create pockets." : "Pocket creation is not available to you.";
-        return $"{count} accessible pocket stack{(count == 1 ? string.Empty : "s")}. {createText}";
+        var createText = _state.CanCreatePocket ? "You can create new pockets." : "Pocket creation is unavailable.";
+        return $"{count} pocket{(count == 1 ? string.Empty : "s")} available. {createText}";
     }
 
     private void AddStackList(GuiComposer composer, ElementBounds panelBounds)
@@ -144,7 +148,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         y += 30;
 
         var allStacks = _state.Stacks ?? new List<PocketDirectoryStackMessage>();
-        _stackScrollIndex = ClampInt(_stackScrollIndex, 0, Math.Max(0, allStacks.Count - MaxVisibleStacks));
+        _stackScrollIndex = ClampInt(_stackScrollIndex, 0, LastPageStart(allStacks.Count, MaxVisibleStacks));
         var stacks = allStacks.Skip(_stackScrollIndex).Take(MaxVisibleStacks).ToArray();
         if (stacks.Length == 0)
         {
@@ -162,7 +166,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
 
         if (allStacks.Count > MaxVisibleStacks)
         {
-            AddScrollButtons(composer, x, panelBounds.fixedY + panelBounds.fixedHeight - 32, width, ScrollStacksUp, ScrollStacksDown, _stackScrollIndex, allStacks.Count - MaxVisibleStacks);
+            AddScrollButtons(composer, x, panelBounds.fixedY + panelBounds.fixedHeight - 32, width, ScrollStacksUp, ScrollStacksDown, PageLabel(_stackScrollIndex, allStacks.Count, MaxVisibleStacks));
         }
     }
 
@@ -172,7 +176,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         var x = panelBounds.fixedX + 10;
         var y = panelBounds.fixedY + 8;
         var width = panelBounds.fixedWidth - 20;
-        composer.AddStaticText(stack?.DisplayName ?? "Layers", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 22));
+        composer.AddStaticText(Truncate(stack?.DisplayName ?? "Layers", MaxHeaderLabelLength), CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 22));
         y += 28;
 
         if (stack == null)
@@ -182,7 +186,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         }
 
         var owner = string.IsNullOrWhiteSpace(stack.OwnerPlayerName) ? "Server/global" : stack.OwnerPlayerName;
-        composer.AddStaticText($"Owner: {owner}. Layers can be created: {(stack.CanCreateLayer ? "yes" : "no")}", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 22));
+        composer.AddStaticText($"Owner: {Truncate(owner, 28)}. New layers: {(stack.CanCreateLayer ? "yes" : "no")}", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 22));
         y += 30;
 
         if (stack.CanCreateLayer)
@@ -201,7 +205,8 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         var rowHeight = 50;
         var controlsHeight = allLayers.Length > MaxVisibleLayerRows(y, panelBounds) ? 34 : 0;
         var maxRows = MaxVisibleLayerRows(y, panelBounds, controlsHeight);
-        _layerScrollIndex = ClampInt(_layerScrollIndex, 0, Math.Max(0, allLayers.Length - maxRows));
+        _layerPageSize = maxRows;
+        _layerScrollIndex = ClampInt(_layerScrollIndex, 0, LastPageStart(allLayers.Length, maxRows));
         var layers = allLayers.Skip(_layerScrollIndex).Take(maxRows).ToArray();
 
         foreach (var layer in layers)
@@ -227,7 +232,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
 
         if (allLayers.Length > maxRows)
         {
-            AddScrollButtons(composer, x, panelBounds.fixedY + panelBounds.fixedHeight - 32, width, ScrollLayersUp, ScrollLayersDown, _layerScrollIndex, allLayers.Length - maxRows);
+            AddScrollButtons(composer, x, panelBounds.fixedY + panelBounds.fixedHeight - 32, width, ScrollLayersUp, ScrollLayersDown, PageLabel(_layerScrollIndex, allLayers.Length, maxRows));
         }
     }
 
@@ -239,7 +244,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
     private static string StackButtonText(PocketDirectoryStackMessage stack)
     {
         var selected = stack?.IsOwner == true ? "* " : string.Empty;
-        return selected + (string.IsNullOrWhiteSpace(stack?.DisplayName) ? stack?.StackId ?? "Unnamed" : stack.DisplayName);
+        return selected + Truncate(string.IsNullOrWhiteSpace(stack?.DisplayName) ? stack?.StackId ?? "Unnamed" : stack.DisplayName, MaxStackLabelLength);
     }
 
     private static string LayerText(PocketDirectoryLayerMessage layer)
@@ -297,7 +302,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
 
     private bool ScrollStacksDown()
     {
-        var max = Math.Max(0, (_state.Stacks?.Count ?? 0) - MaxVisibleStacks);
+        var max = LastPageStart(_state.Stacks?.Count ?? 0, MaxVisibleStacks);
         _stackScrollIndex = Math.Min(max, _stackScrollIndex + MaxVisibleStacks);
         ComposeDialog();
         return true;
@@ -305,7 +310,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
 
     private bool ScrollLayersUp()
     {
-        _layerScrollIndex = Math.Max(0, _layerScrollIndex - 3);
+        _layerScrollIndex = Math.Max(0, _layerScrollIndex - Math.Max(1, _layerPageSize));
         ComposeDialog();
         return true;
     }
@@ -313,8 +318,8 @@ internal sealed class PocketDirectoryDialog : GuiDialog
     private bool ScrollLayersDown()
     {
         var stack = SelectedStack();
-        var max = Math.Max(0, (stack?.Layers?.Count ?? 0) - 1);
-        _layerScrollIndex = Math.Min(max, _layerScrollIndex + 3);
+        var max = LastPageStart(stack?.Layers?.Count ?? 0, Math.Max(1, _layerPageSize));
+        _layerScrollIndex = Math.Min(max, _layerScrollIndex + Math.Max(1, _layerPageSize));
         ComposeDialog();
         return true;
     }
@@ -356,7 +361,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
     {
         return string.IsNullOrWhiteSpace(_state.CurrentLocationText)
             ? "Current location: unknown."
-            : _state.CurrentLocationText;
+            : Truncate(_state.CurrentLocationText, MaxLocationTextLength);
     }
 
     private void KeepSelectedStackVisible()
@@ -370,11 +375,11 @@ internal sealed class PocketDirectoryDialog : GuiDialog
 
         if (index < _stackScrollIndex)
         {
-            _stackScrollIndex = index;
+            _stackScrollIndex = PageStartForIndex(index, MaxVisibleStacks);
         }
         else if (index >= _stackScrollIndex + MaxVisibleStacks)
         {
-            _stackScrollIndex = Math.Max(0, index - MaxVisibleStacks + 1);
+            _stackScrollIndex = PageStartForIndex(index, MaxVisibleStacks);
         }
     }
 
@@ -390,21 +395,44 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         var current = Array.FindIndex(layers, layer => layer.IsCurrent);
         if (current >= 0)
         {
-            _layerScrollIndex = current;
+            _layerScrollIndex = PageStartForIndex(current, Math.Max(1, _layerPageSize));
         }
     }
 
     private void ClampScrollIndexes()
     {
-        _stackScrollIndex = ClampInt(_stackScrollIndex, 0, Math.Max(0, (_state.Stacks?.Count ?? 0) - MaxVisibleStacks));
+        _stackScrollIndex = ClampInt(_stackScrollIndex, 0, LastPageStart(_state.Stacks?.Count ?? 0, MaxVisibleStacks));
         _layerScrollIndex = Math.Max(0, _layerScrollIndex);
     }
 
-    private static void AddScrollButtons(GuiComposer composer, double x, double y, double width, Func<bool> up, Func<bool> down, int current, int max)
+    private static void AddScrollButtons(GuiComposer composer, double x, double y, double width, Func<bool> up, Func<bool> down, string label)
     {
         composer.AddSmallButton("Up", () => up(), ElementBounds.Fixed(x, y, 72, 26));
-        composer.AddStaticText($"{current + 1} / {max + 1}", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + 82, y + 3, width - 164, 24));
+        composer.AddStaticText(label, CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + 82, y + 3, width - 164, 24));
         composer.AddSmallButton("Down", () => down(), ElementBounds.Fixed(x + width - 72, y, 72, 26));
+    }
+
+    private static string PageLabel(int currentOffset, int totalItems, int pageSize)
+    {
+        pageSize = Math.Max(1, pageSize);
+        var totalPages = Math.Max(1, (totalItems + pageSize - 1) / pageSize);
+        var currentPage = Math.Min(totalPages, currentOffset / pageSize + 1);
+        return $"Page {currentPage} / {totalPages}";
+    }
+
+    private static int LastPageStart(int totalItems, int pageSize)
+    {
+        if (totalItems <= 0 || pageSize <= 0)
+        {
+            return 0;
+        }
+
+        return ((totalItems - 1) / pageSize) * pageSize;
+    }
+
+    private static int PageStartForIndex(int index, int pageSize)
+    {
+        return pageSize <= 0 ? 0 : Math.Max(0, index / pageSize * pageSize);
     }
 
     private static int MaxVisibleLayerRows(double currentY, ElementBounds panelBounds, double reservedBottom = 0)

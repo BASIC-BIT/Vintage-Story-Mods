@@ -46,6 +46,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private const string DirectoryActionEditLayer = "editlayer";
     private const float PocketMinimumSceneLight = 0.18f;
     private const int HudUpdateTickMs = 250;
+    private const int MaxDisplayNameLength = 48;
 
     private ICoreServerAPI _api;
     private ICoreClientAPI _clientApi;
@@ -1260,6 +1261,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return DimensionLibResult<PocketLayerRef>.Fail(templateLookup.Message, templateLookup.ErrorCode);
         }
 
+        displayName = NormalizeDisplayName(displayName);
         var dimensionId = LayerDimensionId(stack.StackId, targetIndex);
         var lookup = _dimensionLib.GetDimension(dimensionId);
         Dimension dimension;
@@ -1679,13 +1681,14 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
     private void ApplyStackDisplayName(Dimension dimension, string displayName)
     {
+        displayName = NormalizeDisplayName(displayName);
         if (string.IsNullOrWhiteSpace(displayName))
         {
             return;
         }
 
         var stack = EnsureLayerStack(dimension);
-        stack.DisplayName = displayName.Trim();
+        stack.DisplayName = displayName;
         var baseLayer = FindLayer(stack, 0);
         if (baseLayer != null)
         {
@@ -1697,7 +1700,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
     private void ApplyLayerDisplayName(PocketLayerStack stack, PocketLayerRef layer, string displayName)
     {
-        layer.DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+        layer.DisplayName = NormalizeDisplayName(displayName);
         if (layer.Index == 0 && !string.IsNullOrWhiteSpace(layer.DisplayName))
         {
             stack.DisplayName = layer.DisplayName;
@@ -2591,6 +2594,19 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private static string DisplayPocketMessage(string message)
     {
         return (message ?? string.Empty).Replace(ModId + ":", string.Empty, StringComparison.Ordinal);
+    }
+
+    private static string NormalizeDisplayName(string displayName)
+    {
+        displayName = displayName?.Trim();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            return null;
+        }
+
+        return displayName.Length <= MaxDisplayNameLength
+            ? displayName
+            : displayName.Substring(0, MaxDisplayNameLength);
     }
 
     private static DimensionSpec ToSpec(Dimension dimension)
