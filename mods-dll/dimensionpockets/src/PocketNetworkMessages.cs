@@ -160,6 +160,18 @@ public sealed class PocketDirectoryStateMessage
 
     [ProtoMember(5)]
     public bool CanCreateLayer { get; set; }
+
+    [ProtoMember(6)]
+    public string SelectedStackId { get; set; }
+
+    [ProtoMember(7)]
+    public string CurrentLocationText { get; set; }
+
+    [ProtoMember(8)]
+    public int DefaultSizeChunks { get; set; }
+
+    [ProtoMember(9)]
+    public int DefaultSpawnY { get; set; }
 }
 
 [ProtoContract]

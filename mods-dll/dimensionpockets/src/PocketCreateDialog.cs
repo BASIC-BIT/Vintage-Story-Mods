@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Vintagestory.API.Client;
 
 namespace PocketDimensions;
@@ -7,10 +8,16 @@ internal sealed class PocketCreateDialog : GuiDialog
 {
     private const double DialogWidth = 520;
     private readonly Action<string, string, int, int> _onSubmit;
+    private readonly int _defaultSizeChunks;
+    private readonly int _defaultSpawnY;
+    private bool _autoSlug = true;
+    private bool _updatingSlug;
 
-    public PocketCreateDialog(ICoreClientAPI capi, Action<string, string, int, int> onSubmit)
+    public PocketCreateDialog(ICoreClientAPI capi, int defaultSizeChunks, int defaultSpawnY, Action<string, string, int, int> onSubmit)
         : base(capi)
     {
+        _defaultSizeChunks = defaultSizeChunks;
+        _defaultSpawnY = defaultSpawnY;
         _onSubmit = onSubmit;
         Compose();
     }
@@ -50,18 +57,46 @@ internal sealed class PocketCreateDialog : GuiDialog
             .AddDialogTitleBar("Create Pocket", OnTitleBarCloseClicked)
             .BeginChildElements(bodyBounds)
             .AddStaticText("Display name", CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, contentTop, width, 20))
-            .AddTextInput(displayNameBounds, _ => { }, CairoFont.TextInput(), "displayName")
+            .AddTextInput(displayNameBounds, OnDisplayNameChanged, CairoFont.TextInput(), "displayName")
             .AddStaticText("Slug", CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, slugBounds.fixedY - 20, width, 20))
-            .AddTextInput(slugBounds, _ => { }, CairoFont.TextInput(), "slug")
-            .AddStaticText("Size chunks", CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, sizeBounds.fixedY - 20, 160, 20))
+            .AddTextInput(slugBounds, OnSlugChanged, CairoFont.TextInput(), "slug")
+            .AddStaticText("Size in chunks", CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, sizeBounds.fixedY - 20, 160, 20))
             .AddTextInput(sizeBounds, _ => { }, CairoFont.TextInput(), "sizeChunks")
-            .AddStaticText("Spawn Y", CairoFont.WhiteSmallText(), ElementBounds.Fixed(180, spawnBounds.fixedY - 20, 160, 20))
+            .AddStaticText("Spawn height (Y)", CairoFont.WhiteSmallText(), ElementBounds.Fixed(180, spawnBounds.fixedY - 20, 180, 20))
             .AddTextInput(spawnBounds, _ => { }, CairoFont.TextInput(), "spawnY")
-            .AddStaticText("Leave size or spawn Y blank to use server defaults. Slug controls the persistent pocket id.", CairoFont.WhiteSmallText(), hintBounds)
+            .AddStaticText($"Blank size/spawn use defaults: {_defaultSizeChunks} chunks, spawn Y {_defaultSpawnY}. Slug controls the persistent pocket id.", CairoFont.WhiteSmallText(), hintBounds)
             .AddSmallButton("Cancel", OnCancel, ElementBounds.Fixed(0, y, 120, rowHeight))
             .AddSmallButton("Create", OnSubmit, ElementBounds.Fixed(DialogWidth - 142, y, 120, rowHeight), EnumButtonStyle.Normal, "create")
             .EndChildElements()
             .Compose(focusFirstElement: true);
+        SingleComposer.GetTextInput("sizeChunks")?.SetPlaceHolderText(_defaultSizeChunks.ToString());
+        SingleComposer.GetTextInput("spawnY")?.SetPlaceHolderText(_defaultSpawnY.ToString());
+    }
+
+    private void OnDisplayNameChanged(string value)
+    {
+        if (!_autoSlug)
+        {
+            return;
+        }
+
+        var slugInput = SingleComposer?.GetTextInput("slug");
+        if (slugInput == null)
+        {
+            return;
+        }
+
+        _updatingSlug = true;
+        slugInput.SetValue(NormalizeSlug(value));
+        _updatingSlug = false;
+    }
+
+    private void OnSlugChanged(string value)
+    {
+        if (!_updatingSlug)
+        {
+            _autoSlug = false;
+        }
     }
 
     private bool OnSubmit()
@@ -86,6 +121,28 @@ internal sealed class PocketCreateDialog : GuiDialog
     private int ParseInt(string key)
     {
         return int.TryParse(Text(key), out var value) ? value : 0;
+    }
+
+    private static string NormalizeSlug(string value)
+    {
+        value = (value ?? string.Empty).Trim().ToLowerInvariant();
+        var chars = new List<char>(value.Length);
+        var lastDash = false;
+        foreach (var ch in value)
+        {
+            if (char.IsLetterOrDigit(ch) || ch == '_' || ch == ':')
+            {
+                chars.Add(ch);
+                lastDash = false;
+            }
+            else if (!lastDash)
+            {
+                chars.Add('-');
+                lastDash = true;
+            }
+        }
+
+        return new string(chars.ToArray()).Trim('-');
     }
 
     private bool OnCancel()

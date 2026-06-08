@@ -62,6 +62,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private readonly Dictionary<string, Dictionary<string, DimensionLocation>> _unanchoredReturnsByPlayer = new Dictionary<string, Dictionary<string, DimensionLocation>>(StringComparer.Ordinal);
     private readonly Dictionary<string, PocketLayerStack> _layerStacksById = new Dictionary<string, PocketLayerStack>(StringComparer.Ordinal);
     private readonly HashSet<string> _playersWithPocketHud = new HashSet<string>(StringComparer.Ordinal);
+    private readonly HashSet<string> _layersNeedingInitialSend = new HashSet<string>(StringComparer.Ordinal);
 
     public override double ExecuteOrder()
     {
@@ -658,7 +659,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             player.SendIngameError(result.ErrorCode ?? "pocket-directory-action-failed", result.Message);
         }
 
-        SendPocketDirectory(player, result.Message, result.Success);
+        SendPocketDirectory(player, result.Message, result.Success, DirectorySelectedStack(request, result.Success));
     }
 
     private DimensionLibResult HandlePocketDirectoryAction(IServerPlayer player, PocketDirectoryActionRequest request)
@@ -1034,27 +1035,49 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         };
     }
 
-    private void SendPocketDirectory(IServerPlayer player, string message = null, bool success = true)
+    private string DirectorySelectedStack(PocketDirectoryActionRequest request, bool success)
+    {
+        if (!success || request == null)
+        {
+            return null;
+        }
+
+        return request.Action?.Trim().ToLowerInvariant() switch
+        {
+            DirectoryActionCreatePocket => ToDimensionId(NormalizePocketSlug(string.IsNullOrWhiteSpace(request.Slug) ? request.DisplayName : request.Slug)),
+            DirectoryActionCreateLayer => request.StackId,
+            DirectoryActionEditLayer => request.StackId,
+            DirectoryActionEnter => FindStackForDimension(request.DimensionId)?.StackId,
+            _ => null,
+        };
+    }
+
+    private void SendPocketDirectory(IServerPlayer player, string message = null, bool success = true, string selectedStackId = null)
     {
         if (player == null)
         {
             return;
         }
 
-        _serverChannel?.SendPacket(BuildPocketDirectoryState(player, message, success), player);
+        _serverChannel?.SendPacket(BuildPocketDirectoryState(player, message, success, selectedStackId), player);
     }
 
-    private PocketDirectoryStateMessage BuildPocketDirectoryState(IServerPlayer player, string message, bool success)
+    private PocketDirectoryStateMessage BuildPocketDirectoryState(IServerPlayer player, string message, bool success, string selectedStackId)
     {
+        var currentDimensionId = CurrentPocketDimensionId(player);
+        var currentStack = string.IsNullOrWhiteSpace(currentDimensionId) ? null : FindStackForDimension(currentDimensionId);
         var state = new PocketDirectoryStateMessage
         {
             Message = message,
             Success = success,
             CanCreatePocket = CanCreatePocket(player),
             CanCreateLayer = _layerStacksById.Values.Any(stack => CanCreateLayer(player, stack)),
+            SelectedStackId = selectedStackId ?? currentStack?.StackId,
+            CurrentLocationText = CurrentLocationText(currentStack, currentDimensionId),
+            DefaultSizeChunks = _config.DefaultSizeChunks,
+            DefaultSpawnY = ResolveDefaultSpawnY(),
         };
 
-        var currentDimensionId = CurrentPocketDimensionId(player);
         var emittedDimensions = new HashSet<string>(StringComparer.Ordinal);
         foreach (var stack in _layerStacksById.Values.OrderBy(stack => stack.DisplayName, StringComparer.OrdinalIgnoreCase))
         {
@@ -1080,6 +1103,19 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         return state;
+    }
+
+    private string CurrentLocationText(PocketLayerStack stack, string currentDimensionId)
+    {
+        if (stack == null || string.IsNullOrWhiteSpace(currentDimensionId))
+        {
+            return "Current location: outside a Pocket Dimensions pocket.";
+        }
+
+        var layer = FindLayer(stack, currentDimensionId);
+        return layer == null
+            ? $"Current location: {stack.DisplayName}."
+            : $"Current location: {stack.DisplayName}, layer {FormatLayer(layer.Index)}.";
     }
 
     private PocketDirectoryStackMessage BuildDirectoryStack(IServerPlayer player, PocketLayerStack stack, string currentDimensionId, HashSet<string> emittedDimensions)
@@ -1266,6 +1302,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         stack.Layers.Add(layer);
         stack.Normalize();
         _layerStacksById[stack.StackId] = stack;
+        _layersNeedingInitialSend.Add(dimension.DimensionId);
 
         foreach (var neighborIndex in new[] { targetIndex - 1, targetIndex + 1 })
         {
@@ -1839,6 +1876,15 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     {
         if (_dimensionLib.IsDimensionPrepared(dimension.DimensionId))
         {
+            if (_layersNeedingInitialSend.Remove(dimension.DimensionId))
+            {
+                var sent = _dimensionLib.PrepareDimension(dimension.DimensionId, sendToPlayer: player);
+                if (!sent.Success)
+                {
+                    return sent;
+                }
+            }
+
             var centralElevatorPos = GetCentralElevatorWorldPos(dimension);
             if (!IsBlockCode(centralElevatorPos, PocketElevatorBlockCode))
             {
