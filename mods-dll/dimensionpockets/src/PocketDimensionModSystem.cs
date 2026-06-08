@@ -463,6 +463,15 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return traveled;
         }
 
+        if (placeMissingElevator || target.Value.CreatedTargetLayer)
+        {
+            var placedAfterTravel = EnsurePlacedElevatorAtLoadedLanding(targetElevatorPos);
+            if (!placedAfterTravel.Success)
+            {
+                return placedAfterTravel;
+            }
+        }
+
         return DimensionLibResult.Ok($"Moved to {DisplayName(target.Value.TargetLayer.DimensionId)} layer {FormatLayer(target.Value.TargetLayer.Index)}.");
     }
 
@@ -928,8 +937,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return canPlace;
         }
 
-        _api.World.BlockAccessor.SetBlock(GetPocketElevatorBlock().BlockId, elevatorPos);
-        return DimensionLibResult.Ok();
+        return PlacePocketElevator(elevatorPos);
     }
 
     private DimensionLibResult ValidateElevatorBlockPlacement(BlockPos elevatorPos)
@@ -952,6 +960,30 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private Block GetPocketElevatorBlock()
     {
         return _api.World.GetBlock(new AssetLocation(PocketElevatorBlockCode));
+    }
+
+    private DimensionLibResult EnsurePlacedElevatorAtLoadedLanding(BlockPos elevatorPos)
+    {
+        return IsBlockCode(elevatorPos, PocketElevatorBlockCode)
+            ? DimensionLibResult.Ok()
+            : PlacePocketElevator(elevatorPos, verifyPlacement: true);
+    }
+
+    private DimensionLibResult PlacePocketElevator(BlockPos elevatorPos, bool verifyPlacement = false)
+    {
+        var elevatorBlock = GetPocketElevatorBlock();
+        if (elevatorBlock == null || elevatorBlock.BlockId == 0)
+        {
+            return DimensionLibResult.Fail("Pocket Elevator block is unavailable.", "missing-pocketelevator-block");
+        }
+
+        _api.World.BlockAccessor.SetBlock(elevatorBlock.BlockId, elevatorPos);
+        if (verifyPlacement && !IsBlockCode(elevatorPos, PocketElevatorBlockCode))
+        {
+            return DimensionLibResult.Fail("Moved to the target layer, but the Pocket Elevator could not be placed at the landing.", "pocketelevator-place-failed");
+        }
+
+        return DimensionLibResult.Ok();
     }
 
     private bool HasTwoBlockHeadroom(BlockPos elevatorPos)
