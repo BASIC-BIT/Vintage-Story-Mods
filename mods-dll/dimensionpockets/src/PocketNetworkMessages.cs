@@ -48,6 +48,44 @@ public sealed class PocketLayerCreationResponse
 }
 
 [ProtoContract]
+public sealed class PocketElevatorPlacementPrompt
+{
+    [ProtoMember(1)]
+    public int Direction { get; set; }
+
+    [ProtoMember(2)]
+    public string StackName { get; set; }
+
+    [ProtoMember(3)]
+    public string StackId { get; set; }
+
+    [ProtoMember(4)]
+    public int SourceLayerIndex { get; set; }
+
+    [ProtoMember(5)]
+    public int TargetLayerIndex { get; set; }
+}
+
+[ProtoContract]
+public sealed class PocketElevatorPlacementResponse
+{
+    [ProtoMember(1)]
+    public int Direction { get; set; }
+
+    [ProtoMember(2)]
+    public bool Place { get; set; }
+
+    [ProtoMember(3)]
+    public string StackId { get; set; }
+
+    [ProtoMember(4)]
+    public int SourceLayerIndex { get; set; }
+
+    [ProtoMember(5)]
+    public int TargetLayerIndex { get; set; }
+}
+
+[ProtoContract]
 public sealed class PocketHudStateMessage
 {
     [ProtoMember(1)]

@@ -75,9 +75,12 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             .RegisterMessageType<PocketElevatorTravelRequest>()
             .RegisterMessageType<PocketLayerCreationPrompt>()
             .RegisterMessageType<PocketLayerCreationResponse>()
+            .RegisterMessageType<PocketElevatorPlacementPrompt>()
+            .RegisterMessageType<PocketElevatorPlacementResponse>()
             .RegisterMessageType<PocketHudStateMessage>()
             .SetMessageHandler<PocketElevatorTravelRequest>(OnElevatorTravelRequest)
-            .SetMessageHandler<PocketLayerCreationResponse>(OnLayerCreationResponse);
+            .SetMessageHandler<PocketLayerCreationResponse>(OnLayerCreationResponse)
+            .SetMessageHandler<PocketElevatorPlacementResponse>(OnElevatorPlacementResponse);
         _linkStore = new PocketLinkStore(api);
         LoadLinkState();
         api.ObjectCache[WaystoneServiceCacheKey] = this;
@@ -101,8 +104,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             .RegisterMessageType<PocketElevatorTravelRequest>()
             .RegisterMessageType<PocketLayerCreationPrompt>()
             .RegisterMessageType<PocketLayerCreationResponse>()
+            .RegisterMessageType<PocketElevatorPlacementPrompt>()
+            .RegisterMessageType<PocketElevatorPlacementResponse>()
             .RegisterMessageType<PocketHudStateMessage>()
             .SetMessageHandler<PocketLayerCreationPrompt>(OnLayerCreationPrompt)
+            .SetMessageHandler<PocketElevatorPlacementPrompt>(OnElevatorPlacementPrompt)
             .SetMessageHandler<PocketHudStateMessage>(OnPocketHudState);
 
         api.Input.RegisterHotKey("pocketelevatorup", "Pocket Elevator Up", GlKeys.PageUp, HotkeyType.CharacterControls);
@@ -355,12 +361,22 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             string.Equals(errorCode, "dimension-orphaned", StringComparison.Ordinal);
     }
 
+    private static bool IsMissingTargetElevator(string errorCode)
+    {
+        return string.Equals(errorCode, "missing-target-pocketelevator", StringComparison.Ordinal);
+    }
+
     public void ForgetWaystoneEndpoint(string endpointId)
     {
         RemoveWaystoneLink(endpointId);
     }
 
     public DimensionLibResult TravelElevator(IServerPlayer player, int direction, bool createMissingLayer = false)
+    {
+        return TravelElevator(player, direction, createMissingLayer, placeMissingElevator: false);
+    }
+
+    private DimensionLibResult TravelElevator(IServerPlayer player, int direction, bool createMissingLayer, bool placeMissingElevator)
     {
         if (player?.Entity == null)
         {
@@ -418,9 +434,26 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         var destination = mapped.Value.Location;
-        var landing = EnsureElevatorLanding(ToElevatorPos(destination, playerOffsetY), target.Value.CreatedTargetLayer);
+        var targetElevatorPos = ToElevatorPos(destination, playerOffsetY);
+        if (placeMissingElevator && !HasPrivilege(player, _config.MutatePocketBlocksPrivilege))
+        {
+            return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator on the target layer.", "missing-elevator-place-privilege");
+        }
+
+        var landing = EnsureElevatorLanding(targetElevatorPos, target.Value.CreatedTargetLayer || placeMissingElevator);
         if (!landing.Success)
         {
+            if (IsMissingTargetElevator(landing.ErrorCode))
+            {
+                if (!HasPrivilege(player, _config.MutatePocketBlocksPrivilege))
+                {
+                    return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator on the target layer.", "missing-elevator-place-privilege");
+                }
+
+                PromptElevatorPlacement(player, stack, layer.Index, targetIndex, direction);
+                return DimensionLibResult.Ok($"Confirm creating a Pocket Elevator on layer {FormatLayer(targetIndex)} to continue.");
+            }
+
             return landing;
         }
 
@@ -523,6 +556,29 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         player.SendMessage(GlobalConstants.GeneralChatGroup, result.Message, EnumChatType.Notification);
     }
 
+    private void OnElevatorPlacementResponse(IServerPlayer player, PocketElevatorPlacementResponse response)
+    {
+        if (response == null || !response.Place)
+        {
+            return;
+        }
+
+        if (!IsCurrentElevatorPrompt(player, response, out var error))
+        {
+            player.SendIngameError(error.ErrorCode ?? "pocketelevator-confirmation-stale", error.Message);
+            return;
+        }
+
+        var result = TravelElevator(player, response.Direction, createMissingLayer: false, placeMissingElevator: true);
+        if (!result.Success)
+        {
+            player.SendIngameError(result.ErrorCode ?? "pocketelevator-place-failed", result.Message);
+            return;
+        }
+
+        player.SendMessage(GlobalConstants.GeneralChatGroup, result.Message, EnumChatType.Notification);
+    }
+
     private bool SendElevatorTravelRequest(int direction)
     {
         _clientChannel?.SendPacket(new PocketElevatorTravelRequest { Direction = NormalizeDirection(direction) });
@@ -550,10 +606,41 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }).TryOpen();
     }
 
+    private void OnElevatorPlacementPrompt(PocketElevatorPlacementPrompt prompt)
+    {
+        if (prompt == null || _clientApi == null)
+        {
+            return;
+        }
+
+        var text = $"Create a Pocket Elevator at the matching landing on layer {FormatLayer(prompt.TargetLayerIndex)} in {prompt.StackName}?";
+        new PocketLayerCreationDialog(_clientApi, "Create Pocket Elevator", text, place =>
+        {
+            _clientChannel?.SendPacket(new PocketElevatorPlacementResponse
+            {
+                Direction = prompt.Direction,
+                Place = place,
+                StackId = prompt.StackId,
+                SourceLayerIndex = prompt.SourceLayerIndex,
+                TargetLayerIndex = prompt.TargetLayerIndex,
+            });
+        }).TryOpen();
+    }
+
     private bool IsCurrentElevatorPrompt(IServerPlayer player, PocketLayerCreationResponse response, out DimensionLibResult error)
     {
+        return IsCurrentElevatorPrompt(player, response.StackId, response.SourceLayerIndex, response.TargetLayerIndex, response.Direction, out error);
+    }
+
+    private bool IsCurrentElevatorPrompt(IServerPlayer player, PocketElevatorPlacementResponse response, out DimensionLibResult error)
+    {
+        return IsCurrentElevatorPrompt(player, response.StackId, response.SourceLayerIndex, response.TargetLayerIndex, response.Direction, out error);
+    }
+
+    private bool IsCurrentElevatorPrompt(IServerPlayer player, string stackId, int sourceLayerIndex, int targetLayerIndex, int responseDirection, out DimensionLibResult error)
+    {
         error = DimensionLibResult.Ok();
-        var direction = NormalizeDirection(response.Direction);
+        var direction = NormalizeDirection(responseDirection);
         if (!TryFindStandingElevator(player, out var elevatorPos, out _))
         {
             error = DimensionLibResult.Fail("Stand on the original Pocket Elevator and confirm again.", "not-on-pocket-elevator");
@@ -570,9 +657,9 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var stack = FindStackForDimension(dimensionLookup.Value.DimensionId);
         var layer = stack == null ? null : FindLayer(stack, dimensionLookup.Value.DimensionId);
         if (stack == null || layer == null ||
-            !string.Equals(stack.StackId, response.StackId, StringComparison.Ordinal) ||
-            layer.Index != response.SourceLayerIndex ||
-            response.TargetLayerIndex != layer.Index + direction)
+            !string.Equals(stack.StackId, stackId, StringComparison.Ordinal) ||
+            layer.Index != sourceLayerIndex ||
+            targetLayerIndex != layer.Index + direction)
         {
             error = DimensionLibResult.Fail("Pocket layer confirmation is stale. Try the elevator again.", "pocketlayer-confirmation-stale");
             return false;
@@ -601,6 +688,24 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             SourceLayerIndex = sourceIndex,
             TargetLayerIndex = targetIndex,
         }, player);
+    }
+
+    private bool PromptElevatorPlacement(IServerPlayer player, PocketLayerStack stack, int sourceIndex, int targetIndex, int direction)
+    {
+        if (player == null)
+        {
+            return false;
+        }
+
+        _serverChannel?.SendPacket(new PocketElevatorPlacementPrompt
+        {
+            Direction = direction,
+            StackName = stack.DisplayName,
+            StackId = stack.StackId,
+            SourceLayerIndex = sourceIndex,
+            TargetLayerIndex = targetIndex,
+        }, player);
+        return true;
     }
 
     private void OnHudUpdateTick(float dt)
@@ -792,7 +897,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     {
         if (!HasTwoBlockHeadroom(elevatorPos))
         {
-            return DimensionLibResult.Fail("Target elevator landing is blocked.", "pocketelevator-target-blocked");
+            return DimensionLibResult.Fail("The way is blocked where the target Pocket Elevator would be.", "pocketelevator-target-blocked");
         }
 
         if (IsBlockCode(elevatorPos, PocketElevatorBlockCode))
@@ -803,6 +908,12 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var landingMode = _config.ResolveElevatorLandingMode();
         if (landingMode == PocketElevatorLandingMode.RequireElevatorBlock && !allowAutoPlaceForNewLayer)
         {
+            var placeable = ValidateElevatorBlockPlacement(elevatorPos);
+            if (!placeable.Success)
+            {
+                return placeable;
+            }
+
             return DimensionLibResult.Fail("Target layer needs a Pocket Elevator at the mapped landing.", "missing-target-pocketelevator");
         }
 
@@ -811,20 +922,36 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return DimensionLibResult.Ok();
         }
 
+        var canPlace = ValidateElevatorBlockPlacement(elevatorPos);
+        if (!canPlace.Success)
+        {
+            return canPlace;
+        }
+
+        _api.World.BlockAccessor.SetBlock(GetPocketElevatorBlock().BlockId, elevatorPos);
+        return DimensionLibResult.Ok();
+    }
+
+    private DimensionLibResult ValidateElevatorBlockPlacement(BlockPos elevatorPos)
+    {
         var targetBlock = _api.World.BlockAccessor.GetBlock(elevatorPos);
         if (!IsBlockCode(elevatorPos, PocketFloorBlockCode) && targetBlock?.Replaceable < 6000)
         {
-            return DimensionLibResult.Fail("Target elevator floor is not replaceable.", "pocketelevator-floor-blocked");
+            return DimensionLibResult.Fail("The way is blocked where the target Pocket Elevator would be.", "pocketelevator-target-blocked");
         }
 
-        var elevatorBlock = _api.World.GetBlock(new AssetLocation(PocketElevatorBlockCode));
+        var elevatorBlock = GetPocketElevatorBlock();
         if (elevatorBlock == null || elevatorBlock.BlockId == 0)
         {
             return DimensionLibResult.Fail("Pocket Elevator block is unavailable.", "missing-pocketelevator-block");
         }
 
-        _api.World.BlockAccessor.SetBlock(elevatorBlock.BlockId, elevatorPos);
         return DimensionLibResult.Ok();
+    }
+
+    private Block GetPocketElevatorBlock()
+    {
+        return _api.World.GetBlock(new AssetLocation(PocketElevatorBlockCode));
     }
 
     private bool HasTwoBlockHeadroom(BlockPos elevatorPos)

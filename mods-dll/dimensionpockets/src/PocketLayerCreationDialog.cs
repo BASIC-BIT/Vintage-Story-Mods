@@ -7,12 +7,19 @@ namespace PocketDimensions;
 internal sealed class PocketLayerCreationDialog : GuiDialog
 {
     private static int _dialogIndex;
+    private readonly string _title;
     private readonly string _text;
     private readonly Action<bool> _onAnswer;
 
     public PocketLayerCreationDialog(ICoreClientAPI capi, string text, Action<bool> onAnswer)
+        : this(capi, "Create Pocket Layer", text, onAnswer)
+    {
+    }
+
+    public PocketLayerCreationDialog(ICoreClientAPI capi, string title, string text, Action<bool> onAnswer)
         : base(capi)
     {
+        _title = title;
         _text = text;
         _onAnswer = onAnswer;
         Compose();
@@ -32,7 +39,7 @@ internal sealed class PocketLayerCreationDialog : GuiDialog
         var buttonRow = (float)((textHeight + 80) / 80);
         SingleComposer = capi.Gui.CreateCompo("pocket-layer-confirm-" + _dialogIndex++, ElementStdBounds.AutosizedMainDialog)
             .AddShadedDialogBG(bgBounds)
-            .AddDialogTitleBar("Create Pocket Layer", OnTitleBarClose)
+            .AddDialogTitleBar(_title, OnTitleBarClose)
             .BeginChildElements(bgBounds)
             .AddStaticText(_text, font, textBounds)
             .AddSmallButton(Lang.Get("No"), () => Answer(false), ElementStdBounds.MenuButton(buttonRow).WithAlignment(EnumDialogArea.LeftFixed).WithFixedPadding(6))
