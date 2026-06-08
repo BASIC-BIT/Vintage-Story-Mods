@@ -102,7 +102,7 @@ This matters because Pocket Dimensions is likely to grow beyond player-only trav
 
 Design these as links between locations/endpoints. Do not bake the assumption that the only flow is "a player returns to wherever they were." Player return is one consumer of the more general location/link model.
 
-Dimension mappings are the first promoted location/link primitive: a small, reusable way to map player-local coordinates from one registered dimension into another. The concrete consumer need is Devastation-style paired spaces and scaled dimension travel. Durable mappings are persisted by DimensionLib when their endpoints are durable dimensions; transient mappings remain runtime-only for QA and temporary links. The over-promotion risk is turning DimensionLib into a portal/product framework, so core owns only scale/offset coordinate mapping, simple durable relationship metadata, and transfer validation; consumer mods own triggers, content, UI, cooldowns, visuals beyond explicit settings, and gameplay rules. If the abstraction proves too broad, consumers can ignore mappings and continue using explicit `DimensionLocation` transfers.
+Dimension mappings are the first promoted location/link primitive: a small, reusable way to map player-local coordinates from one registered dimension into another. The concrete consumer need is Devastation-style paired spaces, scaled dimension travel, and Pocket Dimensions layer elevators. Durable mappings are persisted by DimensionLib when their endpoints are durable dimensions; transient mappings remain runtime-only for QA and temporary links. The over-promotion risk is turning DimensionLib into a portal/product framework, so core owns only scale/offset coordinate mapping, simple durable relationship metadata, effective-coordinate helpers, non-teleporting mapped-location resolution, and transfer validation; consumer mods own triggers, content, UI, cooldowns, visuals beyond explicit settings, and gameplay rules. If the abstraction proves too broad, consumers can ignore mappings and continue using explicit `DimensionLocation` transfers.
 
 ## Pocket Dimensions Roadmap
 
@@ -113,6 +113,7 @@ Recommended sequence:
 - Protected return pedestal inside each pocket.
 - Bindable overworld Waystone that enters one pocket.
 - Craftable and breakable external Waystone blocks.
+- Layered pocket stacks with generated/player-placeable elevators backed by DimensionLib mappings.
 - Extend explicit locations into named links/endpoints once more product flows need them.
 - Multi-pocket Waystone with a chooser UI.
 - Walk-through portal or portal frame once the block interaction model is proven.

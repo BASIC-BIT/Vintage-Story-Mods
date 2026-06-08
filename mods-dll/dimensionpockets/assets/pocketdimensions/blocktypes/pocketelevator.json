@@ -1,0 +1,31 @@
+{
+  code: "pocketelevator",
+  class: "PocketElevatorBlock",
+  blockmaterial: "Stone",
+  drawtype: "cube",
+  shape: { base: "game:block/basic/cube" },
+  creativeinventory: { "general": ["*"], "decorative": ["*"] },
+  textures: {
+    all: { base: "pocketdimensions:block/pocketwaystone-accent" }
+  },
+  replaceable: 0,
+  resistance: 8,
+  requiredMiningTier: 1,
+  lightAbsorption: 0,
+  sounds: {
+    walk: "game:walk/stone",
+    place: "game:block/rock-place",
+    byTool: {
+      "Pickaxe": { hit: "game:block/rock-hit-pickaxe", break: "game:block/rock-break-pickaxe" }
+    }
+  },
+  drops: [{ type: "block", code: "pocketelevator" }],
+  heldTpIdleAnimation: "holdbothhandslarge",
+  heldRightReadyAnimation: "heldblockready",
+  heldTpUseAnimation: "twohandplaceblock",
+  tpHandTransform: {
+    translation: { x: -1.23, y: -0.91, z: -0.8 },
+    rotation: { x: -2, y: 25, z: -78 },
+    scale: 0.4
+  }
+}

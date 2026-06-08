@@ -189,6 +189,43 @@ public sealed class DimensionLibServerService : IDisposable
         return _mappings.Get(mappingId);
     }
 
+    public DimensionLibResult<DimensionMappedLocation> ResolveMappedLocation(DimensionLocation sourceLocation, string mappingId, DimensionMappingTeleportOptions options = null)
+    {
+        if (sourceLocation == null)
+        {
+            return DimensionLibResult<DimensionMappedLocation>.Fail("Source location is required.", "missing-source-location");
+        }
+
+        var resolved = ResolveMappedDestination(sourceLocation, mappingId, options);
+        if (!resolved.Success)
+        {
+            return DimensionLibResult<DimensionMappedLocation>.Fail(resolved.Message, resolved.ErrorCode);
+        }
+
+        return DimensionLibResult<DimensionMappedLocation>.Ok(resolved.Value);
+    }
+
+    public DimensionLibResult<DimensionLocalPosition> ResolveLocalPosition(DimensionLocation location)
+    {
+        if (location == null)
+        {
+            return DimensionLibResult<DimensionLocalPosition>.Fail("Location is required.", "missing-location");
+        }
+
+        var dimension = ResolveVisibleDimension(location);
+        if (dimension == null)
+        {
+            return DimensionLibResult<DimensionLocalPosition>.Fail("Location is not inside a registered DimensionLib dimension.", "not-in-dimensionlib-dimension");
+        }
+
+        if (location.DimensionPlaneId != dimension.DimensionPlaneId || !dimension.ContainsBlock(location.AsBlockPos()))
+        {
+            return DimensionLibResult<DimensionLocalPosition>.Fail($"Location does not belong to dimension '{dimension.DimensionId}'.", "location-dimension-mismatch");
+        }
+
+        return DimensionLibResult<DimensionLocalPosition>.Ok(dimension.ToLocalPosition(location));
+    }
+
     public bool IsDimensionPrepared(string dimensionId)
     {
         return _preparedDimensions.IsDimensionPrepared(dimensionId);
@@ -452,66 +489,32 @@ public sealed class DimensionLibServerService : IDisposable
             return DimensionLibResult.Fail("Online player is required.", "missing-player");
         }
 
-        var mappingLookup = GetMapping(mappingId);
-        if (!mappingLookup.Success)
-        {
-            return DimensionLibResult.Fail(mappingLookup.Message, mappingLookup.ErrorCode);
-        }
-
-        var mapping = mappingLookup.Value;
-        var sourceLookup = GetDimension(mapping.SourceDimensionId);
-        if (!sourceLookup.Success)
-        {
-            return DimensionLibResult.Fail(sourceLookup.Message, sourceLookup.ErrorCode);
-        }
-
-        var targetLookup = GetDimension(mapping.TargetDimensionId);
-        if (!targetLookup.Success)
-        {
-            return DimensionLibResult.Fail(targetLookup.Message, targetLookup.ErrorCode);
-        }
-
         options ??= new DimensionMappingTeleportOptions();
-        var playerBlockPos = player.Entity.Pos.AsBlockPos;
-        var source = sourceLookup.Value;
-        var target = targetLookup.Value;
-        var startsInSource = source.ContainsBlock(playerBlockPos);
-        var startsInTarget = target.ContainsBlock(playerBlockPos);
-        if (!startsInSource && !startsInTarget)
+        var sourceLocation = new DimensionLocation
         {
-            return DimensionLibResult.Fail($"Player is not inside either endpoint for mapping '{mapping.MappingId}'.", "not-in-mapped-dimension");
-        }
-
-        if (startsInTarget && !mapping.Bidirectional)
-        {
-            return DimensionLibResult.Fail($"Mapping '{mapping.MappingId}' is not bidirectional.", "mapping-not-bidirectional");
-        }
-
-        var reverse = startsInTarget && !startsInSource;
-        var from = reverse ? target : source;
-        var to = reverse ? source : target;
-        if (IsDimensionOrphaned(to.DimensionId))
-        {
-            return DimensionLibResult.Fail($"Dimension '{to.DimensionId}' is orphaned.", "dimension-orphaned");
-        }
-
-        var mapped = DimensionMappingResolver.MapLocalPosition(mapping.Transform, from, to, player.Entity.Pos.X, player.Entity.Pos.Y, player.Entity.Pos.Z, reverse, options);
-        var destination = new DimensionLocation
-        {
-            DimensionId = to.DimensionId,
-            DimensionPlaneId = to.DimensionPlaneId,
-            X = mapped.X,
-            Y = mapped.Y,
-            Z = mapped.Z,
             Yaw = player.Entity.Pos.Yaw,
             Pitch = player.Entity.Pos.Pitch,
             Roll = player.Entity.Pos.Roll,
+            DimensionPlaneId = player.Entity.Pos.Dimension,
+            X = player.Entity.Pos.X,
+            Y = player.Entity.Pos.Y,
+            Z = player.Entity.Pos.Z,
         };
-
-        if (!to.ContainsBlock(destination.AsBlockPos()) || destination.Y < 0 || destination.Y >= _api.WorldManager.MapSizeY)
+        var mappedResult = ResolveMappedDestination(sourceLocation, mappingId, options);
+        if (!mappedResult.Success)
         {
-            return DimensionLibResult.Fail($"Mapping '{mapping.MappingId}' resolves outside dimension '{to.DimensionId}'.", "mapped-location-out-of-bounds");
+            return DimensionLibResult.Fail(mappedResult.Message, mappedResult.ErrorCode);
         }
+
+        var mapped = mappedResult.Value;
+        var destination = mapped.Location;
+        var toLookup = GetDimension(mapped.TargetDimensionId);
+        if (!toLookup.Success)
+        {
+            return DimensionLibResult.Fail(toLookup.Message, toLookup.ErrorCode);
+        }
+
+        var to = toLookup.Value;
 
         if (!_accessService.CanEnter(player, to, out var reason))
         {
@@ -526,10 +529,75 @@ public sealed class DimensionLibServerService : IDisposable
 
         if (options.RequireCollisionFreeDestination && DestinationWouldCollide(player, destination))
         {
-            return DimensionLibResult.Fail($"Mapping '{mapping.MappingId}' target is blocked.", "mapped-location-blocked");
+            return DimensionLibResult.Fail($"Mapping '{mapped.MappingId}' target is blocked.", "mapped-location-blocked");
         }
 
         return TeleportToLocation(player, destination);
+    }
+
+    private DimensionLibResult<DimensionMappedLocation> ResolveMappedDestination(DimensionLocation sourceLocation, string mappingId, DimensionMappingTeleportOptions options)
+    {
+        var mappingLookup = GetMapping(mappingId);
+        if (!mappingLookup.Success)
+        {
+            return DimensionLibResult<DimensionMappedLocation>.Fail(mappingLookup.Message, mappingLookup.ErrorCode);
+        }
+
+        var mapping = mappingLookup.Value;
+        var sourceLookup = GetDimension(mapping.SourceDimensionId);
+        if (!sourceLookup.Success)
+        {
+            return DimensionLibResult<DimensionMappedLocation>.Fail(sourceLookup.Message, sourceLookup.ErrorCode);
+        }
+
+        var targetLookup = GetDimension(mapping.TargetDimensionId);
+        if (!targetLookup.Success)
+        {
+            return DimensionLibResult<DimensionMappedLocation>.Fail(targetLookup.Message, targetLookup.ErrorCode);
+        }
+
+        options ??= new DimensionMappingTeleportOptions();
+        var source = sourceLookup.Value;
+        var target = targetLookup.Value;
+        var sourceBlockPos = sourceLocation.AsBlockPos();
+        var startsInSource = source.ContainsBlock(sourceBlockPos);
+        var startsInTarget = target.ContainsBlock(sourceBlockPos);
+        if (!startsInSource && !startsInTarget)
+        {
+            return DimensionLibResult<DimensionMappedLocation>.Fail($"Location is not inside either endpoint for mapping '{mapping.MappingId}'.", "not-in-mapped-dimension");
+        }
+
+        if (startsInTarget && !mapping.Bidirectional)
+        {
+            return DimensionLibResult<DimensionMappedLocation>.Fail($"Mapping '{mapping.MappingId}' is not bidirectional.", "mapping-not-bidirectional");
+        }
+
+        var reverse = startsInTarget && !startsInSource;
+        var from = reverse ? target : source;
+        var to = reverse ? source : target;
+        if (IsDimensionOrphaned(to.DimensionId))
+        {
+            return DimensionLibResult<DimensionMappedLocation>.Fail($"Dimension '{to.DimensionId}' is orphaned.", "dimension-orphaned");
+        }
+
+        var destination = DimensionMappingResolver.MapLocalPosition(mapping.Transform, from, to, sourceLocation.X, sourceLocation.Y, sourceLocation.Z, reverse, options);
+        destination.Yaw = sourceLocation.Yaw;
+        destination.Pitch = sourceLocation.Pitch;
+        destination.Roll = sourceLocation.Roll;
+
+        if (!to.ContainsBlock(destination.AsBlockPos()) || destination.Y < 0 || destination.Y >= _api.WorldManager.MapSizeY)
+        {
+            return DimensionLibResult<DimensionMappedLocation>.Fail($"Mapping '{mapping.MappingId}' resolves outside dimension '{to.DimensionId}'.", "mapped-location-out-of-bounds");
+        }
+
+        return DimensionLibResult<DimensionMappedLocation>.Ok(new DimensionMappedLocation
+        {
+            MappingId = mapping.MappingId,
+            SourceDimensionId = from.DimensionId,
+            TargetDimensionId = to.DimensionId,
+            Reverse = reverse,
+            Location = destination,
+        });
     }
 
     public DimensionLibResult ReturnPlayer(IServerPlayer player)

@@ -95,6 +95,18 @@ public sealed class DimensionLibModSystem : ModSystem, IDimensionLibApi
         return _serverService.GetMapping(mappingId);
     }
 
+    public DimensionLibResult<DimensionMappedLocation> ResolveMappedLocation(DimensionLocation sourceLocation, string mappingId, DimensionMappingTeleportOptions options = null)
+    {
+        EnsureServerReady();
+        return _serverService.ResolveMappedLocation(sourceLocation, mappingId, options);
+    }
+
+    public DimensionLibResult<DimensionLocalPosition> ResolveLocalPosition(DimensionLocation location)
+    {
+        EnsureServerReady();
+        return _serverService.ResolveLocalPosition(location);
+    }
+
     public bool IsDimensionPrepared(string dimensionId)
     {
         EnsureServerReady();

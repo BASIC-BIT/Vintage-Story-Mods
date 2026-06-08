@@ -12,5 +12,7 @@ internal interface IPocketWaystoneService
 
     DimensionLibResult ReturnFromPocket(IServerPlayer player, BlockSelection blockSelection = null);
 
+    DimensionLibResult TravelElevator(IServerPlayer player, int direction, bool createMissingLayer = false);
+
     void ForgetWaystoneEndpoint(string endpointId);
 }

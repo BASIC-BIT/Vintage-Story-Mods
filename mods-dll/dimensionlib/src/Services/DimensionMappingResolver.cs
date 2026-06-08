@@ -4,6 +4,11 @@ namespace DimensionLib.Services;
 
 internal static class DimensionMappingResolver
 {
+    internal static DimensionLocalPosition ToLocalPosition(Dimension dimension, double x, double y, double z)
+    {
+        return dimension.ToLocalPosition(x, y, z);
+    }
+
     public static DimensionLocation MapLocalPosition(
         DimensionMappingTransform transform,
         Dimension from,
@@ -17,9 +22,10 @@ internal static class DimensionMappingResolver
         transform ??= DimensionMappingTransform.Identity();
         options ??= new DimensionMappingTeleportOptions();
 
-        var localX = x - from.MinBlockX;
-        var localY = y;
-        var localZ = z - from.MinBlockZ;
+        var local = ToLocalPosition(from, x, y, z);
+        var localX = local.X;
+        var localY = local.Y;
+        var localZ = local.Z;
         double mappedLocalX;
         double mappedLocalY;
         double mappedLocalZ;

@@ -25,6 +25,10 @@
       <HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="protobuf-net">
+      <HintPath>$(VINTAGE_STORY)\Lib\protobuf-net.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
@@ -34,6 +38,7 @@
   <ItemGroup>
     <Content Include="modinfo.json" />
     <Content Include="README.md" />
+    <Content Include="assets\**\*" />
     <Content Include="scripts\package.ps1" />
     <Content Include="dimensionpockets.csproj" />
   </ItemGroup>

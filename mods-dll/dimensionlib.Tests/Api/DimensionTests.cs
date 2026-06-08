@@ -46,4 +46,21 @@ public class DimensionTests
 
         dimension.VisualSettings!.Scene.MinimumLight.Should().Be(0.35f);
     }
+
+    [Fact]
+    public void ToLocalPosition_ReturnsEffectiveCoordinatesInsideDimension()
+    {
+        var dimension = TestDimensions.Create(dimensionId: "test:room", dimensionPlaneId: 5, chunkX: 20, chunkZ: 40);
+
+        var local = dimension.ToLocalPosition(dimension.MinBlockX + 12.5, 77, dimension.MinBlockZ + 9.75);
+
+        local.DimensionId.Should().Be("test:room");
+        local.DimensionPlaneId.Should().Be(5);
+        local.X.Should().Be(12.5);
+        local.Y.Should().Be(77);
+        local.Z.Should().Be(9.75);
+        local.BlockX.Should().Be(12);
+        local.BlockY.Should().Be(77);
+        local.BlockZ.Should().Be(9);
+    }
 }
