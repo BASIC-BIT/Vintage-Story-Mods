@@ -135,6 +135,12 @@ public sealed class PocketDirectoryActionRequest
 
     [ProtoMember(6)]
     public int SpawnY { get; set; }
+
+    [ProtoMember(7)]
+    public string StackId { get; set; }
+
+    [ProtoMember(8)]
+    public int LayerIndex { get; set; }
 }
 
 [ProtoContract]
@@ -204,4 +210,7 @@ public sealed class PocketDirectoryLayerMessage
 
     [ProtoMember(7)]
     public bool IsCurrent { get; set; }
+
+    [ProtoMember(8)]
+    public bool CanEdit { get; set; }
 }

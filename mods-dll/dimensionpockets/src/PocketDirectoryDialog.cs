@@ -17,15 +17,25 @@ internal sealed class PocketDirectoryDialog : GuiDialog
     private readonly Action _onRefresh;
     private readonly Action<string> _onTeleport;
     private readonly Action<string, string, int, int> _onCreatePocket;
+    private readonly Action<string, int, string> _onCreateLayer;
+    private readonly Action<string, int, string> _onEditLayer;
     private PocketDirectoryStateMessage _state = new PocketDirectoryStateMessage { Message = "Loading Pocket Directory..." };
     private string _selectedStackId;
 
-    public PocketDirectoryDialog(ICoreClientAPI capi, Action onRefresh, Action<string> onTeleport, Action<string, string, int, int> onCreatePocket)
+    public PocketDirectoryDialog(
+        ICoreClientAPI capi,
+        Action onRefresh,
+        Action<string> onTeleport,
+        Action<string, string, int, int> onCreatePocket,
+        Action<string, int, string> onCreateLayer,
+        Action<string, int, string> onEditLayer)
         : base(capi)
     {
         _onRefresh = onRefresh;
         _onTeleport = onTeleport;
         _onCreatePocket = onCreatePocket;
+        _onCreateLayer = onCreateLayer;
+        _onEditLayer = onEditLayer;
         ComposeDialog();
     }
 
@@ -160,6 +170,12 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         composer.AddStaticText($"Owner: {owner}. Layers can be created: {(stack.CanCreateLayer ? "yes" : "no")}", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 22));
         y += 30;
 
+        if (stack.CanCreateLayer)
+        {
+            composer.AddSmallButton("New Layer", () => CreateLayer(stack), ElementBounds.Fixed(x, y, 112, 26), EnumButtonStyle.Normal, "new-layer-" + Math.Abs((stack.StackId ?? string.Empty).GetHashCode()));
+            y += 34;
+        }
+
         var layers = (stack.Layers ?? new List<PocketDirectoryLayerMessage>()).OrderBy(layer => layer.Index).Take(MaxVisibleLayers).ToArray();
         if (layers.Length == 0)
         {
@@ -170,14 +186,19 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         foreach (var layer in layers)
         {
             var localLayer = layer;
-            composer.AddStaticText(LayerText(localLayer), CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y + 3, width - 104, 24));
+            composer.AddStaticText(LayerText(localLayer), CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y + 3, width - 160, 24));
             if (localLayer.CanTeleport && !localLayer.IsCurrent && !localLayer.Orphaned)
             {
-                composer.AddSmallButton("Teleport", () => Teleport(localLayer.DimensionId), ElementBounds.Fixed(x + width - 96, y, 92, 26), EnumButtonStyle.Normal, "teleport-" + Math.Abs((localLayer.DimensionId ?? string.Empty).GetHashCode()));
+                composer.AddSmallButton("Enter", () => Teleport(localLayer.DimensionId), ElementBounds.Fixed(x + width - 152, y, 70, 26), EnumButtonStyle.Normal, "teleport-" + Math.Abs((localLayer.DimensionId ?? string.Empty).GetHashCode()));
             }
             else
             {
-                composer.AddStaticText(localLayer.IsCurrent ? "Current" : "Unavailable", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + width - 96, y + 3, 92, 24));
+                composer.AddStaticText(localLayer.IsCurrent ? "Current" : "Unavailable", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + width - 152, y + 3, 76, 24));
+            }
+
+            if (localLayer.CanEdit)
+            {
+                composer.AddSmallButton("Edit", () => EditLayer(localLayer), ElementBounds.Fixed(x + width - 74, y, 70, 26), EnumButtonStyle.Normal, "edit-" + Math.Abs((localLayer.DimensionId ?? string.Empty).GetHashCode()));
             }
 
             y += 30;
@@ -238,6 +259,39 @@ internal sealed class PocketDirectoryDialog : GuiDialog
     {
         new PocketCreateDialog(capi, _onCreatePocket).TryOpen();
         return true;
+    }
+
+    private bool CreateLayer(PocketDirectoryStackMessage stack)
+    {
+        var suggested = SuggestedLayerIndex(stack);
+        var hint = $"Target index examples: {FormatLayer(suggested)}, +1, -1. Leave display name blank to use the default layer name.";
+        new PocketLayerDetailsDialog(capi, "Create Pocket Layer", hint, showLayerIndex: true, suggested, (index, displayName) =>
+        {
+            _onCreateLayer?.Invoke(stack.StackId, index, displayName);
+        }).TryOpen();
+        return true;
+    }
+
+    private bool EditLayer(PocketDirectoryLayerMessage layer)
+    {
+        var stack = SelectedStack();
+        if (stack == null || layer == null)
+        {
+            return true;
+        }
+
+        var hint = $"Current name: {layer.DisplayName}. Submit blank to reset this layer to its default name.";
+        new PocketLayerDetailsDialog(capi, $"Edit Layer {FormatLayer(layer.Index)}", hint, showLayerIndex: false, layer.Index, (index, displayName) =>
+        {
+            _onEditLayer?.Invoke(stack.StackId, index, displayName);
+        }).TryOpen();
+        return true;
+    }
+
+    private static int SuggestedLayerIndex(PocketDirectoryStackMessage stack)
+    {
+        var layers = stack?.Layers ?? new List<PocketDirectoryLayerMessage>();
+        return layers.Count == 0 ? 0 : layers.Max(layer => layer.Index) + 1;
     }
 
     private bool OnClose()
