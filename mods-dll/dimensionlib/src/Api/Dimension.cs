@@ -90,4 +90,21 @@ public sealed class Dimension
             pos.X >= MinBlockX && pos.X <= MaxBlockX &&
             pos.Z >= MinBlockZ && pos.Z <= MaxBlockZ;
     }
+
+    public DimensionLocalPosition ToLocalPosition(double x, double y, double z)
+    {
+        return new DimensionLocalPosition
+        {
+            DimensionId = DimensionId,
+            DimensionPlaneId = DimensionPlaneId,
+            X = x - MinBlockX,
+            Y = y,
+            Z = z - MinBlockZ,
+        };
+    }
+
+    public DimensionLocalPosition ToLocalPosition(DimensionLocation location)
+    {
+        return location == null ? null : ToLocalPosition(location.X, location.Y, location.Z);
+    }
 }

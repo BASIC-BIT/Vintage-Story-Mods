@@ -112,4 +112,18 @@ public class DimensionMappingResolverTests
         mapped.Y.Should().Be(73);
         mapped.Z.Should().Be(source.MinBlockZ + 24);
     }
+
+    [Fact]
+    public void ToLocalPosition_ReturnsSourceLocalCoordinates()
+    {
+        var source = TestDimensions.Create(dimensionId: "test:source", dimensionPlaneId: 7, chunkX: 10, chunkZ: 20);
+
+        var local = DimensionMappingResolver.ToLocalPosition(source, source.MinBlockX + 3.25, 45.5, source.MinBlockZ + 8.75);
+
+        local.DimensionId.Should().Be("test:source");
+        local.DimensionPlaneId.Should().Be(7);
+        local.X.Should().Be(3.25);
+        local.Y.Should().Be(45.5);
+        local.Z.Should().Be(8.75);
+    }
 }

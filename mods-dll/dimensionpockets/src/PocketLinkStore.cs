@@ -132,6 +132,14 @@ internal sealed class PocketLinkStore
             }
         }
 
+        normalized.LayerStacks = (state.LayerStacks ?? new List<PocketLayerStack>())
+            .Where(stack => stack != null && !string.IsNullOrWhiteSpace(stack.StackId))
+            .GroupBy(stack => stack.StackId.Trim(), StringComparer.Ordinal)
+            .Select(group => group.Last().Normalize())
+            .Where(stack => stack.Layers.Count > 0)
+            .OrderBy(stack => stack.StackId, StringComparer.Ordinal)
+            .ToList();
+
         return normalized;
     }
 
@@ -168,6 +176,8 @@ internal sealed class PocketLinkState
     public Dictionary<string, Dictionary<string, string>> ActiveIngressByPlayer { get; set; } = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
 
     public Dictionary<string, Dictionary<string, DimensionLocation>> UnanchoredReturnsByPlayer { get; set; } = new Dictionary<string, Dictionary<string, DimensionLocation>>(StringComparer.Ordinal);
+
+    public List<PocketLayerStack> LayerStacks { get; set; } = new List<PocketLayerStack>();
 }
 
 internal sealed class PocketWaystoneLink
@@ -197,6 +207,53 @@ internal sealed class PocketWaystoneLink
         SourceDimensionId = string.IsNullOrWhiteSpace(SourceDimensionId) ? null : SourceDimensionId.Trim();
         BoundByPlayerUid = string.IsNullOrWhiteSpace(BoundByPlayerUid) ? null : BoundByPlayerUid.Trim();
         BoundByPlayerName = string.IsNullOrWhiteSpace(BoundByPlayerName) ? null : BoundByPlayerName.Trim();
+        return this;
+    }
+}
+
+internal sealed class PocketLayerStack
+{
+    public string StackId { get; set; }
+
+    public string DisplayName { get; set; }
+
+    public int SizeChunks { get; set; }
+
+    public int SpawnY { get; set; }
+
+    public List<PocketLayerRef> Layers { get; set; } = new List<PocketLayerRef>();
+
+    public PocketLayerStack Normalize()
+    {
+        StackId = StackId?.Trim();
+        DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? StackId : DisplayName.Trim();
+        SizeChunks = Math.Max(1, SizeChunks);
+        SpawnY = Math.Max(1, SpawnY);
+        Layers = (Layers ?? new List<PocketLayerRef>())
+            .Where(layer => layer != null && !string.IsNullOrWhiteSpace(layer.DimensionId))
+            .GroupBy(layer => layer.Index)
+            .Select(group => group.Last().Normalize())
+            .OrderBy(layer => layer.Index)
+            .ToList();
+        return this;
+    }
+}
+
+internal sealed class PocketLayerRef
+{
+    public int Index { get; set; }
+
+    public string DimensionId { get; set; }
+
+    public string UpMappingId { get; set; }
+
+    public string DownMappingId { get; set; }
+
+    public PocketLayerRef Normalize()
+    {
+        DimensionId = DimensionId?.Trim();
+        UpMappingId = string.IsNullOrWhiteSpace(UpMappingId) ? null : UpMappingId.Trim();
+        DownMappingId = string.IsNullOrWhiteSpace(DownMappingId) ? null : DownMappingId.Trim();
         return this;
     }
 }

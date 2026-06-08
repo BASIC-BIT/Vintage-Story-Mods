@@ -30,6 +30,8 @@ The main contract is `IDimensionLibApi`:
 - `CaptureLocation(player)` captures the player's current engine position and optional visible DimensionLib id.
 - `TeleportToLocation(player, location)` moves a player to an explicit captured location and syncs DimensionLib visuals when applicable.
 - `RegisterMapping(spec)` registers a source/target dimension coordinate mapping owned by a consumer mod.
+- `ResolveMappedLocation(location, mappingId, options)` resolves where a mapping would send a location without teleporting; consumers use this for validation, previews, and UI.
+- `ResolveLocalPosition(location)` converts backing coordinates into effective local coordinates inside a registered DimensionLib dimension.
 - `TeleportAcrossMapping(player, mappingId, options)` maps the player's local position to the paired dimension, applies an optional destination-local offset, validates the target, and transfers the player.
 - `ReturnPlayer(player)` returns the player to the last recorded origin and remains a transitional helper for simple debug flows.
 - `RegisterPolicyProvider(ownerModId, provider)` lets an owner mod enforce richer `OwnerOnly` entry/use/mutation rules.
@@ -91,6 +93,8 @@ dimensionLib.TeleportAcrossMapping(player, "mymod:tower-present-past", new Dimen
 ```
 
 Mapping transforms operate on local coordinates inside the source dimension. A transform scale such as `ScaleX = 0.125` and `ScaleZ = 0.125` can express Nether-style compressed travel, while the per-call offset is applied in destination-local coordinates after the transform.
+
+Use `ResolveMappedLocation(...)` before transfer when consumer-owned rules need to inspect the target first, such as requiring a matching elevator block, validating two-block headroom, or building a bounded preview. Use `ResolveLocalPosition(...)` for client HUDs and product UI that should show effective coordinates instead of sparse backing coordinates.
 
 Mappings are durable by default and are saved with the dimension manifest when both endpoint dimensions are durable. Set `DimensionMappingSpec.IsTransient = true` for QA, temporary, or per-session mappings that the owner mod will recreate as needed.
 

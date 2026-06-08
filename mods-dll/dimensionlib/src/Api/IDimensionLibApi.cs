@@ -28,6 +28,10 @@ public interface IDimensionLibApi
 
     DimensionLibResult<DimensionMapping> GetMapping(string mappingId);
 
+    DimensionLibResult<DimensionMappedLocation> ResolveMappedLocation(DimensionLocation sourceLocation, string mappingId, DimensionMappingTeleportOptions options = null);
+
+    DimensionLibResult<DimensionLocalPosition> ResolveLocalPosition(DimensionLocation location);
+
     bool IsDimensionPrepared(string dimensionId);
 
     bool IsDimensionOrphaned(string dimensionId);

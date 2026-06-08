@@ -33,8 +33,10 @@ Consuming mods own:
 6. Call `TeleportToDimension(...)` when the player should enter.
 7. Call `TeleportToLocation(...)` when the player should move to a captured source point, linked endpoint, or another explicit destination.
 8. Register a `DimensionMappingSpec` when two dimensions should behave like mapped versions of one cohesive space.
-9. Call `TeleportAcrossMapping(...)` from a consumer-owned item, block, hotkey, portal, or command when the player should move through that mapped relationship.
-10. `ReturnPlayer(...)` remains a transitional prototype helper for simple debug flows. New product code should prefer explicit locations, mappings, and consumer-owned links.
+9. Call `ResolveMappedLocation(...)` when the consumer needs to validate or preview the mapped destination before transfer.
+10. Call `TeleportAcrossMapping(...)` from a consumer-owned item, block, hotkey, portal, or command when the player should move through that mapped relationship.
+11. Call `ResolveLocalPosition(...)` when UI should show effective/local coordinates instead of sparse backing coordinates.
+12. `ReturnPlayer(...)` remains a transitional prototype helper for simple debug flows. New product code should prefer explicit locations, mappings, and consumer-owned links.
 
 `mods-dll/dimensionpockets/src/PocketDimensionModSystem.cs` is the current integration consumer and releasable product mod. It uses only public API calls, including `RegisterPolicyProvider`, `RegisterDimension`, `PrepareDimension`, `TeleportToDimension`, `TeleportToLocation`, `ReleaseDimension`, and dimension lookup helpers.
 
@@ -65,6 +67,10 @@ The first mapping transform is scale plus offset:
 - Bidirectional mappings use the inverse transform when the player starts in the target dimension.
 
 `TeleportAcrossMapping(...)` resolves whether the player is in the mapping source or, for bidirectional mappings, the mapping target. It then validates that the destination is inside the mapped dimension, checks target access/prepared state, optionally requires a collision-free destination, and delegates to the normal location transfer path so chunk visibility and visuals stay synchronized.
+
+`ResolveMappedLocation(...)` uses the same source/target direction and transform rules but does not teleport. It returns the target dimension id, direction, and destination location so owner mods can inspect blocks, validate landing rules, drive confirmation UI, or build previews before calling `TeleportToLocation(...)` or `TeleportAcrossMapping(...)`.
+
+`ResolveLocalPosition(...)` converts an engine `DimensionLocation` into local/effective coordinates inside the registered DimensionLib dimension. This is the canonical helper for HUD overlays and product UI that should not expose large sparse backing coordinates.
 
 Mappings are durable by default. DimensionLib persists non-transient mappings in the region manifest when both endpoint dimensions are registered, non-transient, and not orphaned. Set `DimensionMappingSpec.IsTransient = true` for QA, temporary, or per-session links that the owner mod should recreate at runtime. DimensionLib still does not persist consumer-owned triggers, labels, portal blocks, hotkeys, cooldowns, or other product state.
 
