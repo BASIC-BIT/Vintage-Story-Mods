@@ -47,6 +47,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private readonly Dictionary<string, Dictionary<string, string>> _activeIngressByPlayer = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, DimensionLocation>> _unanchoredReturnsByPlayer = new Dictionary<string, Dictionary<string, DimensionLocation>>(StringComparer.Ordinal);
     private readonly Dictionary<string, PocketLayerStack> _layerStacksById = new Dictionary<string, PocketLayerStack>(StringComparer.Ordinal);
+    private readonly HashSet<string> _playersWithPocketHud = new HashSet<string>(StringComparer.Ordinal);
 
     public override double ExecuteOrder()
     {
@@ -229,12 +230,6 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         var dimension = lookup.Value;
-        var ensured = EnsurePocketInfrastructure(dimension, player);
-        if (!ensured.Success)
-        {
-            return ensured;
-        }
-
         DimensionLibResult<DimensionLocation> returnLocation;
         string successMessage;
         if (TryGetActiveIngressEndpoint(player, dimension.DimensionId, out var endpointId))
@@ -539,6 +534,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return DimensionLibResult<string>.Fail(linked.Message, linked.ErrorCode);
         }
 
+        SaveLinkState();
         mappingId = direction > 0 ? layer.UpMappingId : layer.DownMappingId;
         return DimensionLibResult<string>.Ok(mappingId);
     }
@@ -740,7 +736,22 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     {
         foreach (var player in _api.World.AllOnlinePlayers.OfType<IServerPlayer>())
         {
-            _serverChannel?.SendPacket(BuildHudState(player), player);
+            var playerKey = PlayerKey(player);
+            if (string.IsNullOrWhiteSpace(playerKey))
+            {
+                continue;
+            }
+
+            var state = BuildHudState(player);
+            if (state.InPocket)
+            {
+                _playersWithPocketHud.Add(playerKey);
+                _serverChannel?.SendPacket(state, player);
+            }
+            else if (_playersWithPocketHud.Remove(playerKey))
+            {
+                _serverChannel?.SendPacket(state, player);
+            }
         }
     }
 
@@ -758,8 +769,18 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         var dimension = lookup.Value;
-        var stack = EnsureLayerStack(dimension);
+        var stack = FindStackForDimension(dimension.DimensionId);
+        if (stack == null)
+        {
+            return new PocketHudStateMessage();
+        }
+
         var layer = FindLayer(stack, dimension.DimensionId);
+        if (layer == null)
+        {
+            return new PocketHudStateMessage();
+        }
+
         var local = _dimensionLib.ResolveLocalPosition(CreateLocation(player, dimension.DimensionId));
         if (!local.Success)
         {
@@ -770,7 +791,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         {
             InPocket = true,
             PocketName = stack.DisplayName,
-            LayerIndex = layer?.Index ?? 0,
+            LayerIndex = layer.Index,
             LocalX = local.Value.BlockX,
             LocalY = local.Value.BlockY,
             LocalZ = local.Value.BlockZ,
@@ -917,7 +938,6 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         lower.UpMappingId = mappingId;
         upper.DownMappingId = mappingId;
-        SaveLinkState();
         return DimensionLibResult.Ok($"Linked pocket layers {FormatLayer(lowerIndex)} and {FormatLayer(upperIndex)}.");
     }
 

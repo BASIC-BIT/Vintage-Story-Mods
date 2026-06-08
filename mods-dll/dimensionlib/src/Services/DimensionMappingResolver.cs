@@ -4,7 +4,7 @@ namespace DimensionLib.Services;
 
 internal static class DimensionMappingResolver
 {
-    public static DimensionLocalPosition ToLocalPosition(Dimension dimension, double x, double y, double z)
+    internal static DimensionLocalPosition ToLocalPosition(Dimension dimension, double x, double y, double z)
     {
         return dimension.ToLocalPosition(x, y, z);
     }
