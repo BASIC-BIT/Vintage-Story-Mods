@@ -227,6 +227,8 @@ GET /resources  → .attributes.current_state ("running"/"stopped"/etc.)
 
 **Client profile gotcha**: Test profiles load local mods from `D:\Games\VSProfiles\Profile2\Mods` and `D:\Games\VSProfiles\Profile3\Mods`. After packaging, verify those `thebasics_*.zip` files have the same hash as the freshly built zip; stale same-version zips make client-side QA appear to fail even when the server has the new build.
 
+**Server mod auto-download gotcha**: For public side-both mods that are listed on ModDB, Vintage Story clients can download the server-provided mods during connection. Do not manually side-load those ModDB-listed dependencies into local test profiles unless testing unpublished/local zips or debugging the auto-download path itself.
+
 #### What to Look for in Server Logs
 
 After a restart, check `server-main.log` for:

@@ -45,6 +45,23 @@ public class HeritageLanguageSystemTests
         HeritageLanguageSystem.IsLanguageGrantedByClass(language, "game:malefactor").Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("lrc:firebeards-and-broadbeams", "Firebeards And Broadbeams")]
+    [InlineData("lrc:firebeards_and_broadbeams", "Firebeards And Broadbeams")]
+    [InlineData("game:wolf.tailored", "Wolf Tailored")]
+    [InlineData("lrc:firebeardsandbroadbeams", "Firebeardsandbroadbeams")]
+    public void FormatModelCodeFallback_StripsDomainAndFormatsSeparators(string code, string expected)
+    {
+        HeritageLanguageSystem.FormatModelCodeFallback(code).Should().Be(expected);
+    }
+
+    [Fact]
+    public void GetPlayerModelLibModelName_PrefersConfiguredModelName()
+    {
+        HeritageLanguageSystem.GetPlayerModelLibModelName("lrc:bnumenorean", "Black Numenorean")
+            .Should().Be("Black Numenorean");
+    }
+
     private static Language CreateLanguage(string name, string[] grantedToClasses)
     {
         return new Language(
