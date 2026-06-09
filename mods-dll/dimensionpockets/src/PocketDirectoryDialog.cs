@@ -26,6 +26,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
     private int _stackScrollIndex;
     private int _layerScrollIndex;
     private int _layerPageSize = 1;
+    private bool _keepCurrentLayerVisibleOnNextCompose;
 
     public PocketDirectoryDialog(
         ICoreClientAPI capi,
@@ -73,7 +74,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         }
 
         KeepSelectedStackVisible();
-        KeepCurrentLayerVisible();
+        _keepCurrentLayerVisibleOnNextCompose = true;
         ClampScrollIndexes();
 
         ComposeDialog();
@@ -181,6 +182,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
 
         if (stack == null)
         {
+            _keepCurrentLayerVisibleOnNextCompose = false;
             composer.AddStaticText("Select a pocket to view its layers.", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 42));
             return;
         }
@@ -198,6 +200,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         var allLayers = (stack.Layers ?? new List<PocketDirectoryLayerMessage>()).OrderBy(layer => layer.Index).ToArray();
         if (allLayers.Length == 0)
         {
+            _keepCurrentLayerVisibleOnNextCompose = false;
             composer.AddStaticText("No layers are registered for this pocket.", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 42));
             return;
         }
@@ -206,6 +209,12 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         var controlsHeight = allLayers.Length > MaxVisibleLayerRows(y, panelBounds) ? 34 : 0;
         var maxRows = MaxVisibleLayerRows(y, panelBounds, controlsHeight);
         _layerPageSize = maxRows;
+        if (_keepCurrentLayerVisibleOnNextCompose)
+        {
+            KeepCurrentLayerVisible(maxRows);
+            _keepCurrentLayerVisibleOnNextCompose = false;
+        }
+
         _layerScrollIndex = ClampInt(_layerScrollIndex, 0, LastPageStart(allLayers.Length, maxRows));
         var layers = allLayers.Skip(_layerScrollIndex).Take(maxRows).ToArray();
 
@@ -383,7 +392,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         }
     }
 
-    private void KeepCurrentLayerVisible()
+    private void KeepCurrentLayerVisible(int pageSize)
     {
         var stack = SelectedStack();
         var layers = stack?.Layers?.OrderBy(layer => layer.Index).ToArray();
@@ -395,7 +404,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         var current = Array.FindIndex(layers, layer => layer.IsCurrent);
         if (current >= 0)
         {
-            _layerScrollIndex = PageStartForIndex(current, Math.Max(1, _layerPageSize));
+            _layerScrollIndex = PageStartForIndex(current, Math.Max(1, pageSize));
         }
     }
 

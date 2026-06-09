@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Vintagestory.API.Client;
 
 namespace PocketDimensions;
@@ -87,7 +86,7 @@ internal sealed class PocketCreateDialog : GuiDialog
         }
 
         _updatingSlug = true;
-        slugInput.SetValue(NormalizeSlug(value));
+        slugInput.SetValue(PocketSlug.Normalize(value));
         _updatingSlug = false;
     }
 
@@ -121,28 +120,6 @@ internal sealed class PocketCreateDialog : GuiDialog
     private int ParseInt(string key)
     {
         return int.TryParse(Text(key), out var value) ? value : 0;
-    }
-
-    private static string NormalizeSlug(string value)
-    {
-        value = (value ?? string.Empty).Trim().ToLowerInvariant();
-        var chars = new List<char>(value.Length);
-        var lastDash = false;
-        foreach (var ch in value)
-        {
-            if (char.IsLetterOrDigit(ch) || ch == '_' || ch == ':')
-            {
-                chars.Add(ch);
-                lastDash = false;
-            }
-            else if (!lastDash)
-            {
-                chars.Add('-');
-                lastDash = true;
-            }
-        }
-
-        return new string(chars.ToArray()).Trim('-');
     }
 
     private bool OnCancel()

@@ -1045,7 +1045,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         return request.Action?.Trim().ToLowerInvariant() switch
         {
-            DirectoryActionCreatePocket => ToDimensionId(NormalizePocketSlug(string.IsNullOrWhiteSpace(request.Slug) ? request.DisplayName : request.Slug)),
+            DirectoryActionCreatePocket => ToDimensionId(PocketSlug.Normalize(string.IsNullOrWhiteSpace(request.Slug) ? request.DisplayName : request.Slug)),
             DirectoryActionCreateLayer => request.StackId,
             DirectoryActionEditLayer => request.StackId,
             DirectoryActionEnter => FindStackForDimension(request.DimensionId)?.StackId,
@@ -1610,7 +1610,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     {
         displayName = displayName?.Trim();
         slug = string.IsNullOrWhiteSpace(slug) ? displayName : slug.Trim();
-        slug = NormalizePocketSlug(slug);
+        slug = PocketSlug.Normalize(slug);
         if (string.IsNullOrWhiteSpace(slug))
         {
             return DimensionLibResult.Fail("Pocket slug is required.", "missing-pocket-slug");
@@ -1626,7 +1626,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             }
 
             var existingStack = FindStackForDimension(existing.Value.DimensionId);
-            if (!HasPrivilege(player, _config.CreatePrivilege) && (existingStack == null || !CanEditLayer(player, existingStack)))
+            if (!CanRefreshExistingPocket(player, existingStack))
             {
                 return DimensionLibResult.Fail("A pocket with that slug already exists.", "pocket-exists");
             }
@@ -2375,6 +2375,13 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         return HasGlobalCapability(player, _config.CreatePocketCapabilityMode, _config.CreatePrivilege);
     }
 
+    private bool CanRefreshExistingPocket(IServerPlayer player, PocketLayerStack stack)
+    {
+        return HasPrivilege(player, _config.CreatePrivilege) ||
+            IsStackOwner(player, stack) ||
+            (stack != null && CanEditLayer(player, stack));
+    }
+
     private bool CanCreateLayer(IServerPlayer player, PocketLayerStack stack)
     {
         return HasStackCapability(player, stack, _config.CreateLayerCapabilityMode, _config.CreatePrivilege);
@@ -2560,28 +2567,6 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     {
         name = (name ?? string.Empty).Trim().ToLowerInvariant();
         return name.Contains(':') ? name : $"{ModId}:{name}";
-    }
-
-    private static string NormalizePocketSlug(string value)
-    {
-        value = (value ?? string.Empty).Trim().ToLowerInvariant();
-        var chars = new List<char>(value.Length);
-        var lastDash = false;
-        foreach (var ch in value)
-        {
-            if (char.IsLetterOrDigit(ch) || ch == '_' || ch == ':')
-            {
-                chars.Add(ch);
-                lastDash = false;
-            }
-            else if (!lastDash)
-            {
-                chars.Add('-');
-                lastDash = true;
-            }
-        }
-
-        return new string(chars.ToArray()).Trim('-');
     }
 
     private static string ShortName(string dimensionId)
