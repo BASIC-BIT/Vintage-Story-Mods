@@ -42,6 +42,7 @@ public class HeritageLanguageSystem : BaseSubSystem
     private object? _customModelsSystem;
     private PropertyInfo? _customModelsProperty;
     private PropertyInfo? _groupProperty;
+    private PropertyInfo? _nameProperty;
 
     private static string L(string key, params object[] args) => Lang.Get($"thebasics:{key}", args);
 
@@ -536,16 +537,16 @@ public class HeritageLanguageSystem : BaseSubSystem
         player.SetDefaultLanguage(firstKnownConfigured ?? LanguageSystem.BabbleLang);
     }
 
-    private static string GetModelDescriptor(string modelCode, string modelGroupCode)
+    private string GetModelDescriptor(string modelCode, string modelGroupCode)
     {
         if (!string.IsNullOrWhiteSpace(modelGroupCode))
         {
-            return Lang.Get("thebasics:heritage.model.groupDescriptor", modelGroupCode);
+            return Lang.Get("thebasics:heritage.model.groupDescriptor", GetModelGroupDisplayName(modelGroupCode));
         }
 
         if (!string.IsNullOrWhiteSpace(modelCode))
         {
-            return Lang.Get("thebasics:heritage.model.modelDescriptor", modelCode);
+            return Lang.Get("thebasics:heritage.model.modelDescriptor", GetModelDisplayName(modelCode));
         }
 
         return Lang.Get("thebasics:heritage.model.unknownDescriptor");
@@ -556,7 +557,7 @@ public class HeritageLanguageSystem : BaseSubSystem
     /// via GrantedToModels (model-specific) or GrantedToModelGroups (group-level).
     /// Prefers the model-specific descriptor when the language matched on the model directly.
     /// </summary>
-    private static string GetDescriptorForLanguage(Language language, string modelCode, string modelGroupCode, string[] modelVariants, string[] groupVariants)
+    private string GetDescriptorForLanguage(Language language, string modelCode, string modelGroupCode, string[] modelVariants, string[] groupVariants)
     {
         var matchesModel = MatchesAny(language.GrantedToModels, modelVariants);
         var matchesGroup = MatchesAny(language.GrantedToModelGroups, groupVariants);
@@ -573,6 +574,96 @@ public class HeritageLanguageSystem : BaseSubSystem
 
         // Matched both, or matched neither (defensive fallback) — default priority: group > model.
         return GetModelDescriptor(modelCode, modelGroupCode);
+    }
+
+    private string GetModelDisplayName(string modelCode)
+    {
+        var configuredName = GetCustomModelName(modelCode);
+        return GetPlayerModelLibModelName(modelCode, configuredName);
+    }
+
+    private string? GetCustomModelName(string modelCode)
+    {
+        if (string.IsNullOrWhiteSpace(modelCode) || !_playerModelLibEnabled || !TryEnsureCustomModelReflection())
+        {
+            return null;
+        }
+
+        if (_customModelsProperty?.GetValue(_customModelsSystem) is not IDictionary models || !models.Contains(modelCode))
+        {
+            return null;
+        }
+
+        return _nameProperty?.GetValue(models[modelCode]) as string;
+    }
+
+    internal static string GetPlayerModelLibModelName(string modelCode, string? configuredName = null)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredName))
+        {
+            return configuredName.Trim();
+        }
+
+        var (domain, path) = SplitAssetCode(modelCode);
+        return TryGetLangIfExists($"{domain}:playermodel-{path}") ?? FormatModelCodeFallback(modelCode);
+    }
+
+    internal static string GetModelGroupDisplayName(string modelGroupCode)
+    {
+        var (domain, path) = SplitAssetCode(modelGroupCode);
+        return TryGetLangIfExists($"game:playermodelgroup-{path}")
+               ?? TryGetLangIfExists($"{domain}:playermodel-{path}")
+               ?? FormatModelCodeFallback(modelGroupCode);
+    }
+
+    private static string? TryGetLangIfExists(string key)
+    {
+        try
+        {
+            return Lang.GetIfExists(key);
+        }
+        catch (ArgumentNullException)
+        {
+            return null;
+        }
+    }
+
+    private static (string Domain, string Path) SplitAssetCode(string code)
+    {
+        var trimmed = code?.Trim() ?? string.Empty;
+        var separator = trimmed.IndexOf(':');
+        if (separator > 0 && separator < trimmed.Length - 1)
+        {
+            return (trimmed[..separator], trimmed[(separator + 1)..]);
+        }
+
+        return ("game", trimmed);
+    }
+
+    internal static string FormatModelCodeFallback(string code)
+    {
+        var (_, path) = SplitAssetCode(code);
+        var parts = path
+            .Replace('/', ' ')
+            .Replace('\\', ' ')
+            .Replace('-', ' ')
+            .Replace('_', ' ')
+            .Replace('.', ' ')
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return parts.Length == 0
+            ? code?.Trim() ?? string.Empty
+            : string.Join(" ", parts.Select(CapitalizeInvariant));
+    }
+
+    private static string CapitalizeInvariant(string value)
+    {
+        return value.Length switch
+        {
+            0 => value,
+            1 => value.ToUpperInvariant(),
+            _ => char.ToUpperInvariant(value[0]) + value[1..]
+        };
     }
 
     private static string GetPlayerModelCode(IServerPlayer player)
@@ -603,6 +694,7 @@ public class HeritageLanguageSystem : BaseSubSystem
 
     private bool TryEnsureCustomModelReflection()
     {
+        // Name is optional in PlayerModelLib; the required reflection surface is the model map and group metadata.
         if (_customModelsSystem != null && _customModelsProperty != null && _groupProperty != null)
         {
             return true;
@@ -631,6 +723,8 @@ public class HeritageLanguageSystem : BaseSubSystem
                 return false;
             }
 
+            _nameProperty = customModelDataType?.GetProperty("Name");
+
             return true;
         }
         catch
@@ -645,6 +739,7 @@ public class HeritageLanguageSystem : BaseSubSystem
         _customModelsSystem = null;
         _customModelsProperty = null;
         _groupProperty = null;
+        _nameProperty = null;
     }
 
     private static void StorePlayerAppearance(IServerPlayer player, string modelCode, string modelGroupCode)
