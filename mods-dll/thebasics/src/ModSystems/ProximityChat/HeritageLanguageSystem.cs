@@ -605,15 +605,27 @@ public class HeritageLanguageSystem : BaseSubSystem
         }
 
         var (domain, path) = SplitAssetCode(modelCode);
-        return Lang.GetIfExists($"{domain}:playermodel-{path}") ?? FormatModelCodeFallback(modelCode);
+        return TryGetLangIfExists($"{domain}:playermodel-{path}") ?? FormatModelCodeFallback(modelCode);
     }
 
     internal static string GetModelGroupDisplayName(string modelGroupCode)
     {
         var (domain, path) = SplitAssetCode(modelGroupCode);
-        return Lang.GetIfExists($"game:playermodelgroup-{path}")
-               ?? Lang.GetIfExists($"{domain}:playermodel-{path}")
+        return TryGetLangIfExists($"game:playermodelgroup-{path}")
+               ?? TryGetLangIfExists($"{domain}:playermodel-{path}")
                ?? FormatModelCodeFallback(modelGroupCode);
+    }
+
+    private static string? TryGetLangIfExists(string key)
+    {
+        try
+        {
+            return Lang.GetIfExists(key);
+        }
+        catch (ArgumentNullException)
+        {
+            return null;
+        }
     }
 
     private static (string Domain, string Path) SplitAssetCode(string code)
@@ -682,6 +694,7 @@ public class HeritageLanguageSystem : BaseSubSystem
 
     private bool TryEnsureCustomModelReflection()
     {
+        // Name is optional in PlayerModelLib; the required reflection surface is the model map and group metadata.
         if (_customModelsSystem != null && _customModelsProperty != null && _groupProperty != null)
         {
             return true;

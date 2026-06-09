@@ -62,6 +62,23 @@ public class HeritageLanguageSystemTests
             .Should().Be("Black Numenorean");
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GetPlayerModelLibModelName_FallsBackWhenConfiguredNameIsMissing(string? configuredName)
+    {
+        HeritageLanguageSystem.GetPlayerModelLibModelName("lrc:firebeards-and-broadbeams", configuredName)
+            .Should().Be("Firebeards And Broadbeams");
+    }
+
+    [Fact]
+    public void GetModelGroupDisplayName_FallsBackToFormattedCode()
+    {
+        HeritageLanguageSystem.GetModelGroupDisplayName("lrc:lost-races")
+            .Should().Be("Lost Races");
+    }
+
     private static Language CreateLanguage(string name, string[] grantedToClasses)
     {
         return new Language(
