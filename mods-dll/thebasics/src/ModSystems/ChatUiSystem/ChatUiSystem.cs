@@ -1254,8 +1254,9 @@ public class ChatUiSystem : ModSystem
     private static void OnConfigAdminDialogClosed()
     {
         _configAdminDialog = null;
-        _configAdminUnsavedCloseConfirm?.TryClose();
+        var unsavedCloseConfirm = _configAdminUnsavedCloseConfirm;
         _configAdminUnsavedCloseConfirm = null;
+        unsavedCloseConfirm?.TryClose();
     }
 
     private static bool HasConfigAdminUnsavedChanges()
@@ -1282,6 +1283,7 @@ public class ChatUiSystem : ModSystem
 
         _configAdminUnsavedCloseConfirm = new GuiDialogConfirm(_api, Lang.Get("thebasics:config-admin-close-unsaved-confirm"), ok =>
         {
+            _configAdminUnsavedCloseConfirm = null;
             if (ok)
             {
                 onDiscard?.Invoke();
@@ -2192,10 +2194,27 @@ public class ChatUiSystem : ModSystem
             _safeNetworkChannel?.Dispose();
             _safeNetworkChannel = null;
             _returnToConfigAdminAfterLanguageDialog = false;
+            _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
+            _pendingCharacterSheetOpenFromCharacterDialog = false;
+            _suppressNextCharacterDialogSheetOpen = false;
+            _characterSheetOpenedFromCharacterDialog = false;
+            _characterDialogTitleOverride = null;
+            _characterDialog = null;
+            _characterDialogHooked = false;
+            _characterSheetDialog = null;
+            _characterSheetMessageDialog?.TryClose();
+            _characterSheetMessageDialog = null;
             _languageConfigDialog?.TryClose();
             _languageConfigDialog = null;
-            _configAdminDialog?.TryClose();
+            _characterSheetFieldConfigDialog = null;
+            _playerNotesDialog = null;
+            _chatHistoryDialog?.TryClose();
+            _chatHistoryDialog = null;
+            _configAdminDialog?.TryCloseWithoutPrompt();
             _configAdminDialog = null;
+            var configAdminUnsavedCloseConfirm = _configAdminUnsavedCloseConfirm;
+            _configAdminUnsavedCloseConfirm = null;
+            configAdminUnsavedCloseConfirm?.TryClose();
             _configAdminDraft.Clear();
             _configAdminReviewedKeys.Clear();
             _configAdminSelectedGroup = null;

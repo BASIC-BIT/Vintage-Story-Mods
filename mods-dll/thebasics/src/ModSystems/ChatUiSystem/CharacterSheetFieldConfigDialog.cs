@@ -30,6 +30,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     private bool _closing;
     private bool _forceClose;
     private GuiDialogConfirm _unsavedCloseConfirm;
+    private GuiDialogConfirm _deleteConfirm;
     private bool _suspendCallbacks;
 
     public CharacterSheetFieldConfigDialog(
@@ -57,6 +58,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
     public void SetView(List<CharacterSheetFieldConfigEntryMessage> fields, bool updateBaseline)
     {
+        CloseDeleteConfirm();
         _fields = EnsureDraft(fields);
         if (updateBaseline)
         {
@@ -83,6 +85,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         if (closed && !_closing)
         {
             _closing = true;
+            CloseConfirmDialogs();
             _onClose?.Invoke();
         }
 
@@ -374,21 +377,25 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
             return true;
         }
 
-        var indexToDelete = _selectedIndex;
-        var fieldName = DisplayName(_fields[indexToDelete]);
-        new GuiDialogConfirm(capi, Lang.Get("thebasics:charsheet-field-config-delete-confirm", fieldName), ok =>
+        var fieldToDelete = _fields[_selectedIndex];
+        var fieldName = DisplayName(fieldToDelete);
+        CloseDeleteConfirm();
+        _deleteConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:charsheet-field-config-delete-confirm", fieldName), ok =>
         {
+            _deleteConfirm = null;
             if (ok)
             {
-                DeleteFieldAt(indexToDelete);
+                DeleteField(fieldToDelete);
             }
-        }).TryOpen();
+        });
+        _deleteConfirm.TryOpen();
         return true;
     }
 
-    private void DeleteFieldAt(int index)
+    private void DeleteField(CharacterSheetFieldConfigEntryMessage field)
     {
-        if (_fields.Count <= 1 || index < 0 || index >= _fields.Count)
+        var index = field == null ? -1 : _fields.FindIndex(candidate => ReferenceEquals(candidate, field));
+        if (_fields.Count <= 1 || index < 0)
         {
             return;
         }
@@ -407,6 +414,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
         _unsavedCloseConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:charsheet-field-config-close-unsaved-confirm"), ok =>
         {
+            _unsavedCloseConfirm = null;
             if (ok)
             {
                 _forceClose = true;
@@ -421,6 +429,21 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
             }
         });
         _unsavedCloseConfirm.TryOpen();
+    }
+
+    private void CloseConfirmDialogs()
+    {
+        CloseDeleteConfirm();
+        var unsavedCloseConfirm = _unsavedCloseConfirm;
+        _unsavedCloseConfirm = null;
+        unsavedCloseConfirm?.TryClose();
+    }
+
+    private void CloseDeleteConfirm()
+    {
+        var deleteConfirm = _deleteConfirm;
+        _deleteConfirm = null;
+        deleteConfirm?.TryClose();
     }
 
     private bool OnMoveSelectedFieldUp()
