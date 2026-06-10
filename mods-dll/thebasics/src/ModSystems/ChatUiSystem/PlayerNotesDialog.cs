@@ -116,10 +116,24 @@ public class PlayerNotesDialog : GuiDialog
         if (closed && !_closing)
         {
             _closing = true;
+            CloseConfirmDialogs();
             _onClose?.Invoke();
         }
 
         return closed;
+    }
+
+    public bool TryCloseWithoutPrompt()
+    {
+        _forceClose = true;
+        try
+        {
+            return TryClose();
+        }
+        finally
+        {
+            _forceClose = false;
+        }
     }
 
     private void SetDraft(TheBasicsNotesViewMessage view, bool updateBaseline)
@@ -651,6 +665,7 @@ public class PlayerNotesDialog : GuiDialog
 
         _unsavedCloseConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:notes-close-unsaved-confirm"), ok =>
         {
+            _unsavedCloseConfirm = null;
             if (!ok) return;
             _forceClose = true;
             try
@@ -674,12 +689,23 @@ public class PlayerNotesDialog : GuiDialog
 
         _unsavedReloadConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:notes-reload-unsaved-confirm"), ok =>
         {
+            _unsavedReloadConfirm = null;
             if (ok)
             {
                 SendReload();
             }
         });
         _unsavedReloadConfirm.TryOpen();
+    }
+
+    private void CloseConfirmDialogs()
+    {
+        var unsavedCloseConfirm = _unsavedCloseConfirm;
+        var unsavedReloadConfirm = _unsavedReloadConfirm;
+        _unsavedCloseConfirm = null;
+        _unsavedReloadConfirm = null;
+        unsavedCloseConfirm?.TryClose();
+        unsavedReloadConfirm?.TryClose();
     }
 
     private string SnapshotDraft()

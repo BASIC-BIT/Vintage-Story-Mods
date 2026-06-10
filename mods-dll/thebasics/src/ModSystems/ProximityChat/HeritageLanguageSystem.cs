@@ -620,7 +620,8 @@ public class HeritageLanguageSystem : BaseSubSystem
     {
         try
         {
-            return Lang.GetIfExists(key);
+            var value = Lang.GetIfExists(key);
+            return string.IsNullOrWhiteSpace(value) ? null : value;
         }
         catch (ArgumentNullException)
         {
