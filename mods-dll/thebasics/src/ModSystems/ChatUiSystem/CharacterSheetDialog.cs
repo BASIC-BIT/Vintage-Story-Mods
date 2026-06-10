@@ -119,6 +119,19 @@ public class CharacterSheetDialog : GuiDialog
         return base.TryClose();
     }
 
+    public bool TryCloseWithoutPrompt()
+    {
+        _forceClose = true;
+        try
+        {
+            return TryClose();
+        }
+        finally
+        {
+            _forceClose = false;
+        }
+    }
+
     public void SetView(CharacterSheetViewMessage view)
     {
         _view = view;

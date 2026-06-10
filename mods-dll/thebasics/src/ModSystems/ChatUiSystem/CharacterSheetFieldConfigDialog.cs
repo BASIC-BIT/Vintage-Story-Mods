@@ -92,6 +92,19 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         return closed;
     }
 
+    public bool TryCloseWithoutPrompt()
+    {
+        _forceClose = true;
+        try
+        {
+            return TryClose();
+        }
+        finally
+        {
+            _forceClose = false;
+        }
+    }
+
     private void ComposeDialog()
     {
         SingleComposer?.Dispose();

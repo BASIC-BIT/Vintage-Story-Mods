@@ -123,6 +123,19 @@ public class PlayerNotesDialog : GuiDialog
         return closed;
     }
 
+    public bool TryCloseWithoutPrompt()
+    {
+        _forceClose = true;
+        try
+        {
+            return TryClose();
+        }
+        finally
+        {
+            _forceClose = false;
+        }
+    }
+
     private void SetDraft(TheBasicsNotesViewMessage view, bool updateBaseline)
     {
         _view = view ?? new TheBasicsNotesViewMessage { Success = false };

@@ -631,9 +631,8 @@ public class ChatUiSystem : ModSystem
         if (targetPlayerUid == null || _characterSheetDialog?.CurrentTargetPlayerUid == targetPlayerUid)
         {
             _characterSheetDialog?.SetHeadshotStatus(message);
+            _api?.TriggerIngameError(_api.World, "thebasics-headshot", message);
         }
-
-        _api?.TriggerIngameError(_api.World, "thebasics-headshot", message);
     }
 
     private static void OnHeadshotUploadResult(HeadshotUploadResult message)
@@ -2206,12 +2205,15 @@ public class ChatUiSystem : ModSystem
             _characterDialogTitleOverride = null;
             _characterDialog = null;
             _characterDialogHooked = false;
+            _characterSheetDialog?.TryCloseWithoutPrompt();
             _characterSheetDialog = null;
             _characterSheetMessageDialog?.TryClose();
             _characterSheetMessageDialog = null;
             _languageConfigDialog?.TryClose();
             _languageConfigDialog = null;
+            _characterSheetFieldConfigDialog?.TryCloseWithoutPrompt();
             _characterSheetFieldConfigDialog = null;
+            _playerNotesDialog?.TryCloseWithoutPrompt();
             _playerNotesDialog = null;
             _chatHistoryDialog?.TryClose();
             _chatHistoryDialog = null;
