@@ -213,6 +213,27 @@ public class ConfigAdminSettingRegistryTests
         maxResultsError.Should().Contain("whole number from 1 to 1000");
     }
 
+    [Fact]
+    public void HomeSpawnPrivileges_AreRegisteredAndDefaulted()
+    {
+        var config = CreateConfig();
+
+        config.HomeCommandPrivilege.Should().Be("chat");
+        config.SetHomeCommandPrivilege.Should().Be("chat");
+        config.SpawnCommandPrivilege.Should().Be("chat");
+        config.SetSpawnCommandPrivilege.Should().Be("commandplayer");
+
+        GetSetting("HomeCommandPrivilege").TrySetValue(config, "home", out var homeError).Should().BeTrue(homeError);
+        GetSetting("SetHomeCommandPrivilege").TrySetValue(config, "sethome", out var setHomeError).Should().BeTrue(setHomeError);
+        GetSetting("SpawnCommandPrivilege").TrySetValue(config, "spawn", out var spawnError).Should().BeTrue(spawnError);
+        GetSetting("SetSpawnCommandPrivilege").TrySetValue(config, "setspawn", out var setSpawnError).Should().BeTrue(setSpawnError);
+
+        config.HomeCommandPrivilege.Should().Be("home");
+        config.SetHomeCommandPrivilege.Should().Be("sethome");
+        config.SpawnCommandPrivilege.Should().Be("spawn");
+        config.SetSpawnCommandPrivilege.Should().Be("setspawn");
+    }
+
     private static ModConfig CreateConfig()
     {
         var config = new ModConfig();

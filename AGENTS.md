@@ -233,8 +233,9 @@ GET /resources  → .attributes.current_state ("running"/"stopped"/etc.)
 
 After a restart, check `server-main.log` for:
 
-1. **Mod loaded correctly**: Look for `Mod 'thebasics_X_Y_Z.zip' (thebasics):` followed by all 6 mod systems:
+1. **Mod loaded correctly**: Look for `Mod 'thebasics_X_Y_Z.zip' (thebasics):` followed by all expected mod systems, including:
    - `thebasics.ModSystems.TPA.TpaSystem`
+   - `thebasics.ModSystems.HomeSpawn.HomeSpawnSystem`
    - `thebasics.ModSystems.SleepNotifier.SleepNotifierSystem`
    - `thebasics.ModSystems.SaveNotifications.SaveNotificationsSystem`
    - `thebasics.ModSystems.Repair.RepairModSystem`
