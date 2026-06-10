@@ -43,12 +43,15 @@ public class CharacterSheetDialog : GuiDialog
     private CharacterSheetViewMessage _view;
     private bool _forceClose;
     private Action _afterDiscardConfirmed;
+    private readonly Action _onClosed;
+    private bool _closing;
 
-    public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null) : base(capi)
+    public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null, Action onClosed = null) : base(capi)
     {
         _view = view;
         _onSave = onSave;
         _headshotCallbacks = headshotCallbacks;
+        _onClosed = onClosed;
         ComposeDialog();
     }
 
@@ -444,8 +447,14 @@ public class CharacterSheetDialog : GuiDialog
         base.OnGuiClosed();
         _urlPrompt?.TryClose();
         _urlPrompt = null;
-        _unsavedCloseConfirm?.TryClose();
+        var unsavedCloseConfirm = _unsavedCloseConfirm;
         _unsavedCloseConfirm = null;
+        unsavedCloseConfirm?.TryClose();
+        if (!_closing)
+        {
+            _closing = true;
+            _onClosed?.Invoke();
+        }
     }
 
     private ElementBounds AddFields(GuiElementContainer container, ElementBounds row, IList<(int Index, CharacterSheetFieldViewMessage Field)> fields)
@@ -678,6 +687,7 @@ public class CharacterSheetDialog : GuiDialog
 
         _unsavedCloseConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:charsheet-close-unsaved-confirm"), ok =>
         {
+            _unsavedCloseConfirm = null;
             if (!ok)
             {
                 _afterDiscardConfirmed = null;

@@ -406,7 +406,7 @@ public class ChatUiSystem : ModSystem
     {
         if (_characterSheetDialog == null)
         {
-            _characterSheetDialog = new CharacterSheetDialog(_api, message, SendCharacterSheetSaveRequest, BuildHeadshotCallbacks());
+            _characterSheetDialog = new CharacterSheetDialog(_api, message, SendCharacterSheetSaveRequest, BuildHeadshotCallbacks(), OnCharacterSheetDialogClosed);
         }
         else
         {
@@ -419,6 +419,13 @@ public class ChatUiSystem : ModSystem
         }
 
         SubscribeFileDropIfNeeded();
+    }
+
+    private static void OnCharacterSheetDialogClosed()
+    {
+        _characterSheetDialog = null;
+        _pendingCharacterSheetOpenFromCharacterDialog = false;
+        _characterSheetOpenedFromCharacterDialog = false;
     }
 
     private static HeadshotDialogCallbacks BuildHeadshotCallbacks()
