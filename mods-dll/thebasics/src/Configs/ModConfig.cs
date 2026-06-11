@@ -169,6 +169,8 @@ namespace thebasics.Configs
             SetHomeCommandPrivilege = string.IsNullOrWhiteSpace(SetHomeCommandPrivilege) ? "chat" : SetHomeCommandPrivilege;
             SpawnCommandPrivilege = string.IsNullOrWhiteSpace(SpawnCommandPrivilege) ? "chat" : SpawnCommandPrivilege;
             SetSpawnCommandPrivilege = string.IsNullOrWhiteSpace(SetSpawnCommandPrivilege) ? "commandplayer" : SetSpawnCommandPrivilege;
+            Teleportation ??= new TeleportationConfig();
+            Teleportation.InitializeDefaultsIfNeeded();
         }
 
         private void InitializeCharacterSheetDefaults()
@@ -842,5 +844,8 @@ namespace thebasics.Configs
 
         [ProtoMember(137)]
         public bool HomeSpawnRequireTemporalGear { get; set; } = false;
+
+        [ProtoMember(138)]
+        public TeleportationConfig Teleportation { get; set; } = new();
     }
 }

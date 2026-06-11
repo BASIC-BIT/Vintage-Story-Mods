@@ -128,6 +128,9 @@ public static class AnalyticsService
             return;
         }
 
+        config.Teleportation ??= new TeleportationConfig();
+        config.Teleportation.InitializeDefaultsIfNeeded();
+
         Track("config snapshot", new Dictionary<string, object>
         {
             ["disable_nicknames"] = config.DisableNicknames,
@@ -145,6 +148,12 @@ public static class AnalyticsService
             ["tpa_require_temporal_gear"] = config.TpaRequireTemporalGear,
             ["tpa_use_cooldown"] = config.TpaUseCooldown,
             ["tpa_use_timeout"] = config.TpaUseTimeout,
+            ["home_spawn_require_temporal_gear"] = config.HomeSpawnRequireTemporalGear,
+            ["max_homes_bucket"] = AnalyticsBuckets.Count(config.Teleportation.MaxHomes),
+            ["home_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.HomeWarmupSeconds),
+            ["spawn_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.SpawnWarmupSeconds),
+            ["tpa_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.TpaWarmupSeconds),
+            ["stuck_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.StuckWarmupSeconds),
             ["enable_sleep_notifications"] = config.EnableSleepNotifications,
             ["enable_language_system"] = config.EnableLanguageSystem,
             ["prevent_proximity_channel_switching"] = config.PreventProximityChannelSwitching,

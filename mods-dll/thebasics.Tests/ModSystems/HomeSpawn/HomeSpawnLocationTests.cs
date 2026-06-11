@@ -22,4 +22,42 @@ public class HomeSpawnLocationTests
         restored.Roll.Should().Be(source.Roll);
         location.Format().Should().Be("123.5, 64.3, 987.8");
     }
+
+    [Fact]
+    public void Registry_UsesDefaultHomeWhenNameIsMissing()
+    {
+        var registry = new HomeSpawnHomeRegistry();
+        var location = HomeSpawnLocation.From(new EntityPos(1, 2, 3));
+
+        registry.TrySetHome(null, location, maxHomes: 1, out var normalizedName).Should().BeTrue();
+
+        normalizedName.Should().Be(HomeSpawnHomeRegistry.DefaultHomeName);
+        registry.TryGetHome(null, out var restored).Should().BeTrue();
+        restored.Should().BeSameAs(location);
+    }
+
+    [Fact]
+    public void Registry_NormalizesNamesAndEnforcesLimitForNewHomes()
+    {
+        var registry = new HomeSpawnHomeRegistry();
+        var first = HomeSpawnLocation.From(new EntityPos(1, 2, 3));
+        var second = HomeSpawnLocation.From(new EntityPos(4, 5, 6));
+
+        registry.TrySetHome(" Mine ", first, maxHomes: 1, out var normalizedName).Should().BeTrue();
+        registry.TrySetHome("other", second, maxHomes: 1, out _).Should().BeFalse();
+        registry.TrySetHome("MINE", second, maxHomes: 1, out _).Should().BeTrue();
+
+        normalizedName.Should().Be("mine");
+        registry.TryGetHome("mine", out var restored).Should().BeTrue();
+        restored.Should().BeSameAs(second);
+    }
+
+    [Theory]
+    [InlineData("valid-name_1", true)]
+    [InlineData("bad name", false)]
+    [InlineData("bad/name", false)]
+    public void Registry_ValidatesNameShape(string name, bool expected)
+    {
+        HomeSpawnHomeRegistry.IsValidName(name, out _).Should().Be(expected);
+    }
 }

@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.Analytics;
+using thebasics.ModSystems.Teleportation;
 using thebasics.ModSystems.TPA.Models;
 using thebasics.Utilities;
 using thebasics.Utilities.Parsers;
@@ -92,6 +94,13 @@ namespace thebasics.ModSystems.TPA
         private string GetTpaRequestPrivilege()
         {
             return string.IsNullOrWhiteSpace(Config.TpaRequestPrivilege) ? Privilege.chat : Config.TpaRequestPrivilege;
+        }
+
+        private TeleportationConfig GetTeleportationConfig()
+        {
+            Config.Teleportation ??= new TeleportationConfig();
+            Config.Teleportation.InitializeDefaultsIfNeeded();
+            return Config.Teleportation;
         }
 
         private void ExpireOrCancelTpaRequest(IServerPlayer requestingPlayer, TpaRequest request, TpaExpireReason reason, IServerPlayer targetPlayer = null)
@@ -553,32 +562,89 @@ namespace thebasics.ModSystems.TPA
 
         private TextCommandResult HandleTpAccept(TextCommandCallingArgs args)
         {
-            var player = args.Caller.Player as IServerPlayer;
+            var acceptingPlayer = args.Caller.Player as IServerPlayer;
             var playerParser = (PlayerByNameOrNicknameArgParser)args.Parsers[0];
 
             var specifiedPlayers = playerParser.IsMissing ? null : args.Parsers[0].GetValue() as PlayerUidName[];
 
             // Use the centralized resolution method
-            var (request, targetPlayer, error) = ResolveIncomingTpaRequest(player, specifiedPlayers, "accept");
+            var (request, requestingPlayer, error) = ResolveIncomingTpaRequest(acceptingPlayer, specifiedPlayers, "accept");
             if (error != null) return error;
 
-            // Perform the teleport
-            targetPlayer.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:tpa-notify-accepted"),
+            var warmupSeconds = GetTeleportationConfig().TpaWarmupSeconds;
+            if (warmupSeconds > 0)
+            {
+                return BeginAcceptedTpaWarmup(request, requestingPlayer, acceptingPlayer, warmupSeconds);
+            }
+
+            return ExecuteAcceptedTpaTeleport(request, requestingPlayer, acceptingPlayer);
+        }
+
+        private TextCommandResult BeginAcceptedTpaWarmup(TpaRequest request, IServerPlayer requestingPlayer, IServerPlayer acceptingPlayer, int warmupSeconds)
+        {
+            var movingPlayer = GetMovingPlayer(request, requestingPlayer, acceptingPlayer);
+            var teleportation = API.ModLoader.GetModSystem<TeleportationSystem>();
+            if (teleportation == null)
+            {
+                return Error("thebasics:teleport-warmup-error-unavailable");
+            }
+
+            var result = teleportation.BeginWarmup(new TeleportWarmupRequest
+            {
+                Player = movingPlayer,
+                WarmupSeconds = warmupSeconds,
+                CancelOnDamage = GetTeleportationConfig().CancelWarmupOnDamage,
+                CancelOnInteraction = GetTeleportationConfig().CancelWarmupOnInteraction,
+                StartMessage = Lang.Get("thebasics:teleport-warmup-start", warmupSeconds),
+                Execute = _ => ExecuteAcceptedTpaTeleport(request, requestingPlayer, acceptingPlayer),
+                OnCancelled = (player, reason) => CancelAcceptedTpaWarmup(request, requestingPlayer, acceptingPlayer, movingPlayer, reason)
+            });
+
+            if (result.Status != EnumCommandStatus.Success)
+            {
+                return result;
+            }
+
+            requestingPlayer.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:tpa-notify-accepted"),
                 EnumChatType.CommandSuccess);
+            requestingPlayer.ClearOutgoingTpaRequest();
+
+            if (movingPlayer.PlayerUID != acceptingPlayer.PlayerUID)
+            {
+                movingPlayer.SendMessage(GlobalConstants.CurrentChatGroup, result.StatusMessage, EnumChatType.Notification);
+                return new TextCommandResult
+                {
+                    Status = EnumCommandStatus.Success,
+                    StatusMessage = Lang.Get("thebasics:tpa-success-accepted-warmup-other", movingPlayer.PlayerName, warmupSeconds)
+                };
+            }
+
+            return result;
+        }
+
+        private TextCommandResult ExecuteAcceptedTpaTeleport(TpaRequest request, IServerPlayer requestingPlayer, IServerPlayer acceptingPlayer)
+        {
+            if (requestingPlayer?.Entity == null || acceptingPlayer?.Entity == null)
+            {
+                ReturnConsumedTemporalGear(requestingPlayer, request);
+                AnalyticsService.TrackCommandUsed("tpaccept", false, "player_unavailable");
+                AnalyticsService.TrackFeatureUsed("tpa", "accept", false, "player_unavailable");
+                return Error("thebasics:tpa-error-player-not-found");
+            }
 
             if (request.Type == TpaRequestType.Goto)
             {
-                ExecuteTeleport(targetPlayer, player);
-                SpawnTeleportParticles(targetPlayer, player);
+                ExecuteTeleport(requestingPlayer, acceptingPlayer);
+                SpawnTeleportParticles(requestingPlayer, acceptingPlayer);
             }
             else if (request.Type == TpaRequestType.Bring)
             {
-                ExecuteTeleport(player, targetPlayer);
-                SpawnTeleportParticles(player, targetPlayer);
+                ExecuteTeleport(acceptingPlayer, requestingPlayer);
+                SpawnTeleportParticles(acceptingPlayer, requestingPlayer);
             }
 
             // Teleport was successful - clear the outgoing request since gear was used properly
-            targetPlayer.ClearOutgoingTpaRequest();
+            requestingPlayer.ClearOutgoingTpaRequest();
 
             AnalyticsService.TrackCommandUsed("tpaccept", true);
             AnalyticsService.TrackFeatureUsed("tpa", "accept");
@@ -586,8 +652,44 @@ namespace thebasics.ModSystems.TPA
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
-                StatusMessage = Lang.Get("thebasics:tpa-success-teleported", targetPlayer.PlayerName),
+                StatusMessage = Lang.Get("thebasics:tpa-success-teleported", requestingPlayer.PlayerName),
             };
+        }
+
+        private static IServerPlayer GetMovingPlayer(TpaRequest request, IServerPlayer requestingPlayer, IServerPlayer acceptingPlayer)
+        {
+            return request.Type == TpaRequestType.Goto ? requestingPlayer : acceptingPlayer;
+        }
+
+        private void CancelAcceptedTpaWarmup(TpaRequest request, IServerPlayer requestingPlayer, IServerPlayer acceptingPlayer, IServerPlayer movingPlayer, string reason)
+        {
+            var gearReturned = ReturnConsumedTemporalGear(requestingPlayer, request);
+            var requesterMessage = GenerateAcceptedTpaWarmupCancelledMessage(request.TemporalGearConsumed, gearReturned);
+            requestingPlayer?.SendMessage(GlobalConstants.CurrentChatGroup, requesterMessage, EnumChatType.CommandError);
+
+            var otherPlayer = movingPlayer.PlayerUID == requestingPlayer?.PlayerUID ? acceptingPlayer : requestingPlayer;
+            if (otherPlayer != null && otherPlayer.PlayerUID != requestingPlayer?.PlayerUID)
+            {
+                otherPlayer.SendMessage(GlobalConstants.CurrentChatGroup,
+                    Lang.Get("thebasics:tpa-warmup-cancelled-other", movingPlayer.PlayerName),
+                    EnumChatType.CommandError);
+            }
+
+            AnalyticsService.TrackCommandUsed("tpaccept", false, "warmup_cancelled_" + reason);
+            AnalyticsService.TrackFeatureUsed("tpa", "accept", false, "warmup_cancelled_" + reason);
+        }
+
+        private static string GenerateAcceptedTpaWarmupCancelledMessage(bool gearConsumed, bool gearReturned)
+        {
+            var message = Lang.Get("thebasics:tpa-warmup-cancelled-requester");
+            if (!gearConsumed)
+            {
+                return message;
+            }
+
+            return message + (gearReturned
+                ? Lang.Get("thebasics:tpa-expire-gear-returned")
+                : Lang.Get("thebasics:tpa-expire-gear-failed"));
         }
 
         private TextCommandResult HandleTpDeny(TextCommandCallingArgs args)

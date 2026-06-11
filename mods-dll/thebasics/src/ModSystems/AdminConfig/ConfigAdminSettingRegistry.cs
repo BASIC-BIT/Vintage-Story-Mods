@@ -42,6 +42,13 @@ public static class ConfigAdminSettingRegistry
         return errors;
     }
 
+    private static TeleportationConfig Teleportation(ModConfig config)
+    {
+        config.Teleportation ??= new TeleportationConfig();
+        config.Teleportation.InitializeDefaultsIfNeeded();
+        return config.Teleportation;
+    }
+
     private static IReadOnlyList<ConfigAdminSettingDefinition> BuildSettings()
     {
         var settings = new List<ConfigAdminSettingDefinition>();
@@ -106,7 +113,17 @@ public static class ConfigAdminSettingRegistry
             Decimal("TpaCooldownInGameHours", "TPA", "TPA cooldown hours", "Cooldown length in in-game hours.", ConfigAdminReloadBehavior.Live, (c => c.TpaCooldownInGameHours, (c, v) => c.TpaCooldownInGameHours = v), (0, 720)),
             Bool("TpaUseTimeout", "TPA", "Use TPA timeout", "Expire pending TPA requests after a timeout.", ConfigAdminReloadBehavior.Live, c => c.TpaUseTimeout, (c, v) => c.TpaUseTimeout = v),
             Decimal("TpaTimeoutMinutes", "TPA", "TPA timeout minutes", "Real minutes before pending TPA requests expire.", ConfigAdminReloadBehavior.Live, (c => c.TpaTimeoutMinutes, (c, v) => c.TpaTimeoutMinutes = v), (0.1, 1440)),
+            Int("Teleportation.TpaWarmupSeconds", "TPA", "TPA stand-still seconds", "Seconds the moving player must stand still after /tpaccept before teleporting. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).TpaWarmupSeconds, (c, v) => Teleportation(c).TpaWarmupSeconds = v), (0, 600)),
             Bool("HomeSpawnRequireTemporalGear", "Home/Spawn", "Require temporal gear", "Require a temporal gear for /home and /spawn teleports.", ConfigAdminReloadBehavior.Live, c => c.HomeSpawnRequireTemporalGear, (c, v) => c.HomeSpawnRequireTemporalGear = v),
+            Int("Teleportation.MaxHomes", "Home/Spawn", "Max homes", "Maximum saved homes per player, including the default home.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).MaxHomes, (c, v) => Teleportation(c).MaxHomes = v), (1, 20)),
+            Int("Teleportation.HomeWarmupSeconds", "Home/Spawn", "Home stand-still seconds", "Seconds players must stand still before /home teleports. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).HomeWarmupSeconds, (c, v) => Teleportation(c).HomeWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.SpawnWarmupSeconds", "Home/Spawn", "Spawn stand-still seconds", "Seconds players must stand still before /spawn teleports. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).SpawnWarmupSeconds, (c, v) => Teleportation(c).SpawnWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.HomeCooldownSeconds", "Home/Spawn", "Home cooldown seconds", "Real seconds after a successful /home before another /home can be used. 0 disables the cooldown.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).HomeCooldownSeconds, (c, v) => Teleportation(c).HomeCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.SpawnCooldownSeconds", "Home/Spawn", "Spawn cooldown seconds", "Real seconds after a successful /spawn before another /spawn can be used. 0 disables the cooldown.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).SpawnCooldownSeconds, (c, v) => Teleportation(c).SpawnCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.StuckWarmupSeconds", "Home/Spawn", "Stuck stand-still seconds", "Seconds players must stand still before /stuck teleports them to spawn. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).StuckWarmupSeconds, (c, v) => Teleportation(c).StuckWarmupSeconds = v), (0, 3600)),
+            Int("Teleportation.StuckCooldownSeconds", "Home/Spawn", "Stuck cooldown seconds", "Real seconds after a successful /stuck before /stuck can be used again. 0 disables the cooldown.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).StuckCooldownSeconds, (c, v) => Teleportation(c).StuckCooldownSeconds = v), (0, 86400)),
+            Bool("Teleportation.CancelWarmupOnDamage", "Home/Spawn", "Cancel warmup on damage", "Cancel teleport warmups when the moving player takes damage.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).CancelWarmupOnDamage, (c, v) => Teleportation(c).CancelWarmupOnDamage = v),
+            Bool("Teleportation.CancelWarmupOnInteraction", "Home/Spawn", "Cancel warmup on interaction", "Cancel teleport warmups when the moving player interacts, changes active slot, uses, places, or breaks blocks.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).CancelWarmupOnInteraction, (c, v) => Teleportation(c).CancelWarmupOnInteraction = v),
         });
     }
 
@@ -173,6 +190,8 @@ public static class ConfigAdminSettingRegistry
             Text("SetHomeCommandPrivilege", "Permissions", "Set home privilege", "Privilege required to use /sethome.", ConfigAdminReloadBehavior.Live, c => c.SetHomeCommandPrivilege, (c, v) => c.SetHomeCommandPrivilege = v),
             Text("SpawnCommandPrivilege", "Permissions", "Spawn privilege", "Privilege required to use /spawn.", ConfigAdminReloadBehavior.Live, c => c.SpawnCommandPrivilege, (c, v) => c.SpawnCommandPrivilege = v),
             Text("SetSpawnCommandPrivilege", "Permissions", "Set spawn privilege", "Privilege required to use /setspawn.", ConfigAdminReloadBehavior.Live, c => c.SetSpawnCommandPrivilege, (c, v) => c.SetSpawnCommandPrivilege = v),
+            Text("Teleportation.StuckCommandPrivilege", "Permissions", "Stuck privilege", "Privilege required to use /stuck.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).StuckCommandPrivilege, (c, v) => Teleportation(c).StuckCommandPrivilege = v),
+            Text("Teleportation.StuckAdminNotifyPrivilege", "Permissions", "Stuck notify privilege", "Privilege that receives /stuck admin notifications.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).StuckAdminNotifyPrivilege, (c, v) => Teleportation(c).StuckAdminNotifyPrivilege = v),
             Bool("UseGeneralChannelAsProximityChat", "Restart Required", "Use General as proximity chat", "Requires restart because chat group migration is startup-shaped.", ConfigAdminReloadBehavior.RestartRequired, c => c.UseGeneralChannelAsProximityChat, (c, v) => c.UseGeneralChannelAsProximityChat = v),
             Text("ProximityChatName", "Restart Required", "Proximity chat name", "Requires restart because chat group setup is startup-shaped.", ConfigAdminReloadBehavior.RestartRequired, c => c.ProximityChatName, (c, v) => c.ProximityChatName = v),
             Bool("ProximityChatAsDefault", "Restart Required", "Proximity chat as default", "Requires restart/rejoin for chat tab default behavior.", ConfigAdminReloadBehavior.RestartRequired, c => c.ProximityChatAsDefault, (c, v) => c.ProximityChatAsDefault = v),

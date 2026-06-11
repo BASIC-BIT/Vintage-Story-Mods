@@ -223,18 +223,54 @@ public class ConfigAdminSettingRegistryTests
         config.SpawnCommandPrivilege.Should().Be("chat");
         config.SetSpawnCommandPrivilege.Should().Be("commandplayer");
         config.HomeSpawnRequireTemporalGear.Should().BeFalse();
+        config.Teleportation.MaxHomes.Should().Be(3);
+        config.Teleportation.HomeWarmupSeconds.Should().Be(5);
+        config.Teleportation.SpawnWarmupSeconds.Should().Be(5);
+        config.Teleportation.TpaWarmupSeconds.Should().Be(5);
+        config.Teleportation.StuckWarmupSeconds.Should().Be(60);
+        config.Teleportation.HomeCooldownSeconds.Should().Be(300);
+        config.Teleportation.SpawnCooldownSeconds.Should().Be(300);
+        config.Teleportation.StuckCooldownSeconds.Should().Be(3600);
+        config.Teleportation.CancelWarmupOnDamage.Should().BeTrue();
+        config.Teleportation.CancelWarmupOnInteraction.Should().BeTrue();
+        config.Teleportation.StuckCommandPrivilege.Should().Be("chat");
+        config.Teleportation.StuckAdminNotifyPrivilege.Should().Be("commandplayer");
 
         GetSetting("HomeCommandPrivilege").TrySetValue(config, "home", out var homeError).Should().BeTrue(homeError);
         GetSetting("SetHomeCommandPrivilege").TrySetValue(config, "sethome", out var setHomeError).Should().BeTrue(setHomeError);
         GetSetting("SpawnCommandPrivilege").TrySetValue(config, "spawn", out var spawnError).Should().BeTrue(spawnError);
         GetSetting("SetSpawnCommandPrivilege").TrySetValue(config, "setspawn", out var setSpawnError).Should().BeTrue(setSpawnError);
         GetSetting("HomeSpawnRequireTemporalGear").TrySetValue(config, "true", out var gearError).Should().BeTrue(gearError);
+        GetSetting("Teleportation.MaxHomes").TrySetValue(config, "5", out var maxHomesError).Should().BeTrue(maxHomesError);
+        GetSetting("Teleportation.HomeWarmupSeconds").TrySetValue(config, "6", out var homeWarmupError).Should().BeTrue(homeWarmupError);
+        GetSetting("Teleportation.SpawnWarmupSeconds").TrySetValue(config, "7", out var spawnWarmupError).Should().BeTrue(spawnWarmupError);
+        GetSetting("Teleportation.TpaWarmupSeconds").TrySetValue(config, "8", out var tpaWarmupError).Should().BeTrue(tpaWarmupError);
+        GetSetting("Teleportation.StuckWarmupSeconds").TrySetValue(config, "90", out var stuckWarmupError).Should().BeTrue(stuckWarmupError);
+        GetSetting("Teleportation.HomeCooldownSeconds").TrySetValue(config, "120", out var homeCooldownError).Should().BeTrue(homeCooldownError);
+        GetSetting("Teleportation.SpawnCooldownSeconds").TrySetValue(config, "180", out var spawnCooldownError).Should().BeTrue(spawnCooldownError);
+        GetSetting("Teleportation.StuckCooldownSeconds").TrySetValue(config, "7200", out var stuckCooldownError).Should().BeTrue(stuckCooldownError);
+        GetSetting("Teleportation.CancelWarmupOnDamage").TrySetValue(config, "false", out var damageError).Should().BeTrue(damageError);
+        GetSetting("Teleportation.CancelWarmupOnInteraction").TrySetValue(config, "false", out var interactionError).Should().BeTrue(interactionError);
+        GetSetting("Teleportation.StuckCommandPrivilege").TrySetValue(config, "stuck", out var stuckPrivilegeError).Should().BeTrue(stuckPrivilegeError);
+        GetSetting("Teleportation.StuckAdminNotifyPrivilege").TrySetValue(config, "staff", out var stuckNotifyError).Should().BeTrue(stuckNotifyError);
 
         config.HomeCommandPrivilege.Should().Be("home");
         config.SetHomeCommandPrivilege.Should().Be("sethome");
         config.SpawnCommandPrivilege.Should().Be("spawn");
         config.SetSpawnCommandPrivilege.Should().Be("setspawn");
         config.HomeSpawnRequireTemporalGear.Should().BeTrue();
+        config.Teleportation.MaxHomes.Should().Be(5);
+        config.Teleportation.HomeWarmupSeconds.Should().Be(6);
+        config.Teleportation.SpawnWarmupSeconds.Should().Be(7);
+        config.Teleportation.TpaWarmupSeconds.Should().Be(8);
+        config.Teleportation.StuckWarmupSeconds.Should().Be(90);
+        config.Teleportation.HomeCooldownSeconds.Should().Be(120);
+        config.Teleportation.SpawnCooldownSeconds.Should().Be(180);
+        config.Teleportation.StuckCooldownSeconds.Should().Be(7200);
+        config.Teleportation.CancelWarmupOnDamage.Should().BeFalse();
+        config.Teleportation.CancelWarmupOnInteraction.Should().BeFalse();
+        config.Teleportation.StuckCommandPrivilege.Should().Be("stuck");
+        config.Teleportation.StuckAdminNotifyPrivilege.Should().Be("staff");
     }
 
     private static ModConfig CreateConfig()
