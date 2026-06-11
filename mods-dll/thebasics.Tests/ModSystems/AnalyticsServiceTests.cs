@@ -3,6 +3,7 @@ using thebasics.ModSystems.Analytics;
 
 namespace thebasics.Tests.ModSystems;
 
+[Collection(AnalyticsServiceTestCollection.Name)]
 public class AnalyticsServiceTests : IDisposable
 {
     public AnalyticsServiceTests()
