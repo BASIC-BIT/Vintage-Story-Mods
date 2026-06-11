@@ -5,12 +5,12 @@ using System.Text;
 using thebasics.Extensions;
 using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.TPA.Models;
+using thebasics.Utilities;
 using thebasics.Utilities.Parsers;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
-using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.TPA
 {
@@ -89,95 +89,6 @@ namespace thebasics.ModSystems.TPA
             };
         }
 
-        private static bool IsPlayerHoldingTemporalGear(IServerPlayer player)
-        {
-            return ItemSlotContainsTemporalGear(player.Entity.LeftHandItemSlot) ||
-                   ItemSlotContainsTemporalGear(player.Entity.RightHandItemSlot);
-        }
-
-        private static bool ItemSlotContainsTemporalGear(ItemSlot itemSlot)
-        {
-            return itemSlot != null &&
-                   itemSlot.Itemstack != null &&
-                   itemSlot.Itemstack.Item is ItemTemporalGear;
-        }
-
-        private static bool RemoveTemporalGear(IServerPlayer player)
-        {
-            var leftHand = ItemSlotContainsTemporalGear(player.Entity.LeftHandItemSlot);
-            var rightHand = ItemSlotContainsTemporalGear(player.Entity.RightHandItemSlot);
-
-            if (!leftHand && !rightHand)
-            {
-                return false;
-            }
-
-            var itemSlot = leftHand ? player.Entity.LeftHandItemSlot : player.Entity.RightHandItemSlot;
-
-            itemSlot.TakeOut(1);
-            itemSlot.MarkDirty();
-            player.Entity.MarkShapeModified();
-            player.BroadcastPlayerData(true);
-
-            return true;
-        }
-
-        private static bool TryPutInHandSlot(ItemSlot slot, ItemStack itemStack, IServerPlayer player)
-        {
-            if (slot != null && slot.Empty)
-            {
-                slot.Itemstack = itemStack;
-                slot.MarkDirty();
-                player.SendMessage(GlobalConstants.CurrentChatGroup,
-                    Lang.Get("thebasics:tpa-notify-gear-returned-hand"),
-                    EnumChatType.Notification);
-                return true;
-            }
-            return false;
-        }
-
-        private bool ReturnTemporalGear(IServerPlayer player)
-        {
-            // Null check - player might have disconnected
-            if (player == null)
-            {
-                return false;
-            }
-
-            // Create a temporal gear itemstack to return
-            var temporalGearItem = API.World.GetItem(new AssetLocation("game:gear-temporal"));
-            if (temporalGearItem == null)
-            {
-                API.Logger.Error("Could not find temporal gear item to return to player - this is probably a mod bug!");
-                return false;
-            }
-
-            var temporalGearStack = new ItemStack(temporalGearItem, 1);
-
-            // Priority 1: Try to put it in inventory if there's space
-            if (player.InventoryManager.TryGiveItemstack(temporalGearStack, slotNotifyEffect: true))
-            {
-                return true;
-            }
-
-            // Priority 2: Try to put it in hand if hand is free
-            var leftHand = player.Entity.LeftHandItemSlot;
-            var rightHand = player.Entity.RightHandItemSlot;
-
-            if (TryPutInHandSlot(leftHand, temporalGearStack, player) ||
-                TryPutInHandSlot(rightHand, temporalGearStack, player))
-            {
-                return true;
-            }
-
-            // Priority 3: Drop it on the ground as last resort
-            API.World.SpawnItemEntity(temporalGearStack, player.Entity.Pos.XYZ);
-            player.SendMessage(GlobalConstants.CurrentChatGroup,
-                Lang.Get("thebasics:tpa-notify-gear-dropped"),
-                EnumChatType.Notification);
-            return true;
-        }
-
         private string GetTpaRequestPrivilege()
         {
             return string.IsNullOrWhiteSpace(Config.TpaRequestPrivilege) ? Privilege.chat : Config.TpaRequestPrivilege;
@@ -210,7 +121,7 @@ namespace thebasics.ModSystems.TPA
 
         private bool ReturnConsumedTemporalGear(IServerPlayer requestingPlayer, TpaRequest request)
         {
-            return !request.TemporalGearConsumed || ReturnTemporalGear(requestingPlayer);
+            return !request.TemporalGearConsumed || TemporalGearUtil.TryReturnTemporalGear(API, requestingPlayer);
         }
 
         private void NotifyTargetOfRequestExpiry(IServerPlayer requestingPlayer, IServerPlayer targetPlayer, TpaExpireReason reason)
@@ -457,7 +368,7 @@ namespace thebasics.ModSystems.TPA
             }
 
             // ALL validations passed - NOW consume the temporal gear
-            if (Config.TpaRequireTemporalGear && !RemoveTemporalGear(player))
+            if (Config.TpaRequireTemporalGear && !TemporalGearUtil.TryConsumeTemporalGear(player))
             {
                 AnalyticsService.TrackFeatureUsed("tpa", "request", false, "consume_gear_failed");
                 return new TextCommandResult
@@ -497,7 +408,7 @@ namespace thebasics.ModSystems.TPA
 
         private TextCommandResult ValidateTpaRequest(IServerPlayer player, IServerPlayer targetPlayer)
         {
-            if (Config.TpaRequireTemporalGear && !IsPlayerHoldingTemporalGear(player))
+            if (Config.TpaRequireTemporalGear && !TemporalGearUtil.IsPlayerHoldingTemporalGear(player))
             {
                 AnalyticsService.TrackFeatureUsed("tpa", "request", false, "missing_temporal_gear");
                 return Error("thebasics:tpa-error-need-temporal-gear");

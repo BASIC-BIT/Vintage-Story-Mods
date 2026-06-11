@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using thebasics.Extensions;
 using thebasics.ModSystems.Analytics;
+using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -83,7 +84,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:home-spawn-success-home-set", location.Format()));
     }
 
-    private static TextCommandResult HandleHome(TextCommandCallingArgs args)
+    private TextCommandResult HandleHome(TextCommandCallingArgs args)
     {
         var player = args.Caller.Player as IServerPlayer;
         if (player?.Entity == null)
@@ -98,6 +99,12 @@ public class HomeSpawnSystem : BaseBasicModSystem
             AnalyticsService.TrackCommandUsed("home", false, "home_not_set");
             AnalyticsService.TrackFeatureUsed("home-spawn", "home", false, "home_not_set");
             return Error("thebasics:home-spawn-error-no-home", "home-not-set");
+        }
+
+        var gearError = TryConsumeTemporalGearForTeleport(player, "home", "home");
+        if (gearError != null)
+        {
+            return gearError;
         }
 
         Teleport(player, location);
@@ -135,6 +142,12 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         var location = GetStoredSpawnLocation() ?? GetDefaultSpawnLocation();
+        var gearError = TryConsumeTemporalGearForTeleport(player, "spawn", "spawn");
+        if (gearError != null)
+        {
+            return gearError;
+        }
+
         Teleport(player, location);
 
         AnalyticsService.TrackCommandUsed("spawn", true);
@@ -156,6 +169,30 @@ public class HomeSpawnSystem : BaseBasicModSystem
     private static void Teleport(IServerPlayer player, HomeSpawnLocation location)
     {
         player.Entity.TeleportTo(location.ToEntityPos());
+    }
+
+    private TextCommandResult TryConsumeTemporalGearForTeleport(IServerPlayer player, string commandName, string featureAction)
+    {
+        if (!Config.HomeSpawnRequireTemporalGear)
+        {
+            return null;
+        }
+
+        if (!TemporalGearUtil.IsPlayerHoldingTemporalGear(player))
+        {
+            AnalyticsService.TrackCommandUsed(commandName, false, "missing_temporal_gear");
+            AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "missing_temporal_gear");
+            return Error("thebasics:home-spawn-error-need-temporal-gear", "missing-temporal-gear");
+        }
+
+        if (!TemporalGearUtil.TryConsumeTemporalGear(player))
+        {
+            AnalyticsService.TrackCommandUsed(commandName, false, "consume_gear_failed");
+            AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "consume_gear_failed");
+            return Error("thebasics:home-spawn-error-consume-gear-failed", "consume-gear-failed");
+        }
+
+        return null;
     }
 
     private void RegisterConfiguredPrivileges()

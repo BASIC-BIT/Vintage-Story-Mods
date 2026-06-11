@@ -106,6 +106,7 @@ public static class ConfigAdminSettingRegistry
             Decimal("TpaCooldownInGameHours", "TPA", "TPA cooldown hours", "Cooldown length in in-game hours.", ConfigAdminReloadBehavior.Live, (c => c.TpaCooldownInGameHours, (c, v) => c.TpaCooldownInGameHours = v), (0, 720)),
             Bool("TpaUseTimeout", "TPA", "Use TPA timeout", "Expire pending TPA requests after a timeout.", ConfigAdminReloadBehavior.Live, c => c.TpaUseTimeout, (c, v) => c.TpaUseTimeout = v),
             Decimal("TpaTimeoutMinutes", "TPA", "TPA timeout minutes", "Real minutes before pending TPA requests expire.", ConfigAdminReloadBehavior.Live, (c => c.TpaTimeoutMinutes, (c, v) => c.TpaTimeoutMinutes = v), (0.1, 1440)),
+            Bool("HomeSpawnRequireTemporalGear", "Home/Spawn", "Require temporal gear", "Require a temporal gear for /home and /spawn teleports.", ConfigAdminReloadBehavior.Live, c => c.HomeSpawnRequireTemporalGear, (c, v) => c.HomeSpawnRequireTemporalGear = v),
         });
     }
 

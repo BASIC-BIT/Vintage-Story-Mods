@@ -24,6 +24,8 @@
   "home-spawn-setspawn-privilege-desc": "Ability to use the /setspawn command",
   "home-spawn-error-player-required": "This command can only be used by a player.",
   "home-spawn-error-no-home": "You do not have a home set yet. Use /sethome first.",
+  "home-spawn-error-need-temporal-gear": "You must hold a temporal gear to use this teleport command. (This will consume it)",
+  "home-spawn-error-consume-gear-failed": "Failed to consume temporal gear. Please try again.",
   "home-spawn-success-home-set": "Home set to {0}.",
   "home-spawn-success-home-teleported": "Teleported home.",
   "home-spawn-success-spawn-set": "Server spawn set to {0}.",

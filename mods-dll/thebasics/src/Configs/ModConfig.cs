@@ -839,5 +839,8 @@ namespace thebasics.Configs
 
         [ProtoMember(136)]
         public string SetSpawnCommandPrivilege { get; set; } = "commandplayer";
+
+        [ProtoMember(137)]
+        public bool HomeSpawnRequireTemporalGear { get; set; } = false;
     }
 }
