@@ -18,7 +18,7 @@ public class TeleportationConfig
     public int TpaWarmupSeconds { get; set; } = 5;
 
     [ProtoMember(5)]
-    public int StuckWarmupSeconds { get; set; } = 60;
+    public int StuckWarmupSeconds { get; set; } = 300;
 
     [ProtoMember(6)]
     public bool CancelWarmupOnDamage { get; set; } = true;
@@ -41,6 +41,21 @@ public class TeleportationConfig
     [ProtoMember(12)]
     public string StuckAdminNotifyPrivilege { get; set; } = "commandplayer";
 
+    [ProtoMember(13)]
+    public int StuckReminderIntervalSeconds { get; set; } = 60;
+
+    [ProtoMember(14)]
+    public string StuckBlockedByOnlinePrivilege { get; set; } = "commandplayer";
+
+    [ProtoMember(15)]
+    public int TopWarmupSeconds { get; set; } = 5;
+
+    [ProtoMember(16)]
+    public int TopCooldownSeconds { get; set; } = 300;
+
+    [ProtoMember(17)]
+    public string TopCommandPrivilege { get; set; } = "chat";
+
     public void InitializeDefaultsIfNeeded()
     {
         MaxHomes = MaxHomes <= 0 ? 3 : MaxHomes;
@@ -51,8 +66,13 @@ public class TeleportationConfig
         HomeCooldownSeconds = ClampNonNegative(HomeCooldownSeconds);
         SpawnCooldownSeconds = ClampNonNegative(SpawnCooldownSeconds);
         StuckCooldownSeconds = ClampNonNegative(StuckCooldownSeconds);
+        StuckReminderIntervalSeconds = ClampNonNegative(StuckReminderIntervalSeconds);
         StuckCommandPrivilege = string.IsNullOrWhiteSpace(StuckCommandPrivilege) ? "chat" : StuckCommandPrivilege.Trim();
         StuckAdminNotifyPrivilege = string.IsNullOrWhiteSpace(StuckAdminNotifyPrivilege) ? "commandplayer" : StuckAdminNotifyPrivilege.Trim();
+        StuckBlockedByOnlinePrivilege = string.IsNullOrWhiteSpace(StuckBlockedByOnlinePrivilege) ? string.Empty : StuckBlockedByOnlinePrivilege.Trim();
+        TopWarmupSeconds = ClampNonNegative(TopWarmupSeconds);
+        TopCooldownSeconds = ClampNonNegative(TopCooldownSeconds);
+        TopCommandPrivilege = string.IsNullOrWhiteSpace(TopCommandPrivilege) ? "chat" : TopCommandPrivilege.Trim();
     }
 
     private static int ClampNonNegative(int value)

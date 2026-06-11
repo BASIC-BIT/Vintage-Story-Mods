@@ -9,6 +9,7 @@ using thebasics.ModSystems.Teleportation;
 using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.HomeSpawn;
@@ -20,8 +21,23 @@ public class HomeSpawnSystem : BaseBasicModSystem
     private const string HomeCooldownModDataKey = "BASIC_HOME_LAST_TELEPORT_TICKS";
     private const string SpawnCooldownModDataKey = "BASIC_SPAWN_LAST_TELEPORT_TICKS";
     private const string StuckCooldownModDataKey = "BASIC_STUCK_LAST_TELEPORT_TICKS";
+    private const string TopCooldownModDataKey = "BASIC_TOP_LAST_TELEPORT_TICKS";
     private const string TeleportationStuckCommandPrivilegeKey = "Teleportation.StuckCommandPrivilege";
     private const string TeleportationStuckAdminNotifyPrivilegeKey = "Teleportation.StuckAdminNotifyPrivilege";
+    private const string TeleportationStuckBlockedByOnlinePrivilegeKey = "Teleportation.StuckBlockedByOnlinePrivilege";
+    private const string TeleportationTopCommandPrivilegeKey = "Teleportation.TopCommandPrivilege";
+    private static readonly (int X, int Z)[] TopSearchOffsets =
+    [
+        (0, 0),
+        (1, 0),
+        (-1, 0),
+        (0, 1),
+        (0, -1),
+        (1, 1),
+        (1, -1),
+        (-1, 1),
+        (-1, -1)
+    ];
 
     protected override void BasicStartServerSide()
     {
@@ -36,7 +52,9 @@ public class HomeSpawnSystem : BaseBasicModSystem
             changedKeys.Contains(nameof(Config.SpawnCommandPrivilege)) ||
             changedKeys.Contains(nameof(Config.SetSpawnCommandPrivilege)) ||
             changedKeys.Contains(TeleportationStuckCommandPrivilegeKey) ||
-            changedKeys.Contains(TeleportationStuckAdminNotifyPrivilegeKey))
+            changedKeys.Contains(TeleportationStuckAdminNotifyPrivilegeKey) ||
+            changedKeys.Contains(TeleportationStuckBlockedByOnlinePrivilegeKey) ||
+            changedKeys.Contains(TeleportationTopCommandPrivilegeKey))
         {
             RegisterConfiguredPrivileges();
             RefreshCommandPrivileges();
@@ -89,6 +107,12 @@ public class HomeSpawnSystem : BaseBasicModSystem
             .RequiresPrivilege(GetStuckPrivilege())
             .RequiresPlayer()
             .HandleWith(HandleStuck);
+
+        API.ChatCommands.GetOrCreate("top")
+            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-top-desc"))
+            .RequiresPrivilege(GetTopPrivilege())
+            .RequiresPlayer()
+            .HandleWith(HandleTop);
     }
 
     private void RefreshCommandPrivileges()
@@ -100,6 +124,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         API.ChatCommands.Get("spawn")?.RequiresPrivilege(GetSpawnPrivilege());
         API.ChatCommands.Get("setspawn")?.RequiresPrivilege(GetSetSpawnPrivilege());
         API.ChatCommands.Get("stuck")?.RequiresPrivilege(GetStuckPrivilege());
+        API.ChatCommands.Get("top")?.RequiresPrivilege(GetTopPrivilege());
     }
 
     private TextCommandResult HandleSetHome(TextCommandCallingArgs args)
@@ -158,7 +183,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         {
             AnalyticsService.TrackCommandUsed("home", false, "home_not_set");
             AnalyticsService.TrackFeatureUsed("home-spawn", "home", false, "home_not_set");
-            return ErrorMessage(Lang.Get("thebasics:home-spawn-error-no-home", normalizedName), "home-not-set");
+            return ErrorMessage(MissingHomeMessage(normalizedName), "home-not-set");
         }
 
         var cooldownError = TryCheckCooldown(player, HomeCooldownModDataKey, GetTeleportationConfig().HomeCooldownSeconds, "home", "home");
@@ -173,7 +198,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
             return gearError;
         }
 
-        return BeginPlayerTeleport(player, GetTeleportationConfig().HomeWarmupSeconds, "home", "home", p => ExecuteHomeTeleport(p, location, normalizedName),
+        return BeginPlayerTeleport(player, GetTeleportationConfig().HomeWarmupSeconds, "home", p => ExecuteHomeTeleport(p, location, normalizedName),
             (p, reason) => TrackCancelledTeleport("home", "home", reason));
     }
 
@@ -226,7 +251,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         {
             AnalyticsService.TrackCommandUsed("delhome", false, "home_not_set");
             AnalyticsService.TrackFeatureUsed("home-spawn", "delete_home", false, "home_not_set");
-            return ErrorMessage(Lang.Get("thebasics:home-spawn-error-no-home", normalizedName), "home-not-set");
+            return ErrorMessage(MissingHomeMessage(normalizedName), "home-not-set");
         }
 
         SaveHomeRegistry(player, registry);
@@ -274,7 +299,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         var location = GetStoredSpawnLocation() ?? GetDefaultSpawnLocation();
-        return BeginPlayerTeleport(player, GetTeleportationConfig().SpawnWarmupSeconds, "spawn", "spawn", p => ExecuteSpawnTeleport(p, location),
+        return BeginPlayerTeleport(player, GetTeleportationConfig().SpawnWarmupSeconds, "spawn", p => ExecuteSpawnTeleport(p, location),
             (p, reason) => TrackCancelledTeleport("spawn", "spawn", reason));
     }
 
@@ -286,6 +311,13 @@ public class HomeSpawnSystem : BaseBasicModSystem
             return Error("thebasics:home-spawn-error-player-required", "player-required");
         }
 
+        var adminOnlinePrivilege = GetStuckBlockedByOnlinePrivilege();
+        if (!string.IsNullOrWhiteSpace(adminOnlinePrivilege) && IsOtherPlayerWithPrivilegeOnline(player, adminOnlinePrivilege))
+        {
+            TrackHomeSpawnFailure("stuck", "stuck", "admin_online");
+            return Error("thebasics:home-spawn-error-stuck-admin-online", "admin-online");
+        }
+
         var cooldownError = TryCheckCooldown(player, StuckCooldownModDataKey, GetTeleportationConfig().StuckCooldownSeconds, "stuck", "stuck");
         if (cooldownError != null)
         {
@@ -294,14 +326,40 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
         var location = GetStoredSpawnLocation() ?? GetDefaultSpawnLocation();
         var warmupSeconds = GetTeleportationConfig().StuckWarmupSeconds;
-        var result = BeginPlayerTeleport(player, warmupSeconds, "stuck", "stuck", p => ExecuteStuckTeleport(p, location), OnStuckCancelled);
-        if (result.Status == EnumCommandStatus.Success)
+        var result = BeginPlayerTeleport(player, warmupSeconds, "stuck", p => ExecuteStuckTeleport(p, location), OnStuckCancelled,
+            GetTeleportationConfig().StuckReminderIntervalSeconds,
+            remainingSeconds => Lang.Get("thebasics:home-spawn-stuck-reminder", FormatDuration(TimeSpan.FromSeconds(remainingSeconds))));
+        if (result.Status == EnumCommandStatus.Success && warmupSeconds > 0)
         {
             NotifyAdmins(Lang.Get("thebasics:home-spawn-admin-stuck-started", player.PlayerName, player.Entity.Pos.AsBlockPos, warmupSeconds));
             API.Logger.Audit($"Player {player.PlayerName} ({player.PlayerUID}) started /stuck at {player.Entity.Pos.AsBlockPos}.");
         }
 
         return result;
+    }
+
+    private TextCommandResult HandleTop(TextCommandCallingArgs args)
+    {
+        var player = args.Caller.Player as IServerPlayer;
+        if (player?.Entity == null)
+        {
+            return Error("thebasics:home-spawn-error-player-required", "player-required");
+        }
+
+        var cooldownError = TryCheckCooldown(player, TopCooldownModDataKey, GetTeleportationConfig().TopCooldownSeconds, "top", "top");
+        if (cooldownError != null)
+        {
+            return cooldownError;
+        }
+
+        if (!TryFindTopLocation(player, out var location))
+        {
+            TrackHomeSpawnFailure("top", "top", "no_safe_destination");
+            return Error("thebasics:home-spawn-error-no-safe-top", "no-safe-top");
+        }
+
+        return BeginPlayerTeleport(player, GetTeleportationConfig().TopWarmupSeconds, "top", p => ExecuteTopTeleport(p, location),
+            (p, reason) => TrackCancelledTeleport("top", "top", reason));
     }
 
     private TextCommandResult ExecuteHomeTeleport(IServerPlayer player, HomeSpawnLocation location, string homeName)
@@ -351,6 +409,17 @@ public class HomeSpawnSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:home-spawn-success-stuck-teleported"));
     }
 
+    private static TextCommandResult ExecuteTopTeleport(IServerPlayer player, HomeSpawnLocation location)
+    {
+        Teleport(player, location);
+        MarkCooldown(player, TopCooldownModDataKey);
+
+        AnalyticsService.TrackCommandUsed("top", true);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "top");
+
+        return Success(Lang.Get("thebasics:home-spawn-success-top-teleported", location.Format()));
+    }
+
     private void OnStuckCancelled(IServerPlayer player, string reason)
     {
         TrackCancelledTeleport("stuck", "stuck", reason);
@@ -358,7 +427,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         API.Logger.Audit($"Player {player.PlayerName} ({player.PlayerUID}) cancelled /stuck warmup: {reason}.");
     }
 
-    private TextCommandResult BeginPlayerTeleport(IServerPlayer player, int warmupSeconds, string commandName, string featureAction, System.Func<IServerPlayer, TextCommandResult> execute, Action<IServerPlayer, string> onCancelled)
+    private TextCommandResult BeginPlayerTeleport(IServerPlayer player, int warmupSeconds, string commandName, System.Func<IServerPlayer, TextCommandResult> execute, Action<IServerPlayer, string> onCancelled, int reminderIntervalSeconds = 0, System.Func<int, string> reminderMessage = null)
     {
         if (warmupSeconds <= 0)
         {
@@ -368,7 +437,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var teleportation = API.ModLoader.GetModSystem<TeleportationSystem>();
         if (teleportation == null)
         {
-            TrackHomeSpawnFailure(commandName, featureAction, "teleport_unavailable");
+            TrackHomeSpawnFailure(commandName, commandName, "teleport_unavailable");
             return Error("thebasics:teleport-warmup-error-unavailable", "teleport-unavailable");
         }
 
@@ -379,20 +448,22 @@ public class HomeSpawnSystem : BaseBasicModSystem
             CancelOnDamage = GetTeleportationConfig().CancelWarmupOnDamage,
             CancelOnInteraction = GetTeleportationConfig().CancelWarmupOnInteraction,
             StartMessage = Lang.Get("thebasics:teleport-warmup-start", warmupSeconds),
+            ReminderIntervalSeconds = reminderIntervalSeconds,
+            ReminderMessage = reminderMessage,
             Execute = execute,
             OnCancelled = onCancelled
         });
 
         if (result.Status == EnumCommandStatus.Success)
         {
-            AnalyticsService.TrackFeatureUsed("home-spawn", featureAction + "_warmup_start", properties: new Dictionary<string, object>
+            AnalyticsService.TrackFeatureUsed("home-spawn", commandName + "_warmup_start", properties: new Dictionary<string, object>
             {
                 ["warmup_seconds_bucket"] = AnalyticsBuckets.Count(warmupSeconds)
             });
         }
         else
         {
-            TrackHomeSpawnFailure(commandName, featureAction, result.ErrorCode ?? "warmup_failed");
+            TrackHomeSpawnFailure(commandName, commandName, result.ErrorCode ?? "warmup_failed");
         }
 
         return result;
@@ -421,6 +492,90 @@ public class HomeSpawnSystem : BaseBasicModSystem
     private static void Teleport(IServerPlayer player, HomeSpawnLocation location)
     {
         player.Entity.TeleportTo(location.ToEntityPos());
+    }
+
+    private bool TryFindTopLocation(IServerPlayer player, out HomeSpawnLocation location)
+    {
+        location = null;
+        var current = player.Entity.Pos.AsBlockPos;
+        var minY = Math.Max(0, current.Y);
+        var maxY = API.World.BlockAccessor.MapSizeY - 3;
+        if (maxY < minY)
+        {
+            return false;
+        }
+
+        foreach (var offset in TopSearchOffsets)
+        {
+            if (TryFindTopLocationInColumn(current.X + offset.X, current.Z + offset.Z, current.dimension, minY, maxY, player, out location))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryFindTopLocationInColumn(int x, int z, int dimension, int minY, int maxY, IServerPlayer player, out HomeSpawnLocation location)
+    {
+        location = null;
+        for (var y = minY; y <= maxY; y++)
+        {
+            var groundPos = new BlockPos(x, y, z, dimension);
+            if (!TryGetSafeLandingHeight(groundPos, out var landingY))
+            {
+                continue;
+            }
+
+            location = new HomeSpawnLocation
+            {
+                X = x + 0.5,
+                Y = landingY,
+                Z = z + 0.5,
+                Yaw = player.Entity.Pos.Yaw,
+                Pitch = player.Entity.Pos.Pitch,
+                Roll = player.Entity.Pos.Roll
+            };
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryGetSafeLandingHeight(BlockPos groundPos, out double landingY)
+    {
+        landingY = 0;
+        var blockAccessor = API.World.BlockAccessor;
+        var ground = blockAccessor.GetBlock(groundPos);
+        var groundBoxes = ground?.GetCollisionBoxes(blockAccessor, groundPos);
+        if (groundBoxes == null || groundBoxes.Length == 0 || blockAccessor.GetBlock(groundPos, 2).IsLiquid())
+        {
+            return false;
+        }
+
+        var top = groundBoxes.Max(box => box.Y2);
+        if (top < 0.875f)
+        {
+            return false;
+        }
+
+        var feetPos = new BlockPos(groundPos.X, groundPos.Y + 1, groundPos.Z, groundPos.dimension);
+        var headPos = new BlockPos(groundPos.X, groundPos.Y + 2, groundPos.Z, groundPos.dimension);
+        if (!IsClearForPlayer(feetPos) || !IsClearForPlayer(headPos))
+        {
+            return false;
+        }
+
+        landingY = groundPos.Y + top;
+        return true;
+    }
+
+    private bool IsClearForPlayer(BlockPos pos)
+    {
+        var blockAccessor = API.World.BlockAccessor;
+        var block = blockAccessor.GetBlock(pos);
+        var collisionBoxes = block?.GetCollisionBoxes(blockAccessor, pos);
+        return (collisionBoxes == null || collisionBoxes.Length == 0) && !blockAccessor.GetBlock(pos, 2).IsLiquid();
     }
 
     private TextCommandResult TryValidateTemporalGearForTeleport(IServerPlayer player, string commandName, string featureAction)
@@ -496,6 +651,13 @@ public class HomeSpawnSystem : BaseBasicModSystem
         return Lang.Get("thebasics:tpa-time-seconds", Math.Max(1, (int)Math.Ceiling(duration.TotalSeconds)));
     }
 
+    private static string MissingHomeMessage(string normalizedName)
+    {
+        return string.Equals(normalizedName, HomeSpawnHomeRegistry.DefaultHomeName, StringComparison.OrdinalIgnoreCase)
+            ? Lang.Get("thebasics:home-spawn-error-no-default-home")
+            : Lang.Get("thebasics:home-spawn-error-no-home", normalizedName);
+    }
+
     private static TextCommandResult ValidateHomeName(string homeName)
     {
         if (HomeSpawnHomeRegistry.IsValidName(homeName, out var errorCode))
@@ -543,10 +705,17 @@ public class HomeSpawnSystem : BaseBasicModSystem
         RegisterPrivilegeIfCustom(GetSetSpawnPrivilege(), "thebasics:home-spawn-setspawn-privilege-desc");
         RegisterPrivilegeIfCustom(GetStuckPrivilege(), "thebasics:home-spawn-stuck-privilege-desc");
         RegisterPrivilegeIfCustom(GetStuckAdminNotifyPrivilege(), "thebasics:home-spawn-stuck-admin-notify-privilege-desc");
+        RegisterPrivilegeIfCustom(GetStuckBlockedByOnlinePrivilege(), "thebasics:home-spawn-stuck-blocked-by-online-privilege-desc");
+        RegisterPrivilegeIfCustom(GetTopPrivilege(), "thebasics:home-spawn-top-privilege-desc");
     }
 
     private void RegisterPrivilegeIfCustom(string privilege, string descriptionKey)
     {
+        if (string.IsNullOrWhiteSpace(privilege))
+        {
+            return;
+        }
+
         if (IsBuiltInPrivilege(privilege))
         {
             return;
@@ -591,6 +760,23 @@ public class HomeSpawnSystem : BaseBasicModSystem
     private string GetStuckAdminNotifyPrivilege()
     {
         return NormalizePrivilege(GetTeleportationConfig().StuckAdminNotifyPrivilege, Privilege.commandplayer);
+    }
+
+    private string GetStuckBlockedByOnlinePrivilege()
+    {
+        return GetTeleportationConfig().StuckBlockedByOnlinePrivilege?.Trim() ?? string.Empty;
+    }
+
+    private string GetTopPrivilege()
+    {
+        return NormalizePrivilege(GetTeleportationConfig().TopCommandPrivilege, Privilege.chat);
+    }
+
+    private bool IsOtherPlayerWithPrivilegeOnline(IServerPlayer currentPlayer, string privilege)
+    {
+        return API.World.AllOnlinePlayers
+            .OfType<IServerPlayer>()
+            .Any(player => player.PlayerUID != currentPlayer.PlayerUID && player.HasPrivilege(privilege));
     }
 
     private TeleportationConfig GetTeleportationConfig()

@@ -122,8 +122,33 @@ public sealed class TeleportationSystem : BaseBasicModSystem
             if (DateTime.UtcNow >= pending.CompleteAfterUtc)
             {
                 CompleteWarmup(pending);
+                continue;
             }
+
+            SendReminderIfDue(pending);
         }
+    }
+
+    private static void SendReminderIfDue(PendingTeleportWarmup pending)
+    {
+        if (pending.Request.ReminderIntervalSeconds <= 0 || pending.Request.ReminderMessage == null)
+        {
+            return;
+        }
+
+        if (DateTime.UtcNow < pending.NextReminderUtc)
+        {
+            return;
+        }
+
+        var remainingSeconds = Math.Max(1, (int)Math.Ceiling((pending.CompleteAfterUtc - DateTime.UtcNow).TotalSeconds));
+        var message = pending.Request.ReminderMessage(remainingSeconds);
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            pending.Request.Player.SendMessage(GlobalConstants.CurrentChatGroup, message, EnumChatType.Notification);
+        }
+
+        pending.NextReminderUtc = DateTime.UtcNow.AddSeconds(pending.Request.ReminderIntervalSeconds);
     }
 
     private static bool HasMoved(PendingTeleportWarmup pending)
@@ -319,6 +344,7 @@ public sealed class TeleportationSystem : BaseBasicModSystem
             StartX = request.Player.Entity.Pos.X;
             StartY = request.Player.Entity.Pos.Y;
             StartZ = request.Player.Entity.Pos.Z;
+            NextReminderUtc = DateTime.UtcNow.AddSeconds(request.ReminderIntervalSeconds);
         }
 
         public TeleportWarmupRequest Request { get; }
@@ -330,6 +356,8 @@ public sealed class TeleportationSystem : BaseBasicModSystem
         public double StartY { get; }
 
         public double StartZ { get; }
+
+        public DateTime NextReminderUtc { get; set; }
 
         public OnDamagedDelegate DamageHandler { get; set; }
     }

@@ -16,6 +16,10 @@ public sealed class TeleportWarmupRequest
 
     public string StartMessage { get; set; }
 
+    public int ReminderIntervalSeconds { get; set; }
+
+    public System.Func<int, string> ReminderMessage { get; set; }
+
     public System.Func<IServerPlayer, TextCommandResult> Execute { get; set; }
 
     public Action<IServerPlayer, string> OnCancelled { get; set; }

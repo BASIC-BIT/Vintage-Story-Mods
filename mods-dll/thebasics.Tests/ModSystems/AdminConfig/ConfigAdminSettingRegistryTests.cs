@@ -227,10 +227,15 @@ public class ConfigAdminSettingRegistryTests
         config.Teleportation.HomeWarmupSeconds.Should().Be(5);
         config.Teleportation.SpawnWarmupSeconds.Should().Be(5);
         config.Teleportation.TpaWarmupSeconds.Should().Be(5);
-        config.Teleportation.StuckWarmupSeconds.Should().Be(60);
+        config.Teleportation.StuckWarmupSeconds.Should().Be(300);
         config.Teleportation.HomeCooldownSeconds.Should().Be(300);
         config.Teleportation.SpawnCooldownSeconds.Should().Be(300);
         config.Teleportation.StuckCooldownSeconds.Should().Be(3600);
+        config.Teleportation.StuckReminderIntervalSeconds.Should().Be(60);
+        config.Teleportation.StuckBlockedByOnlinePrivilege.Should().Be("commandplayer");
+        config.Teleportation.TopWarmupSeconds.Should().Be(5);
+        config.Teleportation.TopCooldownSeconds.Should().Be(300);
+        config.Teleportation.TopCommandPrivilege.Should().Be("chat");
         config.Teleportation.CancelWarmupOnDamage.Should().BeTrue();
         config.Teleportation.CancelWarmupOnInteraction.Should().BeTrue();
         config.Teleportation.StuckCommandPrivilege.Should().Be("chat");
@@ -245,16 +250,21 @@ public class ConfigAdminSettingRegistryTests
         GetSetting("Teleportation.HomeWarmupSeconds").TrySetValue(config, "6", out var homeWarmupError).Should().BeTrue(homeWarmupError);
         GetSetting("Teleportation.SpawnWarmupSeconds").TrySetValue(config, "7", out var spawnWarmupError).Should().BeTrue(spawnWarmupError);
         GetSetting("Teleportation.TpaWarmupSeconds").TrySetValue(config, "8", out var tpaWarmupError).Should().BeTrue(tpaWarmupError);
+        GetSetting("Teleportation.TopWarmupSeconds").TrySetValue(config, "9", out var topWarmupError).Should().BeTrue(topWarmupError);
         GetSetting("Teleportation.StuckWarmupSeconds").TrySetValue(config, "90", out var stuckWarmupError).Should().BeTrue(stuckWarmupError);
         GetSetting("Teleportation.HomeCooldownSeconds").TrySetValue(config, "120", out var homeCooldownError).Should().BeTrue(homeCooldownError);
         GetSetting("Teleportation.SpawnCooldownSeconds").TrySetValue(config, "180", out var spawnCooldownError).Should().BeTrue(spawnCooldownError);
+        GetSetting("Teleportation.TopCooldownSeconds").TrySetValue(config, "240", out var topCooldownError).Should().BeTrue(topCooldownError);
         GetSetting("Teleportation.StuckCooldownSeconds").TrySetValue(config, "7200", out var stuckCooldownError).Should().BeTrue(stuckCooldownError);
+        GetSetting("Teleportation.StuckReminderIntervalSeconds").TrySetValue(config, "60", out var stuckReminderError).Should().BeTrue(stuckReminderError);
         var damageSetting = GetSetting("Teleportation.CancelWarmupOnDamage");
         damageSetting.Group.Should().Be("Teleportation");
         damageSetting.TrySetValue(config, "false", out var damageError).Should().BeTrue(damageError);
         GetSetting("Teleportation.CancelWarmupOnInteraction").TrySetValue(config, "false", out var interactionError).Should().BeTrue(interactionError);
         GetSetting("Teleportation.StuckCommandPrivilege").TrySetValue(config, "stuck", out var stuckPrivilegeError).Should().BeTrue(stuckPrivilegeError);
         GetSetting("Teleportation.StuckAdminNotifyPrivilege").TrySetValue(config, "staff", out var stuckNotifyError).Should().BeTrue(stuckNotifyError);
+        GetSetting("Teleportation.StuckBlockedByOnlinePrivilege").TrySetValue(config, "helper", out var stuckBlockedError).Should().BeTrue(stuckBlockedError);
+        GetSetting("Teleportation.TopCommandPrivilege").TrySetValue(config, "top", out var topPrivilegeError).Should().BeTrue(topPrivilegeError);
 
         config.HomeCommandPrivilege.Should().Be("home");
         config.SetHomeCommandPrivilege.Should().Be("sethome");
@@ -265,14 +275,19 @@ public class ConfigAdminSettingRegistryTests
         config.Teleportation.HomeWarmupSeconds.Should().Be(6);
         config.Teleportation.SpawnWarmupSeconds.Should().Be(7);
         config.Teleportation.TpaWarmupSeconds.Should().Be(8);
+        config.Teleportation.TopWarmupSeconds.Should().Be(9);
         config.Teleportation.StuckWarmupSeconds.Should().Be(90);
         config.Teleportation.HomeCooldownSeconds.Should().Be(120);
         config.Teleportation.SpawnCooldownSeconds.Should().Be(180);
+        config.Teleportation.TopCooldownSeconds.Should().Be(240);
         config.Teleportation.StuckCooldownSeconds.Should().Be(7200);
+        config.Teleportation.StuckReminderIntervalSeconds.Should().Be(60);
         config.Teleportation.CancelWarmupOnDamage.Should().BeFalse();
         config.Teleportation.CancelWarmupOnInteraction.Should().BeFalse();
         config.Teleportation.StuckCommandPrivilege.Should().Be("stuck");
         config.Teleportation.StuckAdminNotifyPrivilege.Should().Be("staff");
+        config.Teleportation.StuckBlockedByOnlinePrivilege.Should().Be("helper");
+        config.Teleportation.TopCommandPrivilege.Should().Be("top");
     }
 
     private static ModConfig CreateConfig()

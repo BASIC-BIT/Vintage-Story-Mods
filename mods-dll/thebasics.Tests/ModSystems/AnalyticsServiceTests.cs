@@ -90,14 +90,19 @@ public class AnalyticsServiceTests : IDisposable
                 HomeWarmupSeconds = 6,
                 SpawnWarmupSeconds = 7,
                 TpaWarmupSeconds = 8,
+                TopWarmupSeconds = 9,
                 StuckWarmupSeconds = 90,
                 HomeCooldownSeconds = 120,
                 SpawnCooldownSeconds = 180,
+                TopCooldownSeconds = 240,
                 StuckCooldownSeconds = 7200,
+                StuckReminderIntervalSeconds = 60,
                 CancelWarmupOnDamage = false,
                 CancelWarmupOnInteraction = false,
                 StuckCommandPrivilege = "stuckuser",
-                StuckAdminNotifyPrivilege = "staff"
+                StuckAdminNotifyPrivilege = "staff",
+                StuckBlockedByOnlinePrivilege = "helper",
+                TopCommandPrivilege = "topuser"
             }
         };
         AnalyticsService.Configure(sink);
@@ -108,10 +113,15 @@ public class AnalyticsServiceTests : IDisposable
         properties.Should().ContainKey("tpa_request_custom_privilege").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("home_custom_privilege").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("stuck_admin_notify_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("stuck_blocks_when_privilege_online").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("top_custom_privilege").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("max_homes_bucket").WhoseValue.Should().Be("1-5");
+        properties.Should().ContainKey("top_warmup_seconds_bucket").WhoseValue.Should().Be("6-10");
         properties.Should().ContainKey("home_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
         properties.Should().ContainKey("spawn_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("top_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
         properties.Should().ContainKey("stuck_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("stuck_reminder_interval_seconds_bucket").WhoseValue.Should().Be("51-100");
         properties.Should().ContainKey("teleport_cancel_warmup_on_damage").WhoseValue.Should().Be(false);
         properties.Should().ContainKey("teleport_cancel_warmup_on_interaction").WhoseValue.Should().Be(false);
     }
