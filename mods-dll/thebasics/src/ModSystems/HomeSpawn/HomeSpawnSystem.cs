@@ -114,6 +114,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var nameError = ValidateHomeName(homeName);
         if (nameError != null)
         {
+            TrackHomeSpawnFailure("sethome", "set_home", nameError.ErrorCode);
             return nameError;
         }
 
@@ -147,6 +148,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var nameError = ValidateHomeName(homeName);
         if (nameError != null)
         {
+            TrackHomeSpawnFailure("home", "home", nameError.ErrorCode);
             return nameError;
         }
 
@@ -171,7 +173,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
             return gearError;
         }
 
-        return BeginPlayerTeleport(player, GetTeleportationConfig().HomeWarmupSeconds, p => ExecuteHomeTeleport(p, location, normalizedName),
+        return BeginPlayerTeleport(player, GetTeleportationConfig().HomeWarmupSeconds, "home", "home", p => ExecuteHomeTeleport(p, location, normalizedName),
             (p, reason) => TrackCancelledTeleport("home", "home", reason));
     }
 
@@ -186,6 +188,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var homes = ReadHomeRegistry(player).ListHomes();
         if (homes.Count == 0)
         {
+            AnalyticsService.TrackCommandUsed("homes", true, "empty");
+            AnalyticsService.TrackFeatureUsed("home-spawn", "list_homes", result: "empty");
             return Success(Lang.Get("thebasics:home-spawn-homes-empty"));
         }
 
@@ -213,6 +217,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var nameError = ValidateHomeName(homeName);
         if (nameError != null)
         {
+            TrackHomeSpawnFailure("delhome", "delete_home", nameError.ErrorCode);
             return nameError;
         }
 
@@ -269,7 +274,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         var location = GetStoredSpawnLocation() ?? GetDefaultSpawnLocation();
-        return BeginPlayerTeleport(player, GetTeleportationConfig().SpawnWarmupSeconds, p => ExecuteSpawnTeleport(p, location),
+        return BeginPlayerTeleport(player, GetTeleportationConfig().SpawnWarmupSeconds, "spawn", "spawn", p => ExecuteSpawnTeleport(p, location),
             (p, reason) => TrackCancelledTeleport("spawn", "spawn", reason));
     }
 
@@ -289,7 +294,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
         var location = GetStoredSpawnLocation() ?? GetDefaultSpawnLocation();
         var warmupSeconds = GetTeleportationConfig().StuckWarmupSeconds;
-        var result = BeginPlayerTeleport(player, warmupSeconds, p => ExecuteStuckTeleport(p, location), OnStuckCancelled);
+        var result = BeginPlayerTeleport(player, warmupSeconds, "stuck", "stuck", p => ExecuteStuckTeleport(p, location), OnStuckCancelled);
         if (result.Status == EnumCommandStatus.Success)
         {
             NotifyAdmins(Lang.Get("thebasics:home-spawn-admin-stuck-started", player.PlayerName, player.Entity.Pos.AsBlockPos, warmupSeconds));
@@ -353,7 +358,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         API.Logger.Audit($"Player {player.PlayerName} ({player.PlayerUID}) cancelled /stuck warmup: {reason}.");
     }
 
-    private TextCommandResult BeginPlayerTeleport(IServerPlayer player, int warmupSeconds, System.Func<IServerPlayer, TextCommandResult> execute, Action<IServerPlayer, string> onCancelled)
+    private TextCommandResult BeginPlayerTeleport(IServerPlayer player, int warmupSeconds, string commandName, string featureAction, System.Func<IServerPlayer, TextCommandResult> execute, Action<IServerPlayer, string> onCancelled)
     {
         if (warmupSeconds <= 0)
         {
@@ -363,10 +368,11 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var teleportation = API.ModLoader.GetModSystem<TeleportationSystem>();
         if (teleportation == null)
         {
+            TrackHomeSpawnFailure(commandName, featureAction, "teleport_unavailable");
             return Error("thebasics:teleport-warmup-error-unavailable", "teleport-unavailable");
         }
 
-        return teleportation.BeginWarmup(new TeleportWarmupRequest
+        var result = teleportation.BeginWarmup(new TeleportWarmupRequest
         {
             Player = player,
             WarmupSeconds = warmupSeconds,
@@ -376,6 +382,20 @@ public class HomeSpawnSystem : BaseBasicModSystem
             Execute = execute,
             OnCancelled = onCancelled
         });
+
+        if (result.Status == EnumCommandStatus.Success)
+        {
+            AnalyticsService.TrackFeatureUsed("home-spawn", featureAction + "_warmup_start", properties: new Dictionary<string, object>
+            {
+                ["warmup_seconds_bucket"] = AnalyticsBuckets.Count(warmupSeconds)
+            });
+        }
+        else
+        {
+            TrackHomeSpawnFailure(commandName, featureAction, result.ErrorCode ?? "warmup_failed");
+        }
+
+        return result;
     }
 
     private static HomeSpawnHomeRegistry ReadHomeRegistry(IServerPlayer player)
@@ -497,8 +517,13 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
     private static void TrackCancelledTeleport(string commandName, string featureAction, string reason)
     {
-        AnalyticsService.TrackCommandUsed(commandName, false, "warmup_cancelled_" + reason);
-        AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "warmup_cancelled_" + reason);
+        TrackHomeSpawnFailure(commandName, featureAction, "warmup_cancelled_" + reason);
+    }
+
+    private static void TrackHomeSpawnFailure(string commandName, string featureAction, string result)
+    {
+        AnalyticsService.TrackCommandUsed(commandName, false, result);
+        AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, result);
     }
 
     private void NotifyAdmins(string message)

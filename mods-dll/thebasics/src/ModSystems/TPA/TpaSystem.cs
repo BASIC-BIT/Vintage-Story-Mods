@@ -96,6 +96,22 @@ namespace thebasics.ModSystems.TPA
             return string.IsNullOrWhiteSpace(Config.TpaRequestPrivilege) ? Privilege.chat : Config.TpaRequestPrivilege;
         }
 
+        private static string CommandName(TpaRequestType type)
+        {
+            return type == TpaRequestType.Goto ? "tpa" : "tpahere";
+        }
+
+        private static string RequestAction(TpaRequestType type)
+        {
+            return type == TpaRequestType.Goto ? "request_goto" : "request_bring";
+        }
+
+        private static void TrackTpaFailure(string commandName, string action, string result)
+        {
+            AnalyticsService.TrackCommandUsed(commandName, false, result);
+            AnalyticsService.TrackFeatureUsed("tpa", action, false, result);
+        }
+
         private TeleportationConfig GetTeleportationConfig()
         {
             Config.Teleportation ??= new TeleportationConfig();
@@ -352,11 +368,12 @@ namespace thebasics.ModSystems.TPA
             var player = args.Caller.Player as IServerPlayer;
             var targetPlayerUid = ((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid;
             var targetPlayer = API.GetPlayerByUID(targetPlayerUid);
+            var commandName = CommandName(type);
+            var action = RequestAction(type);
 
             if (targetPlayer == null)
             {
-                AnalyticsService.TrackCommandUsed(type == TpaRequestType.Goto ? "tpa" : "tpahere", false, "target_not_found");
-                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "target_not_found");
+                TrackTpaFailure(commandName, action, "target_not_found");
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
@@ -370,7 +387,9 @@ namespace thebasics.ModSystems.TPA
         private TextCommandResult HandleTpaRequest(IServerPlayer player, IServerPlayer targetPlayer,
             TpaRequestType type)
         {
-            var validationError = ValidateTpaRequest(player, targetPlayer);
+            var commandName = CommandName(type);
+            var action = RequestAction(type);
+            var validationError = ValidateTpaRequest(player, targetPlayer, commandName, action);
             if (validationError != null)
             {
                 return validationError;
@@ -379,7 +398,7 @@ namespace thebasics.ModSystems.TPA
             // ALL validations passed - NOW consume the temporal gear
             if (Config.TpaRequireTemporalGear && !TemporalGearUtil.TryConsumeTemporalGear(player))
             {
-                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "consume_gear_failed");
+                TrackTpaFailure(commandName, action, "consume_gear_failed");
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
@@ -405,8 +424,8 @@ namespace thebasics.ModSystems.TPA
             player.SetOutgoingTpaRequest(request);
             player.SetTpaTime(API.World.Calendar);
 
-            AnalyticsService.TrackCommandUsed(type == TpaRequestType.Goto ? "tpa" : "tpahere", true);
-            AnalyticsService.TrackFeatureUsed("tpa", type == TpaRequestType.Goto ? "request_goto" : "request_bring");
+            AnalyticsService.TrackCommandUsed(commandName, true);
+            AnalyticsService.TrackFeatureUsed("tpa", action);
 
             return new TextCommandResult
             {
@@ -415,17 +434,17 @@ namespace thebasics.ModSystems.TPA
             };
         }
 
-        private TextCommandResult ValidateTpaRequest(IServerPlayer player, IServerPlayer targetPlayer)
+        private TextCommandResult ValidateTpaRequest(IServerPlayer player, IServerPlayer targetPlayer, string commandName, string action)
         {
             if (Config.TpaRequireTemporalGear && !TemporalGearUtil.IsPlayerHoldingTemporalGear(player))
             {
-                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "missing_temporal_gear");
+                TrackTpaFailure(commandName, action, "missing_temporal_gear");
                 return Error("thebasics:tpa-error-need-temporal-gear");
             }
 
             if (!player.CanTpa(API.World.Calendar, Config))
             {
-                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "cooldown");
+                TrackTpaFailure(commandName, action, "cooldown");
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Error,
@@ -435,20 +454,20 @@ namespace thebasics.ModSystems.TPA
 
             if (targetPlayer.PlayerUID == player.PlayerUID)
             {
-                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "self_teleport");
+                TrackTpaFailure(commandName, action, "self_teleport");
                 return Error("thebasics:tpa-error-self-teleport");
             }
 
             if (!targetPlayer.GetTpAllowed())
             {
-                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "target_disabled");
+                TrackTpaFailure(commandName, action, "target_disabled");
                 return Error("thebasics:tpa-error-target-disabled");
             }
 
             var existingRequest = player.GetOutgoingTpaRequest();
             if (existingRequest != null && !IsRequestExpired(existingRequest))
             {
-                AnalyticsService.TrackFeatureUsed("tpa", "request", false, "existing_request");
+                TrackTpaFailure(commandName, action, "existing_request");
                 return BuildExistingTpaRequestError(existingRequest);
             }
 
@@ -516,6 +535,7 @@ namespace thebasics.ModSystems.TPA
                 if (request == null)
                 {
                     var specifiedPlayerName = API.GetPlayerByUID(specifiedPlayerUID)?.PlayerName ?? "that player";
+                    TrackTpaFailure("tp" + commandName, commandName, "request_not_found");
                     return (null, null, new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
@@ -532,6 +552,7 @@ namespace thebasics.ModSystems.TPA
 
                 if (allRequests.Count == 0)
                 {
+                    TrackTpaFailure("tp" + commandName, commandName, "no_requests");
                     return (null, null, new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
@@ -549,6 +570,7 @@ namespace thebasics.ModSystems.TPA
                     // Multiple requests - need disambiguation
                     var requesters = string.Join(", ", allRequests.Select(r => GetPlayerDisplayName(r.requester)));
 
+                    TrackTpaFailure("tp" + commandName, commandName, "multiple_requests");
                     return (null, null, new TextCommandResult
                     {
                         Status = EnumCommandStatus.Error,
@@ -586,6 +608,7 @@ namespace thebasics.ModSystems.TPA
             var teleportation = API.ModLoader.GetModSystem<TeleportationSystem>();
             if (teleportation == null)
             {
+                TrackTpaFailure("tpaccept", "accept", "teleport_unavailable");
                 return Error("thebasics:teleport-warmup-error-unavailable");
             }
 
@@ -602,8 +625,14 @@ namespace thebasics.ModSystems.TPA
 
             if (result.Status != EnumCommandStatus.Success)
             {
+                TrackTpaFailure("tpaccept", "accept", result.ErrorCode ?? "warmup_failed");
                 return result;
             }
+
+            AnalyticsService.TrackFeatureUsed("tpa", "accept_warmup_start", properties: new Dictionary<string, object>
+            {
+                ["warmup_seconds_bucket"] = AnalyticsBuckets.Count(warmupSeconds)
+            });
 
             requestingPlayer.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:tpa-notify-accepted"),
                 EnumChatType.CommandSuccess);
@@ -740,6 +769,7 @@ namespace thebasics.ModSystems.TPA
 
             if (allRequests.Count == 0)
             {
+                TrackTpaFailure("cleartpa", "clear_incoming", "no_requests");
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
@@ -778,6 +808,7 @@ namespace thebasics.ModSystems.TPA
             // Check if there's an active request to cancel
             if (outgoingRequest == null || IsRequestExpired(outgoingRequest))
             {
+                TrackTpaFailure("tpacancel", "cancel", "no_outgoing_request");
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,
@@ -810,6 +841,8 @@ namespace thebasics.ModSystems.TPA
 
             if (allRequests.Count == 0)
             {
+                AnalyticsService.TrackCommandUsed("tpalist", true, "empty");
+                AnalyticsService.TrackFeatureUsed("tpa", "list", result: "empty");
                 return new TextCommandResult
                 {
                     Status = EnumCommandStatus.Success,

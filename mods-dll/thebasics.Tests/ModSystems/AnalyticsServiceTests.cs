@@ -1,4 +1,5 @@
 using FluentAssertions;
+using thebasics.Configs;
 using thebasics.ModSystems.Analytics;
 
 namespace thebasics.Tests.ModSystems;
@@ -68,6 +69,51 @@ public class AnalyticsServiceTests : IDisposable
         AnalyticsService.Configure(sink, allowErrorTelemetry: false);
 
         sink.Events.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TrackConfigSnapshot_IncludesTeleportationSettings()
+    {
+        var sink = new RecordingAnalyticsSink();
+        var config = new ModConfig
+        {
+            TpaRequestPrivilege = "tpauser",
+            TpaCooldownInGameHours = 2,
+            TpaTimeoutMinutes = 12,
+            HomeCommandPrivilege = "homeuser",
+            SetHomeCommandPrivilege = "sethomeuser",
+            SpawnCommandPrivilege = "spawnuser",
+            SetSpawnCommandPrivilege = "setspawnuser",
+            Teleportation = new TeleportationConfig
+            {
+                MaxHomes = 5,
+                HomeWarmupSeconds = 6,
+                SpawnWarmupSeconds = 7,
+                TpaWarmupSeconds = 8,
+                StuckWarmupSeconds = 90,
+                HomeCooldownSeconds = 120,
+                SpawnCooldownSeconds = 180,
+                StuckCooldownSeconds = 7200,
+                CancelWarmupOnDamage = false,
+                CancelWarmupOnInteraction = false,
+                StuckCommandPrivilege = "stuckuser",
+                StuckAdminNotifyPrivilege = "staff"
+            }
+        };
+        AnalyticsService.Configure(sink);
+
+        AnalyticsService.TrackConfigSnapshot(config);
+
+        var properties = sink.Events.Should().ContainSingle().Subject.Properties;
+        properties.Should().ContainKey("tpa_request_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("home_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("stuck_admin_notify_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("max_homes_bucket").WhoseValue.Should().Be("1-5");
+        properties.Should().ContainKey("home_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("spawn_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("stuck_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("teleport_cancel_warmup_on_damage").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("teleport_cancel_warmup_on_interaction").WhoseValue.Should().Be(false);
     }
 
     private sealed class RecordingAnalyticsSink : IAnalyticsSink

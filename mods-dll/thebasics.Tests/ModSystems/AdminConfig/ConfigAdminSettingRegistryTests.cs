@@ -249,7 +249,9 @@ public class ConfigAdminSettingRegistryTests
         GetSetting("Teleportation.HomeCooldownSeconds").TrySetValue(config, "120", out var homeCooldownError).Should().BeTrue(homeCooldownError);
         GetSetting("Teleportation.SpawnCooldownSeconds").TrySetValue(config, "180", out var spawnCooldownError).Should().BeTrue(spawnCooldownError);
         GetSetting("Teleportation.StuckCooldownSeconds").TrySetValue(config, "7200", out var stuckCooldownError).Should().BeTrue(stuckCooldownError);
-        GetSetting("Teleportation.CancelWarmupOnDamage").TrySetValue(config, "false", out var damageError).Should().BeTrue(damageError);
+        var damageSetting = GetSetting("Teleportation.CancelWarmupOnDamage");
+        damageSetting.Group.Should().Be("Teleportation");
+        damageSetting.TrySetValue(config, "false", out var damageError).Should().BeTrue(damageError);
         GetSetting("Teleportation.CancelWarmupOnInteraction").TrySetValue(config, "false", out var interactionError).Should().BeTrue(interactionError);
         GetSetting("Teleportation.StuckCommandPrivilege").TrySetValue(config, "stuck", out var stuckPrivilegeError).Should().BeTrue(stuckPrivilegeError);
         GetSetting("Teleportation.StuckAdminNotifyPrivilege").TrySetValue(config, "staff", out var stuckNotifyError).Should().BeTrue(stuckNotifyError);
