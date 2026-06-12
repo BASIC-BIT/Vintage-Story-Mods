@@ -136,13 +136,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         var homeName = GetOptionalHomeName(args);
-        if (homeName == null)
-        {
-            TrackHomeSpawnFailure("delhome", "delete_home", "home_name_required");
-            return Error("thebasics:home-spawn-error-delhome-name-required", "home-name-required");
-        }
-
-        var nameError = ValidateHomeName(homeName);
+        var nameError = ValidateHomeName("sethome", homeName);
         if (nameError != null)
         {
             TrackHomeSpawnFailure("sethome", "set_home", nameError.ErrorCode);
@@ -176,7 +170,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         var homeName = GetOptionalHomeName(args);
-        var nameError = ValidateHomeName(homeName);
+        var nameError = ValidateHomeName("home", homeName);
         if (nameError != null)
         {
             TrackHomeSpawnFailure("home", "home", nameError.ErrorCode);
@@ -245,7 +239,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         var homeName = GetOptionalHomeName(args);
-        var nameError = ValidateHomeName(homeName);
+        var nameError = ValidateHomeName("delhome", homeName);
         if (nameError != null)
         {
             TrackHomeSpawnFailure("delhome", "delete_home", nameError.ErrorCode);
@@ -664,16 +658,31 @@ public class HomeSpawnSystem : BaseBasicModSystem
             : Lang.Get("thebasics:home-spawn-error-no-home", normalizedName);
     }
 
-    private static TextCommandResult ValidateHomeName(string homeName)
+    internal static string GetHomeNameArgumentErrorCode(string commandName, string homeName)
     {
+        if (homeName == null && string.Equals(commandName, "delhome", StringComparison.OrdinalIgnoreCase))
+        {
+            return "home-name-required";
+        }
+
         if (HomeSpawnHomeRegistry.IsValidName(homeName, out var errorCode))
         {
             return null;
         }
 
-        return errorCode == "too-long"
-            ? ErrorMessage(Lang.Get("thebasics:home-spawn-error-home-name-too-long", HomeSpawnHomeRegistry.MaxHomeNameLength), "home-name-too-long")
-            : Error("thebasics:home-spawn-error-home-name-invalid", "home-name-invalid");
+        return errorCode == "too-long" ? "home-name-too-long" : "home-name-invalid";
+    }
+
+    private static TextCommandResult ValidateHomeName(string commandName, string homeName)
+    {
+        var errorCode = GetHomeNameArgumentErrorCode(commandName, homeName);
+        return errorCode switch
+        {
+            null => null,
+            "home-name-required" => Error("thebasics:home-spawn-error-delhome-name-required", errorCode),
+            "home-name-too-long" => ErrorMessage(Lang.Get("thebasics:home-spawn-error-home-name-too-long", HomeSpawnHomeRegistry.MaxHomeNameLength), errorCode),
+            _ => Error("thebasics:home-spawn-error-home-name-invalid", errorCode)
+        };
     }
 
     private static string GetOptionalHomeName(TextCommandCallingArgs args)
