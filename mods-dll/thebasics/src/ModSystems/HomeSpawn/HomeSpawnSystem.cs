@@ -22,10 +22,12 @@ public class HomeSpawnSystem : BaseBasicModSystem
     private const string SpawnCooldownModDataKey = "BASIC_SPAWN_LAST_TELEPORT_TICKS";
     private const string StuckCooldownModDataKey = "BASIC_STUCK_LAST_TELEPORT_TICKS";
     private const string TopCooldownModDataKey = "BASIC_TOP_LAST_TELEPORT_TICKS";
+    private const string BackCooldownModDataKey = "BASIC_BACK_LAST_TELEPORT_TICKS";
     private const string TeleportationStuckCommandPrivilegeKey = "Teleportation.StuckCommandPrivilege";
     private const string TeleportationStuckAdminNotifyPrivilegeKey = "Teleportation.StuckAdminNotifyPrivilege";
     private const string TeleportationStuckBlockedByOnlinePrivilegeKey = "Teleportation.StuckBlockedByOnlinePrivilege";
     private const string TeleportationTopCommandPrivilegeKey = "Teleportation.TopCommandPrivilege";
+    private const string TeleportationBackCommandPrivilegeKey = "Teleportation.BackCommandPrivilege";
     private static readonly (int X, int Z)[] TopSearchOffsets =
     [
         (0, 0),
@@ -54,7 +56,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
             changedKeys.Contains(TeleportationStuckCommandPrivilegeKey) ||
             changedKeys.Contains(TeleportationStuckAdminNotifyPrivilegeKey) ||
             changedKeys.Contains(TeleportationStuckBlockedByOnlinePrivilegeKey) ||
-            changedKeys.Contains(TeleportationTopCommandPrivilegeKey))
+            changedKeys.Contains(TeleportationTopCommandPrivilegeKey) ||
+            changedKeys.Contains(TeleportationBackCommandPrivilegeKey))
         {
             RegisterConfiguredPrivileges();
             RefreshCommandPrivileges();
@@ -113,6 +116,12 @@ public class HomeSpawnSystem : BaseBasicModSystem
             .RequiresPrivilege(GetTopPrivilege())
             .RequiresPlayer()
             .HandleWith(HandleTop);
+
+        API.ChatCommands.GetOrCreate("back")
+            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-back-desc"))
+            .RequiresPrivilege(GetBackPrivilege())
+            .RequiresPlayer()
+            .HandleWith(HandleBack);
     }
 
     private void RefreshCommandPrivileges()
@@ -125,6 +134,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         API.ChatCommands.Get("setspawn")?.RequiresPrivilege(GetSetSpawnPrivilege());
         API.ChatCommands.Get("stuck")?.RequiresPrivilege(GetStuckPrivilege());
         API.ChatCommands.Get("top")?.RequiresPrivilege(GetTopPrivilege());
+        API.ChatCommands.Get("back")?.RequiresPrivilege(GetBackPrivilege());
     }
 
     private TextCommandResult HandleSetHome(TextCommandCallingArgs args)
@@ -362,6 +372,43 @@ public class HomeSpawnSystem : BaseBasicModSystem
             (p, reason) => TrackCancelledTeleport("top", "top", reason));
     }
 
+    private TextCommandResult HandleBack(TextCommandCallingArgs args)
+    {
+        var player = args.Caller.Player as IServerPlayer;
+        if (player?.Entity == null)
+        {
+            return Error("thebasics:home-spawn-error-player-required", "player-required");
+        }
+
+        if (!TeleportBackUtil.TryGetPreviousLocation(player, GetTeleportationConfig().BackExpiresAfterSeconds, out var location, out var expired))
+        {
+            var result = expired ? "back_expired" : "back_not_set";
+            TrackHomeSpawnFailure("back", "back", result);
+            return Error(expired ? "thebasics:home-spawn-error-back-expired" : "thebasics:home-spawn-error-no-back", result);
+        }
+
+        if (!location.IsSameDimensionAs(player.Entity.Pos))
+        {
+            TrackHomeSpawnFailure("back", "back", "back_dimension_mismatch");
+            return Error("thebasics:home-spawn-error-back-dimension-mismatch", "back-dimension-mismatch");
+        }
+
+        var cooldownError = TryCheckCooldown(player, BackCooldownModDataKey, GetTeleportationConfig().BackCooldownSeconds, "back", "back");
+        if (cooldownError != null)
+        {
+            return cooldownError;
+        }
+
+        var gearError = TryValidateTemporalGearForTeleport(player, GetTeleportationConfig().BackRequireTemporalGear, "back", "back");
+        if (gearError != null)
+        {
+            return gearError;
+        }
+
+        return BeginPlayerTeleport(player, GetTeleportationConfig().BackWarmupSeconds, "back", p => ExecuteBackTeleport(p, location),
+            (p, reason) => TrackCancelledTeleport("back", "back", reason));
+    }
+
     private TextCommandResult ExecuteHomeTeleport(IServerPlayer player, HomeSpawnLocation location, string homeName)
     {
         var gearError = TryConsumeTemporalGearForTeleport(player, "home", "home");
@@ -418,6 +465,28 @@ public class HomeSpawnSystem : BaseBasicModSystem
         AnalyticsService.TrackFeatureUsed("home-spawn", "top");
 
         return Success(Lang.Get("thebasics:home-spawn-success-top-teleported", location.Format()));
+    }
+
+    private TextCommandResult ExecuteBackTeleport(IServerPlayer player, HomeSpawnLocation location)
+    {
+        var gearError = TryConsumeTemporalGearForTeleport(player, GetTeleportationConfig().BackRequireTemporalGear, "back", "back");
+        if (gearError != null)
+        {
+            return gearError;
+        }
+
+        using (TeleportBackUtil.SuppressRecording())
+        {
+            Teleport(player, location);
+        }
+
+        TeleportBackUtil.ClearPreviousLocation(player);
+        MarkCooldown(player, BackCooldownModDataKey);
+
+        AnalyticsService.TrackCommandUsed("back", true);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "back");
+
+        return Success(Lang.Get("thebasics:home-spawn-success-back-teleported", location.Format()));
     }
 
     private void OnStuckCancelled(IServerPlayer player, string reason)
@@ -534,7 +603,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
                 Z = z + 0.5,
                 Yaw = player.Entity.Pos.Yaw,
                 Pitch = player.Entity.Pos.Pitch,
-                Roll = player.Entity.Pos.Roll
+                Roll = player.Entity.Pos.Roll,
+                Dimension = groundPos.dimension
             };
             return true;
         }
@@ -580,7 +650,12 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
     private TextCommandResult TryValidateTemporalGearForTeleport(IServerPlayer player, string commandName, string featureAction)
     {
-        if (!Config.HomeSpawnRequireTemporalGear)
+        return TryValidateTemporalGearForTeleport(player, Config.HomeSpawnRequireTemporalGear, commandName, featureAction);
+    }
+
+    private static TextCommandResult TryValidateTemporalGearForTeleport(IServerPlayer player, bool requireTemporalGear, string commandName, string featureAction)
+    {
+        if (!requireTemporalGear)
         {
             return null;
         }
@@ -597,7 +672,12 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
     private TextCommandResult TryConsumeTemporalGearForTeleport(IServerPlayer player, string commandName, string featureAction)
     {
-        if (!Config.HomeSpawnRequireTemporalGear)
+        return TryConsumeTemporalGearForTeleport(player, Config.HomeSpawnRequireTemporalGear, commandName, featureAction);
+    }
+
+    private static TextCommandResult TryConsumeTemporalGearForTeleport(IServerPlayer player, bool requireTemporalGear, string commandName, string featureAction)
+    {
+        if (!requireTemporalGear)
         {
             return null;
         }
@@ -722,6 +802,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         RegisterPrivilegeIfCustom(GetStuckAdminNotifyPrivilege(), "thebasics:home-spawn-stuck-admin-notify-privilege-desc");
         RegisterPrivilegeIfCustom(GetStuckBlockedByOnlinePrivilege(), "thebasics:home-spawn-stuck-blocked-by-online-privilege-desc");
         RegisterPrivilegeIfCustom(GetTopPrivilege(), "thebasics:home-spawn-top-privilege-desc");
+        RegisterPrivilegeIfCustom(GetBackPrivilege(), "thebasics:home-spawn-back-privilege-desc");
     }
 
     private void RegisterPrivilegeIfCustom(string privilege, string descriptionKey)
@@ -785,6 +866,11 @@ public class HomeSpawnSystem : BaseBasicModSystem
     private string GetTopPrivilege()
     {
         return NormalizePrivilege(GetTeleportationConfig().TopCommandPrivilege, Privilege.chat);
+    }
+
+    private string GetBackPrivilege()
+    {
+        return NormalizePrivilege(GetTeleportationConfig().BackCommandPrivilege, Privilege.chat);
     }
 
     private bool IsOtherPlayerWithPrivilegeOnline(IServerPlayer currentPlayer, string privilege)

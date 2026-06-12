@@ -18,6 +18,7 @@ public sealed class TeleportationSystem : BaseBasicModSystem
 
     protected override void BasicStartServerSide()
     {
+        TeleportBackGlobalRecorder.Patch();
         API.Event.HandInteract += OnHandInteract;
         API.Event.DidUseBlock += OnDidUseBlock;
         API.Event.DidPlaceBlock += OnDidPlaceBlock;
@@ -95,6 +96,7 @@ public sealed class TeleportationSystem : BaseBasicModSystem
         }
 
         _pendingWarmups.Clear();
+        TeleportBackGlobalRecorder.Unpatch();
         base.Dispose();
     }
 

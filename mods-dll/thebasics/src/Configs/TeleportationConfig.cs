@@ -56,6 +56,21 @@ public class TeleportationConfig
     [ProtoMember(17)]
     public string TopCommandPrivilege { get; set; } = "chat";
 
+    [ProtoMember(18)]
+    public int BackWarmupSeconds { get; set; } = 5;
+
+    [ProtoMember(19)]
+    public int BackCooldownSeconds { get; set; } = 300;
+
+    [ProtoMember(20)]
+    public int BackExpiresAfterSeconds { get; set; } = 300;
+
+    [ProtoMember(21)]
+    public string BackCommandPrivilege { get; set; } = "chat";
+
+    [ProtoMember(22)]
+    public bool BackRequireTemporalGear { get; set; }
+
     public void InitializeDefaultsIfNeeded()
     {
         MaxHomes = MaxHomes <= 0 ? 3 : MaxHomes;
@@ -73,6 +88,10 @@ public class TeleportationConfig
         TopWarmupSeconds = ClampNonNegative(TopWarmupSeconds);
         TopCooldownSeconds = ClampNonNegative(TopCooldownSeconds);
         TopCommandPrivilege = string.IsNullOrWhiteSpace(TopCommandPrivilege) ? "chat" : TopCommandPrivilege.Trim();
+        BackWarmupSeconds = ClampNonNegative(BackWarmupSeconds);
+        BackCooldownSeconds = ClampNonNegative(BackCooldownSeconds);
+        BackExpiresAfterSeconds = ClampNonNegative(BackExpiresAfterSeconds);
+        BackCommandPrivilege = string.IsNullOrWhiteSpace(BackCommandPrivilege) ? "chat" : BackCommandPrivilege.Trim();
     }
 
     private static int ClampNonNegative(int value)

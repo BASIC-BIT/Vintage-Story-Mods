@@ -25,6 +25,9 @@ public class HomeSpawnLocation
     [ProtoMember(6)]
     public float Roll { get; set; }
 
+    [ProtoMember(7)]
+    public int Dimension { get; set; }
+
     public static HomeSpawnLocation From(EntityPos pos)
     {
         return new HomeSpawnLocation
@@ -34,13 +37,22 @@ public class HomeSpawnLocation
             Z = pos.Z,
             Yaw = pos.Yaw,
             Pitch = pos.Pitch,
-            Roll = pos.Roll
+            Roll = pos.Roll,
+            Dimension = pos.Dimension
         };
     }
 
     public EntityPos ToEntityPos()
     {
-        return new EntityPos(X, Y, Z, Yaw, Pitch, Roll);
+        return new EntityPos(X, Y, Z, Yaw, Pitch, Roll)
+        {
+            Dimension = Dimension
+        };
+    }
+
+    public bool IsSameDimensionAs(EntityPos pos)
+    {
+        return pos != null && Dimension == pos.Dimension;
     }
 
     public string Format()
