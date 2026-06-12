@@ -124,6 +124,11 @@ namespace thebasics.ModSystems.TPA
             // Null checks
             if (requestingPlayer == null || request == null) return;
 
+            if (TryCancelAcceptedWarmup(request, requestingPlayer, targetPlayer, reason.ToString().ToLowerInvariant()))
+            {
+                return;
+            }
+
             // Get target player name for messages (might be offline)
             var targetPlayerName = targetPlayer?.PlayerName ??
                                    API.GetPlayerByUID(request.TargetPlayerUID)?.PlayerName ??
@@ -199,9 +204,24 @@ namespace thebasics.ModSystems.TPA
 
         private void ReturnOwedTemporalGearsAndClearRequest(IServerPlayer player)
         {
-            // Check if player has an expired outgoing TPA request
             var request = player.GetOutgoingTpaRequest();
-            if (request == null || !IsRequestExpired(request)) return;
+            if (request == null) return;
+
+            if (request.AcceptedWarmupStarted)
+            {
+                if (!TryCancelAcceptedWarmup(request, player, null, "disconnect"))
+                {
+                    var gearReturned = ReturnConsumedTemporalGear(player, request);
+                    player.SendMessage(GlobalConstants.CurrentChatGroup,
+                        GenerateAcceptedTpaWarmupCancelledMessage(request.TemporalGearConsumed, gearReturned),
+                        EnumChatType.CommandError);
+                    player.ClearOutgoingTpaRequest();
+                }
+
+                return;
+            }
+
+            if (!IsRequestExpired(request)) return;
 
             // Use the centralized method to handle the expiration
             ExpireOrCancelTpaRequest(player, request, TpaExpireReason.PlayerRejoin);
@@ -636,7 +656,7 @@ namespace thebasics.ModSystems.TPA
 
             requestingPlayer.SendMessage(GlobalConstants.CurrentChatGroup, Lang.Get("thebasics:tpa-notify-accepted"),
                 EnumChatType.CommandSuccess);
-            requestingPlayer.ClearOutgoingTpaRequest();
+            requestingPlayer.SetOutgoingTpaRequest(MarkAcceptedWarmupStarted(request));
 
             if (movingPlayer.PlayerUID != acceptingPlayer.PlayerUID)
             {
@@ -655,7 +675,12 @@ namespace thebasics.ModSystems.TPA
         {
             if (requestingPlayer?.Entity == null || acceptingPlayer?.Entity == null)
             {
-                ReturnConsumedTemporalGear(requestingPlayer, request);
+                var gearReturned = ReturnConsumedTemporalGear(requestingPlayer, request);
+                if (!request.TemporalGearConsumed || gearReturned)
+                {
+                    requestingPlayer?.ClearOutgoingTpaRequest();
+                }
+
                 AnalyticsService.TrackCommandUsed("tpaccept", false, "player_unavailable");
                 AnalyticsService.TrackFeatureUsed("tpa", "accept", false, "player_unavailable");
                 return Error("thebasics:tpa-error-player-not-found");
@@ -690,9 +715,45 @@ namespace thebasics.ModSystems.TPA
             return request.Type == TpaRequestType.Goto ? requestingPlayer : acceptingPlayer;
         }
 
+        private static TpaRequest MarkAcceptedWarmupStarted(TpaRequest request)
+        {
+            return new TpaRequest
+            {
+                Type = request.Type,
+                RequestPlayerUID = request.RequestPlayerUID,
+                TargetPlayerUID = request.TargetPlayerUID,
+                RequestTimeHours = request.RequestTimeHours,
+                RequestTimeRealTicks = request.RequestTimeRealTicks,
+                TemporalGearConsumed = request.TemporalGearConsumed,
+                AcceptedWarmupStarted = true
+            };
+        }
+
+        private bool TryCancelAcceptedWarmup(TpaRequest request, IServerPlayer requestingPlayer, IServerPlayer targetPlayer, string reason)
+        {
+            if (!request.AcceptedWarmupStarted)
+            {
+                return false;
+            }
+
+            targetPlayer ??= API.GetPlayerByUID(request.TargetPlayerUID);
+            var movingPlayer = request.Type == TpaRequestType.Goto ? requestingPlayer : targetPlayer;
+            if (movingPlayer == null)
+            {
+                return false;
+            }
+
+            return API.ModLoader.GetModSystem<TeleportationSystem>()?.CancelWarmup(movingPlayer, reason) == true;
+        }
+
         private void CancelAcceptedTpaWarmup(TpaRequest request, IServerPlayer requestingPlayer, IServerPlayer acceptingPlayer, IServerPlayer movingPlayer, string reason)
         {
             var gearReturned = ReturnConsumedTemporalGear(requestingPlayer, request);
+            if (!request.TemporalGearConsumed || gearReturned)
+            {
+                requestingPlayer?.ClearOutgoingTpaRequest();
+            }
+
             var requesterMessage = GenerateAcceptedTpaWarmupCancelledMessage(request.TemporalGearConsumed, gearReturned);
             requestingPlayer?.SendMessage(GlobalConstants.CurrentChatGroup, requesterMessage, EnumChatType.CommandError);
 

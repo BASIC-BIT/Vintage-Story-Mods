@@ -611,7 +611,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
     private bool TryFindTopLocationInColumn(int x, int z, int dimension, int minY, int maxY, IServerPlayer player, out HomeSpawnLocation location)
     {
         location = null;
-        for (var y = minY; y <= maxY; y++)
+        for (var y = maxY; y >= minY; y--)
         {
             var groundPos = new BlockPos(x, y, z, dimension);
             if (!TryGetSafeLandingHeight(groundPos, out var landingY))
