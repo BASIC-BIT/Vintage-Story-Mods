@@ -33,6 +33,7 @@
   "home-spawn-error-player-required": "This command can only be used by a player.",
   "home-spawn-error-no-default-home": "You do not have a home set yet. Use /sethome first, or use /sethome [name] for a named home.",
   "home-spawn-error-no-home": "You do not have a home named '{0}'. Use /sethome [name] first.",
+  "home-spawn-error-delhome-name-required": "Tell me which home to delete. Use /delhome default to delete your default home, or /homes to list saved homes.",
   "home-spawn-error-no-safe-top": "No safe /top destination was found above you.",
   "home-spawn-error-stuck-admin-online": "An admin is online. Please ask for help instead of using /stuck.",
   "home-spawn-error-home-name-too-long": "Home names must be {0} characters or fewer.",

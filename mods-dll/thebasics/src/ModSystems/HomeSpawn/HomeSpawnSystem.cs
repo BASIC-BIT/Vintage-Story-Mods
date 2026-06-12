@@ -85,7 +85,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
         API.ChatCommands.GetOrCreate("delhome")
             .WithDescription(Lang.Get("thebasics:home-spawn-cmd-delhome-desc"))
-            .WithArgs(new WordArgParser("home", true))
+            .WithArgs(new WordArgParser("home", false))
             .RequiresPrivilege(GetSetHomePrivilege())
             .RequiresPlayer()
             .HandleWith(HandleDelHome);
@@ -136,6 +136,12 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         var homeName = GetOptionalHomeName(args);
+        if (homeName == null)
+        {
+            TrackHomeSpawnFailure("delhome", "delete_home", "home_name_required");
+            return Error("thebasics:home-spawn-error-delhome-name-required", "home-name-required");
+        }
+
         var nameError = ValidateHomeName(homeName);
         if (nameError != null)
         {
