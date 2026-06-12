@@ -328,3 +328,5 @@ For contributor PRs specifically:
 
 - **Configuration Management**
   - This mod is live - ProtoMember attributes for existing config values should not be changed where possible - new config values should receive the next available sequentially increasing number.
+- **Map Player Visibility**
+  - Vintage Story's `mapShowGroupPlayers` is unsafe as a default for The BASICs map-visibility controls because the proximity chat channel is a player group; enabling same-group map visibility can make all proximity-chat members visible regardless of distance.

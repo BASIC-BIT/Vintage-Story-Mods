@@ -78,6 +78,29 @@ public static class EntityBehaviorNameTagPatches
         }
     }
 
+    internal static void RebuildTexture(Entity entity)
+    {
+        if (!ChatUiSystem.IsCustomNametagEnabled() || !IsEntityStillValid(entity))
+        {
+            return;
+        }
+
+        var behavior = entity.GetBehavior<EntityBehaviorNameTag>();
+        if (behavior == null)
+        {
+            return;
+        }
+
+        try
+        {
+            ReplaceTexture(behavior, entity);
+        }
+        catch
+        {
+            // Cosmetic only; keep vanilla texture if the custom rebuild fails.
+        }
+    }
+
     private static bool IsEntityStillValid(Entity entity)
     {
         if (entity == null || !entity.Alive)
@@ -107,12 +130,14 @@ public static class EntityBehaviorNameTagPatches
 
         var headshotHash = GetNametagValue(entity, CharacterSheetSystem.HeadshotHashAttrKey);
         var nicknameColor = GetNametagValue(entity, CharacterSheetSystem.NicknameColorAttrKey);
+        var backgroundColor = GetNametagValue(entity, CharacterSheetSystem.NametagBackgroundColorAttrKey);
+        var borderColor = GetNametagValue(entity, CharacterSheetSystem.NametagBorderColorAttrKey);
         var playerName = GetPlayerName(entity);
         var headshotBitmap = TryCreateHeadshotBitmap(capi, entity, headshotHash);
 
         try
         {
-            ApplyNametagTexture(behavior, ComposeNametagTexture(capi, name, nicknameColor, playerName, headshotBitmap));
+            ApplyNametagTexture(behavior, ComposeNametagTexture(capi, name, nicknameColor, backgroundColor, borderColor, playerName, headshotBitmap));
         }
         finally
         {
@@ -192,7 +217,7 @@ public static class EntityBehaviorNameTagPatches
         }
     }
 
-    private static LoadedTexture ComposeNametagTexture(ICoreClientAPI capi, string name, string nicknameColor, string playerName, BitmapExternal headshotBitmap)
+    private static LoadedTexture ComposeNametagTexture(ICoreClientAPI capi, string name, string nicknameColor, string backgroundColor, string borderColor, string playerName, BitmapExternal headshotBitmap)
     {
         var resolvedName = Lang.GetIfExists("nametag-" + name.ToLowerInvariant()) ?? name;
         var vtml = WrapWithNicknameColor(resolvedName, nicknameColor, playerName);
@@ -202,7 +227,7 @@ public static class EntityBehaviorNameTagPatches
             Vtml = vtml,
             BaseFont = CreateNametagBaseFont(),
             MaxTextWidthPx = NametagMaxTextWidthPx,
-            TextBackground = CreateNametagBackground(),
+            TextBackground = CreateNametagBackground(backgroundColor, borderColor),
             HeadshotBitmap = headshotBitmap,
             HeadshotRenderSizePx = ChatUiSystem.GetNametagInlineImagePixelSize()
         });
@@ -215,17 +240,48 @@ public static class EntityBehaviorNameTagPatches
         return baseFont;
     }
 
-    private static TextBackground CreateNametagBackground()
+    private static TextBackground CreateNametagBackground(string backgroundColor, string borderColor)
     {
         return new TextBackground
         {
-            FillColor = GuiStyle.DialogLightBgColor,
+            FillColor = ResolveNametagColor(backgroundColor, ChatUiSystem.GetNametagBackgroundColor(), GuiStyle.DialogLightBgColor),
             Padding = 3,
             Radius = GuiStyle.ElementBGRadius,
             Shade = true,
-            BorderColor = GuiStyle.DialogBorderColor,
+            BorderColor = ResolveNametagColor(borderColor, ChatUiSystem.GetNametagBorderColor(), GuiStyle.DialogBorderColor),
             BorderWidth = 3.0
         };
+    }
+
+    private static double[] ResolveNametagColor(string playerColor, string serverColor, double[] fallback)
+    {
+        if (TryResolveNametagColor(playerColor, out var resolvedPlayerColor))
+        {
+            return resolvedPlayerColor;
+        }
+
+        return TryResolveNametagColor(serverColor, out var resolvedServerColor)
+            ? resolvedServerColor
+            : fallback;
+    }
+
+    private static bool TryResolveNametagColor(string hexColor, out double[] color)
+    {
+        color = null;
+        if (string.IsNullOrWhiteSpace(hexColor))
+        {
+            return false;
+        }
+
+        try
+        {
+            color = ColorUtil.Hex2Doubles(hexColor.Trim());
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>

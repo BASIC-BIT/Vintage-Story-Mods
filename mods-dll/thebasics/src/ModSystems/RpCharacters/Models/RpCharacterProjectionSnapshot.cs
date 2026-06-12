@@ -27,4 +27,10 @@ public class RpCharacterProjectionSnapshot
     [ProtoMember(6)]
     [DefaultValue(true)]
     public bool ChatterEnabled { get; set; } = true;
+
+    [ProtoMember(7)]
+    public string NametagBackgroundColor { get; set; }
+
+    [ProtoMember(8)]
+    public string NametagBorderColor { get; set; }
 }

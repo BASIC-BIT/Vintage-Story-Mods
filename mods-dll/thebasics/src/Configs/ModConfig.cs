@@ -847,5 +847,32 @@ namespace thebasics.Configs
 
         [ProtoMember(138)]
         public TeleportationConfig Teleportation { get; set; } = new();
+
+        // Opt-in wrapper for vanilla player map marker world config. When enabled, The BASICs
+        // also forces mapShowGroupPlayers=false because the proximity chat channel is a group.
+        [ProtoMember(139)]
+        public bool ManageMapPlayerVisibility { get; set; } = false;
+
+        [ProtoMember(140)]
+        public bool MapHideOtherPlayers { get; set; } = false;
+
+        // Vanilla treats negative render distance as unlimited; The BASICs normalizes any negative
+        // value to -1 before writing the world config.
+        [ProtoMember(141)]
+        public int MapPlayerRenderDistance { get; set; } = 1000;
+
+        // Optional #RRGGBB or #RRGGBBAA colors for the custom nametag text bubble. Empty keeps
+        // the active Vintage Story UI theme colors.
+        [ProtoMember(142)]
+        public string NametagBackgroundColor { get; set; } = string.Empty;
+
+        [ProtoMember(143)]
+        public string NametagBorderColor { get; set; } = string.Empty;
+
+        [ProtoMember(144)]
+        public bool AllowPlayersToChangeNametagColors { get; set; } = true;
+
+        [ProtoMember(145)]
+        public string ChangeNametagColorPermission { get; set; } = "chat";
     }
 }

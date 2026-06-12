@@ -104,6 +104,11 @@ public static class ConfigAdminSettingRegistry
             Bool("HideNametagUnlessTargeting", "Client UX", "Hide nametag unless targeted", "Only show nametags when targeted.", ConfigAdminReloadBehavior.Live, c => c.HideNametagUnlessTargeting, (c, v) => c.HideNametagUnlessTargeting = v),
             Int("NametagRenderRange", "Client UX", "Nametag render range", "Maximum nametag render range in blocks.", ConfigAdminReloadBehavior.Live, (c => c.NametagRenderRange, (c, v) => c.NametagRenderRange = v), (0, 512)),
             Bool("NametagRequiresLineOfSight", "Client UX", "Nametag requires line of sight", "Require client line-of-sight for nametag rendering.", ConfigAdminReloadBehavior.Live, c => c.NametagRequiresLineOfSight, (c, v) => c.NametagRequiresLineOfSight = v),
+            OptionalHexColor("NametagBackgroundColor", "Client UX", "Nametag background color", "Optional #RRGGBB or #RRGGBBAA background color for custom nametags. Empty uses the active UI theme.", ConfigAdminReloadBehavior.Live, c => c.NametagBackgroundColor, (c, v) => c.NametagBackgroundColor = v),
+            OptionalHexColor("NametagBorderColor", "Client UX", "Nametag border color", "Optional #RRGGBB or #RRGGBBAA border color for custom nametags. Empty uses the active UI theme.", ConfigAdminReloadBehavior.Live, c => c.NametagBorderColor, (c, v) => c.NametagBorderColor = v),
+            Bool("ManageMapPlayerVisibility", "Map Visibility", "Manage player map markers", "Let The BASICs write vanilla map player marker world config keys. Also disables same-group map visibility to avoid Proximity chat group leaks.", ConfigAdminReloadBehavior.Live, c => c.ManageMapPlayerVisibility, (c, v) => c.ManageMapPlayerVisibility = v),
+            Bool("MapHideOtherPlayers", "Map Visibility", "Hide other map players", "Hide other players on the minimap and full world map when map visibility is managed.", ConfigAdminReloadBehavior.Live, c => c.MapHideOtherPlayers, (c, v) => c.MapHideOtherPlayers = v),
+            Int("MapPlayerRenderDistance", "Map Visibility", "Map player render range", "Maximum range in blocks for other player map markers. Use -1 for unlimited; ignored when other players are hidden.", ConfigAdminReloadBehavior.Live, (c => c.MapPlayerRenderDistance, (c, v) => c.MapPlayerRenderDistance = v), (-1, 100000)),
             Bool("BoldNicknames", "Client UX", "Bold nicknames", "Render RP nicknames in bold where supported.", ConfigAdminReloadBehavior.Live, c => c.BoldNicknames, (c, v) => c.BoldNicknames = v),
             Bool("ApplyColorsToNicknames", "Client UX", "Color RP nicknames", "Apply nickname colors to IC nicknames.", ConfigAdminReloadBehavior.Live, c => c.ApplyColorsToNicknames, (c, v) => c.ApplyColorsToNicknames = v),
             Bool("ApplyColorsToPlayerNames", "Client UX", "Color account names", "Apply nickname colors to OOC account names.", ConfigAdminReloadBehavior.Live, c => c.ApplyColorsToPlayerNames, (c, v) => c.ApplyColorsToPlayerNames = v),
@@ -176,6 +181,8 @@ public static class ConfigAdminSettingRegistry
             Bool("ProximityChatAllowPlayersToChangeNicknames", "Restart Required", "Players can change nicknames", "Requires command gating work before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, c => c.ProximityChatAllowPlayersToChangeNicknames, (c, v) => c.ProximityChatAllowPlayersToChangeNicknames = v),
             Bool("ProximityChatAllowPlayersToChangeNicknameColors", "Restart Required", "Players can change nickname colors", "Requires command gating work before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, c => c.ProximityChatAllowPlayersToChangeNicknameColors, (c, v) => c.ProximityChatAllowPlayersToChangeNicknameColors = v),
             Text("ChangeNicknameColorPermission", "Permissions", "Nickname color privilege", "Privilege required to change nickname colors.", ConfigAdminReloadBehavior.Live, c => c.ChangeNicknameColorPermission, (c, v) => c.ChangeNicknameColorPermission = v),
+            Bool("AllowPlayersToChangeNametagColors", "Restart Required", "Players can change nametag colors", "Requires command gating work before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, c => c.AllowPlayersToChangeNametagColors, (c, v) => c.AllowPlayersToChangeNametagColors = v),
+            Text("ChangeNametagColorPermission", "Permissions", "Nametag color privilege", "Privilege required to change personal nametag background and border colors.", ConfigAdminReloadBehavior.Live, c => c.ChangeNametagColorPermission, (c, v) => c.ChangeNametagColorPermission = v),
             Int("MinNicknameLength", "Restart Required", "Minimum nickname length", "Minimum player nickname length.", ConfigAdminReloadBehavior.RestartRequired, (c => c.MinNicknameLength, (c, v) => c.MinNicknameLength = v), (1, 256)),
             Int("MaxNicknameLength", "Restart Required", "Maximum nickname length", "Maximum player nickname length.", ConfigAdminReloadBehavior.RestartRequired, (c => c.MaxNicknameLength, (c, v) => c.MaxNicknameLength = v), (1, 512)),
             Bool("DisableRPChat", "Restart Required", "Disable RP chat", "Requires restart because commands and transformers are startup-shaped.", ConfigAdminReloadBehavior.RestartRequired, c => c.DisableRPChat, (c, v) => c.DisableRPChat = v),
@@ -549,6 +556,44 @@ public static class ConfigAdminSettingRegistry
                 return null;
             }
         });
+    }
+
+    private static ConfigAdminSettingDefinition OptionalHexColor(string key, string group, string label, string description, ConfigAdminReloadBehavior reloadBehavior, Func<ModConfig, string> get, Action<ModConfig, string> set)
+    {
+        return new ConfigAdminSettingDefinition(new ConfigAdminSettingDefinitionOptions
+        {
+            Key = key,
+            Group = group,
+            Label = label,
+            Description = description,
+            Kind = ConfigAdminSettingKind.Text,
+            ReloadBehavior = reloadBehavior,
+            GetValue = config => get(config) ?? string.Empty,
+            SetValue = (config, value) =>
+            {
+                var normalizedValue = (value ?? string.Empty).Trim();
+                if (normalizedValue.Length > 0 && !IsHexColor(normalizedValue))
+                {
+                    return $"{key} must be empty or a hex color like #403529 or #403529BF.";
+                }
+
+                set(config, normalizedValue);
+                return null;
+            }
+        });
+    }
+
+    private static bool IsHexColor(string value)
+    {
+        return value != null &&
+               (value.Length == 7 || value.Length == 9) &&
+               value[0] == '#' &&
+               value.Skip(1).All(IsHexDigit);
+    }
+
+    private static bool IsHexDigit(char c)
+    {
+        return c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
     }
 
     private static ConfigAdminSettingDefinition ValidatedText(SettingMeta meta, Func<ModConfig, string> get, Action<ModConfig, string> set, Func<string, string> validate)

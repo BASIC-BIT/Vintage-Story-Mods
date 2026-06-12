@@ -22,6 +22,8 @@ public class RpCharacterService
     internal const string ActiveCharacterIdKey = "BASIC_ACTIVE_CHARACTER_ID";
     private const string CharacterSheetKey = "BASIC_CHARACTER_SHEET";
     private const string NicknameColorKey = "BASIC_NICKNAME_COLOR";
+    private const string NametagBackgroundColorKey = "BASIC_NAMETAG_BACKGROUND_COLOR";
+    private const string NametagBorderColorKey = "BASIC_NAMETAG_BORDER_COLOR";
     private static readonly Dictionary<string, string> EnglishTemplates = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["rpchar-error-name-required"] = "Character name is required.",
@@ -356,6 +358,8 @@ public class RpCharacterService
 
         MirrorHeadshotHashToNametag(player, projection);
         RestoreNicknameColor(player, projection.NicknameColor);
+        RestoreNametagBackgroundColor(player, projection.NametagBackgroundColor);
+        RestoreNametagBorderColor(player, projection.NametagBorderColor);
         RestoreChatProjection(player, projection);
     }
 
@@ -384,6 +388,28 @@ public class RpCharacterService
         IServerPlayerExtensions.SetModData(player, NicknameColorKey, nicknameColor);
     }
 
+    private static void RestoreNametagBackgroundColor(IServerPlayer player, string color)
+    {
+        if (string.IsNullOrWhiteSpace(color))
+        {
+            player.ClearNametagBackgroundColor();
+            return;
+        }
+
+        player.SetNametagBackgroundColor(color);
+    }
+
+    private static void RestoreNametagBorderColor(IServerPlayer player, string color)
+    {
+        if (string.IsNullOrWhiteSpace(color))
+        {
+            player.ClearNametagBorderColor();
+            return;
+        }
+
+        player.SetNametagBorderColor(color);
+    }
+
     private static void RestoreChatProjection(IServerPlayer player, RpCharacterProjectionSnapshot projection)
     {
         player.SetLanguages(projection.Languages);
@@ -398,6 +424,8 @@ public class RpCharacterService
         {
             Sheet = CloneSheet(IServerPlayerExtensions.GetModData(player, CharacterSheetKey, new CharacterSheetData()) ?? new CharacterSheetData()),
             NicknameColor = IServerPlayerExtensions.GetModData<string>(player, NicknameColorKey, null),
+            NametagBackgroundColor = IServerPlayerExtensions.GetModData<string>(player, NametagBackgroundColorKey, null),
+            NametagBorderColor = IServerPlayerExtensions.GetModData<string>(player, NametagBorderColorKey, null),
             Languages = player.GetLanguages().ToList(),
             DefaultLanguage = player.GetDefaultLanguageName(),
             ChatMode = player.GetChatMode(),
