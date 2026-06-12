@@ -34,6 +34,7 @@ namespace thebasics.Configs
             InitializeGeneralFeatureDefaults();
             InitializeNotesDefaults();
             InitializeChatHistoryDefaults();
+            InitializeHomeSpawnDefaults();
         }
 
         private void InitializeProximityChatDefaults()
@@ -160,6 +161,16 @@ namespace thebasics.Configs
             ChatHistoryMaxEntries = Math.Max(0, ChatHistoryMaxEntries);
             ChatHistorySearchMaxResults = ChatHistorySearchMaxResults <= 0 ? 100 : ChatHistorySearchMaxResults;
             ChatHistoryFlushIntervalMilliseconds = ChatHistoryFlushIntervalMilliseconds <= 0 ? 1000 : Math.Max(100, ChatHistoryFlushIntervalMilliseconds);
+        }
+
+        private void InitializeHomeSpawnDefaults()
+        {
+            HomeCommandPrivilege = string.IsNullOrWhiteSpace(HomeCommandPrivilege) ? "chat" : HomeCommandPrivilege;
+            SetHomeCommandPrivilege = string.IsNullOrWhiteSpace(SetHomeCommandPrivilege) ? "chat" : SetHomeCommandPrivilege;
+            SpawnCommandPrivilege = string.IsNullOrWhiteSpace(SpawnCommandPrivilege) ? "chat" : SpawnCommandPrivilege;
+            SetSpawnCommandPrivilege = string.IsNullOrWhiteSpace(SetSpawnCommandPrivilege) ? "commandplayer" : SetSpawnCommandPrivilege;
+            Teleportation ??= new TeleportationConfig();
+            Teleportation.InitializeDefaultsIfNeeded();
         }
 
         private void InitializeCharacterSheetDefaults()
@@ -818,5 +829,23 @@ namespace thebasics.Configs
         // whether death messages are intentionally re-sent to nearby players afterward.
         [ProtoMember(132)]
         public bool EnableNearbyDeathMessagesInProximityChat { get; set; } = true;
+
+        [ProtoMember(133)]
+        public string HomeCommandPrivilege { get; set; } = "chat";
+
+        [ProtoMember(134)]
+        public string SetHomeCommandPrivilege { get; set; } = "chat";
+
+        [ProtoMember(135)]
+        public string SpawnCommandPrivilege { get; set; } = "chat";
+
+        [ProtoMember(136)]
+        public string SetSpawnCommandPrivilege { get; set; } = "commandplayer";
+
+        [ProtoMember(137)]
+        public bool HomeSpawnRequireTemporalGear { get; set; } = false;
+
+        [ProtoMember(138)]
+        public TeleportationConfig Teleportation { get; set; } = new();
     }
 }

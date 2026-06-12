@@ -22,6 +22,11 @@ namespace thebasics.ModSystems.TPA.Models
         /// </summary>
         public bool TemporalGearConsumed { get; init; }
 
+        /// <summary>
+        /// Whether this accepted request is waiting for a teleport warmup to complete.
+        /// </summary>
+        public bool AcceptedWarmupStarted { get; init; }
+
         public bool Equals(TpaRequest other)
         {
             if (ReferenceEquals(null, other)) return false;
@@ -31,7 +36,8 @@ namespace thebasics.ModSystems.TPA.Models
                    TargetPlayerUID == other.TargetPlayerUID &&
                    RequestTimeHours.Equals(other.RequestTimeHours) &&
                    RequestTimeRealTicks == other.RequestTimeRealTicks &&
-                   TemporalGearConsumed == other.TemporalGearConsumed;
+                   TemporalGearConsumed == other.TemporalGearConsumed &&
+                   AcceptedWarmupStarted == other.AcceptedWarmupStarted;
         }
 
         public override bool Equals(object obj)
@@ -52,6 +58,7 @@ namespace thebasics.ModSystems.TPA.Models
                 hashCode = (hashCode * 397) ^ RequestTimeHours.GetHashCode();
                 hashCode = (hashCode * 397) ^ RequestTimeRealTicks.GetHashCode();
                 hashCode = (hashCode * 397) ^ TemporalGearConsumed.GetHashCode();
+                hashCode = (hashCode * 397) ^ AcceptedWarmupStarted.GetHashCode();
                 return hashCode;
             }
         }

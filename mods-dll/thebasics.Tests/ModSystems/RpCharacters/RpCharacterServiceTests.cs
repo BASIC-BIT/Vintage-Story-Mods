@@ -14,6 +14,7 @@ using Vintagestory.API.Util;
 
 namespace thebasics.Tests.ModSystems.RpCharacters;
 
+[Collection(AnalyticsServiceTestCollection.Name)]
 public class RpCharacterServiceTests
 {
     [Fact]

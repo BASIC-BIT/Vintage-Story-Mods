@@ -213,6 +213,113 @@ public class ConfigAdminSettingRegistryTests
         maxResultsError.Should().Contain("whole number from 1 to 1000");
     }
 
+    [Fact]
+    public void HomeSpawnPrivileges_AreRegisteredAndDefaulted()
+    {
+        var config = CreateConfig();
+
+        config.HomeCommandPrivilege.Should().Be("chat");
+        config.SetHomeCommandPrivilege.Should().Be("chat");
+        config.SpawnCommandPrivilege.Should().Be("chat");
+        config.SetSpawnCommandPrivilege.Should().Be("commandplayer");
+        config.HomeSpawnRequireTemporalGear.Should().BeFalse();
+        config.Teleportation.MaxHomes.Should().Be(3);
+        config.Teleportation.HomeWarmupSeconds.Should().Be(5);
+        config.Teleportation.SpawnWarmupSeconds.Should().Be(5);
+        config.Teleportation.TpaWarmupSeconds.Should().Be(5);
+        config.Teleportation.StuckWarmupSeconds.Should().Be(300);
+        config.Teleportation.HomeCooldownSeconds.Should().Be(300);
+        config.Teleportation.SpawnCooldownSeconds.Should().Be(300);
+        config.Teleportation.StuckCooldownSeconds.Should().Be(3600);
+        config.Teleportation.StuckReminderIntervalSeconds.Should().Be(60);
+        config.Teleportation.StuckBlockedByOnlinePrivilege.Should().Be("commandplayer");
+        config.Teleportation.TopWarmupSeconds.Should().Be(5);
+        config.Teleportation.TopCooldownSeconds.Should().Be(300);
+        config.Teleportation.TopCommandPrivilege.Should().Be("chat");
+        config.Teleportation.BackWarmupSeconds.Should().Be(5);
+        config.Teleportation.BackCooldownSeconds.Should().Be(300);
+        config.Teleportation.BackExpiresAfterSeconds.Should().Be(300);
+        config.Teleportation.BackCommandPrivilege.Should().Be("chat");
+        config.Teleportation.BackRequireTemporalGear.Should().BeFalse();
+        config.Teleportation.RegisterHomeCommands.Should().BeTrue();
+        config.Teleportation.RegisterSpawnCommands.Should().BeTrue();
+        config.Teleportation.RegisterStuckCommand.Should().BeTrue();
+        config.Teleportation.RegisterTopCommand.Should().BeTrue();
+        config.Teleportation.RegisterBackCommand.Should().BeTrue();
+        config.Teleportation.CancelWarmupOnDamage.Should().BeTrue();
+        config.Teleportation.CancelWarmupOnInteraction.Should().BeTrue();
+        config.Teleportation.StuckCommandPrivilege.Should().Be("chat");
+        config.Teleportation.StuckAdminNotifyPrivilege.Should().Be("commandplayer");
+
+        GetSetting("HomeCommandPrivilege").TrySetValue(config, "home", out var homeError).Should().BeTrue(homeError);
+        GetSetting("SetHomeCommandPrivilege").TrySetValue(config, "sethome", out var setHomeError).Should().BeTrue(setHomeError);
+        GetSetting("SpawnCommandPrivilege").TrySetValue(config, "spawn", out var spawnError).Should().BeTrue(spawnError);
+        GetSetting("SetSpawnCommandPrivilege").TrySetValue(config, "setspawn", out var setSpawnError).Should().BeTrue(setSpawnError);
+        GetSetting("HomeSpawnRequireTemporalGear").TrySetValue(config, "true", out var gearError).Should().BeTrue(gearError);
+        GetSetting("Teleportation.RegisterHomeCommands").TrySetValue(config, "false", out var registerHomeError).Should().BeTrue(registerHomeError);
+        GetSetting("Teleportation.RegisterSpawnCommands").TrySetValue(config, "false", out var registerSpawnError).Should().BeTrue(registerSpawnError);
+        GetSetting("Teleportation.RegisterStuckCommand").TrySetValue(config, "false", out var registerStuckError).Should().BeTrue(registerStuckError);
+        GetSetting("Teleportation.RegisterTopCommand").TrySetValue(config, "false", out var registerTopError).Should().BeTrue(registerTopError);
+        GetSetting("Teleportation.RegisterBackCommand").TrySetValue(config, "false", out var registerBackError).Should().BeTrue(registerBackError);
+        GetSetting("Teleportation.MaxHomes").TrySetValue(config, "5", out var maxHomesError).Should().BeTrue(maxHomesError);
+        GetSetting("Teleportation.HomeWarmupSeconds").TrySetValue(config, "6", out var homeWarmupError).Should().BeTrue(homeWarmupError);
+        GetSetting("Teleportation.SpawnWarmupSeconds").TrySetValue(config, "7", out var spawnWarmupError).Should().BeTrue(spawnWarmupError);
+        GetSetting("Teleportation.TpaWarmupSeconds").TrySetValue(config, "8", out var tpaWarmupError).Should().BeTrue(tpaWarmupError);
+        GetSetting("Teleportation.TopWarmupSeconds").TrySetValue(config, "9", out var topWarmupError).Should().BeTrue(topWarmupError);
+        GetSetting("Teleportation.BackWarmupSeconds").TrySetValue(config, "10", out var backWarmupError).Should().BeTrue(backWarmupError);
+        GetSetting("Teleportation.StuckWarmupSeconds").TrySetValue(config, "90", out var stuckWarmupError).Should().BeTrue(stuckWarmupError);
+        GetSetting("Teleportation.HomeCooldownSeconds").TrySetValue(config, "120", out var homeCooldownError).Should().BeTrue(homeCooldownError);
+        GetSetting("Teleportation.SpawnCooldownSeconds").TrySetValue(config, "180", out var spawnCooldownError).Should().BeTrue(spawnCooldownError);
+        GetSetting("Teleportation.TopCooldownSeconds").TrySetValue(config, "240", out var topCooldownError).Should().BeTrue(topCooldownError);
+        GetSetting("Teleportation.BackCooldownSeconds").TrySetValue(config, "300", out var backCooldownError).Should().BeTrue(backCooldownError);
+        GetSetting("Teleportation.BackExpiresAfterSeconds").TrySetValue(config, "600", out var backExpiryError).Should().BeTrue(backExpiryError);
+        GetSetting("Teleportation.BackRequireTemporalGear").TrySetValue(config, "true", out var backGearError).Should().BeTrue(backGearError);
+        GetSetting("Teleportation.StuckCooldownSeconds").TrySetValue(config, "7200", out var stuckCooldownError).Should().BeTrue(stuckCooldownError);
+        GetSetting("Teleportation.StuckReminderIntervalSeconds").TrySetValue(config, "60", out var stuckReminderError).Should().BeTrue(stuckReminderError);
+        var damageSetting = GetSetting("Teleportation.CancelWarmupOnDamage");
+        damageSetting.Group.Should().Be("Teleportation");
+        damageSetting.TrySetValue(config, "false", out var damageError).Should().BeTrue(damageError);
+        GetSetting("Teleportation.CancelWarmupOnInteraction").TrySetValue(config, "false", out var interactionError).Should().BeTrue(interactionError);
+        GetSetting("Teleportation.StuckCommandPrivilege").TrySetValue(config, "stuck", out var stuckPrivilegeError).Should().BeTrue(stuckPrivilegeError);
+        GetSetting("Teleportation.StuckAdminNotifyPrivilege").TrySetValue(config, "staff", out var stuckNotifyError).Should().BeTrue(stuckNotifyError);
+        GetSetting("Teleportation.StuckBlockedByOnlinePrivilege").TrySetValue(config, "helper", out var stuckBlockedError).Should().BeTrue(stuckBlockedError);
+        GetSetting("Teleportation.TopCommandPrivilege").TrySetValue(config, "top", out var topPrivilegeError).Should().BeTrue(topPrivilegeError);
+        GetSetting("Teleportation.BackCommandPrivilege").TrySetValue(config, "back", out var backPrivilegeError).Should().BeTrue(backPrivilegeError);
+
+        config.HomeCommandPrivilege.Should().Be("home");
+        config.SetHomeCommandPrivilege.Should().Be("sethome");
+        config.SpawnCommandPrivilege.Should().Be("spawn");
+        config.SetSpawnCommandPrivilege.Should().Be("setspawn");
+        config.HomeSpawnRequireTemporalGear.Should().BeTrue();
+        config.Teleportation.RegisterHomeCommands.Should().BeFalse();
+        config.Teleportation.RegisterSpawnCommands.Should().BeFalse();
+        config.Teleportation.RegisterStuckCommand.Should().BeFalse();
+        config.Teleportation.RegisterTopCommand.Should().BeFalse();
+        config.Teleportation.RegisterBackCommand.Should().BeFalse();
+        config.Teleportation.MaxHomes.Should().Be(5);
+        config.Teleportation.HomeWarmupSeconds.Should().Be(6);
+        config.Teleportation.SpawnWarmupSeconds.Should().Be(7);
+        config.Teleportation.TpaWarmupSeconds.Should().Be(8);
+        config.Teleportation.TopWarmupSeconds.Should().Be(9);
+        config.Teleportation.BackWarmupSeconds.Should().Be(10);
+        config.Teleportation.StuckWarmupSeconds.Should().Be(90);
+        config.Teleportation.HomeCooldownSeconds.Should().Be(120);
+        config.Teleportation.SpawnCooldownSeconds.Should().Be(180);
+        config.Teleportation.TopCooldownSeconds.Should().Be(240);
+        config.Teleportation.BackCooldownSeconds.Should().Be(300);
+        config.Teleportation.BackExpiresAfterSeconds.Should().Be(600);
+        config.Teleportation.BackRequireTemporalGear.Should().BeTrue();
+        config.Teleportation.StuckCooldownSeconds.Should().Be(7200);
+        config.Teleportation.StuckReminderIntervalSeconds.Should().Be(60);
+        config.Teleportation.CancelWarmupOnDamage.Should().BeFalse();
+        config.Teleportation.CancelWarmupOnInteraction.Should().BeFalse();
+        config.Teleportation.StuckCommandPrivilege.Should().Be("stuck");
+        config.Teleportation.StuckAdminNotifyPrivilege.Should().Be("staff");
+        config.Teleportation.StuckBlockedByOnlinePrivilege.Should().Be("helper");
+        config.Teleportation.TopCommandPrivilege.Should().Be("top");
+        config.Teleportation.BackCommandPrivilege.Should().Be("back");
+    }
+
     private static ModConfig CreateConfig()
     {
         var config = new ModConfig();

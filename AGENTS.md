@@ -202,6 +202,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mods-dll/thebasics/scripts/f
 Credentials come from `.env` in repo root (`PTERO_BASE_URL`, `PTERO_TOKEN`, `PTERO_SERVER_ID`).
 All endpoints use the Client API (`ptlc_...` token) under `/api/client/servers/{id}/...`.
 If the current shell has `PTERO_TOKEN` set to an application token (`ptla_...`), reload `PTERO_TOKEN` from repo-root `.env`; `PTERO_TOKEN_APPLICATION` is not valid for Client API power/file endpoints.
+Do not commit or print credential values. If the active checkout/worktree is missing `.env`, check `AGENTS.local.md` in the primary local checkout for machine-specific credential source paths, then load the needed variables into the current process only.
 
 ```
 # List files in a directory
@@ -233,8 +234,9 @@ GET /resources  → .attributes.current_state ("running"/"stopped"/etc.)
 
 After a restart, check `server-main.log` for:
 
-1. **Mod loaded correctly**: Look for `Mod 'thebasics_X_Y_Z.zip' (thebasics):` followed by all 6 mod systems:
+1. **Mod loaded correctly**: Look for `Mod 'thebasics_X_Y_Z.zip' (thebasics):` followed by all expected mod systems, including:
    - `thebasics.ModSystems.TPA.TpaSystem`
+   - `thebasics.ModSystems.HomeSpawn.HomeSpawnSystem`
    - `thebasics.ModSystems.SleepNotifier.SleepNotifierSystem`
    - `thebasics.ModSystems.SaveNotifications.SaveNotificationsSystem`
    - `thebasics.ModSystems.Repair.RepairModSystem`
