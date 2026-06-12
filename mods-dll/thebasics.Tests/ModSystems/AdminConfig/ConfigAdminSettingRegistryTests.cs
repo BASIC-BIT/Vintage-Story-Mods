@@ -241,6 +241,11 @@ public class ConfigAdminSettingRegistryTests
         config.Teleportation.BackExpiresAfterSeconds.Should().Be(300);
         config.Teleportation.BackCommandPrivilege.Should().Be("chat");
         config.Teleportation.BackRequireTemporalGear.Should().BeFalse();
+        config.Teleportation.RegisterHomeCommands.Should().BeTrue();
+        config.Teleportation.RegisterSpawnCommands.Should().BeTrue();
+        config.Teleportation.RegisterStuckCommand.Should().BeTrue();
+        config.Teleportation.RegisterTopCommand.Should().BeTrue();
+        config.Teleportation.RegisterBackCommand.Should().BeTrue();
         config.Teleportation.CancelWarmupOnDamage.Should().BeTrue();
         config.Teleportation.CancelWarmupOnInteraction.Should().BeTrue();
         config.Teleportation.StuckCommandPrivilege.Should().Be("chat");
@@ -251,6 +256,11 @@ public class ConfigAdminSettingRegistryTests
         GetSetting("SpawnCommandPrivilege").TrySetValue(config, "spawn", out var spawnError).Should().BeTrue(spawnError);
         GetSetting("SetSpawnCommandPrivilege").TrySetValue(config, "setspawn", out var setSpawnError).Should().BeTrue(setSpawnError);
         GetSetting("HomeSpawnRequireTemporalGear").TrySetValue(config, "true", out var gearError).Should().BeTrue(gearError);
+        GetSetting("Teleportation.RegisterHomeCommands").TrySetValue(config, "false", out var registerHomeError).Should().BeTrue(registerHomeError);
+        GetSetting("Teleportation.RegisterSpawnCommands").TrySetValue(config, "false", out var registerSpawnError).Should().BeTrue(registerSpawnError);
+        GetSetting("Teleportation.RegisterStuckCommand").TrySetValue(config, "false", out var registerStuckError).Should().BeTrue(registerStuckError);
+        GetSetting("Teleportation.RegisterTopCommand").TrySetValue(config, "false", out var registerTopError).Should().BeTrue(registerTopError);
+        GetSetting("Teleportation.RegisterBackCommand").TrySetValue(config, "false", out var registerBackError).Should().BeTrue(registerBackError);
         GetSetting("Teleportation.MaxHomes").TrySetValue(config, "5", out var maxHomesError).Should().BeTrue(maxHomesError);
         GetSetting("Teleportation.HomeWarmupSeconds").TrySetValue(config, "6", out var homeWarmupError).Should().BeTrue(homeWarmupError);
         GetSetting("Teleportation.SpawnWarmupSeconds").TrySetValue(config, "7", out var spawnWarmupError).Should().BeTrue(spawnWarmupError);
@@ -281,6 +291,11 @@ public class ConfigAdminSettingRegistryTests
         config.SpawnCommandPrivilege.Should().Be("spawn");
         config.SetSpawnCommandPrivilege.Should().Be("setspawn");
         config.HomeSpawnRequireTemporalGear.Should().BeTrue();
+        config.Teleportation.RegisterHomeCommands.Should().BeFalse();
+        config.Teleportation.RegisterSpawnCommands.Should().BeFalse();
+        config.Teleportation.RegisterStuckCommand.Should().BeFalse();
+        config.Teleportation.RegisterTopCommand.Should().BeFalse();
+        config.Teleportation.RegisterBackCommand.Should().BeFalse();
         config.Teleportation.MaxHomes.Should().Be(5);
         config.Teleportation.HomeWarmupSeconds.Should().Be(6);
         config.Teleportation.SpawnWarmupSeconds.Should().Be(7);

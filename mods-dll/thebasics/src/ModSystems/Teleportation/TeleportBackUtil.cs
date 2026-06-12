@@ -9,20 +9,9 @@ public static class TeleportBackUtil
 {
     private const string BackLocationModDataKey = "BASIC_BACK_LOCATION";
 
-    [ThreadStatic]
-    private static int _recordingSuppressed;
-
-    public static bool IsRecordingSuppressed => _recordingSuppressed > 0;
-
-    public static IDisposable SuppressRecording()
-    {
-        _recordingSuppressed++;
-        return new RecordingSuppressionScope();
-    }
-
     public static void RecordPreviousLocation(IServerPlayer player)
     {
-        if (IsRecordingSuppressed || player?.Entity == null)
+        if (player?.Entity == null)
         {
             return;
         }
@@ -55,34 +44,8 @@ public static class TeleportBackUtil
         return true;
     }
 
-    public static void ClearPreviousLocation(IServerPlayer player)
-    {
-        player?.SetModdata(BackLocationModDataKey, null);
-    }
-
     internal static bool IsExpired(long recordedUtcTicks, int expiresAfterSeconds, DateTime nowUtc)
     {
         return expiresAfterSeconds > 0 && nowUtc - new DateTime(recordedUtcTicks, DateTimeKind.Utc) > TimeSpan.FromSeconds(expiresAfterSeconds);
-    }
-
-    private sealed class RecordingSuppressionScope : IDisposable
-    {
-        private bool _disposed;
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
-            ReleaseRecordingSuppression();
-        }
-
-        private static void ReleaseRecordingSuppression()
-        {
-            _recordingSuppressed = Math.Max(0, _recordingSuppressed - 1);
-        }
     }
 }

@@ -66,75 +66,103 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
     private void RegisterCommands()
     {
-        API.ChatCommands.GetOrCreate("home")
-            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-home-desc"))
-            .WithArgs(new WordArgParser("home", false))
-            .RequiresPrivilege(GetHomePrivilege())
-            .RequiresPlayer()
-            .HandleWith(HandleHome);
+        var teleportation = GetTeleportationConfig();
+        if (teleportation.RegisterHomeCommands)
+        {
+            API.ChatCommands.GetOrCreate("home")
+                .WithDescription(Lang.Get("thebasics:home-spawn-cmd-home-desc"))
+                .WithArgs(new WordArgParser("home", false))
+                .RequiresPrivilege(GetHomePrivilege())
+                .RequiresPlayer()
+                .HandleWith(HandleHome);
 
-        API.ChatCommands.GetOrCreate("sethome")
-            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-sethome-desc"))
-            .WithArgs(new WordArgParser("home", false))
-            .RequiresPrivilege(GetSetHomePrivilege())
-            .RequiresPlayer()
-            .HandleWith(HandleSetHome);
+            API.ChatCommands.GetOrCreate("sethome")
+                .WithDescription(Lang.Get("thebasics:home-spawn-cmd-sethome-desc"))
+                .WithArgs(new WordArgParser("home", false))
+                .RequiresPrivilege(GetSetHomePrivilege())
+                .RequiresPlayer()
+                .HandleWith(HandleSetHome);
 
-        API.ChatCommands.GetOrCreate("homes")
-            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-homes-desc"))
-            .RequiresPrivilege(GetHomePrivilege())
-            .RequiresPlayer()
-            .HandleWith(HandleHomes);
+            API.ChatCommands.GetOrCreate("homes")
+                .WithDescription(Lang.Get("thebasics:home-spawn-cmd-homes-desc"))
+                .RequiresPrivilege(GetHomePrivilege())
+                .RequiresPlayer()
+                .HandleWith(HandleHomes);
 
-        API.ChatCommands.GetOrCreate("delhome")
-            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-delhome-desc"))
-            .WithArgs(new WordArgParser("home", false))
-            .RequiresPrivilege(GetSetHomePrivilege())
-            .RequiresPlayer()
-            .HandleWith(HandleDelHome);
+            API.ChatCommands.GetOrCreate("delhome")
+                .WithDescription(Lang.Get("thebasics:home-spawn-cmd-delhome-desc"))
+                .WithArgs(new WordArgParser("home", false))
+                .RequiresPrivilege(GetSetHomePrivilege())
+                .RequiresPlayer()
+                .HandleWith(HandleDelHome);
+        }
 
-        API.ChatCommands.GetOrCreate("spawn")
-            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-spawn-desc"))
-            .RequiresPrivilege(GetSpawnPrivilege())
-            .RequiresPlayer()
-            .HandleWith(HandleSpawn);
+        if (teleportation.RegisterSpawnCommands)
+        {
+            API.ChatCommands.GetOrCreate("spawn")
+                .WithDescription(Lang.Get("thebasics:home-spawn-cmd-spawn-desc"))
+                .RequiresPrivilege(GetSpawnPrivilege())
+                .RequiresPlayer()
+                .HandleWith(HandleSpawn);
 
-        API.ChatCommands.GetOrCreate("setspawn")
-            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-setspawn-desc"))
-            .RequiresPrivilege(GetSetSpawnPrivilege())
-            .RequiresPlayer()
-            .HandleWith(HandleSetSpawn);
+            API.ChatCommands.GetOrCreate("setspawn")
+                .WithDescription(Lang.Get("thebasics:home-spawn-cmd-setspawn-desc"))
+                .RequiresPrivilege(GetSetSpawnPrivilege())
+                .RequiresPlayer()
+                .HandleWith(HandleSetSpawn);
+        }
 
-        API.ChatCommands.GetOrCreate("stuck")
-            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-stuck-desc"))
-            .RequiresPrivilege(GetStuckPrivilege())
-            .RequiresPlayer()
-            .HandleWith(HandleStuck);
+        if (teleportation.RegisterStuckCommand)
+        {
+            API.ChatCommands.GetOrCreate("stuck")
+                .WithDescription(Lang.Get("thebasics:home-spawn-cmd-stuck-desc"))
+                .RequiresPrivilege(GetStuckPrivilege())
+                .RequiresPlayer()
+                .HandleWith(HandleStuck);
+        }
 
-        API.ChatCommands.GetOrCreate("top")
-            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-top-desc"))
-            .RequiresPrivilege(GetTopPrivilege())
-            .RequiresPlayer()
-            .HandleWith(HandleTop);
+        if (teleportation.RegisterTopCommand)
+        {
+            API.ChatCommands.GetOrCreate("top")
+                .WithDescription(Lang.Get("thebasics:home-spawn-cmd-top-desc"))
+                .RequiresPrivilege(GetTopPrivilege())
+                .RequiresPlayer()
+                .HandleWith(HandleTop);
+        }
 
-        API.ChatCommands.GetOrCreate("back")
-            .WithDescription(Lang.Get("thebasics:home-spawn-cmd-back-desc"))
-            .RequiresPrivilege(GetBackPrivilege())
-            .RequiresPlayer()
-            .HandleWith(HandleBack);
+        if (teleportation.RegisterBackCommand)
+        {
+            API.ChatCommands.GetOrCreate("back")
+                .WithDescription(Lang.Get("thebasics:home-spawn-cmd-back-desc"))
+                .RequiresPrivilege(GetBackPrivilege())
+                .RequiresPlayer()
+                .HandleWith(HandleBack);
+        }
     }
 
     private void RefreshCommandPrivileges()
     {
-        API.ChatCommands.Get("home")?.RequiresPrivilege(GetHomePrivilege());
-        API.ChatCommands.Get("sethome")?.RequiresPrivilege(GetSetHomePrivilege());
-        API.ChatCommands.Get("homes")?.RequiresPrivilege(GetHomePrivilege());
-        API.ChatCommands.Get("delhome")?.RequiresPrivilege(GetSetHomePrivilege());
-        API.ChatCommands.Get("spawn")?.RequiresPrivilege(GetSpawnPrivilege());
-        API.ChatCommands.Get("setspawn")?.RequiresPrivilege(GetSetSpawnPrivilege());
-        API.ChatCommands.Get("stuck")?.RequiresPrivilege(GetStuckPrivilege());
-        API.ChatCommands.Get("top")?.RequiresPrivilege(GetTopPrivilege());
-        API.ChatCommands.Get("back")?.RequiresPrivilege(GetBackPrivilege());
+        var teleportation = GetTeleportationConfig();
+        var commandPrivileges = new[]
+        {
+            (teleportation.RegisterHomeCommands, "home", GetHomePrivilege()),
+            (teleportation.RegisterHomeCommands, "sethome", GetSetHomePrivilege()),
+            (teleportation.RegisterHomeCommands, "homes", GetHomePrivilege()),
+            (teleportation.RegisterHomeCommands, "delhome", GetSetHomePrivilege()),
+            (teleportation.RegisterSpawnCommands, "spawn", GetSpawnPrivilege()),
+            (teleportation.RegisterSpawnCommands, "setspawn", GetSetSpawnPrivilege()),
+            (teleportation.RegisterStuckCommand, "stuck", GetStuckPrivilege()),
+            (teleportation.RegisterTopCommand, "top", GetTopPrivilege()),
+            (teleportation.RegisterBackCommand, "back", GetBackPrivilege())
+        };
+
+        foreach (var (enabled, commandName, privilege) in commandPrivileges)
+        {
+            if (enabled)
+            {
+                API.ChatCommands.Get(commandName)?.RequiresPrivilege(privilege);
+            }
+        }
     }
 
     private TextCommandResult HandleSetHome(TextCommandCallingArgs args)
@@ -475,12 +503,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
             return gearError;
         }
 
-        using (TeleportBackUtil.SuppressRecording())
-        {
-            Teleport(player, location);
-        }
-
-        TeleportBackUtil.ClearPreviousLocation(player);
+        Teleport(player, location);
         MarkCooldown(player, BackCooldownModDataKey);
 
         AnalyticsService.TrackCommandUsed("back", true);
@@ -794,15 +817,35 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
     private void RegisterConfiguredPrivileges()
     {
-        RegisterPrivilegeIfCustom(GetHomePrivilege(), "thebasics:home-spawn-home-privilege-desc");
-        RegisterPrivilegeIfCustom(GetSetHomePrivilege(), "thebasics:home-spawn-sethome-privilege-desc");
-        RegisterPrivilegeIfCustom(GetSpawnPrivilege(), "thebasics:home-spawn-spawn-privilege-desc");
-        RegisterPrivilegeIfCustom(GetSetSpawnPrivilege(), "thebasics:home-spawn-setspawn-privilege-desc");
-        RegisterPrivilegeIfCustom(GetStuckPrivilege(), "thebasics:home-spawn-stuck-privilege-desc");
-        RegisterPrivilegeIfCustom(GetStuckAdminNotifyPrivilege(), "thebasics:home-spawn-stuck-admin-notify-privilege-desc");
-        RegisterPrivilegeIfCustom(GetStuckBlockedByOnlinePrivilege(), "thebasics:home-spawn-stuck-blocked-by-online-privilege-desc");
-        RegisterPrivilegeIfCustom(GetTopPrivilege(), "thebasics:home-spawn-top-privilege-desc");
-        RegisterPrivilegeIfCustom(GetBackPrivilege(), "thebasics:home-spawn-back-privilege-desc");
+        var teleportation = GetTeleportationConfig();
+        if (teleportation.RegisterHomeCommands)
+        {
+            RegisterPrivilegeIfCustom(GetHomePrivilege(), "thebasics:home-spawn-home-privilege-desc");
+            RegisterPrivilegeIfCustom(GetSetHomePrivilege(), "thebasics:home-spawn-sethome-privilege-desc");
+        }
+
+        if (teleportation.RegisterSpawnCommands)
+        {
+            RegisterPrivilegeIfCustom(GetSpawnPrivilege(), "thebasics:home-spawn-spawn-privilege-desc");
+            RegisterPrivilegeIfCustom(GetSetSpawnPrivilege(), "thebasics:home-spawn-setspawn-privilege-desc");
+        }
+
+        if (teleportation.RegisterStuckCommand)
+        {
+            RegisterPrivilegeIfCustom(GetStuckPrivilege(), "thebasics:home-spawn-stuck-privilege-desc");
+            RegisterPrivilegeIfCustom(GetStuckAdminNotifyPrivilege(), "thebasics:home-spawn-stuck-admin-notify-privilege-desc");
+            RegisterPrivilegeIfCustom(GetStuckBlockedByOnlinePrivilege(), "thebasics:home-spawn-stuck-blocked-by-online-privilege-desc");
+        }
+
+        if (teleportation.RegisterTopCommand)
+        {
+            RegisterPrivilegeIfCustom(GetTopPrivilege(), "thebasics:home-spawn-top-privilege-desc");
+        }
+
+        if (teleportation.RegisterBackCommand)
+        {
+            RegisterPrivilegeIfCustom(GetBackPrivilege(), "thebasics:home-spawn-back-privilege-desc");
+        }
     }
 
     private void RegisterPrivilegeIfCustom(string privilege, string descriptionKey)

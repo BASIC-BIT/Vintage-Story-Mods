@@ -99,6 +99,11 @@ public class AnalyticsServiceTests : IDisposable
                 BackCooldownSeconds = 300,
                 BackExpiresAfterSeconds = 600,
                 BackRequireTemporalGear = true,
+                RegisterHomeCommands = false,
+                RegisterSpawnCommands = false,
+                RegisterStuckCommand = false,
+                RegisterTopCommand = false,
+                RegisterBackCommand = false,
                 StuckCooldownSeconds = 7200,
                 StuckReminderIntervalSeconds = 60,
                 CancelWarmupOnDamage = false,
@@ -122,6 +127,11 @@ public class AnalyticsServiceTests : IDisposable
         properties.Should().ContainKey("top_custom_privilege").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("back_custom_privilege").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("back_requires_temporal_gear").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("register_home_commands").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("register_spawn_commands").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("register_stuck_command").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("register_top_command").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("register_back_command").WhoseValue.Should().Be(false);
         properties.Should().ContainKey("max_homes_bucket").WhoseValue.Should().Be("1-5");
         properties.Should().ContainKey("top_warmup_seconds_bucket").WhoseValue.Should().Be("6-10");
         properties.Should().ContainKey("back_warmup_seconds_bucket").WhoseValue.Should().Be("6-10");

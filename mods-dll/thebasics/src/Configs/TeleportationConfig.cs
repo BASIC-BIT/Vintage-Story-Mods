@@ -71,6 +71,21 @@ public class TeleportationConfig
     [ProtoMember(22)]
     public bool BackRequireTemporalGear { get; set; }
 
+    [ProtoMember(23)]
+    public bool RegisterHomeCommands { get; set; } = true;
+
+    [ProtoMember(24)]
+    public bool RegisterSpawnCommands { get; set; } = true;
+
+    [ProtoMember(25)]
+    public bool RegisterStuckCommand { get; set; } = true;
+
+    [ProtoMember(26)]
+    public bool RegisterTopCommand { get; set; } = true;
+
+    [ProtoMember(27)]
+    public bool RegisterBackCommand { get; set; } = true;
+
     public void InitializeDefaultsIfNeeded()
     {
         MaxHomes = MaxHomes <= 0 ? 3 : MaxHomes;
