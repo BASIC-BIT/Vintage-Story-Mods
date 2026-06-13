@@ -26,6 +26,25 @@ public class MapPlayerVisibilityConfigApplierTests
     }
 
     [Fact]
+    public void Apply_RemovesManagedWorldConfigWhenManagementDisabled()
+    {
+        var worldConfig = new TreeAttribute();
+        worldConfig.SetBool(MapPlayerVisibilityConfigApplier.HideOtherPlayersKey, true);
+        worldConfig.SetFloat(MapPlayerVisibilityConfigApplier.PlayerRenderDistanceKey, 12f);
+        worldConfig.SetBool(MapPlayerVisibilityConfigApplier.ShowGroupPlayersKey, false);
+        var config = new ModConfig
+        {
+            ManageMapPlayerVisibility = false
+        };
+
+        MapPlayerVisibilityConfigApplier.Apply(config, worldConfig);
+
+        worldConfig.HasAttribute(MapPlayerVisibilityConfigApplier.HideOtherPlayersKey).Should().BeFalse();
+        worldConfig.HasAttribute(MapPlayerVisibilityConfigApplier.PlayerRenderDistanceKey).Should().BeFalse();
+        worldConfig.HasAttribute(MapPlayerVisibilityConfigApplier.ShowGroupPlayersKey).Should().BeFalse();
+    }
+
+    [Fact]
     public void Apply_WritesVanillaWorldConfigAndDisablesGroupBypass()
     {
         var worldConfig = new TreeAttribute();

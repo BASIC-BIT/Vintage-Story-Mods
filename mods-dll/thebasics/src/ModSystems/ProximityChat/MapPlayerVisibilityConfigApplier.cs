@@ -1,4 +1,3 @@
-using System;
 using thebasics.Configs;
 using Vintagestory.API.Datastructures;
 
@@ -12,8 +11,16 @@ internal static class MapPlayerVisibilityConfigApplier
 
     public static void Apply(ModConfig config, ITreeAttribute worldConfig)
     {
-        if (config?.ManageMapPlayerVisibility != true || worldConfig == null)
+        if (worldConfig == null)
         {
+            return;
+        }
+
+        if (config?.ManageMapPlayerVisibility != true)
+        {
+            worldConfig.RemoveAttribute(HideOtherPlayersKey);
+            worldConfig.RemoveAttribute(PlayerRenderDistanceKey);
+            worldConfig.RemoveAttribute(ShowGroupPlayersKey);
             return;
         }
 
@@ -24,6 +31,6 @@ internal static class MapPlayerVisibilityConfigApplier
 
     private static float NormalizeRenderDistance(int renderDistance)
     {
-        return renderDistance < 0 ? -1f : Math.Max(0, renderDistance);
+        return renderDistance < 0 ? -1f : (float)renderDistance;
     }
 }
