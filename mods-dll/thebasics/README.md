@@ -63,6 +63,10 @@ Nametags are also configurable (in `ModConfig/the_basics.json`):
 - `ShowPlayerNameInNametag`: show the Vintage Story account name above heads
 - `HideNametagUnlessTargeting`: only show nametags when the player is targeted
 - `NametagRenderRange`: how far away nametags render
+- `NametagBackgroundColor` / `NametagBorderColor`: optional `#RRGGBB` or `#RRGGBBAA` server defaults for custom nametag styling
+- `AllowPlayersToChangeNametagColors` / `ChangeNametagColorPermission`: allow players to override their own nametag background and border colors with `/nametagbgcolor` and `/nametagbordercolor`
+
+Map player markers can be managed by The BASICs with `ManageMapPlayerVisibility=true`. This writes Vintage Story's vanilla map marker world config for both minimap and full world map, using `MapHideOtherPlayers` and `MapPlayerRenderDistance`. The BASICs also disables vanilla same-group map visibility while managing these settings because Proximity chat is itself a player group.
 
 RP speech formatting can be relaxed for servers that prefer player-authored casing and punctuation:
 - `ProximityChatPresentationMode`: controls chat/bubble presentation. Allowed values are `StandardRoleplay`, `SimpleSpeech`, `PlainProximity`, and `Prose`.

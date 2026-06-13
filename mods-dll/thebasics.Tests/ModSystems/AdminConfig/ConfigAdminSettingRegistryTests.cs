@@ -320,6 +320,39 @@ public class ConfigAdminSettingRegistryTests
         config.Teleportation.BackCommandPrivilege.Should().Be("back");
     }
 
+    [Fact]
+    public void MapVisibilitySettings_AreRegisteredAndAllowUnlimitedRenderDistance()
+    {
+        var config = CreateConfig();
+
+        GetSetting("ManageMapPlayerVisibility").TrySetValue(config, "true", out var manageError).Should().BeTrue(manageError);
+        GetSetting("MapHideOtherPlayers").TrySetValue(config, "true", out var hideError).Should().BeTrue(hideError);
+        GetSetting("MapPlayerRenderDistance").TrySetValue(config, "-1", out var rangeError).Should().BeTrue(rangeError);
+
+        config.ManageMapPlayerVisibility.Should().BeTrue();
+        config.MapHideOtherPlayers.Should().BeTrue();
+        config.MapPlayerRenderDistance.Should().Be(-1);
+    }
+
+    [Fact]
+    public void NametagStyleSettings_AcceptOptionalHexColors()
+    {
+        var config = CreateConfig();
+
+        GetSetting("NametagBackgroundColor").TrySetValue(config, " #403529BF ", out var backgroundError).Should().BeTrue(backgroundError);
+        GetSetting("NametagBorderColor").TrySetValue(config, "", out var borderError).Should().BeTrue(borderError);
+        var invalid = GetSetting("NametagBorderColor").TrySetValue(config, "brown", out var invalidError);
+        GetSetting("AllowPlayersToChangeNametagColors").TrySetValue(config, "false", out var allowError).Should().BeTrue(allowError);
+        GetSetting("ChangeNametagColorPermission").TrySetValue(config, "nametagstyle", out var permissionError).Should().BeTrue(permissionError);
+
+        config.NametagBackgroundColor.Should().Be("#403529BF");
+        config.NametagBorderColor.Should().BeEmpty();
+        config.AllowPlayersToChangeNametagColors.Should().BeFalse();
+        config.ChangeNametagColorPermission.Should().Be("nametagstyle");
+        invalid.Should().BeFalse();
+        invalidError.Should().Contain("hex color");
+    }
+
     private static ModConfig CreateConfig()
     {
         var config = new ModConfig();

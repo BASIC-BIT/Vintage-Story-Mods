@@ -132,6 +132,11 @@ public sealed class TypingIndicatorRenderer : IRenderer
             return false;
         }
 
+        if (IsSneaking(entity))
+        {
+            return false;
+        }
+
         state = ChatUiSystem.GetEntityTypingIndicatorState(entity.EntityId);
         if (state == ChatTypingIndicatorState.None || localPlayerEntity.Pos.SquareDistanceTo(entity.Pos) > maxDistSq)
         {
@@ -145,6 +150,11 @@ public sealed class TypingIndicatorRenderer : IRenderer
 
         renderer = entity.Properties?.Client?.Renderer as EntityShapeRenderer;
         return renderer != null;
+    }
+
+    private static bool IsSneaking(EntityPlayer entity)
+    {
+        return entity.ServerControls?.Sneak == true || entity.Controls?.Sneak == true;
     }
 
     private static Vec3d ProjectIndicatorPosition(EntityPlayer entity, EntityShapeRenderer renderer, IRenderAPI rapi)

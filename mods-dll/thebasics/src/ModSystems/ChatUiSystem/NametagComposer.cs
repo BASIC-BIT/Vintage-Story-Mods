@@ -18,11 +18,6 @@ internal static class NametagComposer
     /// <summary>Px gap between the framed headshot and the text bubble. Keeps the two visually distinct.</summary>
     private const int InterElementGapPx = 16;
 
-    // Subtle vertical brown gradient, lighter in the middle to mimic MMO portrait frames.
-    private static readonly Color FrameGradientTop = new(0.42, 0.30, 0.18, 1.0);
-    private static readonly Color FrameGradientMid = new(0.55, 0.40, 0.24, 1.0);
-    private static readonly Color FrameGradientBottom = new(0.32, 0.22, 0.13, 1.0);
-
     public sealed class Options
     {
         public string Vtml { get; init; }
@@ -31,6 +26,7 @@ internal static class NametagComposer
         public TextBackground TextBackground { get; init; }
         public BitmapExternal HeadshotBitmap { get; init; }
         public int HeadshotRenderSizePx { get; init; }
+        public double[] HeadshotBorderColor { get; init; }
     }
 
     public static LoadedTexture Compose(ICoreClientAPI capi, Options options)
@@ -88,7 +84,7 @@ internal static class NametagComposer
 
         try
         {
-            return BuildFramedHeadshotSurface(options.HeadshotBitmap, options.HeadshotRenderSizePx);
+            return BuildFramedHeadshotSurface(options.HeadshotBitmap, options.HeadshotRenderSizePx, options.HeadshotBorderColor);
         }
         catch
         {
@@ -107,6 +103,7 @@ internal static class NametagComposer
 
         using var composite = new ImageSurface(Format.Argb32, compositeWidth, compositeHeight);
         using var ctx = new Context(composite);
+        ClearSurface(ctx);
         DrawComposite(ctx, textSurface, frameSurface, compositeHeight);
 
         var tex = new LoadedTexture(capi);
@@ -133,11 +130,11 @@ internal static class NametagComposer
     }
 
     /// <summary>
-    /// Renders the headshot bitmap onto a square surface with a subtle vertical brown gradient
-    /// border. The frame and inner image share the same rounded-corner radius so they read as a
-    /// single MMO-style portrait card.
+    /// Renders the headshot bitmap onto a square surface with the same border color as the text
+    /// bubble. The frame and inner image share the same rounded-corner radius so they read as one
+    /// nameplate.
     /// </summary>
-    private static ImageSurface BuildFramedHeadshotSurface(BitmapExternal bitmap, int renderSizePx)
+    private static ImageSurface BuildFramedHeadshotSurface(BitmapExternal bitmap, int renderSizePx, double[] borderColor)
     {
         var border = FrameBorderWidthPx;
         var totalSize = renderSizePx + 2 * border;
@@ -145,12 +142,9 @@ internal static class NametagComposer
         try
         {
             using var ctx = new Context(surface);
+            ClearSurface(ctx);
 
-            using var gradient = new LinearGradient(0, 0, 0, totalSize);
-            gradient.AddColorStop(0, FrameGradientTop);
-            gradient.AddColorStop(0.5, FrameGradientMid);
-            gradient.AddColorStop(1, FrameGradientBottom);
-            ctx.SetSource(gradient);
+            ctx.SetSourceRGBA(borderColor ?? GuiStyle.DialogBorderColor);
             GuiElement.RoundRectangle(ctx, 0, 0, totalSize, totalSize, FrameCornerRadius);
             ctx.Fill();
 
@@ -172,5 +166,13 @@ internal static class NametagComposer
             surface.Dispose();
             throw;
         }
+    }
+
+    private static void ClearSurface(Context ctx)
+    {
+        ctx.Save();
+        ctx.Operator = Operator.Clear;
+        ctx.Paint();
+        ctx.Restore();
     }
 }

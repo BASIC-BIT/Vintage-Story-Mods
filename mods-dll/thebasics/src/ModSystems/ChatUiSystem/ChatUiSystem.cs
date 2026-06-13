@@ -839,6 +839,10 @@ public class ChatUiSystem : ModSystem
     // Cairo-pixel size — VS's distance scaling shrinks the on-screen size from here.
     internal static int GetNametagInlineImagePixelSize() => Math.Max(24, _config?.NametagInlineImagePixelSize ?? 100);
 
+    internal static string GetNametagBackgroundColor() => _config?.NametagBackgroundColor ?? string.Empty;
+
+    internal static string GetNametagBorderColor() => _config?.NametagBorderColor ?? string.Empty;
+
     private static void OnMain(Action action)
     {
         if (action == null || _api == null)
@@ -1818,6 +1822,7 @@ public class ChatUiSystem : ModSystem
             entity,
             _config.HideNametagUnlessTargeting,
             _config.NametagRenderRange);
+        EntityBehaviorNameTagPatches.RebuildTexture(entity);
     }
 
     private static void ScheduleRpttsInitialization()

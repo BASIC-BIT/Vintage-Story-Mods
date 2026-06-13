@@ -38,6 +38,8 @@ public class CharacterSheetSystem : BaseBasicModSystem
     /// Lives next to <see cref="HeadshotHashAttrKey"/> for the same OnNameChanged-triggering reason.
     /// </summary>
     internal const string NicknameColorAttrKey = "thebasicsNicknameColor";
+    internal const string NametagBackgroundColorAttrKey = "thebasicsNametagBackgroundColor";
+    internal const string NametagBorderColorAttrKey = "thebasicsNametagBorderColor";
 
     private HeadshotStore _headshotStore;
     private readonly Dictionary<string, long> _lastHeadshotUploadAtMs = new();
@@ -69,7 +71,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
         if (player?.Entity == null) return;
         var data = GetSheetData(player);
         SyncHeadshotHashAttr(player, data?.Headshot?.Hash);
-        SyncNicknameColorAttr(player);
+        SyncNametagVisualAttrs(player);
     }
 
     private static void SyncHeadshotHashAttr(IServerPlayer player, string hash)
@@ -1377,7 +1379,14 @@ public class CharacterSheetSystem : BaseBasicModSystem
         behavior.ShowOnlyWhenTargeted = Config.HideNametagUnlessTargeting;
         behavior.RenderRange = Config.NametagRenderRange;
         behavior.SetName(BuildNametagDisplayName(player, Config));
+        SyncNametagVisualAttrs(player);
+    }
+
+    internal static void SyncNametagVisualAttrs(IServerPlayer player)
+    {
         SyncNicknameColorAttr(player);
+        SyncNametagBackgroundColorAttr(player);
+        SyncNametagBorderColorAttr(player);
     }
 
     /// <summary>
@@ -1393,6 +1402,27 @@ public class CharacterSheetSystem : BaseBasicModSystem
         var color = player.GetNicknameColor() ?? string.Empty;
         if (nametag.GetString(NicknameColorAttrKey) == color) return;
         nametag.SetString(NicknameColorAttrKey, color);
+        attrs.MarkPathDirty(NametagAttrTree);
+    }
+
+    private static void SyncNametagBackgroundColorAttr(IServerPlayer player)
+    {
+        SyncNametagColorAttr(player, NametagBackgroundColorAttrKey, player.GetNametagBackgroundColor());
+    }
+
+    private static void SyncNametagBorderColorAttr(IServerPlayer player)
+    {
+        SyncNametagColorAttr(player, NametagBorderColorAttrKey, player.GetNametagBorderColor());
+    }
+
+    private static void SyncNametagColorAttr(IServerPlayer player, string attrKey, string color)
+    {
+        if (player?.Entity?.WatchedAttributes is not { } attrs) return;
+        var nametag = attrs.GetTreeAttribute(NametagAttrTree);
+        if (nametag == null) return;
+        var safe = color ?? string.Empty;
+        if (nametag.GetString(attrKey) == safe) return;
+        nametag.SetString(attrKey, safe);
         attrs.MarkPathDirty(NametagAttrTree);
     }
 
