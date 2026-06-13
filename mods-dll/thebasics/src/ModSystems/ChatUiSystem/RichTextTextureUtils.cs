@@ -113,6 +113,7 @@ internal static class RichTextTextureUtils
 
             var surface = new ImageSurface(Format.Argb32, surfaceWidth, surfaceHeight);
             using var ctx = new Context(surface);
+            ClearSurface(ctx);
 
             GuiElement.RoundRectangle(ctx, borderInset, borderInset, bubbleWidth, bubbleHeight, background.Radius);
             ctx.SetSourceRGBA(background.FillColor);
@@ -137,7 +138,11 @@ internal static class RichTextTextureUtils
                 textHeightPx / (double)guiScale
             );
             offsetBounds.ParentBounds = ElementBounds.Empty;
+            ctx.Save();
+            ctx.Rectangle(borderInset, borderInset, bubbleWidth, bubbleHeight);
+            ctx.Clip();
             rich.ComposeFor(offsetBounds, ctx, surface);
+            ctx.Restore();
 
             // Clear the bottom transparent margin (chat-bubble spacing) so no stray Cairo AA
             // bleeds into the gap separating the bubble from the nametag below it.
@@ -320,6 +325,14 @@ internal static class RichTextTextureUtils
                 }
             }
         }
+    }
+
+    private static void ClearSurface(Context ctx)
+    {
+        ctx.Save();
+        ctx.Operator = Operator.Clear;
+        ctx.Paint();
+        ctx.Restore();
     }
 
     private sealed class VisualLine

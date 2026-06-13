@@ -221,15 +221,18 @@ public static class EntityBehaviorNameTagPatches
     {
         var resolvedName = Lang.GetIfExists("nametag-" + name.ToLowerInvariant()) ?? name;
         var vtml = WrapWithNicknameColor(resolvedName, nicknameColor, playerName);
+        var effectiveBackgroundColor = ResolveNametagColor(backgroundColor, ChatUiSystem.GetNametagBackgroundColor(), GuiStyle.DialogLightBgColor);
+        var effectiveBorderColor = ResolveNametagColor(borderColor, ChatUiSystem.GetNametagBorderColor(), GuiStyle.DialogBorderColor);
 
         return NametagComposer.Compose(capi, new NametagComposer.Options
         {
             Vtml = vtml,
             BaseFont = CreateNametagBaseFont(),
             MaxTextWidthPx = NametagMaxTextWidthPx,
-            TextBackground = CreateNametagBackground(backgroundColor, borderColor),
+            TextBackground = CreateNametagBackground(effectiveBackgroundColor, effectiveBorderColor),
             HeadshotBitmap = headshotBitmap,
-            HeadshotRenderSizePx = ChatUiSystem.GetNametagInlineImagePixelSize()
+            HeadshotRenderSizePx = ChatUiSystem.GetNametagInlineImagePixelSize(),
+            HeadshotBorderColor = effectiveBorderColor
         });
     }
 
@@ -240,15 +243,15 @@ public static class EntityBehaviorNameTagPatches
         return baseFont;
     }
 
-    private static TextBackground CreateNametagBackground(string backgroundColor, string borderColor)
+    private static TextBackground CreateNametagBackground(double[] backgroundColor, double[] borderColor)
     {
         return new TextBackground
         {
-            FillColor = ResolveNametagColor(backgroundColor, ChatUiSystem.GetNametagBackgroundColor(), GuiStyle.DialogLightBgColor),
+            FillColor = backgroundColor,
             Padding = 3,
             Radius = GuiStyle.ElementBGRadius,
             Shade = true,
-            BorderColor = ResolveNametagColor(borderColor, ChatUiSystem.GetNametagBorderColor(), GuiStyle.DialogBorderColor),
+            BorderColor = borderColor,
             BorderWidth = 3.0
         };
     }
