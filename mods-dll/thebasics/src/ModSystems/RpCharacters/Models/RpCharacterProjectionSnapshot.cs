@@ -3,6 +3,7 @@ using System.ComponentModel;
 using ProtoBuf;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.ModSystems.ProximityChat.Semantics;
 
 namespace thebasics.ModSystems.RpCharacters.Models;
 
@@ -27,4 +28,10 @@ public class RpCharacterProjectionSnapshot
     [ProtoMember(6)]
     [DefaultValue(true)]
     public bool ChatterEnabled { get; set; } = true;
+
+    [ProtoMember(7)]
+    public Dictionary<string, int> LanguageSkills { get; set; } = new Dictionary<string, int>();
+
+    [ProtoMember(8)]
+    public SemanticLanguageMemoryStore SemanticLanguageMemory { get; set; } = new SemanticLanguageMemoryStore();
 }

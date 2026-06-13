@@ -34,6 +34,8 @@ namespace thebasics.Configs
             InitializeGeneralFeatureDefaults();
             InitializeNotesDefaults();
             InitializeChatHistoryDefaults();
+            SemanticLanguageLearning ??= new SemanticLanguageLearningConfig();
+            SemanticLanguageLearning.Normalize();
         }
 
         private void InitializeProximityChatDefaults()
@@ -818,5 +820,8 @@ namespace thebasics.Configs
         // whether death messages are intentionally re-sent to nearby players afterward.
         [ProtoMember(132)]
         public bool EnableNearbyDeathMessagesInProximityChat { get; set; } = true;
+
+        [ProtoMember(133)]
+        public SemanticLanguageLearningConfig SemanticLanguageLearning { get; set; } = new SemanticLanguageLearningConfig();
     }
 }

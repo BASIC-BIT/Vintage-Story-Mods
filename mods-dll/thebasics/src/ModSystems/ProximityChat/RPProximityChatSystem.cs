@@ -14,6 +14,7 @@ using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.Notes;
 using thebasics.ModSystems.Notes.Models;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.ModSystems.ProximityChat.Semantics;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Utilities;
 using thebasics.Utilities.Parsers;
@@ -42,6 +43,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     public event EventHandler<ProximityChatMessageEventArgs> ProximityChatMessageProcessed;
 
     public int ProximityChatGroupId => ProximityChatId;
+
+    public string SemanticEmbeddingProviderStatus => LanguageSystem?.SemanticEmbeddingProviderStatus ?? "Language system unavailable.";
 
     // Ephemeral state; do not persist.
     private readonly System.Collections.Generic.Dictionary<long, ChatTypingIndicatorState> _typingStatesByEntityId = new();
@@ -100,9 +103,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     public override void Dispose()
     {
+        LanguageSystem?.DisposeLanguageServices();
         ProximityLifecycleMessageFilter.Unpatch(_serverHarmony);
         _serverHarmony = null;
         base.Dispose();
+    }
+
+    public bool RegisterSemanticEmbeddingProvider(ITheBasicsSemanticEmbeddingProvider provider)
+    {
+        return LanguageSystem?.RegisterSemanticEmbeddingProvider(provider) == true;
     }
 
     private void LogExtensionHandlerFailure(Delegate handler, Exception ex)
@@ -1345,7 +1354,18 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             playerData.SetLanguages(reconciledNames);
         }
 
+        ReconcileStoredLanguageSkills(playerData, renameMap, languagesByName, reconciledNames);
         ReconcileStoredDefaultLanguage(playerData, renameMap, languagesByName, reconciledNames);
+    }
+
+    private static void ReconcileStoredLanguageSkills(ServerWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
+    {
+        var currentSkills = playerData.GetLanguageSkills();
+        var reconciledSkills = ReconcileLanguageSkills(currentSkills, renameMap, languagesByName, knownNames);
+        if (!LanguageSkillsEqual(currentSkills, reconciledSkills))
+        {
+            playerData.SetLanguageSkills(reconciledSkills);
+        }
     }
 
     private void ReconcileStoredDefaultLanguage(ServerWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> reconciledNames)
@@ -1405,7 +1425,63 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             serverPlayer.SetLanguages(reconciledNames);
         }
 
+        ReconcilePlayerLanguageSkills(serverPlayer, renameMap, languagesByName, reconciledNames);
         ReconcilePlayerDefaultLanguage(serverPlayer, renameMap, languagesByName, reconciledNames);
+    }
+
+    private static void ReconcilePlayerLanguageSkills(IServerPlayer serverPlayer, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
+    {
+        var currentSkills = serverPlayer.GetLanguageSkills();
+        var reconciledSkills = ReconcileLanguageSkills(currentSkills, renameMap, languagesByName, knownNames);
+        if (!LanguageSkillsEqual(currentSkills, reconciledSkills))
+        {
+            serverPlayer.SetLanguageSkills(reconciledSkills);
+        }
+    }
+
+    private static Dictionary<string, int> ReconcileLanguageSkills(IDictionary<string, int> currentSkills, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
+    {
+        var known = new HashSet<string>(knownNames, StringComparer.OrdinalIgnoreCase);
+        var reconciled = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entry in currentSkills ?? new Dictionary<string, int>())
+        {
+            var candidate = renameMap.TryGetValue(entry.Key, out var renamed) ? renamed : entry.Key;
+            if (!languagesByName.TryGetValue(candidate, out var language) || known.Contains(language.Name))
+            {
+                continue;
+            }
+
+            var skill = Math.Max(0, Math.Min(100, entry.Value));
+            if (skill <= 0)
+            {
+                continue;
+            }
+
+            reconciled[language.Name] = reconciled.TryGetValue(language.Name, out var existingSkill)
+                ? Math.Max(existingSkill, skill)
+                : skill;
+        }
+
+        return reconciled;
+    }
+
+    private static bool LanguageSkillsEqual(IReadOnlyDictionary<string, int> currentSkills, IReadOnlyDictionary<string, int> reconciledSkills)
+    {
+        if ((currentSkills?.Count ?? 0) != (reconciledSkills?.Count ?? 0))
+        {
+            return false;
+        }
+
+        foreach (var entry in reconciledSkills)
+        {
+            if (currentSkills == null || !currentSkills.TryGetValue(entry.Key, out var currentSkill) || currentSkill != entry.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void ReconcilePlayerDefaultLanguage(IServerPlayer serverPlayer, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> reconciledNames)

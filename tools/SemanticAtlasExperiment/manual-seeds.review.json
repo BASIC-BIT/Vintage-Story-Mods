@@ -1,0 +1,233 @@
+{
+  "seedPacks": [
+    {
+      "id": "base-temporal-lore",
+      "name": "Base Game Temporal Lore",
+      "reviewStatus": "approved-for-experiment",
+      "tags": ["base-game", "lore", "temporal"],
+      "sources": [
+        "https://wiki.vintagestory.at/index.php/Temporal_stability",
+        "https://wiki.vintagestory.at/index.php/Translocator",
+        "https://wiki.vintagestory.at/index.php/Ruins"
+      ],
+      "terms": [
+        "temporal stability",
+        "temporal storm",
+        "rift",
+        "Rust World",
+        "static translocator",
+        "broken static translocator",
+        "repaired translocator",
+        "temporal gear",
+        "rusty gear",
+        "resonance archive",
+        "lore room",
+        "ruins",
+        "underground ruins",
+        "Jonas Falx",
+        "rot",
+        "ruined machinery"
+      ],
+      "phrases": [
+        "a temporal storm is approaching",
+        "repair the broken static translocator with temporal gears",
+        "the rift opens into the Rust World",
+        "search the ruins for a lore room",
+        "read the notes left by Jonas Falx",
+        "the machine is covered in rot and rust"
+      ]
+    },
+    {
+      "id": "base-creatures-lore",
+      "name": "Base Game Creatures And Threats",
+      "reviewStatus": "approved-for-experiment",
+      "tags": ["base-game", "mob", "lore", "danger"],
+      "sources": [
+        "https://wiki.vintagestory.at/index.php/Drifter",
+        "https://wiki.vintagestory.at/index.php/Locust",
+        "https://wiki.vintagestory.at/index.php/Bell"
+      ],
+      "terms": [
+        "drifter",
+        "surface drifter",
+        "deep drifter",
+        "tainted drifter",
+        "corrupt drifter",
+        "nightmare drifter",
+        "double-headed drifter",
+        "locust",
+        "sawblade locust",
+        "corrupt sawblade locust",
+        "bell",
+        "locust workshop"
+      ],
+      "phrases": [
+        "a nightmare drifter is near the camp",
+        "a corrupt sawblade locust attacks in the ruins",
+        "the bell summons locusts",
+        "avoid the locust workshop until morning",
+        "deep drifters are coming from the cave"
+      ]
+    },
+    {
+      "id": "base-crafting-survival",
+      "name": "Base Game Crafting And Survival",
+      "reviewStatus": "approved-for-experiment",
+      "tags": ["base-game", "crafting", "survival"],
+      "sources": [
+        "https://wiki.vintagestory.at/index.php/Knapping",
+        "https://wiki.vintagestory.at/index.php/Clay_forming",
+        "https://wiki.vintagestory.at/index.php/Smithing",
+        "https://wiki.vintagestory.at/index.php/Mechanical_power",
+        "https://wiki.vintagestory.at/index.php/Prospecting"
+      ],
+      "terms": [
+        "knapping",
+        "clay forming",
+        "pit kiln",
+        "mold",
+        "crock",
+        "cooking pot",
+        "smithing",
+        "anvil",
+        "ingot",
+        "work item",
+        "helve hammer",
+        "mechanical power",
+        "windmill",
+        "sail",
+        "axle",
+        "gearbox",
+        "quern",
+        "pulverizer",
+        "prospecting pick",
+        "node search",
+        "density search"
+      ],
+      "phrases": [
+        "knap a flint knife blade",
+        "fire the cooking pot in a pit kiln",
+        "smith the ingot on an anvil",
+        "connect the windmill to the quern with axles",
+        "use the prospecting pick in density search mode"
+      ]
+    },
+    {
+      "id": "social-roleplay",
+      "name": "Social Roleplay",
+      "reviewStatus": "approved-for-experiment",
+      "tags": ["manual", "roleplay", "social"],
+      "sources": [],
+      "terms": [
+        "friend",
+        "stranger",
+        "kin",
+        "family",
+        "promise",
+        "debt",
+        "oath",
+        "betrayal",
+        "bargain",
+        "truce",
+        "warning",
+        "mercy"
+      ],
+      "phrases": [
+        "I owe you a debt",
+        "keep your promise to the family",
+        "we can make a bargain",
+        "that stranger betrayed the camp",
+        "swear an oath before the others"
+      ]
+    },
+    {
+      "id": "danger-help-logistics",
+      "name": "Danger Help And Logistics",
+      "reviewStatus": "approved-for-experiment",
+      "tags": ["manual", "roleplay", "survival", "danger"],
+      "sources": [],
+      "terms": [
+        "help",
+        "flee",
+        "danger",
+        "ambush",
+        "wounded",
+        "safe",
+        "shelter",
+        "rescue",
+        "supplies",
+        "guard",
+        "road",
+        "camp",
+        "home"
+      ],
+      "phrases": [
+        "help me carry the supplies",
+        "flee from the ambush",
+        "the wounded traveler needs shelter",
+        "guard the road until nightfall",
+        "meet at home and share food"
+      ]
+    },
+    {
+      "id": "popular-mods-community",
+      "name": "Popular Mods And Community Terms",
+      "reviewStatus": "approved-for-experiment",
+      "tags": ["mod", "community"],
+      "sources": [
+        "https://mods.vintagestory.at/expandedfoods",
+        "https://mods.vintagestory.at/aculinaryartillery",
+        "https://mods.vintagestory.at/primitivesurvival",
+        "https://mods.vintagestory.at/betterruins",
+        "https://mods.vintagestory.at/carryon",
+        "https://mods.vintagestory.at/show/mod/44074",
+        "https://mods.vintagestory.at/wildcraft",
+        "https://mods.vintagestory.at/millwright",
+        "https://mods.vintagestory.at/prospecttogether",
+        "https://mods.vintagestory.at/feverstonewilds"
+      ],
+      "terms": [
+        "Expanded Foods",
+        "A Culinary Artillery",
+        "meal",
+        "expanded cooking",
+        "food preservation",
+        "Primitive Survival",
+        "fish trap",
+        "snare",
+        "animal trap",
+        "BetterRuins",
+        "dungeon",
+        "loot room",
+        "Carry On",
+        "carryable block",
+        "xSkills",
+        "skill tree",
+        "experience",
+        "ability",
+        "profession",
+        "Wildcraft",
+        "Herbarium",
+        "herbs",
+        "foraging",
+        "Millwright",
+        "water wheel",
+        "power train",
+        "ProspectTogether",
+        "shared prospecting",
+        "prospecting map",
+        "ore markers",
+        "Feverstone Wilds",
+        "biome expansion"
+      ],
+      "phrases": [
+        "place a fish trap from Primitive Survival",
+        "mark the ore reading on the ProspectTogether map",
+        "move the chest with Carry On",
+        "explore a BetterRuins dungeon",
+        "preserve food with Expanded Foods",
+        "build a water wheel with Millwright"
+      ]
+    }
+  ]
+}

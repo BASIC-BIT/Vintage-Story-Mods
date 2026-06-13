@@ -1,0 +1,391 @@
+{
+  "atlasId": "vintagestory-core-pilot",
+  "displayName": "Vintage Story Core Pilot",
+  "version": "0.1.0",
+  "buckets": [
+    {
+      "id": "temporal-gear",
+      "label": "Temporal Gear",
+      "alias": "temporal-gear",
+      "family": "temporal-lore",
+      "tags": ["base-game", "temporal", "lore", "item"],
+      "examples": ["temporal gear", "large temporal gear", "no fuel, add temporal gear", "add temporal gear to fuel", "temporal gear amulet"]
+    },
+    {
+      "id": "static-translocator",
+      "label": "Static Translocator",
+      "alias": "static-translocator",
+      "family": "temporal-lore",
+      "tags": ["base-game", "temporal", "lore", "block"],
+      "examples": ["static translocator", "broken static translocator", "repaired translocator", "ruined static translocator", "repair the broken static translocator with temporal gears"]
+    },
+    {
+      "id": "temporal-storm",
+      "label": "Temporal Storm",
+      "alias": "temporal-storm",
+      "family": "temporal-lore",
+      "tags": ["base-game", "temporal", "lore", "danger"],
+      "examples": ["temporal storm", "a temporal storm is approaching", "heavy temporal storm", "light temporal storm", "temporal storm is imminent"]
+    },
+    {
+      "id": "drifters",
+      "label": "Drifters",
+      "alias": "drifters",
+      "family": "hostile-creatures",
+      "tags": ["base-game", "mob", "danger", "lore"],
+      "examples": ["drifter", "deep drifter", "tainted drifter", "corrupt drifter", "nightmare drifter", "double-headed drifter"]
+    },
+    {
+      "id": "locusts",
+      "label": "Locusts",
+      "alias": "locusts",
+      "family": "hostile-creatures",
+      "tags": ["base-game", "mob", "danger", "lore"],
+      "examples": ["locust", "bronze locust", "corrupt locust", "sawblade locust", "corrupt sawblade locust", "locust workshop"]
+    },
+    {
+      "id": "resonance-archive",
+      "label": "Resonance Archive",
+      "alias": "resonance-archive",
+      "family": "temporal-lore",
+      "tags": ["base-game", "lore", "ruins"],
+      "examples": ["resonance archive", "map to the resonance archive", "Resonance Archives", "search the ruins for a lore room"]
+    },
+    {
+      "id": "rusty-gear",
+      "label": "Rusty Gear",
+      "alias": "rusty-gear",
+      "family": "temporal-lore",
+      "tags": ["base-game", "lore", "item", "trade"],
+      "examples": ["rusty gear", "gears", "trade rusty gears", "rust world", "ruined machinery"]
+    },
+    {
+      "id": "black-bronze-tools",
+      "label": "Black Bronze Tools",
+      "alias": "black-bronze-tools",
+      "family": "metals",
+      "tags": ["base-game", "metalworking", "tools"],
+      "examples": ["black bronze axe", "black bronze axe head", "black bronze hammer head", "forge a black bronze ingot", "work black bronze on the anvil"]
+    },
+    {
+      "id": "bismuth-bronze-tools",
+      "label": "Bismuth Bronze Tools",
+      "alias": "bismuth-bronze-tools",
+      "family": "metals",
+      "tags": ["base-game", "metalworking", "tools"],
+      "examples": ["bismuth bronze anvil", "bismuth bronze axe", "bismuth bronze axe head", "forge a bismuth bronze ingot", "repair tools with bismuth bronze"]
+    },
+    {
+      "id": "copper-working",
+      "label": "Copper Working",
+      "alias": "copper-working",
+      "family": "metals",
+      "tags": ["base-game", "metalworking", "mining"],
+      "examples": ["copper block", "copper plate", "copper rod", "native copper ore", "forge a copper ingot", "crush native copper ore in the pulverizer"]
+    },
+    {
+      "id": "meteoric-iron",
+      "label": "Meteoric Iron",
+      "alias": "meteoric-iron",
+      "family": "metals",
+      "tags": ["base-game", "metalworking", "tools"],
+      "examples": ["meteoric iron", "iron meteorite piece", "loose meteoric iron pieces", "meteoric iron axe", "forge a meteoric iron ingot"]
+    },
+    {
+      "id": "fish",
+      "label": "Fish",
+      "alias": "fish",
+      "family": "fish",
+      "tags": ["base-game", "food", "mob"],
+      "examples": ["brown trout", "pink salmon", "carp", "perch", "catch the trout", "clean the fish", "smoke the fish for winter"]
+    },
+    {
+      "id": "grain-crops",
+      "label": "Grain Crops",
+      "alias": "grain-crops",
+      "family": "farming",
+      "tags": ["base-game", "farming", "food"],
+      "examples": ["rye", "spelt", "rice", "flax", "plant rye seeds", "harvest mature flax", "store grain in a vessel"]
+    },
+    {
+      "id": "root-vegetables",
+      "label": "Root Vegetables",
+      "alias": "root-vegetables",
+      "family": "farming",
+      "tags": ["base-game", "farming", "food"],
+      "examples": ["turnips", "carrots", "parsnips", "cassava", "plant carrot seeds", "harvest mature turnips"]
+    },
+    {
+      "id": "ceramic-molds",
+      "label": "Ceramic Molds",
+      "alias": "ceramic-molds",
+      "family": "building-materials",
+      "tags": ["base-game", "ceramic", "crafting"],
+      "examples": ["black ceramic anvil mold", "black ceramic axe mold", "black ceramic hammer mold", "black ceramic hoe mold", "fireclay ceramic mold"]
+    },
+    {
+      "id": "roofing",
+      "label": "Roofing",
+      "alias": "roofing",
+      "family": "building-materials",
+      "tags": ["base-game", "building", "block"],
+      "examples": ["birch roof beam", "birch roof bottom", "black ceramic shingle roof beam", "acacia shingle ridge beam", "aged roof corner"]
+    },
+    {
+      "id": "bricks",
+      "label": "Bricks",
+      "alias": "bricks",
+      "family": "building-materials",
+      "tags": ["base-game", "building", "block"],
+      "examples": ["black bricks", "black brick chimney", "black brick slab", "brown brick", "header bond bricks"]
+    },
+    {
+      "id": "nadiyan-clothing",
+      "label": "Nadiyan Clothing",
+      "alias": "nadiyan-clothing",
+      "family": "clothing",
+      "tags": ["base-game", "clothing", "trade"],
+      "examples": ["beige Nadiyan fur-lined pants", "brown Nadiyan fur-lined shirt", "Nadiyan barber pants", "Nadiyan musician necklace", "Nadiyan guard tunic"]
+    },
+    {
+      "id": "brigandine-armor",
+      "label": "Brigandine Armor",
+      "alias": "brigandine-armor",
+      "family": "clothing",
+      "tags": ["base-game", "armor", "metalworking"],
+      "examples": ["brigandine body armor", "brigandine body armor iron", "brigandine helmet", "brigandine leg armor", "armor body brigandine iron"]
+    },
+    {
+      "id": "goats",
+      "label": "Goats",
+      "alias": "goats",
+      "family": "domestic-creatures",
+      "tags": ["base-game", "mob", "domestic"],
+      "examples": ["angora goat", "angora goat kid", "goat female", "goat male", "lead the goat back to the pen"]
+    },
+    {
+      "id": "deer",
+      "label": "Deer",
+      "alias": "deer",
+      "family": "huntable-creatures",
+      "tags": ["base-game", "mob", "huntable"],
+      "examples": ["chital deer", "chital deer fawn", "red deer", "dead chital deer", "track the deer", "butcher the deer"]
+    },
+    {
+      "id": "quartz-mining",
+      "label": "Quartz Mining",
+      "alias": "quartz-mining",
+      "family": "ores-mining",
+      "tags": ["base-game", "mining", "stone"],
+      "examples": ["clear quartz", "quartz", "quartz bits", "quartz chunk", "quartz glass", "crush quartz in the pulverizer"]
+    },
+    {
+      "id": "social-help",
+      "label": "Social Help",
+      "alias": "social-help",
+      "family": "social-roleplay",
+      "tags": ["manual-seed", "roleplay", "help"],
+      "examples": ["help", "flee", "danger", "wounded", "safe", "shelter", "rescue", "meet at home", "bring supplies"]
+    },
+    {
+      "id": "community-mods",
+      "label": "Community Mods",
+      "alias": "community-mods",
+      "family": "community-mods",
+      "tags": ["manual-seed", "mods", "community"],
+      "examples": ["Primitive Survival", "Tailors Delight", "From Golden Combs", "expanded foods", "fish trap", "beekeeping"]
+    },
+    {
+      "id": "fire-starting",
+      "label": "Fire Starting",
+      "alias": "fire-starting",
+      "family": "survival-crafting",
+      "tags": ["base-game", "survival", "fire", "crafting"],
+      "examples": ["fire starter", "start a fire", "light the campfire", "make a torch", "burn dry grass and sticks", "keep the fire going"]
+    },
+    {
+      "id": "firewood-fuel",
+      "label": "Firewood Fuel",
+      "alias": "firewood-fuel",
+      "family": "survival-crafting",
+      "tags": ["base-game", "fuel", "wood", "survival"],
+      "examples": ["firewood", "split logs into firewood", "add fuel to the firepit", "burn peat bricks", "charcoal fuel", "keep spare fuel for winter"]
+    },
+    {
+      "id": "charcoal-making",
+      "label": "Charcoal Making",
+      "alias": "charcoal-making",
+      "family": "survival-crafting",
+      "tags": ["base-game", "charcoal", "fuel", "crafting"],
+      "examples": ["charcoal pit", "make charcoal", "cover logs with soil", "charcoal pile", "burn wood into charcoal", "collect charcoal for smelting"]
+    },
+    {
+      "id": "stone-knapping",
+      "label": "Stone Knapping",
+      "alias": "stone-knapping",
+      "family": "toolmaking",
+      "tags": ["base-game", "stone", "tools", "crafting"],
+      "examples": ["knap flint", "stone knife blade", "stone axe head", "loose flint", "obsidian spear head", "make a stone tool"]
+    },
+    {
+      "id": "clay-forming",
+      "label": "Clay Forming",
+      "alias": "clay-forming",
+      "family": "ceramics",
+      "tags": ["base-game", "clay", "ceramic", "crafting"],
+      "examples": ["blue clay", "fire clay", "clay forming", "shape a cooking pot", "make a clay vessel", "mold wet clay"]
+    },
+    {
+      "id": "pit-kiln-firing",
+      "label": "Pit Kiln Firing",
+      "alias": "pit-kiln-firing",
+      "family": "ceramics",
+      "tags": ["base-game", "ceramic", "fire", "crafting"],
+      "examples": ["pit kiln", "fire the pottery", "dry grass and firewood", "burn a clay vessel", "fired cooking pot", "ceramic firing pit"]
+    },
+    {
+      "id": "cooking-meals",
+      "label": "Cooking Meals",
+      "alias": "cooking-meals",
+      "family": "food-cooking",
+      "tags": ["base-game", "food", "cooking"],
+      "examples": ["cook a meal", "meat stew", "vegetable stew", "porridge", "cooking pot", "add ingredients to the meal"]
+    },
+    {
+      "id": "food-preservation",
+      "label": "Food Preservation",
+      "alias": "food-preservation",
+      "family": "food-storage",
+      "tags": ["base-game", "food", "storage", "survival"],
+      "examples": ["cellar storage", "seal food in a crock", "preserve meat", "pickle vegetables", "store grain for winter", "food spoilage"]
+    },
+    {
+      "id": "hide-leatherworking",
+      "label": "Hide Leatherworking",
+      "alias": "hide-leatherworking",
+      "family": "crafting-materials",
+      "tags": ["base-game", "leather", "hides", "crafting"],
+      "examples": ["raw hide", "scrape the hide", "soak hides in limewater", "oiled leather", "make leather", "cure the pelt"]
+    },
+    {
+      "id": "healing-medicine",
+      "label": "Healing Medicine",
+      "alias": "healing-medicine",
+      "family": "survival-health",
+      "tags": ["base-game", "healing", "medicine", "survival"],
+      "examples": ["healing poultice", "bandage", "horsetail poultice", "heal wounds", "stop bleeding", "treat an injured friend"]
+    },
+    {
+      "id": "prospecting-ore",
+      "label": "Prospecting Ore",
+      "alias": "prospecting-ore",
+      "family": "ores-mining",
+      "tags": ["base-game", "prospecting", "mining", "ore"],
+      "examples": ["prospecting pick", "ore sample", "very high copper reading", "search for cassiterite", "prospect the hillside", "find ore deposits"]
+    },
+    {
+      "id": "cellar-building",
+      "label": "Cellar Building",
+      "alias": "cellar-building",
+      "family": "building-materials",
+      "tags": ["base-game", "building", "food", "storage"],
+      "examples": ["build a cellar", "seal the cellar room", "stone cellar walls", "food storage cellar", "cool underground storage", "cellar door"]
+    },
+    {
+      "id": "beekeeping",
+      "label": "Beekeeping",
+      "alias": "beekeeping",
+      "family": "farming",
+      "tags": ["base-game", "bees", "farming", "food"],
+      "examples": ["bee skep", "wild beehive", "harvest honeycomb", "bees swarm", "wax and honey", "move the bees near flowers"]
+    },
+    {
+      "id": "fruit-orchards",
+      "label": "Fruit Orchards",
+      "alias": "fruit-orchards",
+      "family": "farming",
+      "tags": ["base-game", "fruit", "trees", "food"],
+      "examples": ["apple tree", "pear tree", "cherry tree", "plant a fruit tree cutting", "harvest ripe fruit", "orchard in spring"]
+    },
+    {
+      "id": "berry-foraging",
+      "label": "Berry Foraging",
+      "alias": "berry-foraging",
+      "family": "foraging",
+      "tags": ["base-game", "berries", "food", "foraging"],
+      "examples": ["cranberries", "blueberries", "red currants", "black currants", "pick ripe berries", "berry bushes near the forest"]
+    },
+    {
+      "id": "mushroom-foraging",
+      "label": "Mushroom Foraging",
+      "alias": "mushroom-foraging",
+      "family": "foraging",
+      "tags": ["base-game", "mushrooms", "food", "foraging"],
+      "examples": ["fly agaric", "bolete mushroom", "gather mushrooms", "edible mushroom", "poisonous mushroom", "mushrooms after rain"]
+    },
+    {
+      "id": "animal-husbandry",
+      "label": "Animal Husbandry",
+      "alias": "animal-husbandry",
+      "family": "domestic-creatures",
+      "tags": ["base-game", "animals", "farming", "domestic"],
+      "examples": ["feed the animals", "breed livestock", "animal pen", "trough", "domesticated generation", "keep livestock through winter"]
+    },
+    {
+      "id": "pigs-boars",
+      "label": "Pigs and Boars",
+      "alias": "pigs-boars",
+      "family": "domestic-creatures",
+      "tags": ["base-game", "animals", "hunting", "domestic"],
+      "examples": ["wild boar", "sow", "piglet", "boar attacks", "feed pigs grain", "raise pigs in a pen"]
+    },
+    {
+      "id": "sheep-bighorn",
+      "label": "Bighorn Sheep",
+      "alias": "sheep-bighorn",
+      "family": "domestic-creatures",
+      "tags": ["base-game", "animals", "wool", "domestic"],
+      "examples": ["bighorn sheep", "ewe", "ram", "lamb", "shear the sheep", "feed sheep dry grass"]
+    },
+    {
+      "id": "wolves-bears",
+      "label": "Wolves and Bears",
+      "alias": "wolves-bears",
+      "family": "hostile-creatures",
+      "tags": ["base-game", "animals", "danger", "hunting"],
+      "examples": ["wolf pack", "bear attack", "brown bear", "polar bear", "wolves howling", "dangerous predator near camp"]
+    },
+    {
+      "id": "weather-seasons",
+      "label": "Weather and Seasons",
+      "alias": "weather-seasons",
+      "family": "environment",
+      "tags": ["base-game", "weather", "seasons", "survival"],
+      "examples": ["winter is coming", "heavy rain", "snow storm", "cold weather", "spring thaw", "prepare food before winter"]
+    },
+    {
+      "id": "maps-navigation",
+      "label": "Maps and Navigation",
+      "alias": "maps-navigation",
+      "family": "exploration",
+      "tags": ["base-game", "map", "travel", "exploration"],
+      "examples": ["mark the map", "waypoint", "travel north", "follow the road", "meet at the ruins", "lost in the forest"]
+    },
+    {
+      "id": "trading-merchants",
+      "label": "Trading Merchants",
+      "alias": "trading-merchants",
+      "family": "trade",
+      "tags": ["base-game", "trade", "merchant", "gear"],
+      "examples": ["trader wagon", "buy from a merchant", "sell goods", "merchant wants rusty gears", "trade for seeds", "commodities trader"]
+    },
+    {
+      "id": "claims-settlement",
+      "label": "Claims and Settlement",
+      "alias": "claims-settlement",
+      "family": "social-roleplay",
+      "tags": ["manual-seed", "settlement", "claims", "roleplay"],
+      "examples": ["claim this land", "settlement boundary", "village rules", "shared storage", "build near the road", "protect the town"]
+    }
+  ]
+}
