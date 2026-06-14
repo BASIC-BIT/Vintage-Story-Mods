@@ -42,6 +42,13 @@ public static class ConfigAdminSettingRegistry
         return errors;
     }
 
+    private static TeleportationConfig Teleportation(ModConfig config)
+    {
+        config.Teleportation ??= new TeleportationConfig();
+        config.Teleportation.InitializeDefaultsIfNeeded();
+        return config.Teleportation;
+    }
+
     private static IReadOnlyList<ConfigAdminSettingDefinition> BuildSettings()
     {
         var settings = new List<ConfigAdminSettingDefinition>();
@@ -97,6 +104,11 @@ public static class ConfigAdminSettingRegistry
             Bool("HideNametagUnlessTargeting", "Client UX", "Hide nametag unless targeted", "Only show nametags when targeted.", ConfigAdminReloadBehavior.Live, c => c.HideNametagUnlessTargeting, (c, v) => c.HideNametagUnlessTargeting = v),
             Int("NametagRenderRange", "Client UX", "Nametag render range", "Maximum nametag render range in blocks.", ConfigAdminReloadBehavior.Live, (c => c.NametagRenderRange, (c, v) => c.NametagRenderRange = v), (0, 512)),
             Bool("NametagRequiresLineOfSight", "Client UX", "Nametag requires line of sight", "Require client line-of-sight for nametag rendering.", ConfigAdminReloadBehavior.Live, c => c.NametagRequiresLineOfSight, (c, v) => c.NametagRequiresLineOfSight = v),
+            OptionalHexColor("NametagBackgroundColor", "Client UX", "Nametag background color", "Optional #RRGGBB or #RRGGBBAA background color for custom nametags. Empty uses the active UI theme.", ConfigAdminReloadBehavior.Live, c => c.NametagBackgroundColor, (c, v) => c.NametagBackgroundColor = v),
+            OptionalHexColor("NametagBorderColor", "Client UX", "Nametag border color", "Optional #RRGGBB or #RRGGBBAA border color for custom nametags. Empty uses the active UI theme.", ConfigAdminReloadBehavior.Live, c => c.NametagBorderColor, (c, v) => c.NametagBorderColor = v),
+            Bool("ManageMapPlayerVisibility", "Map Visibility", "Manage player map markers", "Let The BASICs write vanilla map player marker world config keys. Also disables same-group map visibility to avoid Proximity chat group leaks.", ConfigAdminReloadBehavior.Live, c => c.ManageMapPlayerVisibility, (c, v) => c.ManageMapPlayerVisibility = v),
+            Bool("MapHideOtherPlayers", "Map Visibility", "Hide other map players", "Hide other players on the minimap and full world map when map visibility is managed.", ConfigAdminReloadBehavior.Live, c => c.MapHideOtherPlayers, (c, v) => c.MapHideOtherPlayers = v),
+            Int("MapPlayerRenderDistance", "Map Visibility", "Map player render range", "Maximum range in blocks for other player map markers. Use -1 for unlimited; ignored when other players are hidden.", ConfigAdminReloadBehavior.Live, (c => c.MapPlayerRenderDistance, (c, v) => c.MapPlayerRenderDistance = v), (-1, 100000)),
             Bool("BoldNicknames", "Client UX", "Bold nicknames", "Render RP nicknames in bold where supported.", ConfigAdminReloadBehavior.Live, c => c.BoldNicknames, (c, v) => c.BoldNicknames = v),
             Bool("ApplyColorsToNicknames", "Client UX", "Color RP nicknames", "Apply nickname colors to IC nicknames.", ConfigAdminReloadBehavior.Live, c => c.ApplyColorsToNicknames, (c, v) => c.ApplyColorsToNicknames = v),
             Bool("ApplyColorsToPlayerNames", "Client UX", "Color account names", "Apply nickname colors to OOC account names.", ConfigAdminReloadBehavior.Live, c => c.ApplyColorsToPlayerNames, (c, v) => c.ApplyColorsToPlayerNames = v),
@@ -106,6 +118,29 @@ public static class ConfigAdminSettingRegistry
             Decimal("TpaCooldownInGameHours", "TPA", "TPA cooldown hours", "Cooldown length in in-game hours.", ConfigAdminReloadBehavior.Live, (c => c.TpaCooldownInGameHours, (c, v) => c.TpaCooldownInGameHours = v), (0, 720)),
             Bool("TpaUseTimeout", "TPA", "Use TPA timeout", "Expire pending TPA requests after a timeout.", ConfigAdminReloadBehavior.Live, c => c.TpaUseTimeout, (c, v) => c.TpaUseTimeout = v),
             Decimal("TpaTimeoutMinutes", "TPA", "TPA timeout minutes", "Real minutes before pending TPA requests expire.", ConfigAdminReloadBehavior.Live, (c => c.TpaTimeoutMinutes, (c, v) => c.TpaTimeoutMinutes = v), (0.1, 1440)),
+            Int("Teleportation.TpaWarmupSeconds", "TPA", "TPA stand-still seconds", "Seconds the moving player must stand still after /tpaccept before teleporting. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).TpaWarmupSeconds, (c, v) => Teleportation(c).TpaWarmupSeconds = v), (0, 600)),
+            Bool("HomeSpawnRequireTemporalGear", "Home/Spawn", "Require temporal gear", "Require a temporal gear for /home and /spawn teleports.", ConfigAdminReloadBehavior.Live, c => c.HomeSpawnRequireTemporalGear, (c, v) => c.HomeSpawnRequireTemporalGear = v),
+            Bool("Teleportation.RegisterHomeCommands", "Teleportation/Command Registration", "Register home commands", "Register The BASICs /home, /sethome, /homes, and /delhome commands at startup. Disable to avoid command-name conflicts with another mod.", ConfigAdminReloadBehavior.RestartRequired, c => Teleportation(c).RegisterHomeCommands, (c, v) => Teleportation(c).RegisterHomeCommands = v),
+            Bool("Teleportation.RegisterSpawnCommands", "Teleportation/Command Registration", "Register spawn commands", "Register The BASICs /spawn and /setspawn commands at startup. Disable to avoid command-name conflicts with another mod.", ConfigAdminReloadBehavior.RestartRequired, c => Teleportation(c).RegisterSpawnCommands, (c, v) => Teleportation(c).RegisterSpawnCommands = v),
+            Bool("Teleportation.RegisterStuckCommand", "Teleportation/Command Registration", "Register stuck command", "Register The BASICs /stuck command at startup. Disable to avoid command-name conflicts with another mod.", ConfigAdminReloadBehavior.RestartRequired, c => Teleportation(c).RegisterStuckCommand, (c, v) => Teleportation(c).RegisterStuckCommand = v),
+            Bool("Teleportation.RegisterTopCommand", "Teleportation/Command Registration", "Register top command", "Register The BASICs /top command at startup. Disable to avoid command-name conflicts with another mod.", ConfigAdminReloadBehavior.RestartRequired, c => Teleportation(c).RegisterTopCommand, (c, v) => Teleportation(c).RegisterTopCommand = v),
+            Bool("Teleportation.RegisterBackCommand", "Teleportation/Command Registration", "Register back command", "Register The BASICs /back command at startup. Disable to avoid command-name conflicts with another mod.", ConfigAdminReloadBehavior.RestartRequired, c => Teleportation(c).RegisterBackCommand, (c, v) => Teleportation(c).RegisterBackCommand = v),
+            Int("Teleportation.MaxHomes", "Home/Spawn", "Max homes", "Maximum saved homes per player, including the default home.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).MaxHomes, (c, v) => Teleportation(c).MaxHomes = v), (1, 20)),
+            Int("Teleportation.HomeWarmupSeconds", "Home/Spawn", "Home stand-still seconds", "Seconds players must stand still before /home teleports. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).HomeWarmupSeconds, (c, v) => Teleportation(c).HomeWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.SpawnWarmupSeconds", "Home/Spawn", "Spawn stand-still seconds", "Seconds players must stand still before /spawn teleports. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).SpawnWarmupSeconds, (c, v) => Teleportation(c).SpawnWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.TopWarmupSeconds", "Home/Spawn", "Top stand-still seconds", "Seconds players must stand still before /top teleports. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).TopWarmupSeconds, (c, v) => Teleportation(c).TopWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.BackWarmupSeconds", "Home/Spawn", "Back stand-still seconds", "Seconds players must stand still before /back teleports. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).BackWarmupSeconds, (c, v) => Teleportation(c).BackWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.HomeCooldownSeconds", "Home/Spawn", "Home cooldown seconds", "Real seconds after a successful /home before another /home can be used. 0 disables the cooldown.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).HomeCooldownSeconds, (c, v) => Teleportation(c).HomeCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.SpawnCooldownSeconds", "Home/Spawn", "Spawn cooldown seconds", "Real seconds after a successful /spawn before another /spawn can be used. 0 disables the cooldown.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).SpawnCooldownSeconds, (c, v) => Teleportation(c).SpawnCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.TopCooldownSeconds", "Home/Spawn", "Top cooldown seconds", "Real seconds after a successful /top before another /top can be used. 0 disables the cooldown.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).TopCooldownSeconds, (c, v) => Teleportation(c).TopCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.BackCooldownSeconds", "Home/Spawn", "Back cooldown seconds", "Real seconds after a successful /back before another /back can be used. 0 disables the cooldown.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).BackCooldownSeconds, (c, v) => Teleportation(c).BackCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.BackExpiresAfterSeconds", "Home/Spawn", "Back expiry seconds", "Real seconds before a saved /back location expires. 0 disables expiry.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).BackExpiresAfterSeconds, (c, v) => Teleportation(c).BackExpiresAfterSeconds = v), (0, 86400)),
+            Bool("Teleportation.BackRequireTemporalGear", "Home/Spawn", "Back requires temporal gear", "Require a temporal gear for /back teleports.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).BackRequireTemporalGear, (c, v) => Teleportation(c).BackRequireTemporalGear = v),
+            Int("Teleportation.StuckWarmupSeconds", "Home/Spawn", "Stuck stand-still seconds", "Seconds players must stand still before /stuck teleports them to spawn. 0 disables the warmup.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).StuckWarmupSeconds, (c, v) => Teleportation(c).StuckWarmupSeconds = v), (0, 3600)),
+            Int("Teleportation.StuckCooldownSeconds", "Home/Spawn", "Stuck cooldown seconds", "Real seconds after a successful /stuck before /stuck can be used again. 0 disables the cooldown.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).StuckCooldownSeconds, (c, v) => Teleportation(c).StuckCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.StuckReminderIntervalSeconds", "Home/Spawn", "Stuck reminder seconds", "How often /stuck reminds the player while waiting. 0 disables reminders.", ConfigAdminReloadBehavior.Live, (c => Teleportation(c).StuckReminderIntervalSeconds, (c, v) => Teleportation(c).StuckReminderIntervalSeconds = v), (0, 3600)),
+            Bool("Teleportation.CancelWarmupOnDamage", "Teleportation", "Cancel warmup on damage", "Cancel teleport warmups when the moving player takes damage.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).CancelWarmupOnDamage, (c, v) => Teleportation(c).CancelWarmupOnDamage = v),
+            Bool("Teleportation.CancelWarmupOnInteraction", "Teleportation", "Cancel warmup on interaction", "Cancel teleport warmups when the moving player interacts, changes active slot, uses, places, or breaks blocks.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).CancelWarmupOnInteraction, (c, v) => Teleportation(c).CancelWarmupOnInteraction = v),
         });
     }
 
@@ -113,10 +148,10 @@ public static class ConfigAdminSettingRegistry
     {
         settings.AddRange(new[]
         {
-            Bool("SendServerSaveAnnouncement", "Server Notifications", "Announce save start", "Notify players when a server save starts.", ConfigAdminReloadBehavior.Live, c => c.SendServerSaveAnnouncement, (c, v) => c.SendServerSaveAnnouncement = v),
-            Bool("SendServerSaveFinishedAnnouncement", "Server Notifications", "Announce save finish", "Notify players when a server save finishes.", ConfigAdminReloadBehavior.Live, c => c.SendServerSaveFinishedAnnouncement, (c, v) => c.SendServerSaveFinishedAnnouncement = v),
-            Bool("ServerSaveAnnouncementAsNotification", "Server Notifications", "Save start as popup", "Use notification popup for save start.", ConfigAdminReloadBehavior.Live, c => c.ServerSaveAnnouncementAsNotification, (c, v) => c.ServerSaveAnnouncementAsNotification = v),
-            Bool("ServerSaveFinishedAsNotification", "Server Notifications", "Save finish as popup", "Use notification popup for save finish.", ConfigAdminReloadBehavior.Live, c => c.ServerSaveFinishedAsNotification, (c, v) => c.ServerSaveFinishedAsNotification = v),
+            Bool("SendServerSaveAnnouncement", "Server Notifications", "Enable save-start message", "Actually send a message when a server save starts. Turn this off to disable the start announcement.", ConfigAdminReloadBehavior.Live, c => c.SendServerSaveAnnouncement, (c, v) => c.SendServerSaveAnnouncement = v),
+            Bool("SendServerSaveFinishedAnnouncement", "Server Notifications", "Enable save-finish message", "Actually send a message when a server save finishes. Turn this off to disable the finish announcement.", ConfigAdminReloadBehavior.Live, c => c.SendServerSaveFinishedAnnouncement, (c, v) => c.SendServerSaveFinishedAnnouncement = v),
+            Bool("ServerSaveAnnouncementAsNotification", "Server Notifications", "Save-start uses popup", "Only changes the start announcement from chat text to popup style; it does not disable the announcement.", ConfigAdminReloadBehavior.Live, c => c.ServerSaveAnnouncementAsNotification, (c, v) => c.ServerSaveAnnouncementAsNotification = v),
+            Bool("ServerSaveFinishedAsNotification", "Server Notifications", "Save-finish uses popup", "Only changes the finish announcement from chat text to popup style; it does not disable the announcement.", ConfigAdminReloadBehavior.Live, c => c.ServerSaveFinishedAsNotification, (c, v) => c.ServerSaveFinishedAsNotification = v),
             Text("TEXT_ServerSaveAnnouncement", "Server Notifications", "Save start text", "Text sent when a server save starts.", ConfigAdminReloadBehavior.Live, c => c.TEXT_ServerSaveAnnouncement, (c, v) => c.TEXT_ServerSaveAnnouncement = v),
             Text("TEXT_ServerSaveFinished", "Server Notifications", "Save finish text", "Text sent when a server save finishes.", ConfigAdminReloadBehavior.Live, c => c.TEXT_ServerSaveFinished, (c, v) => c.TEXT_ServerSaveFinished = v),
             Bool("EnableNearbyDeathMessagesInProximityChat", "Server Notifications", "Nearby death messages in proximity", "Suppress vanilla join/leave/death lifecycle spam from proximity, then re-send death messages only to nearby players.", ConfigAdminReloadBehavior.Live, c => c.EnableNearbyDeathMessagesInProximityChat, (c, v) => c.EnableNearbyDeathMessagesInProximityChat = v),
@@ -146,6 +181,8 @@ public static class ConfigAdminSettingRegistry
             Bool("ProximityChatAllowPlayersToChangeNicknames", "Restart Required", "Players can change nicknames", "Requires command gating work before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, c => c.ProximityChatAllowPlayersToChangeNicknames, (c, v) => c.ProximityChatAllowPlayersToChangeNicknames = v),
             Bool("ProximityChatAllowPlayersToChangeNicknameColors", "Restart Required", "Players can change nickname colors", "Requires command gating work before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, c => c.ProximityChatAllowPlayersToChangeNicknameColors, (c, v) => c.ProximityChatAllowPlayersToChangeNicknameColors = v),
             Text("ChangeNicknameColorPermission", "Permissions", "Nickname color privilege", "Privilege required to change nickname colors.", ConfigAdminReloadBehavior.Live, c => c.ChangeNicknameColorPermission, (c, v) => c.ChangeNicknameColorPermission = v),
+            Bool("AllowPlayersToChangeNametagColors", "Restart Required", "Players can change nametag colors", "Requires command gating work before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, c => c.AllowPlayersToChangeNametagColors, (c, v) => c.AllowPlayersToChangeNametagColors = v),
+            Text("ChangeNametagColorPermission", "Permissions", "Nametag color privilege", "Privilege required to change personal nametag background and border colors.", ConfigAdminReloadBehavior.Live, c => c.ChangeNametagColorPermission, (c, v) => c.ChangeNametagColorPermission = v),
             Int("MinNicknameLength", "Restart Required", "Minimum nickname length", "Minimum player nickname length.", ConfigAdminReloadBehavior.RestartRequired, (c => c.MinNicknameLength, (c, v) => c.MinNicknameLength = v), (1, 256)),
             Int("MaxNicknameLength", "Restart Required", "Maximum nickname length", "Maximum player nickname length.", ConfigAdminReloadBehavior.RestartRequired, (c => c.MaxNicknameLength, (c, v) => c.MaxNicknameLength = v), (1, 512)),
             Bool("DisableRPChat", "Restart Required", "Disable RP chat", "Requires restart because commands and transformers are startup-shaped.", ConfigAdminReloadBehavior.RestartRequired, c => c.DisableRPChat, (c, v) => c.DisableRPChat = v),
@@ -168,6 +205,15 @@ public static class ConfigAdminSettingRegistry
             Text("PlayerNotesPermission", "Permissions", "Personal notes privilege", "Privilege required to use personal notes.", ConfigAdminReloadBehavior.Live, c => c.PlayerNotesPermission, (c, v) => c.PlayerNotesPermission = v),
             Text("ChatHistoryPermission", "Permissions", "Chat history privilege", "Privilege required to search chat history.", ConfigAdminReloadBehavior.Live, c => c.ChatHistoryPermission, (c, v) => c.ChatHistoryPermission = v),
             Text("ChatHistoryManagePermission", "Permissions", "Chat history manage privilege", "Privilege required to export or purge chat history.", ConfigAdminReloadBehavior.Live, c => c.ChatHistoryManagePermission, (c, v) => c.ChatHistoryManagePermission = v),
+            Text("HomeCommandPrivilege", "Permissions", "Home privilege", "Privilege required to use /home.", ConfigAdminReloadBehavior.Live, c => c.HomeCommandPrivilege, (c, v) => c.HomeCommandPrivilege = v),
+            Text("SetHomeCommandPrivilege", "Permissions", "Set home privilege", "Privilege required to use /sethome.", ConfigAdminReloadBehavior.Live, c => c.SetHomeCommandPrivilege, (c, v) => c.SetHomeCommandPrivilege = v),
+            Text("SpawnCommandPrivilege", "Permissions", "Spawn privilege", "Privilege required to use /spawn.", ConfigAdminReloadBehavior.Live, c => c.SpawnCommandPrivilege, (c, v) => c.SpawnCommandPrivilege = v),
+            Text("SetSpawnCommandPrivilege", "Permissions", "Set spawn privilege", "Privilege required to use /setspawn.", ConfigAdminReloadBehavior.Live, c => c.SetSpawnCommandPrivilege, (c, v) => c.SetSpawnCommandPrivilege = v),
+            Text("Teleportation.StuckCommandPrivilege", "Permissions", "Stuck privilege", "Privilege required to use /stuck.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).StuckCommandPrivilege, (c, v) => Teleportation(c).StuckCommandPrivilege = v),
+            Text("Teleportation.StuckAdminNotifyPrivilege", "Permissions", "Stuck notify privilege", "Privilege that receives /stuck admin notifications.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).StuckAdminNotifyPrivilege, (c, v) => Teleportation(c).StuckAdminNotifyPrivilege = v),
+            Text("Teleportation.StuckBlockedByOnlinePrivilege", "Permissions", "Stuck blocked by online privilege", "If any other online player has this privilege, /stuck is blocked. Empty disables the check.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).StuckBlockedByOnlinePrivilege, (c, v) => Teleportation(c).StuckBlockedByOnlinePrivilege = v),
+            Text("Teleportation.TopCommandPrivilege", "Permissions", "Top privilege", "Privilege required to use /top.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).TopCommandPrivilege, (c, v) => Teleportation(c).TopCommandPrivilege = v),
+            Text("Teleportation.BackCommandPrivilege", "Permissions", "Back privilege", "Privilege required to use /back.", ConfigAdminReloadBehavior.Live, c => Teleportation(c).BackCommandPrivilege, (c, v) => Teleportation(c).BackCommandPrivilege = v),
             Bool("UseGeneralChannelAsProximityChat", "Restart Required", "Use General as proximity chat", "Requires restart because chat group migration is startup-shaped.", ConfigAdminReloadBehavior.RestartRequired, c => c.UseGeneralChannelAsProximityChat, (c, v) => c.UseGeneralChannelAsProximityChat = v),
             Text("ProximityChatName", "Restart Required", "Proximity chat name", "Requires restart because chat group setup is startup-shaped.", ConfigAdminReloadBehavior.RestartRequired, c => c.ProximityChatName, (c, v) => c.ProximityChatName = v),
             Bool("ProximityChatAsDefault", "Restart Required", "Proximity chat as default", "Requires restart/rejoin for chat tab default behavior.", ConfigAdminReloadBehavior.RestartRequired, c => c.ProximityChatAsDefault, (c, v) => c.ProximityChatAsDefault = v),
@@ -510,6 +556,44 @@ public static class ConfigAdminSettingRegistry
                 return null;
             }
         });
+    }
+
+    private static ConfigAdminSettingDefinition OptionalHexColor(string key, string group, string label, string description, ConfigAdminReloadBehavior reloadBehavior, Func<ModConfig, string> get, Action<ModConfig, string> set)
+    {
+        return new ConfigAdminSettingDefinition(new ConfigAdminSettingDefinitionOptions
+        {
+            Key = key,
+            Group = group,
+            Label = label,
+            Description = description,
+            Kind = ConfigAdminSettingKind.Text,
+            ReloadBehavior = reloadBehavior,
+            GetValue = config => get(config) ?? string.Empty,
+            SetValue = (config, value) =>
+            {
+                var normalizedValue = (value ?? string.Empty).Trim();
+                if (normalizedValue.Length > 0 && !IsHexColor(normalizedValue))
+                {
+                    return $"{key} must be empty or a hex color like #403529 or #403529BF.";
+                }
+
+                set(config, normalizedValue);
+                return null;
+            }
+        });
+    }
+
+    private static bool IsHexColor(string value)
+    {
+        return value != null &&
+               (value.Length == 7 || value.Length == 9) &&
+               value[0] == '#' &&
+               value.Skip(1).All(IsHexDigit);
+    }
+
+    private static bool IsHexDigit(char c)
+    {
+        return c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
     }
 
     private static ConfigAdminSettingDefinition ValidatedText(SettingMeta meta, Func<ModConfig, string> get, Action<ModConfig, string> set, Func<string, string> validate)

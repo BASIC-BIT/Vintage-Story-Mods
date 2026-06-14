@@ -14,6 +14,7 @@ using Vintagestory.API.Util;
 
 namespace thebasics.Tests.ModSystems.RpCharacters;
 
+[Collection(AnalyticsServiceTestCollection.Name)]
 public class RpCharacterServiceTests
 {
     [Fact]
@@ -24,6 +25,8 @@ public class RpCharacterServiceTests
         var service = new RpCharacterService(config);
         StoreSheet(player, "summary", "Quiet and watchful");
         player.SetNicknameColor("#112233");
+        player.SetNametagBackgroundColor("#223344");
+        player.SetNametagBorderColor("#334455");
         player.SetLanguages(["Common", "Tradeband"]);
         IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", "Tradeband");
         player.SetChatMode(ProximityChatMode.Whisper);
@@ -37,6 +40,8 @@ public class RpCharacterServiceTests
         character.DisplayName.Should().Be("Alice");
         character.Projection.Sheet.Fields.Should().ContainSingle(field => field.FieldId == "summary" && field.Value == "Quiet and watchful");
         character.Projection.NicknameColor.Should().Be("#112233");
+        character.Projection.NametagBackgroundColor.Should().Be("#223344");
+        character.Projection.NametagBorderColor.Should().Be("#334455");
         character.Projection.Languages.Should().Equal("Common", "Tradeband");
         character.Projection.DefaultLanguage.Should().Be("Tradeband");
         character.Projection.ChatMode.Should().Be(ProximityChatMode.Whisper);
@@ -67,6 +72,8 @@ public class RpCharacterServiceTests
                 }
             },
             NicknameColor = "#445566",
+            NametagBackgroundColor = "#556677",
+            NametagBorderColor = "#667788",
             Languages = ["Tradeband"],
             DefaultLanguage = "Tradeband",
             ChatMode = ProximityChatMode.Yell,
@@ -76,6 +83,8 @@ public class RpCharacterServiceTests
 
         StoreSheet(player, "summary", "Edited Alice");
         player.SetNicknameColor("#112233");
+        player.SetNametagBackgroundColor("#223344");
+        player.SetNametagBorderColor("#334455");
         player.SetLanguages(["Common"]);
         IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", "Common");
         player.SetChatMode(ProximityChatMode.Whisper);
@@ -87,6 +96,8 @@ public class RpCharacterServiceTests
         service.GetActiveCharacterId(player).Should().Be(bob.CharacterId);
         GetStoredSheetData(player).Fields.Should().ContainSingle(field => field.FieldId == "summary" && field.Value == "Bob summary");
         player.GetNicknameColor().Should().Be("#445566");
+        player.GetNametagBackgroundColor().Should().Be("#556677");
+        player.GetNametagBorderColor().Should().Be("#667788");
         player.GetLanguages().Should().Equal("Tradeband");
         player.GetDefaultLanguageName().Should().Be("Tradeband");
         player.GetChatMode().Should().Be(ProximityChatMode.Yell);
@@ -96,6 +107,8 @@ public class RpCharacterServiceTests
         var savedAlice = savedRegistry.Characters.Should().ContainSingle(character => character.CharacterId == aliceId).Subject;
         savedAlice.Projection.Sheet.Fields.Should().ContainSingle(field => field.FieldId == "summary" && field.Value == "Edited Alice");
         savedAlice.Projection.NicknameColor.Should().Be("#112233");
+        savedAlice.Projection.NametagBackgroundColor.Should().Be("#223344");
+        savedAlice.Projection.NametagBorderColor.Should().Be("#334455");
         savedAlice.Projection.Languages.Should().Equal("Common");
         savedAlice.Projection.DefaultLanguage.Should().Be("Common");
         savedAlice.Projection.ChatMode.Should().Be(ProximityChatMode.Whisper);

@@ -45,6 +45,40 @@ public class HeritageLanguageSystemTests
         HeritageLanguageSystem.IsLanguageGrantedByClass(language, "game:malefactor").Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("lrc:firebeards-and-broadbeams", "Firebeards And Broadbeams")]
+    [InlineData("lrc:firebeards_and_broadbeams", "Firebeards And Broadbeams")]
+    [InlineData("game:wolf.tailored", "Wolf Tailored")]
+    [InlineData("lrc:firebeardsandbroadbeams", "Firebeardsandbroadbeams")]
+    public void FormatModelCodeFallback_StripsDomainAndFormatsSeparators(string code, string expected)
+    {
+        HeritageLanguageSystem.FormatModelCodeFallback(code).Should().Be(expected);
+    }
+
+    [Fact]
+    public void GetPlayerModelLibModelName_PrefersConfiguredModelName()
+    {
+        HeritageLanguageSystem.GetPlayerModelLibModelName("lrc:bnumenorean", "Black Numenorean")
+            .Should().Be("Black Numenorean");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GetPlayerModelLibModelName_FallsBackWhenConfiguredNameIsMissing(string? configuredName)
+    {
+        HeritageLanguageSystem.GetPlayerModelLibModelName("lrc:firebeards-and-broadbeams", configuredName)
+            .Should().Be("Firebeards And Broadbeams");
+    }
+
+    [Fact]
+    public void GetModelGroupDisplayName_FallsBackToFormattedCode()
+    {
+        HeritageLanguageSystem.GetModelGroupDisplayName("lrc:lost-races")
+            .Should().Be("Lost Races");
+    }
+
     private static Language CreateLanguage(string name, string[] grantedToClasses)
     {
         return new Language(

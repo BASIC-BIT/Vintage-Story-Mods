@@ -202,6 +202,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mods-dll/thebasics/scripts/f
 Credentials come from `.env` in repo root (`PTERO_BASE_URL`, `PTERO_TOKEN`, `PTERO_SERVER_ID`).
 All endpoints use the Client API (`ptlc_...` token) under `/api/client/servers/{id}/...`.
 If the current shell has `PTERO_TOKEN` set to an application token (`ptla_...`), reload `PTERO_TOKEN` from repo-root `.env`; `PTERO_TOKEN_APPLICATION` is not valid for Client API power/file endpoints.
+Do not commit or print credential values. If the active checkout/worktree is missing `.env`, check `AGENTS.local.md` in the primary local checkout for machine-specific credential source paths, then load the needed variables into the current process only.
 
 ```
 # List files in a directory
@@ -227,12 +228,15 @@ GET /resources  → .attributes.current_state ("running"/"stopped"/etc.)
 
 **Client profile gotcha**: Test profiles load local mods from `D:\Games\VSProfiles\Profile2\Mods` and `D:\Games\VSProfiles\Profile3\Mods`. After packaging, verify those `thebasics_*.zip` files have the same hash as the freshly built zip; stale same-version zips make client-side QA appear to fail even when the server has the new build.
 
+**Server mod auto-download gotcha**: For public side-both mods that are listed on ModDB, Vintage Story clients can download the server-provided mods during connection. Do not manually side-load those ModDB-listed dependencies into local test profiles unless testing unpublished/local zips or debugging the auto-download path itself.
+
 #### What to Look for in Server Logs
 
 After a restart, check `server-main.log` for:
 
-1. **Mod loaded correctly**: Look for `Mod 'thebasics_X_Y_Z.zip' (thebasics):` followed by all 6 mod systems:
+1. **Mod loaded correctly**: Look for `Mod 'thebasics_X_Y_Z.zip' (thebasics):` followed by all expected mod systems, including:
    - `thebasics.ModSystems.TPA.TpaSystem`
+   - `thebasics.ModSystems.HomeSpawn.HomeSpawnSystem`
    - `thebasics.ModSystems.SleepNotifier.SleepNotifierSystem`
    - `thebasics.ModSystems.SaveNotifications.SaveNotificationsSystem`
    - `thebasics.ModSystems.Repair.RepairModSystem`
@@ -324,3 +328,5 @@ For contributor PRs specifically:
 
 - **Configuration Management**
   - This mod is live - ProtoMember attributes for existing config values should not be changed where possible - new config values should receive the next available sequentially increasing number.
+- **Map Player Visibility**
+  - Vintage Story's `mapShowGroupPlayers` is unsafe as a default for The BASICs map-visibility controls because the proximity chat channel is a player group; enabling same-group map visibility can make all proximity-chat members visible regardless of distance.

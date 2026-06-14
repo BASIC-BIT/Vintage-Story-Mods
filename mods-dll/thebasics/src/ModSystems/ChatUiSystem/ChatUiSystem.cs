@@ -406,7 +406,7 @@ public class ChatUiSystem : ModSystem
     {
         if (_characterSheetDialog == null)
         {
-            _characterSheetDialog = new CharacterSheetDialog(_api, message, SendCharacterSheetSaveRequest, BuildHeadshotCallbacks());
+            _characterSheetDialog = new CharacterSheetDialog(_api, message, SendCharacterSheetSaveRequest, BuildHeadshotCallbacks(), OnCharacterSheetDialogClosed);
         }
         else
         {
@@ -419,6 +419,13 @@ public class ChatUiSystem : ModSystem
         }
 
         SubscribeFileDropIfNeeded();
+    }
+
+    private static void OnCharacterSheetDialogClosed()
+    {
+        _characterSheetDialog = null;
+        _pendingCharacterSheetOpenFromCharacterDialog = false;
+        _characterSheetOpenedFromCharacterDialog = false;
     }
 
     private static HeadshotDialogCallbacks BuildHeadshotCallbacks()
@@ -511,7 +518,7 @@ public class ChatUiSystem : ModSystem
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-bad-url"));
+            ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-bad-url"), targetPlayerUid);
             return;
         }
 
@@ -521,20 +528,20 @@ public class ChatUiSystem : ModSystem
 
         Task.Run(async () =>
         {
-            var bytes = await TryDownloadHeadshotAsync(uri, maxDownloadKb).ConfigureAwait(false);
+            var bytes = await TryDownloadHeadshotAsync(uri, maxDownloadKb, targetPlayerUid).ConfigureAwait(false);
             if (bytes == null || Interlocked.Read(ref _headshotPendingRequestId) != requestId)
             {
                 return;
             }
 
-            SubmitNormalizedUpload(bytes, adminTargetUid);
+            SubmitNormalizedUpload(bytes, adminTargetUid, targetPlayerUid);
         });
     }
 
     /// <summary>
     /// Returns the downloaded bytes on success; null on any failure (errors are surfaced to the dialog).
     /// </summary>
-    private static async Task<byte[]> TryDownloadHeadshotAsync(Uri uri, int maxDownloadKb)
+    private static async Task<byte[]> TryDownloadHeadshotAsync(Uri uri, int maxDownloadKb, string targetPlayerUid)
     {
         var maxDownloadBytes = maxDownloadKb * 1024L;
         try
@@ -543,14 +550,14 @@ public class ChatUiSystem : ModSystem
             response.EnsureSuccessStatusCode();
             if (response.Content?.Headers?.ContentLength is long declared && declared > maxDownloadBytes)
             {
-                OnMain(() => ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-too-large", maxDownloadKb)));
+                OnMain(() => ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-too-large", maxDownloadKb), targetPlayerUid));
                 return null;
             }
 
             var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
             if (bytes.Length > maxDownloadBytes)
             {
-                OnMain(() => ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-too-large", maxDownloadKb)));
+                OnMain(() => ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-too-large", maxDownloadKb), targetPlayerUid));
                 return null;
             }
 
@@ -559,7 +566,7 @@ public class ChatUiSystem : ModSystem
         catch (Exception ex)
         {
             _api?.Logger.Notification($"[thebasics] Headshot URL fetch failed: {ex.Message}");
-            OnMain(() => ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-fetch")));
+            OnMain(() => ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-fetch"), targetPlayerUid));
             return null;
         }
     }
@@ -591,7 +598,7 @@ public class ChatUiSystem : ModSystem
             : viewTargetPlayerUid;
     }
 
-    private static void SubmitNormalizedUpload(byte[] inputBytes, string adminTargetUid)
+    private static void SubmitNormalizedUpload(byte[] inputBytes, string adminTargetUid, string targetPlayerUid)
     {
         if (inputBytes == null || inputBytes.Length == 0 || _config == null)
         {
@@ -605,7 +612,7 @@ public class ChatUiSystem : ModSystem
         var result = HeadshotPipeline.Normalize(inputBytes, options);
         if (!result.Ok)
         {
-            OnMain(() => ShowHeadshotErrorOnDialog(HeadshotPipeline.GetErrorMessage(result.ErrorCode, _config.HeadshotMaxKb)));
+            OnMain(() => ShowHeadshotErrorOnDialog(HeadshotPipeline.GetErrorMessage(result.ErrorCode, _config.HeadshotMaxKb), targetPlayerUid));
             return;
         }
 
@@ -619,10 +626,13 @@ public class ChatUiSystem : ModSystem
         });
     }
 
-    private static void ShowHeadshotErrorOnDialog(string message)
+    private static void ShowHeadshotErrorOnDialog(string message, string targetPlayerUid = null)
     {
-        _characterSheetDialog?.SetHeadshotStatus(message);
-        _api?.TriggerIngameError(_api.World, "thebasics-headshot", message);
+        if (targetPlayerUid == null || _characterSheetDialog?.CurrentTargetPlayerUid == targetPlayerUid)
+        {
+            _characterSheetDialog?.SetHeadshotStatus(message);
+            _api?.TriggerIngameError(_api.World, "thebasics-headshot", message);
+        }
     }
 
     private static void OnHeadshotUploadResult(HeadshotUploadResult message)
@@ -634,7 +644,7 @@ public class ChatUiSystem : ModSystem
 
         if (!message.Success)
         {
-            ShowHeadshotErrorOnDialog(string.IsNullOrEmpty(message.Message) ? Lang.Get("thebasics:headshot-error-generic") : message.Message);
+            ShowHeadshotErrorOnDialog(string.IsNullOrEmpty(message.Message) ? Lang.Get("thebasics:headshot-error-generic") : message.Message, message.TargetPlayerUid);
             return;
         }
 
@@ -751,9 +761,10 @@ public class ChatUiSystem : ModSystem
                 return;
             }
 
+            var targetPlayerUid = _characterSheetDialog.CurrentTargetPlayerUid;
             if (info.Length > maxBytes)
             {
-                ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-too-large", maxKb));
+                ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-url-too-large", maxKb), targetPlayerUid);
                 e.Handled = true;
                 return;
             }
@@ -761,14 +772,14 @@ public class ChatUiSystem : ModSystem
             var bytes = System.IO.File.ReadAllBytes(path);
             if (!HeadshotPipeline.IsPng(bytes) && !HeadshotPipeline.IsJpeg(bytes))
             {
-                ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-format"));
+                ShowHeadshotErrorOnDialog(Lang.Get("thebasics:headshot-error-format"), targetPlayerUid);
                 e.Handled = true;
                 return;
             }
 
             e.Handled = true;
             _characterSheetDialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-status-uploading"));
-            var adminTargetUid = ResolveAdminTargetUid(_characterSheetDialog.CurrentTargetPlayerUid);
+            var adminTargetUid = ResolveAdminTargetUid(targetPlayerUid);
             // Bump the request token so any in-flight URL upload is superseded by this drop.
             var requestId = Interlocked.Increment(ref _headshotPendingRequestId);
             Task.Run(() =>
@@ -777,7 +788,7 @@ public class ChatUiSystem : ModSystem
                 {
                     return;
                 }
-                SubmitNormalizedUpload(bytes, adminTargetUid);
+                SubmitNormalizedUpload(bytes, adminTargetUid, targetPlayerUid);
             });
         }
         catch (Exception ex)
@@ -827,6 +838,10 @@ public class ChatUiSystem : ModSystem
 
     // Cairo-pixel size — VS's distance scaling shrinks the on-screen size from here.
     internal static int GetNametagInlineImagePixelSize() => Math.Max(24, _config?.NametagInlineImagePixelSize ?? 100);
+
+    internal static string GetNametagBackgroundColor() => _config?.NametagBackgroundColor ?? string.Empty;
+
+    internal static string GetNametagBorderColor() => _config?.NametagBorderColor ?? string.Empty;
 
     private static void OnMain(Action action)
     {
@@ -1247,8 +1262,9 @@ public class ChatUiSystem : ModSystem
     private static void OnConfigAdminDialogClosed()
     {
         _configAdminDialog = null;
-        _configAdminUnsavedCloseConfirm?.TryClose();
+        var unsavedCloseConfirm = _configAdminUnsavedCloseConfirm;
         _configAdminUnsavedCloseConfirm = null;
+        unsavedCloseConfirm?.TryClose();
     }
 
     private static bool HasConfigAdminUnsavedChanges()
@@ -1275,6 +1291,7 @@ public class ChatUiSystem : ModSystem
 
         _configAdminUnsavedCloseConfirm = new GuiDialogConfirm(_api, Lang.Get("thebasics:config-admin-close-unsaved-confirm"), ok =>
         {
+            _configAdminUnsavedCloseConfirm = null;
             if (ok)
             {
                 onDiscard?.Invoke();
@@ -1805,6 +1822,7 @@ public class ChatUiSystem : ModSystem
             entity,
             _config.HideNametagUnlessTargeting,
             _config.NametagRenderRange);
+        EntityBehaviorNameTagPatches.RebuildTexture(entity);
     }
 
     private static void ScheduleRpttsInitialization()
@@ -2185,10 +2203,30 @@ public class ChatUiSystem : ModSystem
             _safeNetworkChannel?.Dispose();
             _safeNetworkChannel = null;
             _returnToConfigAdminAfterLanguageDialog = false;
+            _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
+            _pendingCharacterSheetOpenFromCharacterDialog = false;
+            _suppressNextCharacterDialogSheetOpen = false;
+            _characterSheetOpenedFromCharacterDialog = false;
+            _characterDialogTitleOverride = null;
+            _characterDialog = null;
+            _characterDialogHooked = false;
+            _characterSheetDialog?.TryCloseWithoutPrompt();
+            _characterSheetDialog = null;
+            _characterSheetMessageDialog?.TryClose();
+            _characterSheetMessageDialog = null;
             _languageConfigDialog?.TryClose();
             _languageConfigDialog = null;
-            _configAdminDialog?.TryClose();
+            _characterSheetFieldConfigDialog?.TryCloseWithoutPrompt();
+            _characterSheetFieldConfigDialog = null;
+            _playerNotesDialog?.TryCloseWithoutPrompt();
+            _playerNotesDialog = null;
+            _chatHistoryDialog?.TryClose();
+            _chatHistoryDialog = null;
+            _configAdminDialog?.TryCloseWithoutPrompt();
             _configAdminDialog = null;
+            var configAdminUnsavedCloseConfirm = _configAdminUnsavedCloseConfirm;
+            _configAdminUnsavedCloseConfirm = null;
+            configAdminUnsavedCloseConfirm?.TryClose();
             _configAdminDraft.Clear();
             _configAdminReviewedKeys.Clear();
             _configAdminSelectedGroup = null;

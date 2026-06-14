@@ -80,7 +80,7 @@ Admin commands:
 - `/basic config`, `/thebasics config`, `/tb config`
 - `/basic reloadconfig`, `/thebasics reloadconfig`, `/tb reloadconfig`
 
-Live-applied setting groups currently include chatter, typing indicators, nametag display/range, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, per-mode proximity/chat/audio dictionaries, chat delimiters, player-stat toggles, and debug mode. Restart-required settings include startup-shaped command registration, chat group setup, language system enablement, and player stats enablement.
+Live-applied setting groups currently include chatter, typing indicators, nametag display/range/style, map player visibility, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, per-mode proximity/chat/audio dictionaries, chat delimiters, player-stat toggles, and debug mode. Restart-required settings include startup-shaped command registration, chat group setup, language system enablement, and player stats enablement.
 
 The admin panel exposes fixed-shape complex settings as validated flattened rows. This covers per-mode distance, obfuscation, font-size, verb, punctuation, RPTTS, chatter dictionaries, chat delimiter start/end values, player-stat toggles, and comma-separated font-size clamps. Variable-length/nested collections use dedicated editors where available: `/thebasics config languages` for `Languages` and `/thebasics config charsheetfields` for `CharacterSheetFields`. Prefer these editors over direct JSON edits because they validate field keys, bindings, options, and persisted character-sheet compatibility.
 
@@ -210,6 +210,8 @@ Features:
 - Admin nickname and nickname-color assignment.
 - Configurable nickname length limits and change permissions.
 - Configurable nametag content and range.
+- Optional custom nametag background and border colors.
+- Optional player-selected nametag background and border colors, falling back to server defaults.
 - Optional hide-unless-targeting nametags.
 - Multi-point line-of-sight gating for nametags when LOS is required.
 
@@ -227,8 +229,28 @@ Primary config areas:
 - `HideNametagUnlessTargeting`
 - `NametagRenderRange`
 - `NametagRequiresLineOfSight`
+- `NametagBackgroundColor`
+- `NametagBorderColor`
+- `AllowPlayersToChangeNametagColors`
+- `ChangeNametagColorPermission`
 - `MinNicknameLength`
 - `MaxNicknameLength`
+
+## Map Player Visibility
+
+Features:
+
+- Optional The BASICs management of vanilla player map marker world config.
+- Applies to both minimap and full world map because both use Vintage Story's player map marker tracking.
+- Can hide other players completely with `MapHideOtherPlayers=true`.
+- Can limit visible player marker range with `MapPlayerRenderDistance`; `-1` means unlimited.
+- Forces vanilla `mapShowGroupPlayers=false` while managed, because The BASICs Proximity chat is a player group and same-group map visibility can otherwise reveal everyone.
+
+Primary config areas:
+
+- `ManageMapPlayerVisibility`
+- `MapHideOtherPlayers`
+- `MapPlayerRenderDistance`
 
 ## Client UI And Rendering
 

@@ -64,6 +64,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         TransformerSystem = new TransformerSystem(this, LanguageSystem, DistanceObfuscationSystem, ProximityCheckUtils);
         _th3EssentialsDiscordRelay = new Th3EssentialsDiscordRelay(API);
         ProximityChatMessageProcessed += RelayProcessedMessageToTh3Essentials;
+        ApplyManagedMapPlayerVisibilityConfig();
         RefreshAllNameTags();
     }
 
@@ -196,6 +197,36 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                     new ColorArgParser("new nickname color", false))
                 .RequiresPrivilege(Privilege.commandplayer)
                 .HandleWith(SetNicknameColorAdmin);
+        }
+
+        if (Config.AllowPlayersToChangeNametagColors)
+        {
+            API.ChatCommands.GetOrCreate("nametagbackgroundcolor")
+                .WithAlias("nametagbgcolor", "nameplatebackgroundcolor", "nameplatebgcolor")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-nametagbgcolor-desc"))
+                .WithArgs(new ColorArgParser("new nametag background color", false))
+                .RequiresPrivilege(Config.ChangeNametagColorPermission)
+                .RequiresPlayer()
+                .HandleWith(HandleNametagBackgroundColor);
+            API.ChatCommands.GetOrCreate("clearnametagbackgroundcolor")
+                .WithAlias("clearnametagbgcolor", "clearnameplatebackgroundcolor", "clearnameplatebgcolor")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-clearnametagbgcolor-desc"))
+                .RequiresPrivilege(Config.ChangeNametagColorPermission)
+                .RequiresPlayer()
+                .HandleWith(ClearNametagBackgroundColor);
+            API.ChatCommands.GetOrCreate("nametagbordercolor")
+                .WithAlias("nameplatebordercolor")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-nametagbordercolor-desc"))
+                .WithArgs(new ColorArgParser("new nametag border color", false))
+                .RequiresPrivilege(Config.ChangeNametagColorPermission)
+                .RequiresPlayer()
+                .HandleWith(HandleNametagBorderColor);
+            API.ChatCommands.GetOrCreate("clearnametagbordercolor")
+                .WithAlias("clearnameplatebordercolor")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-clearnametagbordercolor-desc"))
+                .RequiresPrivilege(Config.ChangeNametagColorPermission)
+                .RequiresPlayer()
+                .HandleWith(ClearNametagBorderColor);
         }
 
         // Skip RP-specific commands if RP chat is disabled
@@ -1116,6 +1147,73 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         };
     }
 
+    private TextCommandResult HandleNametagBackgroundColor(TextCommandCallingArgs args)
+    {
+        return HandleNametagColor(args, isBackground: true);
+    }
+
+    private TextCommandResult HandleNametagBorderColor(TextCommandCallingArgs args)
+    {
+        return HandleNametagColor(args, isBackground: false);
+    }
+
+    private TextCommandResult HandleNametagColor(TextCommandCallingArgs args, bool isBackground)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        if (args.Parsers[0].IsMissing)
+        {
+            return GetNametagColorStatus(player, isBackground);
+        }
+
+        var color = ColorToHex((Color)args.Parsers[0].GetValue());
+        if (color.Contains('<') || color.Contains('>'))
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = Lang.Get("thebasics:chat-error-invalid-color"),
+            };
+        }
+
+        if (isBackground)
+        {
+            player.SetNametagBackgroundColor(color);
+        }
+        else
+        {
+            player.SetNametagBorderColor(color);
+        }
+
+        SwapOutNameTag(player);
+        AnalyticsService.TrackCommandUsed(isBackground ? "nametagbackgroundcolor" : "nametagbordercolor", true);
+        AnalyticsService.TrackFeatureUsed("nametag_style", isBackground ? "set_background" : "set_border");
+
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = Lang.Get(isBackground ? "thebasics:chat-nametag-bgcolor-set" : "thebasics:chat-nametag-bordercolor-set", ChatHelper.Color(color, color)),
+        };
+    }
+
+    private static TextCommandResult GetNametagColorStatus(IServerPlayer player, bool isBackground)
+    {
+        var color = isBackground ? player.GetNametagBackgroundColor() : player.GetNametagBorderColor();
+        if (string.IsNullOrWhiteSpace(color))
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = Lang.Get(isBackground ? "thebasics:chat-nametag-bgcolor-none" : "thebasics:chat-nametag-bordercolor-none"),
+            };
+        }
+
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = Lang.Get(isBackground ? "thebasics:chat-nametag-bgcolor-current" : "thebasics:chat-nametag-bordercolor-current", ChatHelper.Color(color, color)),
+        };
+    }
+
     private void SendClientConfig(IServerPlayer byPlayer)
     {
         _serverConfigChannel.SendPacket(new TheBasicsConfigMessage
@@ -1255,6 +1353,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     protected override void OnConfigReloaded(IReadOnlySet<string> changedKeys)
     {
         if (changedKeys.Contains(nameof(Config.ChangeNicknameColorPermission)) ||
+            changedKeys.Contains(nameof(Config.ChangeNametagColorPermission)) ||
             changedKeys.Contains(nameof(Config.RPTextTogglePermission)) ||
             changedKeys.Contains(nameof(Config.OOCTogglePermission)) ||
             changedKeys.Contains(nameof(Config.ChangeOwnLanguagePermission)) ||
@@ -1266,27 +1365,37 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void RefreshCommandPrivileges()
     {
-        API.ChatCommands.Get("nickcolor")?.RequiresPrivilege(Config.ChangeNicknameColorPermission);
-        API.ChatCommands.Get("clearnickcolor")?.RequiresPrivilege(Config.ChangeNicknameColorPermission);
-        API.ChatCommands.Get("rptext")?.RequiresPrivilege(Config.RPTextTogglePermission);
-        API.ChatCommands.Get("oocToggle")?.RequiresPrivilege(Config.OOCTogglePermission);
+        SetCommandPrivilege("nickcolor", Config.ChangeNicknameColorPermission);
+        SetCommandPrivilege("clearnickcolor", Config.ChangeNicknameColorPermission);
+        SetCommandPrivilege("nametagbackgroundcolor", Config.ChangeNametagColorPermission);
+        SetCommandPrivilege("clearnametagbackgroundcolor", Config.ChangeNametagColorPermission);
+        SetCommandPrivilege("nametagbordercolor", Config.ChangeNametagColorPermission);
+        SetCommandPrivilege("clearnametagbordercolor", Config.ChangeNametagColorPermission);
+        SetCommandPrivilege("rptext", Config.RPTextTogglePermission);
+        SetCommandPrivilege("oocToggle", Config.OOCTogglePermission);
 
-        API.ChatCommands.Get("addlang")?.RequiresPrivilege(Config.ChangeOwnLanguagePermission);
-        API.ChatCommands.Get("removelang")?.RequiresPrivilege(Config.ChangeOwnLanguagePermission);
-        API.ChatCommands.Get("adminaddlang")?.RequiresPrivilege(Config.ChangeOtherLanguagePermission);
-        API.ChatCommands.Get("adminremovelang")?.RequiresPrivilege(Config.ChangeOtherLanguagePermission);
-        API.ChatCommands.Get("adminlistlang")?.RequiresPrivilege(Config.ChangeOtherLanguagePermission);
+        SetCommandPrivilege("addlang", Config.ChangeOwnLanguagePermission);
+        SetCommandPrivilege("removelang", Config.ChangeOwnLanguagePermission);
+        SetCommandPrivilege("adminaddlang", Config.ChangeOtherLanguagePermission);
+        SetCommandPrivilege("adminremovelang", Config.ChangeOtherLanguagePermission);
+        SetCommandPrivilege("adminlistlang", Config.ChangeOtherLanguagePermission);
+    }
+
+    private void SetCommandPrivilege(string commandName, string privilege)
+    {
+        API.ChatCommands.Get(commandName)?.RequiresPrivilege(privilege);
     }
 
     private void ApplyConfigChangeSideEffects(IReadOnlySet<string> changedKeys)
     {
         NotifyConfigReloaded(changedKeys);
 
-        if (changedKeys.Contains(nameof(Config.ShowNicknameInNametag)) ||
-            changedKeys.Contains(nameof(Config.ShowPlayerNameInNametag)) ||
-            changedKeys.Contains(nameof(Config.HideNametagUnlessTargeting)) ||
-            changedKeys.Contains(nameof(Config.NametagRenderRange)) ||
-            changedKeys.Contains(nameof(Config.CharacterSheetFields)))
+        if (IsMapVisibilityConfigChange(changedKeys))
+        {
+            ApplyManagedMapPlayerVisibilityConfig();
+        }
+
+        if (IsNametagConfigChange(changedKeys))
         {
             RefreshAllNameTags();
         }
@@ -1295,6 +1404,29 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         {
             ClearTypingIndicators();
         }
+    }
+
+    private static bool IsMapVisibilityConfigChange(IReadOnlySet<string> changedKeys)
+    {
+        return changedKeys.Contains(nameof(Config.ManageMapPlayerVisibility)) ||
+               changedKeys.Contains(nameof(Config.MapHideOtherPlayers)) ||
+               changedKeys.Contains(nameof(Config.MapPlayerRenderDistance));
+    }
+
+    private static bool IsNametagConfigChange(IReadOnlySet<string> changedKeys)
+    {
+        return changedKeys.Contains(nameof(Config.ShowNicknameInNametag)) ||
+               changedKeys.Contains(nameof(Config.ShowPlayerNameInNametag)) ||
+               changedKeys.Contains(nameof(Config.HideNametagUnlessTargeting)) ||
+               changedKeys.Contains(nameof(Config.NametagRenderRange)) ||
+               changedKeys.Contains(nameof(Config.NametagBackgroundColor)) ||
+               changedKeys.Contains(nameof(Config.NametagBorderColor)) ||
+               changedKeys.Contains(nameof(Config.CharacterSheetFields));
+    }
+
+    private void ApplyManagedMapPlayerVisibilityConfig()
+    {
+        MapPlayerVisibilityConfigApplier.Apply(Config, API?.WorldManager?.SaveGame?.WorldConfiguration ?? API?.World?.Config);
     }
 
     private void ReconcileOnlinePlayerLanguages(IReadOnlyDictionary<string, string> renameMap)
@@ -1778,6 +1910,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         behavior.RenderRange = Config.NametagRenderRange;
 
         behavior.SetName(CharacterSheetSystem.BuildNametagDisplayName(player, Config));
+        CharacterSheetSystem.SyncNametagVisualAttrs(player);
     }
 
     internal void RefreshPlayerIdentityState(IServerPlayer player)
@@ -2036,6 +2169,34 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         {
             Status = EnumCommandStatus.Success,
             StatusMessage = Lang.Get("thebasics:chat-nickcolor-cleared"),
+        };
+    }
+
+    private TextCommandResult ClearNametagBackgroundColor(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        player.ClearNametagBackgroundColor();
+        SwapOutNameTag(player);
+        AnalyticsService.TrackCommandUsed("clearnametagbackgroundcolor", true);
+        AnalyticsService.TrackFeatureUsed("nametag_style", "clear_background");
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = Lang.Get("thebasics:chat-nametag-bgcolor-cleared"),
+        };
+    }
+
+    private TextCommandResult ClearNametagBorderColor(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        player.ClearNametagBorderColor();
+        SwapOutNameTag(player);
+        AnalyticsService.TrackCommandUsed("clearnametagbordercolor", true);
+        AnalyticsService.TrackFeatureUsed("nametag_style", "clear_border");
+        return new TextCommandResult
+        {
+            Status = EnumCommandStatus.Success,
+            StatusMessage = Lang.Get("thebasics:chat-nametag-bordercolor-cleared"),
         };
     }
 

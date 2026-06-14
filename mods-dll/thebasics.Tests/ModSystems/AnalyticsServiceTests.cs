@@ -1,8 +1,10 @@
 using FluentAssertions;
+using thebasics.Configs;
 using thebasics.ModSystems.Analytics;
 
 namespace thebasics.Tests.ModSystems;
 
+[Collection(AnalyticsServiceTestCollection.Name)]
 public class AnalyticsServiceTests : IDisposable
 {
     public AnalyticsServiceTests()
@@ -67,6 +69,81 @@ public class AnalyticsServiceTests : IDisposable
         AnalyticsService.Configure(sink, allowErrorTelemetry: false);
 
         sink.Events.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TrackConfigSnapshot_IncludesTeleportationSettings()
+    {
+        var sink = new RecordingAnalyticsSink();
+        var config = new ModConfig
+        {
+            TpaRequestPrivilege = "tpauser",
+            TpaCooldownInGameHours = 2,
+            TpaTimeoutMinutes = 12,
+            HomeCommandPrivilege = "homeuser",
+            SetHomeCommandPrivilege = "sethomeuser",
+            SpawnCommandPrivilege = "spawnuser",
+            SetSpawnCommandPrivilege = "setspawnuser",
+            Teleportation = new TeleportationConfig
+            {
+                MaxHomes = 5,
+                HomeWarmupSeconds = 6,
+                SpawnWarmupSeconds = 7,
+                TpaWarmupSeconds = 8,
+                TopWarmupSeconds = 9,
+                BackWarmupSeconds = 10,
+                StuckWarmupSeconds = 90,
+                HomeCooldownSeconds = 120,
+                SpawnCooldownSeconds = 180,
+                TopCooldownSeconds = 240,
+                BackCooldownSeconds = 300,
+                BackExpiresAfterSeconds = 600,
+                BackRequireTemporalGear = true,
+                RegisterHomeCommands = false,
+                RegisterSpawnCommands = false,
+                RegisterStuckCommand = false,
+                RegisterTopCommand = false,
+                RegisterBackCommand = false,
+                StuckCooldownSeconds = 7200,
+                StuckReminderIntervalSeconds = 60,
+                CancelWarmupOnDamage = false,
+                CancelWarmupOnInteraction = false,
+                StuckCommandPrivilege = "stuckuser",
+                StuckAdminNotifyPrivilege = "staff",
+                StuckBlockedByOnlinePrivilege = "helper",
+                TopCommandPrivilege = "topuser",
+                BackCommandPrivilege = "backuser"
+            }
+        };
+        AnalyticsService.Configure(sink);
+
+        AnalyticsService.TrackConfigSnapshot(config);
+
+        var properties = sink.Events.Should().ContainSingle().Subject.Properties;
+        properties.Should().ContainKey("tpa_request_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("home_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("stuck_admin_notify_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("stuck_blocks_when_privilege_online").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("top_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("back_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("back_requires_temporal_gear").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("register_home_commands").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("register_spawn_commands").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("register_stuck_command").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("register_top_command").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("register_back_command").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("max_homes_bucket").WhoseValue.Should().Be("1-5");
+        properties.Should().ContainKey("top_warmup_seconds_bucket").WhoseValue.Should().Be("6-10");
+        properties.Should().ContainKey("back_warmup_seconds_bucket").WhoseValue.Should().Be("6-10");
+        properties.Should().ContainKey("home_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("spawn_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("top_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("back_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("back_expires_after_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("stuck_cooldown_seconds_bucket").WhoseValue.Should().Be("101+");
+        properties.Should().ContainKey("stuck_reminder_interval_seconds_bucket").WhoseValue.Should().Be("51-100");
+        properties.Should().ContainKey("teleport_cancel_warmup_on_damage").WhoseValue.Should().Be(false);
+        properties.Should().ContainKey("teleport_cancel_warmup_on_interaction").WhoseValue.Should().Be(false);
     }
 
     private sealed class RecordingAnalyticsSink : IAnalyticsSink

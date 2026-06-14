@@ -128,6 +128,9 @@ public static class AnalyticsService
             return;
         }
 
+        config.Teleportation ??= new TeleportationConfig();
+        config.Teleportation.InitializeDefaultsIfNeeded();
+
         Track("config snapshot", new Dictionary<string, object>
         {
             ["disable_nicknames"] = config.DisableNicknames,
@@ -145,6 +148,42 @@ public static class AnalyticsService
             ["tpa_require_temporal_gear"] = config.TpaRequireTemporalGear,
             ["tpa_use_cooldown"] = config.TpaUseCooldown,
             ["tpa_use_timeout"] = config.TpaUseTimeout,
+            ["tpa_request_custom_privilege"] = UsesCustomPrivilege(config.TpaRequestPrivilege, "chat"),
+            ["tpa_cooldown_hours_bucket"] = AnalyticsBuckets.Count((int)Math.Ceiling(config.TpaCooldownInGameHours)),
+            ["tpa_timeout_minutes_bucket"] = AnalyticsBuckets.Count((int)Math.Ceiling(config.TpaTimeoutMinutes)),
+            ["home_spawn_require_temporal_gear"] = config.HomeSpawnRequireTemporalGear,
+            ["register_home_commands"] = config.Teleportation.RegisterHomeCommands,
+            ["register_spawn_commands"] = config.Teleportation.RegisterSpawnCommands,
+            ["register_stuck_command"] = config.Teleportation.RegisterStuckCommand,
+            ["register_top_command"] = config.Teleportation.RegisterTopCommand,
+            ["register_back_command"] = config.Teleportation.RegisterBackCommand,
+            ["home_custom_privilege"] = UsesCustomPrivilege(config.HomeCommandPrivilege, "chat"),
+            ["set_home_custom_privilege"] = UsesCustomPrivilege(config.SetHomeCommandPrivilege, "chat"),
+            ["spawn_custom_privilege"] = UsesCustomPrivilege(config.SpawnCommandPrivilege, "chat"),
+            ["set_spawn_custom_privilege"] = UsesCustomPrivilege(config.SetSpawnCommandPrivilege, "commandplayer"),
+            ["stuck_custom_privilege"] = UsesCustomPrivilege(config.Teleportation.StuckCommandPrivilege, "chat"),
+            ["stuck_admin_notify_custom_privilege"] = UsesCustomPrivilege(config.Teleportation.StuckAdminNotifyPrivilege, "commandplayer"),
+            ["stuck_blocks_when_privilege_online"] = !string.IsNullOrWhiteSpace(config.Teleportation.StuckBlockedByOnlinePrivilege),
+            ["stuck_blocked_by_online_custom_privilege"] = UsesCustomPrivilege(config.Teleportation.StuckBlockedByOnlinePrivilege, "commandplayer"),
+            ["top_custom_privilege"] = UsesCustomPrivilege(config.Teleportation.TopCommandPrivilege, "chat"),
+            ["back_custom_privilege"] = UsesCustomPrivilege(config.Teleportation.BackCommandPrivilege, "chat"),
+            ["back_requires_temporal_gear"] = config.Teleportation.BackRequireTemporalGear,
+            ["max_homes_bucket"] = AnalyticsBuckets.Count(config.Teleportation.MaxHomes),
+            ["home_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.HomeWarmupSeconds),
+            ["spawn_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.SpawnWarmupSeconds),
+            ["top_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.TopWarmupSeconds),
+            ["back_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.BackWarmupSeconds),
+            ["tpa_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.TpaWarmupSeconds),
+            ["stuck_warmup_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.StuckWarmupSeconds),
+            ["home_cooldown_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.HomeCooldownSeconds),
+            ["spawn_cooldown_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.SpawnCooldownSeconds),
+            ["top_cooldown_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.TopCooldownSeconds),
+            ["back_cooldown_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.BackCooldownSeconds),
+            ["back_expires_after_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.BackExpiresAfterSeconds),
+            ["stuck_cooldown_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.StuckCooldownSeconds),
+            ["stuck_reminder_interval_seconds_bucket"] = AnalyticsBuckets.Count(config.Teleportation.StuckReminderIntervalSeconds),
+            ["teleport_cancel_warmup_on_damage"] = config.Teleportation.CancelWarmupOnDamage,
+            ["teleport_cancel_warmup_on_interaction"] = config.Teleportation.CancelWarmupOnInteraction,
             ["enable_sleep_notifications"] = config.EnableSleepNotifications,
             ["enable_language_system"] = config.EnableLanguageSystem,
             ["prevent_proximity_channel_switching"] = config.PreventProximityChannelSwitching,
@@ -199,6 +238,12 @@ public static class AnalyticsService
         {
             eventProperties[property.Key] = property.Value;
         }
+    }
+
+    private static bool UsesCustomPrivilege(string configuredPrivilege, string defaultPrivilege)
+    {
+        var normalized = string.IsNullOrWhiteSpace(configuredPrivilege) ? defaultPrivilege : configuredPrivilege.Trim();
+        return !string.Equals(normalized, defaultPrivilege, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeLabel(string value, string fallback)

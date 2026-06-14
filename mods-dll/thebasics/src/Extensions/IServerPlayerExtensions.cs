@@ -29,6 +29,8 @@ namespace thebasics.Extensions
         private const string CharacterSheetNicknameBind = "thebasics.nickname";
         private const string CharacterSheetNicknameField = "nickname";
         private const string ModDataNicknameColor = "BASIC_NICKNAME_COLOR";
+        private const string ModDataNametagBackgroundColor = "BASIC_NAMETAG_BACKGROUND_COLOR";
+        private const string ModDataNametagBorderColor = "BASIC_NAMETAG_BORDER_COLOR";
         private const string ModDataChatMode = "BASIC_CHATMODE";
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
         private const string ModDataRpTextEnabled = "BASIC_RPTEXTENABLED";
@@ -273,10 +275,54 @@ namespace thebasics.Extensions
             SyncNametagSubAttribute(player, ModSystems.CharacterSheets.CharacterSheetSystem.NicknameColorAttrKey, string.Empty);
         }
 
+        public static string GetNametagBackgroundColor(this IServerPlayer player)
+        {
+            return GetModData<string>(player, ModDataNametagBackgroundColor, null);
+        }
+
+        public static void SetNametagBackgroundColor(this IServerPlayer player, string color)
+        {
+            SetModData(player, ModDataNametagBackgroundColor, color);
+            SyncNametagSubAttribute(player, ModSystems.CharacterSheets.CharacterSheetSystem.NametagBackgroundColorAttrKey, color ?? string.Empty);
+        }
+
+        public static bool HasNametagBackgroundColor(this IServerPlayer player)
+        {
+            return GetModData<string>(player, ModDataNametagBackgroundColor, null) != null;
+        }
+
+        public static void ClearNametagBackgroundColor(this IServerPlayer player)
+        {
+            player.RemoveModdata(ModDataNametagBackgroundColor);
+            SyncNametagSubAttribute(player, ModSystems.CharacterSheets.CharacterSheetSystem.NametagBackgroundColorAttrKey, string.Empty);
+        }
+
+        public static string GetNametagBorderColor(this IServerPlayer player)
+        {
+            return GetModData<string>(player, ModDataNametagBorderColor, null);
+        }
+
+        public static void SetNametagBorderColor(this IServerPlayer player, string color)
+        {
+            SetModData(player, ModDataNametagBorderColor, color);
+            SyncNametagSubAttribute(player, ModSystems.CharacterSheets.CharacterSheetSystem.NametagBorderColorAttrKey, color ?? string.Empty);
+        }
+
+        public static bool HasNametagBorderColor(this IServerPlayer player)
+        {
+            return GetModData<string>(player, ModDataNametagBorderColor, null) != null;
+        }
+
+        public static void ClearNametagBorderColor(this IServerPlayer player)
+        {
+            player.RemoveModdata(ModDataNametagBorderColor);
+            SyncNametagSubAttribute(player, ModSystems.CharacterSheets.CharacterSheetSystem.NametagBorderColorAttrKey, string.Empty);
+        }
+
         /// <summary>
         /// Writes a value into the entity's "nametag" tree-attribute and marks it dirty so vanilla's
         /// <c>EntityBehaviorNameTag.OnNameChanged</c> listener fires on the client. Used for the
-        /// nickname-color and headshot-hash sub-attributes that drive our patched nametag renderer.
+        /// custom sub-attributes that drive our patched nametag renderer.
         /// </summary>
         private static void SyncNametagSubAttribute(IServerPlayer player, string subKey, string value)
         {

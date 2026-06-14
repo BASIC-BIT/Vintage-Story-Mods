@@ -30,8 +30,14 @@ public class RpCharacterProjectionSnapshot
     public bool ChatterEnabled { get; set; } = true;
 
     [ProtoMember(7)]
-    public Dictionary<string, int> LanguageSkills { get; set; } = new Dictionary<string, int>();
+    public string NametagBackgroundColor { get; set; }
 
     [ProtoMember(8)]
+    public string NametagBorderColor { get; set; }
+
+    [ProtoMember(9)]
+    public Dictionary<string, int> LanguageSkills { get; set; } = new Dictionary<string, int>();
+
+    [ProtoMember(10)]
     public SemanticLanguageMemoryStore SemanticLanguageMemory { get; set; } = new SemanticLanguageMemoryStore();
 }

@@ -36,6 +36,7 @@ namespace thebasics.Configs
             InitializeChatHistoryDefaults();
             SemanticLanguageLearning ??= new SemanticLanguageLearningConfig();
             SemanticLanguageLearning.Normalize();
+            InitializeHomeSpawnDefaults();
         }
 
         private void InitializeProximityChatDefaults()
@@ -162,6 +163,16 @@ namespace thebasics.Configs
             ChatHistoryMaxEntries = Math.Max(0, ChatHistoryMaxEntries);
             ChatHistorySearchMaxResults = ChatHistorySearchMaxResults <= 0 ? 100 : ChatHistorySearchMaxResults;
             ChatHistoryFlushIntervalMilliseconds = ChatHistoryFlushIntervalMilliseconds <= 0 ? 1000 : Math.Max(100, ChatHistoryFlushIntervalMilliseconds);
+        }
+
+        private void InitializeHomeSpawnDefaults()
+        {
+            HomeCommandPrivilege = string.IsNullOrWhiteSpace(HomeCommandPrivilege) ? "chat" : HomeCommandPrivilege;
+            SetHomeCommandPrivilege = string.IsNullOrWhiteSpace(SetHomeCommandPrivilege) ? "chat" : SetHomeCommandPrivilege;
+            SpawnCommandPrivilege = string.IsNullOrWhiteSpace(SpawnCommandPrivilege) ? "chat" : SpawnCommandPrivilege;
+            SetSpawnCommandPrivilege = string.IsNullOrWhiteSpace(SetSpawnCommandPrivilege) ? "commandplayer" : SetSpawnCommandPrivilege;
+            Teleportation ??= new TeleportationConfig();
+            Teleportation.InitializeDefaultsIfNeeded();
         }
 
         private void InitializeCharacterSheetDefaults()
@@ -822,6 +833,51 @@ namespace thebasics.Configs
         public bool EnableNearbyDeathMessagesInProximityChat { get; set; } = true;
 
         [ProtoMember(133)]
+        public string HomeCommandPrivilege { get; set; } = "chat";
+
+        [ProtoMember(134)]
+        public string SetHomeCommandPrivilege { get; set; } = "chat";
+
+        [ProtoMember(135)]
+        public string SpawnCommandPrivilege { get; set; } = "chat";
+
+        [ProtoMember(136)]
+        public string SetSpawnCommandPrivilege { get; set; } = "commandplayer";
+
+        [ProtoMember(137)]
+        public bool HomeSpawnRequireTemporalGear { get; set; } = false;
+
+        [ProtoMember(138)]
+        public TeleportationConfig Teleportation { get; set; } = new();
+
+        // Opt-in wrapper for vanilla player map marker world config. When enabled, The BASICs
+        // also forces mapShowGroupPlayers=false because the proximity chat channel is a group.
+        [ProtoMember(139)]
+        public bool ManageMapPlayerVisibility { get; set; } = false;
+
+        [ProtoMember(140)]
+        public bool MapHideOtherPlayers { get; set; } = false;
+
+        // Vanilla treats negative render distance as unlimited; The BASICs normalizes any negative
+        // value to -1 before writing the world config.
+        [ProtoMember(141)]
+        public int MapPlayerRenderDistance { get; set; } = 1000;
+
+        // Optional #RRGGBB or #RRGGBBAA colors for the custom nametag text bubble. Empty keeps
+        // the active Vintage Story UI theme colors.
+        [ProtoMember(142)]
+        public string NametagBackgroundColor { get; set; } = string.Empty;
+
+        [ProtoMember(143)]
+        public string NametagBorderColor { get; set; } = string.Empty;
+
+        [ProtoMember(144)]
+        public bool AllowPlayersToChangeNametagColors { get; set; } = true;
+
+        [ProtoMember(145)]
+        public string ChangeNametagColorPermission { get; set; } = "chat";
+
+        [ProtoMember(146)]
         public SemanticLanguageLearningConfig SemanticLanguageLearning { get; set; } = new SemanticLanguageLearningConfig();
     }
 }
