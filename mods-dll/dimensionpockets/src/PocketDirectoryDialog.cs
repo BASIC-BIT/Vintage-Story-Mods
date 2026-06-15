@@ -8,40 +8,30 @@ namespace PocketDimensions;
 
 internal sealed class PocketDirectoryDialog : GuiDialog
 {
-    private const double DialogWidth = 760;
+    private const double DialogWidth = 560;
     private const double ContentWidth = DialogWidth - 48;
     private const double PanelHeight = 360;
     private const int MaxVisibleStacks = 8;
-    private const int MaxStackLabelLength = 28;
-    private const int MaxHeaderLabelLength = 42;
+    private const int MaxStackLabelLength = 52;
     private const int MaxLocationTextLength = 96;
 
     private readonly Action _onRefresh;
     private readonly Action<string> _onTeleport;
     private readonly Action<string, string, int, int> _onCreatePocket;
-    private readonly Action<string, int, string> _onCreateLayer;
-    private readonly Action<string, int, string> _onEditLayer;
     private PocketDirectoryStateMessage _state = new PocketDirectoryStateMessage { Message = "Loading Pocket Directory..." };
     private string _selectedStackId;
     private int _stackScrollIndex;
-    private int _layerScrollIndex;
-    private int _layerPageSize = 1;
-    private bool _keepCurrentLayerVisibleOnNextCompose;
 
     public PocketDirectoryDialog(
         ICoreClientAPI capi,
         Action onRefresh,
         Action<string> onTeleport,
-        Action<string, string, int, int> onCreatePocket,
-        Action<string, int, string> onCreateLayer,
-        Action<string, int, string> onEditLayer)
+        Action<string, string, int, int> onCreatePocket)
         : base(capi)
     {
         _onRefresh = onRefresh;
         _onTeleport = onTeleport;
         _onCreatePocket = onCreatePocket;
-        _onCreateLayer = onCreateLayer;
-        _onEditLayer = onEditLayer;
         ComposeDialog();
     }
 
@@ -70,11 +60,9 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         if (!string.Equals(_selectedStackId, preferredStackId, StringComparison.Ordinal))
         {
             _selectedStackId = preferredStackId;
-            _layerScrollIndex = 0;
         }
 
         KeepSelectedStackVisible();
-        _keepCurrentLayerVisibleOnNextCompose = true;
         ClampScrollIndexes();
 
         ComposeDialog();
@@ -89,13 +77,9 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         var locationBounds = ElementBounds.Fixed(0, helpBounds.fixedY + helpBounds.fixedHeight + 4, ContentWidth, 22);
         var statusBounds = ElementBounds.Fixed(0, locationBounds.fixedY + locationBounds.fixedHeight + 4, ContentWidth, 24);
         var panelY = statusBounds.fixedY + statusBounds.fixedHeight + 10;
-        var leftWidth = 250;
-        var panelGap = 16;
-        var rightX = leftWidth + panelGap;
-        var rightWidth = ContentWidth - rightX;
-        var leftPanelBounds = ElementBounds.Fixed(0, panelY, leftWidth, PanelHeight);
-        var rightPanelBounds = ElementBounds.Fixed(rightX, panelY, rightWidth, PanelHeight);
-        var buttonY = panelY + PanelHeight + 12;
+        var listBounds = ElementBounds.Fixed(0, panelY, ContentWidth, PanelHeight);
+        var summaryBounds = ElementBounds.Fixed(0, panelY + PanelHeight + 10, ContentWidth, 48);
+        var buttonY = summaryBounds.fixedY + summaryBounds.fixedHeight + 8;
         var bodyHeight = buttonY + 36;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth - 10, bodyHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
@@ -104,14 +88,13 @@ internal sealed class PocketDirectoryDialog : GuiDialog
             .AddShadedDialogBG(bodyBounds)
             .AddDialogTitleBar("Pocket Directory", OnTitleBarCloseClicked)
             .BeginChildElements(bodyBounds)
-            .AddInset(leftPanelBounds.FlatCopy().FixedGrow(3).WithFixedOffset(-3, -3), 3)
-            .AddInset(rightPanelBounds.FlatCopy().FixedGrow(3).WithFixedOffset(-3, -3), 3)
-            .AddStaticText("Browse Pocket Dimensions spaces and teleport to layers your server permissions allow.", CairoFont.WhiteSmallText(), helpBounds)
+            .AddInset(listBounds.FlatCopy().FixedGrow(3).WithFixedOffset(-3, -3), 3)
+            .AddStaticText("Browse Pocket Dimensions spaces and enter pockets.", CairoFont.WhiteSmallText(), helpBounds)
             .AddStaticText(CurrentLocationText(), CairoFont.WhiteSmallText(), locationBounds)
             .AddStaticText(StatusText(), CairoFont.WhiteSmallText(), statusBounds);
 
-        AddStackList(composer, leftPanelBounds);
-        AddLayerList(composer, rightPanelBounds);
+        AddStackList(composer, listBounds);
+        AddSelectedPocketSummary(composer, summaryBounds);
         composer.AddSmallButton("Refresh", OnRefresh, ElementBounds.Fixed(0, buttonY, 116, 30));
         if (_state.CanCreatePocket)
         {
@@ -125,17 +108,23 @@ internal sealed class PocketDirectoryDialog : GuiDialog
 
     private string StatusText()
     {
-        if (!string.IsNullOrWhiteSpace(_state.Message))
+        if (!string.IsNullOrWhiteSpace(_state.Message) && !_state.Success)
         {
-            return _state.Success ? _state.Message : "Error: " + _state.Message;
+            return "Error: " + _state.Message;
         }
 
         var count = _state.Stacks?.Count ?? 0;
         if (count == 0)
         {
+            if (string.Equals(_state.Message, "Loading Pocket Directory...", StringComparison.Ordinal))
+            {
+                return _state.Message;
+            }
+
             return "No accessible pockets yet.";
         }
 
+        // Avoid transient success copy here; after actions, players need stable context or errors.
         var createText = _state.CanCreatePocket ? "You can create new pockets." : "Pocket creation is unavailable.";
         return $"{count} pocket{(count == 1 ? string.Empty : "s")} available. {createText}";
     }
@@ -160,8 +149,14 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         foreach (var stack in stacks)
         {
             var localStack = stack;
-            var label = StackButtonText(localStack);
-            composer.AddSmallButton(label, () => SelectStack(localStack.StackId), ElementBounds.Fixed(x, y, width, 28), EnumButtonStyle.Normal, "stack-" + Math.Abs((localStack.StackId ?? label).GetHashCode()));
+            var selected = string.Equals(localStack.StackId, _selectedStackId, StringComparison.Ordinal);
+            var label = StackButtonText(localStack, selected);
+            if (selected)
+            {
+                composer.AddInset(ElementBounds.Fixed(x - 4, y - 4, width + 8, 36), 2, 1.15f);
+            }
+
+            composer.AddSmallButton(label, () => SelectStack(localStack.StackId), ElementBounds.Fixed(x, y, width, 28), EnumButtonStyle.Small, "stack-" + Math.Abs((localStack.StackId ?? label).GetHashCode()));
             y += 34;
         }
 
@@ -171,77 +166,39 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         }
     }
 
-    private void AddLayerList(GuiComposer composer, ElementBounds panelBounds)
+    private void AddSelectedPocketSummary(GuiComposer composer, ElementBounds bounds)
     {
         var stack = SelectedStack();
-        var x = panelBounds.fixedX + 10;
-        var y = panelBounds.fixedY + 8;
-        var width = panelBounds.fixedWidth - 20;
-        composer.AddStaticText(Truncate(stack?.DisplayName ?? "Layers", MaxHeaderLabelLength), CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 22));
-        y += 28;
+        var x = bounds.fixedX;
+        var y = bounds.fixedY;
+        var width = bounds.fixedWidth;
 
         if (stack == null)
         {
-            _keepCurrentLayerVisibleOnNextCompose = false;
-            composer.AddStaticText("Select a pocket to view its layers.", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 42));
+            composer.AddStaticText("Select a pocket.", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y + 8, width, 22));
             return;
         }
 
         var owner = string.IsNullOrWhiteSpace(stack.OwnerPlayerName) ? "Server/global" : stack.OwnerPlayerName;
-        composer.AddStaticText($"Owner: {Truncate(owner, 28)}. New layers: {(stack.CanCreateLayer ? "yes" : "no")}", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 22));
-        y += 30;
+        var allSpaces = stack.Layers ?? new List<PocketDirectoryLayerMessage>();
+        var availableSpaces = allSpaces.Count(layer => layer.Prepared && !layer.Orphaned);
+        var displayName = string.IsNullOrWhiteSpace(stack.DisplayName) ? stack.StackId ?? "Unnamed" : stack.DisplayName;
+        var summary = $"{Truncate(displayName, 28)} | {Truncate(owner, 16)} | {availableSpaces}/{allSpaces.Count} spaces";
+        composer.AddStaticText(summary, CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width - 146, 22));
 
-        if (stack.CanCreateLayer)
+        var entry = DirectoryEntry(stack);
+        var current = allSpaces.FirstOrDefault(layer => layer.IsCurrent);
+        if (current != null)
         {
-            composer.AddSmallButton("New Layer", () => CreateLayer(stack), ElementBounds.Fixed(x, y, 112, 26), EnumButtonStyle.Normal, "new-layer-" + Math.Abs((stack.StackId ?? string.Empty).GetHashCode()));
-            y += 34;
+            composer.AddStaticText("Currently inside this pocket.", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y + 22, width - 146, 22));
         }
-
-        var allLayers = (stack.Layers ?? new List<PocketDirectoryLayerMessage>()).OrderBy(layer => layer.Index).ToArray();
-        if (allLayers.Length == 0)
+        else if (entry?.CanTeleport == true && !entry.Orphaned)
         {
-            _keepCurrentLayerVisibleOnNextCompose = false;
-            composer.AddStaticText("No layers are registered for this pocket.", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y, width, 42));
-            return;
+            composer.AddSmallButton("Enter Pocket", () => Teleport(entry.DimensionId), ElementBounds.Fixed(x + width - 132, y + 6, 132, 30), EnumButtonStyle.Normal, "enter-pocket-" + Math.Abs((entry.DimensionId ?? stack.StackId ?? string.Empty).GetHashCode()));
         }
-
-        var rowHeight = 50;
-        var controlsHeight = allLayers.Length > MaxVisibleLayerRows(y, panelBounds) ? 34 : 0;
-        var maxRows = MaxVisibleLayerRows(y, panelBounds, controlsHeight);
-        _layerPageSize = maxRows;
-        if (_keepCurrentLayerVisibleOnNextCompose)
+        else
         {
-            KeepCurrentLayerVisible(maxRows);
-            _keepCurrentLayerVisibleOnNextCompose = false;
-        }
-
-        _layerScrollIndex = ClampInt(_layerScrollIndex, 0, LastPageStart(allLayers.Length, maxRows));
-        var layers = allLayers.Skip(_layerScrollIndex).Take(maxRows).ToArray();
-
-        foreach (var layer in layers)
-        {
-            var localLayer = layer;
-            composer.AddStaticText(LayerText(localLayer), CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y + 3, width - 160, 44));
-            if (localLayer.CanTeleport && !localLayer.IsCurrent && !localLayer.Orphaned)
-            {
-                composer.AddSmallButton("Enter", () => Teleport(localLayer.DimensionId), ElementBounds.Fixed(x + width - 152, y, 70, 26), EnumButtonStyle.Normal, "teleport-" + Math.Abs((localLayer.DimensionId ?? string.Empty).GetHashCode()));
-            }
-            else
-            {
-                composer.AddStaticText(localLayer.IsCurrent ? "Current" : "Unavailable", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + width - 152, y + 3, 76, 24));
-            }
-
-            if (localLayer.CanEdit)
-            {
-                composer.AddSmallButton("Edit", () => EditLayer(localLayer), ElementBounds.Fixed(x + width - 74, y, 70, 26), EnumButtonStyle.Normal, "edit-" + Math.Abs((localLayer.DimensionId ?? string.Empty).GetHashCode()));
-            }
-
-            y += rowHeight;
-        }
-
-        if (allLayers.Length > maxRows)
-        {
-            AddScrollButtons(composer, x, panelBounds.fixedY + panelBounds.fixedHeight - 32, width, ScrollLayersUp, ScrollLayersDown, PageLabel(_layerScrollIndex, allLayers.Length, maxRows));
+            composer.AddStaticText("Unavailable for directory entry.", CairoFont.WhiteSmallText(), ElementBounds.Fixed(x, y + 22, width - 146, 22));
         }
     }
 
@@ -250,32 +207,27 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         return (_state.Stacks ?? new List<PocketDirectoryStackMessage>()).FirstOrDefault(stack => string.Equals(stack.StackId, _selectedStackId, StringComparison.Ordinal));
     }
 
-    private static string StackButtonText(PocketDirectoryStackMessage stack)
+    private static string StackButtonText(PocketDirectoryStackMessage stack, bool selected)
     {
-        var selected = stack?.IsOwner == true ? "* " : string.Empty;
-        return selected + Truncate(string.IsNullOrWhiteSpace(stack?.DisplayName) ? stack?.StackId ?? "Unnamed" : stack.DisplayName, MaxStackLabelLength);
+        var ownerPrefix = stack?.IsOwner == true ? "* " : string.Empty;
+        var selectedPrefix = selected ? "[Selected] " : string.Empty;
+        var name = string.IsNullOrWhiteSpace(stack?.DisplayName) ? stack?.StackId ?? "Unnamed" : stack.DisplayName;
+        return selectedPrefix + ownerPrefix + Truncate(name, MaxStackLabelLength - selectedPrefix.Length - ownerPrefix.Length);
     }
 
-    private static string LayerText(PocketDirectoryLayerMessage layer)
+    private static PocketDirectoryLayerMessage DirectoryEntry(PocketDirectoryStackMessage stack)
     {
-        var status = layer.Prepared ? "prepared" : "unprepared";
-        if (layer.Orphaned)
-        {
-            status = "orphaned";
-        }
-
-        return $"Layer {FormatLayer(layer.Index)}: {Truncate(layer.DisplayName, 24)}\n({status})";
-    }
-
-    private static string FormatLayer(int index)
-    {
-        return index > 0 ? "+" + index : index.ToString();
+        var layers = stack?.Layers ?? new List<PocketDirectoryLayerMessage>();
+        return layers.FirstOrDefault(layer => layer.IsCurrent)
+            ?? layers.FirstOrDefault(layer => layer.Index == 0 && layer.CanTeleport && !layer.Orphaned)
+            ?? layers.FirstOrDefault(layer => layer.CanTeleport && !layer.Orphaned)
+            ?? layers.FirstOrDefault(layer => layer.Index == 0)
+            ?? layers.FirstOrDefault();
     }
 
     private bool SelectStack(string stackId)
     {
         _selectedStackId = stackId;
-        _layerScrollIndex = 0;
         ComposeDialog();
         return true;
     }
@@ -317,55 +269,6 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         return true;
     }
 
-    private bool ScrollLayersUp()
-    {
-        _layerScrollIndex = Math.Max(0, _layerScrollIndex - Math.Max(1, _layerPageSize));
-        ComposeDialog();
-        return true;
-    }
-
-    private bool ScrollLayersDown()
-    {
-        var stack = SelectedStack();
-        var max = LastPageStart(stack?.Layers?.Count ?? 0, Math.Max(1, _layerPageSize));
-        _layerScrollIndex = Math.Min(max, _layerScrollIndex + Math.Max(1, _layerPageSize));
-        ComposeDialog();
-        return true;
-    }
-
-    private bool CreateLayer(PocketDirectoryStackMessage stack)
-    {
-        var suggested = SuggestedLayerIndex(stack);
-        var hint = $"Target index examples: {FormatLayer(suggested)}, +1, -1. Leave display name blank to use the default layer name.";
-        new PocketLayerDetailsDialog(capi, "Create Pocket Layer", hint, showLayerIndex: true, suggested, (index, displayName) =>
-        {
-            _onCreateLayer?.Invoke(stack.StackId, index, displayName);
-        }).TryOpen();
-        return true;
-    }
-
-    private bool EditLayer(PocketDirectoryLayerMessage layer)
-    {
-        var stack = SelectedStack();
-        if (stack == null || layer == null)
-        {
-            return true;
-        }
-
-        var hint = $"Current name: {layer.DisplayName}. Submit blank to reset this layer to its default name.";
-        new PocketLayerDetailsDialog(capi, $"Edit Layer {FormatLayer(layer.Index)}", hint, showLayerIndex: false, layer.Index, (index, displayName) =>
-        {
-            _onEditLayer?.Invoke(stack.StackId, index, displayName);
-        }).TryOpen();
-        return true;
-    }
-
-    private static int SuggestedLayerIndex(PocketDirectoryStackMessage stack)
-    {
-        var layers = stack?.Layers ?? new List<PocketDirectoryLayerMessage>();
-        return layers.Count == 0 ? 0 : layers.Max(layer => layer.Index) + 1;
-    }
-
     private string CurrentLocationText()
     {
         return string.IsNullOrWhiteSpace(_state.CurrentLocationText)
@@ -392,33 +295,18 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         }
     }
 
-    private void KeepCurrentLayerVisible(int pageSize)
-    {
-        var stack = SelectedStack();
-        var layers = stack?.Layers?.OrderBy(layer => layer.Index).ToArray();
-        if (layers == null)
-        {
-            return;
-        }
-
-        var current = Array.FindIndex(layers, layer => layer.IsCurrent);
-        if (current >= 0)
-        {
-            _layerScrollIndex = PageStartForIndex(current, Math.Max(1, pageSize));
-        }
-    }
-
     private void ClampScrollIndexes()
     {
         _stackScrollIndex = ClampInt(_stackScrollIndex, 0, LastPageStart(_state.Stacks?.Count ?? 0, MaxVisibleStacks));
-        _layerScrollIndex = Math.Max(0, _layerScrollIndex);
     }
 
     private static void AddScrollButtons(GuiComposer composer, double x, double y, double width, Func<bool> up, Func<bool> down, string label)
     {
-        composer.AddSmallButton("Up", () => up(), ElementBounds.Fixed(x, y, 72, 26));
-        composer.AddStaticText(label, CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + 82, y + 3, width - 164, 24));
-        composer.AddSmallButton("Down", () => down(), ElementBounds.Fixed(x + width - 72, y, 72, 26));
+        var controlsWidth = 172;
+        var controlsX = x + (width - controlsWidth) / 2;
+        composer.AddSmallButton("<", () => up(), ElementBounds.Fixed(controlsX, y, 36, 24), EnumButtonStyle.Small);
+        composer.AddStaticText(label, CairoFont.WhiteSmallText().WithOrientation(EnumTextOrientation.Center), ElementBounds.Fixed(controlsX + 44, y + 3, 84, 24));
+        composer.AddSmallButton(">", () => down(), ElementBounds.Fixed(controlsX + controlsWidth - 36, y, 36, 24), EnumButtonStyle.Small);
     }
 
     private static string PageLabel(int currentOffset, int totalItems, int pageSize)
@@ -426,7 +314,7 @@ internal sealed class PocketDirectoryDialog : GuiDialog
         pageSize = Math.Max(1, pageSize);
         var totalPages = Math.Max(1, (totalItems + pageSize - 1) / pageSize);
         var currentPage = Math.Min(totalPages, currentOffset / pageSize + 1);
-        return $"Page {currentPage} / {totalPages}";
+        return $"Page {currentPage}/{totalPages}";
     }
 
     private static int LastPageStart(int totalItems, int pageSize)
@@ -442,11 +330,6 @@ internal sealed class PocketDirectoryDialog : GuiDialog
     private static int PageStartForIndex(int index, int pageSize)
     {
         return pageSize <= 0 ? 0 : Math.Max(0, index / pageSize * pageSize);
-    }
-
-    private static int MaxVisibleLayerRows(double currentY, ElementBounds panelBounds, double reservedBottom = 0)
-    {
-        return Math.Max(1, (int)((panelBounds.fixedY + panelBounds.fixedHeight - currentY - reservedBottom - 6) / 50));
     }
 
     private static int ClampInt(int value, int min, int max)

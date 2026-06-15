@@ -444,7 +444,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         if (layer == null)
         {
-            return DimensionLibResult.Fail($"Pocket layer metadata for '{DisplayName(dimension.DimensionId)}' is unavailable.", "missing-pocket-layer");
+            return DimensionLibResult.Fail($"Pocket space metadata for '{DisplayName(dimension.DimensionId)}' is unavailable.", "missing-pocket-layer");
         }
 
         var targetIndex = layer.Index + direction;
@@ -476,7 +476,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var targetElevatorPos = destinations.Value.TargetElevatorPos;
         if (placeMissingElevator && !HasPrivilege(player, _config.MutatePocketBlocksPrivilege))
         {
-            return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator on the target layer.", "missing-elevator-place-privilege");
+            return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator in the target connected space.", "missing-elevator-place-privilege");
         }
 
         var landing = EnsureElevatorLanding(targetElevatorPos, target.Value.CreatedTargetLayer || placeMissingElevator);
@@ -486,11 +486,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             {
                 if (!HasPrivilege(player, _config.MutatePocketBlocksPrivilege))
                 {
-                    return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator on the target layer.", "missing-elevator-place-privilege");
+                    return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator in the target connected space.", "missing-elevator-place-privilege");
                 }
 
                 PromptElevatorPlacement(player, stack, layer.Index, targetIndex, direction);
-                return DimensionLibResult.Ok($"Confirm creating a Pocket Elevator on layer {FormatLayer(targetIndex)} to continue.");
+                return DimensionLibResult.Ok("Confirm creating a Pocket Elevator at the matching landing to continue.");
             }
 
             return landing;
@@ -511,7 +511,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             }
         }
 
-        return DimensionLibResult.Ok($"Moved to {DisplayName(target.Value.TargetLayer.DimensionId)} layer {FormatLayer(target.Value.TargetLayer.Index)}.");
+        return DimensionLibResult.Ok($"Moved within {stack.DisplayName}.");
     }
 
     private DimensionLibResult<(DimensionLocation Destination, BlockPos TargetElevatorPos)> ResolveElevatorDestinations(
@@ -549,13 +549,13 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         if (!CanCreateLayer(player, stack))
         {
-            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Fail(CapabilityDeniedReason(_config.CreateLayerCapabilityMode, _config.CreatePrivilege, "create a new pocket layer"), "missing-layer-create-privilege");
+            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Fail(CapabilityDeniedReason(_config.CreateLayerCapabilityMode, _config.CreatePrivilege, "create a new connected pocket space"), "missing-layer-create-privilege");
         }
 
         if (!createMissingLayer)
         {
             PromptLayerCreation(player, stack, sourceLayer.Index, targetIndex, direction);
-            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Ok((null, false), $"Confirm creating layer {FormatLayer(targetIndex)} to continue.");
+            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Ok((null, false), "Confirm creating a connected pocket space to continue.");
         }
 
         var created = CreateLayer(stack, targetIndex, player);
@@ -697,23 +697,23 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         if (!CanCreateLayer(player, stack))
         {
-            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.CreateLayerCapabilityMode, _config.CreatePrivilege, "create a pocket layer"), "missing-layer-create-privilege");
+            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.CreateLayerCapabilityMode, _config.CreatePrivilege, "create a connected pocket space"), "missing-layer-create-privilege");
         }
 
         var targetIndex = request.LayerIndex;
         if (FindLayer(stack, targetIndex) != null)
         {
-            return DimensionLibResult.Fail($"Layer {FormatLayer(targetIndex)} already exists in '{stack.DisplayName}'.", "pocket-layer-exists");
+            return DimensionLibResult.Fail($"That connected pocket space already exists in '{stack.DisplayName}'.", "pocket-layer-exists");
         }
 
         if (!HasAdjacentLayer(stack, targetIndex))
         {
-            return DimensionLibResult.Fail("Choose a layer index adjacent to an existing layer so elevator mappings stay connected.", "pocket-layer-not-adjacent");
+            return DimensionLibResult.Fail("Choose a connected space next to an existing one so elevator mappings stay connected.", "pocket-layer-not-adjacent");
         }
 
         var created = CreateLayer(stack, targetIndex, player, request.DisplayName);
         return created.Success
-            ? DimensionLibResult.Ok($"Created layer {FormatLayer(targetIndex)} in '{stack.DisplayName}'.")
+            ? DimensionLibResult.Ok($"Created a connected space in '{stack.DisplayName}'.")
             : DimensionLibResult.Fail(created.Message, created.ErrorCode);
     }
 
@@ -726,17 +726,17 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         if (!CanEditLayer(player, stack))
         {
-            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.EditLayerCapabilityMode, _config.CreatePrivilege, "edit pocket layer metadata"), "missing-layer-edit-privilege");
+            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.EditLayerCapabilityMode, _config.CreatePrivilege, "edit connected pocket space metadata"), "missing-layer-edit-privilege");
         }
 
         var layer = FindLayer(stack, request.LayerIndex);
         if (layer == null)
         {
-            return DimensionLibResult.Fail($"Layer {FormatLayer(request.LayerIndex)} does not exist in '{stack.DisplayName}'.", "missing-pocket-layer");
+            return DimensionLibResult.Fail($"That connected pocket space does not exist in '{stack.DisplayName}'.", "missing-pocket-layer");
         }
 
         ApplyLayerDisplayName(stack, layer, request.DisplayName);
-        return DimensionLibResult.Ok($"Updated layer {FormatLayer(layer.Index)} in '{stack.DisplayName}'.");
+        return DimensionLibResult.Ok($"Updated a connected space in '{stack.DisplayName}'.");
     }
 
     private bool TryGetDirectoryStack(string stackId, out PocketLayerStack stack)
@@ -759,7 +759,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         if (string.IsNullOrWhiteSpace(dimensionId))
         {
-            return DimensionLibResult.Fail("Select a pocket layer first.", "missing-pocket-selection");
+            return DimensionLibResult.Fail("Select a pocket first.", "missing-pocket-selection");
         }
 
         var lookup = _dimensionLib.GetDimension(dimensionId.Trim());
@@ -804,7 +804,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return;
         }
 
-        var text = $"Create a new pocket layer {FormatLayer(prompt.TargetLayerIndex)} {(prompt.Direction > 0 ? "above" : "below")} {prompt.StackName}?";
+        var text = $"Create a new connected pocket space {(prompt.Direction > 0 ? "above" : "below")} {prompt.StackName}?";
         new PocketLayerCreationDialog(_clientApi, text, create =>
         {
             _clientChannel?.SendPacket(new PocketLayerCreationResponse
@@ -825,7 +825,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return;
         }
 
-        var text = $"Create a Pocket Elevator at the matching landing on layer {FormatLayer(prompt.TargetLayerIndex)} in {prompt.StackName}?";
+        var text = $"Create a Pocket Elevator at the matching landing {(prompt.Direction > 0 ? "above" : "below")} {prompt.StackName}?";
         new PocketLayerCreationDialog(_clientApi, "Create Pocket Elevator", text, place =>
         {
             _clientChannel?.SendPacket(new PocketElevatorPlacementResponse
@@ -862,7 +862,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var dimensionLookup = _dimensionLib.GetDimensionAt(elevatorPos);
         if (!dimensionLookup.Success || !IsOwnedPocket(dimensionLookup.Value))
         {
-            error = DimensionLibResult.Fail("Pocket layer confirmation is no longer valid.", "pocketlayer-confirmation-stale");
+            error = DimensionLibResult.Fail("Pocket space confirmation is no longer valid.", "pocketlayer-confirmation-stale");
             return false;
         }
 
@@ -873,7 +873,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             layer.Index != sourceLayerIndex ||
             targetLayerIndex != layer.Index + direction)
         {
-            error = DimensionLibResult.Fail("Pocket layer confirmation is stale. Try the elevator again.", "pocketlayer-confirmation-stale");
+            error = DimensionLibResult.Fail("Pocket space confirmation is stale. Try the elevator again.", "pocketlayer-confirmation-stale");
             return false;
         }
 
@@ -904,20 +904,6 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
                 Slug = slug,
                 SizeChunks = sizeChunks,
                 SpawnY = spawnY,
-            }),
-            (stackId, layerIndex, displayName) => _clientChannel?.SendPacket(new PocketDirectoryActionRequest
-            {
-                Action = DirectoryActionCreateLayer,
-                StackId = stackId,
-                LayerIndex = layerIndex,
-                DisplayName = displayName,
-            }),
-            (stackId, layerIndex, displayName) => _clientChannel?.SendPacket(new PocketDirectoryActionRequest
-            {
-                Action = DirectoryActionEditLayer,
-                StackId = stackId,
-                LayerIndex = layerIndex,
-                DisplayName = displayName,
             }));
         _directoryDialog.SetState(new PocketDirectoryStateMessage { Message = "Loading Pocket Directory..." });
         _directoryDialog.TryOpen();
@@ -1116,7 +1102,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var layer = FindLayer(stack, currentDimensionId);
         return layer == null
             ? $"Current location: {stack.DisplayName}."
-            : $"Current location: {stack.DisplayName}, layer {FormatLayer(layer.Index)}.";
+            : $"Current location: {stack.DisplayName}.";
     }
 
     private PocketDirectoryStackMessage BuildDirectoryStack(IServerPlayer player, PocketLayerStack stack, string currentDimensionId, HashSet<string> emittedDimensions)
@@ -1294,7 +1280,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             dimension = registered.Value;
         }
 
-        var prepared = PreparePocket(dimension, player, $"Created pocket layer {FormatLayer(targetIndex)}.", recordStandaloneStack: false);
+        var prepared = PreparePocket(dimension, player, "Created a connected pocket space.", recordStandaloneStack: false);
         if (!prepared.Success)
         {
             return DimensionLibResult<PocketLayerRef>.Fail(prepared.Message, prepared.ErrorCode);
@@ -1328,7 +1314,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var upper = FindLayer(stack, upperIndex);
         if (lower == null || upper == null)
         {
-            return DimensionLibResult.Fail("Adjacent pocket layers are required before registering an elevator mapping.", "missing-pocket-layer");
+            return DimensionLibResult.Fail("Adjacent connected pocket spaces are required before registering an elevator mapping.", "missing-pocket-layer");
         }
 
         var mappingId = LayerMappingId(stack.StackId, lowerIndex, upperIndex);
@@ -1349,7 +1335,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         lower.UpMappingId = mappingId;
         upper.DownMappingId = mappingId;
-        return DimensionLibResult.Ok($"Linked pocket layers {FormatLayer(lowerIndex)} and {FormatLayer(upperIndex)}.");
+        return DimensionLibResult.Ok("Linked connected pocket spaces.");
     }
 
     private DimensionLibResult EnsureElevatorLanding(BlockPos elevatorPos, bool allowAutoPlaceForNewLayer)
@@ -1373,7 +1359,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
                 return placeable;
             }
 
-            return DimensionLibResult.Fail("Target layer needs a Pocket Elevator at the mapped landing.", "missing-target-pocketelevator");
+            return DimensionLibResult.Fail("The target connected space needs a Pocket Elevator at the mapped landing.", "missing-target-pocketelevator");
         }
 
         if (landingMode != PocketElevatorLandingMode.AutoPlaceElevatorIfMissing && !allowAutoPlaceForNewLayer)

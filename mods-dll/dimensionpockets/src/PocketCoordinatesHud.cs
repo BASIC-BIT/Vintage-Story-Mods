@@ -31,7 +31,7 @@ internal sealed class PocketCoordinatesHud : HudElement
 
     private void Compose()
     {
-        var textBounds = ElementBounds.Fixed(EnumDialogArea.None, 0, 0, 230, 56);
+        var textBounds = ElementBounds.Fixed(EnumDialogArea.None, 0, 0, 230, 82);
         var bgBounds = textBounds.ForkBoundingParent(5, 5, 5, 5);
         var bounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.RightTop).WithFixedAlignmentOffset(0 - GuiStyle.DialogToScreenPadding, GuiStyle.DialogToScreenPadding + 70);
         SingleComposer = capi.Gui.CreateCompo("pocketcoordinateshud", bounds)
@@ -65,7 +65,7 @@ internal sealed class PocketCoordinatesHud : HudElement
         }
 
         var text = _state.InPocket
-            ? $"{_state.PocketName}  Layer {FormatLayer(_state.LayerIndex)}\n{_state.LocalX}, {_state.LocalY}, {_state.LocalZ}"
+            ? $"{_state.PocketName}\nLayer {FormatLayer(_state.LayerIndex)}\n{_state.LocalX}, {_state.LocalY}, {_state.LocalZ}"
             : string.Empty;
         SingleComposer.GetDynamicText("text").SetNewText(text);
     }
