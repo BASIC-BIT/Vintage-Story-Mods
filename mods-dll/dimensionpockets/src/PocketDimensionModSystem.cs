@@ -18,6 +18,15 @@ internal enum PocketElevatorLandingMode
     AutoPlaceElevatorIfMissing,
 }
 
+internal enum PocketCapabilityMode
+{
+    Disabled,
+    Privilege,
+    OwnerOrPrivilege,
+    OwnerMemberOrPrivilege,
+    Public,
+}
+
 /// <summary>
 /// Small DimensionLib consumer mod. Keep this file readable enough to copy from as an integration example.
 /// </summary>
@@ -31,8 +40,13 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private const string PocketWaystoneBlockCode = "pocketdimensions:pocketwaystone";
     private const string PocketReturnPedestalBlockCode = "pocketdimensions:pocketreturnpedestal";
     private const string PocketElevatorBlockCode = "pocketdimensions:pocketelevator";
+    private const string DirectoryActionEnter = "enter";
+    private const string DirectoryActionCreatePocket = "createpocket";
+    private const string DirectoryActionCreateLayer = "createlayer";
+    private const string DirectoryActionEditLayer = "editlayer";
     private const float PocketMinimumSceneLight = 0.18f;
     private const int HudUpdateTickMs = 250;
+    private const int MaxDisplayNameLength = 48;
 
     private ICoreServerAPI _api;
     private ICoreClientAPI _clientApi;
@@ -42,12 +56,14 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private IServerNetworkChannel _serverChannel;
     private IClientNetworkChannel _clientChannel;
     private PocketCoordinatesHud _coordinatesHud;
+    private PocketDirectoryDialog _directoryDialog;
     private long _hudUpdateListenerId;
     private readonly Dictionary<string, PocketWaystoneLink> _linksByEndpointId = new Dictionary<string, PocketWaystoneLink>(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _activeIngressByPlayer = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, DimensionLocation>> _unanchoredReturnsByPlayer = new Dictionary<string, Dictionary<string, DimensionLocation>>(StringComparer.Ordinal);
     private readonly Dictionary<string, PocketLayerStack> _layerStacksById = new Dictionary<string, PocketLayerStack>(StringComparer.Ordinal);
     private readonly HashSet<string> _playersWithPocketHud = new HashSet<string>(StringComparer.Ordinal);
+    private readonly HashSet<string> _layersNeedingInitialSend = new HashSet<string>(StringComparer.Ordinal);
 
     public override double ExecuteOrder()
     {
@@ -79,9 +95,16 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             .RegisterMessageType<PocketElevatorPlacementPrompt>()
             .RegisterMessageType<PocketElevatorPlacementResponse>()
             .RegisterMessageType<PocketHudStateMessage>()
+            .RegisterMessageType<PocketDirectoryRequest>()
+            .RegisterMessageType<PocketDirectoryActionRequest>()
+            .RegisterMessageType<PocketDirectoryStateMessage>()
+            .RegisterMessageType<PocketDirectoryStackMessage>()
+            .RegisterMessageType<PocketDirectoryLayerMessage>()
             .SetMessageHandler<PocketElevatorTravelRequest>(OnElevatorTravelRequest)
             .SetMessageHandler<PocketLayerCreationResponse>(OnLayerCreationResponse)
-            .SetMessageHandler<PocketElevatorPlacementResponse>(OnElevatorPlacementResponse);
+            .SetMessageHandler<PocketElevatorPlacementResponse>(OnElevatorPlacementResponse)
+            .SetMessageHandler<PocketDirectoryRequest>(OnPocketDirectoryRequest)
+            .SetMessageHandler<PocketDirectoryActionRequest>(OnPocketDirectoryActionRequest);
         _linkStore = new PocketLinkStore(api);
         LoadLinkState();
         api.ObjectCache[WaystoneServiceCacheKey] = this;
@@ -108,14 +131,22 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             .RegisterMessageType<PocketElevatorPlacementPrompt>()
             .RegisterMessageType<PocketElevatorPlacementResponse>()
             .RegisterMessageType<PocketHudStateMessage>()
+            .RegisterMessageType<PocketDirectoryRequest>()
+            .RegisterMessageType<PocketDirectoryActionRequest>()
+            .RegisterMessageType<PocketDirectoryStateMessage>()
+            .RegisterMessageType<PocketDirectoryStackMessage>()
+            .RegisterMessageType<PocketDirectoryLayerMessage>()
             .SetMessageHandler<PocketLayerCreationPrompt>(OnLayerCreationPrompt)
             .SetMessageHandler<PocketElevatorPlacementPrompt>(OnElevatorPlacementPrompt)
-            .SetMessageHandler<PocketHudStateMessage>(OnPocketHudState);
+            .SetMessageHandler<PocketHudStateMessage>(OnPocketHudState)
+            .SetMessageHandler<PocketDirectoryStateMessage>(OnPocketDirectoryState);
 
         api.Input.RegisterHotKey("pocketelevatorup", "Pocket Elevator Up", GlKeys.PageUp, HotkeyType.CharacterControls);
         api.Input.RegisterHotKey("pocketelevatordown", "Pocket Elevator Down", GlKeys.PageDown, HotkeyType.CharacterControls);
+        api.Input.RegisterHotKey("pocketdirectory", "Pocket Directory", GlKeys.P, HotkeyType.HelpAndOverlays, ctrlPressed: true, shiftPressed: true);
         api.Input.SetHotKeyHandler("pocketelevatorup", _ => SendElevatorTravelRequest(1));
         api.Input.SetHotKeyHandler("pocketelevatordown", _ => SendElevatorTravelRequest(-1));
+        api.Input.SetHotKeyHandler("pocketdirectory", OnPocketDirectoryHotkey);
         _coordinatesHud = new PocketCoordinatesHud(api);
     }
 
@@ -134,6 +165,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         _coordinatesHud?.Dispose();
+        _directoryDialog?.Dispose();
 
         base.Dispose();
     }
@@ -166,6 +198,18 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         return ShortName(dimensionId);
     }
 
+    private static string LayerDisplayName(PocketLayerStack stack, PocketLayerRef layer, string dimensionId)
+    {
+        if (!string.IsNullOrWhiteSpace(layer?.DisplayName))
+        {
+            return layer.DisplayName;
+        }
+
+        return layer?.Index == 0 && !string.IsNullOrWhiteSpace(stack?.DisplayName)
+            ? stack.DisplayName
+            : ShortName(dimensionId);
+    }
+
     public DimensionLibResult EnterBoundPocket(IServerPlayer player, BlockSelection blockSelection)
     {
         if (player?.Entity == null)
@@ -176,11 +220,6 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         if (blockSelection?.Position == null)
         {
             return DimensionLibResult.Fail("This Waystone is not bound to a Pocket Dimension yet.", "pocketwaystone-unbound");
-        }
-
-        if (!HasPrivilege(player, _config.UseWaystonePrivilege))
-        {
-            return DimensionLibResult.Fail($"Missing privilege '{_config.UseWaystonePrivilege}'.", "missing-waystone-use-privilege");
         }
 
         var blockEntity = _api.World.BlockAccessor.GetBlockEntity(blockSelection.Position) as PocketWaystoneBlockEntity;
@@ -204,6 +243,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         if (_dimensionLib.IsDimensionOrphaned(dimensionId))
         {
             return DimensionLibResult.Fail($"Bound pocket '{DisplayName(dimensionId)}' is orphaned.", "dimension-orphaned");
+        }
+
+        if (!CanUseWaystone(player, lookup.Value))
+        {
+            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.UseWaystoneCapabilityMode, _config.UseWaystonePrivilege, "use a Pocket Waystone"), "missing-waystone-use-privilege");
         }
 
         var linked = RegisterWaystoneLink(blockEntity, blockSelection.Position, lookup.Value, player);
@@ -379,11 +423,6 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         direction = NormalizeDirection(direction);
-        if (!HasPrivilege(player, _config.UseElevatorPrivilege))
-        {
-            return DimensionLibResult.Fail($"Missing privilege '{_config.UseElevatorPrivilege}'.", "missing-elevator-use-privilege");
-        }
-
         if (!TryFindStandingElevator(player, out var elevatorPos, out _))
         {
             return DimensionLibResult.Fail("Stand on a Pocket Elevator first.", "not-on-pocket-elevator");
@@ -398,9 +437,14 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var dimension = dimensionLookup.Value;
         var stack = EnsureLayerStack(dimension);
         var layer = FindLayer(stack, dimension.DimensionId);
+        if (!CanUseElevator(player, stack))
+        {
+            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.UseElevatorCapabilityMode, _config.UseElevatorPrivilege, "use a Pocket Elevator"), "missing-elevator-use-privilege");
+        }
+
         if (layer == null)
         {
-            return DimensionLibResult.Fail($"Pocket layer metadata for '{DisplayName(dimension.DimensionId)}' is unavailable.", "missing-pocket-layer");
+            return DimensionLibResult.Fail($"Pocket space metadata for '{DisplayName(dimension.DimensionId)}' is unavailable.", "missing-pocket-layer");
         }
 
         var targetIndex = layer.Index + direction;
@@ -432,7 +476,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var targetElevatorPos = destinations.Value.TargetElevatorPos;
         if (placeMissingElevator && !HasPrivilege(player, _config.MutatePocketBlocksPrivilege))
         {
-            return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator on the target layer.", "missing-elevator-place-privilege");
+            return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator in the target connected space.", "missing-elevator-place-privilege");
         }
 
         var landing = EnsureElevatorLanding(targetElevatorPos, target.Value.CreatedTargetLayer || placeMissingElevator);
@@ -442,11 +486,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             {
                 if (!HasPrivilege(player, _config.MutatePocketBlocksPrivilege))
                 {
-                    return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator on the target layer.", "missing-elevator-place-privilege");
+                    return DimensionLibResult.Fail($"Missing privilege '{_config.MutatePocketBlocksPrivilege}' to place a Pocket Elevator in the target connected space.", "missing-elevator-place-privilege");
                 }
 
                 PromptElevatorPlacement(player, stack, layer.Index, targetIndex, direction);
-                return DimensionLibResult.Ok($"Confirm creating a Pocket Elevator on layer {FormatLayer(targetIndex)} to continue.");
+                return DimensionLibResult.Ok("Confirm creating a Pocket Elevator at the matching landing to continue.");
             }
 
             return landing;
@@ -467,7 +511,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             }
         }
 
-        return DimensionLibResult.Ok($"Moved to {DisplayName(target.Value.TargetLayer.DimensionId)} layer {FormatLayer(target.Value.TargetLayer.Index)}.");
+        return DimensionLibResult.Ok($"Moved within {stack.DisplayName}.");
     }
 
     private DimensionLibResult<(DimensionLocation Destination, BlockPos TargetElevatorPos)> ResolveElevatorDestinations(
@@ -503,15 +547,15 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Ok((targetLayer, false));
         }
 
-        if (!HasPrivilege(player, _config.CreatePrivilege))
+        if (!CanCreateLayer(player, stack))
         {
-            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Fail($"Missing privilege '{_config.CreatePrivilege}' to create a new pocket layer.", "missing-layer-create-privilege");
+            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Fail(CapabilityDeniedReason(_config.CreateLayerCapabilityMode, _config.CreatePrivilege, "create a new connected pocket space"), "missing-layer-create-privilege");
         }
 
         if (!createMissingLayer)
         {
             PromptLayerCreation(player, stack, sourceLayer.Index, targetIndex, direction);
-            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Ok((null, false), $"Confirm creating layer {FormatLayer(targetIndex)} to continue.");
+            return DimensionLibResult<(PocketLayerRef TargetLayer, bool CreatedTargetLayer)>.Ok((null, false), "Confirm creating a connected pocket space to continue.");
         }
 
         var created = CreateLayer(stack, targetIndex, player);
@@ -603,6 +647,150 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         player.SendMessage(GlobalConstants.GeneralChatGroup, result.Message, EnumChatType.Notification);
     }
 
+    private void OnPocketDirectoryRequest(IServerPlayer player, PocketDirectoryRequest request)
+    {
+        SendPocketDirectory(player);
+    }
+
+    private void OnPocketDirectoryActionRequest(IServerPlayer player, PocketDirectoryActionRequest request)
+    {
+        var result = HandlePocketDirectoryAction(player, request);
+        if (!result.Success)
+        {
+            player.SendIngameError(result.ErrorCode ?? "pocket-directory-action-failed", result.Message);
+        }
+
+        SendPocketDirectory(player, result.Message, result.Success, DirectorySelectedStack(request, result.Success));
+    }
+
+    private DimensionLibResult HandlePocketDirectoryAction(IServerPlayer player, PocketDirectoryActionRequest request)
+    {
+        return request?.Action?.Trim().ToLowerInvariant() switch
+        {
+            DirectoryActionEnter => EnterPocketFromDirectory(player, request.DimensionId),
+            DirectoryActionCreatePocket => CreatePocketFromDirectory(player, request),
+            DirectoryActionCreateLayer => CreateLayerFromDirectory(player, request),
+            DirectoryActionEditLayer => EditLayerFromDirectory(player, request),
+            _ => DimensionLibResult.Fail("Unknown Pocket Directory action.", "unknown-pocket-directory-action"),
+        };
+    }
+
+    private DimensionLibResult CreatePocketFromDirectory(IServerPlayer player, PocketDirectoryActionRequest request)
+    {
+        if (!CanCreatePocket(player))
+        {
+            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.CreatePocketCapabilityMode, _config.CreatePrivilege, "create a pocket"), "missing-pocket-create-privilege");
+        }
+
+        var result = CreateOrPreparePocket(player, request?.DisplayName, request?.Slug, request?.SizeChunks ?? 0, request?.SpawnY ?? 0);
+        return result.Success
+            ? DimensionLibResult.Ok(result.Message)
+            : DimensionLibResult.Fail(result.Message, result.ErrorCode);
+    }
+
+    private DimensionLibResult CreateLayerFromDirectory(IServerPlayer player, PocketDirectoryActionRequest request)
+    {
+        if (!TryGetDirectoryStack(request?.StackId, out var stack))
+        {
+            return DimensionLibResult.Fail("Select a pocket stack first.", "missing-pocket-stack");
+        }
+
+        if (!CanCreateLayer(player, stack))
+        {
+            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.CreateLayerCapabilityMode, _config.CreatePrivilege, "create a connected pocket space"), "missing-layer-create-privilege");
+        }
+
+        var targetIndex = request.LayerIndex;
+        if (FindLayer(stack, targetIndex) != null)
+        {
+            return DimensionLibResult.Fail($"That connected pocket space already exists in '{stack.DisplayName}'.", "pocket-layer-exists");
+        }
+
+        if (!HasAdjacentLayer(stack, targetIndex))
+        {
+            return DimensionLibResult.Fail("Choose a connected space next to an existing one so elevator mappings stay connected.", "pocket-layer-not-adjacent");
+        }
+
+        var created = CreateLayer(stack, targetIndex, player, request.DisplayName);
+        return created.Success
+            ? DimensionLibResult.Ok($"Created a connected space in '{stack.DisplayName}'.")
+            : DimensionLibResult.Fail(created.Message, created.ErrorCode);
+    }
+
+    private DimensionLibResult EditLayerFromDirectory(IServerPlayer player, PocketDirectoryActionRequest request)
+    {
+        if (!TryGetDirectoryStack(request?.StackId, out var stack))
+        {
+            return DimensionLibResult.Fail("Select a pocket stack first.", "missing-pocket-stack");
+        }
+
+        if (!CanEditLayer(player, stack))
+        {
+            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.EditLayerCapabilityMode, _config.CreatePrivilege, "edit connected pocket space metadata"), "missing-layer-edit-privilege");
+        }
+
+        var layer = FindLayer(stack, request.LayerIndex);
+        if (layer == null)
+        {
+            return DimensionLibResult.Fail($"That connected pocket space does not exist in '{stack.DisplayName}'.", "missing-pocket-layer");
+        }
+
+        ApplyLayerDisplayName(stack, layer, request.DisplayName);
+        return DimensionLibResult.Ok($"Updated a connected space in '{stack.DisplayName}'.");
+    }
+
+    private bool TryGetDirectoryStack(string stackId, out PocketLayerStack stack)
+    {
+        stack = null;
+        return !string.IsNullOrWhiteSpace(stackId) && _layerStacksById.TryGetValue(stackId.Trim(), out stack);
+    }
+
+    private static bool HasAdjacentLayer(PocketLayerStack stack, int targetIndex)
+    {
+        return FindLayer(stack, targetIndex - 1) != null || FindLayer(stack, targetIndex + 1) != null;
+    }
+
+    private DimensionLibResult EnterPocketFromDirectory(IServerPlayer player, string dimensionId)
+    {
+        if (player?.Entity == null)
+        {
+            return DimensionLibResult.Fail("Online player is required.", "missing-player");
+        }
+
+        if (string.IsNullOrWhiteSpace(dimensionId))
+        {
+            return DimensionLibResult.Fail("Select a pocket first.", "missing-pocket-selection");
+        }
+
+        var lookup = _dimensionLib.GetDimension(dimensionId.Trim());
+        if (!lookup.Success)
+        {
+            return DimensionLibResult.Fail(lookup.Message, lookup.ErrorCode);
+        }
+
+        var stack = FindStackForDimension(lookup.Value.DimensionId);
+        if (!CanTeleportFromDirectory(player, stack, lookup.Value))
+        {
+            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.DirectoryTeleportCapabilityMode, new[] { _config.EnterPrivilege, _config.UseWaystonePrivilege }, "enter this pocket from the directory"), "missing-pocket-access-privilege");
+        }
+
+        if (_dimensionLib.IsDimensionOrphaned(lookup.Value.DimensionId))
+        {
+            return DimensionLibResult.Fail($"Pocket '{DisplayName(lookup.Value.DimensionId)}' is orphaned.", "dimension-orphaned");
+        }
+
+        var ensured = EnsurePocketInfrastructure(lookup.Value, player);
+        if (!ensured.Success)
+        {
+            return ensured;
+        }
+
+        var returnLocation = _dimensionLib.CaptureLocation(player);
+        return returnLocation.Success
+            ? EnterPocket(player, lookup.Value, endpointId: null, unanchoredReturn: returnLocation.Value)
+            : DimensionLibResult.Fail(returnLocation.Message, returnLocation.ErrorCode);
+    }
+
     private bool SendElevatorTravelRequest(int direction)
     {
         _clientChannel?.SendPacket(new PocketElevatorTravelRequest { Direction = NormalizeDirection(direction) });
@@ -616,7 +804,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return;
         }
 
-        var text = $"Create a new pocket layer {FormatLayer(prompt.TargetLayerIndex)} {(prompt.Direction > 0 ? "above" : "below")} {prompt.StackName}?";
+        var text = $"Create a new connected pocket space {(prompt.Direction > 0 ? "above" : "below")} {prompt.StackName}?";
         new PocketLayerCreationDialog(_clientApi, text, create =>
         {
             _clientChannel?.SendPacket(new PocketLayerCreationResponse
@@ -637,7 +825,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return;
         }
 
-        var text = $"Create a Pocket Elevator at the matching landing on layer {FormatLayer(prompt.TargetLayerIndex)} in {prompt.StackName}?";
+        var text = $"Create a Pocket Elevator at the matching landing {(prompt.Direction > 0 ? "above" : "below")} {prompt.StackName}?";
         new PocketLayerCreationDialog(_clientApi, "Create Pocket Elevator", text, place =>
         {
             _clientChannel?.SendPacket(new PocketElevatorPlacementResponse
@@ -674,7 +862,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var dimensionLookup = _dimensionLib.GetDimensionAt(elevatorPos);
         if (!dimensionLookup.Success || !IsOwnedPocket(dimensionLookup.Value))
         {
-            error = DimensionLibResult.Fail("Pocket layer confirmation is no longer valid.", "pocketlayer-confirmation-stale");
+            error = DimensionLibResult.Fail("Pocket space confirmation is no longer valid.", "pocketlayer-confirmation-stale");
             return false;
         }
 
@@ -685,7 +873,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             layer.Index != sourceLayerIndex ||
             targetLayerIndex != layer.Index + direction)
         {
-            error = DimensionLibResult.Fail("Pocket layer confirmation is stale. Try the elevator again.", "pocketlayer-confirmation-stale");
+            error = DimensionLibResult.Fail("Pocket space confirmation is stale. Try the elevator again.", "pocketlayer-confirmation-stale");
             return false;
         }
 
@@ -697,9 +885,45 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         _coordinatesHud?.SetState(message);
     }
 
+    private bool OnPocketDirectoryHotkey(KeyCombination _)
+    {
+        if (_directoryDialog?.IsOpened() == true)
+        {
+            _directoryDialog.TryClose();
+            return true;
+        }
+
+        _directoryDialog ??= new PocketDirectoryDialog(
+            _clientApi,
+            RequestPocketDirectory,
+            dimensionId => _clientChannel?.SendPacket(new PocketDirectoryActionRequest { Action = DirectoryActionEnter, DimensionId = dimensionId }),
+            (displayName, slug, sizeChunks, spawnY) => _clientChannel?.SendPacket(new PocketDirectoryActionRequest
+            {
+                Action = DirectoryActionCreatePocket,
+                DisplayName = displayName,
+                Slug = slug,
+                SizeChunks = sizeChunks,
+                SpawnY = spawnY,
+            }));
+        _directoryDialog.SetState(new PocketDirectoryStateMessage { Message = "Loading Pocket Directory..." });
+        _directoryDialog.TryOpen();
+        RequestPocketDirectory();
+        return true;
+    }
+
+    private void RequestPocketDirectory()
+    {
+        _clientChannel?.SendPacket(new PocketDirectoryRequest { Refresh = true });
+    }
+
+    private void OnPocketDirectoryState(PocketDirectoryStateMessage message)
+    {
+        _directoryDialog?.SetState(message);
+    }
+
     private void PromptLayerCreation(IServerPlayer player, PocketLayerStack stack, int sourceIndex, int targetIndex, int direction)
     {
-        if (player == null || !HasPrivilege(player, _config.CreatePrivilege))
+        if (player == null || !CanCreateLayer(player, stack))
         {
             return;
         }
@@ -798,7 +1022,176 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         };
     }
 
-    private PocketLayerStack EnsureLayerStack(Dimension dimension)
+    private string DirectorySelectedStack(PocketDirectoryActionRequest request, bool success)
+    {
+        if (!success || request == null)
+        {
+            return null;
+        }
+
+        return request.Action?.Trim().ToLowerInvariant() switch
+        {
+            DirectoryActionCreatePocket => ToDimensionId(PocketSlug.Normalize(string.IsNullOrWhiteSpace(request.Slug) ? request.DisplayName : request.Slug)),
+            DirectoryActionCreateLayer => request.StackId,
+            DirectoryActionEditLayer => request.StackId,
+            DirectoryActionEnter => FindStackForDimension(request.DimensionId)?.StackId,
+            _ => null,
+        };
+    }
+
+    private void SendPocketDirectory(IServerPlayer player, string message = null, bool success = true, string selectedStackId = null)
+    {
+        if (player == null)
+        {
+            return;
+        }
+
+        _serverChannel?.SendPacket(BuildPocketDirectoryState(player, message, success, selectedStackId), player);
+    }
+
+    private PocketDirectoryStateMessage BuildPocketDirectoryState(IServerPlayer player, string message, bool success, string selectedStackId)
+    {
+        var currentDimensionId = CurrentPocketDimensionId(player);
+        var currentStack = string.IsNullOrWhiteSpace(currentDimensionId) ? null : FindStackForDimension(currentDimensionId);
+        var state = new PocketDirectoryStateMessage
+        {
+            Message = message,
+            Success = success,
+            CanCreatePocket = CanCreatePocket(player),
+            CanCreateLayer = _layerStacksById.Values.Any(stack => CanCreateLayer(player, stack)),
+            SelectedStackId = selectedStackId ?? currentStack?.StackId,
+            CurrentLocationText = CurrentLocationText(currentStack, currentDimensionId),
+            DefaultSizeChunks = _config.DefaultSizeChunks,
+            DefaultSpawnY = ResolveDefaultSpawnY(),
+        };
+
+        var emittedDimensions = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var stack in _layerStacksById.Values.OrderBy(stack => stack.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            var entry = BuildDirectoryStack(player, stack, currentDimensionId, emittedDimensions);
+            if (entry.Layers.Count > 0)
+            {
+                state.Stacks.Add(entry);
+            }
+        }
+
+        foreach (var dimension in _dimensionLib.Dimensions.Where(IsOwnedPocket).OrderBy(dimension => DisplayName(dimension.DimensionId), StringComparer.OrdinalIgnoreCase))
+        {
+            if (emittedDimensions.Contains(dimension.DimensionId))
+            {
+                continue;
+            }
+
+            var entry = BuildDirectoryStandalonePocket(player, dimension, currentDimensionId);
+            if (entry != null)
+            {
+                state.Stacks.Add(entry);
+            }
+        }
+
+        return state;
+    }
+
+    private string CurrentLocationText(PocketLayerStack stack, string currentDimensionId)
+    {
+        if (stack == null || string.IsNullOrWhiteSpace(currentDimensionId))
+        {
+            return "Current location: outside a Pocket Dimensions pocket.";
+        }
+
+        var layer = FindLayer(stack, currentDimensionId);
+        return layer == null
+            ? $"Current location: {stack.DisplayName}."
+            : $"Current location: {stack.DisplayName}.";
+    }
+
+    private PocketDirectoryStackMessage BuildDirectoryStack(IServerPlayer player, PocketLayerStack stack, string currentDimensionId, HashSet<string> emittedDimensions)
+    {
+        var entry = new PocketDirectoryStackMessage
+        {
+            StackId = stack.StackId,
+            DisplayName = stack.DisplayName,
+            OwnerPlayerUid = stack.OwnerPlayerUid,
+            OwnerPlayerName = stack.OwnerPlayerName,
+            IsOwner = IsStackOwner(player, stack),
+            CanCreateLayer = CanCreateLayer(player, stack),
+        };
+
+        foreach (var layer in stack.Layers.OrderBy(layer => layer.Index))
+        {
+            var dimension = _dimensionLib.GetDimension(layer.DimensionId);
+            if (!dimension.Success || !IsOwnedPocket(dimension.Value))
+            {
+                continue;
+            }
+
+            emittedDimensions.Add(dimension.Value.DimensionId);
+            var layerEntry = BuildDirectoryLayer(player, stack, layer, dimension.Value, currentDimensionId);
+            if (layerEntry != null)
+            {
+                entry.Layers.Add(layerEntry);
+            }
+        }
+
+        return entry;
+    }
+
+    private PocketDirectoryStackMessage BuildDirectoryStandalonePocket(IServerPlayer player, Dimension dimension, string currentDimensionId)
+    {
+        var layer = BuildDirectoryLayer(player, null, null, dimension, currentDimensionId);
+        if (layer == null)
+        {
+            return null;
+        }
+
+        return new PocketDirectoryStackMessage
+        {
+            StackId = dimension.DimensionId,
+            DisplayName = DisplayName(dimension.DimensionId),
+            CanCreateLayer = false,
+            Layers = new List<PocketDirectoryLayerMessage> { layer },
+        };
+    }
+
+    private PocketDirectoryLayerMessage BuildDirectoryLayer(IServerPlayer player, PocketLayerStack stack, PocketLayerRef layer, Dimension dimension, string currentDimensionId)
+    {
+        if (!CanViewPocket(player, stack, dimension))
+        {
+            return null;
+        }
+
+        var orphaned = _dimensionLib.IsDimensionOrphaned(dimension.DimensionId);
+        return new PocketDirectoryLayerMessage
+        {
+            Index = layer?.Index ?? 0,
+            DimensionId = dimension.DimensionId,
+            DisplayName = LayerDisplayName(stack, layer, dimension.DimensionId),
+            Prepared = _dimensionLib.IsDimensionPrepared(dimension.DimensionId),
+            Orphaned = orphaned,
+            CanTeleport = !orphaned && CanTeleportFromDirectory(player, stack, dimension),
+            IsCurrent = string.Equals(dimension.DimensionId, currentDimensionId, StringComparison.Ordinal),
+            CanEdit = stack != null && CanEditLayer(player, stack),
+        };
+    }
+
+    private string CurrentPocketDimensionId(IServerPlayer player)
+    {
+        var pos = player?.Entity?.Pos;
+        if (pos == null)
+        {
+            return null;
+        }
+
+        var lookup = _dimensionLib.GetDimensionAt(pos.AsBlockPos);
+        return lookup.Success && IsOwnedPocket(lookup.Value) ? lookup.Value.DimensionId : null;
+    }
+
+    private static bool IsStackOwner(IServerPlayer player, PocketLayerStack stack)
+    {
+        return !string.IsNullOrWhiteSpace(stack?.OwnerPlayerUid) && string.Equals(stack.OwnerPlayerUid, PlayerKey(player), StringComparison.Ordinal);
+    }
+
+    private PocketLayerStack EnsureLayerStack(Dimension dimension, IServerPlayer owner = null)
     {
         var existing = FindStackForDimension(dimension.DimensionId);
         if (existing != null)
@@ -810,11 +1203,13 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         {
             StackId = dimension.DimensionId,
             DisplayName = ShortName(dimension.DimensionId),
+            OwnerPlayerUid = PlayerKey(owner),
+            OwnerPlayerName = owner?.PlayerName,
             SizeChunks = dimension.ChunkSizeX,
             SpawnY = dimension.SpawnY,
             Layers = new List<PocketLayerRef>
             {
-                new PocketLayerRef { Index = 0, DimensionId = dimension.DimensionId },
+                new PocketLayerRef { Index = 0, DimensionId = dimension.DimensionId, DisplayName = ShortName(dimension.DimensionId) },
             },
         }.Normalize();
         _layerStacksById[stack.StackId] = stack;
@@ -837,7 +1232,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         return stack?.Layers.FirstOrDefault(layer => layer.Index == index);
     }
 
-    private DimensionLibResult<PocketLayerRef> CreateLayer(PocketLayerStack stack, int targetIndex, IServerPlayer player)
+    private DimensionLibResult<PocketLayerRef> CreateLayer(PocketLayerStack stack, int targetIndex, IServerPlayer player, string displayName = null)
     {
         var existing = FindLayer(stack, targetIndex);
         if (existing != null)
@@ -852,6 +1247,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return DimensionLibResult<PocketLayerRef>.Fail(templateLookup.Message, templateLookup.ErrorCode);
         }
 
+        displayName = NormalizeDisplayName(displayName);
         var dimensionId = LayerDimensionId(stack.StackId, targetIndex);
         var lookup = _dimensionLib.GetDimension(dimensionId);
         Dimension dimension;
@@ -884,16 +1280,17 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             dimension = registered.Value;
         }
 
-        var prepared = PreparePocket(dimension, player, $"Created pocket layer {FormatLayer(targetIndex)}.", recordStandaloneStack: false);
+        var prepared = PreparePocket(dimension, player, "Created a connected pocket space.", recordStandaloneStack: false);
         if (!prepared.Success)
         {
             return DimensionLibResult<PocketLayerRef>.Fail(prepared.Message, prepared.ErrorCode);
         }
 
-        var layer = new PocketLayerRef { Index = targetIndex, DimensionId = dimension.DimensionId };
+        var layer = new PocketLayerRef { Index = targetIndex, DimensionId = dimension.DimensionId, DisplayName = displayName };
         stack.Layers.Add(layer);
         stack.Normalize();
         _layerStacksById[stack.StackId] = stack;
+        _layersNeedingInitialSend.Add(dimension.DimensionId);
 
         foreach (var neighborIndex in new[] { targetIndex - 1, targetIndex + 1 })
         {
@@ -917,7 +1314,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var upper = FindLayer(stack, upperIndex);
         if (lower == null || upper == null)
         {
-            return DimensionLibResult.Fail("Adjacent pocket layers are required before registering an elevator mapping.", "missing-pocket-layer");
+            return DimensionLibResult.Fail("Adjacent connected pocket spaces are required before registering an elevator mapping.", "missing-pocket-layer");
         }
 
         var mappingId = LayerMappingId(stack.StackId, lowerIndex, upperIndex);
@@ -938,7 +1335,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         lower.UpMappingId = mappingId;
         upper.DownMappingId = mappingId;
-        return DimensionLibResult.Ok($"Linked pocket layers {FormatLayer(lowerIndex)} and {FormatLayer(upperIndex)}.");
+        return DimensionLibResult.Ok("Linked connected pocket spaces.");
     }
 
     private DimensionLibResult EnsureElevatorLanding(BlockPos elevatorPos, bool allowAutoPlaceForNewLayer)
@@ -962,7 +1359,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
                 return placeable;
             }
 
-            return DimensionLibResult.Fail("Target layer needs a Pocket Elevator at the mapped landing.", "missing-target-pocketelevator");
+            return DimensionLibResult.Fail("The target connected space needs a Pocket Elevator at the mapped landing.", "missing-target-pocketelevator");
         }
 
         if (landingMode != PocketElevatorLandingMode.AutoPlaceElevatorIfMissing && !allowAutoPlaceForNewLayer)
@@ -1190,13 +1587,34 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return TextCommandResult.Error("Usage: /pocket create <name> [sizeChunks] [spawnY]");
         }
 
-        var dimensionId = ToDimensionId(name);
+        var sizeChunks = int.TryParse(sizeText, out var parsedSize) ? parsedSize : 0;
+        var spawnY = int.TryParse(spawnYText, out var parsedSpawnY) ? parsedSpawnY : 0;
+        return ToCommandResult(CreateOrPreparePocket(args.Caller.Player as IServerPlayer, name, name, sizeChunks, spawnY));
+    }
+
+    private DimensionLibResult CreateOrPreparePocket(IServerPlayer player, string displayName, string slug, int sizeChunks, int spawnY)
+    {
+        displayName = displayName?.Trim();
+        slug = string.IsNullOrWhiteSpace(slug) ? displayName : slug.Trim();
+        slug = PocketSlug.Normalize(slug);
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            return DimensionLibResult.Fail("Pocket slug is required.", "missing-pocket-slug");
+        }
+
+        var dimensionId = ToDimensionId(slug);
         var existing = _dimensionLib.GetDimension(dimensionId);
         if (existing.Success)
         {
             if (!IsOwnedPocket(existing.Value))
             {
-                return TextCommandResult.Error($"Dimension '{DisplayName(dimensionId)}' is not owned by Pocket Dimensions.");
+                return DimensionLibResult.Fail($"Dimension '{DisplayName(dimensionId)}' is not owned by Pocket Dimensions.", "not-pocket-dimension");
+            }
+
+            var existingStack = FindStackForDimension(existing.Value.DimensionId);
+            if (!CanRefreshExistingPocket(player, existingStack))
+            {
+                return DimensionLibResult.Fail("A pocket with that slug already exists.", "pocket-exists");
             }
 
             var refreshSpec = ToSpec(existing.Value);
@@ -1204,14 +1622,20 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             var refreshed = _dimensionLib.RegisterDimension(refreshSpec);
             if (!refreshed.Success)
             {
-                return ToCommandResult(refreshed);
+                return DimensionLibResult.Fail(refreshed.Message, refreshed.ErrorCode);
             }
 
-            return ToCommandResult(PreparePocket(refreshed.Value, args.Caller.Player as IServerPlayer, "Pocket already exists; refreshed and prepared existing dimension."));
+            var preparedExisting = PreparePocket(refreshed.Value, player, "Pocket already exists; refreshed and prepared existing dimension.");
+            if (preparedExisting.Success)
+            {
+                ApplyStackDisplayName(refreshed.Value, displayName);
+            }
+
+            return preparedExisting;
         }
 
-        var sizeChunks = int.TryParse(sizeText, out var parsedSize) ? ClampInt(parsedSize, 1, _config.MaxSizeChunks) : _config.DefaultSizeChunks;
-        var spawnY = int.TryParse(spawnYText, out var parsedSpawnY) ? ClampInt(parsedSpawnY, 1, _api.WorldManager.MapSizeY - 2) : ResolveDefaultSpawnY();
+        sizeChunks = sizeChunks > 0 ? ClampInt(sizeChunks, 1, _config.MaxSizeChunks) : _config.DefaultSizeChunks;
+        spawnY = spawnY > 0 ? ClampInt(spawnY, 1, _api.WorldManager.MapSizeY - 2) : ResolveDefaultSpawnY();
         var spec = new DimensionSpec
         {
             DimensionId = dimensionId,
@@ -1229,10 +1653,47 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var registered = _dimensionLib.RegisterDimension(spec);
         if (!registered.Success)
         {
-            return ToCommandResult(registered);
+            return DimensionLibResult.Fail(registered.Message, registered.ErrorCode);
         }
 
-        return ToCommandResult(PreparePocket(registered.Value, args.Caller.Player as IServerPlayer, $"Created pocket '{DisplayName(dimensionId)}'."));
+        var prepared = PreparePocket(registered.Value, player, $"Created pocket '{DisplayName(dimensionId)}'.");
+        if (prepared.Success)
+        {
+            ApplyStackDisplayName(registered.Value, displayName);
+        }
+
+        return prepared;
+    }
+
+    private void ApplyStackDisplayName(Dimension dimension, string displayName)
+    {
+        displayName = NormalizeDisplayName(displayName);
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            return;
+        }
+
+        var stack = EnsureLayerStack(dimension);
+        stack.DisplayName = displayName;
+        var baseLayer = FindLayer(stack, 0);
+        if (baseLayer != null)
+        {
+            baseLayer.DisplayName = stack.DisplayName;
+        }
+
+        SaveLinkState();
+    }
+
+    private void ApplyLayerDisplayName(PocketLayerStack stack, PocketLayerRef layer, string displayName)
+    {
+        layer.DisplayName = NormalizeDisplayName(displayName);
+        if (layer.Index == 0 && !string.IsNullOrWhiteSpace(layer.DisplayName))
+        {
+            stack.DisplayName = layer.DisplayName;
+        }
+
+        stack.Normalize();
+        SaveLinkState();
     }
 
     private TextCommandResult HandleEnter(TextCommandCallingArgs args)
@@ -1392,7 +1853,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         var prepared = _dimensionLib.PrepareDimension(dimension.DimensionId, new PocketPlatformSource(_api, dimension), player);
         if (prepared.Success && recordStandaloneStack)
         {
-            EnsureLayerStack(dimension);
+            EnsureLayerStack(dimension, player);
         }
 
         return prepared.Success
@@ -1404,6 +1865,15 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     {
         if (_dimensionLib.IsDimensionPrepared(dimension.DimensionId))
         {
+            if (_layersNeedingInitialSend.Remove(dimension.DimensionId))
+            {
+                var sent = _dimensionLib.PrepareDimension(dimension.DimensionId, sendToPlayer: player);
+                if (!sent.Success)
+                {
+                    return sent;
+                }
+            }
+
             var centralElevatorPos = GetCentralElevatorWorldPos(dimension);
             if (!IsBlockCode(centralElevatorPos, PocketElevatorBlockCode))
             {
@@ -1798,7 +2268,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         return string.Join("\n", stacks.Select(stack =>
         {
-            var layers = string.Join(", ", stack.Layers.OrderBy(layer => layer.Index).Select(layer => $"{FormatLayer(layer.Index)}={DisplayName(layer.DimensionId)}"));
+            var layers = string.Join(", ", stack.Layers.OrderBy(layer => layer.Index).Select(layer => $"{FormatLayer(layer.Index)}={LayerDisplayName(stack, layer, layer.DimensionId)}"));
             return $"{stack.DisplayName}: {layers}";
         }));
     }
@@ -1829,29 +2299,28 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return false;
         }
 
-        if (HasPrivilege(player, _config.EnterPrivilege) || HasPrivilege(player, _config.UseWaystonePrivilege))
+        var stack = FindStackForDimension(dimension.DimensionId);
+        if (CanEnterPocket(player, stack, dimension))
         {
             reason = string.Empty;
             return true;
         }
 
-        reason = string.Equals(_config.EnterPrivilege, _config.UseWaystonePrivilege, StringComparison.Ordinal)
-            ? $"Missing privilege '{_config.EnterPrivilege}'."
-            : $"Missing privilege '{_config.EnterPrivilege}' or '{_config.UseWaystonePrivilege}'.";
+        reason = CapabilityDeniedReason(_config.DirectoryTeleportCapabilityMode, new[] { _config.EnterPrivilege, _config.UseWaystonePrivilege }, "enter this pocket");
         return false;
     }
 
     private bool CanUsePocketBlock(IServerPlayer player, Dimension dimension, out string reason)
     {
-        return HasOwnedPocketPrivilege(player, dimension, _config.UsePocketBlocksPrivilege, "use blocks inside this pocket", out reason);
+        return CanUsePocketBlock(player, FindStackForDimension(dimension?.DimensionId), dimension, out reason);
     }
 
     private bool CanMutatePocketBlock(IServerPlayer player, Dimension dimension, out string reason)
     {
-        return HasOwnedPocketPrivilege(player, dimension, _config.MutatePocketBlocksPrivilege, "modify blocks inside this pocket", out reason);
+        return CanMutatePocketBlock(player, FindStackForDimension(dimension?.DimensionId), dimension, out reason);
     }
 
-    private static bool HasOwnedPocketPrivilege(IServerPlayer player, Dimension dimension, string privilege, string action, out string reason)
+    private bool CanUsePocketBlock(IServerPlayer player, PocketLayerStack stack, Dimension dimension, out string reason)
     {
         if (!IsOwnedPocket(dimension))
         {
@@ -1859,19 +2328,143 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return false;
         }
 
-        if (HasPrivilege(player, privilege))
+        if (HasStackCapability(player, stack, _config.UsePocketBlocksCapabilityMode, _config.UsePocketBlocksPrivilege))
         {
             reason = string.Empty;
             return true;
         }
 
-        reason = $"Missing privilege '{privilege}' to {action}.";
+        reason = CapabilityDeniedReason(_config.UsePocketBlocksCapabilityMode, _config.UsePocketBlocksPrivilege, "use blocks inside this pocket");
         return false;
+    }
+
+    private bool CanMutatePocketBlock(IServerPlayer player, PocketLayerStack stack, Dimension dimension, out string reason)
+    {
+        if (!IsOwnedPocket(dimension))
+        {
+            reason = "Dimension is not owned by Pocket Dimensions.";
+            return false;
+        }
+
+        if (HasStackCapability(player, stack, _config.MutatePocketBlocksCapabilityMode, _config.MutatePocketBlocksPrivilege))
+        {
+            reason = string.Empty;
+            return true;
+        }
+
+        reason = CapabilityDeniedReason(_config.MutatePocketBlocksCapabilityMode, _config.MutatePocketBlocksPrivilege, "modify blocks inside this pocket");
+        return false;
+    }
+
+    private bool CanCreatePocket(IServerPlayer player)
+    {
+        return HasGlobalCapability(player, _config.CreatePocketCapabilityMode, _config.CreatePrivilege);
+    }
+
+    private bool CanRefreshExistingPocket(IServerPlayer player, PocketLayerStack stack)
+    {
+        return HasPrivilege(player, _config.CreatePrivilege) ||
+            IsStackOwner(player, stack) ||
+            (stack != null && CanEditLayer(player, stack));
+    }
+
+    private bool CanCreateLayer(IServerPlayer player, PocketLayerStack stack)
+    {
+        return HasStackCapability(player, stack, _config.CreateLayerCapabilityMode, _config.CreatePrivilege);
+    }
+
+    private bool CanEditLayer(IServerPlayer player, PocketLayerStack stack)
+    {
+        return HasStackCapability(player, stack, _config.EditLayerCapabilityMode, _config.CreatePrivilege);
+    }
+
+    private bool CanViewPocket(IServerPlayer player, PocketLayerStack stack, Dimension dimension)
+    {
+        return IsOwnedPocket(dimension) && HasStackCapability(player, stack, _config.DirectoryVisibilityCapabilityMode, _config.EnterPrivilege, _config.UseWaystonePrivilege);
+    }
+
+    private bool CanTeleportFromDirectory(IServerPlayer player, PocketLayerStack stack, Dimension dimension)
+    {
+        return IsOwnedPocket(dimension) && HasStackCapability(player, stack, _config.DirectoryTeleportCapabilityMode, _config.EnterPrivilege, _config.UseWaystonePrivilege);
+    }
+
+    private bool CanEnterPocket(IServerPlayer player, PocketLayerStack stack, Dimension dimension)
+    {
+        return IsOwnedPocket(dimension) &&
+            (HasStackCapability(player, stack, _config.DirectoryTeleportCapabilityMode, _config.EnterPrivilege, _config.UseWaystonePrivilege) ||
+            HasStackCapability(player, stack, _config.UseWaystoneCapabilityMode, _config.UseWaystonePrivilege) ||
+            HasStackCapability(player, stack, _config.UseElevatorCapabilityMode, _config.UseElevatorPrivilege));
+    }
+
+    private bool CanUseWaystone(IServerPlayer player, Dimension dimension)
+    {
+        return IsOwnedPocket(dimension) && HasStackCapability(player, FindStackForDimension(dimension.DimensionId), _config.UseWaystoneCapabilityMode, _config.UseWaystonePrivilege);
+    }
+
+    private bool CanUseElevator(IServerPlayer player, PocketLayerStack stack)
+    {
+        return HasStackCapability(player, stack, _config.UseElevatorCapabilityMode, _config.UseElevatorPrivilege);
+    }
+
+    private bool HasGlobalCapability(IServerPlayer player, string modeName, params string[] overridePrivileges)
+    {
+        if (HasAnyPrivilege(player, overridePrivileges))
+        {
+            return true;
+        }
+
+        return _config.ResolveCapabilityMode(modeName) == PocketCapabilityMode.Public && player != null;
+    }
+
+    private bool HasStackCapability(IServerPlayer player, PocketLayerStack stack, string modeName, params string[] overridePrivileges)
+    {
+        if (HasAnyPrivilege(player, overridePrivileges))
+        {
+            return true;
+        }
+
+        return _config.ResolveCapabilityMode(modeName) switch
+        {
+            PocketCapabilityMode.Public => player != null,
+            PocketCapabilityMode.OwnerOrPrivilege => IsStackOwner(player, stack),
+            PocketCapabilityMode.OwnerMemberOrPrivilege => IsStackOwner(player, stack) || IsStackMember(player, stack),
+            _ => false,
+        };
+    }
+
+    private static bool IsStackMember(IServerPlayer player, PocketLayerStack stack)
+    {
+        var playerKey = PlayerKey(player);
+        return !string.IsNullOrWhiteSpace(playerKey) && stack?.MemberPlayerUids?.Any(uid => string.Equals(uid, playerKey, StringComparison.Ordinal)) == true;
+    }
+
+    private static bool HasAnyPrivilege(IServerPlayer player, params string[] privileges)
+    {
+        return privileges != null && privileges.Any(privilege => HasPrivilege(player, privilege));
+    }
+
+    private string CapabilityDeniedReason(string modeName, string privilege, string action)
+    {
+        return CapabilityDeniedReason(modeName, new[] { privilege }, action);
+    }
+
+    private string CapabilityDeniedReason(string modeName, string[] privileges, string action)
+    {
+        var mode = _config.ResolveCapabilityMode(modeName);
+        if (mode == PocketCapabilityMode.Disabled)
+        {
+            return $"Server config disables the ability to {action}.";
+        }
+
+        var privilegeText = privileges == null || privileges.Length == 0
+            ? "the configured privilege"
+            : string.Join(" or ", privileges.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => $"'{value}'"));
+        return $"Missing {privilegeText} to {action}.";
     }
 
     private static bool HasPrivilege(IServerPlayer player, string privilege)
     {
-        return player?.HasPrivilege(privilege) == true;
+        return !string.IsNullOrWhiteSpace(privilege) && player?.HasPrivilege(privilege) == true;
     }
 
     private bool IsProtectedPocketBlock(BlockSelection blockSelection)
@@ -1972,6 +2565,19 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private static string DisplayPocketMessage(string message)
     {
         return (message ?? string.Empty).Replace(ModId + ":", string.Empty, StringComparison.Ordinal);
+    }
+
+    private static string NormalizeDisplayName(string displayName)
+    {
+        displayName = displayName?.Trim();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            return null;
+        }
+
+        return displayName.Length <= MaxDisplayNameLength
+            ? displayName
+            : displayName.Substring(0, MaxDisplayNameLength);
     }
 
     private static DimensionSpec ToSpec(Dimension dimension)
@@ -2200,6 +2806,24 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         public string ReleasePrivilege { get; set; } = Privilege.root;
 
+        public string CreatePocketCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
+
+        public string CreateLayerCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
+
+        public string EditLayerCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
+
+        public string DirectoryVisibilityCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
+
+        public string DirectoryTeleportCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
+
+        public string UseWaystoneCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
+
+        public string UseElevatorCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
+
+        public string UsePocketBlocksCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
+
+        public string MutatePocketBlocksCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
+
         public string ElevatorLandingMode { get; set; } = nameof(PocketElevatorLandingMode.RequireElevatorBlock);
 
         public int DefaultSizeChunks { get; set; } = 3;
@@ -2219,6 +2843,15 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             MutatePocketBlocksPrivilege = NormalizePrivilege(MutatePocketBlocksPrivilege, Privilege.root);
             BindPrivilege = NormalizePrivilege(BindPrivilege, Privilege.root);
             ReleasePrivilege = NormalizePrivilege(ReleasePrivilege, Privilege.root);
+            CreatePocketCapabilityMode = NormalizeCapabilityMode(CreatePocketCapabilityMode);
+            CreateLayerCapabilityMode = NormalizeCapabilityMode(CreateLayerCapabilityMode);
+            EditLayerCapabilityMode = NormalizeCapabilityMode(EditLayerCapabilityMode);
+            DirectoryVisibilityCapabilityMode = NormalizeCapabilityMode(DirectoryVisibilityCapabilityMode);
+            DirectoryTeleportCapabilityMode = NormalizeCapabilityMode(DirectoryTeleportCapabilityMode);
+            UseWaystoneCapabilityMode = NormalizeCapabilityMode(UseWaystoneCapabilityMode);
+            UseElevatorCapabilityMode = NormalizeCapabilityMode(UseElevatorCapabilityMode);
+            UsePocketBlocksCapabilityMode = NormalizeCapabilityMode(UsePocketBlocksCapabilityMode);
+            MutatePocketBlocksCapabilityMode = NormalizeCapabilityMode(MutatePocketBlocksCapabilityMode);
             if (!Enum.TryParse<PocketElevatorLandingMode>(ElevatorLandingMode, ignoreCase: true, out var parsed))
             {
                 parsed = PocketElevatorLandingMode.RequireElevatorBlock;
@@ -2233,6 +2866,20 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         private static string NormalizePrivilege(string value, string fallback)
         {
             return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        }
+
+        private static string NormalizeCapabilityMode(string value)
+        {
+            return Enum.TryParse<PocketCapabilityMode>(value, ignoreCase: true, out var parsed)
+                ? parsed.ToString()
+                : nameof(PocketCapabilityMode.Privilege);
+        }
+
+        public PocketCapabilityMode ResolveCapabilityMode(string value)
+        {
+            return Enum.TryParse<PocketCapabilityMode>(value, ignoreCase: true, out var parsed)
+                ? parsed
+                : PocketCapabilityMode.Privilege;
         }
 
         public PocketElevatorLandingMode ResolveElevatorLandingMode()

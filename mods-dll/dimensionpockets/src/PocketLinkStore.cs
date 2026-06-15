@@ -217,6 +217,14 @@ internal sealed class PocketLayerStack
 
     public string DisplayName { get; set; }
 
+    public string OwnerPlayerUid { get; set; }
+
+    public string OwnerPlayerName { get; set; }
+
+    public List<string> MemberPlayerUids { get; set; } = new List<string>();
+
+    public List<string> MemberPlayerNames { get; set; } = new List<string>();
+
     public int SizeChunks { get; set; }
 
     public int SpawnY { get; set; }
@@ -227,6 +235,10 @@ internal sealed class PocketLayerStack
     {
         StackId = StackId?.Trim();
         DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? StackId : DisplayName.Trim();
+        OwnerPlayerUid = string.IsNullOrWhiteSpace(OwnerPlayerUid) ? null : OwnerPlayerUid.Trim();
+        OwnerPlayerName = string.IsNullOrWhiteSpace(OwnerPlayerName) ? null : OwnerPlayerName.Trim();
+        MemberPlayerUids = NormalizeStringList(MemberPlayerUids);
+        MemberPlayerNames = NormalizeStringList(MemberPlayerNames);
         SizeChunks = Math.Max(1, SizeChunks);
         SpawnY = Math.Max(1, SpawnY);
         Layers = (Layers ?? new List<PocketLayerRef>())
@@ -237,6 +249,16 @@ internal sealed class PocketLayerStack
             .ToList();
         return this;
     }
+
+    private static List<string> NormalizeStringList(List<string> values)
+    {
+        return (values ?? new List<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToList();
+    }
 }
 
 internal sealed class PocketLayerRef
@@ -245,6 +267,8 @@ internal sealed class PocketLayerRef
 
     public string DimensionId { get; set; }
 
+    public string DisplayName { get; set; }
+
     public string UpMappingId { get; set; }
 
     public string DownMappingId { get; set; }
@@ -252,6 +276,7 @@ internal sealed class PocketLayerRef
     public PocketLayerRef Normalize()
     {
         DimensionId = DimensionId?.Trim();
+        DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? null : DisplayName.Trim();
         UpMappingId = string.IsNullOrWhiteSpace(UpMappingId) ? null : UpMappingId.Trim();
         DownMappingId = string.IsNullOrWhiteSpace(DownMappingId) ? null : DownMappingId.Trim();
         return this;

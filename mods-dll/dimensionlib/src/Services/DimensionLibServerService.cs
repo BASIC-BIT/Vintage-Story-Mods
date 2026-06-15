@@ -131,9 +131,11 @@ public sealed class DimensionLibServerService : IDisposable
             return DimensionLibResult<Dimension>.Fail(validation.Message, validation.ErrorCode);
         }
 
-        if (!_dimensions.TryGet(spec.DimensionId, out _) && !DimensionRegionAllocator.TryAssignSparseRegion(spec, _dimensions.Values))
+        var maxChunkX = _api.WorldManager.MapSizeX / GlobalConstants.ChunkSize;
+        var maxChunkZ = _api.WorldManager.MapSizeZ / GlobalConstants.ChunkSize;
+        if (!_dimensions.TryGet(spec.DimensionId, out _) && !DimensionRegionAllocator.TryAssignSparseRegion(spec, _dimensions.Values, maxChunkX, maxChunkZ))
         {
-            return DimensionLibResult<Dimension>.Fail("No free sparse DimensionLib region was found.", "no-free-region");
+            return DimensionLibResult<Dimension>.Fail("No free in-bounds sparse DimensionLib region was found.", "no-free-region");
         }
 
         var result = _dimensions.Register(spec);
@@ -265,15 +267,23 @@ public sealed class DimensionLibServerService : IDisposable
 
         try
         {
-            _chunkService.CreateChunkColumns(lookup.Value);
-            if (source != null)
+            if (source == null && IsDimensionPrepared(lookup.Value.DimensionId))
             {
-                _materializer.Materialize(lookup.Value, source, token);
+                _chunkService.LoadLocalChunkColumns(lookup.Value, _preparedDimensions.GetPreparedLocalChunks(lookup.Value));
+            }
+            else
+            {
+                _chunkService.CreateChunkColumns(lookup.Value);
+                if (source != null)
+                {
+                    _materializer.Materialize(lookup.Value, source, token);
+                }
+
+                _chunkService.Relight(lookup.Value);
+                _preparedDimensions.MarkAllChunksPrepared(lookup.Value);
+                _preparedDimensions.MarkDimensionPrepared(lookup.Value.DimensionId);
             }
 
-            _chunkService.Relight(lookup.Value);
-            _preparedDimensions.MarkAllChunksPrepared(lookup.Value);
-            _preparedDimensions.MarkDimensionPrepared(lookup.Value.DimensionId);
             if (sendToPlayer != null)
             {
                 ForceSend(lookup.Value, sendToPlayer);
@@ -321,13 +331,18 @@ public sealed class DimensionLibServerService : IDisposable
 
     public DimensionLibResult<string> ValidateDimension(string dimensionId)
     {
+        return ValidateDimension(dimensionId, null);
+    }
+
+    internal DimensionLibResult<string> ValidateDimension(string dimensionId, IServerPlayer player)
+    {
         var lookup = GetDimension(dimensionId);
         if (!lookup.Success)
         {
             return DimensionLibResult<string>.Fail(lookup.Message, lookup.ErrorCode);
         }
 
-        return _diagnostics.Validate(lookup.Value, IsDimensionOrphaned(lookup.Value.DimensionId));
+        return _diagnostics.Validate(lookup.Value, IsDimensionOrphaned(lookup.Value.DimensionId), player);
     }
 
     public DimensionLibResult EnterDimension(IServerPlayer player, string dimensionId)
@@ -404,30 +419,38 @@ public sealed class DimensionLibServerService : IDisposable
             _returnPositions.Record(player);
         }
 
+        var targetX = options.X.GetValueOrDefault(dimension.SpawnX);
+        var targetY = options.Y.GetValueOrDefault(dimension.SpawnY);
+        var targetZ = options.Z.GetValueOrDefault(dimension.SpawnZ);
+        var targetYaw = options.Yaw.GetValueOrDefault(player.Entity.Pos.Yaw);
+        var targetPitch = options.Pitch.GetValueOrDefault(player.Entity.Pos.Pitch);
+        var targetRoll = options.Roll.GetValueOrDefault(player.Entity.Pos.Roll);
+
+        if (options.ForceSendDimension)
+        {
+            ForceSendDestinationChunk(dimension, player, targetX, targetZ);
+            QueuePreparedChunksNear(dimension, player, targetX, targetZ);
+        }
+
         _transferService.MovePlayer(
             player,
             dimension.DimensionPlaneId,
-            options.X ?? dimension.SpawnX,
-            options.Y ?? dimension.SpawnY,
-            options.Z ?? dimension.SpawnZ,
-            options.Yaw ?? player.Entity.Pos.Yaw,
-            options.Pitch ?? player.Entity.Pos.Pitch,
-            options.Roll ?? player.Entity.Pos.Roll);
+            targetX,
+            targetY,
+            targetZ,
+            targetYaw,
+            targetPitch,
+            targetRoll);
         _transferService.SyncClientTransfer(
             player,
             dimension.DimensionPlaneId,
-            options.X ?? dimension.SpawnX,
-            options.Y ?? dimension.SpawnY,
-            options.Z ?? dimension.SpawnZ,
-            options.Yaw ?? player.Entity.Pos.Yaw,
-            options.Pitch ?? player.Entity.Pos.Pitch,
-            options.Roll ?? player.Entity.Pos.Roll,
+            targetX,
+            targetY,
+            targetZ,
+            targetYaw,
+            targetPitch,
+            targetRoll,
             dimension);
-        if (options.ForceSendDimension)
-        {
-            QueuePreparedChunksNear(dimension, player, options.X ?? dimension.SpawnX, options.Z ?? dimension.SpawnZ);
-        }
-
         return DimensionLibResult.Ok($"Teleported {player.PlayerName} to dimension '{dimension.DimensionId}'.");
     }
 
@@ -472,12 +495,14 @@ public sealed class DimensionLibServerService : IDisposable
             }
         }
 
-        _transferService.MovePlayer(player, location.DimensionPlaneId, location.X, location.Y, location.Z, location.Yaw, location.Pitch, location.Roll);
-        _transferService.SyncClientTransfer(player, location.DimensionPlaneId, location.X, location.Y, location.Z, location.Yaw, location.Pitch, location.Roll, visibleDimension);
         if (visibleDimension != null)
         {
+            ForceSendDestinationChunk(visibleDimension, player, location.X, location.Z);
             QueuePreparedChunksNear(visibleDimension, player, location.X, location.Z);
         }
+
+        _transferService.MovePlayer(player, location.DimensionPlaneId, location.X, location.Y, location.Z, location.Yaw, location.Pitch, location.Roll);
+        _transferService.SyncClientTransfer(player, location.DimensionPlaneId, location.X, location.Y, location.Z, location.Yaw, location.Pitch, location.Roll, visibleDimension);
 
         return DimensionLibResult.Ok($"Teleported {player.PlayerName} to saved location.");
     }
@@ -893,6 +918,23 @@ public sealed class DimensionLibServerService : IDisposable
         }
 
         _preparedChunkSendQueues[PreparedChunkSendQueueKey(player.PlayerUID, dimension.DimensionId)] = new PreparedChunkSendQueue(player.PlayerUID, dimension.DimensionId, chunks);
+    }
+
+    private void ForceSendDestinationChunk(Dimension dimension, IServerPlayer player, double x, double z)
+    {
+        if (player?.Entity == null || dimension == null)
+        {
+            return;
+        }
+
+        var localChunk = _generatedWindowPreparer.ResolveLocalChunk(dimension, x, z);
+        if (!_preparedDimensions.IsChunkPrepared(dimension.DimensionId, localChunk.X, localChunk.Y))
+        {
+            return;
+        }
+
+        _chunkService.LoadLocalChunkColumn(dimension, localChunk.X, localChunk.Y);
+        _chunkService.ForceSendLocalChunkColumn(dimension, player, localChunk.X, localChunk.Y);
     }
 
     private static string PreparedChunkSendQueueKey(string playerUid, string dimensionId)

@@ -2,5 +2,8 @@
   "block-pocketfloor": "Pocket Dimension Floor",
   "block-pocketwaystone": "Pocket Waystone",
   "block-pocketreturnpedestal": "Pocket Return Pedestal",
-  "block-pocketelevator": "Pocket Elevator"
+  "block-pocketelevator": "Pocket Elevator",
+  "handbook-category-pocketdimensions": "Pocket Dimensions",
+  "pocketdimensions-handbook-title-guide": "Pocket Dimensions: Player Guide",
+  "pocketdimensions-handbook-title-admin": "Pocket Dimensions: Admin Guide"
 }
