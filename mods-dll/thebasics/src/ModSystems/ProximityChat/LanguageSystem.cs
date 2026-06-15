@@ -33,7 +33,15 @@ namespace thebasics.ModSystems.ProximityChat
                 return;
             }
 
-            // Player commands
+            RegisterPlayerCommands();
+            RegisterAdminCommands();
+
+            var playerModelLibEnabled = API.ModLoader.IsModEnabled("playermodellib");
+            HeritageLanguageSystem = new HeritageLanguageSystem(System, API, Config, playerModelLibEnabled);
+        }
+
+        private void RegisterPlayerCommands()
+        {
             API.ChatCommands.GetOrCreate("addlang")
                 .WithAlias("addlanguage")
                 .WithDescription(Lang.Get("thebasics:lang-cmd-addlang-desc"))
@@ -64,8 +72,10 @@ namespace thebasics.ModSystems.ProximityChat
                 .RequiresPlayer()
                 .WithArgs(new WordArgParser("language", true))
                 .HandleWith(HandleLanguageProgressCommand);
+        }
 
-            // Admin commands
+        private void RegisterAdminCommands()
+        {
             API.ChatCommands.GetOrCreate("adminaddlang")
                 .WithAlias("adminaddlanguage")
                 .WithDescription(Lang.Get("thebasics:lang-cmd-adminaddlang-desc"))
@@ -120,9 +130,6 @@ namespace thebasics.ModSystems.ProximityChat
                 .WithArgs(new PlayersArgParser("player", API, true),
                     new WordArgParser("language", true))
                 .HandleWith(HandleAdminLanguageProgressCommand);
-
-            var playerModelLibEnabled = API.ModLoader.IsModEnabled("playermodellib");
-            HeritageLanguageSystem = new HeritageLanguageSystem(System, API, Config, playerModelLibEnabled);
         }
 
         public static readonly Language BabbleLang = new Language("Babble", "Unintelligible", "babble", ["ba", "ble", "bla", "bal"], "#FF0000", false, true);
