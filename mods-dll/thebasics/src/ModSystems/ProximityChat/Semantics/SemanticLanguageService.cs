@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
-using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -21,7 +20,6 @@ public sealed class SemanticLanguageService : IDisposable
     private const int MaxQueuedObservations = 256;
     private const int MaxQueuedCandidatePrewarms = 512;
     private const int AtlasPhraseEmbeddingTimeoutMs = 1500;
-    private const int OnDemandEmbeddingTimeoutMs = 45;
 
     private readonly LanguageSystem _languageSystem;
     private readonly ICoreServerAPI _api;
@@ -34,8 +32,8 @@ public sealed class SemanticLanguageService : IDisposable
     private readonly object _atlasIndexLock = new object();
     private readonly CancellationTokenSource _disposeCts = new CancellationTokenSource();
     private readonly SemanticLanguageAtlasCatalog _atlas;
-    private readonly System.Func<string, Language?> _languageResolver;
-    private readonly System.Func<string, IServerPlayer?> _playerResolver;
+    private readonly SemanticLanguageMatcher _matcher;
+    private readonly SemanticLanguageLearningApplier _learningApplier;
     private IReadOnlyList<SemanticAtlasBucketVector> _atlasVectors = Array.Empty<SemanticAtlasBucketVector>();
     private bool _workerRunning;
     private bool _prewarmWorkerRunning;
@@ -61,8 +59,10 @@ public sealed class SemanticLanguageService : IDisposable
         _atlas = atlas ?? SemanticLanguageAtlasCatalog.Empty;
         _config = config ?? new SemanticLanguageLearningConfig();
         _config.Normalize();
-        _languageResolver = languageResolver ?? (name => _languageSystem?.GetLangFromText(name, false, allowHidden: true));
-        _playerResolver = playerResolver ?? (playerUid => _api.GetPlayerByUID(playerUid));
+        var resolvedLanguageResolver = languageResolver ?? (name => _languageSystem?.GetLangFromText(name, false, allowHidden: true));
+        var resolvedPlayerResolver = playerResolver ?? (playerUid => _api.GetPlayerByUID(playerUid));
+        _matcher = new SemanticLanguageMatcher(_config, _atlas, GetAtlasVectors, EnqueueCandidatePrewarm);
+        _learningApplier = new SemanticLanguageLearningApplier(_config, _atlas, _matcher, resolvedLanguageResolver, resolvedPlayerResolver);
     }
 
     public int QueuedObservationCount => Math.Max(0, Volatile.Read(ref _queuedObservations));
@@ -210,7 +210,7 @@ public sealed class SemanticLanguageService : IDisposable
         Dictionary<string, int> bucketConfidence)
     {
         var scores = new int[originalWordCount];
-        var matches = MatchMessageSpansForComprehension(provider, tokens, bucketConfidence.Keys);
+        var matches = _matcher.MatchMessageSpansForComprehension(provider, tokens, bucketConfidence.Keys);
         foreach (var match in matches)
         {
             if (bucketConfidence.TryGetValue(match.BucketId, out var confidence))
@@ -270,7 +270,7 @@ public sealed class SemanticLanguageService : IDisposable
         var memory = SemanticLanguageMemoryOperations.FindOrCreateLanguageMemory(store, language.Name);
         SemanticLanguageMemoryOperations.SetBucketConfidence(memory, resolvedBucket.Id, confidence, DateTimeOffset.UtcNow.ToUnixTimeSeconds(), promoteToLearned: true, learnedThresholdPercent: _config.LearnedThresholdPercent, out _);
         player.SetSemanticLanguageMemory(store);
-        TryPromoteWholeLanguage(player, language, memory, notify: false);
+        _learningApplier.TryPromoteWholeLanguage(player, language, memory, notify: false);
         bucket = resolvedBucket;
         return true;
     }
@@ -362,37 +362,6 @@ public sealed class SemanticLanguageService : IDisposable
             .Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
-    private ISet<string> GetBucketHintTokens(IEnumerable<string> bucketIds)
-    {
-        var hints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var bucketId in bucketIds)
-        {
-            var bucket = _atlas.FindBucket(bucketId);
-            if (bucket == null)
-            {
-                continue;
-            }
-
-            AddHintTokens(hints, bucket.Id.Replace('-', ' '));
-            AddHintTokens(hints, bucket.Alias.Replace('-', ' '));
-            AddHintTokens(hints, bucket.Label);
-            foreach (var example in bucket.Examples ?? new List<string>())
-            {
-                AddHintTokens(hints, example);
-            }
-        }
-
-        return hints;
-    }
-
-    private static void AddHintTokens(ISet<string> hints, string text)
-    {
-        foreach (var token in SemanticTextCandidateBuilder.Tokenize(text))
-        {
-            hints.Add(token.Text.ToLowerInvariant());
-        }
-    }
-
     private void EnqueueObservation(string playerUid, string languageName, string message)
     {
         if (string.IsNullOrWhiteSpace(playerUid) || string.IsNullOrWhiteSpace(languageName) || string.IsNullOrWhiteSpace(message))
@@ -472,10 +441,10 @@ public sealed class SemanticLanguageService : IDisposable
                     continue;
                 }
 
-                var embeddings = await EmbedObservationAsync(provider, observation, _disposeCts.Token).ConfigureAwait(false);
+                var embeddings = await _matcher.EmbedObservationAsync(provider, observation.Message, _disposeCts.Token).ConfigureAwait(false);
                 if (embeddings.Count > 0)
                 {
-                    OnMain(() => ApplyObservation(observation, embeddings));
+                    OnMain(() => _learningApplier.ApplyObservation(observation, embeddings));
                 }
             }
         }
@@ -541,254 +510,6 @@ public sealed class SemanticLanguageService : IDisposable
         }
     }
 
-    private async Task<List<SemanticSpanEmbedding>> EmbedObservationAsync(
-        ITheBasicsSemanticEmbeddingProvider provider,
-        SemanticLanguageObservation observation,
-        CancellationToken cancellationToken)
-    {
-        var tokens = SemanticTextCandidateBuilder.Tokenize(observation.Message).ToList();
-        if (tokens.Count == 0)
-        {
-            return new List<SemanticSpanEmbedding>();
-        }
-
-        var priorityTokens = GetBucketHintTokens(_atlas.Buckets.Select(bucket => bucket.Id));
-        if (tokens.Count <= _config.MaxChunkWords)
-        {
-            return await EmbedCandidateSpansAsync(
-                provider,
-                tokens,
-                0,
-                tokens.Count,
-                _config.MaxSpansPerMessage,
-                priorityTokens,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        var routedChunks = await RouteRelevantChunksAsync(
-            provider,
-            tokens,
-            allowedBucketIds: null,
-            priorityTokens,
-            _config.MaxRealtimeChunkEmbeddingsPerMessage,
-            cancellationToken).ConfigureAwait(false);
-        if (routedChunks.Count == 0)
-        {
-            return await EmbedCandidateSpansAsync(
-                provider,
-                tokens,
-                0,
-                tokens.Count,
-                _config.MaxSpansPerMessage,
-                priorityTokens,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        var embeddings = new List<SemanticSpanEmbedding>();
-        foreach (var chunk in routedChunks)
-        {
-            embeddings.AddRange(await EmbedCandidateSpansAsync(
-                provider,
-                tokens,
-                chunk.StartIndex,
-                chunk.EndIndex,
-                _config.MaxRealtimeSpanEmbeddingsPerChunk,
-                priorityTokens,
-                cancellationToken).ConfigureAwait(false));
-        }
-
-        return embeddings;
-    }
-
-    private async Task<List<SemanticSpanEmbedding>> EmbedCandidateSpansAsync(
-        ITheBasicsSemanticEmbeddingProvider provider,
-        List<WordToken> tokens,
-        int startTokenIndex,
-        int endTokenIndex,
-        int maxSpans,
-        ISet<string>? priorityTokens,
-        CancellationToken cancellationToken)
-    {
-        var embeddings = new List<SemanticSpanEmbedding>();
-        foreach (var candidate in SemanticTextCandidateBuilder.BuildCandidateSpans(
-            tokens,
-            _config.MaxSpanWords,
-            maxSpans,
-            startTokenIndex,
-            endTokenIndex,
-            priorityTokens))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var vector = await provider.EmbedAsync(candidate.Text, cancellationToken).ConfigureAwait(false);
-            vector = SemanticVectorMath.Normalize(vector);
-            if (vector != null)
-            {
-                embeddings.Add(new SemanticSpanEmbedding(candidate, vector));
-            }
-        }
-
-        return embeddings;
-    }
-
-    private void ApplyObservation(SemanticLanguageObservation observation, List<SemanticSpanEmbedding> embeddings)
-    {
-        var player = _playerResolver(observation.PlayerUid);
-        var language = _languageResolver(observation.LanguageName);
-        if (player == null || language == null || player.KnowsLanguage(language))
-        {
-            return;
-        }
-
-        var matches = ResolveOverlaps(embeddings
-            .Select(embedding => TryMatchAtlasBucket(embedding, _config.MinimumLearningSimilarity))
-            .Where(match => match != null)
-            .Cast<SemanticBucketSpanMatch>());
-        if (matches.Count == 0)
-        {
-            return;
-        }
-
-        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var store = player.GetSemanticLanguageMemory();
-        var memory = SemanticLanguageMemoryOperations.FindOrCreateLanguageMemory(store, language.Name);
-        if (IsLearningObservationOnCooldown(memory, now))
-        {
-            return;
-        }
-
-        var learnedBuckets = ApplyBucketLearning(memory, matches, now, out var updatedAnyBucket);
-        if (!updatedAnyBucket)
-        {
-            return;
-        }
-
-        memory.LastLearningObservationUnixSeconds = now;
-        player.SetSemanticLanguageMemory(store);
-        NotifyLearnedBuckets(player, language, learnedBuckets);
-        TryPromoteWholeLanguage(player, language, memory, notify: true);
-    }
-
-    private bool IsLearningObservationOnCooldown(SemanticLanguageMemory memory, long now)
-    {
-        return _config.MinimumSecondsBetweenLearningObservations > 0 &&
-            memory.LastLearningObservationUnixSeconds > 0 &&
-            now - memory.LastLearningObservationUnixSeconds < _config.MinimumSecondsBetweenLearningObservations;
-    }
-
-    private List<SemanticLanguageAtlasBucket> ApplyBucketLearning(SemanticLanguageMemory memory, IEnumerable<SemanticBucketSpanMatch> matches, long now, out bool updatedAnyBucket)
-    {
-        var learnedBuckets = new List<SemanticLanguageAtlasBucket>();
-        updatedAnyBucket = false;
-        foreach (var match in matches
-            .GroupBy(match => match.BucketId, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.OrderByDescending(match => match.Similarity).First()))
-        {
-            var existing = SemanticLanguageMemoryOperations.FindBucketCoverage(memory, match.BucketId);
-            if (IsBucketLearningOnCooldown(existing, now))
-            {
-                continue;
-            }
-
-            var gain = CalculateLearningGain(match.Similarity);
-            var current = existing?.Confidence ?? 0;
-            var target = Math.Min(100, current + gain);
-            SemanticLanguageMemoryOperations.SetBucketConfidence(memory, match.BucketId, target, now, promoteToLearned: true, learnedThresholdPercent: _config.LearnedThresholdPercent, out var learnedNow);
-            updatedAnyBucket = true;
-            if (learnedNow)
-            {
-                var bucket = _atlas.FindBucket(match.BucketId);
-                if (bucket != null)
-                {
-                    learnedBuckets.Add(bucket);
-                }
-            }
-        }
-
-        return learnedBuckets;
-    }
-
-    private bool IsBucketLearningOnCooldown(SemanticLanguageAtlasBucketCoverage? existing, long now)
-    {
-        return _config.MinimumSecondsBetweenBucketLearning > 0 &&
-            existing?.LastUpdatedUnixSeconds > 0 &&
-            now - existing.LastUpdatedUnixSeconds < _config.MinimumSecondsBetweenBucketLearning;
-    }
-
-    private int CalculateLearningGain(float similarity)
-    {
-        var rawGain = (int)Math.Round(Math.Max(0.25f, similarity) * _config.LearningRatePercent);
-        return Math.Max(1, Math.Min(_config.MaxBucketProgressPerMessage, rawGain));
-    }
-
-    private void NotifyLearnedBuckets(IServerPlayer player, Language language, IEnumerable<SemanticLanguageAtlasBucket> learnedBuckets)
-    {
-        if (!_config.NotifyLearnedConcepts)
-        {
-            return;
-        }
-
-        foreach (var bucket in learnedBuckets)
-        {
-            player.SendMessage(
-                GlobalConstants.CurrentChatGroup,
-                Lang.Get(
-                    "thebasics:lang-semantic-learned-concept",
-                    FormatPlainLanguageIdentifier(language),
-                    VtmlUtils.EscapeVtml(bucket.DisplayName)),
-                EnumChatType.Notification);
-        }
-    }
-
-    private void TryPromoteWholeLanguage(IServerPlayer player, Language language, SemanticLanguageMemory memory, bool notify)
-    {
-        if (!ShouldPromoteWholeLanguage(player, language, memory))
-        {
-            return;
-        }
-
-        player.AddLanguage(language);
-        if (notify && _config.NotifyWholeLanguageLearned)
-        {
-            player.SendMessage(
-                GlobalConstants.CurrentChatGroup,
-                Lang.Get("thebasics:lang-semantic-learned-language", FormatPlainLanguageIdentifier(language)),
-                EnumChatType.Notification);
-        }
-    }
-
-    private bool ShouldPromoteWholeLanguage(IServerPlayer player, Language language, SemanticLanguageMemory memory)
-    {
-        if (!_config.EnableWholeLanguagePromotion || player == null || language == null || memory == null || player.KnowsLanguage(language) || !_atlas.HasBuckets)
-        {
-            return false;
-        }
-
-        var requiredLearnedBuckets = GetRequiredWholeLanguageLearnedBucketCount();
-        return requiredLearnedBuckets > 0 && CountLearnedAtlasBuckets(memory) >= requiredLearnedBuckets;
-    }
-
-    private int GetRequiredWholeLanguageLearnedBucketCount()
-    {
-        var atlasBucketCount = _atlas.Buckets.Count;
-        if (atlasBucketCount <= 0)
-        {
-            return 0;
-        }
-
-        var percentRequirement = (int)Math.Ceiling(atlasBucketCount * (_config.WholeLanguageLearnedBucketPercent / 100.0));
-        return Math.Min(atlasBucketCount, Math.Max(_config.WholeLanguageMinimumLearnedBuckets, percentRequirement));
-    }
-
-    private int CountLearnedAtlasBuckets(SemanticLanguageMemory memory)
-    {
-        return (memory.AtlasBuckets ?? new List<SemanticLanguageAtlasBucketCoverage>())
-            .Where(SemanticLanguageMemoryOperations.IsLearned)
-            .Select(bucket => bucket.BucketId)
-            .Where(bucketId => _atlas.FindBucket(bucketId) != null)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Count();
-    }
-
     private void OnMain(Action action)
     {
         try
@@ -824,300 +545,6 @@ public sealed class SemanticLanguageService : IDisposable
         }
     }
 
-    private List<SemanticBucketSpanMatch> MatchMessageSpansForComprehension(
-        ITheBasicsSemanticEmbeddingProvider provider,
-        List<WordToken> tokens,
-        IEnumerable<string> allowedBucketIds)
-    {
-        var priorityTokens = GetBucketHintTokens(allowedBucketIds);
-        if (tokens.Count <= _config.MaxChunkWords)
-        {
-            return MatchMessageSpans(
-                provider,
-                tokens,
-                new SpanMatchOptions(
-                    _config.MinimumComprehensionSimilarity,
-                    allowedBucketIds,
-                    true,
-                    _config.MaxRealtimeEmbeddingsPerMessage,
-                    priorityTokens: priorityTokens));
-        }
-
-        var routedChunks = RouteRelevantChunks(
-            provider,
-            tokens,
-            allowedBucketIds,
-            priorityTokens,
-            _config.MaxRealtimeChunkEmbeddingsPerMessage);
-        if (routedChunks.Count == 0)
-        {
-            return MatchMessageSpans(
-                provider,
-                tokens,
-                new SpanMatchOptions(
-                    _config.MinimumComprehensionSimilarity,
-                    allowedBucketIds,
-                    true,
-                    _config.MaxRealtimeEmbeddingsPerMessage,
-                    priorityTokens: priorityTokens));
-        }
-
-        var matches = new List<SemanticBucketSpanMatch>();
-        foreach (var chunk in routedChunks)
-        {
-            matches.AddRange(MatchMessageSpans(
-                provider,
-                tokens,
-                new SpanMatchOptions(
-                    _config.MinimumComprehensionSimilarity,
-                    allowedBucketIds,
-                    true,
-                    _config.MaxRealtimeSpanEmbeddingsPerChunk,
-                    chunk.StartIndex,
-                    chunk.EndIndex,
-                    priorityTokens)));
-        }
-
-        return ResolveOverlaps(matches, preferLongerMatches: false);
-    }
-
-    private List<SemanticBucketSpanMatch> RouteRelevantChunks(
-        ITheBasicsSemanticEmbeddingProvider provider,
-        List<WordToken> tokens,
-        IEnumerable<string>? allowedBucketIds,
-        ISet<string>? priorityTokens,
-        int maxOnDemandEmbeddings)
-    {
-        var allowed = allowedBucketIds == null
-            ? null
-            : new HashSet<string>(allowedBucketIds, StringComparer.OrdinalIgnoreCase);
-        var routed = new List<SemanticBucketSpanMatch>();
-        var onDemandEmbeddingsUsed = 0;
-        foreach (var chunk in SemanticTextCandidateBuilder.BuildTokenChunks(tokens, _config.MaxChunkWords, _config.ChunkOverlapWords, priorityTokens))
-        {
-            var chunkVector = GetCandidateVector(
-                provider,
-                chunk.Text,
-                allowOnDemandEmbedding: true,
-                ref onDemandEmbeddingsUsed,
-                maxOnDemandEmbeddings);
-            if (chunkVector == null)
-            {
-                continue;
-            }
-
-            var match = TryMatchAtlasBucket(
-                new SemanticSpanEmbedding(chunk, chunkVector),
-                _config.MinimumChunkRoutingSimilarity,
-                allowed);
-            if (match != null)
-            {
-                routed.Add(match);
-            }
-        }
-
-        return SelectRoutedChunks(routed);
-    }
-
-    private async Task<List<SemanticBucketSpanMatch>> RouteRelevantChunksAsync(
-        ITheBasicsSemanticEmbeddingProvider provider,
-        List<WordToken> tokens,
-        IEnumerable<string>? allowedBucketIds,
-        ISet<string>? priorityTokens,
-        int maxEmbeddings,
-        CancellationToken cancellationToken)
-    {
-        var allowed = allowedBucketIds == null
-            ? null
-            : new HashSet<string>(allowedBucketIds, StringComparer.OrdinalIgnoreCase);
-        var routed = new List<SemanticBucketSpanMatch>();
-        var embeddingsUsed = 0;
-        foreach (var chunk in SemanticTextCandidateBuilder.BuildTokenChunks(tokens, _config.MaxChunkWords, _config.ChunkOverlapWords, priorityTokens))
-        {
-            if (embeddingsUsed >= maxEmbeddings)
-            {
-                break;
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            embeddingsUsed++;
-            var chunkVector = SemanticVectorMath.Normalize(await provider.EmbedAsync(chunk.Text, cancellationToken).ConfigureAwait(false));
-            if (chunkVector == null)
-            {
-                continue;
-            }
-
-            var match = TryMatchAtlasBucket(
-                new SemanticSpanEmbedding(chunk, chunkVector),
-                _config.MinimumChunkRoutingSimilarity,
-                allowed);
-            if (match != null)
-            {
-                routed.Add(match);
-            }
-        }
-
-        return SelectRoutedChunks(routed);
-    }
-
-    private List<SemanticBucketSpanMatch> SelectRoutedChunks(IEnumerable<SemanticBucketSpanMatch> routed)
-    {
-        var selected = new List<SemanticBucketSpanMatch>();
-        foreach (var chunk in routed
-            .OrderByDescending(chunk => chunk.Similarity)
-            .ThenBy(chunk => chunk.StartIndex))
-        {
-            if (selected.Any(existing => chunk.StartIndex < existing.EndIndex && existing.StartIndex < chunk.EndIndex))
-            {
-                continue;
-            }
-
-            selected.Add(chunk);
-            if (selected.Count >= _config.MaxFineChunksPerMessage)
-            {
-                break;
-            }
-        }
-
-        return selected.OrderBy(chunk => chunk.StartIndex).ToList();
-    }
-
-    private List<SemanticBucketSpanMatch> MatchMessageSpans(
-        ITheBasicsSemanticEmbeddingProvider provider,
-        List<WordToken> tokens,
-        SpanMatchOptions options)
-    {
-        var allowed = options.AllowedBucketIds == null
-            ? null
-            : new HashSet<string>(options.AllowedBucketIds, StringComparer.OrdinalIgnoreCase);
-        var matches = new List<SemanticBucketSpanMatch>();
-        var onDemandEmbeddingsUsed = 0;
-        foreach (var candidate in SemanticTextCandidateBuilder.BuildCandidateSpans(
-            tokens,
-            _config.MaxSpanWords,
-            _config.MaxSpansPerMessage,
-            options.StartTokenIndex,
-            options.EndTokenIndex,
-            options.PriorityTokens))
-        {
-            var candidateVector = GetCandidateVector(
-                provider,
-                candidate.Text,
-                options.AllowOnDemandEmbeddings,
-                ref onDemandEmbeddingsUsed,
-                options.MaxOnDemandEmbeddings);
-            if (candidateVector == null)
-            {
-                continue;
-            }
-
-            var match = TryMatchAtlasBucket(new SemanticSpanEmbedding(candidate, candidateVector), options.MinimumSimilarity, allowed);
-            if (match == null)
-            {
-                continue;
-            }
-
-            matches.Add(match);
-        }
-
-        return ResolveOverlaps(matches, preferLongerMatches: false);
-    }
-
-    private SemanticBucketSpanMatch? TryMatchAtlasBucket(
-        SemanticSpanEmbedding embedding,
-        float minimumSimilarity,
-        ISet<string>? allowedBucketIds = null)
-    {
-        SemanticAtlasBucketVector? bestVector = null;
-        var bestSimilarity = 0f;
-        foreach (var atlasVector in GetAtlasVectors())
-        {
-            if (allowedBucketIds?.Contains(atlasVector.BucketId) == false)
-            {
-                continue;
-            }
-
-            var similarity = SemanticVectorMath.CosineSimilarity(embedding.Vector, atlasVector.Vector);
-            if (similarity > bestSimilarity)
-            {
-                bestSimilarity = similarity;
-                bestVector = atlasVector;
-            }
-        }
-
-        return bestVector != null && bestSimilarity >= minimumSimilarity
-            ? new SemanticBucketSpanMatch(embedding.StartIndex, embedding.EndIndex, embedding.Text, bestVector.BucketId, bestSimilarity)
-            : null;
-    }
-
-    private static List<SemanticBucketSpanMatch> ResolveOverlaps(IEnumerable<SemanticBucketSpanMatch> matches, bool preferLongerMatches = true)
-    {
-        var selected = new List<SemanticBucketSpanMatch>();
-        foreach (var match in matches
-            .OrderByDescending(match => match.Similarity)
-            .ThenBy(match => preferLongerMatches ? -match.WordCount : match.WordCount))
-        {
-            if (selected.Any(existing => match.StartIndex < existing.EndIndex && existing.StartIndex < match.EndIndex))
-            {
-                continue;
-            }
-
-            selected.Add(match);
-        }
-
-        return selected.OrderBy(match => match.StartIndex).ToList();
-    }
-
-    private float[]? GetCandidateVector(
-        ITheBasicsSemanticEmbeddingProvider provider,
-        string candidate,
-        bool allowOnDemandEmbedding,
-        ref int onDemandEmbeddingsUsed,
-        int maxOnDemandEmbeddings)
-    {
-        if (provider.TryGetCachedEmbedding(candidate, out var cachedVector))
-        {
-            return SemanticVectorMath.Normalize(cachedVector);
-        }
-
-        EnqueueCandidatePrewarm(candidate);
-        if (!allowOnDemandEmbedding || onDemandEmbeddingsUsed >= maxOnDemandEmbeddings)
-        {
-            return null;
-        }
-
-        onDemandEmbeddingsUsed++;
-        return TryEmbedCandidateWithinBudget(provider, candidate);
-    }
-
-    private static float[]? TryEmbedCandidateWithinBudget(ITheBasicsSemanticEmbeddingProvider provider, string candidate)
-    {
-        using var timeout = new CancellationTokenSource(OnDemandEmbeddingTimeoutMs);
-        var task = provider.EmbedAsync(candidate, timeout.Token).AsTask();
-        try
-        {
-            if (task.Wait(OnDemandEmbeddingTimeoutMs))
-            {
-                return SemanticVectorMath.Normalize(task.Result);
-            }
-        }
-        catch (AggregateException ex)
-        {
-            if (ex.InnerExceptions.All(inner => inner is OperationCanceledException))
-            {
-                return null;
-            }
-
-            throw;
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
-        }
-
-        return null;
-    }
-
     private static bool IsProviderReady(ITheBasicsSemanticEmbeddingProvider? provider)
     {
         return provider != null && provider.IsReady;
@@ -1126,17 +553,6 @@ public sealed class SemanticLanguageService : IDisposable
     private static bool HasComprehensionInputs(IServerPlayer player, Language language, string message)
     {
         return player != null && language != null && !string.IsNullOrWhiteSpace(message);
-    }
-
-    private static string FormatPlainLanguageIdentifier(Language language)
-    {
-        if (language == null)
-        {
-            return string.Empty;
-        }
-
-        var hiddenMarker = language.Hidden ? " [hidden]" : string.Empty;
-        return VtmlUtils.EscapeVtml($"{language.Name} (:{language.Prefix}){hiddenMarker}");
     }
 
 }
