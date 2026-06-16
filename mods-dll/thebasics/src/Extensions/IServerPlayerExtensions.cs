@@ -9,6 +9,7 @@ using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.ModSystems.ProximityChat.Semantics;
 using thebasics.ModSystems.TPA;
 using thebasics.ModSystems.TPA.Models;
 using thebasics.Utilities;
@@ -44,6 +45,8 @@ namespace thebasics.Extensions
 
         private const string ModDataLanguages = "BASIC_LANGUAGES";
         private const string ModDataDefaultLanguage = "BASIC_DEFAULT_LANGUAGE";
+        private const string ModDataLanguageSkills = "BASIC_LANGUAGE_SKILLS";
+        private const string ModDataSemanticLanguageMemory = "BASIC_LANGUAGE_SEMANTIC_MEMORY";
 
         private const string ModDataLastSelectedGroupId = "BASIC_LAST_SELECTED_GROUP_ID";
         private const string ModDataChatterEnabled = "BASIC_CHATTER_ENABLED";
@@ -485,6 +488,223 @@ namespace thebasics.Extensions
             playerData?.SetModData(ModDataLanguages, languages?.ToList() ?? new List<string>());
         }
 
+        public static Dictionary<string, int> GetLanguageSkills(this IServerPlayer player)
+        {
+            return NormalizeLanguageSkills(GetModData(player, ModDataLanguageSkills, new Dictionary<string, int>()));
+        }
+
+        public static Dictionary<string, int> GetLanguageSkills(this IWorldPlayerData playerData)
+        {
+            return NormalizeLanguageSkills(playerData?.GetModData(ModDataLanguageSkills, new Dictionary<string, int>()) ?? new Dictionary<string, int>());
+        }
+
+        public static void SetLanguageSkills(this IServerPlayer player, IDictionary<string, int> languageSkills)
+        {
+            SetModData(player, ModDataLanguageSkills, NormalizeLanguageSkills(languageSkills));
+        }
+
+        public static void SetLanguageSkills(this IWorldPlayerData playerData, IDictionary<string, int> languageSkills)
+        {
+            playerData?.SetModData(ModDataLanguageSkills, NormalizeLanguageSkills(languageSkills));
+        }
+
+        public static SemanticLanguageMemoryStore GetSemanticLanguageMemory(this IServerPlayer player)
+        {
+            return NormalizeSemanticLanguageMemory(GetModData(player, ModDataSemanticLanguageMemory, new SemanticLanguageMemoryStore()));
+        }
+
+        public static SemanticLanguageMemoryStore GetSemanticLanguageMemory(this IWorldPlayerData playerData)
+        {
+            return NormalizeSemanticLanguageMemory(playerData?.GetModData(ModDataSemanticLanguageMemory, new SemanticLanguageMemoryStore()) ?? new SemanticLanguageMemoryStore());
+        }
+
+        public static void SetSemanticLanguageMemory(this IServerPlayer player, SemanticLanguageMemoryStore memory)
+        {
+            SetModData(player, ModDataSemanticLanguageMemory, NormalizeSemanticLanguageMemory(memory));
+        }
+
+        public static void SetSemanticLanguageMemory(this IWorldPlayerData playerData, SemanticLanguageMemoryStore memory)
+        {
+            playerData?.SetModData(ModDataSemanticLanguageMemory, NormalizeSemanticLanguageMemory(memory));
+        }
+
+        public static void ClearSemanticLanguageMemory(this IServerPlayer player, Language lang)
+        {
+            if (lang == null)
+            {
+                return;
+            }
+
+            var memory = player.GetSemanticLanguageMemory();
+            var removed = memory.Languages.RemoveAll(entry => string.Equals(entry.LanguageName, lang.Name, StringComparison.OrdinalIgnoreCase)) > 0;
+            if (removed)
+            {
+                player.SetSemanticLanguageMemory(memory);
+            }
+        }
+
+        public static SemanticLanguageMemoryStore NormalizeSemanticLanguageMemory(SemanticLanguageMemoryStore memory, ISet<string> alreadyKnownLanguages = null)
+        {
+            var normalized = new SemanticLanguageMemoryStore();
+            if (memory?.Languages == null)
+            {
+                return normalized;
+            }
+
+            var languages = new Dictionary<string, SemanticLanguageMemory>(StringComparer.OrdinalIgnoreCase);
+            foreach (var languageMemory in memory.Languages)
+            {
+                var languageName = GetSemanticMemoryLanguageName(languageMemory, alreadyKnownLanguages);
+                if (languageName == null)
+                {
+                    continue;
+                }
+
+                if (!languages.TryGetValue(languageName, out var target))
+                {
+                    target = new SemanticLanguageMemory { LanguageName = languageName };
+                    languages[languageName] = target;
+                }
+
+                target.LastLearningObservationUnixSeconds = Math.Max(
+                    target.LastLearningObservationUnixSeconds,
+                    Math.Max(0, languageMemory.LastLearningObservationUnixSeconds));
+                AddNormalizedSemanticAtlasBuckets(target, languageMemory.AtlasBuckets);
+            }
+
+            normalized.Languages = languages.Values
+                .Where(languageMemory => languageMemory.AtlasBuckets.Count > 0)
+                .OrderBy(languageMemory => languageMemory.LanguageName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return normalized;
+        }
+
+        private static string GetSemanticMemoryLanguageName(SemanticLanguageMemory languageMemory, ISet<string> alreadyKnownLanguages)
+        {
+            if (languageMemory == null || string.IsNullOrWhiteSpace(languageMemory.LanguageName))
+            {
+                return null;
+            }
+
+            var languageName = languageMemory.LanguageName.Trim();
+            return alreadyKnownLanguages?.Contains(languageName) == true ? null : languageName;
+        }
+
+        private static void AddNormalizedSemanticAtlasBuckets(SemanticLanguageMemory target, IEnumerable<SemanticLanguageAtlasBucketCoverage> buckets)
+        {
+            if (buckets == null)
+            {
+                return;
+            }
+
+            var byId = new Dictionary<string, SemanticLanguageAtlasBucketCoverage>(StringComparer.OrdinalIgnoreCase);
+            foreach (var bucket in buckets)
+            {
+                if (!TryCreateNormalizedSemanticAtlasBucket(bucket, out var normalizedBucket))
+                {
+                    continue;
+                }
+
+                if (!byId.TryGetValue(normalizedBucket.BucketId, out var existing) || normalizedBucket.Confidence > existing.Confidence)
+                {
+                    byId[normalizedBucket.BucketId] = normalizedBucket;
+                }
+            }
+
+            target.AtlasBuckets.AddRange(byId.Values
+                .OrderByDescending(bucket => bucket.Confidence)
+                .ThenBy(bucket => bucket.BucketId, StringComparer.OrdinalIgnoreCase)
+                .Take(4096));
+        }
+
+        private static bool TryCreateNormalizedSemanticAtlasBucket(SemanticLanguageAtlasBucketCoverage bucket, out SemanticLanguageAtlasBucketCoverage normalizedBucket)
+        {
+            normalizedBucket = null;
+            var bucketId = SemanticLanguageAtlasCatalog.NormalizeIdentifier(bucket?.BucketId);
+            if (string.IsNullOrWhiteSpace(bucketId) || bucket.Confidence <= 0)
+            {
+                return false;
+            }
+
+            normalizedBucket = new SemanticLanguageAtlasBucketCoverage
+            {
+                BucketId = bucketId,
+                Confidence = Math.Max(0, Math.Min(100, bucket.Confidence)),
+                ExposureCount = Math.Max(0, bucket.ExposureCount),
+                LastUpdatedUnixSeconds = Math.Max(0, bucket.LastUpdatedUnixSeconds),
+                LearnedAtUnixSeconds = Math.Max(0, bucket.LearnedAtUnixSeconds)
+            };
+            return true;
+        }
+
+        public static int GetLanguageSkill(this IServerPlayer player, Language lang)
+        {
+            if (lang == null)
+            {
+                return 0;
+            }
+
+            if (player.KnowsLanguage(lang))
+            {
+                return 100;
+            }
+
+            return player.GetLanguageSkills().TryGetValue(lang.Name, out var skill)
+                ? ClampLanguageSkill(skill)
+                : 0;
+        }
+
+        public static void SetLanguageSkill(this IServerPlayer player, Language lang, int skill)
+        {
+            if (lang == null)
+            {
+                return;
+            }
+
+            var skills = player.GetLanguageSkills();
+            var clampedSkill = ClampLanguageSkill(skill);
+            if (clampedSkill <= 0 || player.KnowsLanguage(lang))
+            {
+                skills.Remove(lang.Name);
+            }
+            else
+            {
+                skills[lang.Name] = clampedSkill;
+            }
+
+            SetModData(player, ModDataLanguageSkills, skills);
+        }
+
+        private static Dictionary<string, int> NormalizeLanguageSkills(IDictionary<string, int> languageSkills)
+        {
+            var normalized = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (languageSkills == null)
+            {
+                return normalized;
+            }
+
+            foreach (var entry in languageSkills)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Key))
+                {
+                    continue;
+                }
+
+                var skill = ClampLanguageSkill(entry.Value);
+                if (skill > 0)
+                {
+                    normalized[entry.Key.Trim()] = skill;
+                }
+            }
+
+            return normalized;
+        }
+
+        private static int ClampLanguageSkill(int skill)
+        {
+            return Math.Max(0, Math.Min(100, skill));
+        }
+
         public static bool KnowsLanguage(this IServerPlayer player, Language lang)
         {
             return GetLanguages(player).Any(langName => langName == lang.Name);
@@ -498,6 +718,8 @@ namespace thebasics.Extensions
                 currentLanguages.Add(lang.Name);
             }
             SetModData(player, ModDataLanguages, currentLanguages);
+            ClearLanguageSkill(player, lang);
+            ClearSemanticLanguageMemory(player, lang);
         }
 
         public static void RemoveLanguage(this IServerPlayer player, Language lang)
@@ -505,6 +727,17 @@ namespace thebasics.Extensions
             var currentLanguages = player.GetLanguages().ToList();
             var newLanguages = currentLanguages.Where(curLang => lang.Name != curLang).ToList();
             SetModData(player, ModDataLanguages, newLanguages);
+            ClearLanguageSkill(player, lang);
+            ClearSemanticLanguageMemory(player, lang);
+        }
+
+        private static void ClearLanguageSkill(IServerPlayer player, Language lang)
+        {
+            var skills = player.GetLanguageSkills();
+            if (skills.Remove(lang.Name))
+            {
+                SetModData(player, ModDataLanguageSkills, skills);
+            }
         }
 
         public static Language GetDefaultLanguage(this IServerPlayer player, ModConfig config)

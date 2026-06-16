@@ -12,13 +12,19 @@ namespace thebasics.ModSystems.ProximityChat
 {
     public static class LanguageScrambler
     {
-        public static string ScrambleMessage(string message, Language language, ISet<string>? preservedWords = null)
+        public static string ScrambleMessage(
+            string message,
+            Language language,
+            ISet<string>? preservedWords = null,
+            Func<string, int, bool>? shouldPreserveWord = null)
         {
             var wordRegex = new Regex(@"\w+");
+            var wordIndex = 0;
             return wordRegex.Replace(message, match =>
             {
                 var word = match.Groups[0].Value;
-                if (preservedWords?.Contains(word) == true)
+                var currentWordIndex = wordIndex++;
+                if (preservedWords?.Contains(word) == true || shouldPreserveWord?.Invoke(word, currentWordIndex) == true)
                 {
                     return word;
                 }

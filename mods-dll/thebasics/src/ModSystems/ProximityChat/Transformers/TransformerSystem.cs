@@ -254,6 +254,7 @@ public class TransformerSystem
             Flags = new Dictionary<string, bool>(context.Flags)
         };
 
+        _languageSystem.ObserveMessageForRecipient(recipientContext);
         recipientContext = ExecuteTransformers(recipientContext, _recipientPhaseTransformers);
         if (recipientContext.State != MessageContextState.CONTINUE)
         {

@@ -4,6 +4,7 @@ using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.Tests.Support;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -142,9 +143,6 @@ public class ChatPreferencesCommandHandlerTests
 
     private static void EnsureLangInitialized()
     {
-        var translationService = Substitute.For<ITranslationService>();
-        translationService.Get(Arg.Any<string>(), Arg.Any<object[]>()).Returns(call => call.ArgAt<string>(0));
-        Lang.AvailableLanguages["en"] = translationService;
-        Lang.ChangeLanguage("en");
+        LangTestHelper.EnsureEnglish();
     }
 }

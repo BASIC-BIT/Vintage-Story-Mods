@@ -413,6 +413,8 @@ public class RpCharacterService
     private static void RestoreChatProjection(IServerPlayer player, RpCharacterProjectionSnapshot projection)
     {
         player.SetLanguages(projection.Languages);
+        player.SetLanguageSkills(projection.LanguageSkills);
+        player.SetSemanticLanguageMemory(projection.SemanticLanguageMemory);
         IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", projection.DefaultLanguage);
         player.SetChatMode(projection.ChatMode);
         player.SetChatterEnabled(projection.ChatterEnabled);
@@ -427,6 +429,8 @@ public class RpCharacterService
             NametagBackgroundColor = IServerPlayerExtensions.GetModData<string>(player, NametagBackgroundColorKey, null),
             NametagBorderColor = IServerPlayerExtensions.GetModData<string>(player, NametagBorderColorKey, null),
             Languages = player.GetLanguages().ToList(),
+            LanguageSkills = player.GetLanguageSkills(),
+            SemanticLanguageMemory = player.GetSemanticLanguageMemory(),
             DefaultLanguage = player.GetDefaultLanguageName(),
             ChatMode = player.GetChatMode(),
             ChatterEnabled = player.GetChatterEnabled()
@@ -518,6 +522,20 @@ public class RpCharacterService
             .Where(language => !string.IsNullOrWhiteSpace(language))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList() ?? new List<string>();
+        var knownLanguages = new HashSet<string>(projection.Languages, StringComparer.OrdinalIgnoreCase);
+
+        projection.LanguageSkills = projection.LanguageSkills == null
+            ? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            : projection.LanguageSkills
+                .Where(entry => !string.IsNullOrWhiteSpace(entry.Key))
+                .Where(entry => !knownLanguages.Contains(entry.Key))
+                .Where(entry => entry.Value > 0)
+                .ToDictionary(
+                    entry => entry.Key.Trim(),
+                    entry => Math.Max(0, Math.Min(100, entry.Value)),
+                    StringComparer.OrdinalIgnoreCase);
+
+        projection.SemanticLanguageMemory = IServerPlayerExtensions.NormalizeSemanticLanguageMemory(projection.SemanticLanguageMemory, knownLanguages);
 
         if (projection.Languages.Count == 0)
         {

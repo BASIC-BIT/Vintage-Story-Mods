@@ -3,6 +3,7 @@ using System.ComponentModel;
 using ProtoBuf;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.ModSystems.ProximityChat.Semantics;
 
 namespace thebasics.ModSystems.RpCharacters.Models;
 
@@ -33,4 +34,10 @@ public class RpCharacterProjectionSnapshot
 
     [ProtoMember(8)]
     public string NametagBorderColor { get; set; }
+
+    [ProtoMember(9)]
+    public Dictionary<string, int> LanguageSkills { get; set; } = new Dictionary<string, int>();
+
+    [ProtoMember(10)]
+    public SemanticLanguageMemoryStore SemanticLanguageMemory { get; set; } = new SemanticLanguageMemoryStore();
 }

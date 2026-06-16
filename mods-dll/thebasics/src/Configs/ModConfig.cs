@@ -34,6 +34,8 @@ namespace thebasics.Configs
             InitializeGeneralFeatureDefaults();
             InitializeNotesDefaults();
             InitializeChatHistoryDefaults();
+            SemanticLanguageLearning ??= new SemanticLanguageLearningConfig();
+            SemanticLanguageLearning.Normalize();
             InitializeHomeSpawnDefaults();
         }
 
@@ -874,5 +876,8 @@ namespace thebasics.Configs
 
         [ProtoMember(145)]
         public string ChangeNametagColorPermission { get; set; } = "chat";
+
+        [ProtoMember(146)]
+        public SemanticLanguageLearningConfig SemanticLanguageLearning { get; set; } = new SemanticLanguageLearningConfig();
     }
 }

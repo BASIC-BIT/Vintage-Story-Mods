@@ -1,5 +1,6 @@
 using System;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.ModSystems.ProximityChat.Semantics;
 
 namespace thebasics.ModSystems.ProximityChat;
 
@@ -15,4 +16,14 @@ public interface ITheBasicsProximityChatApi
     /// The chat group The BASICs currently uses for proximity chat.
     /// </summary>
     int ProximityChatGroupId { get; }
+
+    /// <summary>
+    /// Registers an optional embedding provider used for semantic language-learning features.
+    /// </summary>
+    bool RegisterSemanticEmbeddingProvider(ITheBasicsSemanticEmbeddingProvider provider);
+
+    /// <summary>
+    /// Human-readable semantic provider status for diagnostics.
+    /// </summary>
+    string SemanticEmbeddingProviderStatus { get; }
 }
