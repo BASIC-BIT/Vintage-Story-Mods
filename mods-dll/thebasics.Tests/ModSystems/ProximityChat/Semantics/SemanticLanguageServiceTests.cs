@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using FluentAssertions;
 using NSubstitute;
 using thebasics.Configs;
 using thebasics.Extensions;
+using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Semantics;
 using Vintagestory.API.Common;
@@ -44,6 +46,7 @@ public class SemanticLanguageServiceTests
         catalog.TryResolveBucket("Temporal Gear", out var byLabel).Should().BeTrue();
         byId.Should().BeSameAs(byAlias);
         byAlias.Should().BeSameAs(byLabel);
+        catalog.FindBucket("TEMPORAL GEAR").Should().BeSameAs(byId);
     }
 
     [Fact]
@@ -91,6 +94,63 @@ public class SemanticLanguageServiceTests
         buckets[0].ExposureCount.Should().Be(0);
         buckets[0].LastUpdatedUnixSeconds.Should().Be(0);
         buckets[0].LearnedAtUnixSeconds.Should().Be(0);
+    }
+
+    [Fact]
+    public void NormalizeSemanticLanguageMemory_DropsAlreadyKnownLanguages()
+    {
+        var memory = new SemanticLanguageMemoryStore
+        {
+            Languages = new List<SemanticLanguageMemory>
+            {
+                new SemanticLanguageMemory
+                {
+                    LanguageName = "Tradeband",
+                    AtlasBuckets = new List<SemanticLanguageAtlasBucketCoverage>
+                    {
+                        new SemanticLanguageAtlasBucketCoverage { BucketId = "temporal-gear", Confidence = 50 }
+                    }
+                }
+            }
+        };
+
+        var normalized = IServerPlayerExtensions.NormalizeSemanticLanguageMemory(
+            memory,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "tradeband" });
+
+        normalized.Languages.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ReconcileSemanticLanguageMemory_RenamesMemoryAndDropsKnownLanguages()
+    {
+        var oldMemory = new SemanticLanguageMemoryStore
+        {
+            Languages = new List<SemanticLanguageMemory>
+            {
+                new SemanticLanguageMemory
+                {
+                    LanguageName = "Old Trade",
+                    LastLearningObservationUnixSeconds = 123,
+                    AtlasBuckets = new List<SemanticLanguageAtlasBucketCoverage>
+                    {
+                        new SemanticLanguageAtlasBucketCoverage { BucketId = "temporal-gear", Confidence = 50 }
+                    }
+                }
+            }
+        };
+        var language = CreateLanguage();
+        var languagesByName = new Dictionary<string, Language>(StringComparer.OrdinalIgnoreCase) { [language.Name] = language };
+        var renameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Old Trade"] = language.Name };
+
+        var renamed = RPProximityChatSystem.ReconcileSemanticLanguageMemory(oldMemory, renameMap, languagesByName, Array.Empty<string>());
+        var dropped = RPProximityChatSystem.ReconcileSemanticLanguageMemory(oldMemory, renameMap, languagesByName, new[] { language.Name });
+
+        renamed.Languages.Should().ContainSingle();
+        renamed.Languages[0].LanguageName.Should().Be(language.Name);
+        renamed.Languages[0].LastLearningObservationUnixSeconds.Should().Be(123);
+        renamed.Languages[0].AtlasBuckets.Should().ContainSingle(bucket => bucket.BucketId == "temporal-gear" && bucket.Confidence == 50);
+        dropped.Languages.Should().BeEmpty();
     }
 
     [Fact]
@@ -165,6 +225,7 @@ public class SemanticLanguageServiceTests
         var player = CreatePlayer();
         var service = CreateService();
         service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
         service.TrySetAtlasBucketCoverage(player, language, "temporal-gear", 80, out _, out _).Should().BeTrue();
 
         var plan = service.BuildComprehensionPlan(player, language, "temporal gear");
@@ -181,6 +242,7 @@ public class SemanticLanguageServiceTests
         var player = CreatePlayer();
         var service = CreateService();
         service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
         service.TrySetAtlasBucketCoverage(player, language, "temporal-gear", 85, out _, out _).Should().BeTrue();
 
         var plan = service.BuildComprehensionPlan(player, language, "I have a temporal gear");
@@ -208,6 +270,7 @@ public class SemanticLanguageServiceTests
             MaxRealtimeEmbeddingsPerMessage = 1
         });
         service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
         service.TrySetAtlasBucketCoverage(player, language, "temporal-gear", 85, out _, out _).Should().BeTrue();
 
         var message = "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo temporal gear";
@@ -226,6 +289,7 @@ public class SemanticLanguageServiceTests
         var player = CreatePlayer();
         var service = CreateService();
         service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
         service.TrySetAtlasBucketCoverage(player, language, "temporal-gear", 85, out _, out _).Should().BeTrue();
 
         var plan = service.BuildComprehensionPlan(player, language, "weird gear from ruins");
@@ -244,6 +308,7 @@ public class SemanticLanguageServiceTests
         var player = CreatePlayer();
         var service = CreateService();
         service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
         service.TrySetAtlasBucketCoverage(player, language, "temporal-gear", 80, out _, out _).Should().BeTrue();
 
         var plan = service.BuildComprehensionPlan(player, language, "temporal storm");
@@ -269,6 +334,7 @@ public class SemanticLanguageServiceTests
             MaxRealtimeEmbeddingsPerMessage = 1
         }, api, player);
         service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
 
         service.ObserveMessageForRecipient(new MessageContext
         {
@@ -296,6 +362,7 @@ public class SemanticLanguageServiceTests
             MaxBucketProgressPerMessage = 100
         }, CreateApi(player), player);
         service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
 
         service.ObserveMessageForRecipient(new MessageContext
         {
@@ -307,6 +374,53 @@ public class SemanticLanguageServiceTests
         });
 
         player.GetSemanticLanguageMemory().Languages.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RegisterProvider_DoesNotBlockWhileAtlasIndexBuilds()
+    {
+        using var service = CreateService();
+        using var provider = new BlockingEmbeddingProvider();
+        var stopwatch = Stopwatch.StartNew();
+
+        var registered = service.RegisterProvider(provider);
+
+        stopwatch.Stop();
+        registered.Should().BeTrue();
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(250));
+        service.HasReadyAtlasIndex.Should().BeFalse();
+        service.ProviderStatus.Should().Contain("atlasIndexing=True");
+    }
+
+    [Fact]
+    public void ObserveMessageForRecipient_LearnsQuotedSpeechFromEmoteOnly()
+    {
+        var language = CreateLanguage();
+        var player = CreatePlayer();
+        var api = CreateApi(player);
+        var service = CreateService(new SemanticLanguageLearningConfig
+        {
+            LearningRatePercent = 100,
+            MaxBucketProgressPerMessage = 100
+        }, api, player);
+        service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
+
+        service.ObserveMessageForRecipient(new MessageContext
+        {
+            ReceivingPlayer = player,
+            Message = "Alice waves at a drifter and says \"temporal gear\" softly.",
+            Metadata = new Dictionary<string, object> { [MessageContext.LANGUAGE] = language },
+            Flags = new Dictionary<string, bool> { [MessageContext.IS_EMOTE] = true }
+        });
+
+        SpinWait.SpinUntil(() =>
+        {
+            var memory = player.GetSemanticLanguageMemory().Languages.SingleOrDefault();
+            return memory?.AtlasBuckets.Any(bucket => bucket.BucketId == "temporal-gear" && bucket.Confidence == 100) == true;
+        }, TimeSpan.FromSeconds(2)).Should().BeTrue();
+
+        player.GetSemanticLanguageMemory().Languages.Single().AtlasBuckets.Should().NotContain(bucket => bucket.BucketId == "drifters");
     }
 
     [Fact]
@@ -338,6 +452,7 @@ public class SemanticLanguageServiceTests
             MaxBucketProgressPerMessage = 100
         }, CreateApi(player), player);
         service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
 
         service.ObserveMessageForRecipient(new MessageContext
         {
@@ -380,6 +495,7 @@ public class SemanticLanguageServiceTests
             MaxBucketProgressPerMessage = 100
         }, CreateApi(player), player);
         service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
 
         service.ObserveMessageForRecipient(new MessageContext
         {
@@ -499,6 +615,11 @@ public class SemanticLanguageServiceTests
         return player;
     }
 
+    private static void WaitForAtlasIndex(SemanticLanguageService service)
+    {
+        SpinWait.SpinUntil(() => service.HasReadyAtlasIndex, TimeSpan.FromSeconds(2)).Should().BeTrue(service.ProviderStatus);
+    }
+
     private sealed class FakeEmbeddingProvider : ITheBasicsSemanticEmbeddingProvider
     {
         private readonly Dictionary<string, float[]> _vectors;
@@ -535,6 +656,37 @@ public class SemanticLanguageServiceTests
         private static string Normalize(string text)
         {
             return string.Join(" ", (text ?? string.Empty).Trim().ToLowerInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        }
+    }
+
+    private sealed class BlockingEmbeddingProvider : ITheBasicsSemanticEmbeddingProvider, IDisposable
+    {
+        private readonly CancellationTokenSource _disposeCts = new CancellationTokenSource();
+
+        public string ProviderId => "blocking";
+
+        public int Dimensions => 2;
+
+        public bool IsReady => true;
+
+        public ValueTask<float[]?> EmbedAsync(string text, CancellationToken cancellationToken)
+        {
+            var linkedToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
+            var task = Task.Delay(Timeout.InfiniteTimeSpan, linkedToken.Token)
+                .ContinueWith<float[]?>(_ => null, TaskScheduler.Default);
+            return new ValueTask<float[]?>(task);
+        }
+
+        public bool TryGetCachedEmbedding(string text, out float[] embedding)
+        {
+            embedding = Array.Empty<float>();
+            return false;
+        }
+
+        public void Dispose()
+        {
+            _disposeCts.Cancel();
+            _disposeCts.Dispose();
         }
     }
 }

@@ -61,9 +61,7 @@ internal static class NativeOnnxRuntimeResolver
     {
         var assemblyDir = Path.GetDirectoryName(assembly.Location) ?? AppContext.BaseDirectory;
         var rid = GetRuntimeIdentifier();
-        var fileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? "onnxruntime.dll"
-            : "libonnxruntime.so";
+        var fileName = GetNativeLibraryFileName();
 
         return new[]
         {
@@ -78,16 +76,34 @@ internal static class NativeOnnxRuntimeResolver
 
     private static string GetRuntimeIdentifier()
     {
+        var architecture = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "arm64" : "x64";
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            return "win-x64";
+            return $"win-{architecture}";
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            return "linux-x64";
+            return $"linux-{architecture}";
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return $"osx-{architecture}";
         }
 
         return RuntimeInformation.RuntimeIdentifier;
+    }
+
+    private static string GetNativeLibraryFileName()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return "onnxruntime.dll";
+        }
+
+        return RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+            ? "libonnxruntime.dylib"
+            : "libonnxruntime.so";
     }
 }

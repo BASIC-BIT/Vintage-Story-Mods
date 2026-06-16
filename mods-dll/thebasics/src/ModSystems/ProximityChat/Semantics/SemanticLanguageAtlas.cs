@@ -54,6 +54,7 @@ public sealed class SemanticLanguageAtlasCatalog
         new AssetLocation("thebasics", "semantic-atlas/vintagestory-core.pilot.json")
     };
 
+    private readonly Dictionary<string, SemanticLanguageAtlasBucket> _byId;
     private readonly Dictionary<string, SemanticLanguageAtlasBucket> _byIdentifier;
 
     private SemanticLanguageAtlasCatalog(string atlasId, string displayName, string version, IReadOnlyList<SemanticLanguageAtlasBucket> buckets)
@@ -62,6 +63,7 @@ public sealed class SemanticLanguageAtlasCatalog
         DisplayName = displayName;
         Version = version;
         Buckets = buckets;
+        _byId = buckets.ToDictionary(bucket => bucket.Id, StringComparer.OrdinalIgnoreCase);
         _byIdentifier = new Dictionary<string, SemanticLanguageAtlasBucket>(StringComparer.OrdinalIgnoreCase);
         foreach (var bucket in buckets)
         {
@@ -157,7 +159,7 @@ public sealed class SemanticLanguageAtlasCatalog
 
     public SemanticLanguageAtlasBucket? FindBucket(string bucketId)
     {
-        return Buckets.FirstOrDefault(bucket => string.Equals(bucket.Id, bucketId, StringComparison.OrdinalIgnoreCase));
+        return _byId.TryGetValue(NormalizeIdentifier(bucketId), out var bucket) ? bucket : null;
     }
 
     public static string FormatBucket(SemanticLanguageAtlasBucket bucket)

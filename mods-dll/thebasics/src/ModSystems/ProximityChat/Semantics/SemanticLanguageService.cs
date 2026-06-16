@@ -35,6 +35,8 @@ public sealed class SemanticLanguageService : IDisposable
     private readonly SemanticLanguageMatcher _matcher;
     private readonly SemanticLanguageLearningApplier _learningApplier;
     private IReadOnlyList<SemanticAtlasBucketVector> _atlasVectors = Array.Empty<SemanticAtlasBucketVector>();
+    private int _atlasIndexBuildVersion;
+    private int _atlasIndexBuilding;
     private bool _workerRunning;
     private bool _prewarmWorkerRunning;
     private int _queuedObservations;
@@ -82,11 +84,15 @@ public sealed class SemanticLanguageService : IDisposable
                 return "No semantic embedding provider registered; semantic language learning is degraded.";
             }
 
-            return $"{provider.ProviderId} ({provider.Dimensions}d, ready={provider.IsReady}, queued={QueuedObservationCount}, atlasVectors={AtlasVectorCount})";
+            return $"{provider.ProviderId} ({provider.Dimensions}d, ready={provider.IsReady}, queued={QueuedObservationCount}, atlasVectors={AtlasVectorCount}, atlasIndexing={IsAtlasIndexBuilding})";
         }
     }
 
     public SemanticLanguageAtlasCatalog Atlas => _atlas;
+
+    internal bool HasReadyAtlasIndex => HasAtlasVectors();
+
+    private bool IsAtlasIndexBuilding => Volatile.Read(ref _atlasIndexBuilding) != 0;
 
     private int AtlasVectorCount
     {
@@ -113,8 +119,8 @@ public sealed class SemanticLanguageService : IDisposable
         }
 
         _provider = provider;
-        RebuildAtlasIndex(provider);
-        _api.Logger.Notification($"[thebasics] Registered semantic embedding provider '{provider.ProviderId}' ({provider.Dimensions} dimensions, {AtlasVectorCount} atlas vectors). ");
+        StartAtlasIndexBuild(provider);
+        _api.Logger.Notification($"[thebasics] Registered semantic embedding provider '{provider.ProviderId}' ({provider.Dimensions} dimensions; semantic atlas index building in background). ");
         StartWorkerIfNeeded();
         return true;
     }
@@ -281,28 +287,69 @@ public sealed class SemanticLanguageService : IDisposable
         _disposeCts.Dispose();
     }
 
-    private void RebuildAtlasIndex(ITheBasicsSemanticEmbeddingProvider provider)
+    private void StartAtlasIndexBuild(ITheBasicsSemanticEmbeddingProvider provider)
     {
-        var vectors = new List<SemanticAtlasBucketVector>();
+        var buildVersion = Interlocked.Increment(ref _atlasIndexBuildVersion);
+        SetAtlasVectors(Array.Empty<SemanticAtlasBucketVector>());
         if (!_config.Enabled || !_atlas.HasBuckets || !provider.IsReady)
         {
-            SetAtlasVectors(vectors);
+            Volatile.Write(ref _atlasIndexBuilding, 0);
             return;
         }
 
+        Volatile.Write(ref _atlasIndexBuilding, 1);
+        Task.Run(() => RebuildAtlasIndexAsync(provider, buildVersion, _disposeCts.Token));
+    }
+
+    private async Task RebuildAtlasIndexAsync(ITheBasicsSemanticEmbeddingProvider provider, int buildVersion, CancellationToken cancellationToken)
+    {
+        var vectors = new List<SemanticAtlasBucketVector>();
+        try
+        {
+            await EmbedAtlasBucketsAsync(provider, vectors, cancellationToken).ConfigureAwait(false);
+            if (IsCurrentAtlasBuild(provider, buildVersion))
+            {
+                SetAtlasVectors(vectors);
+                _api.Logger.Notification($"[thebasics] Semantic atlas index ready with {vectors.Count} vectors for provider '{provider.ProviderId}'.");
+                StartWorkerIfNeeded();
+            }
+        }
+        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+        {
+            _ = ex;
+        }
+        catch (Exception ex)
+        {
+            _api.Logger.Warning($"[thebasics] Failed to build semantic atlas index for provider '{provider.ProviderId}': {ex.Message}");
+        }
+        finally
+        {
+            if (Volatile.Read(ref _atlasIndexBuildVersion) == buildVersion)
+            {
+                Volatile.Write(ref _atlasIndexBuilding, 0);
+            }
+        }
+    }
+
+    private async Task EmbedAtlasBucketsAsync(ITheBasicsSemanticEmbeddingProvider provider, List<SemanticAtlasBucketVector> vectors, CancellationToken cancellationToken)
+    {
         foreach (var bucket in _atlas.Buckets)
         {
             foreach (var phrase in GetAtlasBucketEmbeddingPhrases(bucket))
             {
-                var vector = TryEmbedAtlasPhrase(provider, phrase);
+                cancellationToken.ThrowIfCancellationRequested();
+                var vector = await TryEmbedAtlasPhraseAsync(provider, phrase, cancellationToken).ConfigureAwait(false);
                 if (vector != null)
                 {
                     vectors.Add(new SemanticAtlasBucketVector(bucket.Id, phrase, vector));
                 }
             }
         }
+    }
 
-        SetAtlasVectors(vectors);
+    private bool IsCurrentAtlasBuild(ITheBasicsSemanticEmbeddingProvider provider, int buildVersion)
+    {
+        return ReferenceEquals(_provider, provider) && Volatile.Read(ref _atlasIndexBuildVersion) == buildVersion && !_disposeCts.IsCancellationRequested;
     }
 
     private void SetAtlasVectors(IReadOnlyList<SemanticAtlasBucketVector> vectors)
@@ -326,7 +373,7 @@ public sealed class SemanticLanguageService : IDisposable
         return AtlasVectorCount > 0;
     }
 
-    private float[]? TryEmbedAtlasPhrase(ITheBasicsSemanticEmbeddingProvider provider, string phrase)
+    private async ValueTask<float[]?> TryEmbedAtlasPhraseAsync(ITheBasicsSemanticEmbeddingProvider provider, string phrase, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(phrase))
         {
@@ -335,8 +382,13 @@ public sealed class SemanticLanguageService : IDisposable
 
         try
         {
-            using var timeout = new CancellationTokenSource(AtlasPhraseEmbeddingTimeoutMs);
-            return SemanticVectorMath.Normalize(provider.EmbedAsync(phrase, timeout.Token).AsTask().GetAwaiter().GetResult());
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(AtlasPhraseEmbeddingTimeoutMs);
+            return SemanticVectorMath.Normalize(await provider.EmbedAsync(phrase, timeout.Token).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex) when (ex is OperationCanceledException || ex is InvalidOperationException)
         {

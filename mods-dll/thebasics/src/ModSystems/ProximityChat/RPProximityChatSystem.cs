@@ -1487,6 +1487,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         ReconcileStoredLanguageSkills(playerData, renameMap, languagesByName, reconciledNames);
+        ReconcileStoredSemanticLanguageMemory(playerData, renameMap, languagesByName, reconciledNames);
         ReconcileStoredDefaultLanguage(playerData, renameMap, languagesByName, reconciledNames);
     }
 
@@ -1558,7 +1559,49 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         ReconcilePlayerLanguageSkills(serverPlayer, renameMap, languagesByName, reconciledNames);
+        ReconcilePlayerSemanticLanguageMemory(serverPlayer, renameMap, languagesByName, reconciledNames);
         ReconcilePlayerDefaultLanguage(serverPlayer, renameMap, languagesByName, reconciledNames);
+    }
+
+    private static void ReconcileStoredSemanticLanguageMemory(ServerWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
+    {
+        var currentMemory = playerData.GetSemanticLanguageMemory();
+        var reconciledMemory = ReconcileSemanticLanguageMemory(currentMemory, renameMap, languagesByName, knownNames);
+        playerData.SetSemanticLanguageMemory(reconciledMemory);
+    }
+
+    private static void ReconcilePlayerSemanticLanguageMemory(IServerPlayer serverPlayer, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
+    {
+        var currentMemory = serverPlayer.GetSemanticLanguageMemory();
+        var reconciledMemory = ReconcileSemanticLanguageMemory(currentMemory, renameMap, languagesByName, knownNames);
+        serverPlayer.SetSemanticLanguageMemory(reconciledMemory);
+    }
+
+    internal static SemanticLanguageMemoryStore ReconcileSemanticLanguageMemory(SemanticLanguageMemoryStore currentMemory, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
+    {
+        var reconciled = new SemanticLanguageMemoryStore();
+        foreach (var languageMemory in currentMemory?.Languages ?? new List<SemanticLanguageMemory>())
+        {
+            if (string.IsNullOrWhiteSpace(languageMemory.LanguageName))
+            {
+                continue;
+            }
+
+            var candidate = renameMap.TryGetValue(languageMemory.LanguageName, out var renamed) ? renamed : languageMemory.LanguageName;
+            if (!languagesByName.TryGetValue(candidate, out var language))
+            {
+                continue;
+            }
+
+            reconciled.Languages.Add(new SemanticLanguageMemory
+            {
+                LanguageName = language.Name,
+                LastLearningObservationUnixSeconds = languageMemory.LastLearningObservationUnixSeconds,
+                AtlasBuckets = languageMemory.AtlasBuckets ?? new List<SemanticLanguageAtlasBucketCoverage>()
+            });
+        }
+
+        return IServerPlayerExtensions.NormalizeSemanticLanguageMemory(reconciled, new HashSet<string>(knownNames, StringComparer.OrdinalIgnoreCase));
     }
 
     private static void ReconcilePlayerLanguageSkills(IServerPlayer serverPlayer, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)

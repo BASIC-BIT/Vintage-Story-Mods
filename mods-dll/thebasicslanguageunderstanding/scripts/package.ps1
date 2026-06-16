@@ -58,7 +58,8 @@ $nativeRuntimeFiles = @(
     @{ Source = Join-Path $onnxPackageRoot "runtimes/win-x64/native/onnxruntime.dll"; Entry = "native/onnxruntime.dll" },
     @{ Source = Join-Path $onnxPackageRoot "runtimes/win-x64/native/onnxruntime_providers_shared.dll"; Entry = "native/onnxruntime_providers_shared.dll" },
     @{ Source = Join-Path $onnxPackageRoot "runtimes/linux-x64/native/libonnxruntime.so"; Entry = "native/libonnxruntime.so" },
-    @{ Source = Join-Path $onnxPackageRoot "runtimes/linux-x64/native/libonnxruntime_providers_shared.so"; Entry = "native/libonnxruntime_providers_shared.so" }
+    @{ Source = Join-Path $onnxPackageRoot "runtimes/linux-x64/native/libonnxruntime_providers_shared.so"; Entry = "native/libonnxruntime_providers_shared.so" },
+    @{ Source = Join-Path $onnxPackageRoot "runtimes/osx-arm64/native/libonnxruntime.dylib"; Entry = "native/libonnxruntime.dylib" }
 )
 
 foreach ($runtimeFile in $nativeRuntimeFiles) {

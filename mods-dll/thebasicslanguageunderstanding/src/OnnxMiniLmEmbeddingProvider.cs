@@ -21,14 +21,17 @@ internal sealed class OnnxMiniLmEmbeddingProvider : ITheBasicsSemanticEmbeddingP
     private const int MaxTokens = 128;
     private readonly ICoreServerAPI _api;
     private readonly ConcurrentDictionary<string, float[]> _cache = new ConcurrentDictionary<string, float[]>(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentQueue<string> _cacheOrder = new ConcurrentQueue<string>();
     private readonly InferenceSession? _session;
     private readonly WordPieceTokenizer? _tokenizer;
+    private readonly int _maxCacheEntries;
 
     public OnnxMiniLmEmbeddingProvider(ICoreServerAPI api, string modId, LanguageUnderstandingConfig config)
     {
         _api = api;
         config ??= new LanguageUnderstandingConfig();
         config.InitializeDefaultsIfNeeded();
+        _maxCacheEntries = config.MaxCacheEntries;
         ProviderId = $"onnx-{config.ProviderProfile}";
 
         try
@@ -85,7 +88,7 @@ internal sealed class OnnxMiniLmEmbeddingProvider : ITheBasicsSemanticEmbeddingP
             return null;
         }
 
-        _cache[normalizedText] = vector;
+        AddCachedEmbedding(normalizedText, vector);
         return vector;
     }
 
@@ -125,6 +128,23 @@ internal sealed class OnnxMiniLmEmbeddingProvider : ITheBasicsSemanticEmbeddingP
         var tensor = output.AsTensor<float>();
         var vector = ExtractSentenceVector(tensor, tokenized.AttentionMask);
         return NormalizeVector(vector);
+    }
+
+    private void AddCachedEmbedding(string normalizedText, float[] vector)
+    {
+        if (_cache.TryAdd(normalizedText, vector))
+        {
+            _cacheOrder.Enqueue(normalizedText);
+            TrimCache();
+        }
+    }
+
+    private void TrimCache()
+    {
+        while (_cache.Count > _maxCacheEntries && _cacheOrder.TryDequeue(out var oldest))
+        {
+            _cache.TryRemove(oldest, out _);
+        }
     }
 
     private static List<NamedOnnxValue> CreateInputs(InferenceSession session, TokenizedText tokenized)

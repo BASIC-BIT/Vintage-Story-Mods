@@ -513,9 +513,19 @@ namespace thebasics.Extensions
             return NormalizeSemanticLanguageMemory(GetModData(player, ModDataSemanticLanguageMemory, new SemanticLanguageMemoryStore()));
         }
 
+        public static SemanticLanguageMemoryStore GetSemanticLanguageMemory(this IWorldPlayerData playerData)
+        {
+            return NormalizeSemanticLanguageMemory(playerData?.GetModData(ModDataSemanticLanguageMemory, new SemanticLanguageMemoryStore()) ?? new SemanticLanguageMemoryStore());
+        }
+
         public static void SetSemanticLanguageMemory(this IServerPlayer player, SemanticLanguageMemoryStore memory)
         {
             SetModData(player, ModDataSemanticLanguageMemory, NormalizeSemanticLanguageMemory(memory));
+        }
+
+        public static void SetSemanticLanguageMemory(this IWorldPlayerData playerData, SemanticLanguageMemoryStore memory)
+        {
+            playerData?.SetModData(ModDataSemanticLanguageMemory, NormalizeSemanticLanguageMemory(memory));
         }
 
         public static void ClearSemanticLanguageMemory(this IServerPlayer player, Language lang)
@@ -533,7 +543,7 @@ namespace thebasics.Extensions
             }
         }
 
-        public static SemanticLanguageMemoryStore NormalizeSemanticLanguageMemory(SemanticLanguageMemoryStore memory, ISet<string> knownLanguages = null)
+        public static SemanticLanguageMemoryStore NormalizeSemanticLanguageMemory(SemanticLanguageMemoryStore memory, ISet<string> alreadyKnownLanguages = null)
         {
             var normalized = new SemanticLanguageMemoryStore();
             if (memory?.Languages == null)
@@ -544,7 +554,7 @@ namespace thebasics.Extensions
             var languages = new Dictionary<string, SemanticLanguageMemory>(StringComparer.OrdinalIgnoreCase);
             foreach (var languageMemory in memory.Languages)
             {
-                var languageName = GetNormalizableSemanticLanguageName(languageMemory, knownLanguages);
+                var languageName = GetSemanticMemoryLanguageName(languageMemory, alreadyKnownLanguages);
                 if (languageName == null)
                 {
                     continue;
@@ -569,7 +579,7 @@ namespace thebasics.Extensions
             return normalized;
         }
 
-        private static string GetNormalizableSemanticLanguageName(SemanticLanguageMemory languageMemory, ISet<string> knownLanguages)
+        private static string GetSemanticMemoryLanguageName(SemanticLanguageMemory languageMemory, ISet<string> alreadyKnownLanguages)
         {
             if (languageMemory == null || string.IsNullOrWhiteSpace(languageMemory.LanguageName))
             {
@@ -577,7 +587,7 @@ namespace thebasics.Extensions
             }
 
             var languageName = languageMemory.LanguageName.Trim();
-            return knownLanguages?.Contains(languageName) == true ? null : languageName;
+            return alreadyKnownLanguages?.Contains(languageName) == true ? null : languageName;
         }
 
         private static void AddNormalizedSemanticAtlasBuckets(SemanticLanguageMemory target, IEnumerable<SemanticLanguageAtlasBucketCoverage> buckets)

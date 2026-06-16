@@ -13,7 +13,7 @@ The initial model is `sentence-transformers/all-MiniLM-L6-v2` using the quantize
 
 This small default is an intentional beta-release tradeoff: it keeps the server-only sidecar package and startup/runtime costs modest, while still allowing the gameplay system to validate the semantic language-learning loop. Larger or stronger embedding models may improve broad concept understanding, but should be selected through an evaluation pass against the atlas and representative RP messages rather than by model size alone.
 
-The package script includes ONNX Runtime native files for `win-x64` and `linux-x64` from the restored `Microsoft.ML.OnnxRuntime` NuGet package. Vintage Story requires unmanaged libraries inside the mod `native/` folder, so both Windows and Linux native files are packaged there.
+The package script includes ONNX Runtime native files for `win-x64`, `linux-x64`, and `osx-arm64` from the restored `Microsoft.ML.OnnxRuntime` NuGet package. Vintage Story requires unmanaged libraries inside the mod `native/` folder, so supported platform native files are packaged there.
 
 Server configuration lives in `ModConfig/thebasicslanguageunderstanding.json`:
 
@@ -21,7 +21,8 @@ Server configuration lives in `ModConfig/thebasicslanguageunderstanding.json`:
 {
   "ProviderProfile": "minilm-lite",
   "ModelPath": "model.onnx",
-  "VocabPath": "vocab.txt"
+  "VocabPath": "vocab.txt",
+  "MaxCacheEntries": 4096
 }
 ```
 
