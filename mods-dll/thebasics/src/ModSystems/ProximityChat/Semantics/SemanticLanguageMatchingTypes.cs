@@ -97,16 +97,12 @@ internal sealed class SpanMatchOptions
     public SpanMatchOptions(
         float minimumSimilarity,
         IEnumerable<string>? allowedBucketIds,
-        bool allowOnDemandEmbeddings,
-        int maxOnDemandEmbeddings,
         int startTokenIndex = 0,
         int? endTokenIndex = null,
         ISet<string>? priorityTokens = null)
     {
         MinimumSimilarity = minimumSimilarity;
         AllowedBucketIds = allowedBucketIds;
-        AllowOnDemandEmbeddings = allowOnDemandEmbeddings;
-        MaxOnDemandEmbeddings = maxOnDemandEmbeddings;
         StartTokenIndex = startTokenIndex;
         EndTokenIndex = endTokenIndex;
         PriorityTokens = priorityTokens;
@@ -115,10 +111,6 @@ internal sealed class SpanMatchOptions
     public float MinimumSimilarity { get; }
 
     public IEnumerable<string>? AllowedBucketIds { get; }
-
-    public bool AllowOnDemandEmbeddings { get; }
-
-    public int MaxOnDemandEmbeddings { get; }
 
     public int StartTokenIndex { get; }
 

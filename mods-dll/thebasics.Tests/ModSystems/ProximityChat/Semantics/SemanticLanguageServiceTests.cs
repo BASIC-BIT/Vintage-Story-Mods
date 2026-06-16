@@ -283,12 +283,14 @@ public class SemanticLanguageServiceTests
     }
 
     [Fact]
-    public void BuildComprehensionPlan_UsesLearnedBucketForEmbeddingMatchedParaphrase()
+    public async Task BuildComprehensionPlan_UsesLearnedBucketForEmbeddingMatchedParaphrase()
     {
         var language = CreateLanguage();
         var player = CreatePlayer();
         var service = CreateService();
-        service.RegisterProvider(CreateProvider());
+        var provider = CreateProvider();
+        await provider.EmbedAsync("weird gear from ruins", CancellationToken.None);
+        service.RegisterProvider(provider);
         WaitForAtlasIndex(service);
         service.TrySetAtlasBucketCoverage(player, language, "temporal-gear", 85, out _, out _).Should().BeTrue();
 
@@ -314,6 +316,26 @@ public class SemanticLanguageServiceTests
         var plan = service.BuildComprehensionPlan(player, language, "temporal storm");
 
         plan.Should().BeNull();
+    }
+
+    [Fact]
+    public void MatchMessageSpansForComprehension_UsesCacheOnlyOnMisses()
+    {
+        var atlas = CreateAtlas();
+        var prewarmCandidates = new List<string>();
+        var matcher = new SemanticLanguageMatcher(
+            new SemanticLanguageLearningConfig(),
+            atlas,
+            () => Array.Empty<SemanticAtlasBucketVector>(),
+            prewarmCandidates.Add);
+        var provider = new ThrowingEmbeddingProvider();
+        var tokens = SemanticTextCandidateBuilder.TokenizeWithOriginalWordCount("weird gear from ruins", out _);
+
+        var matches = matcher.MatchMessageSpansForComprehension(provider, tokens, new[] { "temporal-gear" });
+
+        matches.Should().BeEmpty();
+        provider.EmbedCalls.Should().Be(0);
+        prewarmCandidates.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -688,6 +710,29 @@ public class SemanticLanguageServiceTests
         private static string Normalize(string text)
         {
             return string.Join(" ", (text ?? string.Empty).Trim().ToLowerInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        }
+    }
+
+    private sealed class ThrowingEmbeddingProvider : ITheBasicsSemanticEmbeddingProvider
+    {
+        public string ProviderId => "throwing";
+
+        public int Dimensions => 2;
+
+        public bool IsReady => true;
+
+        public int EmbedCalls { get; private set; }
+
+        public ValueTask<float[]?> EmbedAsync(string text, CancellationToken cancellationToken)
+        {
+            EmbedCalls++;
+            throw new InvalidOperationException("Comprehension should not synchronously embed cache misses.");
+        }
+
+        public bool TryGetCachedEmbedding(string text, out float[] embedding)
+        {
+            embedding = Array.Empty<float>();
+            return false;
         }
     }
 

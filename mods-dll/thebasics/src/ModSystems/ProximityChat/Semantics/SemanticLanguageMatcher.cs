@@ -11,8 +11,6 @@ namespace thebasics.ModSystems.ProximityChat.Semantics;
 
 internal sealed class SemanticLanguageMatcher
 {
-    private const int OnDemandEmbeddingTimeoutMs = 45;
-
     private readonly SemanticLanguageLearningConfig _config;
     private readonly SemanticLanguageAtlasCatalog _atlas;
     private readonly Func<IReadOnlyList<SemanticAtlasBucketVector>> _getAtlasVectors;
@@ -103,8 +101,6 @@ internal sealed class SemanticLanguageMatcher
                 new SpanMatchOptions(
                     _config.MinimumComprehensionSimilarity,
                     allowedBucketIds,
-                    true,
-                    _config.MaxRealtimeEmbeddingsPerMessage,
                     priorityTokens: priorityTokens));
         }
 
@@ -112,8 +108,7 @@ internal sealed class SemanticLanguageMatcher
             provider,
             tokens,
             allowedBucketIds,
-            priorityTokens,
-            _config.MaxRealtimeChunkEmbeddingsPerMessage);
+            priorityTokens);
         if (routedChunks.Count == 0)
         {
             return MatchMessageSpans(
@@ -122,8 +117,6 @@ internal sealed class SemanticLanguageMatcher
                 new SpanMatchOptions(
                     _config.MinimumComprehensionSimilarity,
                     allowedBucketIds,
-                    true,
-                    _config.MaxRealtimeEmbeddingsPerMessage,
                     priorityTokens: priorityTokens));
         }
 
@@ -136,10 +129,8 @@ internal sealed class SemanticLanguageMatcher
                 new SpanMatchOptions(
                     _config.MinimumComprehensionSimilarity,
                     allowedBucketIds,
-                    true,
-                    _config.MaxRealtimeSpanEmbeddingsPerChunk,
-                    chunk.StartIndex,
-                    chunk.EndIndex,
+                    startTokenIndex: chunk.StartIndex,
+                    endTokenIndex: chunk.EndIndex,
                     priorityTokens)));
         }
 
@@ -225,22 +216,15 @@ internal sealed class SemanticLanguageMatcher
         ITheBasicsSemanticEmbeddingProvider provider,
         List<WordToken> tokens,
         IEnumerable<string>? allowedBucketIds,
-        ISet<string>? priorityTokens,
-        int maxOnDemandEmbeddings)
+        ISet<string>? priorityTokens)
     {
         var allowed = allowedBucketIds == null
             ? null
             : new HashSet<string>(allowedBucketIds, StringComparer.OrdinalIgnoreCase);
         var routed = new List<SemanticBucketSpanMatch>();
-        var onDemandEmbeddingsUsed = 0;
         foreach (var chunk in SemanticTextCandidateBuilder.BuildTokenChunks(tokens, _config.MaxChunkWords, _config.ChunkOverlapWords, priorityTokens))
         {
-            var chunkVector = GetCandidateVector(
-                provider,
-                chunk.Text,
-                allowOnDemandEmbedding: true,
-                ref onDemandEmbeddingsUsed,
-                maxOnDemandEmbeddings);
+            var chunkVector = GetCachedCandidateVector(provider, chunk.Text);
             if (chunkVector == null)
             {
                 continue;
@@ -331,7 +315,6 @@ internal sealed class SemanticLanguageMatcher
             ? null
             : new HashSet<string>(options.AllowedBucketIds, StringComparer.OrdinalIgnoreCase);
         var matches = new List<SemanticBucketSpanMatch>();
-        var onDemandEmbeddingsUsed = 0;
         foreach (var candidate in SemanticTextCandidateBuilder.BuildCandidateSpans(
             tokens,
             _config.MaxSpanWords,
@@ -340,12 +323,7 @@ internal sealed class SemanticLanguageMatcher
             options.EndTokenIndex,
             options.PriorityTokens))
         {
-            var candidateVector = GetCandidateVector(
-                provider,
-                candidate.Text,
-                options.AllowOnDemandEmbeddings,
-                ref onDemandEmbeddingsUsed,
-                options.MaxOnDemandEmbeddings);
+            var candidateVector = GetCachedCandidateVector(provider, candidate.Text);
             if (candidateVector == null)
             {
                 continue;
@@ -363,12 +341,7 @@ internal sealed class SemanticLanguageMatcher
         return ResolveOverlaps(matches, preferLongerMatches: false);
     }
 
-    private float[]? GetCandidateVector(
-        ITheBasicsSemanticEmbeddingProvider provider,
-        string candidate,
-        bool allowOnDemandEmbedding,
-        ref int onDemandEmbeddingsUsed,
-        int maxOnDemandEmbeddings)
+    private float[]? GetCachedCandidateVector(ITheBasicsSemanticEmbeddingProvider provider, string candidate)
     {
         if (provider.TryGetCachedEmbedding(candidate, out var cachedVector))
         {
@@ -376,40 +349,6 @@ internal sealed class SemanticLanguageMatcher
         }
 
         _enqueueCandidatePrewarm(candidate);
-        if (!allowOnDemandEmbedding || onDemandEmbeddingsUsed >= maxOnDemandEmbeddings)
-        {
-            return null;
-        }
-
-        onDemandEmbeddingsUsed++;
-        return TryEmbedCandidateWithinBudget(provider, candidate);
-    }
-
-    private static float[]? TryEmbedCandidateWithinBudget(ITheBasicsSemanticEmbeddingProvider provider, string candidate)
-    {
-        using var timeout = new CancellationTokenSource(OnDemandEmbeddingTimeoutMs);
-        var task = provider.EmbedAsync(candidate, timeout.Token).AsTask();
-        try
-        {
-            if (task.Wait(OnDemandEmbeddingTimeoutMs))
-            {
-                return SemanticVectorMath.Normalize(task.Result);
-            }
-        }
-        catch (AggregateException ex)
-        {
-            if (ex.InnerExceptions.All(inner => inner is OperationCanceledException))
-            {
-                return null;
-            }
-
-            throw;
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
-        }
-
         return null;
     }
 
