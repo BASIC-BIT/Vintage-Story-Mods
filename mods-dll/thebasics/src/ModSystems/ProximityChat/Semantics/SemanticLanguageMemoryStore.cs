@@ -20,6 +20,9 @@ public class SemanticLanguageMemory
 
     [ProtoMember(2)]
     public List<SemanticLanguageAtlasBucketCoverage> AtlasBuckets { get; set; } = new List<SemanticLanguageAtlasBucketCoverage>();
+
+    [ProtoMember(3)]
+    public long LastLearningObservationUnixSeconds { get; set; }
 }
 
 [ProtoContract]

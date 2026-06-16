@@ -1290,6 +1290,8 @@ internal static class StagedCandidateClassifier
 
         if (tags.Contains("social-roleplay")) return "social-roleplay";
         if (tags.Contains("danger-help-logistics")) return "danger-help";
+        if (tags.Contains("everyday-conversation")) return "social-roleplay";
+        if (tags.Contains("everyday-survival-actions")) return "danger-help";
         if (tags.Contains("popular-mods-community")) return "community-mods";
         if (tags.Contains("base-temporal-lore")) return "temporal-lore";
         if (tags.Contains("base-creatures-lore")) return "hostile-creatures";

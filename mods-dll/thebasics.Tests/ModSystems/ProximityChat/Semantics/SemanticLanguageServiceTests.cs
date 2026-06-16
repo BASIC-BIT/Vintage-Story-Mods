@@ -310,6 +310,91 @@ public class SemanticLanguageServiceTests
     }
 
     [Fact]
+    public void ObserveMessageForRecipient_RespectsLearningObservationCooldown()
+    {
+        var language = CreateLanguage();
+        var player = CreatePlayer();
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        player.SetSemanticLanguageMemory(new SemanticLanguageMemoryStore
+        {
+            Languages = new List<SemanticLanguageMemory>
+            {
+                new SemanticLanguageMemory
+                {
+                    LanguageName = language.Name,
+                    LastLearningObservationUnixSeconds = now,
+                    AtlasBuckets = new List<SemanticLanguageAtlasBucketCoverage>
+                    {
+                        new SemanticLanguageAtlasBucketCoverage { BucketId = "temporal-gear", Confidence = 10, LastUpdatedUnixSeconds = now }
+                    }
+                }
+            }
+        });
+        var service = CreateService(new SemanticLanguageLearningConfig
+        {
+            MinimumSecondsBetweenLearningObservations = 60,
+            MinimumSecondsBetweenBucketLearning = 0,
+            LearningRatePercent = 100,
+            MaxBucketProgressPerMessage = 100
+        }, CreateApi(player), player);
+        service.RegisterProvider(CreateProvider());
+
+        service.ObserveMessageForRecipient(new MessageContext
+        {
+            ReceivingPlayer = player,
+            Message = "drifters",
+            Metadata = new Dictionary<string, object> { [MessageContext.LANGUAGE] = language },
+            Flags = new Dictionary<string, bool> { [MessageContext.IS_SPEECH] = true }
+        });
+
+        SpinWait.SpinUntil(() => service.QueuedObservationCount == 0, TimeSpan.FromSeconds(2)).Should().BeTrue();
+        var memory = player.GetSemanticLanguageMemory().Languages.Single();
+        memory.AtlasBuckets.Should().NotContain(bucket => bucket.BucketId == "drifters");
+    }
+
+    [Fact]
+    public void ObserveMessageForRecipient_RespectsBucketLearningCooldown()
+    {
+        var language = CreateLanguage();
+        var player = CreatePlayer();
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        player.SetSemanticLanguageMemory(new SemanticLanguageMemoryStore
+        {
+            Languages = new List<SemanticLanguageMemory>
+            {
+                new SemanticLanguageMemory
+                {
+                    LanguageName = language.Name,
+                    AtlasBuckets = new List<SemanticLanguageAtlasBucketCoverage>
+                    {
+                        new SemanticLanguageAtlasBucketCoverage { BucketId = "temporal-gear", Confidence = 10, LastUpdatedUnixSeconds = now }
+                    }
+                }
+            }
+        });
+        var service = CreateService(new SemanticLanguageLearningConfig
+        {
+            MinimumSecondsBetweenLearningObservations = 0,
+            MinimumSecondsBetweenBucketLearning = 60,
+            LearningRatePercent = 100,
+            MaxBucketProgressPerMessage = 100
+        }, CreateApi(player), player);
+        service.RegisterProvider(CreateProvider());
+
+        service.ObserveMessageForRecipient(new MessageContext
+        {
+            ReceivingPlayer = player,
+            Message = "temporal gear",
+            Metadata = new Dictionary<string, object> { [MessageContext.LANGUAGE] = language },
+            Flags = new Dictionary<string, bool> { [MessageContext.IS_SPEECH] = true }
+        });
+
+        SpinWait.SpinUntil(() => service.QueuedObservationCount == 0, TimeSpan.FromSeconds(2)).Should().BeTrue();
+        var bucket = player.GetSemanticLanguageMemory().Languages.Single().AtlasBuckets.Single(entry => entry.BucketId == "temporal-gear");
+        bucket.Confidence.Should().Be(10);
+    }
+
+    [Fact]
     public void SetAtlasBucketCoverage_PromotesWholeLanguageWhenEnoughBucketsAreLearned()
     {
         var language = CreateLanguage();

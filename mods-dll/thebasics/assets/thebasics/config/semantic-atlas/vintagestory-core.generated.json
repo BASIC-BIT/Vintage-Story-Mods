@@ -857,6 +857,103 @@
       ]
     },
     {
+      "id": "danger-help-supplies",
+      "label": "supplies",
+      "alias": "danger-help-supplies",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "generated-action",
+        "npc",
+        "trade",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival",
+        "danger",
+        "danger-help-logistics",
+        "manual-phrase",
+        "action",
+        "everyday"
+      ],
+      "examples": [
+        "supplies",
+        "help me carry the supplies",
+        "take the supplies and carry them inside",
+        "bring supplies to the Baker",
+        "bring supplies to the Blacksmith",
+        "bring supplies to the Farmer",
+        "bring supplies to the Herbalist"
+      ]
+    },
+    {
+      "id": "danger-help-camp",
+      "label": "camp",
+      "alias": "danger-help-camp",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival",
+        "action",
+        "danger",
+        "danger-help-logistics",
+        "everyday",
+        "everyday-survival-actions",
+        "generated-generic",
+        "manual-phrase"
+      ],
+      "examples": [
+        "camp",
+        "we are lost far from camp",
+        "tell the camp about Musician"
+      ]
+    },
+    {
+      "id": "danger-help-today",
+      "label": "today",
+      "alias": "danger-help-today",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "today",
+        "tomorrow"
+      ]
+    },
+    {
+      "id": "danger-help-east",
+      "label": "east",
+      "alias": "danger-help-east",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "asset-code",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival",
+        "worldproperty"
+      ],
+      "examples": [
+        "east",
+        "west"
+      ]
+    },
+    {
       "id": "danger-help-ambush",
       "label": "ambush",
       "alias": "danger-help-ambush",
@@ -874,6 +971,26 @@
       "examples": [
         "ambush",
         "flee from the ambush"
+      ]
+    },
+    {
+      "id": "danger-help-cold",
+      "label": "cold",
+      "alias": "danger-help-cold",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "cold",
+        "warm"
       ]
     },
     {
@@ -896,6 +1013,161 @@
       ]
     },
     {
+      "id": "danger-help-wound",
+      "label": "wound",
+      "alias": "danger-help-wound",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival",
+        "action",
+        "danger",
+        "danger-help-logistics",
+        "everyday",
+        "everyday-survival-actions"
+      ],
+      "examples": [
+        "wound",
+        "wounded"
+      ]
+    },
+    {
+      "id": "danger-help-bring",
+      "label": "bring",
+      "alias": "danger-help-bring",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "bring"
+      ]
+    },
+    {
+      "id": "danger-help-carry",
+      "label": "carry",
+      "alias": "danger-help-carry",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "carry"
+      ]
+    },
+    {
+      "id": "danger-help-come",
+      "label": "come",
+      "alias": "danger-help-come",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "come"
+      ]
+    },
+    {
+      "id": "danger-help-drink",
+      "label": "drink",
+      "alias": "danger-help-drink",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "drink"
+      ]
+    },
+    {
+      "id": "danger-help-far",
+      "label": "far",
+      "alias": "danger-help-far",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "far"
+      ]
+    },
+    {
+      "id": "danger-help-find",
+      "label": "find",
+      "alias": "danger-help-find",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "find"
+      ]
+    },
+    {
+      "id": "danger-help-fire",
+      "label": "fire",
+      "alias": "danger-help-fire",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "fire"
+      ]
+    },
+    {
       "id": "danger-help-flee",
       "label": "flee",
       "alias": "danger-help-flee",
@@ -911,6 +1183,25 @@
       ],
       "examples": [
         "flee"
+      ]
+    },
+    {
+      "id": "danger-help-go",
+      "label": "go",
+      "alias": "danger-help-go",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "go"
       ]
     },
     {
@@ -932,6 +1223,44 @@
       ]
     },
     {
+      "id": "danger-help-here",
+      "label": "here",
+      "alias": "danger-help-here",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "here"
+      ]
+    },
+    {
+      "id": "danger-help-hide",
+      "label": "hide",
+      "alias": "danger-help-hide",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "hide"
+      ]
+    },
+    {
       "id": "danger-help-home",
       "label": "home",
       "alias": "danger-help-home",
@@ -950,75 +1279,174 @@
       ]
     },
     {
-      "id": "danger-help-rescue",
-      "label": "rescue",
-      "alias": "danger-help-rescue",
+      "id": "danger-help-inside",
+      "label": "inside",
+      "alias": "danger-help-inside",
       "family": "danger-help",
       "tags": [
         "danger-help",
-        "danger",
-        "danger-help-logistics",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
         "manual",
         "manual-seed-review",
         "roleplay",
         "survival"
       ],
       "examples": [
-        "rescue"
+        "inside"
       ]
     },
     {
-      "id": "danger-help-road",
-      "label": "road",
-      "alias": "danger-help-road",
+      "id": "danger-help-later",
+      "label": "later",
+      "alias": "danger-help-later",
       "family": "danger-help",
       "tags": [
         "danger-help",
-        "danger",
-        "danger-help-logistics",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
         "manual",
         "manual-seed-review",
         "roleplay",
         "survival"
       ],
       "examples": [
-        "road"
+        "later"
       ]
     },
     {
-      "id": "danger-help-shelter",
-      "label": "shelter",
-      "alias": "danger-help-shelter",
+      "id": "danger-help-listen",
+      "label": "listen",
+      "alias": "danger-help-listen",
       "family": "danger-help",
       "tags": [
         "danger-help",
-        "danger",
-        "danger-help-logistics",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
         "manual",
         "manual-seed-review",
         "roleplay",
         "survival"
       ],
       "examples": [
-        "shelter"
+        "listen"
       ]
     },
     {
-      "id": "danger-help-wounded",
-      "label": "wounded",
-      "alias": "danger-help-wounded",
+      "id": "danger-help-look",
+      "label": "look",
+      "alias": "danger-help-look",
       "family": "danger-help",
       "tags": [
         "danger-help",
-        "danger",
-        "danger-help-logistics",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
         "manual",
         "manual-seed-review",
         "roleplay",
         "survival"
       ],
       "examples": [
-        "wounded"
+        "look"
+      ]
+    },
+    {
+      "id": "danger-help-lost",
+      "label": "lost",
+      "alias": "danger-help-lost",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "lost"
+      ]
+    },
+    {
+      "id": "danger-help-medicine",
+      "label": "medicine",
+      "alias": "danger-help-medicine",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "medicine"
+      ]
+    },
+    {
+      "id": "danger-help-morning",
+      "label": "morning",
+      "alias": "danger-help-morning",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "morning"
+      ]
+    },
+    {
+      "id": "danger-help-near",
+      "label": "near",
+      "alias": "danger-help-near",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "near"
+      ]
+    },
+    {
+      "id": "danger-help-need",
+      "label": "need",
+      "alias": "danger-help-need",
+      "family": "danger-help",
+      "tags": [
+        "danger-help",
+        "action",
+        "everyday",
+        "everyday-survival-actions",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "survival"
+      ],
+      "examples": [
+        "need"
       ]
     },
     {
@@ -1040,6 +1468,45 @@
       ]
     },
     {
+      "id": "social-roleplay-no",
+      "label": "no",
+      "alias": "social-roleplay-no",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay",
+        "dialogue"
+      ],
+      "examples": [
+        "no",
+        "yes"
+      ]
+    },
+    {
+      "id": "social-roleplay-answer",
+      "label": "answer",
+      "alias": "social-roleplay-answer",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "answer",
+        "question"
+      ]
+    },
+    {
       "id": "social-roleplay-bargain",
       "label": "bargain",
       "alias": "social-roleplay-bargain",
@@ -1055,6 +1522,43 @@
       "examples": [
         "bargain",
         "we can make a bargain"
+      ]
+    },
+    {
+      "id": "social-roleplay-lie",
+      "label": "lie",
+      "alias": "social-roleplay-lie",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "lie",
+        "truth"
+      ]
+    },
+    {
+      "id": "social-roleplay-angry",
+      "label": "angry",
+      "alias": "social-roleplay-angry",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "angry"
       ]
     },
     {
@@ -1090,12 +1594,33 @@
       ]
     },
     {
+      "id": "social-roleplay-fear",
+      "label": "fear",
+      "alias": "social-roleplay-fear",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "fear"
+      ]
+    },
+    {
       "id": "social-roleplay-friend",
       "label": "friend",
       "alias": "social-roleplay-friend",
       "family": "social-roleplay",
       "tags": [
         "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
         "manual",
         "manual-seed-review",
         "roleplay",
@@ -1103,6 +1628,60 @@
       ],
       "examples": [
         "friend"
+      ]
+    },
+    {
+      "id": "social-roleplay-goodbye",
+      "label": "goodbye",
+      "alias": "social-roleplay-goodbye",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "goodbye"
+      ]
+    },
+    {
+      "id": "social-roleplay-happy",
+      "label": "happy",
+      "alias": "social-roleplay-happy",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "happy"
+      ]
+    },
+    {
+      "id": "social-roleplay-hello",
+      "label": "hello",
+      "alias": "social-roleplay-hello",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "hello"
       ]
     },
     {
@@ -1122,6 +1701,24 @@
       ]
     },
     {
+      "id": "social-roleplay-maybe",
+      "label": "maybe",
+      "alias": "social-roleplay-maybe",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "maybe"
+      ]
+    },
+    {
       "id": "social-roleplay-mercy",
       "label": "mercy",
       "alias": "social-roleplay-mercy",
@@ -1138,12 +1735,87 @@
       ]
     },
     {
+      "id": "social-roleplay-name",
+      "label": "name",
+      "alias": "social-roleplay-name",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "name"
+      ]
+    },
+    {
+      "id": "social-roleplay-people",
+      "label": "people",
+      "alias": "social-roleplay-people",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "people"
+      ]
+    },
+    {
+      "id": "social-roleplay-person",
+      "label": "person",
+      "alias": "social-roleplay-person",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "person"
+      ]
+    },
+    {
+      "id": "social-roleplay-please",
+      "label": "please",
+      "alias": "social-roleplay-please",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "please"
+      ]
+    },
+    {
       "id": "social-roleplay-promise",
       "label": "promise",
       "alias": "social-roleplay-promise",
       "family": "social-roleplay",
       "tags": [
         "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
         "manual",
         "manual-seed-review",
         "roleplay",
@@ -1154,19 +1826,93 @@
       ]
     },
     {
-      "id": "social-roleplay-stranger",
-      "label": "stranger",
-      "alias": "social-roleplay-stranger",
+      "id": "social-roleplay-sad",
+      "label": "sad",
+      "alias": "social-roleplay-sad",
       "family": "social-roleplay",
       "tags": [
         "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
         "manual",
         "manual-seed-review",
-        "roleplay",
-        "social"
+        "roleplay"
       ],
       "examples": [
-        "stranger"
+        "sad"
+      ]
+    },
+    {
+      "id": "social-roleplay-sorry",
+      "label": "sorry",
+      "alias": "social-roleplay-sorry",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "sorry"
+      ]
+    },
+    {
+      "id": "social-roleplay-story",
+      "label": "story",
+      "alias": "social-roleplay-story",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "story"
+      ]
+    },
+    {
+      "id": "social-roleplay-thanks",
+      "label": "thanks",
+      "alias": "social-roleplay-thanks",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "thanks"
+      ]
+    },
+    {
+      "id": "social-roleplay-threat",
+      "label": "threat",
+      "alias": "social-roleplay-threat",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "threat"
       ]
     },
     {
@@ -1186,6 +1932,24 @@
       ]
     },
     {
+      "id": "social-roleplay-trust",
+      "label": "trust",
+      "alias": "social-roleplay-trust",
+      "family": "social-roleplay",
+      "tags": [
+        "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
+        "manual",
+        "manual-seed-review",
+        "roleplay"
+      ],
+      "examples": [
+        "trust"
+      ]
+    },
+    {
       "id": "social-roleplay-warning",
       "label": "warning",
       "alias": "social-roleplay-warning",
@@ -1202,21 +1966,24 @@
       ]
     },
     {
-      "id": "social-roleplay-debt",
-      "label": "debt",
-      "alias": "social-roleplay-debt",
+      "id": "social-roleplay-stranger",
+      "label": "stranger",
+      "alias": "social-roleplay-stranger",
       "family": "social-roleplay",
       "tags": [
         "social-roleplay",
+        "conversation",
+        "everyday",
+        "everyday-conversation",
         "manual",
         "manual-seed-review",
         "roleplay",
-        "social",
-        "manual-phrase"
+        "manual-phrase",
+        "social"
       ],
       "examples": [
-        "debt",
-        "I owe you a debt"
+        "stranger",
+        "hello stranger what is your name"
       ]
     },
     {
@@ -3408,27 +4175,6 @@
       ]
     },
     {
-      "id": "metals-platinum-block",
-      "label": "Platinum block",
-      "alias": "metals-platinum-block",
-      "family": "metals",
-      "tags": [
-        "metals",
-        "block",
-        "item",
-        "generated-action",
-        "metalworking"
-      ],
-      "examples": [
-        "Platinum block",
-        "repair tools with Platinum",
-        "Platinum block (riveted)",
-        "Platinum chain",
-        "Platinum plate",
-        "Platinum scales"
-      ]
-    },
-    {
       "id": "metals-gold-bits",
       "label": "Gold bits",
       "alias": "metals-gold-bits",
@@ -3939,6 +4685,19 @@
       ],
       "examples": [
         "Metal windmill rotor"
+      ]
+    },
+    {
+      "id": "metals-meteoric-stone-in-snowball",
+      "label": "Meteoric Stone in snowball",
+      "alias": "metals-meteoric-stone-in-snowball",
+      "family": "metals",
+      "tags": [
+        "metals",
+        "item"
+      ],
+      "examples": [
+        "Meteoric Stone in snowball"
       ]
     },
     {
@@ -4603,12 +5362,12 @@
       "examples": [
         "Innkeeper",
         "ask the Innkeeper for help",
-        "bring supplies to the Innkeeper",
         "find the Innkeeper near the market",
         "talk to the Innkeeper",
         "trade with the Innkeeper",
         "ask for Innkeeper",
-        "tell the camp about Innkeeper"
+        "tell the camp about Innkeeper",
+        "Foot Innkeeper"
       ]
     },
     {
@@ -4629,12 +5388,12 @@
       "examples": [
         "Blacksmith",
         "ask the Blacksmith for help",
-        "bring supplies to the Blacksmith",
         "find the Blacksmith near the market",
         "talk to the Blacksmith",
         "trade with the Blacksmith",
         "ask for Blacksmith",
-        "tell the camp about Blacksmith"
+        "tell the camp about Blacksmith",
+        "Foot Blacksmith"
       ]
     },
     {
@@ -4748,21 +5507,6 @@
         "Cheese Blue 1Slice",
         "Cheese Blue 4Slice",
         "Cheese Cheddar 1Slice"
-      ]
-    },
-    {
-      "id": "npc-social-claytile-fired-center-red",
-      "label": "Claytile Fired Center Red",
-      "alias": "npc-social-claytile-fired-center-red",
-      "family": "npc-social",
-      "tags": [
-        "npc-social",
-        "asset-code",
-        "trade"
-      ],
-      "examples": [
-        "Claytile Fired Center Red",
-        "Claytile Fired Circle Red"
       ]
     },
     {
@@ -4923,90 +5667,6 @@
       ]
     },
     {
-      "id": "npc-social-cheese-waxedcheddar-4slice",
-      "label": "Cheese Waxedcheddar 4Slice",
-      "alias": "npc-social-cheese-waxedcheddar-4slice",
-      "family": "npc-social",
-      "tags": [
-        "npc-social",
-        "asset-code",
-        "trade"
-      ],
-      "examples": [
-        "Cheese Waxedcheddar 4Slice"
-      ]
-    },
-    {
-      "id": "npc-social-chest-east",
-      "label": "Chest East",
-      "alias": "npc-social-chest-east",
-      "family": "npc-social",
-      "tags": [
-        "npc-social",
-        "asset-code",
-        "trade"
-      ],
-      "examples": [
-        "Chest East"
-      ]
-    },
-    {
-      "id": "npc-social-ciderportion-cherry",
-      "label": "Ciderportion Cherry",
-      "alias": "npc-social-ciderportion-cherry",
-      "family": "npc-social",
-      "tags": [
-        "npc-social",
-        "asset-code",
-        "trade"
-      ],
-      "examples": [
-        "Ciderportion Cherry"
-      ]
-    },
-    {
-      "id": "npc-social-ciderportion-rye",
-      "label": "Ciderportion Rye",
-      "alias": "npc-social-ciderportion-rye",
-      "family": "npc-social",
-      "tags": [
-        "npc-social",
-        "asset-code",
-        "trade"
-      ],
-      "examples": [
-        "Ciderportion Rye"
-      ]
-    },
-    {
-      "id": "npc-social-clay-blue",
-      "label": "Clay Blue",
-      "alias": "npc-social-clay-blue",
-      "family": "npc-social",
-      "tags": [
-        "npc-social",
-        "asset-code",
-        "trade"
-      ],
-      "examples": [
-        "Clay Blue"
-      ]
-    },
-    {
-      "id": "npc-social-clay-fire",
-      "label": "Clay Fire",
-      "alias": "npc-social-clay-fire",
-      "family": "npc-social",
-      "tags": [
-        "npc-social",
-        "asset-code",
-        "trade"
-      ],
-      "examples": [
-        "Clay Fire"
-      ]
-    },
-    {
       "id": "npc-social-cordovan",
       "label": "Cordovan",
       "alias": "npc-social-cordovan",
@@ -5018,20 +5678,6 @@
       ],
       "examples": [
         "Cordovan"
-      ]
-    },
-    {
-      "id": "npc-social-crate",
-      "label": "Crate",
-      "alias": "npc-social-crate",
-      "family": "npc-social",
-      "tags": [
-        "npc-social",
-        "asset-code",
-        "trade"
-      ],
-      "examples": [
-        "Crate"
       ]
     },
     {
@@ -5130,6 +5776,119 @@
       ],
       "examples": [
         "Oldburgundy"
+      ]
+    },
+    {
+      "id": "npc-social-palatinatepurple",
+      "label": "Palatinatepurple",
+      "alias": "npc-social-palatinatepurple",
+      "family": "npc-social",
+      "tags": [
+        "npc-social",
+        "asset-code",
+        "entity"
+      ],
+      "examples": [
+        "Palatinatepurple"
+      ]
+    },
+    {
+      "id": "npc-social-rosewood",
+      "label": "Rosewood",
+      "alias": "npc-social-rosewood",
+      "family": "npc-social",
+      "tags": [
+        "npc-social",
+        "asset-code",
+        "entity"
+      ],
+      "examples": [
+        "Rosewood"
+      ]
+    },
+    {
+      "id": "npc-social-russet",
+      "label": "Russet",
+      "alias": "npc-social-russet",
+      "family": "npc-social",
+      "tags": [
+        "npc-social",
+        "asset-code",
+        "entity"
+      ],
+      "examples": [
+        "Russet"
+      ]
+    },
+    {
+      "id": "npc-social-sanddune",
+      "label": "Sanddune",
+      "alias": "npc-social-sanddune",
+      "family": "npc-social",
+      "tags": [
+        "npc-social",
+        "asset-code",
+        "entity"
+      ],
+      "examples": [
+        "Sanddune"
+      ]
+    },
+    {
+      "id": "npc-social-slategray",
+      "label": "Slategray",
+      "alias": "npc-social-slategray",
+      "family": "npc-social",
+      "tags": [
+        "npc-social",
+        "asset-code",
+        "entity"
+      ],
+      "examples": [
+        "Slategray"
+      ]
+    },
+    {
+      "id": "npc-social-wheat",
+      "label": "Wheat",
+      "alias": "npc-social-wheat",
+      "family": "npc-social",
+      "tags": [
+        "npc-social",
+        "asset-code",
+        "entity"
+      ],
+      "examples": [
+        "Wheat"
+      ]
+    },
+    {
+      "id": "npc-social-wintergreendream",
+      "label": "Wintergreendream",
+      "alias": "npc-social-wintergreendream",
+      "family": "npc-social",
+      "tags": [
+        "npc-social",
+        "asset-code",
+        "entity"
+      ],
+      "examples": [
+        "Wintergreendream"
+      ]
+    },
+    {
+      "id": "npc-social-bomb-ore",
+      "label": "Bomb Ore",
+      "alias": "npc-social-bomb-ore",
+      "family": "npc-social",
+      "tags": [
+        "npc-social",
+        "asset-code",
+        "trade"
+      ],
+      "examples": [
+        "Bomb Ore",
+        "Ore Sulfur"
       ]
     },
     {
@@ -5540,23 +6299,6 @@
         "Dead red brocket deer (male)",
         "Dead red brocket deer fawn (female)",
         "Dead red brocket deer fawn (male)"
-      ]
-    },
-    {
-      "id": "building-materials-cream-ceramic-bowl",
-      "label": "Cream ceramic bowl",
-      "alias": "building-materials-cream-ceramic-bowl",
-      "family": "building-materials",
-      "tags": [
-        "building-materials",
-        "block"
-      ],
-      "examples": [
-        "Cream ceramic bowl",
-        "Cream ceramic cooking pot",
-        "Cream ceramic crock",
-        "Cream ceramic crucible",
-        "Cream ceramic flowerpot"
       ]
     },
     {
@@ -7644,23 +8386,6 @@
       ]
     },
     {
-      "id": "blocks-dry-farmland-high-fertility",
-      "label": "Dry Farmland (High Fertility)",
-      "alias": "blocks-dry-farmland-high-fertility",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Dry Farmland (High Fertility)",
-        "Dry Farmland (Low Fertility)",
-        "Dry Farmland (Medium Fertility)",
-        "Dry Farmland (Terra preta)",
-        "High fertility soil"
-      ]
-    },
-    {
       "id": "blocks-blue-glass",
       "label": "Blue glass",
       "alias": "blocks-blue-glass",
@@ -7675,6 +8400,23 @@
         "Brown glass",
         "Brown glass slab",
         "Glass"
+      ]
+    },
+    {
+      "id": "blocks-barren-soil",
+      "label": "Barren soil",
+      "alias": "blocks-barren-soil",
+      "family": "blocks",
+      "tags": [
+        "blocks",
+        "block"
+      ],
+      "examples": [
+        "Barren soil",
+        "Barren soil (Grassy)",
+        "Barren soil (Patches of grass)",
+        "Barren soil (Sparse grass)",
+        "Dry Farmland (Barren)"
       ]
     },
     {
@@ -7814,23 +8556,6 @@
       ]
     },
     {
-      "id": "blocks-dry-gravel-overlay-1",
-      "label": "Dry gravel overlay 1",
-      "alias": "blocks-dry-gravel-overlay-1",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Dry gravel overlay 1",
-        "Dry gravel overlay 2",
-        "Dry gravel overlay 3",
-        "Dry gravel overlay 4",
-        "Wet gravel overlay 1"
-      ]
-    },
-    {
       "id": "blocks-birch-ladder",
       "label": "Birch ladder",
       "alias": "blocks-birch-ladder",
@@ -7879,23 +8604,6 @@
         "Bamboo leaves",
         "Brown bamboo sapling",
         "Brown bamboo segment"
-      ]
-    },
-    {
-      "id": "blocks-dry-dirty-gravel-cracked",
-      "label": "Dry dirty gravel (Cracked)",
-      "alias": "blocks-dry-dirty-gravel-cracked",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Dry dirty gravel (Cracked)",
-        "Dry dirty gravel (Plain)",
-        "Muddy gravel",
-        "Sludgy gravel",
-        "Wet dirty gravel (Cracked)"
       ]
     },
     {
@@ -7964,142 +8672,6 @@
         "Gray wallpaper",
         "Green wallpaper",
         "Light green wallpaper"
-      ]
-    },
-    {
-      "id": "blocks-anemone-blue",
-      "label": "Anemone (blue)",
-      "alias": "blocks-anemone-blue",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Anemone (blue)",
-        "Anemone (green)",
-        "Anemone (red)",
-        "Anemone (yellow)",
-        "Spotted anemone"
-      ]
-    },
-    {
-      "id": "blocks-aged-wooden-bed",
-      "label": "Aged wooden bed",
-      "alias": "blocks-aged-wooden-bed",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Aged wooden bed",
-        "Aged wooden chair",
-        "Aged wooden chest",
-        "Aged wooden ladder",
-        "Aged wooden path"
-      ]
-    },
-    {
-      "id": "blocks-bald-cypress-branchy-leaves",
-      "label": "Bald cypress branchy leaves",
-      "alias": "blocks-bald-cypress-branchy-leaves",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Bald cypress branchy leaves",
-        "Bald cypress leaves",
-        "Bald cypress path",
-        "Bald cypress sapling",
-        "Mediterranean cypress branchy leaves"
-      ]
-    },
-    {
-      "id": "blocks-chest",
-      "label": "Chest",
-      "alias": "blocks-chest",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Chest",
-        "Collapsed chest",
-        "Damaged chest",
-        "Heavily collapsed chest",
-        "Labeled chest"
-      ]
-    },
-    {
-      "id": "blocks-barren-soil",
-      "label": "Barren soil",
-      "alias": "blocks-barren-soil",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Barren soil",
-        "Barren soil (Grassy)",
-        "Barren soil (Patches of grass)",
-        "Barren soil (Sparse grass)",
-        "Dry Farmland (Barren)"
-      ]
-    },
-    {
-      "id": "blocks-blue-torch",
-      "label": "Blue torch",
-      "alias": "blocks-blue-torch",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Blue torch",
-        "Green torch",
-        "Orange torch",
-        "Pink torch",
-        "Red torch"
-      ]
-    },
-    {
-      "id": "blocks-crimson-maple-branchy-leaves",
-      "label": "Crimson maple branchy leaves",
-      "alias": "blocks-crimson-maple-branchy-leaves",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Crimson maple branchy leaves",
-        "Crimson maple leaves",
-        "Crimson maple sapling",
-        "Maple branchy leaves",
-        "Maple leaves"
-      ]
-    },
-    {
-      "id": "blocks-blueberry-bush-empty",
-      "label": "Blueberry bush (Empty)",
-      "alias": "blocks-blueberry-bush-empty",
-      "family": "blocks",
-      "tags": [
-        "blocks",
-        "block"
-      ],
-      "examples": [
-        "Blueberry bush (Empty)",
-        "Blueberry bush (Flowering)",
-        "Blueberry bush (Ripe)",
-        "Cranberry bush (Empty)",
-        "Cranberry bush (Flowering)"
       ]
     },
     {
@@ -8605,23 +9177,6 @@
         "Clothes Waist Messenger Belt",
         "Clothes Waist Moss Embroidered Belt",
         "Clothes Waist Noble Sash"
-      ]
-    },
-    {
-      "id": "clothing-black-and-yellow-hose",
-      "label": "Black and yellow hose",
-      "alias": "clothing-black-and-yellow-hose",
-      "family": "clothing",
-      "tags": [
-        "clothing",
-        "item"
-      ],
-      "examples": [
-        "Black and yellow hose",
-        "Blue and orange hose",
-        "Gray and brown hose",
-        "Orange and white hose",
-        "Pink and blue hose"
       ]
     }
   ]

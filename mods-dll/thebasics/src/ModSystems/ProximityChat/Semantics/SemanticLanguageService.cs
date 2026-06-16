@@ -4,7 +4,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using thebasics.Configs;
@@ -23,7 +22,6 @@ public sealed class SemanticLanguageService : IDisposable
     private const int MaxQueuedCandidatePrewarms = 512;
     private const int AtlasPhraseEmbeddingTimeoutMs = 1500;
     private const int OnDemandEmbeddingTimeoutMs = 45;
-    private static readonly Regex WordRegex = new Regex(@"\w+", RegexOptions.Compiled);
 
     private readonly LanguageSystem _languageSystem;
     private readonly ICoreServerAPI _api;
@@ -194,14 +192,14 @@ public sealed class SemanticLanguageService : IDisposable
             return false;
         }
 
-        var memory = FindLanguageMemory(player.GetSemanticLanguageMemory(), language.Name);
+        var memory = SemanticLanguageMemoryOperations.FindLanguageMemory(player.GetSemanticLanguageMemory(), language.Name);
         if (memory?.AtlasBuckets == null || memory.AtlasBuckets.Count == 0)
         {
             return false;
         }
 
-        bucketConfidence = GetBucketConfidence(memory);
-        tokens = TokenizeWithOriginalWordCount(message, out originalWordCount);
+        bucketConfidence = SemanticLanguageMemoryOperations.GetBucketConfidence(memory);
+        tokens = SemanticTextCandidateBuilder.TokenizeWithOriginalWordCount(message, out originalWordCount);
         return bucketConfidence.Count > 0 && tokens.Count > 0;
     }
 
@@ -241,9 +239,9 @@ public sealed class SemanticLanguageService : IDisposable
         var languageName = language?.Name ?? string.Empty;
         var memory = player == null || language == null
             ? null
-            : FindLanguageMemory(player.GetSemanticLanguageMemory(), language.Name);
+            : SemanticLanguageMemoryOperations.FindLanguageMemory(player.GetSemanticLanguageMemory(), language.Name);
 
-        return BuildProgress(languageName, memory, ProviderStatus, _atlas);
+        return SemanticLanguageProgressBuilder.Build(languageName, memory, ProviderStatus, _atlas);
     }
 
     public bool TrySetAtlasBucketCoverage(IServerPlayer player, Language language, string bucketIdentifier, int confidence, out SemanticLanguageAtlasBucket? bucket, out string errorCode)
@@ -269,8 +267,8 @@ public sealed class SemanticLanguageService : IDisposable
         }
 
         var store = player.GetSemanticLanguageMemory();
-        var memory = FindOrCreateLanguageMemory(store, language.Name);
-        SetBucketConfidence(memory, resolvedBucket.Id, confidence, DateTimeOffset.UtcNow.ToUnixTimeSeconds(), promoteToLearned: true, out _);
+        var memory = SemanticLanguageMemoryOperations.FindOrCreateLanguageMemory(store, language.Name);
+        SemanticLanguageMemoryOperations.SetBucketConfidence(memory, resolvedBucket.Id, confidence, DateTimeOffset.UtcNow.ToUnixTimeSeconds(), promoteToLearned: true, learnedThresholdPercent: _config.LearnedThresholdPercent, out _);
         player.SetSemanticLanguageMemory(store);
         TryPromoteWholeLanguage(player, language, memory, notify: false);
         bucket = resolvedBucket;
@@ -281,59 +279,6 @@ public sealed class SemanticLanguageService : IDisposable
     {
         _disposeCts.Cancel();
         _disposeCts.Dispose();
-    }
-
-    private static SemanticLanguageProgress BuildProgress(string languageName, SemanticLanguageMemory? memory, string providerStatus, SemanticLanguageAtlasCatalog atlas)
-    {
-        var progress = new SemanticLanguageProgress
-        {
-            LanguageName = languageName,
-            ProviderStatus = providerStatus,
-            AtlasBucketCount = atlas?.Buckets.Count ?? 0
-        };
-
-        if (memory == null)
-        {
-            return progress;
-        }
-
-        AddAtlasProgress(progress, memory, atlas);
-        return progress;
-    }
-
-    private static void AddAtlasProgress(SemanticLanguageProgress progress, SemanticLanguageMemory memory, SemanticLanguageAtlasCatalog? atlas)
-    {
-        if (atlas == null || !atlas.HasBuckets || memory.AtlasBuckets == null)
-        {
-            return;
-        }
-
-        var coverage = memory.AtlasBuckets
-            .Select(entry => new
-            {
-                Entry = entry,
-                Bucket = atlas.FindBucket(entry.BucketId)
-            })
-            .Where(entry => entry.Bucket != null && entry.Entry.Confidence > 0)
-            .OrderByDescending(entry => ClampPercent(entry.Entry.Confidence))
-            .ThenBy(entry => entry.Bucket!.Label, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        progress.AtlasCoveredBucketCount = coverage.Count;
-        progress.AtlasLearnedBucketCount = coverage.Count(entry => IsLearned(entry.Entry));
-        progress.AtlasCoveragePercent = atlas.Buckets.Count == 0
-            ? 0
-            : ClampPercent((int)Math.Round(coverage.Sum(entry => ClampPercent(entry.Entry.Confidence)) / (double)atlas.Buckets.Count));
-        progress.LearnedAtlasBuckets = coverage
-            .Where(entry => IsLearned(entry.Entry))
-            .Take(8)
-            .Select(entry => entry.Bucket!.DisplayName)
-            .ToArray();
-        progress.InProgressAtlasBuckets = coverage
-            .Where(entry => !IsLearned(entry.Entry))
-            .Take(8)
-            .Select(entry => $"{entry.Bucket!.DisplayName} ({ClampPercent(entry.Entry.Confidence)}%)")
-            .ToArray();
     }
 
     private void RebuildAtlasIndex(ITheBasicsSemanticEmbeddingProvider provider)
@@ -391,7 +336,7 @@ public sealed class SemanticLanguageService : IDisposable
         try
         {
             using var timeout = new CancellationTokenSource(AtlasPhraseEmbeddingTimeoutMs);
-            return NormalizeVector(provider.EmbedAsync(phrase, timeout.Token).AsTask().GetAwaiter().GetResult());
+            return SemanticVectorMath.Normalize(provider.EmbedAsync(phrase, timeout.Token).AsTask().GetAwaiter().GetResult());
         }
         catch (Exception ex) when (ex is OperationCanceledException || ex is InvalidOperationException)
         {
@@ -412,7 +357,7 @@ public sealed class SemanticLanguageService : IDisposable
 
         phrases.AddRange((bucket.Examples ?? new List<string>()).Take(_config.MaxAtlasExamplesPerBucket));
         return phrases
-            .Select(NormalizeText)
+            .Select(SemanticTextCandidateBuilder.NormalizeText)
             .Where(phrase => !string.IsNullOrWhiteSpace(phrase))
             .Distinct(StringComparer.OrdinalIgnoreCase);
     }
@@ -442,7 +387,7 @@ public sealed class SemanticLanguageService : IDisposable
 
     private static void AddHintTokens(ISet<string> hints, string text)
     {
-        foreach (var token in Tokenize(text))
+        foreach (var token in SemanticTextCandidateBuilder.Tokenize(text))
         {
             hints.Add(token.Text.ToLowerInvariant());
         }
@@ -467,7 +412,7 @@ public sealed class SemanticLanguageService : IDisposable
 
     private void EnqueueCandidatePrewarm(string candidate)
     {
-        var normalized = NormalizeText(candidate);
+        var normalized = SemanticTextCandidateBuilder.NormalizeText(candidate);
         if (string.IsNullOrWhiteSpace(normalized) || !_queuedCandidatePrewarms.TryAdd(normalized, 0))
         {
             return;
@@ -601,7 +546,7 @@ public sealed class SemanticLanguageService : IDisposable
         SemanticLanguageObservation observation,
         CancellationToken cancellationToken)
     {
-        var tokens = Tokenize(observation.Message).ToList();
+        var tokens = SemanticTextCandidateBuilder.Tokenize(observation.Message).ToList();
         if (tokens.Count == 0)
         {
             return new List<SemanticSpanEmbedding>();
@@ -665,7 +610,7 @@ public sealed class SemanticLanguageService : IDisposable
         CancellationToken cancellationToken)
     {
         var embeddings = new List<SemanticSpanEmbedding>();
-        foreach (var candidate in BuildCandidateSpans(
+        foreach (var candidate in SemanticTextCandidateBuilder.BuildCandidateSpans(
             tokens,
             _config.MaxSpanWords,
             maxSpans,
@@ -675,7 +620,7 @@ public sealed class SemanticLanguageService : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             var vector = await provider.EmbedAsync(candidate.Text, cancellationToken).ConfigureAwait(false);
-            vector = NormalizeVector(vector);
+            vector = SemanticVectorMath.Normalize(vector);
             if (vector != null)
             {
                 embeddings.Add(new SemanticSpanEmbedding(candidate, vector));
@@ -705,24 +650,50 @@ public sealed class SemanticLanguageService : IDisposable
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var store = player.GetSemanticLanguageMemory();
-        var memory = FindOrCreateLanguageMemory(store, language.Name);
-        var learnedBuckets = ApplyBucketLearning(memory, matches, now);
+        var memory = SemanticLanguageMemoryOperations.FindOrCreateLanguageMemory(store, language.Name);
+        if (IsLearningObservationOnCooldown(memory, now))
+        {
+            return;
+        }
+
+        var learnedBuckets = ApplyBucketLearning(memory, matches, now, out var updatedAnyBucket);
+        if (!updatedAnyBucket)
+        {
+            return;
+        }
+
+        memory.LastLearningObservationUnixSeconds = now;
         player.SetSemanticLanguageMemory(store);
         NotifyLearnedBuckets(player, language, learnedBuckets);
         TryPromoteWholeLanguage(player, language, memory, notify: true);
     }
 
-    private List<SemanticLanguageAtlasBucket> ApplyBucketLearning(SemanticLanguageMemory memory, IEnumerable<SemanticBucketSpanMatch> matches, long now)
+    private bool IsLearningObservationOnCooldown(SemanticLanguageMemory memory, long now)
+    {
+        return _config.MinimumSecondsBetweenLearningObservations > 0 &&
+            memory.LastLearningObservationUnixSeconds > 0 &&
+            now - memory.LastLearningObservationUnixSeconds < _config.MinimumSecondsBetweenLearningObservations;
+    }
+
+    private List<SemanticLanguageAtlasBucket> ApplyBucketLearning(SemanticLanguageMemory memory, IEnumerable<SemanticBucketSpanMatch> matches, long now, out bool updatedAnyBucket)
     {
         var learnedBuckets = new List<SemanticLanguageAtlasBucket>();
+        updatedAnyBucket = false;
         foreach (var match in matches
             .GroupBy(match => match.BucketId, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(match => match.Similarity).First()))
         {
+            var existing = SemanticLanguageMemoryOperations.FindBucketCoverage(memory, match.BucketId);
+            if (IsBucketLearningOnCooldown(existing, now))
+            {
+                continue;
+            }
+
             var gain = CalculateLearningGain(match.Similarity);
-            var current = FindBucketCoverage(memory, match.BucketId)?.Confidence ?? 0;
+            var current = existing?.Confidence ?? 0;
             var target = Math.Min(100, current + gain);
-            SetBucketConfidence(memory, match.BucketId, target, now, promoteToLearned: true, out var learnedNow);
+            SemanticLanguageMemoryOperations.SetBucketConfidence(memory, match.BucketId, target, now, promoteToLearned: true, learnedThresholdPercent: _config.LearnedThresholdPercent, out var learnedNow);
+            updatedAnyBucket = true;
             if (learnedNow)
             {
                 var bucket = _atlas.FindBucket(match.BucketId);
@@ -734,6 +705,13 @@ public sealed class SemanticLanguageService : IDisposable
         }
 
         return learnedBuckets;
+    }
+
+    private bool IsBucketLearningOnCooldown(SemanticLanguageAtlasBucketCoverage? existing, long now)
+    {
+        return _config.MinimumSecondsBetweenBucketLearning > 0 &&
+            existing?.LastUpdatedUnixSeconds > 0 &&
+            now - existing.LastUpdatedUnixSeconds < _config.MinimumSecondsBetweenBucketLearning;
     }
 
     private int CalculateLearningGain(float similarity)
@@ -804,7 +782,7 @@ public sealed class SemanticLanguageService : IDisposable
     private int CountLearnedAtlasBuckets(SemanticLanguageMemory memory)
     {
         return (memory.AtlasBuckets ?? new List<SemanticLanguageAtlasBucketCoverage>())
-            .Where(IsLearned)
+            .Where(SemanticLanguageMemoryOperations.IsLearned)
             .Select(bucket => bucket.BucketId)
             .Where(bucketId => _atlas.FindBucket(bucketId) != null)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -915,7 +893,7 @@ public sealed class SemanticLanguageService : IDisposable
             : new HashSet<string>(allowedBucketIds, StringComparer.OrdinalIgnoreCase);
         var routed = new List<SemanticBucketSpanMatch>();
         var onDemandEmbeddingsUsed = 0;
-        foreach (var chunk in BuildTokenChunks(tokens, _config.MaxChunkWords, _config.ChunkOverlapWords, priorityTokens))
+        foreach (var chunk in SemanticTextCandidateBuilder.BuildTokenChunks(tokens, _config.MaxChunkWords, _config.ChunkOverlapWords, priorityTokens))
         {
             var chunkVector = GetCandidateVector(
                 provider,
@@ -954,7 +932,7 @@ public sealed class SemanticLanguageService : IDisposable
             : new HashSet<string>(allowedBucketIds, StringComparer.OrdinalIgnoreCase);
         var routed = new List<SemanticBucketSpanMatch>();
         var embeddingsUsed = 0;
-        foreach (var chunk in BuildTokenChunks(tokens, _config.MaxChunkWords, _config.ChunkOverlapWords, priorityTokens))
+        foreach (var chunk in SemanticTextCandidateBuilder.BuildTokenChunks(tokens, _config.MaxChunkWords, _config.ChunkOverlapWords, priorityTokens))
         {
             if (embeddingsUsed >= maxEmbeddings)
             {
@@ -963,7 +941,7 @@ public sealed class SemanticLanguageService : IDisposable
 
             cancellationToken.ThrowIfCancellationRequested();
             embeddingsUsed++;
-            var chunkVector = NormalizeVector(await provider.EmbedAsync(chunk.Text, cancellationToken).ConfigureAwait(false));
+            var chunkVector = SemanticVectorMath.Normalize(await provider.EmbedAsync(chunk.Text, cancellationToken).ConfigureAwait(false));
             if (chunkVector == null)
             {
                 continue;
@@ -1014,7 +992,7 @@ public sealed class SemanticLanguageService : IDisposable
             : new HashSet<string>(options.AllowedBucketIds, StringComparer.OrdinalIgnoreCase);
         var matches = new List<SemanticBucketSpanMatch>();
         var onDemandEmbeddingsUsed = 0;
-        foreach (var candidate in BuildCandidateSpans(
+        foreach (var candidate in SemanticTextCandidateBuilder.BuildCandidateSpans(
             tokens,
             _config.MaxSpanWords,
             _config.MaxSpansPerMessage,
@@ -1059,7 +1037,7 @@ public sealed class SemanticLanguageService : IDisposable
                 continue;
             }
 
-            var similarity = CosineSimilarity(embedding.Vector, atlasVector.Vector);
+            var similarity = SemanticVectorMath.CosineSimilarity(embedding.Vector, atlasVector.Vector);
             if (similarity > bestSimilarity)
             {
                 bestSimilarity = similarity;
@@ -1099,7 +1077,7 @@ public sealed class SemanticLanguageService : IDisposable
     {
         if (provider.TryGetCachedEmbedding(candidate, out var cachedVector))
         {
-            return NormalizeVector(cachedVector);
+            return SemanticVectorMath.Normalize(cachedVector);
         }
 
         EnqueueCandidatePrewarm(candidate);
@@ -1120,7 +1098,7 @@ public sealed class SemanticLanguageService : IDisposable
         {
             if (task.Wait(OnDemandEmbeddingTimeoutMs))
             {
-                return NormalizeVector(task.Result);
+                return SemanticVectorMath.Normalize(task.Result);
             }
         }
         catch (AggregateException ex)
@@ -1140,272 +1118,6 @@ public sealed class SemanticLanguageService : IDisposable
         return null;
     }
 
-    private static Dictionary<string, int> GetBucketConfidence(SemanticLanguageMemory memory)
-    {
-        return (memory.AtlasBuckets ?? new List<SemanticLanguageAtlasBucketCoverage>())
-            .Where(bucket => bucket.Confidence > 0 && !string.IsNullOrWhiteSpace(bucket.BucketId))
-            .GroupBy(bucket => bucket.BucketId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => ClampPercent(group.Max(bucket => bucket.Confidence)),
-                StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static SemanticLanguageAtlasBucketCoverage? FindBucketCoverage(SemanticLanguageMemory memory, string bucketId)
-    {
-        memory.AtlasBuckets ??= new List<SemanticLanguageAtlasBucketCoverage>();
-        return memory.AtlasBuckets.FirstOrDefault(entry => string.Equals(entry.BucketId, bucketId, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private void SetBucketConfidence(SemanticLanguageMemory memory, string bucketId, int confidence, long now, bool promoteToLearned, out bool learnedNow)
-    {
-        learnedNow = false;
-        memory.AtlasBuckets ??= new List<SemanticLanguageAtlasBucketCoverage>();
-        var normalizedBucketId = SemanticLanguageAtlasCatalog.NormalizeIdentifier(bucketId);
-        var clampedConfidence = ClampPercent(confidence);
-        if (clampedConfidence <= 0)
-        {
-            memory.AtlasBuckets.RemoveAll(entry => string.Equals(entry.BucketId, normalizedBucketId, StringComparison.OrdinalIgnoreCase));
-            return;
-        }
-
-        var existing = FindBucketCoverage(memory, normalizedBucketId);
-        if (promoteToLearned && clampedConfidence >= _config.LearnedThresholdPercent)
-        {
-            clampedConfidence = 100;
-        }
-
-        if (existing == null)
-        {
-            existing = new SemanticLanguageAtlasBucketCoverage
-            {
-                BucketId = normalizedBucketId
-            };
-            memory.AtlasBuckets.Add(existing);
-        }
-
-        var wasLearned = IsLearned(existing);
-        existing.Confidence = clampedConfidence;
-        existing.ExposureCount = Math.Max(0, existing.ExposureCount) + 1;
-        existing.LastUpdatedUnixSeconds = now;
-        if (clampedConfidence >= 100 && existing.LearnedAtUnixSeconds <= 0)
-        {
-            existing.LearnedAtUnixSeconds = now;
-        }
-
-        learnedNow = !wasLearned && IsLearned(existing);
-    }
-
-    private static bool IsLearned(SemanticLanguageAtlasBucketCoverage coverage)
-    {
-        return coverage.Confidence >= 100 || coverage.LearnedAtUnixSeconds > 0;
-    }
-
-    private static IEnumerable<SemanticCandidateSpan> BuildTokenChunks(
-        List<WordToken> tokens,
-        int maxChunkWords,
-        int overlapWords,
-        ISet<string>? priorityTokens = null)
-    {
-        if (tokens.Count == 0)
-        {
-            yield break;
-        }
-
-        var chunks = new List<(int Start, int End, string Text, int Priority)>();
-        var chunkWords = Math.Max(1, maxChunkWords);
-        var overlap = Math.Max(0, Math.Min(overlapWords, chunkWords - 1));
-        var step = Math.Max(1, chunkWords - overlap);
-        for (var start = 0; start < tokens.Count; start += step)
-        {
-            var end = Math.Min(tokens.Count, start + chunkWords);
-            var text = NormalizeTokenRange(tokens, start, end);
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                chunks.Add((start, end, text, CountPriorityTokens(tokens, start, end, priorityTokens)));
-            }
-
-            if (end >= tokens.Count)
-            {
-                break;
-            }
-        }
-
-        foreach (var chunk in chunks
-            .OrderByDescending(chunk => chunk.Priority)
-            .ThenBy(chunk => chunk.Start))
-        {
-            yield return new SemanticCandidateSpan(chunk.Start, chunk.End, chunk.Text);
-        }
-    }
-
-    private static IEnumerable<SemanticCandidateSpan> BuildCandidateSpans(
-        List<WordToken> tokens,
-        int maxSpanWords,
-        int maxSpans,
-        int startTokenIndex = 0,
-        int? endTokenIndex = null,
-        ISet<string>? priorityTokens = null)
-    {
-        if (!TryGetCandidateRange(tokens, maxSpans, startTokenIndex, endTokenIndex, out var startIndex, out var endIndex))
-        {
-            yield break;
-        }
-
-        var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var count = 0;
-        foreach (var windowSize in GetCandidateWindowSizes(Math.Min(maxSpanWords, endIndex - startIndex)))
-        {
-            foreach (var candidate in BuildWindowCandidates(tokens, startIndex, endIndex, windowSize, emitted, priorityTokens)
-                .OrderByDescending(candidate => candidate.Priority)
-                .ThenBy(candidate => candidate.Start))
-            {
-                yield return new SemanticCandidateSpan(candidate.Start, candidate.Start + windowSize, candidate.Text);
-                count++;
-                if (count >= maxSpans)
-                {
-                    yield break;
-                }
-            }
-        }
-    }
-
-    private static bool TryGetCandidateRange(
-        List<WordToken> tokens,
-        int maxSpans,
-        int startTokenIndex,
-        int? endTokenIndex,
-        out int startIndex,
-        out int endIndex)
-    {
-        startIndex = 0;
-        endIndex = 0;
-        if (tokens.Count == 0 || maxSpans <= 0)
-        {
-            return false;
-        }
-
-        startIndex = Math.Max(0, Math.Min(startTokenIndex, tokens.Count));
-        endIndex = Math.Max(startIndex, Math.Min(endTokenIndex ?? tokens.Count, tokens.Count));
-        return startIndex < endIndex;
-    }
-
-    private static IEnumerable<(int Start, string Text, int Priority)> BuildWindowCandidates(
-        List<WordToken> tokens,
-        int startIndex,
-        int endIndex,
-        int windowSize,
-        ISet<string> emitted,
-        ISet<string>? priorityTokens)
-    {
-        for (var start = startIndex; start <= endIndex - windowSize; start++)
-        {
-            var normalized = NormalizeTokenRange(tokens, start, start + windowSize);
-            if (string.IsNullOrWhiteSpace(normalized) || !emitted.Add(normalized) || normalized.Length > 80)
-            {
-                continue;
-            }
-
-            yield return (start, normalized, CountPriorityTokens(tokens, start, start + windowSize, priorityTokens));
-        }
-    }
-
-    private static int CountPriorityTokens(List<WordToken> tokens, int startIndex, int endIndex, ISet<string>? priorityTokens)
-    {
-        if (priorityTokens == null || priorityTokens.Count == 0)
-        {
-            return 0;
-        }
-
-        var score = 0;
-        for (var index = startIndex; index < endIndex && index < tokens.Count; index++)
-        {
-            if (priorityTokens.Contains(tokens[index].Text))
-            {
-                score++;
-            }
-        }
-
-        return score;
-    }
-
-    private static IEnumerable<int> GetCandidateWindowSizes(int maxSpanWords)
-    {
-        if (maxSpanWords >= 2)
-        {
-            yield return 2;
-        }
-
-        if (maxSpanWords > 2)
-        {
-            yield return maxSpanWords;
-        }
-
-        for (var windowSize = 3; windowSize < maxSpanWords; windowSize++)
-        {
-            yield return windowSize;
-        }
-
-        yield return 1;
-    }
-
-    private static SemanticLanguageMemory? FindLanguageMemory(SemanticLanguageMemoryStore store, string languageName)
-    {
-        return store.Languages?.FirstOrDefault(memory => string.Equals(memory.LanguageName, languageName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static SemanticLanguageMemory FindOrCreateLanguageMemory(SemanticLanguageMemoryStore store, string languageName)
-    {
-        store.Languages ??= new List<SemanticLanguageMemory>();
-        var memory = FindLanguageMemory(store, languageName);
-        if (memory != null)
-        {
-            memory.AtlasBuckets ??= new List<SemanticLanguageAtlasBucketCoverage>();
-            return memory;
-        }
-
-        memory = new SemanticLanguageMemory
-        {
-            LanguageName = languageName,
-            AtlasBuckets = new List<SemanticLanguageAtlasBucketCoverage>()
-        };
-        store.Languages.Add(memory);
-        return memory;
-    }
-
-    private static IEnumerable<WordToken> Tokenize(string message)
-    {
-        return TokenizeWithOriginalWordCount(message, out _);
-    }
-
-    private static List<WordToken> TokenizeWithOriginalWordCount(string message, out int originalWordCount)
-    {
-        var tokens = new List<WordToken>();
-        originalWordCount = 0;
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            return tokens;
-        }
-
-        foreach (var text in WordRegex.Matches(message).Cast<Match>().Select(match => match.Value))
-        {
-            var originalWordIndex = originalWordCount++;
-            if (!IsUsefulToken(text))
-            {
-                continue;
-            }
-
-            tokens.Add(new WordToken(text, originalWordIndex));
-        }
-
-        return tokens;
-    }
-
-    private static bool IsUsefulToken(string token)
-    {
-        return !string.IsNullOrWhiteSpace(token) && token.Length >= 3 && token.Any(char.IsLetterOrDigit);
-    }
-
     private static bool IsProviderReady(ITheBasicsSemanticEmbeddingProvider? provider)
     {
         return provider != null && provider.IsReady;
@@ -1414,68 +1126,6 @@ public sealed class SemanticLanguageService : IDisposable
     private static bool HasComprehensionInputs(IServerPlayer player, Language language, string message)
     {
         return player != null && language != null && !string.IsNullOrWhiteSpace(message);
-    }
-
-    private static string NormalizeText(string text)
-    {
-        return string.Join(" ", Tokenize(text).Select(token => token.Text.ToLowerInvariant()));
-    }
-
-    private static string NormalizeTokenRange(List<WordToken> tokens, int startIndex, int endIndex)
-    {
-        return string.Join(" ", tokens
-            .Skip(startIndex)
-            .Take(Math.Max(0, endIndex - startIndex))
-            .Select(token => token.Text.ToLowerInvariant()));
-    }
-
-    private static int ClampPercent(int value)
-    {
-        return Math.Max(0, Math.Min(100, value));
-    }
-
-    private static float[]? NormalizeVector(float[]? vector)
-    {
-        if (vector == null || vector.Length == 0)
-        {
-            return null;
-        }
-
-        var magnitudeSquared = 0f;
-        for (var index = 0; index < vector.Length; index++)
-        {
-            magnitudeSquared += vector[index] * vector[index];
-        }
-
-        if (magnitudeSquared <= 0f || float.IsNaN(magnitudeSquared) || float.IsInfinity(magnitudeSquared))
-        {
-            return null;
-        }
-
-        var magnitude = MathF.Sqrt(magnitudeSquared);
-        var normalized = new float[vector.Length];
-        for (var index = 0; index < vector.Length; index++)
-        {
-            normalized[index] = vector[index] / magnitude;
-        }
-
-        return normalized;
-    }
-
-    private static float CosineSimilarity(float[] left, float[] right)
-    {
-        if (left == null || right == null || left.Length == 0 || left.Length != right.Length)
-        {
-            return 0f;
-        }
-
-        var dot = 0f;
-        for (var index = 0; index < left.Length; index++)
-        {
-            dot += left[index] * right[index];
-        }
-
-        return dot;
     }
 
     private static string FormatPlainLanguageIdentifier(Language language)
@@ -1489,142 +1139,4 @@ public sealed class SemanticLanguageService : IDisposable
         return VtmlUtils.EscapeVtml($"{language.Name} (:{language.Prefix}){hiddenMarker}");
     }
 
-    private sealed class SemanticLanguageObservation
-    {
-        public SemanticLanguageObservation(string playerUid, string languageName, string message)
-        {
-            PlayerUid = playerUid;
-            LanguageName = languageName;
-            Message = message;
-        }
-
-        public string PlayerUid { get; }
-
-        public string LanguageName { get; }
-
-        public string Message { get; }
-    }
-
-    private sealed class SemanticCandidateSpan
-    {
-        public SemanticCandidateSpan(int startIndex, int endIndex, string text)
-        {
-            StartIndex = startIndex;
-            EndIndex = endIndex;
-            Text = text;
-        }
-
-        public int StartIndex { get; }
-
-        public int EndIndex { get; }
-
-        public string Text { get; }
-    }
-
-    private sealed class SemanticSpanEmbedding
-    {
-        public SemanticSpanEmbedding(SemanticCandidateSpan span, float[] vector)
-        {
-            StartIndex = span.StartIndex;
-            EndIndex = span.EndIndex;
-            Text = span.Text;
-            Vector = vector;
-        }
-
-        public int StartIndex { get; }
-
-        public int EndIndex { get; }
-
-        public string Text { get; }
-
-        public float[] Vector { get; }
-    }
-
-    private sealed class SemanticAtlasBucketVector
-    {
-        public SemanticAtlasBucketVector(string bucketId, string phrase, float[] vector)
-        {
-            BucketId = bucketId;
-            Phrase = phrase;
-            Vector = vector;
-        }
-
-        public string BucketId { get; }
-
-        public string Phrase { get; }
-
-        public float[] Vector { get; }
-    }
-
-    private sealed class SemanticBucketSpanMatch
-    {
-        public SemanticBucketSpanMatch(int startIndex, int endIndex, string text, string bucketId, float similarity)
-        {
-            StartIndex = startIndex;
-            EndIndex = endIndex;
-            Text = text;
-            BucketId = bucketId;
-            Similarity = similarity;
-        }
-
-        public int StartIndex { get; }
-
-        public int EndIndex { get; }
-
-        public int WordCount => EndIndex - StartIndex;
-
-        public string Text { get; }
-
-        public string BucketId { get; }
-
-        public float Similarity { get; }
-    }
-
-    private sealed class SpanMatchOptions
-    {
-        public SpanMatchOptions(
-            float minimumSimilarity,
-            IEnumerable<string>? allowedBucketIds,
-            bool allowOnDemandEmbeddings,
-            int maxOnDemandEmbeddings,
-            int startTokenIndex = 0,
-            int? endTokenIndex = null,
-            ISet<string>? priorityTokens = null)
-        {
-            MinimumSimilarity = minimumSimilarity;
-            AllowedBucketIds = allowedBucketIds;
-            AllowOnDemandEmbeddings = allowOnDemandEmbeddings;
-            MaxOnDemandEmbeddings = maxOnDemandEmbeddings;
-            StartTokenIndex = startTokenIndex;
-            EndTokenIndex = endTokenIndex;
-            PriorityTokens = priorityTokens;
-        }
-
-        public float MinimumSimilarity { get; }
-
-        public IEnumerable<string>? AllowedBucketIds { get; }
-
-        public bool AllowOnDemandEmbeddings { get; }
-
-        public int MaxOnDemandEmbeddings { get; }
-
-        public int StartTokenIndex { get; }
-
-        public int? EndTokenIndex { get; }
-
-        public ISet<string>? PriorityTokens { get; }
-    }
-
-    private sealed class WordToken
-    {
-        public WordToken(string text, int originalWordIndex)
-        {
-            Text = text;
-            OriginalWordIndex = originalWordIndex;
-        }
-
-        public string Text { get; }
-
-        public int OriginalWordIndex { get; }
-    }
 }

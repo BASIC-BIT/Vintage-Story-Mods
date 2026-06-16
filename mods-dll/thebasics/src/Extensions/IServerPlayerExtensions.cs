@@ -556,6 +556,9 @@ namespace thebasics.Extensions
                     languages[languageName] = target;
                 }
 
+                target.LastLearningObservationUnixSeconds = Math.Max(
+                    target.LastLearningObservationUnixSeconds,
+                    Math.Max(0, languageMemory.LastLearningObservationUnixSeconds));
                 AddNormalizedSemanticAtlasBuckets(target, languageMemory.AtlasBuckets);
             }
 

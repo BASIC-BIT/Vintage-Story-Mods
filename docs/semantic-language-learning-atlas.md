@@ -24,6 +24,8 @@ Current runtime behavior:
 - Per player/language memory stores bucket coverage by atlas bucket ID.
 - Player-facing learning units are concept buckets, not individual terms.
 - Learned concept notifications are emitted only for organic threshold crossings.
+- Organic learning is rate-limited by configurable per-language observation and per-bucket cooldowns. Comprehension/rendering is not cooldown-gated; players can always understand concepts they already know.
+- The default generated atlas includes both Vintage Story-specific concepts and reviewed everyday/RP seed packs for ordinary speech, needs, movement, trust, danger, and survival actions.
 
 Current MVP constraints:
 
@@ -31,6 +33,7 @@ Current MVP constraints:
 - If no provider is available, the server still boots and admin-set bucket progress remains usable, but semantic matching is degraded.
 - There is no exact phrase matcher as a gameplay path; exact strings in atlas assets seed vectors only.
 - The current default atlas is a curated generated Vintage Story core atlas. It is broader than the original pilot but still intentionally marked experimental.
+- The packaged embedding model is intentionally small (`all-MiniLM-L6-v2`, quantized ONNX) for beta release ergonomics. Stronger server-local models can be configured through the sidecar model paths, but should be selected with an evaluation pass instead of by package size alone.
 
 The MVP is enough to test the learning loop and UX, not enough to claim broad fluency for a full natural language.
 
@@ -151,6 +154,8 @@ When a whole language is promoted:
 
 Future broader rules can add concept family diversity and minimum exposure counts if the current learned-bucket rule proves too easy to grind.
 
+Organic learning should remain deliberately paced. Cooldowns should limit progress gain from repeated exposure without limiting comprehension of already-learned concepts. The current default posture is a short per-language observation cooldown plus a longer per-bucket cooldown so repeated tutoring or phrase spam does not rapidly max out a concept.
+
 Do not require players to hear every synonym or every possible string forever.
 
 ## Bucket Compaction
@@ -195,6 +200,7 @@ Seed buckets should include:
 - Game UI strings where relevant.
 - Lore vocabulary and proper nouns.
 - Manual social/RP concepts not present in item/block assets.
+- Everyday conversational and survival language that is not specific to Vintage Story assets, such as greetings, agreement, trust, directions, food, water, medicine, wounds, time, movement, and simple requests.
 
 Manual examples must be treated as placeholders, not as complete domain coverage. For example, an “occult/lovecraftian” bucket must not stop at generic words like `rift nightmare madness abyss`. It should include Vintage Story-specific lore and mechanics such as temporal gears, rusty gears, temporal stability, temporal storms, rifts, rust world, drifters, corrupt and sawblade locusts, locust workshops, Resonance Archives, Jonas Falx, rot, ruined machinery, gears, and other actual game/lore concepts.
 

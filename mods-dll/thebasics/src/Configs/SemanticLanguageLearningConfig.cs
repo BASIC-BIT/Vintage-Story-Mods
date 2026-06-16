@@ -69,12 +69,19 @@ public class SemanticLanguageLearningConfig
     [ProtoMember(21)]
     public bool NotifyWholeLanguageLearned { get; set; } = true;
 
+    [ProtoMember(22)]
+    public int MinimumSecondsBetweenLearningObservations { get; set; } = 5;
+
+    [ProtoMember(23)]
+    public int MinimumSecondsBetweenBucketLearning { get; set; } = 60;
+
     public void Normalize()
     {
         NormalizeLearningThresholds();
         NormalizeSpanBudgets();
         NormalizeChunkRouting();
         NormalizeWholeLanguagePromotion();
+        NormalizeCooldowns();
     }
 
     private void NormalizeLearningThresholds()
@@ -109,6 +116,12 @@ public class SemanticLanguageLearningConfig
     {
         WholeLanguageLearnedBucketPercent = ClampPercent(WholeLanguageLearnedBucketPercent <= 0 ? 70 : WholeLanguageLearnedBucketPercent);
         WholeLanguageMinimumLearnedBuckets = WholeLanguageMinimumLearnedBuckets <= 0 ? 12 : WholeLanguageMinimumLearnedBuckets;
+    }
+
+    private void NormalizeCooldowns()
+    {
+        MinimumSecondsBetweenLearningObservations = Math.Max(0, MinimumSecondsBetweenLearningObservations);
+        MinimumSecondsBetweenBucketLearning = Math.Max(0, MinimumSecondsBetweenBucketLearning);
     }
 
     private static int ClampPercent(int value)
