@@ -24,6 +24,7 @@ public sealed class SemanticLanguageService : IDisposable
     private readonly LanguageSystem _languageSystem;
     private readonly ICoreServerAPI _api;
     private readonly SemanticLanguageLearningConfig _config;
+    private readonly Func<bool> _usesProsePresentation;
     private readonly ConcurrentQueue<SemanticLanguageObservation> _observations = new ConcurrentQueue<SemanticLanguageObservation>();
     private readonly ConcurrentQueue<string> _candidatePrewarms = new ConcurrentQueue<string>();
     private readonly ConcurrentDictionary<string, byte> _queuedCandidatePrewarms = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
@@ -43,8 +44,8 @@ public sealed class SemanticLanguageService : IDisposable
     private int _queuedCandidatePrewarmCount;
     private ITheBasicsSemanticEmbeddingProvider? _provider;
 
-    public SemanticLanguageService(LanguageSystem languageSystem, ICoreServerAPI api, SemanticLanguageLearningConfig config)
-        : this(languageSystem, api, SemanticLanguageAtlasCatalog.LoadDefault(api), config)
+    public SemanticLanguageService(LanguageSystem languageSystem, ICoreServerAPI api, SemanticLanguageLearningConfig config, Func<bool>? usesProsePresentation = null)
+        : this(languageSystem, api, SemanticLanguageAtlasCatalog.LoadDefault(api), config, usesProsePresentation: usesProsePresentation)
     {
     }
 
@@ -54,11 +55,13 @@ public sealed class SemanticLanguageService : IDisposable
         SemanticLanguageAtlasCatalog? atlas,
         SemanticLanguageLearningConfig? config = null,
         System.Func<string, Language?>? languageResolver = null,
-        System.Func<string, IServerPlayer?>? playerResolver = null)
+        System.Func<string, IServerPlayer?>? playerResolver = null,
+        Func<bool>? usesProsePresentation = null)
     {
         _languageSystem = languageSystem;
         _api = api;
         _atlas = atlas ?? SemanticLanguageAtlasCatalog.Empty;
+        _usesProsePresentation = usesProsePresentation ?? (() => false);
         _config = config ?? new SemanticLanguageLearningConfig();
         _config.Normalize();
         var resolvedLanguageResolver = languageResolver ?? (name => _languageSystem?.GetLangFromText(name, false, allowHidden: true));
@@ -574,10 +577,20 @@ public sealed class SemanticLanguageService : IDisposable
         }
     }
 
-    private static IEnumerable<string> GetObservableSegments(MessageContext context)
+    private IEnumerable<string> GetObservableSegments(MessageContext context)
     {
         if (context.HasFlag(MessageContext.IS_SPEECH))
         {
+            if (_usesProsePresentation())
+            {
+                foreach (var segment in GetQuotedSegments(context.Message))
+                {
+                    yield return segment;
+                }
+
+                yield break;
+            }
+
             yield return context.Message ?? string.Empty;
             yield break;
         }
@@ -587,7 +600,20 @@ public sealed class SemanticLanguageService : IDisposable
             yield break;
         }
 
-        var splitMessage = context.Message.Trim().Split('"');
+        foreach (var segment in GetQuotedSegments(context.Message))
+        {
+            yield return segment;
+        }
+    }
+
+    private static IEnumerable<string> GetQuotedSegments(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            yield break;
+        }
+
+        var splitMessage = message.Trim().Split('"');
         for (var index = 1; index < splitMessage.Length; index += 2)
         {
             if (!string.IsNullOrWhiteSpace(splitMessage[index]))

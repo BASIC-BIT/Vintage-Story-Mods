@@ -424,6 +424,37 @@ public class SemanticLanguageServiceTests
     }
 
     [Fact]
+    public void ObserveMessageForRecipient_InProseModeLearnsOnlyQuotedSpeech()
+    {
+        var language = CreateLanguage();
+        var player = CreatePlayer();
+        var api = CreateApi(player);
+        var service = CreateService(new SemanticLanguageLearningConfig
+        {
+            LearningRatePercent = 100,
+            MaxBucketProgressPerMessage = 100
+        }, api, player, usesProsePresentation: true);
+        service.RegisterProvider(CreateProvider());
+        WaitForAtlasIndex(service);
+
+        service.ObserveMessageForRecipient(new MessageContext
+        {
+            ReceivingPlayer = player,
+            Message = "Alice watches the drifters and says \"temporal gear\" softly.",
+            Metadata = new Dictionary<string, object> { [MessageContext.LANGUAGE] = language },
+            Flags = new Dictionary<string, bool> { [MessageContext.IS_SPEECH] = true }
+        });
+
+        SpinWait.SpinUntil(() =>
+        {
+            var memory = player.GetSemanticLanguageMemory().Languages.SingleOrDefault();
+            return memory?.AtlasBuckets.Any(bucket => bucket.BucketId == "temporal-gear" && bucket.Confidence == 100) == true;
+        }, TimeSpan.FromSeconds(2)).Should().BeTrue();
+
+        player.GetSemanticLanguageMemory().Languages.Single().AtlasBuckets.Should().NotContain(bucket => bucket.BucketId == "drifters");
+    }
+
+    [Fact]
     public void ObserveMessageForRecipient_RespectsLearningObservationCooldown()
     {
         var language = CreateLanguage();
@@ -538,7 +569,7 @@ public class SemanticLanguageServiceTests
             false);
     }
 
-    private static SemanticLanguageService CreateService(SemanticLanguageLearningConfig? config = null, ICoreServerAPI? api = null, IServerPlayer? player = null)
+    private static SemanticLanguageService CreateService(SemanticLanguageLearningConfig? config = null, ICoreServerAPI? api = null, IServerPlayer? player = null, bool usesProsePresentation = false)
     {
         var language = CreateLanguage();
         return new SemanticLanguageService(
@@ -547,7 +578,8 @@ public class SemanticLanguageServiceTests
             CreateAtlas(),
             config,
             name => string.Equals(name, language.Name, StringComparison.OrdinalIgnoreCase) ? language : null,
-            playerUid => player != null && string.Equals(playerUid, player.PlayerUID, StringComparison.OrdinalIgnoreCase) ? player : null);
+            playerUid => player != null && string.Equals(playerUid, player.PlayerUID, StringComparison.OrdinalIgnoreCase) ? player : null,
+            () => usesProsePresentation);
     }
 
     private static ICoreServerAPI CreateApi(params IServerPlayer[] players)
