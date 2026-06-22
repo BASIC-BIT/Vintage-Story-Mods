@@ -339,31 +339,36 @@ public class ChatUiSystem : ModSystem
                     _safeNetworkChannel?.SendPacketSafely(saveMessage);
                 }
             },
-            Shortcuts = new[]
-            {
-                new BasicConfigClientShortcut
-                {
-                    Code = "languages",
-                    Label = Lang.Get("thebasics:config-admin-languages"),
-                    Tooltip = Lang.Get("thebasics:config-admin-languages-tooltip"),
-                    OnClick = OpenLanguageConfigFromBasicConfig
-                },
-                new BasicConfigClientShortcut
-                {
-                    Code = "charsheetfields",
-                    Label = Lang.Get("thebasics:config-admin-charsheet-fields"),
-                    Tooltip = Lang.Get("thebasics:config-admin-charsheet-fields-tooltip"),
-                    OnClick = OpenCharacterSheetFieldConfigFromBasicConfig
-                },
-                new BasicConfigClientShortcut
-                {
-                    Code = "guide",
-                    Label = Lang.Get("thebasics:guide-button"),
-                    Tooltip = Lang.Get("thebasics:config-admin-guide-tooltip"),
-                    OnClick = () => HandbookGuide.Open(_api, HandbookGuide.OverviewPage)
-                }
-            }
+            Shortcuts = BuildBasicConfigShortcuts()
         });
+    }
+
+    private static BasicConfigClientShortcut[] BuildBasicConfigShortcuts()
+    {
+        return
+        [
+            new BasicConfigClientShortcut
+            {
+                Code = "languages",
+                Label = Lang.Get("thebasics:config-admin-languages"),
+                Tooltip = Lang.Get("thebasics:config-admin-languages-tooltip"),
+                OnClick = OpenLanguageConfigFromBasicConfig
+            },
+            new BasicConfigClientShortcut
+            {
+                Code = "charsheetfields",
+                Label = Lang.Get("thebasics:config-admin-charsheet-fields"),
+                Tooltip = Lang.Get("thebasics:config-admin-charsheet-fields-tooltip"),
+                OnClick = OpenCharacterSheetFieldConfigFromBasicConfig
+            },
+            new BasicConfigClientShortcut
+            {
+                Code = "guide",
+                Label = Lang.Get("thebasics:guide-button"),
+                Tooltip = Lang.Get("thebasics:config-admin-guide-tooltip"),
+                OnClick = () => HandbookGuide.Open(_api, HandbookGuide.OverviewPage)
+            }
+        ];
     }
 
     private static void OnBasicConfigOpenMessage(BasicConfigOpenMessage message)
