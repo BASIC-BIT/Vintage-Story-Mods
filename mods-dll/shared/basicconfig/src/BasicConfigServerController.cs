@@ -103,6 +103,21 @@ public sealed class BasicConfigServerController<TConfig> where TConfig : class, 
 
     public TConfig Config => _getConfig();
 
+    public TConfig CreateDraft()
+    {
+        return _cloneConfig(Config);
+    }
+
+    public IReadOnlyList<string> ValidateDraft(TConfig draft)
+    {
+        if (draft == null)
+        {
+            throw new ArgumentNullException(nameof(draft));
+        }
+
+        return _schema.Validate(draft);
+    }
+
     public void SendOpen(IServerPlayer player, string statusMessage = null)
     {
         if (player == null)
@@ -145,7 +160,7 @@ public sealed class BasicConfigServerController<TConfig> where TConfig : class, 
             return;
         }
 
-        var draft = _cloneConfig(Config);
+        var draft = CreateDraft();
         var errors = _schema.ApplyValues(draft, message.Values);
         if (errors.Count > 0)
         {
@@ -159,15 +174,28 @@ public sealed class BasicConfigServerController<TConfig> where TConfig : class, 
         }
 
         var changedKeys = _schema.GetChangedKeys(Config, draft);
+        SaveDraft(draft, changedKeys);
+        SendResult(player, true, BuildSaveMessage(changedKeys), changedKeys);
+    }
+
+    public HashSet<string> SaveDraft(TConfig draft, IReadOnlySet<string> changedKeys = null, Action<IReadOnlySet<string>> afterSaved = null)
+    {
+        if (draft == null)
+        {
+            throw new ArgumentNullException(nameof(draft));
+        }
+
+        var appliedChangedKeys = changedKeys?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? _schema.GetChangedKeys(Config, draft);
         _copyConfig(draft, Config);
         _saveConfig();
-        _afterChanged?.Invoke(changedKeys);
-        SendResult(player, true, BuildSaveMessage(changedKeys), changedKeys);
+        afterSaved?.Invoke(appliedChangedKeys);
+        _afterChanged?.Invoke(appliedChangedKeys);
+        return appliedChangedKeys;
     }
 
     public HashSet<string> ReloadAndApply()
     {
-        var before = _cloneConfig(Config);
+        var before = CreateDraft();
         _reloadConfig();
         var changedKeys = _schema.GetChangedKeys(before, Config);
         _afterChanged?.Invoke(changedKeys);

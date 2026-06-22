@@ -815,7 +815,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var changedKeys = ReloadConfigAndGetChangedKeys();
+        var changedKeys = _basicConfigController.ReloadAndApply();
         AnalyticsService.TrackFeatureUsed("language_config", "reload");
         SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {changedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config));
         return true;
@@ -823,13 +823,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private bool TryBuildLanguageConfigDraft(List<LanguageConfigEntryMessage> submittedLanguages, out ModConfig draft, out List<string> errors)
     {
-        draft = CloneConfig(Config);
+        draft = _basicConfigController.CreateDraft();
         if (!LanguageConfigAdmin.TryApplyEntries(draft, submittedLanguages, out errors))
         {
             return false;
         }
 
-        errors.AddRange(TheBasicsBasicConfigSchema.ValidateConfig(draft));
+        errors.AddRange(_basicConfigController.ValidateDraft(draft));
         return errors.Count == 0;
     }
 
@@ -837,14 +837,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         var renameMap = LanguageConfigAdmin.BuildRenameMap(submittedLanguages);
         TrackLanguageRenamesForJoiningPlayers(renameMap);
-        CopyConfigValues(draft, Config);
-        SaveSharedConfig(API);
-
         var changedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { nameof(Config.Languages) };
-        ReconcileOnlinePlayerLanguages(renameMap);
-        ReconcileStoredPlayerLanguages(renameMap);
-        ApplyConfigChangeSideEffects(changedKeys);
-        BroadcastClientConfigs();
+        _basicConfigController.SaveDraft(draft, changedKeys, _ =>
+        {
+            ReconcileOnlinePlayerLanguages(renameMap);
+            ReconcileStoredPlayerLanguages(renameMap);
+        });
 
         AnalyticsService.TrackFeatureUsed("language_config", "save", properties: new Dictionary<string, object>
         {
@@ -888,7 +886,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var changedKeys = ReloadConfigAndGetChangedKeys();
+        var changedKeys = _basicConfigController.ReloadAndApply();
         AnalyticsService.TrackFeatureUsed("character_sheet_fields", "reload");
         SendCharacterSheetFieldConfigResult(player, true, $"Reloaded character sheet fields from disk. Changed settings: {changedKeys.Count}.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
         return true;
@@ -896,24 +894,20 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private bool TryBuildCharacterSheetFieldConfigDraft(List<CharacterSheetFieldConfigEntryMessage> submittedFields, out ModConfig draft, out List<string> errors)
     {
-        draft = CloneConfig(Config);
+        draft = _basicConfigController.CreateDraft();
         if (!CharacterSheetFieldConfigAdmin.TryApplyEntries(draft, submittedFields, out errors))
         {
             return false;
         }
 
-        errors.AddRange(TheBasicsBasicConfigSchema.ValidateConfig(draft));
+        errors.AddRange(_basicConfigController.ValidateDraft(draft));
         return errors.Count == 0;
     }
 
     private void SaveCharacterSheetFieldConfigDraft(IServerPlayer player, ModConfig draft)
     {
-        CopyConfigValues(draft, Config);
-        SaveSharedConfig(API);
-
         var changedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { nameof(Config.CharacterSheetFields) };
-        ApplyConfigChangeSideEffects(changedKeys);
-        BroadcastClientConfigs();
+        _basicConfigController.SaveDraft(draft, changedKeys);
 
         AnalyticsService.TrackFeatureUsed("character_sheet_fields", "save", properties: new Dictionary<string, object>
         {
@@ -931,16 +925,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         AnalyticsService.TrackFeatureUsed(featureName, action, false, "validation_failed", properties);
         AnalyticsService.TrackFailure(featureName, action, "warning", "validation_failed", properties: properties);
-    }
-
-    private HashSet<string> ReloadConfigAndGetChangedKeys()
-    {
-        var before = CloneConfig(Config);
-        ReloadSharedConfigFromDisk(API);
-        var changedKeys = TheBasicsBasicConfigSchema.Build().GetChangedKeys(before, Config);
-        ApplyConfigChangeSideEffects(changedKeys);
-        BroadcastClientConfigs();
-        return changedKeys;
     }
 
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
