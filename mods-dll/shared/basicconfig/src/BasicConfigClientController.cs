@@ -83,6 +83,16 @@ public sealed class BasicConfigClientController
         _dialog.TryOpen(withFocus: false);
     }
 
+    public void CloseWithoutPrompt()
+    {
+        _dialog?.TryCloseWithoutPrompt();
+    }
+
+    public void Reopen()
+    {
+        OpenDialog();
+    }
+
     private void OnDialogClosed()
     {
         _dialog = null;

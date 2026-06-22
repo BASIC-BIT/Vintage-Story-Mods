@@ -71,16 +71,8 @@ public class ChatUiSystem : ModSystem
     private static ChatTypingIndicatorState? _lastSentTypingState;
     private static string _lastChatInputText;
     private static long _lastChatInputChangeMs;
-    private static ConfirmingConfigAdminDialog _configAdminDialog;
-    private static Dictionary<string, string> _configAdminDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-    private static Dictionary<string, string> _configAdminLoadedDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-    private static HashSet<string> _configAdminReviewedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    private static string _configAdminStatusMessage;
-    private static string _configAdminSelectedGroup;
-    private static GuiDialogConfirm _configAdminUnsavedCloseConfirm;
-    private static bool _configAdminOpenQueued;
-    private static bool _returnToConfigAdminAfterLanguageDialog;
-    private static bool _returnToConfigAdminAfterCharacterSheetFieldDialog;
+    private static bool _returnToBasicConfigAfterLanguageDialog;
+    private static bool _returnToBasicConfigAfterCharacterSheetFieldDialog;
 
     private static HeadshotClientCache _headshotCache;
     private static HttpClient _headshotHttpClient;
@@ -276,9 +268,6 @@ public class ChatUiSystem : ModSystem
     {
         _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
-            .RegisterMessageType<TheBasicsConfigAdminOpenMessage>()
-            .RegisterMessageType<TheBasicsConfigAdminSaveMessage>()
-            .RegisterMessageType<TheBasicsConfigAdminResultMessage>()
             .RegisterMessageType<BasicConfigOpenMessage>()
             .RegisterMessageType<BasicConfigSaveMessage>()
             .RegisterMessageType<BasicConfigResultMessage>()
@@ -310,8 +299,6 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
-            .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
-            .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
             .SetMessageHandler<BasicConfigOpenMessage>(OnBasicConfigOpenMessage)
             .SetMessageHandler<BasicConfigResultMessage>(OnBasicConfigResultMessage)
             .SetMessageHandler<TheBasicsLanguageConfigOpenMessage>(OnLanguageConfigOpenMessage)
@@ -350,6 +337,30 @@ public class ChatUiSystem : ModSystem
                 if (packet is BasicConfigSaveMessage saveMessage)
                 {
                     _safeNetworkChannel?.SendPacketSafely(saveMessage);
+                }
+            },
+            Shortcuts = new[]
+            {
+                new BasicConfigClientShortcut
+                {
+                    Code = "languages",
+                    Label = Lang.Get("thebasics:config-admin-languages"),
+                    Tooltip = Lang.Get("thebasics:config-admin-languages-tooltip"),
+                    OnClick = OpenLanguageConfigFromBasicConfig
+                },
+                new BasicConfigClientShortcut
+                {
+                    Code = "charsheetfields",
+                    Label = Lang.Get("thebasics:config-admin-charsheet-fields"),
+                    Tooltip = Lang.Get("thebasics:config-admin-charsheet-fields-tooltip"),
+                    OnClick = OpenCharacterSheetFieldConfigFromBasicConfig
+                },
+                new BasicConfigClientShortcut
+                {
+                    Code = "guide",
+                    Label = Lang.Get("thebasics:guide-button"),
+                    Tooltip = Lang.Get("thebasics:config-admin-guide-tooltip"),
+                    OnClick = () => HandbookGuide.Open(_api, HandbookGuide.OverviewPage)
                 }
             }
         });
@@ -990,41 +1001,12 @@ public class ChatUiSystem : ModSystem
         _characterSheetMessageDialog.TryOpen();
     }
 
-    private static void OnConfigAdminOpenMessage(TheBasicsConfigAdminOpenMessage message)
-    {
-        if (message?.Config != null)
-        {
-            _config = message.Config;
-            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
-        }
-
-        UpdateConfigAdminDraft(message?.Values, message?.ReviewedKeys, message?.StatusMessage);
-        OpenConfigAdminDialog();
-    }
-
-    private static void OnConfigAdminResultMessage(TheBasicsConfigAdminResultMessage message)
-    {
-        if (message?.Config != null)
-        {
-            _config = message.Config;
-            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
-        }
-
-        if (!string.IsNullOrWhiteSpace(message?.Message))
-        {
-            _api.ShowChatMessage(message.Message);
-        }
-
-        UpdateConfigAdminDraft(message?.Values, message?.ReviewedKeys, message?.Message);
-        OpenConfigAdminDialog();
-    }
-
     private static void OnLanguageConfigOpenMessage(TheBasicsLanguageConfigOpenMessage message)
     {
         if (message?.Success == false)
         {
             ShowLanguageConfigChatMessage(message.Message);
-            _returnToConfigAdminAfterLanguageDialog = false;
+            _returnToBasicConfigAfterLanguageDialog = false;
             return;
         }
 
@@ -1046,8 +1028,8 @@ public class ChatUiSystem : ModSystem
     {
         if (message?.Success == false)
         {
-            ShowConfigAdminChatMessage(message.Message);
-            _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
+            ShowBasicConfigChatMessage(message.Message);
+            _returnToBasicConfigAfterCharacterSheetFieldDialog = false;
             return;
         }
 
@@ -1058,7 +1040,7 @@ public class ChatUiSystem : ModSystem
     {
         if (_characterSheetFieldConfigDialog == null)
         {
-            ShowConfigAdminChatMessage(message?.Message);
+            ShowBasicConfigChatMessage(message?.Message);
             return;
         }
 
@@ -1069,7 +1051,7 @@ public class ChatUiSystem : ModSystem
     {
         if (message?.Success == false && _playerNotesDialog == null)
         {
-            ShowConfigAdminChatMessage(message.Message);
+            ShowBasicConfigChatMessage(message.Message);
             return;
         }
 
@@ -1080,7 +1062,7 @@ public class ChatUiSystem : ModSystem
     {
         if (message?.Success == false && _chatHistoryDialog == null)
         {
-            ShowConfigAdminChatMessage(message.Message);
+            ShowBasicConfigChatMessage(message.Message);
             return;
         }
 
@@ -1095,7 +1077,7 @@ public class ChatUiSystem : ModSystem
         }
     }
 
-    private static void ShowConfigAdminChatMessage(string message)
+    private static void ShowBasicConfigChatMessage(string message)
     {
         if (!string.IsNullOrWhiteSpace(message))
         {
@@ -1129,13 +1111,13 @@ public class ChatUiSystem : ModSystem
     private static void OnLanguageConfigClosed()
     {
         _languageConfigDialog = null;
-        if (!_returnToConfigAdminAfterLanguageDialog)
+        if (!_returnToBasicConfigAfterLanguageDialog)
         {
             return;
         }
 
-        _returnToConfigAdminAfterLanguageDialog = false;
-        OpenConfigAdminDialog();
+        _returnToBasicConfigAfterLanguageDialog = false;
+        _basicConfigClientController?.Reopen();
     }
 
     private static void OpenCharacterSheetFieldConfigDialog(IEnumerable<CharacterSheetFieldConfigEntryMessage> fields, string message, bool success)
@@ -1148,7 +1130,7 @@ public class ChatUiSystem : ModSystem
         var entries = (fields ?? Array.Empty<CharacterSheetFieldConfigEntryMessage>()).ToList();
         if (!success)
         {
-            ShowConfigAdminChatMessage(message);
+            ShowBasicConfigChatMessage(message);
         }
 
         if (_characterSheetFieldConfigDialog == null)
@@ -1169,13 +1151,13 @@ public class ChatUiSystem : ModSystem
     private static void OnCharacterSheetFieldConfigClosed()
     {
         _characterSheetFieldConfigDialog = null;
-        if (!_returnToConfigAdminAfterCharacterSheetFieldDialog)
+        if (!_returnToBasicConfigAfterCharacterSheetFieldDialog)
         {
             return;
         }
 
-        _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
-        OpenConfigAdminDialog();
+        _returnToBasicConfigAfterCharacterSheetFieldDialog = false;
+        _basicConfigClientController?.Reopen();
     }
 
     private static void OpenPlayerNotesDialog(TheBasicsNotesViewMessage message)
@@ -1232,400 +1214,18 @@ public class ChatUiSystem : ModSystem
         _chatHistoryDialog = null;
     }
 
-    private static void UpdateConfigAdminDraft(IEnumerable<ConfigAdminSettingValue> values, IEnumerable<string> reviewedKeys, string statusMessage)
+    private static void OpenLanguageConfigFromBasicConfig()
     {
-        _configAdminDraft = ConfigAdminSettingRegistry.Settings.ToDictionary(
-            setting => setting.Key,
-            setting => _config == null ? string.Empty : setting.GetValue(_config),
-            StringComparer.OrdinalIgnoreCase);
-
-        if (values != null)
-        {
-            foreach (var value in values.Where(value => !string.IsNullOrWhiteSpace(value?.Key)))
-            {
-                _configAdminDraft[value.Key] = value.Value ?? string.Empty;
-            }
-        }
-
-        _configAdminReviewedKeys = new HashSet<string>(reviewedKeys ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
-        _configAdminStatusMessage = statusMessage;
-        _configAdminLoadedDraft = new Dictionary<string, string>(_configAdminDraft, StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static void OpenConfigAdminDialog()
-    {
-        if (_api == null)
-        {
-            return;
-        }
-
-        _configAdminOpenQueued = false;
-        _configAdminDialog?.TryCloseWithoutPrompt();
-        _configAdminDialog = new ConfirmingConfigAdminDialog(
-            BuildConfigAdminDialogSettings(),
-            _api,
-            focusFirstElement: false,
-            HasConfigAdminUnsavedChanges,
-            ConfirmConfigAdminDiscard,
-            OnConfigAdminDialogClosed);
-        _configAdminDialog.TryOpen(withFocus: false);
-    }
-
-    private static void QueueConfigAdminDialogOpen()
-    {
-        if (_api == null || _configAdminOpenQueued)
-        {
-            return;
-        }
-
-        _configAdminOpenQueued = true;
-        var dialogToReplace = _configAdminDialog;
-        _api.Event.RegisterCallback(_ =>
-        {
-            _configAdminOpenQueued = false;
-            if (_api == null || dialogToReplace == null || _configAdminDialog != dialogToReplace || !dialogToReplace.IsOpened())
-            {
-                return;
-            }
-
-            OpenConfigAdminDialog();
-        }, 1, true);
-    }
-
-    private static void OnConfigAdminDialogClosed()
-    {
-        _configAdminDialog = null;
-        var unsavedCloseConfirm = _configAdminUnsavedCloseConfirm;
-        _configAdminUnsavedCloseConfirm = null;
-        unsavedCloseConfirm?.TryClose();
-    }
-
-    private static bool HasConfigAdminUnsavedChanges()
-    {
-        foreach (var key in ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key))
-        {
-            _configAdminDraft.TryGetValue(key, out var draftValue);
-            _configAdminLoadedDraft.TryGetValue(key, out var loadedValue);
-            if (!string.Equals(draftValue ?? string.Empty, loadedValue ?? string.Empty, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static void ConfirmConfigAdminDiscard(Action onDiscard)
-    {
-        if (_api == null || _configAdminUnsavedCloseConfirm?.IsOpened() == true)
-        {
-            return;
-        }
-
-        _configAdminUnsavedCloseConfirm = new GuiDialogConfirm(_api, Lang.Get("thebasics:config-admin-close-unsaved-confirm"), ok =>
-        {
-            _configAdminUnsavedCloseConfirm = null;
-            if (ok)
-            {
-                onDiscard?.Invoke();
-            }
-        });
-        _configAdminUnsavedCloseConfirm.TryOpen();
-    }
-
-    private static JsonDialogSettings BuildConfigAdminDialogSettings()
-    {
-        var rows = new List<DialogRow>
-        {
-            new(new DialogElement
-            {
-                Code = "title",
-                Type = EnumDialogElementType.Text,
-                Text = Lang.Get("thebasics:config-admin-title"),
-                Width = 720,
-                Height = 32,
-                FontSize = 18
-            })
-        };
-
-        AddConfigAdminStatusRow(rows);
-        AddConfigAdminGroupSelectorRow(rows);
-        AddConfigAdminLanguageShortcutRow(rows);
-        AddConfigAdminSettingRows(rows);
-        AddConfigAdminActionRows(rows);
-
-        return new JsonDialogSettings
-        {
-            Code = "thebasics-config-admin",
-            Alignment = EnumDialogArea.CenterMiddle,
-            Rows = rows.ToArray(),
-            SizeMultiplier = 0.9,
-            Padding = 16,
-            DisableWorldInteract = true,
-            OnGet = GetConfigAdminValue,
-            OnSet = SetConfigAdminValue
-        };
-    }
-
-    private static void AddConfigAdminStatusRow(List<DialogRow> rows)
-    {
-        if (!string.IsNullOrWhiteSpace(_configAdminStatusMessage))
-        {
-            rows.Add(new DialogRow(new DialogElement
-            {
-                Code = "status",
-                Type = EnumDialogElementType.Text,
-                Text = _configAdminStatusMessage,
-                Width = 720,
-                Height = 42,
-                FontSize = 13
-            }));
-        }
-    }
-
-    private static void AddConfigAdminGroupSelectorRow(List<DialogRow> rows)
-    {
-        var groups = GetConfigAdminGroups();
-        _configAdminSelectedGroup = NormalizeConfigAdminGroup(_configAdminSelectedGroup, groups);
-        rows.Add(new DialogRow(new DialogElement
-        {
-            Code = "group-select",
-            Label = "thebasics:config-admin-group",
-            Tooltip = "thebasics:config-admin-group-tooltip",
-            Type = EnumDialogElementType.Select,
-            Mode = EnumDialogElementMode.DropDown,
-            Values = groups.ToArray(),
-            Names = groups.ToArray(),
-            Width = 720,
-            Height = 28
-        })
-        {
-            TopPadding = 8,
-            BottomPadding = 6
-        });
-    }
-
-    private static void AddConfigAdminLanguageShortcutRow(List<DialogRow> rows)
-    {
-        rows.Add(new DialogRow(
-            CreateButton("languages", Lang.Get("thebasics:config-admin-languages"), Lang.Get("thebasics:config-admin-languages-tooltip")),
-            CreateButton("charsheetfields", Lang.Get("thebasics:config-admin-charsheet-fields"), Lang.Get("thebasics:config-admin-charsheet-fields-tooltip")),
-            CreateButton("guide", Lang.Get("thebasics:guide-button"), Lang.Get("thebasics:config-admin-guide-tooltip")))
-        {
-            TopPadding = 4,
-            BottomPadding = 8
-        });
-    }
-
-    private static void AddConfigAdminSettingRows(List<DialogRow> rows)
-    {
-        foreach (var group in ConfigAdminSettingRegistry.Settings.Where(setting => string.Equals(setting.Group, _configAdminSelectedGroup, StringComparison.OrdinalIgnoreCase)).GroupBy(setting => setting.Group))
-        {
-            rows.Add(new DialogRow(new DialogElement
-            {
-                Code = "group-" + group.Key,
-                Type = EnumDialogElementType.Text,
-                Text = group.Key,
-                Width = 720,
-                Height = 26,
-                FontSize = 15
-            })
-            {
-                TopPadding = 8,
-                BottomPadding = 2
-            });
-
-            foreach (var setting in group.OrderBy(setting => _configAdminReviewedKeys.Contains(setting.Key) ? 1 : 0).ThenBy(setting => setting.Label))
-            {
-                rows.Add(new DialogRow(CreateConfigAdminElement(setting))
-                {
-                    BottomPadding = 4
-                });
-            }
-        }
-    }
-
-    private static void AddConfigAdminActionRows(List<DialogRow> rows)
-    {
-        rows.Add(new DialogRow(
-            CreateButton("save", Lang.Get("thebasics:config-admin-save"), Lang.Get("thebasics:config-admin-save-tooltip")),
-            CreateButton("mark-reviewed", Lang.Get("thebasics:config-admin-mark-reviewed"), Lang.Get("thebasics:config-admin-mark-reviewed-tooltip")),
-            CreateButton("reload", Lang.Get("thebasics:config-admin-reload"), Lang.Get("thebasics:config-admin-reload-tooltip")))
-        {
-            TopPadding = 12
-        });
-
-        rows.Add(new DialogRow(
-            CreateButton("close", Lang.Get("thebasics:config-admin-close"), Lang.Get("thebasics:config-admin-close-tooltip")))
-        {
-            TopPadding = 4
-        });
-    }
-
-    private static List<string> GetConfigAdminGroups()
-    {
-        return ConfigAdminSettingRegistry.Settings
-            .Select(setting => setting.Group)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    private static string NormalizeConfigAdminGroup(string group, IReadOnlyList<string> groups)
-    {
-        if (groups.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        return groups.FirstOrDefault(candidate => string.Equals(candidate, group, StringComparison.OrdinalIgnoreCase)) ?? groups[0];
-    }
-
-    private static DialogElement CreateConfigAdminElement(ConfigAdminSettingDefinition setting)
-    {
-        var label = _configAdminReviewedKeys.Contains(setting.Key) ? setting.Label : Lang.Get("thebasics:config-admin-new-prefix", setting.Label);
-        var tooltip = setting.ReloadBehavior == ConfigAdminReloadBehavior.Live
-            ? Lang.Get("thebasics:config-admin-live-tooltip", setting.Description)
-            : Lang.Get("thebasics:config-admin-restart-tooltip", setting.Description);
-
-        var element = new DialogElement
-        {
-            Code = setting.Key,
-            Label = label,
-            Tooltip = tooltip,
-            Width = 720,
-            Height = 28
-        };
-
-        switch (setting.Kind)
-        {
-            case ConfigAdminSettingKind.Boolean:
-                element.Type = EnumDialogElementType.Switch;
-                break;
-            case ConfigAdminSettingKind.Integer:
-            case ConfigAdminSettingKind.Decimal:
-                element.Type = EnumDialogElementType.NumberInput;
-                break;
-            case ConfigAdminSettingKind.Select:
-                element.Type = EnumDialogElementType.Select;
-                element.Mode = EnumDialogElementMode.DropDown;
-                element.Values = setting.Options.ToArray();
-                element.Names = setting.OptionNames.ToArray();
-                break;
-            default:
-                element.Type = EnumDialogElementType.Input;
-                break;
-        }
-
-        return element;
-    }
-
-    private static DialogElement CreateButton(string code, string text, string tooltip)
-    {
-        return new DialogElement
-        {
-            Code = code,
-            Type = EnumDialogElementType.Button,
-            Text = text,
-            Tooltip = tooltip,
-            Width = 150,
-            Height = 34,
-            FontSize = 13
-        };
-    }
-
-    private static string GetConfigAdminValue(string code)
-    {
-        if (code == "group-select")
-        {
-            return _configAdminSelectedGroup ?? string.Empty;
-        }
-
-        return _configAdminDraft.TryGetValue(code, out var value) ? value : string.Empty;
-    }
-
-    private static void SetConfigAdminValue(string code, string value)
-    {
-        switch (code)
-        {
-            case "save":
-                SendConfigAdminSave();
-                break;
-            case "languages":
-                OpenLanguageConfigFromConfigAdmin();
-                break;
-            case "charsheetfields":
-                OpenCharacterSheetFieldConfigFromConfigAdmin();
-                break;
-            case "guide":
-                HandbookGuide.Open(_api, HandbookGuide.OverviewPage);
-                break;
-            case "mark-reviewed":
-                SendConfigAdminMarkReviewed();
-                break;
-            case "reload":
-                if (HasConfigAdminUnsavedChanges())
-                {
-                    ConfirmConfigAdminDiscard(SendConfigAdminReload);
-                }
-                else
-                {
-                    SendConfigAdminReload();
-                }
-                break;
-            case "close":
-                _configAdminDialog?.TryClose();
-                break;
-            case "group-select":
-                _configAdminSelectedGroup = NormalizeConfigAdminGroup(value, GetConfigAdminGroups());
-                QueueConfigAdminDialogOpen();
-                break;
-            default:
-                if (ConfigAdminSettingRegistry.TryGet(code, out _))
-                {
-                    _configAdminDraft[code] = value ?? string.Empty;
-                }
-                break;
-        }
-    }
-
-    private static void OpenLanguageConfigFromConfigAdmin()
-    {
-        _returnToConfigAdminAfterLanguageDialog = true;
-        _configAdminDialog?.TryCloseWithoutPrompt();
+        _returnToBasicConfigAfterLanguageDialog = true;
+        _basicConfigClientController?.CloseWithoutPrompt();
         SendLanguageConfigOpenRequest();
     }
 
-    private static void OpenCharacterSheetFieldConfigFromConfigAdmin()
+    private static void OpenCharacterSheetFieldConfigFromBasicConfig()
     {
-        _returnToConfigAdminAfterCharacterSheetFieldDialog = true;
-        _configAdminDialog?.TryCloseWithoutPrompt();
+        _returnToBasicConfigAfterCharacterSheetFieldDialog = true;
+        _basicConfigClientController?.CloseWithoutPrompt();
         SendCharacterSheetFieldConfigOpenRequest();
-    }
-
-    private static void SendConfigAdminSave()
-    {
-        _safeNetworkChannel?.SendPacketSafely(new TheBasicsConfigAdminSaveMessage
-        {
-            Values = _configAdminDraft
-                .Select(kvp => new ConfigAdminSettingValue { Key = kvp.Key, Value = kvp.Value })
-                .ToList()
-        });
-    }
-
-    private static void SendConfigAdminMarkReviewed()
-    {
-        _safeNetworkChannel?.SendPacketSafely(new TheBasicsConfigAdminSaveMessage
-        {
-            MarkReviewedKeys = ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key).ToList()
-        });
-    }
-
-    private static void SendConfigAdminReload()
-    {
-        _safeNetworkChannel?.SendPacketSafely(new TheBasicsConfigAdminSaveMessage
-        {
-            ReloadFromDisk = true
-        });
     }
 
     private static void SendLanguageConfigOpenRequest()
@@ -2235,8 +1835,8 @@ public class ChatUiSystem : ModSystem
             _pendingConfigActions.Clear();
             _safeNetworkChannel?.Dispose();
             _safeNetworkChannel = null;
-            _returnToConfigAdminAfterLanguageDialog = false;
-            _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
+            _returnToBasicConfigAfterLanguageDialog = false;
+            _returnToBasicConfigAfterCharacterSheetFieldDialog = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
             _suppressNextCharacterDialogSheetOpen = false;
             _characterSheetOpenedFromCharacterDialog = false;
@@ -2255,16 +1855,6 @@ public class ChatUiSystem : ModSystem
             _playerNotesDialog = null;
             _chatHistoryDialog?.TryClose();
             _chatHistoryDialog = null;
-            _configAdminDialog?.TryCloseWithoutPrompt();
-            _configAdminDialog = null;
-            var configAdminUnsavedCloseConfirm = _configAdminUnsavedCloseConfirm;
-            _configAdminUnsavedCloseConfirm = null;
-            configAdminUnsavedCloseConfirm?.TryClose();
-            _configAdminDraft.Clear();
-            _configAdminReviewedKeys.Clear();
-            _configAdminSelectedGroup = null;
-            _configAdminOpenQueued = false;
-            _configAdminStatusMessage = null;
 
             // Clear static typing indicator state to prevent stale data on reconnect/world reload.
             _typingStatesByEntityId.Clear();
@@ -2450,72 +2040,4 @@ public class ChatUiSystem : ModSystem
         }
     }
 
-    private sealed class ConfirmingConfigAdminDialog : GuiJsonDialog
-    {
-        private readonly Func<bool> _hasUnsavedChanges;
-        private readonly Action<Action> _confirmDiscard;
-        private readonly Action _onClosed;
-        private bool _forceClose;
-
-        public ConfirmingConfigAdminDialog(
-            JsonDialogSettings settings,
-            ICoreClientAPI capi,
-            bool focusFirstElement,
-            Func<bool> hasUnsavedChanges,
-            Action<Action> confirmDiscard,
-            Action onClosed) : base(settings, capi, focusFirstElement)
-        {
-            _hasUnsavedChanges = hasUnsavedChanges;
-            _confirmDiscard = confirmDiscard;
-            _onClosed = onClosed;
-        }
-
-        public override bool TryClose()
-        {
-            return TryCloseWithContinuation(null);
-        }
-
-        public bool TryCloseWithContinuation(Action afterClose)
-        {
-            if (!_forceClose && _hasUnsavedChanges?.Invoke() == true)
-            {
-                _confirmDiscard?.Invoke(() =>
-                {
-                    if (TryCloseWithoutPrompt())
-                    {
-                        afterClose?.Invoke();
-                    }
-                });
-                return false;
-            }
-
-            var closed = base.TryClose();
-            if (closed)
-            {
-                _onClosed?.Invoke();
-                afterClose?.Invoke();
-            }
-
-            return closed;
-        }
-
-        public bool TryCloseWithoutPrompt()
-        {
-            _forceClose = true;
-            try
-            {
-                var closed = base.TryClose();
-                if (closed)
-                {
-                    _onClosed?.Invoke();
-                }
-
-                return closed;
-            }
-            finally
-            {
-                _forceClose = false;
-            }
-        }
-    }
 }

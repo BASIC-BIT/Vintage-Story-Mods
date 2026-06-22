@@ -1,4 +1,5 @@
 using FluentAssertions;
+using BasicConfig;
 using thebasics.Configs;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.PlayerStats.Models;
@@ -6,7 +7,7 @@ using thebasics.ModSystems.ProximityChat.Models;
 
 namespace thebasics.Tests.ModSystems.AdminConfig;
 
-public class ConfigAdminSettingRegistryTests
+public class TheBasicsBasicConfigSchemaTests
 {
     [Fact]
     public void ValidateConfig_RejectsRangeAtOrBelowObfuscationStart()
@@ -15,7 +16,7 @@ public class ConfigAdminSettingRegistryTests
         var setting = GetSetting("ProximityChatModeDistances.Normal");
 
         var success = setting.TrySetValue(config, "15", out var error);
-        var errors = ConfigAdminSettingRegistry.ValidateConfig(config);
+        var errors = TheBasicsBasicConfigSchema.ValidateConfig(config);
 
         success.Should().BeTrue(error);
         errors.Should().ContainSingle().Which.Should().Contain("Normal range must be greater than its obfuscation start");
@@ -29,7 +30,7 @@ public class ConfigAdminSettingRegistryTests
         var setting = GetSetting("ProximityChatModeObfuscationRanges.Normal");
 
         var success = setting.TrySetValue(config, "35", out var error);
-        var errors = ConfigAdminSettingRegistry.ValidateConfig(config);
+        var errors = TheBasicsBasicConfigSchema.ValidateConfig(config);
 
         success.Should().BeTrue(error);
         errors.Should().ContainSingle().Which.Should().Contain("Normal range must be greater than its obfuscation start");
@@ -360,9 +361,9 @@ public class ConfigAdminSettingRegistryTests
         return config;
     }
 
-    private static ConfigAdminSettingDefinition GetSetting(string key)
+    private static BasicConfigSettingDefinition<ModConfig> GetSetting(string key)
     {
-        ConfigAdminSettingRegistry.TryGet(key, out var setting).Should().BeTrue($"{key} should be registered");
+        TheBasicsBasicConfigSchema.TryGet(key, out var setting).Should().BeTrue($"{key} should be registered");
         return setting;
     }
 }

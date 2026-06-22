@@ -879,9 +879,5 @@ namespace thebasics.Configs
 
         [ProtoMember(146)]
         public SemanticLanguageLearningConfig SemanticLanguageLearning { get; set; } = new SemanticLanguageLearningConfig();
-
-        // Opt-in while BasicConfig is proven across mods. The legacy in-mod config UI remains default.
-        [ProtoMember(147)]
-        public bool UseBasicConfigAdminUi { get; set; } = false;
     }
 }
