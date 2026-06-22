@@ -9,6 +9,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using BasicConfig;
 using HarmonyLib;
 using thebasics.Configs;
 using thebasics.Models;
@@ -40,6 +41,7 @@ public class ChatUiSystem : ModSystem
 
     private static IClientNetworkChannel _clientConfigChannel;
     private static SafeClientNetworkChannel _safeNetworkChannel;
+    private static BasicConfigClientController _basicConfigClientController;
     private static bool _lastClientChannelConnected;
     private static bool _usingRptts = false;
     private static dynamic _rpttsApi = null;
@@ -277,6 +279,9 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsConfigAdminOpenMessage>()
             .RegisterMessageType<TheBasicsConfigAdminSaveMessage>()
             .RegisterMessageType<TheBasicsConfigAdminResultMessage>()
+            .RegisterMessageType<BasicConfigOpenMessage>()
+            .RegisterMessageType<BasicConfigSaveMessage>()
+            .RegisterMessageType<BasicConfigResultMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenRequest>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigSaveMessage>()
@@ -307,6 +312,8 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
+            .SetMessageHandler<BasicConfigOpenMessage>(OnBasicConfigOpenMessage)
+            .SetMessageHandler<BasicConfigResultMessage>(OnBasicConfigResultMessage)
             .SetMessageHandler<TheBasicsLanguageConfigOpenMessage>(OnLanguageConfigOpenMessage)
             .SetMessageHandler<TheBasicsLanguageConfigResultMessage>(OnLanguageConfigResultMessage)
             .SetMessageHandler<TheBasicsCharacterSheetFieldConfigOpenMessage>(OnCharacterSheetFieldConfigOpenMessage)
@@ -330,6 +337,32 @@ public class ChatUiSystem : ModSystem
             MaxRetries = 10
         };
         _safeNetworkChannel = new SafeClientNetworkChannel(_clientConfigChannel, _api, config);
+        _basicConfigClientController = new BasicConfigClientController(new BasicConfigClientOptions
+        {
+            ConfigId = TheBasicsBasicConfigSchema.ConfigId,
+            DisplayName = "The BASICs",
+            Title = "The BASICs Config",
+            DialogCode = "thebasics-basicconfig-admin",
+            Api = _api,
+            Settings = TheBasicsBasicConfigSchema.Build().Settings.Cast<IBasicConfigSettingDefinition>().ToList(),
+            SendPacket = packet =>
+            {
+                if (packet is BasicConfigSaveMessage saveMessage)
+                {
+                    _safeNetworkChannel?.SendPacketSafely(saveMessage);
+                }
+            }
+        });
+    }
+
+    private static void OnBasicConfigOpenMessage(BasicConfigOpenMessage message)
+    {
+        _basicConfigClientController?.OnOpenMessage(message);
+    }
+
+    private static void OnBasicConfigResultMessage(BasicConfigResultMessage message)
+    {
+        _basicConfigClientController?.OnResultMessage(message);
     }
 
     private static void OnCharacterSheetViewMessage(CharacterSheetViewMessage message)

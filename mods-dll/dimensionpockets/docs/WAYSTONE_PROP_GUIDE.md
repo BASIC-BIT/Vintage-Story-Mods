@@ -217,13 +217,15 @@ In-game verification:
 - Use `/pocket inspect <name>` to confirm the expected return pedestal position and actual block code.
 - Craft or place an external `pocketdimensions:pocketwaystone`.
 - Look at the external Waystone and run `/pocket bind <name>`.
-- Right-click the bound external Waystone and confirm it enters the bound pocket.
-- Break the external Waystone and confirm it drops as an item.
+- Right-click the bound external Waystone and confirm it enters the bound pocket after the configured delay and sounds.
+- Try to break the bound external Waystone and confirm breaking is denied with guidance to run `/pocket unbind`.
+- Run `/pocket unbind`, break the now-unbound external Waystone, and confirm it drops as an item.
+- Run `/pocket links` before and after unbinding to confirm link status reporting changes as expected.
 - Place or inspect the block in creative mode when manual QA is approved.
 - Confirm selection outline matches `selectionbox`.
 - Confirm collision matches `collisionbox`.
 - Confirm adjacent faces are not culled incorrectly.
-- Confirm right-clicking the return pedestal returns to the linked external Waystone endpoint after Waystone entry and to the captured command-entry point after `/pocket enter`.
+- Confirm right-clicking the return pedestal returns after the configured delay to the linked external Waystone endpoint after Waystone entry and to the captured command-entry point after `/pocket enter`.
 - Confirm player breaking is denied for `pocketdimensions:pocketreturnpedestal`.
 
 Do not mark the prop done based only on "looks okay." The prop needs clean logs, correct package contents, correct block code at the managed return location, correct selection/collision behavior, and retained right-click behavior.

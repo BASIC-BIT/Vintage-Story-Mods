@@ -61,6 +61,9 @@
   <ItemGroup>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\shared\basicconfig\src\**\*.cs" Link="BasicConfig\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="SkiaSharp" Version="3.119.1" Condition="!Exists('$(VINTAGE_STORY)\Lib\SkiaSharp.dll')" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.26.0.140279">

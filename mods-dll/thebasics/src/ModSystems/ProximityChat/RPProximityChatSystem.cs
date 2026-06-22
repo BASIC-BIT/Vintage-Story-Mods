@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using BasicConfig;
 using HarmonyLib;
 using thebasics.Configs;
 using thebasics.Extensions;
@@ -34,6 +35,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     public LanguageSystem LanguageSystem { get; set; }
     public DistanceObfuscationSystem DistanceObfuscationSystem { get; set; }
     private IServerNetworkChannel _serverConfigChannel;
+    private BasicConfigServerController<ModConfig> _basicConfigController;
     public ProximityCheckUtils ProximityCheckUtils { get; set; }
     public TransformerSystem TransformerSystem { get; set; }
     private Th3EssentialsDiscordRelay _th3EssentialsDiscordRelay;
@@ -417,7 +419,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return TextCommandResult.Error("This command can only be used by a player.");
         }
 
-        SendConfigAdminOpen(player, null);
+        if (Config.UseBasicConfigAdminUi && _basicConfigController != null)
+        {
+            _basicConfigController.SendOpen(player);
+        }
+        else
+        {
+            SendConfigAdminOpen(player, null);
+        }
+
         return TextCommandResult.Success("Opening The BASICs config panel.");
     }
 
@@ -566,6 +576,9 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .RegisterMessageType<TheBasicsConfigAdminOpenMessage>()
             .RegisterMessageType<TheBasicsConfigAdminSaveMessage>()
             .RegisterMessageType<TheBasicsConfigAdminResultMessage>()
+            .RegisterMessageType<BasicConfigOpenMessage>()
+            .RegisterMessageType<BasicConfigSaveMessage>()
+            .RegisterMessageType<BasicConfigResultMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenRequest>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigSaveMessage>()
@@ -608,7 +621,34 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .SetMessageHandler<TheBasicsNotesOpenRequest>(OnNotesOpenRequest)
             .SetMessageHandler<TheBasicsNotesSaveMessage>(OnNotesSaveMessage)
             .SetMessageHandler<TheBasicsChatHistoryQueryRequest>(OnChatHistoryQueryRequest)
+            .SetMessageHandler<BasicConfigSaveMessage>(OnBasicConfigSaveMessage)
             .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
+
+        _basicConfigController = new BasicConfigServerController<ModConfig>(new BasicConfigServerControllerOptions<ModConfig>
+        {
+            ConfigId = TheBasicsBasicConfigSchema.ConfigId,
+            DisplayName = "The BASICs",
+            Schema = TheBasicsBasicConfigSchema.Build(),
+            Channel = _serverConfigChannel,
+            CanEdit = player => player?.HasPrivilege(Privilege.root) == true,
+            GetConfig = () => Config,
+            ReloadConfig = () => ReloadSharedConfigFromDisk(API),
+            SaveConfig = () => SaveSharedConfig(API),
+            CloneConfig = CloneConfig,
+            CopyConfig = CopyConfigValues,
+            GetReviewedKeys = config => config.ReviewedConfigSettingKeys,
+            SetReviewedKeys = (config, keys) => config.ReviewedConfigSettingKeys = keys,
+            AfterChanged = changedKeys =>
+            {
+                ApplyConfigChangeSideEffects(changedKeys);
+                BroadcastClientConfigs();
+            }
+        });
+    }
+
+    private void OnBasicConfigSaveMessage(IServerPlayer player, BasicConfigSaveMessage message)
+    {
+        _basicConfigController?.OnSaveMessage(player, message);
     }
 
     /// <summary>

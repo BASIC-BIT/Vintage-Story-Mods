@@ -36,6 +36,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\shared\basicconfig\src\**\*.cs" Link="BasicConfig\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="modinfo.json" />
     <Content Include="README.md" />
     <Content Include="assets\**\*" />
