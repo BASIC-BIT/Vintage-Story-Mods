@@ -1,0 +1,14 @@
+{
+  "type": "code",
+  "modid": "basicconfig",
+  "name": "BasicConfig",
+  "authors": [
+    "BASIC"
+  ],
+  "description": "Shared in-game config UI and command registry for BASIC mods.",
+  "version": "0.1.0",
+  "dependencies": {
+    "game": ""
+  },
+  "side": "universal"
+}

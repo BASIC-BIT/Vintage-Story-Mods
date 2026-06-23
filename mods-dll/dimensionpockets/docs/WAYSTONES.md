@@ -6,10 +6,12 @@ Pocket Waystones let players enter bound pocket dimensions without typing comman
 
 - Each newly prepared pocket gets a protected `pocketdimensions:pocketreturnpedestal` near the center spawn area.
 - The return pedestal is protected by Pocket Dimensions policy and is not breakable through normal player block-breaking hooks.
-- Right-clicking the return pedestal uses DimensionLib's explicit `TeleportToLocation(...)` primitive. It returns through the player's active ingress Waystone, the captured command-entry location, or the single linked Waystone fallback, in that order.
+- Right-clicking the return pedestal starts the configured delayed-transfer flow and then uses DimensionLib's explicit `TeleportToLocation(...)` primitive. It returns through the player's active ingress Waystone, the captured command-entry location, or the single linked Waystone fallback, in that order.
 - Pocket Dimensions records durable Waystone endpoint links plus minimal active trip state. This includes `player -> pocket -> endpoint` for Waystone ingress and `player -> pocket -> location` for unanchored command ingress, not a generic return stack.
-- Externally placed Waystones are craftable, breakable, and bindable with `/pocket bind <name>`.
-- Right-clicking a bound external Waystone records that endpoint as the player's active ingress for the destination pocket, idempotently ensures pocket infrastructure, and calls DimensionLib's `TeleportToDimension(player, dimensionId, RecordReturn=false)` primitive.
+- Externally placed Waystones are craftable, breakable while unbound, and bindable with `/pocket bind <name>`.
+- Right-clicking a bound external Waystone records that endpoint as the player's active ingress for the destination pocket, idempotently ensures pocket infrastructure, plays the configured start sound, waits the configured teleport delay, revalidates the binding, and calls DimensionLib's `TeleportToDimension(player, dimensionId, RecordReturn=false)` primitive.
+- Bound Waystones require `/pocket unbind` before breaking. Unbinding preserves active return locations for players already inside that pocket.
+- `/pocket links` reports durable Waystone links and stale/missing pocket, block, and binding state.
 - The Waystone is intentionally product-layer code; DimensionLib should provide location/link and transfer primitives, not Waystone lore or assets.
 - The Waystone model is a neutral JSON prop with dedicated generated stone, trim, and accent textures. See `WAYSTONE_PROP_GUIDE.md` for the prop design, modeling, and verification plan.
 
@@ -20,7 +22,6 @@ The return pedestal is placed center-adjacent rather than exactly inside the spa
 ## Future Slices
 
 - Hand-tune or replace the generated stone, trim, and accent textures after visual feedback.
-- Add an admin inspection/report command for Waystone links.
 - Add a multi-pocket chooser UI for Waystones with more than one target.
 - Add optional lore, model, texture, and naming overrides for servers.
 - Explore walk-through portals only after Waystone flows are proven.
@@ -48,3 +49,5 @@ To clear an external Waystone binding, look at it and run:
 ```text
 /pocket unbind
 ```
+
+After unbinding, players with `BreakWaystonePrivilege` can break the external Waystone normally.

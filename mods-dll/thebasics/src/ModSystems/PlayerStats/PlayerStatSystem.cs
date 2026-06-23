@@ -220,36 +220,9 @@ namespace thebasics.ModSystems.PlayerStats
 
         private TextCommandResult GetStats(TextCommandCallingArgs args)
         {
-            var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
-            var isOtherPlayer = !args.Parsers[0].IsMissing;
-            var otherPlayer = args.Parsers[0].GetValue();
-
-            if (!isOtherPlayer && args.Caller.Type != EnumCallerType.Player)
+            if (!TryResolveStatsTarget(args, out var targetPlayer, out var isOtherPlayer, out var errorResult))
             {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:stats-error-must-be-player"),
-                };
-            }
-
-            if (isOtherPlayer && otherPlayer == null)
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:stats-error-player-not-found"),
-                };
-            }
-            var targetPlayer = isOtherPlayer ? API.GetPlayerByUID(((PlayerUidName[])args.Parsers[0].GetValue())[0].Uid) : player;
-
-            if (targetPlayer == null)
-            {
-                return new TextCommandResult
-                {
-                    Status = EnumCommandStatus.Error,
-                    StatusMessage = Lang.Get("thebasics:stats-error-player-not-found"),
-                };
+                return errorResult;
             }
 
             var message = new StringBuilder();
@@ -269,6 +242,51 @@ namespace thebasics.ModSystems.PlayerStats
             {
                 Status = EnumCommandStatus.Success,
                 StatusMessage = message.ToString(),
+            };
+        }
+
+        private bool TryResolveStatsTarget(TextCommandCallingArgs args, out IServerPlayer targetPlayer, out bool isOtherPlayer, out TextCommandResult errorResult)
+        {
+            targetPlayer = null;
+            errorResult = null;
+            isOtherPlayer = !args.Parsers[0].IsMissing;
+            if (!isOtherPlayer && args.Caller.Type != EnumCallerType.Player)
+            {
+                errorResult = ErrorResult("thebasics:stats-error-must-be-player");
+                return false;
+            }
+
+            if (isOtherPlayer)
+            {
+                var selectedPlayers = args.Parsers[0].GetValue() as PlayerUidName[];
+                if (selectedPlayers == null || selectedPlayers.Length == 0)
+                {
+                    errorResult = ErrorResult("thebasics:stats-error-player-not-found");
+                    return false;
+                }
+
+                targetPlayer = API.GetPlayerByUID(selectedPlayers[0].Uid);
+            }
+            else
+            {
+                targetPlayer = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
+            }
+
+            if (targetPlayer != null)
+            {
+                return true;
+            }
+
+            errorResult = ErrorResult("thebasics:stats-error-player-not-found");
+            return false;
+        }
+
+        private static TextCommandResult ErrorResult(string langKey)
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = Lang.Get(langKey),
             };
         }
 

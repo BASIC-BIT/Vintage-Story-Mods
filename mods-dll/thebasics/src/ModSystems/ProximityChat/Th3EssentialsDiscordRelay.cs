@@ -79,7 +79,9 @@ internal sealed class Th3EssentialsDiscordRelay
 
         // Th3Essentials only exposes system/admin send helpers publicly. Its normal chat
         // queue is private, but using it preserves the configured chat channel and batching.
+#pragma warning disable S3011
         var queueField = discord.GetType().GetField("sendQueue", BindingFlags.Instance | BindingFlags.NonPublic);
+#pragma warning restore S3011
         if (queueField?.GetValue(discord) is not ConcurrentQueue<string> queue)
         {
             LogReflectionFailure("Th3Essentials sendQueue field was not found");
@@ -124,7 +126,10 @@ internal sealed class Th3EssentialsDiscordRelay
 
     private bool IsDiscordChatRelayEnabled(object discord)
     {
+        // Th3Essentials keeps these settings on private fields; there is no public API for chat relay status.
+#pragma warning disable S3011
         var configField = discord.GetType().GetField("Config", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+#pragma warning restore S3011
         var config = configField?.GetValue(discord);
         if (config == null)
         {
@@ -132,7 +137,9 @@ internal sealed class Th3EssentialsDiscordRelay
             return false;
         }
 
+#pragma warning disable S3011
         var relayField = config.GetType().GetField("DiscordChatRelay", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+#pragma warning restore S3011
         if (relayField?.GetValue(config) is not bool enabled)
         {
             LogReflectionFailure("Th3Essentials DiscordChatRelay field was not found");

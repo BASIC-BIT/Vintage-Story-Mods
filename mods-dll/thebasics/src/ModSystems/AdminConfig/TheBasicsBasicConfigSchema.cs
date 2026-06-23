@@ -1,0 +1,670 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using BasicConfig;
+using thebasics.Configs;
+using thebasics.Models;
+using thebasics.ModSystems.PlayerStats.Definitions;
+using thebasics.ModSystems.PlayerStats.Models;
+using thebasics.ModSystems.ProximityChat.Models;
+
+namespace thebasics.ModSystems.AdminConfig;
+
+internal static class TheBasicsBasicConfigSchema
+{
+    public const string ConfigId = "thebasics";
+
+    private readonly record struct SettingMeta(string Key, string Group, string Label, string Description, BasicConfigReloadBehavior ReloadBehavior);
+
+    private static readonly IReadOnlyList<BasicConfigSettingDefinition<ModConfig>> _settings = BuildSettings();
+    private static readonly IDictionary<string, BasicConfigSettingDefinition<ModConfig>> _settingsByKey =
+        _settings.ToDictionary(setting => setting.Key, StringComparer.OrdinalIgnoreCase);
+    private static readonly BasicConfigSchema<ModConfig> _schema = new(_settings, ValidateConfig);
+
+    public static IReadOnlyList<BasicConfigSettingDefinition<ModConfig>> Settings => _settings;
+
+    public static BasicConfigSchema<ModConfig> Build()
+    {
+        return _schema;
+    }
+
+    public static bool TryGet(string key, out BasicConfigSettingDefinition<ModConfig> setting)
+    {
+        return _settingsByKey.TryGetValue(key, out setting);
+    }
+
+    public static IReadOnlyList<string> ValidateConfig(ModConfig config)
+    {
+        var errors = new List<string>();
+
+        foreach (var mode in EnumValues<ProximityChatMode>())
+        {
+            var range = GetModeValue(config.ProximityChatModeDistances, mode, DefaultDistance(mode));
+            var obfuscationStart = GetModeValue(config.ProximityChatModeObfuscationRanges, mode, DefaultObfuscationStart(mode));
+            if (range <= obfuscationStart)
+            {
+                errors.Add($"{mode} range must be greater than its obfuscation start.");
+            }
+        }
+
+        return errors;
+    }
+
+    private static TeleportationConfig Teleportation(ModConfig config)
+    {
+        config.Teleportation ??= new TeleportationConfig();
+        config.Teleportation.InitializeDefaultsIfNeeded();
+        return config.Teleportation;
+    }
+
+    private static IReadOnlyList<BasicConfigSettingDefinition<ModConfig>> BuildSettings()
+    {
+        var settings = new List<BasicConfigSettingDefinition<ModConfig>>();
+        AddScalarSettings(settings);
+        AddProximityModeSettings(settings);
+        AddAudioModeSettings(settings);
+        AddDelimiterSettings(settings);
+        AddPlayerStatToggleSettings(settings);
+        return settings;
+    }
+
+    private static void AddScalarSettings(List<BasicConfigSettingDefinition<ModConfig>> settings)
+    {
+        AddCoreScalarSettings(settings);
+        AddServerNotificationScalarSettings(settings);
+        AddRemainingScalarSettings(settings);
+    }
+
+    private static void AddCoreScalarSettings(List<BasicConfigSettingDefinition<ModConfig>> settings)
+    {
+        settings.AddRange(new[]
+        {
+            Bool("EnableChatter", "Chat/RP", "Enable chatter sounds", "Play seraph voice chatter for speech messages.", BasicConfigReloadBehavior.Live, c => c.EnableChatter, (c, v) => c.EnableChatter = v),
+            Select("ProximityChatPresentationMode", "Chat/RP", "Chat presentation mode", "Controls how proximity speech appears in chat.", BasicConfigReloadBehavior.Live, (c => ProximityChatPresentationModes.Normalize(c.ProximityChatPresentationMode), (c, v) => c.ProximityChatPresentationMode = v), new[] { "StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose" }),
+            Bool("NormalizeProximityChatText", "Chat/RP", "Normalize proximity text", "Automatically capitalize and punctuate RP speech, emotes, and environmental messages.", BasicConfigReloadBehavior.Live, c => c.NormalizeProximityChatText, (c, v) => c.NormalizeProximityChatText = v),
+            Text("ProseNicknameToken", "Chat/RP", "Prose nickname token", "Standalone token replaced with the sender's RP nickname in Prose mode.", BasicConfigReloadBehavior.Live, c => c.ProseNicknameToken, (c, v) => c.ProseNicknameToken = v),
+            Bool("AttributeFreeformMessagesToPlayerName", "Chat/RP", "Attribute freeform messages", "Prefix Prose and environmental messages with account names for auditability.", BasicConfigReloadBehavior.Live, c => c.AttributeFreeformMessagesToPlayerName, (c, v) => c.AttributeFreeformMessagesToPlayerName = v),
+            Text("ProximityChatModeBabbleVerb", "Chat/RP", "Babble verb", "Verb used for unintelligible/babble speech.", BasicConfigReloadBehavior.Live, c => c.ProximityChatModeBabbleVerb, (c, v) => c.ProximityChatModeBabbleVerb = v),
+            Text("EmoteColor", "Chat/RP", "Emote color", "VTML color used for emote text.", BasicConfigReloadBehavior.Live, c => c.EmoteColor, (c, v) => c.EmoteColor = v),
+            Text("OOCColor", "Chat/RP", "OOC color", "VTML color used for local OOC text.", BasicConfigReloadBehavior.Live, c => c.OOCColor, (c, v) => c.OOCColor = v),
+            Text("GlobalOOCColor", "Chat/RP", "Global OOC color", "VTML color used for global OOC text.", BasicConfigReloadBehavior.Live, c => c.GlobalOOCColor, (c, v) => c.GlobalOOCColor = v),
+            Bool("UseNicknameInOOC", "Chat/RP", "Use nickname in OOC", "Use RP nicknames in local OOC messages.", BasicConfigReloadBehavior.Live, c => c.UseNicknameInOOC, (c, v) => c.UseNicknameInOOC = v),
+            Bool("UseNicknameInGlobalOOC", "Chat/RP", "Use nickname in global OOC", "Use RP nicknames in global OOC messages.", BasicConfigReloadBehavior.Live, c => c.UseNicknameInGlobalOOC, (c, v) => c.UseNicknameInGlobalOOC = v),
+            Bool("AllowOOCToggle", "Chat/RP", "Allow OOC toggle", "Allow players to toggle local OOC mode.", BasicConfigReloadBehavior.Live, c => c.AllowOOCToggle, (c, v) => c.AllowOOCToggle = v),
+            Bool("EnableDistanceObfuscationSystem", "Chat/RP", "Enable distance obfuscation", "Obfuscate speech by distance when configured.", BasicConfigReloadBehavior.Live, c => c.EnableDistanceObfuscationSystem, (c, v) => c.EnableDistanceObfuscationSystem = v),
+            Bool("EnableDistanceFontSizeSystem", "Chat/RP", "Enable distance font size", "Change chat font size by speech distance when configured.", BasicConfigReloadBehavior.Live, c => c.EnableDistanceFontSizeSystem, (c, v) => c.EnableDistanceFontSizeSystem = v),
+            Decimal("MaxEnvironmentPlacementDistance", "Chat/RP", "Max placed env distance", "Maximum raycast distance for placed environmental messages.", BasicConfigReloadBehavior.Live, (c => c.MaxEnvironmentPlacementDistance, (c, v) => c.MaxEnvironmentPlacementDistance = v), (0, 512)),
+            Bool("EnableChatHistory", "Chat History", "Enable chat history", "Store structured chat history for admin search.", BasicConfigReloadBehavior.Live, c => c.EnableChatHistory, (c, v) => c.EnableChatHistory = v),
+            Bool("ChatHistoryCaptureNonBasicChat", "Chat History", "Capture other chat", "Capture non-BASICs player chat observed through the server chat event.", BasicConfigReloadBehavior.Live, c => c.ChatHistoryCaptureNonBasicChat, (c, v) => c.ChatHistoryCaptureNonBasicChat = v),
+            Int("ChatHistoryRetentionDays", "Chat History", "Retention days", "Delete chat history older than this many days. 0 keeps history forever by age.", BasicConfigReloadBehavior.Live, (c => c.ChatHistoryRetentionDays, (c, v) => c.ChatHistoryRetentionDays = v), (0, 36500)),
+            Int("ChatHistoryMaxEntries", "Chat History", "Max retained entries", "Keep only the newest N chat entries. 0 keeps unlimited entries by count.", BasicConfigReloadBehavior.Live, (c => c.ChatHistoryMaxEntries, (c, v) => c.ChatHistoryMaxEntries = v), (0, 10000000)),
+            Int("ChatHistorySearchMaxResults", "Chat History", "Max search results", "Maximum chat history rows returned to an admin search request.", BasicConfigReloadBehavior.Live, (c => c.ChatHistorySearchMaxResults, (c, v) => c.ChatHistorySearchMaxResults = v), (1, 1000)),
+            Int("ChatHistoryFlushIntervalMilliseconds", "Chat History", "Flush interval ms", "How often queued chat history entries are flushed to disk.", BasicConfigReloadBehavior.RestartRequired, (c => c.ChatHistoryFlushIntervalMilliseconds, (c, v) => c.ChatHistoryFlushIntervalMilliseconds = v), (100, 60000)),
+            Bool("EnableTypingIndicator", "Client UX", "Enable typing indicator", "Show typing state above players.", BasicConfigReloadBehavior.Live, c => c.EnableTypingIndicator, (c, v) => c.EnableTypingIndicator = v),
+            Select("TypingIndicatorDisplayMode", "Client UX", "Typing indicator display", "Controls icon/text rendering for typing indicators.", BasicConfigReloadBehavior.Live, (c => c.TypingIndicatorDisplayMode.ToString(), (c, v) => c.TypingIndicatorDisplayMode = Enum.Parse<TypingIndicatorDisplayMode>(v, true)), EnumNames<TypingIndicatorDisplayMode>()),
+            Int("TypingIndicatorMaxRange", "Client UX", "Typing indicator range", "Maximum range in blocks for typing indicators.", BasicConfigReloadBehavior.Live, (c => c.TypingIndicatorMaxRange, (c, v) => c.TypingIndicatorMaxRange = v), (0, 512)),
+            Decimal("TypingIndicatorTimeoutSeconds", "Client UX", "Typing indicator timeout", "Seconds before typing state expires.", BasicConfigReloadBehavior.Live, (c => c.TypingIndicatorTimeoutSeconds, (c, v) => c.TypingIndicatorTimeoutSeconds = (float)v), (0, 60)),
+            Text("TypingIndicatorTextOverride", "Client UX", "Typing indicator text override", "Optional custom typing indicator text. Empty uses lang default.", BasicConfigReloadBehavior.Live, c => c.TypingIndicatorTextOverride, (c, v) => c.TypingIndicatorTextOverride = v),
+            Select("OverheadChatBubbleMode", "Client UX", "Overhead chat bubbles", "Controls RP text, vanilla, or disabled overhead bubbles.", BasicConfigReloadBehavior.Live, (c => c.OverheadChatBubbleMode, (c, v) => c.OverheadChatBubbleMode = v), new[] { "RpText", "Vanilla", "Off" }),
+            Int("SpeechBubbleMinimumDisplayMilliseconds", "Client UX", "Minimum bubble time", "Minimum speech bubble lifetime in milliseconds.", BasicConfigReloadBehavior.Live, (c => c.SpeechBubbleMinimumDisplayMilliseconds, (c, v) => c.SpeechBubbleMinimumDisplayMilliseconds = v), (0, 60000)),
+            Bool("ShowNicknameInNametag", "Client UX", "Show nickname in nametag", "Include RP nickname in rendered nametags.", BasicConfigReloadBehavior.Live, c => c.ShowNicknameInNametag, (c, v) => c.ShowNicknameInNametag = v),
+            Bool("ShowPlayerNameInNametag", "Client UX", "Show account name in nametag", "Include account name in rendered nametags.", BasicConfigReloadBehavior.Live, c => c.ShowPlayerNameInNametag, (c, v) => c.ShowPlayerNameInNametag = v),
+            Bool("HideNametagUnlessTargeting", "Client UX", "Hide nametag unless targeted", "Only show nametags when targeted.", BasicConfigReloadBehavior.Live, c => c.HideNametagUnlessTargeting, (c, v) => c.HideNametagUnlessTargeting = v),
+            Int("NametagRenderRange", "Client UX", "Nametag render range", "Maximum nametag render range in blocks.", BasicConfigReloadBehavior.Live, (c => c.NametagRenderRange, (c, v) => c.NametagRenderRange = v), (0, 512)),
+            Bool("NametagRequiresLineOfSight", "Client UX", "Nametag requires line of sight", "Require client line-of-sight for nametag rendering.", BasicConfigReloadBehavior.Live, c => c.NametagRequiresLineOfSight, (c, v) => c.NametagRequiresLineOfSight = v),
+            OptionalHexColor("NametagBackgroundColor", "Client UX", "Nametag background color", "Optional #RRGGBB or #RRGGBBAA background color for custom nametags. Empty uses the active UI theme.", BasicConfigReloadBehavior.Live, c => c.NametagBackgroundColor, (c, v) => c.NametagBackgroundColor = v),
+            OptionalHexColor("NametagBorderColor", "Client UX", "Nametag border color", "Optional #RRGGBB or #RRGGBBAA border color for custom nametags. Empty uses the active UI theme.", BasicConfigReloadBehavior.Live, c => c.NametagBorderColor, (c, v) => c.NametagBorderColor = v),
+            Bool("ManageMapPlayerVisibility", "Map Visibility", "Manage player map markers", "Let The BASICs write vanilla map player marker world config keys. Also disables same-group map visibility to avoid Proximity chat group leaks.", BasicConfigReloadBehavior.Live, c => c.ManageMapPlayerVisibility, (c, v) => c.ManageMapPlayerVisibility = v),
+            Bool("MapHideOtherPlayers", "Map Visibility", "Hide other map players", "Hide other players on the minimap and full world map when map visibility is managed.", BasicConfigReloadBehavior.Live, c => c.MapHideOtherPlayers, (c, v) => c.MapHideOtherPlayers = v),
+            Int("MapPlayerRenderDistance", "Map Visibility", "Map player render range", "Maximum range in blocks for other player map markers. Use -1 for unlimited; ignored when other players are hidden.", BasicConfigReloadBehavior.Live, (c => c.MapPlayerRenderDistance, (c, v) => c.MapPlayerRenderDistance = v), (-1, 100000)),
+            Bool("BoldNicknames", "Client UX", "Bold nicknames", "Render RP nicknames in bold where supported.", BasicConfigReloadBehavior.Live, c => c.BoldNicknames, (c, v) => c.BoldNicknames = v),
+            Bool("ApplyColorsToNicknames", "Client UX", "Color RP nicknames", "Apply nickname colors to IC nicknames.", BasicConfigReloadBehavior.Live, c => c.ApplyColorsToNicknames, (c, v) => c.ApplyColorsToNicknames = v),
+            Bool("ApplyColorsToPlayerNames", "Client UX", "Color account names", "Apply nickname colors to OOC account names.", BasicConfigReloadBehavior.Live, c => c.ApplyColorsToPlayerNames, (c, v) => c.ApplyColorsToPlayerNames = v),
+            Bool("EnableGlobalOOC", "Chat/RP", "Enable global OOC", "Allow global OOC formatting and command support.", BasicConfigReloadBehavior.RestartRequired, c => c.EnableGlobalOOC, (c, v) => c.EnableGlobalOOC = v),
+            Bool("TpaRequireTemporalGear", "TPA", "Require temporal gear", "Require temporal gear for /tpa requests.", BasicConfigReloadBehavior.Live, c => c.TpaRequireTemporalGear, (c, v) => c.TpaRequireTemporalGear = v),
+            Bool("TpaUseCooldown", "TPA", "Use TPA cooldown", "Apply cooldown between outgoing TPA requests.", BasicConfigReloadBehavior.Live, c => c.TpaUseCooldown, (c, v) => c.TpaUseCooldown = v),
+            Decimal("TpaCooldownInGameHours", "TPA", "TPA cooldown hours", "Cooldown length in in-game hours.", BasicConfigReloadBehavior.Live, (c => c.TpaCooldownInGameHours, (c, v) => c.TpaCooldownInGameHours = v), (0, 720)),
+            Bool("TpaUseTimeout", "TPA", "Use TPA timeout", "Expire pending TPA requests after a timeout.", BasicConfigReloadBehavior.Live, c => c.TpaUseTimeout, (c, v) => c.TpaUseTimeout = v),
+            Decimal("TpaTimeoutMinutes", "TPA", "TPA timeout minutes", "Real minutes before pending TPA requests expire.", BasicConfigReloadBehavior.Live, (c => c.TpaTimeoutMinutes, (c, v) => c.TpaTimeoutMinutes = v), (0.1, 1440)),
+            Int("Teleportation.TpaWarmupSeconds", "TPA", "TPA stand-still seconds", "Seconds the moving player must stand still after /tpaccept before teleporting. 0 disables the warmup.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).TpaWarmupSeconds, (c, v) => Teleportation(c).TpaWarmupSeconds = v), (0, 600)),
+            Bool("HomeSpawnRequireTemporalGear", "Home/Spawn", "Require temporal gear", "Require a temporal gear for /home and /spawn teleports.", BasicConfigReloadBehavior.Live, c => c.HomeSpawnRequireTemporalGear, (c, v) => c.HomeSpawnRequireTemporalGear = v),
+            Bool("Teleportation.RegisterHomeCommands", "Teleportation/Command Registration", "Register home commands", "Register The BASICs /home, /sethome, /homes, and /delhome commands at startup. Disable to avoid command-name conflicts with another mod.", BasicConfigReloadBehavior.RestartRequired, c => Teleportation(c).RegisterHomeCommands, (c, v) => Teleportation(c).RegisterHomeCommands = v),
+            Bool("Teleportation.RegisterSpawnCommands", "Teleportation/Command Registration", "Register spawn commands", "Register The BASICs /spawn and /setspawn commands at startup. Disable to avoid command-name conflicts with another mod.", BasicConfigReloadBehavior.RestartRequired, c => Teleportation(c).RegisterSpawnCommands, (c, v) => Teleportation(c).RegisterSpawnCommands = v),
+            Bool("Teleportation.RegisterStuckCommand", "Teleportation/Command Registration", "Register stuck command", "Register The BASICs /stuck command at startup. Disable to avoid command-name conflicts with another mod.", BasicConfigReloadBehavior.RestartRequired, c => Teleportation(c).RegisterStuckCommand, (c, v) => Teleportation(c).RegisterStuckCommand = v),
+            Bool("Teleportation.RegisterTopCommand", "Teleportation/Command Registration", "Register top command", "Register The BASICs /top command at startup. Disable to avoid command-name conflicts with another mod.", BasicConfigReloadBehavior.RestartRequired, c => Teleportation(c).RegisterTopCommand, (c, v) => Teleportation(c).RegisterTopCommand = v),
+            Bool("Teleportation.RegisterBackCommand", "Teleportation/Command Registration", "Register back command", "Register The BASICs /back command at startup. Disable to avoid command-name conflicts with another mod.", BasicConfigReloadBehavior.RestartRequired, c => Teleportation(c).RegisterBackCommand, (c, v) => Teleportation(c).RegisterBackCommand = v),
+            Int("Teleportation.MaxHomes", "Home/Spawn", "Max homes", "Maximum saved homes per player, including the default home.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).MaxHomes, (c, v) => Teleportation(c).MaxHomes = v), (1, 20)),
+            Int("Teleportation.HomeWarmupSeconds", "Home/Spawn", "Home stand-still seconds", "Seconds players must stand still before /home teleports. 0 disables the warmup.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).HomeWarmupSeconds, (c, v) => Teleportation(c).HomeWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.SpawnWarmupSeconds", "Home/Spawn", "Spawn stand-still seconds", "Seconds players must stand still before /spawn teleports. 0 disables the warmup.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).SpawnWarmupSeconds, (c, v) => Teleportation(c).SpawnWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.TopWarmupSeconds", "Home/Spawn", "Top stand-still seconds", "Seconds players must stand still before /top teleports. 0 disables the warmup.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).TopWarmupSeconds, (c, v) => Teleportation(c).TopWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.BackWarmupSeconds", "Home/Spawn", "Back stand-still seconds", "Seconds players must stand still before /back teleports. 0 disables the warmup.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).BackWarmupSeconds, (c, v) => Teleportation(c).BackWarmupSeconds = v), (0, 600)),
+            Int("Teleportation.HomeCooldownSeconds", "Home/Spawn", "Home cooldown seconds", "Real seconds after a successful /home before another /home can be used. 0 disables the cooldown.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).HomeCooldownSeconds, (c, v) => Teleportation(c).HomeCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.SpawnCooldownSeconds", "Home/Spawn", "Spawn cooldown seconds", "Real seconds after a successful /spawn before another /spawn can be used. 0 disables the cooldown.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).SpawnCooldownSeconds, (c, v) => Teleportation(c).SpawnCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.TopCooldownSeconds", "Home/Spawn", "Top cooldown seconds", "Real seconds after a successful /top before another /top can be used. 0 disables the cooldown.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).TopCooldownSeconds, (c, v) => Teleportation(c).TopCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.BackCooldownSeconds", "Home/Spawn", "Back cooldown seconds", "Real seconds after a successful /back before another /back can be used. 0 disables the cooldown.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).BackCooldownSeconds, (c, v) => Teleportation(c).BackCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.BackExpiresAfterSeconds", "Home/Spawn", "Back expiry seconds", "Real seconds before a saved /back location expires. 0 disables expiry.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).BackExpiresAfterSeconds, (c, v) => Teleportation(c).BackExpiresAfterSeconds = v), (0, 86400)),
+            Bool("Teleportation.BackRequireTemporalGear", "Home/Spawn", "Back requires temporal gear", "Require a temporal gear for /back teleports.", BasicConfigReloadBehavior.Live, c => Teleportation(c).BackRequireTemporalGear, (c, v) => Teleportation(c).BackRequireTemporalGear = v),
+            Int("Teleportation.StuckWarmupSeconds", "Home/Spawn", "Stuck stand-still seconds", "Seconds players must stand still before /stuck teleports them to spawn. 0 disables the warmup.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).StuckWarmupSeconds, (c, v) => Teleportation(c).StuckWarmupSeconds = v), (0, 3600)),
+            Int("Teleportation.StuckCooldownSeconds", "Home/Spawn", "Stuck cooldown seconds", "Real seconds after a successful /stuck before /stuck can be used again. 0 disables the cooldown.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).StuckCooldownSeconds, (c, v) => Teleportation(c).StuckCooldownSeconds = v), (0, 86400)),
+            Int("Teleportation.StuckReminderIntervalSeconds", "Home/Spawn", "Stuck reminder seconds", "How often /stuck reminds the player while waiting. 0 disables reminders.", BasicConfigReloadBehavior.Live, (c => Teleportation(c).StuckReminderIntervalSeconds, (c, v) => Teleportation(c).StuckReminderIntervalSeconds = v), (0, 3600)),
+            Bool("Teleportation.CancelWarmupOnDamage", "Teleportation", "Cancel warmup on damage", "Cancel teleport warmups when the moving player takes damage.", BasicConfigReloadBehavior.Live, c => Teleportation(c).CancelWarmupOnDamage, (c, v) => Teleportation(c).CancelWarmupOnDamage = v),
+            Bool("Teleportation.CancelWarmupOnInteraction", "Teleportation", "Cancel warmup on interaction", "Cancel teleport warmups when the moving player interacts, changes active slot, uses, places, or breaks blocks.", BasicConfigReloadBehavior.Live, c => Teleportation(c).CancelWarmupOnInteraction, (c, v) => Teleportation(c).CancelWarmupOnInteraction = v),
+        });
+    }
+
+    private static void AddServerNotificationScalarSettings(List<BasicConfigSettingDefinition<ModConfig>> settings)
+    {
+        settings.AddRange(new[]
+        {
+            Bool("SendServerSaveAnnouncement", "Server Notifications", "Enable save-start message", "Actually send a message when a server save starts. Turn this off to disable the start announcement.", BasicConfigReloadBehavior.Live, c => c.SendServerSaveAnnouncement, (c, v) => c.SendServerSaveAnnouncement = v),
+            Bool("SendServerSaveFinishedAnnouncement", "Server Notifications", "Enable save-finish message", "Actually send a message when a server save finishes. Turn this off to disable the finish announcement.", BasicConfigReloadBehavior.Live, c => c.SendServerSaveFinishedAnnouncement, (c, v) => c.SendServerSaveFinishedAnnouncement = v),
+            Bool("ServerSaveAnnouncementAsNotification", "Server Notifications", "Save-start uses popup", "Only changes the start announcement from chat text to popup style; it does not disable the announcement.", BasicConfigReloadBehavior.Live, c => c.ServerSaveAnnouncementAsNotification, (c, v) => c.ServerSaveAnnouncementAsNotification = v),
+            Bool("ServerSaveFinishedAsNotification", "Server Notifications", "Save-finish uses popup", "Only changes the finish announcement from chat text to popup style; it does not disable the announcement.", BasicConfigReloadBehavior.Live, c => c.ServerSaveFinishedAsNotification, (c, v) => c.ServerSaveFinishedAsNotification = v),
+            Text("TEXT_ServerSaveAnnouncement", "Server Notifications", "Save start text", "Text sent when a server save starts.", BasicConfigReloadBehavior.Live, c => c.TEXT_ServerSaveAnnouncement, (c, v) => c.TEXT_ServerSaveAnnouncement = v),
+            Text("TEXT_ServerSaveFinished", "Server Notifications", "Save finish text", "Text sent when a server save finishes.", BasicConfigReloadBehavior.Live, c => c.TEXT_ServerSaveFinished, (c, v) => c.TEXT_ServerSaveFinished = v),
+            Bool("EnableNearbyDeathMessagesInProximityChat", "Server Notifications", "Nearby death messages in proximity", "Suppress vanilla join/leave/death lifecycle spam from proximity, then re-send death messages only to nearby players.", BasicConfigReloadBehavior.Live, c => c.EnableNearbyDeathMessagesInProximityChat, (c, v) => c.EnableNearbyDeathMessagesInProximityChat = v),
+            Bool("EnableSleepNotifications", "Server Notifications", "Enable sleep notifications", "Notify players when enough players are sleeping.", BasicConfigReloadBehavior.Live, c => c.EnableSleepNotifications, (c, v) => c.EnableSleepNotifications = v),
+            Decimal("SleepNotificationThreshold", "Server Notifications", "Sleep notification threshold", "Fraction of online players sleeping before notifying.", BasicConfigReloadBehavior.Live, (c => c.SleepNotificationThreshold, (c, v) => c.SleepNotificationThreshold = v), (0, 1)),
+            Text("TEXT_SleepNotification", "Server Notifications", "Sleep notification text", "Text sent when enough players are sleeping.", BasicConfigReloadBehavior.Live, c => c.TEXT_SleepNotification, (c, v) => c.TEXT_SleepNotification = v),
+        });
+    }
+
+    private static void AddRemainingScalarSettings(List<BasicConfigSettingDefinition<ModConfig>> settings)
+    {
+        settings.AddRange(new[]
+        {
+            Bool("DebugMode", "Diagnostics", "Debug mode", "Enable The BASICs diagnostic logging.", BasicConfigReloadBehavior.Live, c => c.DebugMode, (c, v) => c.DebugMode = v),
+            Bool("EnableRpCharacterSlots", "Characters", "Enable RP character slots", "Enable full RP character slots with per-character identity, appearance, inventory, body state, and position. Requires character sheets to be enabled.", BasicConfigReloadBehavior.RestartRequired, c => c.EnableRpCharacterSlots, (c, v) => c.EnableRpCharacterSlots = v),
+            Int("MaxRpCharacterSlots", "Characters", "Max RP character slots", "Maximum active RP character slots per account.", BasicConfigReloadBehavior.Live, (c => c.MaxRpCharacterSlots, (c, v) => c.MaxRpCharacterSlots = v), (1, 20)),
+            Bool("EnableAdminNotes", "Notes", "Enable admin notes", "Enable staff-only notes about player accounts.", BasicConfigReloadBehavior.Live, c => c.EnableAdminNotes, (c, v) => c.EnableAdminNotes = v),
+            Bool("EnableStructuredAdminNotes", "Notes", "Enable structured admin notes", "Enable timestamped staff notes with separate entries.", BasicConfigReloadBehavior.Live, c => c.EnableStructuredAdminNotes, (c, v) => c.EnableStructuredAdminNotes = v),
+            Bool("EnableAdminNoteLedger", "Notes", "Enable admin ledger", "Enable one freeform staff ledger per player account.", BasicConfigReloadBehavior.Live, c => c.EnableAdminNoteLedger, (c, v) => c.EnableAdminNoteLedger = v),
+            Bool("EnablePlayerNotes", "Notes", "Enable personal notes", "Enable private player-authored notes.", BasicConfigReloadBehavior.Live, c => c.EnablePlayerNotes, (c, v) => c.EnablePlayerNotes = v),
+            Int("MaxNoteLength", "Notes", "Max note length", "Maximum characters in a structured note.", BasicConfigReloadBehavior.Live, (c => c.MaxNoteLength, (c, v) => c.MaxNoteLength = v), (1, 20000)),
+            Int("MaxFreeformNoteLength", "Notes", "Max freeform notes length", "Maximum characters in a freeform notes field.", BasicConfigReloadBehavior.Live, (c => c.MaxFreeformNoteLength, (c, v) => c.MaxFreeformNoteLength = v), (1, 200000)),
+            Int("MaxAdminNotesPerTarget", "Notes", "Max admin notes per player", "Maximum structured admin notes per target account.", BasicConfigReloadBehavior.Live, (c => c.MaxAdminNotesPerTarget, (c, v) => c.MaxAdminNotesPerTarget = v), (1, 1000)),
+            Int("MaxPlayerNotesPerAuthor", "Notes", "Max personal notes per player", "Maximum personal notes one player can store.", BasicConfigReloadBehavior.Live, (c => c.MaxPlayerNotesPerAuthor, (c, v) => c.MaxPlayerNotesPerAuthor = v), (1, 5000)),
+            Bool("EnableTh3EssentialsDiscordRelay", "Integrations", "Relay proximity to Discord", "Opt-in bridge to Th3Essentials Discord chat relay. Makes local proximity RP chat visible in Discord.", BasicConfigReloadBehavior.Live, c => c.EnableTh3EssentialsDiscordRelay, (c, v) => c.EnableTh3EssentialsDiscordRelay = v),
+            Decimal("ChatterSelfVolumeMultiplier", "Chat/RP", "Chatter self volume multiplier", "Volume multiplier when chatter is sent back to the speaker.", BasicConfigReloadBehavior.Live, (c => c.ChatterSelfVolumeMultiplier, (c, v) => c.ChatterSelfVolumeMultiplier = (float)v), (0, 4)),
+            Bool("ProximityChatAllowPlayersToChangeNicknames", "Restart Required", "Players can change nicknames", "Requires command gating work before it can be fully live.", BasicConfigReloadBehavior.RestartRequired, c => c.ProximityChatAllowPlayersToChangeNicknames, (c, v) => c.ProximityChatAllowPlayersToChangeNicknames = v),
+            Bool("ProximityChatAllowPlayersToChangeNicknameColors", "Restart Required", "Players can change nickname colors", "Requires command gating work before it can be fully live.", BasicConfigReloadBehavior.RestartRequired, c => c.ProximityChatAllowPlayersToChangeNicknameColors, (c, v) => c.ProximityChatAllowPlayersToChangeNicknameColors = v),
+            Text("ChangeNicknameColorPermission", "Permissions", "Nickname color privilege", "Privilege required to change nickname colors.", BasicConfigReloadBehavior.Live, c => c.ChangeNicknameColorPermission, (c, v) => c.ChangeNicknameColorPermission = v),
+            Bool("AllowPlayersToChangeNametagColors", "Restart Required", "Players can change nametag colors", "Requires command gating work before it can be fully live.", BasicConfigReloadBehavior.RestartRequired, c => c.AllowPlayersToChangeNametagColors, (c, v) => c.AllowPlayersToChangeNametagColors = v),
+            Text("ChangeNametagColorPermission", "Permissions", "Nametag color privilege", "Privilege required to change personal nametag background and border colors.", BasicConfigReloadBehavior.Live, c => c.ChangeNametagColorPermission, (c, v) => c.ChangeNametagColorPermission = v),
+            Int("MinNicknameLength", "Restart Required", "Minimum nickname length", "Minimum player nickname length.", BasicConfigReloadBehavior.RestartRequired, (c => c.MinNicknameLength, (c, v) => c.MinNicknameLength = v), (1, 256)),
+            Int("MaxNicknameLength", "Restart Required", "Maximum nickname length", "Maximum player nickname length.", BasicConfigReloadBehavior.RestartRequired, (c => c.MaxNicknameLength, (c, v) => c.MaxNicknameLength = v), (1, 512)),
+            Bool("DisableRPChat", "Restart Required", "Disable RP chat", "Requires restart because commands and transformers are startup-shaped.", BasicConfigReloadBehavior.RestartRequired, c => c.DisableRPChat, (c, v) => c.DisableRPChat = v),
+            Bool("DisableNicknames", "Restart Required", "Disable nicknames", "Requires restart because nickname commands are startup-shaped.", BasicConfigReloadBehavior.RestartRequired, c => c.DisableNicknames, (c, v) => c.DisableNicknames = v),
+            Bool("AllowPlayerTpa", "Restart Required", "Allow player TPA", "Requires restart because TPA commands are startup-shaped.", BasicConfigReloadBehavior.RestartRequired, c => c.AllowPlayerTpa, (c, v) => c.AllowPlayerTpa = v),
+            Bool("EnableLanguageSystem", "Restart Required", "Enable language system", "Requires restart because language commands and joins are startup-shaped.", BasicConfigReloadBehavior.RestartRequired, c => c.EnableLanguageSystem, (c, v) => c.EnableLanguageSystem = v),
+            Int("MaxLanguagesPerPlayer", "Restart Required", "Max languages per player", "Requires language-system reconciliation before it can be fully live.", BasicConfigReloadBehavior.RestartRequired, (c => c.MaxLanguagesPerPlayer, (c, v) => c.MaxLanguagesPerPlayer = v), (1, 100)),
+            Int("SignLanguageRange", "Restart Required", "Sign language range", "Requires language-system reconciliation before it can be fully live.", BasicConfigReloadBehavior.RestartRequired, (c => c.SignLanguageRange, (c, v) => c.SignLanguageRange = v), (0, 512)),
+            Bool("RemoveGrantedLanguagesOnChange", "Restart Required", "Remove granted languages on change", "Affects future class/model language reconciliation.", BasicConfigReloadBehavior.RestartRequired, c => c.RemoveGrantedLanguagesOnChange, (c, v) => c.RemoveGrantedLanguagesOnChange = v),
+            Bool("RequireLineOfSightForSignLanguage", "Restart Required", "Sign language requires LOS", "Requires language-system reconciliation before it can be fully live.", BasicConfigReloadBehavior.RestartRequired, c => c.RequireLineOfSightForSignLanguage, (c, v) => c.RequireLineOfSightForSignLanguage = v),
+            Bool("PlayerStatSystem", "Restart Required", "Enable player stats", "Requires restart until stat event subscriptions are refactored.", BasicConfigReloadBehavior.RestartRequired, c => c.PlayerStatSystem, (c, v) => c.PlayerStatSystem = v),
+            Int("PlayerStatDistanceTravelledTimer", "Restart Required", "Player stat movement interval", "Requires stat tick listener refresh before it can be fully live.", BasicConfigReloadBehavior.RestartRequired, (c => c.PlayerStatDistanceTravelledTimer, (c, v) => c.PlayerStatDistanceTravelledTimer = v), (100, 600000)),
+            Text("TpaRequestPrivilege", "Permissions", "TPA request privilege", "Privilege required to initiate /tpa and /tpahere.", BasicConfigReloadBehavior.Live, c => c.TpaRequestPrivilege, (c, v) => c.TpaRequestPrivilege = v),
+            Text("RPTextTogglePermission", "Permissions", "RP text toggle privilege", "Privilege required to toggle RP text bypass.", BasicConfigReloadBehavior.Live, c => c.RPTextTogglePermission, (c, v) => c.RPTextTogglePermission = v),
+            Text("OOCTogglePermission", "Permissions", "OOC toggle privilege", "Privilege required to toggle OOC mode.", BasicConfigReloadBehavior.Live, c => c.OOCTogglePermission, (c, v) => c.OOCTogglePermission = v),
+            Text("ChangeOwnLanguagePermission", "Permissions", "Own language privilege", "Privilege required for player language add/remove commands.", BasicConfigReloadBehavior.Live, c => c.ChangeOwnLanguagePermission, (c, v) => c.ChangeOwnLanguagePermission = v),
+            Text("ChangeOtherLanguagePermission", "Permissions", "Other language privilege", "Privilege required for admin language commands.", BasicConfigReloadBehavior.Live, c => c.ChangeOtherLanguagePermission, (c, v) => c.ChangeOtherLanguagePermission = v),
+            Text("PlayerStatClearPermission", "Permissions", "Clear stats privilege", "Privilege required to clear player stats.", BasicConfigReloadBehavior.Live, c => c.PlayerStatClearPermission, (c, v) => c.PlayerStatClearPermission = v),
+            Text("AdminNotesPermission", "Permissions", "Admin notes privilege", "Privilege required to view and edit admin notes.", BasicConfigReloadBehavior.Live, c => c.AdminNotesPermission, (c, v) => c.AdminNotesPermission = v),
+            Text("PlayerNotesPermission", "Permissions", "Personal notes privilege", "Privilege required to use personal notes.", BasicConfigReloadBehavior.Live, c => c.PlayerNotesPermission, (c, v) => c.PlayerNotesPermission = v),
+            Text("ChatHistoryPermission", "Permissions", "Chat history privilege", "Privilege required to search chat history.", BasicConfigReloadBehavior.Live, c => c.ChatHistoryPermission, (c, v) => c.ChatHistoryPermission = v),
+            Text("ChatHistoryManagePermission", "Permissions", "Chat history manage privilege", "Privilege required to export or purge chat history.", BasicConfigReloadBehavior.Live, c => c.ChatHistoryManagePermission, (c, v) => c.ChatHistoryManagePermission = v),
+            Text("HomeCommandPrivilege", "Permissions", "Home privilege", "Privilege required to use /home.", BasicConfigReloadBehavior.Live, c => c.HomeCommandPrivilege, (c, v) => c.HomeCommandPrivilege = v),
+            Text("SetHomeCommandPrivilege", "Permissions", "Set home privilege", "Privilege required to use /sethome.", BasicConfigReloadBehavior.Live, c => c.SetHomeCommandPrivilege, (c, v) => c.SetHomeCommandPrivilege = v),
+            Text("SpawnCommandPrivilege", "Permissions", "Spawn privilege", "Privilege required to use /spawn.", BasicConfigReloadBehavior.Live, c => c.SpawnCommandPrivilege, (c, v) => c.SpawnCommandPrivilege = v),
+            Text("SetSpawnCommandPrivilege", "Permissions", "Set spawn privilege", "Privilege required to use /setspawn.", BasicConfigReloadBehavior.Live, c => c.SetSpawnCommandPrivilege, (c, v) => c.SetSpawnCommandPrivilege = v),
+            Text("Teleportation.StuckCommandPrivilege", "Permissions", "Stuck privilege", "Privilege required to use /stuck.", BasicConfigReloadBehavior.Live, c => Teleportation(c).StuckCommandPrivilege, (c, v) => Teleportation(c).StuckCommandPrivilege = v),
+            Text("Teleportation.StuckAdminNotifyPrivilege", "Permissions", "Stuck notify privilege", "Privilege that receives /stuck admin notifications.", BasicConfigReloadBehavior.Live, c => Teleportation(c).StuckAdminNotifyPrivilege, (c, v) => Teleportation(c).StuckAdminNotifyPrivilege = v),
+            Text("Teleportation.StuckBlockedByOnlinePrivilege", "Permissions", "Stuck blocked by online privilege", "If any other online player has this privilege, /stuck is blocked. Empty disables the check.", BasicConfigReloadBehavior.Live, c => Teleportation(c).StuckBlockedByOnlinePrivilege, (c, v) => Teleportation(c).StuckBlockedByOnlinePrivilege = v),
+            Text("Teleportation.TopCommandPrivilege", "Permissions", "Top privilege", "Privilege required to use /top.", BasicConfigReloadBehavior.Live, c => Teleportation(c).TopCommandPrivilege, (c, v) => Teleportation(c).TopCommandPrivilege = v),
+            Text("Teleportation.BackCommandPrivilege", "Permissions", "Back privilege", "Privilege required to use /back.", BasicConfigReloadBehavior.Live, c => Teleportation(c).BackCommandPrivilege, (c, v) => Teleportation(c).BackCommandPrivilege = v),
+            Bool("UseGeneralChannelAsProximityChat", "Restart Required", "Use General as proximity chat", "Requires restart because chat group migration is startup-shaped.", BasicConfigReloadBehavior.RestartRequired, c => c.UseGeneralChannelAsProximityChat, (c, v) => c.UseGeneralChannelAsProximityChat = v),
+            Text("ProximityChatName", "Restart Required", "Proximity chat name", "Requires restart because chat group setup is startup-shaped.", BasicConfigReloadBehavior.RestartRequired, c => c.ProximityChatName, (c, v) => c.ProximityChatName = v),
+            Bool("ProximityChatAsDefault", "Restart Required", "Proximity chat as default", "Requires restart/rejoin for chat tab default behavior.", BasicConfigReloadBehavior.RestartRequired, c => c.ProximityChatAsDefault, (c, v) => c.ProximityChatAsDefault = v),
+            Bool("PreserveDefaultChatChoice", "Restart Required", "Preserve default chat choice", "Requires restart/rejoin for chat tab default behavior.", BasicConfigReloadBehavior.RestartRequired, c => c.PreserveDefaultChatChoice, (c, v) => c.PreserveDefaultChatChoice = v),
+            Bool("PreventProximityChannelSwitching", "Restart Required", "Prevent proximity tab switching", "Requires reconnect for existing clients.", BasicConfigReloadBehavior.RestartRequired, c => c.PreventProximityChannelSwitching, (c, v) => c.PreventProximityChannelSwitching = v)
+        });
+    }
+
+    private static void AddProximityModeSettings(List<BasicConfigSettingDefinition<ModConfig>> settings)
+    {
+        foreach (var mode in EnumValues<ProximityChatMode>())
+        {
+            settings.Add(ModeInt(ModeMeta("ProximityChatModeDistances", "Chat/Ranges", mode, "range", "Maximum delivery range in blocks."), mode, c => c.ProximityChatModeDistances, DefaultDistance(mode), (1, 512)));
+            settings.Add(ModeInt(ModeMeta("ProximityChatModeObfuscationRanges", "Chat/Ranges", mode, "obfuscation start", "Distance where speech starts obfuscating."), mode, c => c.ProximityChatModeObfuscationRanges, DefaultObfuscationStart(mode), (0, 512)));
+            settings.Add(ModeInt(ModeMeta("ProximityChatDefaultFontSize", "Chat/Font Sizes", mode, "default font size", "Font size used near the speaker."), mode, c => c.ProximityChatDefaultFontSize, DefaultFontSize(mode), (1, 128)));
+            settings.Add(ModeText(ModeMeta("ProximityChatModePunctuation", "Chat/RP Text", mode, "punctuation", "Punctuation appended by auto-punctuation."), mode, c => c.ProximityChatModePunctuation, DefaultPunctuation(mode), maxLength: 8));
+            settings.Add(ModeTextArray(ModeMeta("ProximityChatModeVerbs", "Chat/RP Text", mode, "verbs", "Comma-separated speech verbs for this mode."), mode, c => c.ProximityChatModeVerbs, DefaultVerbs(mode)));
+        }
+
+        settings.Add(IntArray(new SettingMeta("ProximityChatClampFontSizes", "Chat/Font Sizes", "Clamp font sizes", "Comma-separated allowed distance font sizes.", BasicConfigReloadBehavior.Live), c => c.ProximityChatClampFontSizes, (c, v) => c.ProximityChatClampFontSizes = v, (1, 128)));
+    }
+
+    private static void AddAudioModeSettings(List<BasicConfigSettingDefinition<ModConfig>> settings)
+    {
+        foreach (var mode in EnumValues<ProximityChatMode>())
+        {
+            settings.Add(ModeFloat(ModeMeta("RPTTS_ModeGain", "Chat/RPTTS Audio", mode, "RPTTS gain", "Speech audio gain for this mode."), mode, c => c.RPTTS_ModeGain, DefaultRpttsGain(mode), (0, 4)));
+            settings.Add(ModeFloat(ModeMeta("RPTTS_ModeFalloff", "Chat/RPTTS Audio", mode, "RPTTS falloff", "Speech audio falloff for this mode."), mode, c => c.RPTTS_ModeFalloff, DefaultRpttsFalloff(mode), (0.1, 10)));
+            settings.Add(ModeFloat(ModeMeta("ChatterModeVolume", "Chat/Chatter Audio", mode, "chatter volume", "Seraph chatter volume for this mode."), mode, c => c.ChatterModeVolume, DefaultChatterVolume(mode), (0, 4)));
+            settings.Add(ModeFloat(ModeMeta("ChatterModePitch", "Chat/Chatter Audio", mode, "chatter pitch", "Seraph chatter pitch for this mode."), mode, c => c.ChatterModePitch, DefaultChatterPitch(mode), (0.1, 4)));
+        }
+    }
+
+    private static void AddDelimiterSettings(List<BasicConfigSettingDefinition<ModConfig>> settings)
+    {
+        foreach (var delimiter in GetDelimiterDefinitions())
+        {
+            settings.Add(DelimiterText(delimiter.Key + ".Start", delimiter.Label + " start", "Opening delimiter text.", config => delimiter.Get(config.ChatDelimiters).Start, (config, value) => delimiter.Get(config.ChatDelimiters).Start = value, required: true));
+            settings.Add(DelimiterText(delimiter.Key + ".End", delimiter.Label + " end", "Closing delimiter text. May be empty for prefix-style delimiters.", config => delimiter.Get(config.ChatDelimiters).End, (config, value) => delimiter.Get(config.ChatDelimiters).End = value, required: false));
+        }
+    }
+
+    private static void AddPlayerStatToggleSettings(List<BasicConfigSettingDefinition<ModConfig>> settings)
+    {
+        foreach (var stat in EnumValues<PlayerStatType>())
+        {
+            var title = StatTypes.Types.TryGetValue(stat, out var definition) ? definition.Title : stat.ToString();
+            settings.Add(Bool($"PlayerStatToggles.{stat}", "Player Stats/Toggles", title, "Enable or disable tracking for this stat.", BasicConfigReloadBehavior.Live,
+                c => GetModeValue(c.PlayerStatToggles, stat, true),
+                (c, v) => c.PlayerStatToggles[stat] = v));
+        }
+    }
+
+    private static SettingMeta ModeMeta(string keyPrefix, string group, ProximityChatMode mode, string labelSuffix, string description)
+    {
+        return new SettingMeta($"{keyPrefix}.{mode}", group, $"{mode} {labelSuffix}", description, BasicConfigReloadBehavior.Live);
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> ModeInt(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, int>> get, int fallback, (int Min, int Max) range)
+    {
+        return Int(meta.Key, meta.Group, meta.Label, meta.Description, meta.ReloadBehavior,
+            (config => GetModeValue(get(config), mode, fallback), (config, value) => get(config)[mode] = value), range);
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> ModeFloat(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, float>> get, float fallback, (double Min, double Max) range)
+    {
+        return new BasicConfigSettingDefinition<ModConfig>(new BasicConfigSettingDefinitionOptions<ModConfig>
+        {
+            Key = meta.Key,
+            Group = meta.Group,
+            Label = meta.Label,
+            Description = meta.Description,
+            Kind = BasicConfigSettingKind.Decimal,
+            ReloadBehavior = meta.ReloadBehavior,
+            GetValue = config => GetModeValue(get(config), mode, fallback).ToString("0.########", CultureInfo.InvariantCulture),
+            SetValue = (config, value) =>
+            {
+                if (!BasicConfigSettingDefinition<ModConfig>.TryParseDecimal(value, out var parsed) || parsed < range.Min || parsed > range.Max)
+                {
+                    return $"{meta.Key} must be a number from {range.Min.ToString(CultureInfo.InvariantCulture)} to {range.Max.ToString(CultureInfo.InvariantCulture)}.";
+                }
+
+                get(config)[mode] = (float)parsed;
+                return null;
+            }
+        });
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> ModeText(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, string>> get, string fallback, int maxLength)
+    {
+        return ValidatedText(meta,
+            config => GetModeValue(get(config), mode, fallback),
+            (config, value) => get(config)[mode] = value,
+            value => value.Length > maxLength ? $"{meta.Key} must be {maxLength} characters or fewer." : null);
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> ModeTextArray(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, string[]>> get, string[] fallback)
+    {
+        return ValidatedText(meta,
+            config => FormatStringArray(GetModeValue(get(config), mode, fallback)),
+            (config, value) => get(config)[mode] = ParseStringArray(value),
+            value => ParseStringArray(value).Length == 0 ? $"{meta.Key} must contain at least one value." : null);
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> IntArray(SettingMeta meta, Func<ModConfig, int[]> get, Action<ModConfig, int[]> set, (int Min, int Max) range)
+    {
+        return new BasicConfigSettingDefinition<ModConfig>(new BasicConfigSettingDefinitionOptions<ModConfig>
+        {
+            Key = meta.Key,
+            Group = meta.Group,
+            Label = meta.Label,
+            Description = meta.Description,
+            Kind = BasicConfigSettingKind.Text,
+            ReloadBehavior = meta.ReloadBehavior,
+            GetValue = config => string.Join(", ", get(config) ?? Array.Empty<int>()),
+            SetValue = (config, value) =>
+            {
+                var error = ValidateIntArray(meta.Key, value, range, out var parsed);
+                if (error != null)
+                {
+                    return error;
+                }
+
+                set(config, parsed);
+                return null;
+            }
+        });
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> DelimiterText(string key, string label, string description, Func<ModConfig, string> get, Action<ModConfig, string> set, bool required)
+    {
+        return ValidatedText(new SettingMeta(key, "Chat/Delimiters", label, description, BasicConfigReloadBehavior.Live), get, set,
+            value => required && string.IsNullOrEmpty(value) ? $"{key} cannot be empty." : null);
+    }
+
+    private static IReadOnlyList<(string Key, string Label, Func<ChatDelimiters, ChatDelimiter> Get)> GetDelimiterDefinitions()
+    {
+        return new List<(string, string, Func<ChatDelimiters, ChatDelimiter>)>
+        {
+            ("ChatDelimiters.Bold", "Bold", delimiters => delimiters.Bold),
+            ("ChatDelimiters.Italic", "Italic", delimiters => delimiters.Italic),
+            ("ChatDelimiters.Emote", "Emote", delimiters => delimiters.Emote),
+            ("ChatDelimiters.Environmental", "Environmental", delimiters => delimiters.Environmental),
+            ("ChatDelimiters.PlacedEnvironmental", "Placed environmental", delimiters => delimiters.PlacedEnvironmental),
+            ("ChatDelimiters.OOC", "Local OOC", delimiters => delimiters.OOC),
+            ("ChatDelimiters.GlobalOOC", "Global OOC", delimiters => delimiters.GlobalOOC),
+            ("ChatDelimiters.Quote", "Quote", delimiters => delimiters.Quote),
+            ("ChatDelimiters.SignLanguageQuote", "Sign language quote", delimiters => delimiters.SignLanguageQuote)
+        };
+    }
+
+    private static TValue GetModeValue<TKey, TValue>(IDictionary<TKey, TValue> dictionary, TKey key, TValue fallback)
+    {
+        return dictionary != null && dictionary.TryGetValue(key, out var value) ? value : fallback;
+    }
+
+    private static string FormatStringArray(IEnumerable<string> values)
+    {
+        return string.Join(", ", values ?? Array.Empty<string>());
+    }
+
+    private static string[] ParseStringArray(string value)
+    {
+        return (value ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .ToArray();
+    }
+
+    private static string ValidateIntArray(string key, string value, (int Min, int Max) range, out int[] parsedValues)
+    {
+        var parsed = new List<int>();
+        var parts = (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            parsedValues = Array.Empty<int>();
+            return $"{key} must contain at least one whole number.";
+        }
+
+        foreach (var part in parts)
+        {
+            if (!int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var item) || item < range.Min || item > range.Max)
+            {
+                parsedValues = Array.Empty<int>();
+                return $"{key} must contain whole numbers from {range.Min} to {range.Max}, separated by commas.";
+            }
+
+            parsed.Add(item);
+        }
+
+        parsedValues = parsed.ToArray();
+        return null;
+    }
+
+    private static int DefaultDistance(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 90,
+        ProximityChatMode.Whisper => 5,
+        _ => 35
+    };
+
+    private static int DefaultObfuscationStart(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 45,
+        ProximityChatMode.Whisper => 2,
+        _ => 15
+    };
+
+    private static int DefaultFontSize(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 30,
+        ProximityChatMode.Whisper => 12,
+        _ => 16
+    };
+
+    private static string[] DefaultVerbs(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => new[] { "yells", "shouts", "exclaims" },
+        ProximityChatMode.Whisper => new[] { "whispers", "mumbles", "mutters" },
+        _ => new[] { "says", "states", "mentions" }
+    };
+
+    private static string DefaultPunctuation(ProximityChatMode mode) => mode == ProximityChatMode.Yell ? "!" : ".";
+
+    private static float DefaultRpttsGain(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 1.7f,
+        ProximityChatMode.Whisper => 0.65f,
+        _ => 1f
+    };
+
+    private static float DefaultRpttsFalloff(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Whisper => 5f,
+        ProximityChatMode.Normal => 1.5f,
+        _ => 1f
+    };
+
+    private static float DefaultChatterVolume(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 1.4f,
+        ProximityChatMode.Whisper => 0.4f,
+        _ => 0.8f
+    };
+
+    private static float DefaultChatterPitch(ProximityChatMode mode) => mode switch
+    {
+        ProximityChatMode.Yell => 1.1f,
+        ProximityChatMode.Whisper => 0.95f,
+        _ => 1f
+    };
+
+    private static BasicConfigSettingDefinition<ModConfig> Bool(string key, string group, string label, string description, BasicConfigReloadBehavior reloadBehavior, Func<ModConfig, bool> get, Action<ModConfig, bool> set)
+    {
+        return new BasicConfigSettingDefinition<ModConfig>(new BasicConfigSettingDefinitionOptions<ModConfig>
+        {
+            Key = key,
+            Group = group,
+            Label = label,
+            Description = description,
+            Kind = BasicConfigSettingKind.Boolean,
+            ReloadBehavior = reloadBehavior,
+            GetValue = config => BasicConfigSettingDefinition<ModConfig>.FormatBool(get(config)),
+            SetValue = (config, value) =>
+            {
+                if (!BasicConfigSettingDefinition<ModConfig>.TryParseBool(value, out var parsed))
+                {
+                    return $"{key} must be true/false or 1/0.";
+                }
+
+                set(config, parsed);
+                return null;
+            }
+        });
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> Int(string key, string group, string label, string description, BasicConfigReloadBehavior reloadBehavior, (Func<ModConfig, int> Get, Action<ModConfig, int> Set) accessors, (int Min, int Max) range)
+    {
+        return new BasicConfigSettingDefinition<ModConfig>(new BasicConfigSettingDefinitionOptions<ModConfig>
+        {
+            Key = key,
+            Group = group,
+            Label = label,
+            Description = description,
+            Kind = BasicConfigSettingKind.Integer,
+            ReloadBehavior = reloadBehavior,
+            GetValue = config => accessors.Get(config).ToString(CultureInfo.InvariantCulture),
+            SetValue = (config, value) =>
+            {
+                if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < range.Min || parsed > range.Max)
+                {
+                    return $"{key} must be a whole number from {range.Min} to {range.Max}.";
+                }
+
+                accessors.Set(config, parsed);
+                return null;
+            }
+        });
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> Decimal(string key, string group, string label, string description, BasicConfigReloadBehavior reloadBehavior, (Func<ModConfig, double> Get, Action<ModConfig, double> Set) accessors, (double Min, double Max) range)
+    {
+        return new BasicConfigSettingDefinition<ModConfig>(new BasicConfigSettingDefinitionOptions<ModConfig>
+        {
+            Key = key,
+            Group = group,
+            Label = label,
+            Description = description,
+            Kind = BasicConfigSettingKind.Decimal,
+            ReloadBehavior = reloadBehavior,
+            GetValue = config => BasicConfigSettingDefinition<ModConfig>.FormatDecimal(accessors.Get(config)),
+            SetValue = (config, value) =>
+            {
+                if (!BasicConfigSettingDefinition<ModConfig>.TryParseDecimal(value, out var parsed) || parsed < range.Min || parsed > range.Max)
+                {
+                    return $"{key} must be a number from {range.Min.ToString(CultureInfo.InvariantCulture)} to {range.Max.ToString(CultureInfo.InvariantCulture)}.";
+                }
+
+                accessors.Set(config, parsed);
+                return null;
+            }
+        });
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> Text(string key, string group, string label, string description, BasicConfigReloadBehavior reloadBehavior, Func<ModConfig, string> get, Action<ModConfig, string> set)
+    {
+        return new BasicConfigSettingDefinition<ModConfig>(new BasicConfigSettingDefinitionOptions<ModConfig>
+        {
+            Key = key,
+            Group = group,
+            Label = label,
+            Description = description,
+            Kind = BasicConfigSettingKind.Text,
+            ReloadBehavior = reloadBehavior,
+            GetValue = config => get(config) ?? string.Empty,
+            SetValue = (config, value) =>
+            {
+                var normalizedValue = value ?? string.Empty;
+                set(config, normalizedValue);
+                return null;
+            }
+        });
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> OptionalHexColor(string key, string group, string label, string description, BasicConfigReloadBehavior reloadBehavior, Func<ModConfig, string> get, Action<ModConfig, string> set)
+    {
+        return new BasicConfigSettingDefinition<ModConfig>(new BasicConfigSettingDefinitionOptions<ModConfig>
+        {
+            Key = key,
+            Group = group,
+            Label = label,
+            Description = description,
+            Kind = BasicConfigSettingKind.Text,
+            ReloadBehavior = reloadBehavior,
+            GetValue = config => get(config) ?? string.Empty,
+            SetValue = (config, value) =>
+            {
+                var normalizedValue = (value ?? string.Empty).Trim();
+                if (normalizedValue.Length > 0 && !IsHexColor(normalizedValue))
+                {
+                    return $"{key} must be empty or a hex color like #403529 or #403529BF.";
+                }
+
+                set(config, normalizedValue);
+                return null;
+            }
+        });
+    }
+
+    private static bool IsHexColor(string value)
+    {
+        return value != null &&
+               (value.Length == 7 || value.Length == 9) &&
+               value[0] == '#' &&
+               value.Skip(1).All(IsHexDigit);
+    }
+
+    private static bool IsHexDigit(char c)
+    {
+        return c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> ValidatedText(SettingMeta meta, Func<ModConfig, string> get, Action<ModConfig, string> set, Func<string, string> validate)
+    {
+        return new BasicConfigSettingDefinition<ModConfig>(new BasicConfigSettingDefinitionOptions<ModConfig>
+        {
+            Key = meta.Key,
+            Group = meta.Group,
+            Label = meta.Label,
+            Description = meta.Description,
+            Kind = BasicConfigSettingKind.Text,
+            ReloadBehavior = meta.ReloadBehavior,
+            GetValue = config => get(config) ?? string.Empty,
+            SetValue = (config, value) =>
+            {
+                var normalizedValue = value ?? string.Empty;
+                var error = validate(normalizedValue);
+                if (error != null)
+                {
+                    return error;
+                }
+
+                set(config, normalizedValue);
+                return null;
+            }
+        });
+    }
+
+    private static BasicConfigSettingDefinition<ModConfig> Select(string key, string group, string label, string description, BasicConfigReloadBehavior reloadBehavior, (Func<ModConfig, string> Get, Action<ModConfig, string> Set) accessors, string[] options)
+    {
+        return new BasicConfigSettingDefinition<ModConfig>(new BasicConfigSettingDefinitionOptions<ModConfig>
+        {
+            Key = key,
+            Group = group,
+            Label = label,
+            Description = description,
+            Kind = BasicConfigSettingKind.Select,
+            ReloadBehavior = reloadBehavior,
+            GetValue = config => accessors.Get(config) ?? options[0],
+            SetValue = (config, value) =>
+            {
+                if (!options.Contains(value, StringComparer.OrdinalIgnoreCase))
+                {
+                    return $"{key} must be one of: {string.Join(", ", options)}.";
+                }
+
+                var canonicalValue = options.First(option => option.Equals(value, StringComparison.OrdinalIgnoreCase));
+                accessors.Set(config, canonicalValue);
+                return null;
+            },
+            Options = options,
+            OptionNames = options
+        });
+    }
+
+    private static string[] EnumNames<TEnum>() where TEnum : struct, Enum
+    {
+        return Enum.GetNames<TEnum>();
+    }
+
+    private static TEnum[] EnumValues<TEnum>() where TEnum : struct, Enum
+    {
+        return Enum.GetValues<TEnum>();
+    }
+}

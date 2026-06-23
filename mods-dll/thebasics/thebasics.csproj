@@ -59,7 +59,9 @@
     <Content Include="thebasics.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\basicconfig\basicconfig.csproj" Private="False" />
   </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="SkiaSharp" Version="3.119.1" Condition="!Exists('$(VINTAGE_STORY)\Lib\SkiaSharp.dll')" />
