@@ -9,6 +9,7 @@
   "version": "0.1.0",
   "dependencies": {
     "game": "",
+    "basicconfig": "0.1.0",
     "dimensionlib": "0.1.0"
   },
   "side": "universal"

@@ -107,27 +107,22 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             .RegisterMessageType<PocketDirectoryStateMessage>()
             .RegisterMessageType<PocketDirectoryStackMessage>()
             .RegisterMessageType<PocketDirectoryLayerMessage>()
-            .RegisterMessageType<BasicConfigOpenMessage>()
-            .RegisterMessageType<BasicConfigSaveMessage>()
-            .RegisterMessageType<BasicConfigResultMessage>()
             .SetMessageHandler<PocketElevatorTravelRequest>(OnElevatorTravelRequest)
             .SetMessageHandler<PocketLayerCreationResponse>(OnLayerCreationResponse)
             .SetMessageHandler<PocketElevatorPlacementResponse>(OnElevatorPlacementResponse)
             .SetMessageHandler<PocketDirectoryRequest>(OnPocketDirectoryRequest)
-            .SetMessageHandler<PocketDirectoryActionRequest>(OnPocketDirectoryActionRequest)
-            .SetMessageHandler<BasicConfigSaveMessage>((player, message) => _configController?.OnSaveMessage(player, message));
+            .SetMessageHandler<PocketDirectoryActionRequest>(OnPocketDirectoryActionRequest);
         _linkStore = new PocketLinkStore(api);
         LoadLinkState();
         api.ObjectCache[WaystoneServiceCacheKey] = this;
         _configStore = new BasicConfigStore<PocketDimensionsConfig>(api, ConfigName, "Pocket Dimensions", config => config.Normalize());
         _config = _configStore.GetOrLoad();
-        _configController = new BasicConfigServerController<PocketDimensionsConfig>(new BasicConfigServerControllerOptions<PocketDimensionsConfig>
+        _configController = api.ModLoader.GetModSystem<BasicConfigModSystem>()?.RegisterServer(new BasicConfigServerControllerOptions<PocketDimensionsConfig>
         {
             ConfigId = PocketDimensionsConfigSchema.ConfigId,
             DisplayName = "Pocket Dimensions",
             Store = _configStore,
             Schema = PocketDimensionsConfigSchema.Build(),
-            Channel = _serverChannel,
             CanEdit = CanEditConfig,
             GetReviewedKeys = config => config.ReviewedConfigSettingKeys,
             SetReviewedKeys = (config, keys) => config.ReviewedConfigSettingKeys = keys,
@@ -161,31 +156,19 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             .RegisterMessageType<PocketDirectoryStateMessage>()
             .RegisterMessageType<PocketDirectoryStackMessage>()
             .RegisterMessageType<PocketDirectoryLayerMessage>()
-            .RegisterMessageType<BasicConfigOpenMessage>()
-            .RegisterMessageType<BasicConfigSaveMessage>()
-            .RegisterMessageType<BasicConfigResultMessage>()
             .SetMessageHandler<PocketLayerCreationPrompt>(OnLayerCreationPrompt)
             .SetMessageHandler<PocketElevatorPlacementPrompt>(OnElevatorPlacementPrompt)
             .SetMessageHandler<PocketHudStateMessage>(OnPocketHudState)
-            .SetMessageHandler<PocketDirectoryStateMessage>(OnPocketDirectoryState)
-            .SetMessageHandler<BasicConfigOpenMessage>(message => _clientConfigController?.OnOpenMessage(message))
-            .SetMessageHandler<BasicConfigResultMessage>(message => _clientConfigController?.OnResultMessage(message));
+            .SetMessageHandler<PocketDirectoryStateMessage>(OnPocketDirectoryState);
 
-        _clientConfigController = new BasicConfigClientController(new BasicConfigClientOptions
+        _clientConfigController = api.ModLoader.GetModSystem<BasicConfigModSystem>()?.RegisterClient(new BasicConfigClientOptions
         {
             ConfigId = PocketDimensionsConfigSchema.ConfigId,
             DisplayName = "Pocket Dimensions",
             Title = "Pocket Dimensions Config",
             DialogCode = "pocketdimensions-basicconfig-admin",
             Api = api,
-            Settings = PocketDimensionsConfigSchema.Settings.Cast<IBasicConfigSettingDefinition>().ToList(),
-            SendPacket = packet =>
-            {
-                if (packet is BasicConfigSaveMessage saveMessage && _clientChannel?.Connected == true)
-                {
-                    _clientChannel.SendPacket(saveMessage);
-                }
-            }
+            Settings = PocketDimensionsConfigSchema.Settings.Cast<IBasicConfigSettingDefinition>().ToList()
         });
 
         api.Input.RegisterHotKey("pocketelevatorup", "Pocket Elevator Up", GlKeys.PageUp, HotkeyType.CharacterControls);

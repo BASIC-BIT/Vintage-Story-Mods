@@ -277,7 +277,24 @@ jobs:
     - name: Package Main Mod
       run: |
         Write-Host "Creating distribution packages..." -ForegroundColor Yellow
-        
+
+        $basicConfigDllPath = "mods-dll\basicconfig\bin\Release\net10.0\basicconfig.dll"
+        if (Test-Path $basicConfigDllPath) {
+          Push-Location "mods-dll\basicconfig"
+          try {
+            & ".\scripts\package.ps1"
+            Write-Host "basicconfig packaged successfully" -ForegroundColor Green
+          } catch {
+            Write-Host "Error: basicconfig packaging failed: $_" -ForegroundColor Red
+            exit 1
+          } finally {
+            Pop-Location
+          }
+        } else {
+          Write-Host "Error: basicconfig.dll not found at expected location: $basicConfigDllPath" -ForegroundColor Red
+          exit 1
+        }
+
         # Check if thebasics was built
         $dllPath = "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll"
         if (Test-Path $dllPath) {
@@ -310,7 +327,7 @@ jobs:
         # Create release directory
         New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
         
-        # Find and copy the versioned mod package
+        # Find and copy the versioned mod packages
         $sourceZip = Get-ChildItem "mods-dll\thebasics\thebasics_*.zip" | Select-Object -First 1
         $targetZip = "$releaseDir\thebasics-v$newVersion.zip"
         
@@ -321,9 +338,22 @@ jobs:
           Write-Host "Error: No versioned thebasics zip file found in mods-dll\thebasics\" -ForegroundColor Red
           exit 1
         }
-        
+
+        $basicConfigModInfo = Get-Content "mods-dll\basicconfig\modinfo.json" | ConvertFrom-Json
+        $basicConfigVersion = $basicConfigModInfo.version
+        $basicConfigSourceZip = Get-ChildItem "mods-dll\basicconfig\basicconfig_*.zip" | Select-Object -First 1
+        $basicConfigTargetZip = "$releaseDir\basicconfig-v$basicConfigVersion.zip"
+
+        if ($basicConfigSourceZip) {
+          Copy-Item $basicConfigSourceZip.FullName $basicConfigTargetZip
+          Write-Host "Created release asset: basicconfig-v$basicConfigVersion.zip (from $($basicConfigSourceZip.Name))" -ForegroundColor Green
+        } else {
+          Write-Host "Error: No versioned basicconfig zip file found in mods-dll\basicconfig\" -ForegroundColor Red
+          exit 1
+        }
+
         # Set outputs for later steps
-        echo "asset_path=$targetZip" >> $env:GITHUB_OUTPUT
+        echo "asset_paths=$targetZip,$basicConfigTargetZip" >> $env:GITHUB_OUTPUT
         echo "asset_name=thebasics-v$newVersion.zip" >> $env:GITHUB_OUTPUT
         
     - name: Create Release Notes
@@ -348,8 +378,8 @@ jobs:
               $releaseNotes += "This release publishes The BASICs v$newVersion with packaged release assets.`n`n"
             }
             $releaseNotes += "## Installation`n"
-            $releaseNotes += "1. Download the ``thebasics-v$newVersion.zip`` file below`n"
-            $releaseNotes += "2. Place it in your Vintage Story mods folder`n"
+            $releaseNotes += "1. Download the ``thebasics-v$newVersion.zip`` and ``basicconfig`` zip files below`n"
+            $releaseNotes += "2. Place both files in your Vintage Story mods folder`n"
             $releaseNotes += "3. Restart your server/client`n`n"
             $releaseNotes += "## Support`n"
             $releaseNotes += "- Join our [Discord](https://discord.gg/PYKTaJ5Ett) for support`n"
@@ -402,7 +432,7 @@ jobs:
         prerelease: ${{ github.event.inputs.prerelease }}
         allowUpdates: true
         replacesArtifacts: true
-        artifacts: "${{ steps.prepare_assets.outputs.asset_path }}"
+        artifacts: "${{ steps.prepare_assets.outputs.asset_paths }}"
         token: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Release Summary
@@ -419,4 +449,5 @@ jobs:
         }
         Write-Host "   Tag: V$newVersion" -ForegroundColor Cyan
         Write-Host "   Asset: thebasics-v$newVersion.zip" -ForegroundColor Cyan
+        Write-Host "   Asset: basicconfig dependency zip" -ForegroundColor Cyan
         Write-Host "   Release URL: https://github.com/BASIC-BIT/Vintage-Story-Mods/releases/tag/V$newVersion" -ForegroundColor Cyan 

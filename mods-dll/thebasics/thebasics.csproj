@@ -58,7 +58,9 @@
     <Content Include="scripts\package.ps1" />
     <Content Include="thebasics.csproj" />
   </ItemGroup>
-  <Import Project="..\shared\basicconfig\BasicConfig.Shared.projitems" />
+  <ItemGroup>
+    <ProjectReference Include="..\basicconfig\basicconfig.csproj" Private="False" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />

@@ -5,7 +5,7 @@ using Vintagestory.API.Server;
 
 namespace BasicConfig;
 
-public sealed class BasicConfigServerController<TConfig> where TConfig : class, new()
+public sealed class BasicConfigServerController<TConfig> : IBasicConfigServerController where TConfig : class, new()
 {
     private readonly string _configId;
     private readonly string _displayName;
@@ -102,6 +102,15 @@ public sealed class BasicConfigServerController<TConfig> where TConfig : class, 
     }
 
     public TConfig Config => _getConfig();
+
+    public string ConfigId => _configId;
+
+    public string DisplayName => _displayName;
+
+    public bool CanEdit(IServerPlayer player)
+    {
+        return _canEdit(player);
+    }
 
     public TConfig CreateDraft()
     {

@@ -572,9 +572,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         _serverConfigChannel = API.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
-            .RegisterMessageType<BasicConfigOpenMessage>()
-            .RegisterMessageType<BasicConfigSaveMessage>()
-            .RegisterMessageType<BasicConfigResultMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenRequest>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigSaveMessage>()
@@ -616,15 +613,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .SetMessageHandler<TheBasicsCharacterSheetFieldConfigSaveMessage>(OnCharacterSheetFieldConfigSaveMessage)
             .SetMessageHandler<TheBasicsNotesOpenRequest>(OnNotesOpenRequest)
             .SetMessageHandler<TheBasicsNotesSaveMessage>(OnNotesSaveMessage)
-            .SetMessageHandler<TheBasicsChatHistoryQueryRequest>(OnChatHistoryQueryRequest)
-            .SetMessageHandler<BasicConfigSaveMessage>(OnBasicConfigSaveMessage);
+            .SetMessageHandler<TheBasicsChatHistoryQueryRequest>(OnChatHistoryQueryRequest);
 
-        _basicConfigController = new BasicConfigServerController<ModConfig>(new BasicConfigServerControllerOptions<ModConfig>
+        _basicConfigController = API.ModLoader.GetModSystem<BasicConfigModSystem>()?.RegisterServer(new BasicConfigServerControllerOptions<ModConfig>
         {
             ConfigId = TheBasicsBasicConfigSchema.ConfigId,
             DisplayName = "The BASICs",
             Schema = TheBasicsBasicConfigSchema.Build(),
-            Channel = _serverConfigChannel,
             CanEdit = player => player?.HasPrivilege(Privilege.root) == true,
             GetConfig = () => Config,
             ReloadConfig = () => ReloadSharedConfigFromDisk(API),
@@ -639,11 +634,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 BroadcastClientConfigs();
             }
         });
-    }
-
-    private void OnBasicConfigSaveMessage(IServerPlayer player, BasicConfigSaveMessage message)
-    {
-        _basicConfigController?.OnSaveMessage(player, message);
     }
 
     /// <summary>

@@ -268,9 +268,6 @@ public class ChatUiSystem : ModSystem
     {
         _clientConfigChannel = _api.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
-            .RegisterMessageType<BasicConfigOpenMessage>()
-            .RegisterMessageType<BasicConfigSaveMessage>()
-            .RegisterMessageType<BasicConfigResultMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenRequest>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigSaveMessage>()
@@ -299,8 +296,6 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
-            .SetMessageHandler<BasicConfigOpenMessage>(OnBasicConfigOpenMessage)
-            .SetMessageHandler<BasicConfigResultMessage>(OnBasicConfigResultMessage)
             .SetMessageHandler<TheBasicsLanguageConfigOpenMessage>(OnLanguageConfigOpenMessage)
             .SetMessageHandler<TheBasicsLanguageConfigResultMessage>(OnLanguageConfigResultMessage)
             .SetMessageHandler<TheBasicsCharacterSheetFieldConfigOpenMessage>(OnCharacterSheetFieldConfigOpenMessage)
@@ -324,7 +319,7 @@ public class ChatUiSystem : ModSystem
             MaxRetries = 10
         };
         _safeNetworkChannel = new SafeClientNetworkChannel(_clientConfigChannel, _api, config);
-        _basicConfigClientController = new BasicConfigClientController(new BasicConfigClientOptions
+        _basicConfigClientController = _api.ModLoader.GetModSystem<BasicConfigModSystem>()?.RegisterClient(new BasicConfigClientOptions
         {
             ConfigId = TheBasicsBasicConfigSchema.ConfigId,
             DisplayName = "The BASICs",
@@ -332,13 +327,6 @@ public class ChatUiSystem : ModSystem
             DialogCode = "thebasics-basicconfig-admin",
             Api = _api,
             Settings = TheBasicsBasicConfigSchema.Build().Settings.Cast<IBasicConfigSettingDefinition>().ToList(),
-            SendPacket = packet =>
-            {
-                if (packet is BasicConfigSaveMessage saveMessage)
-                {
-                    _safeNetworkChannel?.SendPacketSafely(saveMessage);
-                }
-            },
             Shortcuts = BuildBasicConfigShortcuts()
         });
     }
@@ -369,16 +357,6 @@ public class ChatUiSystem : ModSystem
                 OnClick = () => HandbookGuide.Open(_api, HandbookGuide.OverviewPage)
             }
         ];
-    }
-
-    private static void OnBasicConfigOpenMessage(BasicConfigOpenMessage message)
-    {
-        _basicConfigClientController?.OnOpenMessage(message);
-    }
-
-    private static void OnBasicConfigResultMessage(BasicConfigResultMessage message)
-    {
-        _basicConfigClientController?.OnResultMessage(message);
     }
 
     private static void OnCharacterSheetViewMessage(CharacterSheetViewMessage message)
