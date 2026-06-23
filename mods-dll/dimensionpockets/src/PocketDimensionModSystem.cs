@@ -178,7 +178,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             Title = "Pocket Dimensions Config",
             DialogCode = "pocketdimensions-basicconfig-admin",
             Api = api,
-            Settings = PocketDimensionsConfigSchema.Build().Settings.Cast<IBasicConfigSettingDefinition>().ToList(),
+            Settings = PocketDimensionsConfigSchema.Settings.Cast<IBasicConfigSettingDefinition>().ToList(),
             SendPacket = packet =>
             {
                 if (packet is BasicConfigSaveMessage saveMessage && _clientChannel?.Connected == true)

@@ -35,9 +35,7 @@
     <ProjectReference Include="..\dimensionlib\dimensionlib.csproj" Private="False" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Include="..\shared\basicconfig\src\**\*.cs" Link="BasicConfig\%(RecursiveDir)%(Filename)%(Extension)" />
-  </ItemGroup>
+  <Import Project="..\shared\basicconfig\BasicConfig.Shared.projitems" />
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />

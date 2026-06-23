@@ -58,11 +58,8 @@
     <Content Include="scripts\package.ps1" />
     <Content Include="thebasics.csproj" />
   </ItemGroup>
-  <ItemGroup>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\shared\basicconfig\src\**\*.cs" Link="BasicConfig\%(RecursiveDir)%(Filename)%(Extension)" />
-  </ItemGroup>
+  <Import Project="..\shared\basicconfig\BasicConfig.Shared.projitems" />
+
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="SkiaSharp" Version="3.119.1" Condition="!Exists('$(VINTAGE_STORY)\Lib\SkiaSharp.dll')" />

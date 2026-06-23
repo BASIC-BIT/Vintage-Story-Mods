@@ -7,7 +7,16 @@ internal static class PocketDimensionsConfigSchema
 {
     public const string ConfigId = "pocketdimensions";
 
+    private static readonly BasicConfigSchema<PocketDimensionsConfig> _schema = BuildSchema();
+
+    public static IReadOnlyList<BasicConfigSettingDefinition<PocketDimensionsConfig>> Settings => _schema.Settings;
+
     public static BasicConfigSchema<PocketDimensionsConfig> Build()
+    {
+        return _schema;
+    }
+
+    private static BasicConfigSchema<PocketDimensionsConfig> BuildSchema()
     {
         var capabilityModes = new[]
         {
