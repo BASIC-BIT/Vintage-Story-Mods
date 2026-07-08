@@ -125,7 +125,7 @@ foreach ($SkillName in $OpenCodeSkillNames) {
         Add-CheckError ".codex/skills must include $SkillName."
     }
 
-    if (-not $Wrapper.StartsWith("---`n")) {
+    if ($Wrapper -notmatch "\A---\r?\n") {
         Add-CheckError "$WrapperPath must start with frontmatter."
     }
 
