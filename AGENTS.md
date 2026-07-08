@@ -34,7 +34,7 @@ If the toolbox repo is present next to this repo, also read:
 
 ## Repository Skills
 
-OpenCode skills under `.opencode/skills/` are first-class workflow assets for this repository. When a task matches a skill, follow it and update it in the same PR as workflow changes.
+OpenCode skills under `.opencode/skills/` are first-class workflow assets for this repository. Codex wrappers under `.codex/skills/` are thin compatibility shims that point back to those source skills. When a task matches a skill, follow the source skill and update it in the same PR as workflow changes. After changing `.opencode/skills/`, `.codex/skills/`, or `docs/agentic/codex.md`, run `.\scripts\check-agent-tooling.ps1`.
 
 ## DimensionLib Product Direction
 
