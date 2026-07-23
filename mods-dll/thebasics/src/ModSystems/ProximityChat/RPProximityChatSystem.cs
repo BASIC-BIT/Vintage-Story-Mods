@@ -1438,7 +1438,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 continue;
             }
 
-            ReconcilePlayerLanguages(serverPlayer, renameMap);
+            ReconcilePlayerLanguages(serverPlayer, Config, renameMap);
         }
     }
 
@@ -1458,28 +1458,16 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 continue;
             }
 
-            ReconcileStoredPlayerLanguages(playerData, renameMap);
+            ReconcileStoredPlayerLanguages(playerData, Config, renameMap);
         }
     }
 
-    private void ReconcileStoredPlayerLanguages(ServerWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap)
+    internal static void ReconcileStoredPlayerLanguages(IWorldPlayerData playerData, ModConfig config, IReadOnlyDictionary<string, string> renameMap)
     {
-        var languagesByName = Config.Languages.ToDictionary(language => language.Name, StringComparer.OrdinalIgnoreCase);
-        var validNames = new HashSet<string>(languagesByName.Keys, StringComparer.OrdinalIgnoreCase);
+        playerData.InstantiateLanguagesIfNotExist(config);
+        var languagesByName = LanguageCatalog.GetReconciliationMap(config);
         var currentNames = playerData.GetLanguages();
-        var reconciledNames = new List<string>();
-        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var currentName in currentNames)
-        {
-            var candidate = renameMap.TryGetValue(currentName, out var renamed) ? renamed : currentName;
-            if (!validNames.Contains(candidate) || !seenNames.Add(candidate))
-            {
-                continue;
-            }
-
-            reconciledNames.Add(languagesByName[candidate].Name);
-        }
+        var reconciledNames = ReconcileLanguageNames(currentNames, renameMap, languagesByName);
 
         if (!currentNames.SequenceEqual(reconciledNames, StringComparer.OrdinalIgnoreCase))
         {
@@ -1488,10 +1476,14 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         ReconcileStoredLanguageSkills(playerData, renameMap, languagesByName, reconciledNames);
         ReconcileStoredSemanticLanguageMemory(playerData, renameMap, languagesByName, reconciledNames);
-        ReconcileStoredDefaultLanguage(playerData, renameMap, languagesByName, reconciledNames);
+        playerData.SetDefaultLanguage(ResolveReconciledDefaultLanguage(
+            playerData.GetDefaultLanguageName(),
+            renameMap,
+            languagesByName,
+            reconciledNames));
     }
 
-    private static void ReconcileStoredLanguageSkills(ServerWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
+    private static void ReconcileStoredLanguageSkills(IWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
     {
         var currentSkills = playerData.GetLanguageSkills();
         var reconciledSkills = ReconcileLanguageSkills(currentSkills, renameMap, languagesByName, knownNames);
@@ -1501,57 +1493,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
     }
 
-    private void ReconcileStoredDefaultLanguage(ServerWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> reconciledNames)
+    internal static void ReconcilePlayerLanguages(IServerPlayer serverPlayer, ModConfig config, IReadOnlyDictionary<string, string> renameMap)
     {
-        var defaultLanguageName = playerData.GetDefaultLanguageName();
-        var mappedDefault = renameMap.TryGetValue(defaultLanguageName ?? string.Empty, out var renamedDefault)
-            ? renamedDefault
-            : defaultLanguageName;
-
-        if (string.Equals(mappedDefault, LanguageSystem.BabbleLang.Name, StringComparison.OrdinalIgnoreCase))
-        {
-            playerData.SetDefaultLanguage(LanguageSystem.BabbleLang);
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(mappedDefault) && languagesByName.TryGetValue(mappedDefault, out var defaultLanguage))
-        {
-            if (!string.Equals(defaultLanguageName, defaultLanguage.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                playerData.SetDefaultLanguage(defaultLanguage);
-            }
-
-            return;
-        }
-
-        var fallbackName = reconciledNames.FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(fallbackName) && languagesByName.TryGetValue(fallbackName, out var fallbackLanguage))
-        {
-            playerData.SetDefaultLanguage(fallbackLanguage);
-            return;
-        }
-
-        playerData.SetDefaultLanguage(Config.Languages.FirstOrDefault(language => language.Default) ?? LanguageSystem.BabbleLang);
-    }
-
-    private void ReconcilePlayerLanguages(IServerPlayer serverPlayer, IReadOnlyDictionary<string, string> renameMap)
-    {
-        var languagesByName = Config.Languages.ToDictionary(language => language.Name, StringComparer.OrdinalIgnoreCase);
-        var validNames = new HashSet<string>(languagesByName.Keys, StringComparer.OrdinalIgnoreCase);
+        serverPlayer.InstantiateLanguagesIfNotExist(config);
+        var languagesByName = LanguageCatalog.GetReconciliationMap(config);
         var currentNames = serverPlayer.GetLanguages();
-        var reconciledNames = new List<string>();
-        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var currentName in currentNames)
-        {
-            var candidate = renameMap.TryGetValue(currentName, out var renamed) ? renamed : currentName;
-            if (!validNames.Contains(candidate) || !seenNames.Add(candidate))
-            {
-                continue;
-            }
-
-            reconciledNames.Add(languagesByName[candidate].Name);
-        }
+        var reconciledNames = ReconcileLanguageNames(currentNames, renameMap, languagesByName);
 
         if (!currentNames.SequenceEqual(reconciledNames, StringComparer.OrdinalIgnoreCase))
         {
@@ -1560,10 +1507,89 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         ReconcilePlayerLanguageSkills(serverPlayer, renameMap, languagesByName, reconciledNames);
         ReconcilePlayerSemanticLanguageMemory(serverPlayer, renameMap, languagesByName, reconciledNames);
-        ReconcilePlayerDefaultLanguage(serverPlayer, renameMap, languagesByName, reconciledNames);
+        serverPlayer.SetDefaultLanguage(ResolveReconciledDefaultLanguage(
+            serverPlayer.GetDefaultLanguageName(),
+            renameMap,
+            languagesByName,
+            reconciledNames));
     }
 
-    private static void ReconcileStoredSemanticLanguageMemory(ServerWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
+    internal static List<string> ReconcileLanguageNames(
+        IEnumerable<string> currentNames,
+        IReadOnlyDictionary<string, string> renameMap,
+        IReadOnlyDictionary<string, Language> languagesByName)
+    {
+        var reconciledNames = new List<string>();
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var currentName in currentNames ?? Array.Empty<string>())
+        {
+            var candidate = ResolveLanguageCandidate(currentName, renameMap, languagesByName);
+            if (string.IsNullOrWhiteSpace(candidate) ||
+                !languagesByName.TryGetValue(candidate, out var language) ||
+                !seenNames.Add(language.Name))
+            {
+                continue;
+            }
+
+            reconciledNames.Add(language.Name);
+        }
+
+        return reconciledNames;
+    }
+
+    internal static string ResolveLanguageCandidate(
+        string currentName,
+        IReadOnlyDictionary<string, string> renameMap,
+        IReadOnlyDictionary<string, Language> languagesByName)
+    {
+        if (string.IsNullOrWhiteSpace(currentName))
+        {
+            return null;
+        }
+
+        if (languagesByName.TryGetValue(currentName, out var currentLanguage))
+        {
+            return currentLanguage.Name;
+        }
+
+        return renameMap != null && renameMap.TryGetValue(currentName, out var renamed)
+            ? renamed
+            : currentName;
+    }
+
+    internal static Language ResolveReconciledDefaultLanguage(
+        string defaultLanguageName,
+        IReadOnlyDictionary<string, string> renameMap,
+        IReadOnlyDictionary<string, Language> languagesByName,
+        IReadOnlyList<string> reconciledNames)
+    {
+        if (string.Equals(defaultLanguageName, LanguageSystem.BabbleLang.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return LanguageSystem.BabbleLang;
+        }
+
+        var knownNames = new HashSet<string>(reconciledNames ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+        var candidate = ResolveLanguageCandidate(defaultLanguageName, renameMap, languagesByName);
+        if (!string.IsNullOrWhiteSpace(candidate) &&
+            languagesByName.TryGetValue(candidate, out var defaultLanguage) &&
+            knownNames.Contains(defaultLanguage.Name))
+        {
+            return defaultLanguage;
+        }
+
+        foreach (var knownName in reconciledNames ?? Array.Empty<string>())
+        {
+            if (languagesByName.TryGetValue(knownName, out var fallbackLanguage))
+            {
+                return fallbackLanguage;
+            }
+        }
+
+        return LanguageSystem.BabbleLang;
+    }
+
+    private static void ReconcileStoredSemanticLanguageMemory(IWorldPlayerData playerData, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> knownNames)
     {
         var currentMemory = playerData.GetSemanticLanguageMemory();
         var reconciledMemory = ReconcileSemanticLanguageMemory(currentMemory, renameMap, languagesByName, knownNames);
@@ -1587,7 +1613,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 continue;
             }
 
-            var candidate = renameMap.TryGetValue(languageMemory.LanguageName, out var renamed) ? renamed : languageMemory.LanguageName;
+            var candidate = ResolveLanguageCandidate(languageMemory.LanguageName, renameMap, languagesByName);
             if (!languagesByName.TryGetValue(candidate, out var language))
             {
                 continue;
@@ -1621,7 +1647,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         foreach (var entry in currentSkills ?? new Dictionary<string, int>())
         {
-            var candidate = renameMap.TryGetValue(entry.Key, out var renamed) ? renamed : entry.Key;
+            var candidate = ResolveLanguageCandidate(entry.Key, renameMap, languagesByName);
             if (!languagesByName.TryGetValue(candidate, out var language) || known.Contains(language.Name))
             {
                 continue;
@@ -1657,39 +1683,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         return true;
-    }
-
-    private void ReconcilePlayerDefaultLanguage(IServerPlayer serverPlayer, IReadOnlyDictionary<string, string> renameMap, IReadOnlyDictionary<string, Language> languagesByName, IReadOnlyList<string> reconciledNames)
-    {
-        var defaultLanguageName = serverPlayer.GetDefaultLanguageName();
-        var mappedDefault = renameMap.TryGetValue(defaultLanguageName ?? string.Empty, out var renamedDefault)
-            ? renamedDefault
-            : defaultLanguageName;
-
-        if (string.Equals(mappedDefault, LanguageSystem.BabbleLang.Name, StringComparison.OrdinalIgnoreCase))
-        {
-            serverPlayer.SetDefaultLanguage(LanguageSystem.BabbleLang);
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(mappedDefault) && languagesByName.TryGetValue(mappedDefault, out var defaultLanguage))
-        {
-            if (!string.Equals(defaultLanguageName, defaultLanguage.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                serverPlayer.SetDefaultLanguage(defaultLanguage);
-            }
-
-            return;
-        }
-
-        var fallbackName = reconciledNames.FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(fallbackName) && languagesByName.TryGetValue(fallbackName, out var fallbackLanguage))
-        {
-            serverPlayer.SetDefaultLanguage(fallbackLanguage);
-            return;
-        }
-
-        serverPlayer.SetDefaultLanguage(Config.Languages.FirstOrDefault(language => language.Default) ?? LanguageSystem.BabbleLang);
     }
 
     private void TrackLanguageRenamesForJoiningPlayers(IReadOnlyDictionary<string, string> renameMap)
@@ -1924,7 +1917,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         // Config will be sent when client indicates it's ready.
-        ReconcilePlayerLanguages(byPlayer, _languageRenameMapForJoiningPlayers);
+        ReconcilePlayerLanguages(byPlayer, Config, _languageRenameMapForJoiningPlayers);
         SwapOutNameTag(byPlayer);
     }
 
