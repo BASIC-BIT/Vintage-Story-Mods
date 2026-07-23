@@ -1548,13 +1548,18 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return null;
         }
 
-        if (languagesByName.TryGetValue(currentName, out var currentLanguage))
+        if (string.Equals(currentName, LanguageSystem.SignLanguage.Name, StringComparison.OrdinalIgnoreCase))
         {
-            return currentLanguage.Name;
+            return LanguageSystem.SignLanguage.Name;
         }
 
-        return renameMap != null && renameMap.TryGetValue(currentName, out var renamed)
-            ? renamed
+        if (renameMap != null && renameMap.TryGetValue(currentName, out var renamed))
+        {
+            return renamed;
+        }
+
+        return languagesByName.TryGetValue(currentName, out var currentLanguage)
+            ? currentLanguage.Name
             : currentName;
     }
 

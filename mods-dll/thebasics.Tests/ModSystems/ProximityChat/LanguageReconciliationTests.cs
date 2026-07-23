@@ -67,6 +67,24 @@ public class LanguageReconciliationTests
     }
 
     [Fact]
+    public void ReconcileLanguageNames_AppliesConfiguredRenameWhenOldNameIsReused()
+    {
+        var languagesByName = LanguageCatalog.GetReconciliationMap(CreateConfig(
+            new Language("Old Trade", "Replacement language", "old", ["ol"], "#E9DDCE")));
+        var renameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Old Trade"] = "Trade"
+        };
+
+        var reconciled = RPProximityChatSystem.ReconcileLanguageNames(
+            ["Old Trade"],
+            renameMap,
+            languagesByName);
+
+        reconciled.Should().Equal("Trade");
+    }
+
+    [Fact]
     public void ResolveDefault_RequiresKnownLanguageAndFallsBackToFirstKnown()
     {
         var languagesByName = LanguageCatalog.GetReconciliationMap(CreateConfig());
