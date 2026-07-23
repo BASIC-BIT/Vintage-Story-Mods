@@ -453,18 +453,43 @@ namespace thebasics.Extensions
         {
             if (player.GetModdata(ModDataLanguages) == null)
             {
-                SetModData(player, ModDataLanguages, config.Languages
+                SetModData(player, ModDataLanguages, (config?.Languages ?? Array.Empty<Language>())
                     .Where(lang => lang.Default)
                     .Select(lang => lang.Name)
                     .ToList());
             }
             if (player.GetModdata(ModDataDefaultLanguage) == null)
             {
-                var defaultLang = config.Languages
+                var defaultLang = (config?.Languages ?? Array.Empty<Language>())
                     .Where(lang => lang.Default)
                     .Select(lang => lang.Name)
                     .FirstOrDefault(LanguageSystem.BabbleLang.Name);
                 SetModData(player, ModDataDefaultLanguage, defaultLang);
+            }
+        }
+
+        public static void InstantiateLanguagesIfNotExist(this IWorldPlayerData playerData, ModConfig config)
+        {
+            if (playerData == null)
+            {
+                return;
+            }
+
+            if (playerData.GetModData<List<string>>(ModDataLanguages, null) == null)
+            {
+                playerData.SetModData(ModDataLanguages, (config?.Languages ?? Array.Empty<Language>())
+                    .Where(lang => lang.Default)
+                    .Select(lang => lang.Name)
+                    .ToList());
+            }
+
+            if (playerData.GetModData<string>(ModDataDefaultLanguage, null) == null)
+            {
+                var defaultLang = (config?.Languages ?? Array.Empty<Language>())
+                    .Where(lang => lang.Default)
+                    .Select(lang => lang.Name)
+                    .FirstOrDefault(LanguageSystem.BabbleLang.Name);
+                playerData.SetModData(ModDataDefaultLanguage, defaultLang);
             }
         }
 
@@ -707,13 +732,15 @@ namespace thebasics.Extensions
 
         public static bool KnowsLanguage(this IServerPlayer player, Language lang)
         {
-            return GetLanguages(player).Any(langName => langName == lang.Name);
+            return GetLanguages(player).Any(langName =>
+                string.Equals(langName, lang.Name, StringComparison.OrdinalIgnoreCase));
         }
 
         public static void AddLanguage(this IServerPlayer player, Language lang)
         {
             var currentLanguages = player.GetLanguages().ToList();
-            if (player.GetLanguages().All(curLang => curLang != lang.Name))
+            if (currentLanguages.All(curLang =>
+                    !string.Equals(curLang, lang.Name, StringComparison.OrdinalIgnoreCase)))
             {
                 currentLanguages.Add(lang.Name);
             }
@@ -725,7 +752,9 @@ namespace thebasics.Extensions
         public static void RemoveLanguage(this IServerPlayer player, Language lang)
         {
             var currentLanguages = player.GetLanguages().ToList();
-            var newLanguages = currentLanguages.Where(curLang => lang.Name != curLang).ToList();
+            var newLanguages = currentLanguages
+                .Where(curLang => !string.Equals(lang.Name, curLang, StringComparison.OrdinalIgnoreCase))
+                .ToList();
             SetModData(player, ModDataLanguages, newLanguages);
             ClearLanguageSkill(player, lang);
             ClearSemanticLanguageMemory(player, lang);
@@ -757,22 +786,14 @@ namespace thebasics.Extensions
 
         private static Language GetLangFromName(string langName, ModConfig config, bool allowBabble, bool allowSignLanguage)
         {
-            return GetAllLanguages(config, allowBabble, allowSignLanguage).First((lang) => lang.Name == langName);
+            return GetAllLanguages(config, allowBabble, allowSignLanguage).First(lang =>
+                string.Equals(lang.Name, langName, StringComparison.OrdinalIgnoreCase));
         }
 
         // TODO: Refactor this to use version in LanguageSystem
         private static List<Language> GetAllLanguages(ModConfig config, bool allowBabble, bool allowSignLanguage = false)
         {
-            List<Language> languages = [.. config.Languages];
-            if (allowBabble)
-            {
-                languages.Add(LanguageSystem.BabbleLang);
-            }
-            if (allowSignLanguage)
-            {
-                languages.Add(LanguageSystem.SignLanguage);
-            }
-            return languages;
+            return LanguageCatalog.GetAll(config, allowBabble, includeHidden: true, includeSign: allowSignLanguage);
         }
 
         public static void SetDefaultLanguage(this IServerPlayer player, Language lang)
