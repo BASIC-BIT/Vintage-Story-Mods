@@ -5,8 +5,6 @@ namespace thebasics.Configs;
 [ProtoContract]
 public class TeleportationConfig
 {
-    private const int CurrentCommandRegistrationDefaultsVersion = 1;
-
     [ProtoMember(1)]
     public int MaxHomes { get; set; } = 3;
 
@@ -88,14 +86,8 @@ public class TeleportationConfig
     [ProtoMember(27)]
     public bool RegisterBackCommand { get; set; }
 
-    // Internal one-time migration marker. Version 1 resets the briefly shipped
-    // v5.8.0 true defaults to the safer opt-in posture.
-    [ProtoMember(28)]
-    public int CommandRegistrationDefaultsVersion { get; set; }
-
     public void InitializeDefaultsIfNeeded()
     {
-        ApplyCommandRegistrationDefaultsMigration();
         MaxHomes = MaxHomes <= 0 ? 3 : MaxHomes;
         HomeWarmupSeconds = ClampNonNegative(HomeWarmupSeconds);
         SpawnWarmupSeconds = ClampNonNegative(SpawnWarmupSeconds);
@@ -115,21 +107,6 @@ public class TeleportationConfig
         BackCooldownSeconds = ClampNonNegative(BackCooldownSeconds);
         BackExpiresAfterSeconds = ClampNonNegative(BackExpiresAfterSeconds);
         BackCommandPrivilege = string.IsNullOrWhiteSpace(BackCommandPrivilege) ? "chat" : BackCommandPrivilege.Trim();
-    }
-
-    private void ApplyCommandRegistrationDefaultsMigration()
-    {
-        if (CommandRegistrationDefaultsVersion >= CurrentCommandRegistrationDefaultsVersion)
-        {
-            return;
-        }
-
-        RegisterHomeCommands = false;
-        RegisterSpawnCommands = false;
-        RegisterStuckCommand = false;
-        RegisterTopCommand = false;
-        RegisterBackCommand = false;
-        CommandRegistrationDefaultsVersion = CurrentCommandRegistrationDefaultsVersion;
     }
 
     private static int ClampNonNegative(int value)

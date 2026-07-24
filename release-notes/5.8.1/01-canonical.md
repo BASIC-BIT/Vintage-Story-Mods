@@ -12,11 +12,7 @@ v5.8.1 is a corrective release that makes the five new non-request teleport comm
 - Server owners can enable only the families they want with `RegisterHomeCommands`, `RegisterSpawnCommands`, `RegisterStuckCommand`, `RegisterTopCommand`, and `RegisterBackCommand`, then restart the server.
 - The opt-in privilege defaults are unchanged: player-facing teleport commands use `chat`, while `/setspawn` uses the administrative `commandplayer` privilege.
 
-### One-time v5.8.0 safety migration
-
-The first v5.8.1 load adds a command-registration defaults marker and switches all five families off for configurations that do not already contain that marker. This includes configurations where v5.8.0 wrote its previous `true` defaults to disk.
-
-Because a persisted v5.8.0 `true` value does not reveal whether it was an intentional administrator choice or merely the old default, v5.8.1 takes the safer course and resets it to `false`. Administrators who intentionally opted in on v5.8.0 must re-enable the desired families once and restart. Explicit `false` values remain false, and choices made after the v5.8.1 migration are preserved.
+These new defaults apply when the settings are absent, including freshly generated configuration. Existing explicitly serialized `true` or `false` values are preserved.
 
 ## Language-understanding boundary
 

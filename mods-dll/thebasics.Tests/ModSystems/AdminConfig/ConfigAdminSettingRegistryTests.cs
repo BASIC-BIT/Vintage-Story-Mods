@@ -246,7 +246,6 @@ public class ConfigAdminSettingRegistryTests
         config.Teleportation.RegisterStuckCommand.Should().BeFalse();
         config.Teleportation.RegisterTopCommand.Should().BeFalse();
         config.Teleportation.RegisterBackCommand.Should().BeFalse();
-        config.Teleportation.CommandRegistrationDefaultsVersion.Should().Be(1);
         config.Teleportation.CancelWarmupOnDamage.Should().BeTrue();
         config.Teleportation.CancelWarmupOnInteraction.Should().BeTrue();
         config.Teleportation.StuckCommandPrivilege.Should().Be("chat");

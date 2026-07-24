@@ -25,7 +25,7 @@ public class TeleportationConfigTests
     }
 
     [Fact]
-    public void LegacyPre580Config_BackfillsSafeTeleportCommandDefaults()
+    public void ConfigWithMissingTeleportationSection_DefaultsAllCommandFamiliesOff()
     {
         var config = JsonConvert.DeserializeObject<ModConfig>("""
             {
@@ -40,7 +40,7 @@ public class TeleportationConfigTests
     }
 
     [Fact]
-    public void V580MaterializedTrueDefaults_AreResetOnceWithoutChangingPrivileges()
+    public void ExplicitSerializedValues_ArePreservedWithoutChangingPrivileges()
     {
         var config = JsonConvert.DeserializeObject<ModConfig>("""
             {
@@ -48,9 +48,9 @@ public class TeleportationConfigTests
               "SetSpawnCommandPrivilege": "custom-setspawn",
               "Teleportation": {
                 "RegisterHomeCommands": true,
-                "RegisterSpawnCommands": true,
+                "RegisterSpawnCommands": false,
                 "RegisterStuckCommand": true,
-                "RegisterTopCommand": true,
+                "RegisterTopCommand": false,
                 "RegisterBackCommand": true,
                 "StuckCommandPrivilege": "custom-stuck",
                 "TopCommandPrivilege": "custom-top",
@@ -61,7 +61,11 @@ public class TeleportationConfigTests
 
         config.InitializeDefaultsIfNeeded();
 
-        AssertAllCommandFamiliesDisabled(config.Teleportation);
+        config.Teleportation.RegisterHomeCommands.Should().BeTrue();
+        config.Teleportation.RegisterSpawnCommands.Should().BeFalse();
+        config.Teleportation.RegisterStuckCommand.Should().BeTrue();
+        config.Teleportation.RegisterTopCommand.Should().BeFalse();
+        config.Teleportation.RegisterBackCommand.Should().BeTrue();
         config.HomeCommandPrivilege.Should().Be("custom-home");
         config.SetSpawnCommandPrivilege.Should().Be("custom-setspawn");
         config.Teleportation.StuckCommandPrivilege.Should().Be("custom-stuck");
@@ -70,53 +74,7 @@ public class TeleportationConfigTests
     }
 
     [Fact]
-    public void Migration_PreservesExplicitFalseValuesWhileResettingTrueValues()
-    {
-        var config = JsonConvert.DeserializeObject<ModConfig>("""
-            {
-              "Teleportation": {
-                "RegisterHomeCommands": false,
-                "RegisterSpawnCommands": true,
-                "RegisterStuckCommand": false,
-                "RegisterTopCommand": true,
-                "RegisterBackCommand": false
-              }
-            }
-            """)!;
-
-        config.InitializeDefaultsIfNeeded();
-
-        AssertAllCommandFamiliesDisabled(config.Teleportation);
-    }
-
-    [Fact]
-    public void MigratedConfig_PreservesLaterExplicitOptIn()
-    {
-        var config = new ModConfig
-        {
-            Teleportation = new TeleportationConfig
-            {
-                CommandRegistrationDefaultsVersion = 1,
-                RegisterHomeCommands = true,
-                RegisterSpawnCommands = true,
-                RegisterStuckCommand = true,
-                RegisterTopCommand = true,
-                RegisterBackCommand = true
-            }
-        };
-
-        config.InitializeDefaultsIfNeeded();
-
-        config.Teleportation.RegisterHomeCommands.Should().BeTrue();
-        config.Teleportation.RegisterSpawnCommands.Should().BeTrue();
-        config.Teleportation.RegisterStuckCommand.Should().BeTrue();
-        config.Teleportation.RegisterTopCommand.Should().BeTrue();
-        config.Teleportation.RegisterBackCommand.Should().BeTrue();
-        config.Teleportation.CommandRegistrationDefaultsVersion.Should().Be(1);
-    }
-
-    [Fact]
-    public void BackRecorder_TracksTheMigratedBackCommandSetting()
+    public void BackRecorder_TracksTheBackCommandSetting()
     {
         var defaultConfig = new ModConfig();
         defaultConfig.InitializeDefaultsIfNeeded();
@@ -125,7 +83,6 @@ public class TeleportationConfigTests
         {
             Teleportation = new TeleportationConfig
             {
-                CommandRegistrationDefaultsVersion = 1,
                 RegisterBackCommand = true
             }
         };
@@ -142,6 +99,5 @@ public class TeleportationConfigTests
         teleportation.RegisterStuckCommand.Should().BeFalse();
         teleportation.RegisterTopCommand.Should().BeFalse();
         teleportation.RegisterBackCommand.Should().BeFalse();
-        teleportation.CommandRegistrationDefaultsVersion.Should().Be(1);
     }
 }

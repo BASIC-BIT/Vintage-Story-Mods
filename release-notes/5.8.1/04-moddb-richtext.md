@@ -14,11 +14,7 @@ v5.8.1 is a corrective release that makes the five new non-request teleport comm
 [*]The opt-in privilege defaults are unchanged: player-facing teleport commands use [b]chat[/b], while [b]/setspawn[/b] uses the administrative [b]commandplayer[/b] privilege.
 [/list]
 
-[h3]One-time v5.8.0 safety migration[/h3]
-
-The first v5.8.1 load adds a command-registration defaults marker and switches all five families off for configurations that do not already contain that marker. This includes configurations where v5.8.0 wrote its previous [b]true[/b] defaults to disk.
-
-Because a persisted v5.8.0 [b]true[/b] value does not reveal whether it was an intentional administrator choice or merely the old default, v5.8.1 takes the safer course and resets it to [b]false[/b]. Administrators who intentionally opted in on v5.8.0 must re-enable the desired families once and restart. Explicit [b]false[/b] values remain false, and choices made after the v5.8.1 migration are preserved.
+These new defaults apply when the settings are absent, including freshly generated configuration. Existing explicitly serialized [b]true[/b] or [b]false[/b] values are preserved.
 
 [h3]Language-understanding boundary[/h3]
 
