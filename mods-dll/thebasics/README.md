@@ -17,6 +17,7 @@ High-level systems:
  * Player stat tracking for deaths, player kills, NPC kills, block breaks, and distance travelled.
  * Permission-gated chat history search for staff, with GUI search, text command backup, export, and retention/purge controls.
  * TPA (teleport request) system with optional temporal gear cost, cooldowns, timeouts, and privileges.
+ * Opt-in home, spawn, stuck, top, and back teleport command families with configurable privileges, warmups, cooldowns, and safety gates.
  * Admin repair utility for setting item durability.
 
 All features can be toggled.  If you want more granularity in any feature toggles, feel free to suggest it.
@@ -113,6 +114,8 @@ Languages are defined via the config:
 Language prefixes are used to set your current speaking language for future messages, or to speak a single message in that language.
 
 The language system can be completely disabled if desired via the config flag `EnableLanguageSystem`
+
+The base language system does not require a companion mod: known languages remain readable, unknown languages are scrambled, and staff can set manual whole-language proficiency with `/adminsetlangskill`. Automatic semantic learning through exposure and concept-aware partial comprehension require the optional server-side `thebasicslanguageunderstanding` companion provider. Without a ready companion provider, The BASICs still loads and the base language behavior remains available, but semantic matching and organic learning are inactive.
 
 
 Players can add and remove languages via:
