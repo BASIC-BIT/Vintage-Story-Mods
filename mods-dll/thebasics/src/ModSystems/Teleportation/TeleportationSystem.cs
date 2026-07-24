@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using thebasics.Configs;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -18,7 +19,11 @@ public sealed class TeleportationSystem : BaseBasicModSystem
 
     protected override void BasicStartServerSide()
     {
-        TeleportBackGlobalRecorder.Patch();
+        if (ShouldEnableBackRecorder(Config))
+        {
+            TeleportBackGlobalRecorder.Patch();
+        }
+
         API.Event.HandInteract += OnHandInteract;
         API.Event.DidUseBlock += OnDidUseBlock;
         API.Event.DidPlaceBlock += OnDidPlaceBlock;
@@ -28,6 +33,17 @@ public sealed class TeleportationSystem : BaseBasicModSystem
         API.Event.PlayerDeath += OnPlayerDeath;
         API.Event.PlayerDisconnect += OnPlayerDisconnect;
         _warmupTickListener = API.World.RegisterGameTickListener(UpdateWarmups, 100);
+    }
+
+    internal static bool ShouldEnableBackRecorder(ModConfig config)
+    {
+        if (config?.Teleportation == null)
+        {
+            return false;
+        }
+
+        config.Teleportation.InitializeDefaultsIfNeeded();
+        return config.Teleportation.RegisterBackCommand;
     }
 
     public TextCommandResult BeginWarmup(TeleportWarmupRequest request)
