@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ (!github.event.pull_request.head.repo.fork && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && !endsWith(github.event.pull_request.user.login, '[bot]')) && format('claude-review-{0}', github.event.pull_request.number) || format('claude-review-noop-{0}', github.run_id) }}
-  cancel-in-progress: ${{ !github.event.pull_request.head.repo.fork && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && !endsWith(github.event.pull_request.user.login, '[bot]') }}
+  group: ${{ (!github.event.pull_request.head.repo.fork && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && !endsWith(github.event.pull_request.user.login, '[bot]') && (github.event.action != 'unlabeled' || github.event.label.name == 'skip-claude-review')) && format('claude-review-{0}', github.event.pull_request.number) || format('claude-review-noop-{0}', github.run_id) }}
+  cancel-in-progress: ${{ !github.event.pull_request.head.repo.fork && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && !endsWith(github.event.pull_request.user.login, '[bot]') && (github.event.action != 'unlabeled' || github.event.label.name == 'skip-claude-review') }}
 
 jobs:
   mark-unavailable-comment:
@@ -338,9 +338,13 @@ jobs:
                   "mcp__github_comment__update_claude_comment",
                   "mcp__github_inline_comment__create_inline_comment",
                   "Read(./pr-head/AGENTS.md)",
+                  "Read(./pr-head/**/AGENTS.md)",
                   "Read(./pr-head/CLAUDE.md)",
+                  "Read(./pr-head/**/CLAUDE.md)",
                   "Read(./pr-head/REVIEW.md)",
+                  "Read(./pr-head/**/REVIEW.md)",
                   "Read(./pr-head/.claude/**)",
+                  "Read(./pr-head/**/.claude/**)",
                   "Read(./.git/**)",
                   "Read(./pr-head/.git/**)",
                   "Read(//proc/**)",
