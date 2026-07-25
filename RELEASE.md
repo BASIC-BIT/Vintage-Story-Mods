@@ -10,7 +10,15 @@ This document explains how to create releases using the automated GitHub Actions
    - **New Version**: Enter the semantic version (e.g., `5.1.1`, `6.0.0-rc.1`)
    - **Pre-release**: Check if this is a pre-release version (optional)
    - **Persist Version Commit**: Push version file updates to the default branch (optional; requires `RELEASE_PUSH_TOKEN`)
-   - **Release Notes**: Add custom release notes or leave empty for auto-generated notes (optional)
+   - **Release Notes**: Paste the exact owner-approved public release body. Generated notes are a fallback, not publication-ready product copy.
+
+## Public Release Notes
+
+Before drafting, reviewing, or converting GitHub or ModDB release copy, follow [the repository release-note reference](.opencode/skills/moddb-release-playwright/references/public-release-notes.md).
+
+- Present the exact final body verbatim for owner approval before posting or updating either public page.
+- Prepare one canonical body and adapt only the platform formatting.
+- Never put an `[AGENT]` prefix or an em dash in public release-note copy.
 
 ## What the Workflow Does
 
