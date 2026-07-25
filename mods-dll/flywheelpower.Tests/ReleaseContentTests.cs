@@ -39,6 +39,55 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
+    public void UnreadyKeyedAndMultiMaterialSurfacesAreInactive()
+    {
+        string activeBlocktypes = Path.Combine(ProjectRoot, "assets", "flywheelpower", "blocktypes");
+        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+        string fullSizeBlocktype = File.ReadAllText(Path.Combine(activeBlocktypes, "flywheel.json"));
+        string compactBlocktype = File.ReadAllText(Path.Combine(activeBlocktypes, "compactflywheel.json"));
+
+        Assert.False(File.Exists(Path.Combine(activeBlocktypes, "keyedflywheel.json")));
+        Assert.False(File.Exists(Path.Combine(activeBlocktypes, "keyedcompactflywheel.json")));
+        Assert.DoesNotContain("keyedflywheel", activeLanguage, StringComparison.OrdinalIgnoreCase);
+        Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedflywheel.json")));
+        Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedcompactflywheel.json")));
+        Assert.Contains("""{ code: "material", states: ["iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""{ code: "hub", states: ["iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""{ code: "material", states: ["iron"] }""", compactBlocktype, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InventoryPreviewMatchesReleasedFullSizeDimensions()
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(
+                ProjectRoot,
+                "assets",
+                "flywheelpower",
+                "shapes",
+                "block",
+                "flywheel-wheel-coupled.json")));
+        JsonElement elements = document.RootElement.GetProperty("elements");
+        JsonElement[] discBands = elements.EnumerateArray()
+            .Where(element => element.GetProperty("name").GetString()!.StartsWith("DiscBand", StringComparison.Ordinal))
+            .ToArray();
+        JsonElement hub = elements.EnumerateArray()
+            .Single(element => element.GetProperty("name").GetString() == "Hub");
+
+        double minY = discBands.Min(element => element.GetProperty("from")[1].GetDouble());
+        double maxY = discBands.Max(element => element.GetProperty("to")[1].GetDouble());
+        double minZ = discBands.Min(element => element.GetProperty("from")[2].GetDouble());
+        double maxZ = discBands.Max(element => element.GetProperty("to")[2].GetDouble());
+        double minX = discBands.Min(element => element.GetProperty("from")[0].GetDouble());
+        double maxX = discBands.Max(element => element.GetProperty("to")[0].GetDouble());
+
+        Assert.Equal(32d, maxY - minY);
+        Assert.Equal(32d, maxZ - minZ);
+        Assert.Equal(2d, maxX - minX);
+        Assert.Equal(8d, hub.GetProperty("to")[1].GetDouble() - hub.GetProperty("from")[1].GetDouble());
+    }
+
+    [Fact]
     public void MetadataDeclaresUniversalSurvivalDependency()
     {
         using JsonDocument document = JsonDocument.Parse(

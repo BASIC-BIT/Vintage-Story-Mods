@@ -14,11 +14,13 @@ Prepare the previously uncommitted Flywheel Power prototype as a bounded 0.5.0 f
 
 ## Initial feedback scope
 
-- Preserve the existing flywheel mechanics for player testing.
+- Expose only the iron friction-coupled full-size and compact mechanics for player testing.
 - Keep the full-size flywheel's 3x3x1 placement, collision, selection, pivot, axle, and network orientation semantics.
 - Reduce the full-size visible wheel to a 2-block diameter with 0.5-block edge clearance.
 - Reduce the radial core to a 0.5-block diameter and disc depth to 0.125 block.
 - Keep the slip transmission source and assets, but remove its active blocktype and runtime registrations.
+- Keep keyed flywheel blocktypes and preview assets inactive because their current rigid path does not return inertial torque.
+- Limit active material/hub states to iron/iron until renderer grouping includes material identity.
 - Keep survival recipes deferred and describe the candidate as creative-only.
 
 ## Intentionally inactive source
@@ -27,6 +29,7 @@ Prepare the previously uncommitted Flywheel Power prototype as a bounded 0.5.0 f
 
 - The unfinished slip transmission blocktype.
 - Pre-release legacy flywheel blocktypes that duplicate the active block codes.
+- Keyed flywheel blocktypes and preview shapes whose current behavior does not buffer power.
 
 Slip transmission C# and shape sources remain in place. Nothing under `disabled-content/` is packaged.
 
@@ -44,10 +47,10 @@ Automated:
 Completed July 25, 2026:
 
 - Repository CI-equivalent builds and whitespace checks passed for all six configured projects.
-- The BASICs tests passed 481/481, DimensionLib tests passed 58/58, and Flywheel Power tests passed 7/7.
+- The BASICs tests passed 481/481, DimensionLib tests passed 58/58, and Flywheel Power tests passed 18/18.
 - The repository Lizard complexity gate passed with Flywheel Power included.
-- `flywheelpower_0_5_0.zip` contains 23 entries and has SHA-256
-  `4C86F29EECEB301B8140712BE663B15AA35FD58BF01288B31E02BDDE2DCCEFB3`.
+- `flywheelpower_0_5_0.zip` contains 18 entries and has SHA-256
+  `34F03EBE7DE3B4321C267304E932B545E90EAC0389C72613181EC29A2186D855`.
 - Exact archive inspection confirmed that no disabled blocktype, disabled localization, or `disabled-content/` path is packaged.
 - A local Vintage Story 1.22.2 disposable server loaded the packaged mod after `game`, `creative`, and `survival`, instantiated
   `FlywheelPower.FlywheelPowerModSystem`, finalized assets without errors, and reached `WorldReady`. The only smoke warnings
@@ -55,6 +58,8 @@ Completed July 25, 2026:
 - A source-geometry comparison was inspected from front, three-quarter, and side views. An independent taste review found
   the two-block disc, half-block edge clearance, 0.5-block core, and 0.125-block depth consistent with the brief. This is
   bounded schematic evidence, not human in-game visual approval.
+- An independent exact-commit code review found five issues. Before the next candidate, keyed and multi-material surfaces were
+  narrowed out, procedural normals and relative schematic links were added, and the inventory preview was rebuilt at released scale.
 
 Manual approval required before execution:
 
@@ -92,6 +97,8 @@ Manual approval required before execution:
 
 - Replace the slip transmission's cross-network torque model before re-registering any content.
 - Decide whether compact variants belong in the long-term product surface or remain test fixtures.
+- Implement real inertial contribution for keyed flywheels before restoring their blocktypes.
+- Include material/hub identity in mechanical renderer grouping before restoring the dormant variant states.
 - Design survival recipes and material progression after feedback establishes which variants are worth keeping.
 - Balance inertia, coupling, losses, safe speed, and block info against real windmill/machine rigs.
 - Add sound, wear, heat, and failure behavior only after the basic storage loop is understandable.

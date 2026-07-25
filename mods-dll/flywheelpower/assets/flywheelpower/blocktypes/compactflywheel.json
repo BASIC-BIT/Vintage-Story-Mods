@@ -28,7 +28,7 @@
     }
   },
   variantgroups: [
-    { code: "material", states: ["bronze", "iron", "meteoriciron", "steel"] },
+    { code: "material", states: ["iron"] },
     { code: "rotation", states: ["ud", "ns", "we"] }
   ],
   creativeinventory: { "general": ["*-ud"], "mechanics": ["*-ud"] },

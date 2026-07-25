@@ -202,11 +202,11 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
 
         if (frontFace)
         {
-            AddQuad(mesh, tex, v0, v1, v2, v3);
+            AddQuad(mesh, tex, v0, v1, v2, v3, new Vec3f(1f, 0f, 0f));
         }
         else
         {
-            AddQuad(mesh, tex, v0, v3, v2, v1);
+            AddQuad(mesh, tex, v0, v3, v2, v1, new Vec3f(-1f, 0f, 0f));
         }
     }
 
@@ -244,11 +244,11 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
 
                     if (outerSide)
                     {
-                        AddQuad(mesh, tex, vtx0, vtx1, vtx2, vtx3);
+                        AddQuad(mesh, tex, vtx0, vtx1, vtx2, vtx3, RadialNormal((a0 + a1) / 2f, 1f));
                     }
                     else
                     {
-                        AddQuad(mesh, tex, vtx0, vtx3, vtx2, vtx1);
+                        AddQuad(mesh, tex, vtx0, vtx3, vtx2, vtx1, RadialNormal((a0 + a1) / 2f, -1f));
                     }
                 }
             }
@@ -262,7 +262,7 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         MeshVertex b = CylinderVertex(maxX, radius, -halfAngle, 0f, 1f);
         MeshVertex c = CylinderVertex(maxX, radius, halfAngle, 1f, 1f);
         MeshVertex d = CylinderVertex(minX, radius, halfAngle, 1f, 0f);
-        AddQuad(mesh, tex, a, b, c, d);
+        AddQuad(mesh, tex, a, b, c, d, RadialNormal(0f, 1f));
     }
 
     private static void AddChalkLine(MeshData mesh, TextureAtlasPosition tex, float x, float innerRadius, float outerRadius, float halfWidth, bool frontFace)
@@ -275,11 +275,11 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
 
         if (frontFace)
         {
-            AddQuad(mesh, tex, a, b, c, d);
+            AddQuad(mesh, tex, a, b, c, d, new Vec3f(1f, 0f, 0f));
         }
         else
         {
-            AddQuad(mesh, tex, a, d, c, b);
+            AddQuad(mesh, tex, a, d, c, b, new Vec3f(-1f, 0f, 0f));
         }
     }
 
@@ -308,22 +308,27 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         d = d.WithUv(d.Y / TextureMeters - tileY, d.Z / TextureMeters - tileZ);
     }
 
-    private static void AddQuad(MeshData mesh, TextureAtlasPosition tex, MeshVertex a, MeshVertex b, MeshVertex c, MeshVertex d)
+    private static Vec3f RadialNormal(float angle, float direction)
+    {
+        return new Vec3f(0f, MathF.Sin(angle) * direction, MathF.Cos(angle) * direction);
+    }
+
+    private static void AddQuad(MeshData mesh, TextureAtlasPosition tex, MeshVertex a, MeshVertex b, MeshVertex c, MeshVertex d, Vec3f normal)
     {
         int vertexStart = mesh.VerticesCount;
         mesh.AddTextureId(tex.atlasTextureId);
-        AddVertex(mesh, tex, a);
-        AddVertex(mesh, tex, b);
-        AddVertex(mesh, tex, c);
-        AddVertex(mesh, tex, d);
+        AddVertex(mesh, tex, a, normal);
+        AddVertex(mesh, tex, b, normal);
+        AddVertex(mesh, tex, c, normal);
+        AddVertex(mesh, tex, d, normal);
         mesh.AddQuadIndices(vertexStart);
     }
 
-    private static void AddVertex(MeshData mesh, TextureAtlasPosition tex, MeshVertex vertex)
+    private static void AddVertex(MeshData mesh, TextureAtlasPosition tex, MeshVertex vertex, Vec3f normal)
     {
         float u = tex.x1 + GameMath.Clamp(vertex.U, 0f, 1f) * (tex.x2 - tex.x1);
         float v = tex.y1 + GameMath.Clamp(vertex.V, 0f, 1f) * (tex.y2 - tex.y1);
-        mesh.AddVertex(vertex.X, vertex.Y, vertex.Z, u, v, -1);
+        mesh.AddWithFlagsVertex(vertex.X, vertex.Y, vertex.Z, u, v, -1, VertexFlags.PackNormal(normal));
     }
 
     private readonly struct MeshVertex
