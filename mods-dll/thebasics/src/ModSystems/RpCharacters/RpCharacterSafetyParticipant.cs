@@ -93,7 +93,11 @@ public class RpCharacterSafetyParticipant : IRpCharacterSwitchParticipant, IRpCh
                 continue;
             }
 
-            if (inventory is not InventoryBasePlayer)
+            if (inventory is not InventoryBasePlayer ||
+                !string.Equals(
+                    inventory.InventoryID,
+                    (inventory.ClassName ?? string.Empty) + "-" + player.PlayerUID,
+                    StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

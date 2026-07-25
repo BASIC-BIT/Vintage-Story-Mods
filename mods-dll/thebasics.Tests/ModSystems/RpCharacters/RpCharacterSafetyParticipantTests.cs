@@ -34,6 +34,16 @@ public class RpCharacterSafetyParticipantTests
     }
 
     [Fact]
+    public void HasExternalOpenInventory_RejectsPlayerInventoryOwnedByAnotherPlayer()
+    {
+        var player = CreatePlayer(new TestPlayerInventory("moddedbelt", "player-2"));
+
+        var result = RpCharacterSafetyParticipant.HasExternalOpenInventory(player);
+
+        result.Should().BeTrue();
+    }
+
+    [Fact]
     public void Validate_RejectsDeadPlayerBeforeInventorySwitching()
     {
         var player = Substitute.For<IServerPlayer>();
