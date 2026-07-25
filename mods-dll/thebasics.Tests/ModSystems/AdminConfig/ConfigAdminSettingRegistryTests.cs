@@ -236,6 +236,7 @@ public class ConfigAdminSettingRegistryTests
         config.Teleportation.TopWarmupSeconds.Should().Be(5);
         config.Teleportation.TopCooldownSeconds.Should().Be(300);
         config.Teleportation.TopCommandPrivilege.Should().Be("chat");
+        config.Teleportation.TopRequireTemporalGear.Should().BeFalse();
         config.Teleportation.BackWarmupSeconds.Should().Be(5);
         config.Teleportation.BackCooldownSeconds.Should().Be(300);
         config.Teleportation.BackExpiresAfterSeconds.Should().Be(300);
@@ -271,6 +272,9 @@ public class ConfigAdminSettingRegistryTests
         GetSetting("Teleportation.HomeCooldownSeconds").TrySetValue(config, "120", out var homeCooldownError).Should().BeTrue(homeCooldownError);
         GetSetting("Teleportation.SpawnCooldownSeconds").TrySetValue(config, "180", out var spawnCooldownError).Should().BeTrue(spawnCooldownError);
         GetSetting("Teleportation.TopCooldownSeconds").TrySetValue(config, "240", out var topCooldownError).Should().BeTrue(topCooldownError);
+        var topGearSetting = GetSetting("Teleportation.TopRequireTemporalGear");
+        topGearSetting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        topGearSetting.TrySetValue(config, "true", out var topGearError).Should().BeTrue(topGearError);
         GetSetting("Teleportation.BackCooldownSeconds").TrySetValue(config, "300", out var backCooldownError).Should().BeTrue(backCooldownError);
         GetSetting("Teleportation.BackExpiresAfterSeconds").TrySetValue(config, "600", out var backExpiryError).Should().BeTrue(backExpiryError);
         GetSetting("Teleportation.BackRequireTemporalGear").TrySetValue(config, "true", out var backGearError).Should().BeTrue(backGearError);
@@ -306,6 +310,7 @@ public class ConfigAdminSettingRegistryTests
         config.Teleportation.HomeCooldownSeconds.Should().Be(120);
         config.Teleportation.SpawnCooldownSeconds.Should().Be(180);
         config.Teleportation.TopCooldownSeconds.Should().Be(240);
+        config.Teleportation.TopRequireTemporalGear.Should().BeTrue();
         config.Teleportation.BackCooldownSeconds.Should().Be(300);
         config.Teleportation.BackExpiresAfterSeconds.Should().Be(600);
         config.Teleportation.BackRequireTemporalGear.Should().BeTrue();
