@@ -13,7 +13,7 @@ These are explicit repository or owner rules:
 5. Keep optional companions proportionate to their user impact. State plainly when a promoted capability is unavailable without an unpublished or unconfigured provider.
 6. Omit installation boilerplate. Include unusual distribution instructions only when the owner explicitly requests them or users otherwise cannot obtain the release safely.
 7. Prepare one canonical body for GitHub and ModDB. Change only platform formatting unless a platform-specific fact genuinely differs.
-8. Present the exact final body verbatim for owner approval before posting or editing either public page.
+8. Before posting, present each exact platform-ready body verbatim and show its rendered preview for owner approval.
 9. Never put `[AGENT]` in a public release body.
 10. Never use an em dash in public release-note copy. Use a comma, colon, parentheses, semicolon, or sentence break instead.
 
@@ -96,6 +96,6 @@ Prefer:
 5. Remove duplicated rationale, implementation vocabulary, install boilerplate, stale availability claims, and low-value links.
 6. Check that unavailable optional functionality is labeled beside the claim.
 7. Search the final public body for `[AGENT]` and U+2014; both counts must be zero.
-8. Present the complete final body verbatim for owner approval.
-9. Convert formatting for each platform without changing visible wording.
+8. Convert formatting for each platform without changing visible wording.
+9. Present each complete platform-ready body verbatim, validate its rendered preview, and obtain owner approval.
 10. Re-read both live pages after publication and compare their visible text with the approved canonical body.

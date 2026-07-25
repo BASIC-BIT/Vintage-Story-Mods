@@ -17,21 +17,26 @@ Target site: `https://mods.vintagestory.at`
 
 For GitHub or ModDB release-note drafting, review, or platform conversion, read [references/public-release-notes.md](references/public-release-notes.md) before writing copy.
 
-## Inputs required
+## Drafting inputs
+
+- Release version or merged-change range.
+- Canonical source, pull request, tag, and packaged-artifact evidence needed to verify public claims.
+
+## ModDB publication inputs
 
 - `modId` (numeric mod id on ModDB)
 - `zipPath` (absolute path to built mod zip)
 - `changelogHtmlOrText`
 - `compatibleVersions` (array of semver strings, e.g. `1.21.6`)
 
-## Preconditions
+## ModDB publication preconditions
 
 - The zip already exists locally (build/package step completed).
 - Operator can complete any interactive auth challenge (account login/2FA) if prompted.
 
 ## Workflow
 
-1. Prepare one fact-checked canonical release body using `references/public-release-notes.md`, present it verbatim for owner approval, and derive platform formatting only after approval.
+1. Prepare one fact-checked canonical release body using `references/public-release-notes.md`, derive each platform-ready body, and present the exact bodies plus rendered previews for owner approval.
 2. Open login page: `https://mods.vintagestory.at/login`.
 3. Complete auth flow and wait until logged in.
 4. Navigate to release page:
