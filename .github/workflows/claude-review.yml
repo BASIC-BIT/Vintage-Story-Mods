@@ -352,6 +352,7 @@ jobs:
       pull-requests: read
     outputs:
       review_markdown_b64: ${{ steps.extract_review.outputs.review_markdown_b64 }}
+      review_oversized: ${{ steps.extract_review.outputs.review_oversized }}
 
     steps:
       - name: Check out trusted base
@@ -562,12 +563,28 @@ jobs:
           fs.writeFileSync(reviewFile, `${markdown}\n`);
           NODE
 
-          {
-            echo "review_markdown_b64<<EOF"
-            base64 -w0 "${review_file}"
-            echo
-            echo "EOF"
-          } >> "${GITHUB_OUTPUT}"
+          if node - "$review_file" <<'NODE'
+          const fs = require("node:fs");
+
+          const review = fs.readFileSync(process.argv[2], "utf8");
+          const withinBudget =
+            Array.from(review).length <= 58000 &&
+            Buffer.byteLength(review, "utf8") <= 58000;
+          process.exit(withinBudget ? 0 : 1);
+          NODE
+          then
+            echo "review_oversized=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "review_markdown_b64<<EOF"
+              base64 -w0 "${review_file}"
+              echo
+              echo "EOF"
+            } >> "${GITHUB_OUTPUT}"
+          else
+            echo "::warning::Claude review output exceeded the safe transfer and GitHub comment budget."
+            echo "review_oversized=true" >> "$GITHUB_OUTPUT"
+            echo "review_markdown_b64=" >> "$GITHUB_OUTPUT"
+          fi
 
   publish-review:
     name: Publish Claude PR review
@@ -589,6 +606,7 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REVIEW_RESULT: ${{ needs.review.result }}
+          REVIEW_OVERSIZED: ${{ needs.review.outputs.review_oversized }}
           STICKY_MARKER: '<!-- claude-pr-review -->'
           REVIEW_MARKDOWN_B64: ${{ needs.review.outputs.review_markdown_b64 }}
         shell: bash
@@ -654,13 +672,27 @@ jobs:
             exit 0
           fi
 
-          if [ "${REVIEW_RESULT}" = "success" ] && [ -n "${REVIEW_MARKDOWN_B64}" ]; then
+          if [ "${REVIEW_RESULT}" = "success" ] && [ "${REVIEW_OVERSIZED}" = "true" ]; then
+            cat > "$body_file" <<EOF
+          ${STICKY_MARKER}
+          [AGENT]
+
+          ## Claude Review
+
+          Claude review completed for commit \`${PR_HEAD_SHA}\`, but its output exceeded the safe transfer and GitHub comment size and was not published.
+
+          This is a review-delivery failure, not an approval. Inspect the workflow logs before retrying.
+          EOF
+          elif [ "${REVIEW_RESULT}" = "success" ] && [ -n "${REVIEW_MARKDOWN_B64}" ]; then
             printf '%s' "${REVIEW_MARKDOWN_B64}" | base64 -d > "$review_file"
             if node - "$review_file" <<'NODE'
             const fs = require("node:fs");
 
             const review = fs.readFileSync(process.argv[2], "utf8");
-            process.exit(Array.from(review).length <= 58000 ? 0 : 1);
+            const withinBudget =
+              Array.from(review).length <= 58000 &&
+              Buffer.byteLength(review, "utf8") <= 58000;
+            process.exit(withinBudget ? 0 : 1);
             NODE
             then
               {

@@ -38,8 +38,10 @@ jobs:
           const numbers = fs
             .readFileSync(numbersFile, "utf8")
             .split(/\r?\n/)
+            .map((value) => value.trim())
+            .filter(Boolean)
             .map((value) => Number(value))
-            .filter(Number.isInteger);
+            .filter((value) => Number.isInteger(value) && value > 0);
           fs.appendFileSync(outputFile, `pull_requests=${JSON.stringify(numbers)}\n`);
           NODE
 
@@ -124,13 +126,12 @@ jobs:
           )"
 
           if [ -z "$reviewed_base_sha" ]; then
-            echo "::notice::Completed Claude review has no recorded base SHA; leaving it unchanged."
-            exit 0
-          fi
-
-          if [ "$reviewed_base_sha" = "$current_base_sha" ]; then
+            reviewed_base_description="an unrecorded legacy base"
+          elif [ "$reviewed_base_sha" = "$current_base_sha" ]; then
             echo "Claude review for PR ${PR_NUMBER} already matches current main ${current_base_sha}."
             exit 0
+          else
+            reviewed_base_description="\`${reviewed_base_sha}\`"
           fi
 
           cat > "$body_file" <<EOF
@@ -139,7 +140,7 @@ jobs:
 
           ## Claude Review
 
-          Claude review for commit \`${head_sha}\` was invalidated because \`main\` advanced from \`${reviewed_base_sha}\` to \`${current_base_sha}\` after the review completed.
+          Claude review for commit \`${head_sha}\` was invalidated because \`main\` advanced from ${reviewed_base_description} to \`${current_base_sha}\` after the review completed.
 
           This is not an approval. Trigger a new eligible pull request event before treating this head as Claude-reviewed.
           EOF
