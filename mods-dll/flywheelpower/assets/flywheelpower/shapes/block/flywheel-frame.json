@@ -1,0 +1,53 @@
+{
+  "editor": {
+    "allAngles": false,
+    "entityTextureMode": false
+  },
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "metal": "game:block/metal/tarnished/sheet/iron1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "elements": [
+    {
+      "name": "StandWest",
+      "from": [3.0, 0.0, 5.5],
+      "to": [5.0, 7.0, 10.5],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0.0, 0.0, 2.0, 7.0] },
+        "east": { "texture": "#wood", "uv": [0.0, 0.0, 5.0, 7.0] },
+        "south": { "texture": "#wood", "uv": [0.0, 0.0, 2.0, 7.0] },
+        "west": { "texture": "#wood", "uv": [0.0, 0.0, 5.0, 7.0] },
+        "up": { "texture": "#wood", "uv": [0.0, 0.0, 2.0, 5.0] },
+        "down": { "texture": "#wood", "uv": [0.0, 0.0, 2.0, 5.0] }
+      }
+    },
+    {
+      "name": "StandEast",
+      "from": [11.0, 0.0, 5.5],
+      "to": [13.0, 7.0, 10.5],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0.0, 0.0, 2.0, 7.0] },
+        "east": { "texture": "#wood", "uv": [0.0, 0.0, 5.0, 7.0] },
+        "south": { "texture": "#wood", "uv": [0.0, 0.0, 2.0, 7.0] },
+        "west": { "texture": "#wood", "uv": [0.0, 0.0, 5.0, 7.0] },
+        "up": { "texture": "#wood", "uv": [0.0, 0.0, 2.0, 5.0] },
+        "down": { "texture": "#wood", "uv": [0.0, 0.0, 2.0, 5.0] }
+      }
+    },
+    {
+      "name": "Base",
+      "from": [2.0, 0.0, 4.0],
+      "to": [14.0, 1.5, 12.0],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 1.5] },
+        "east": { "texture": "#wood", "uv": [0.0, 0.0, 8.0, 1.5] },
+        "south": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 1.5] },
+        "west": { "texture": "#wood", "uv": [0.0, 0.0, 8.0, 1.5] },
+        "up": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 8.0] },
+        "down": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 8.0] }
+      }
+    }
+  ]
+}

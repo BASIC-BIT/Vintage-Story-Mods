@@ -1,0 +1,18 @@
+{
+  "editor": {
+    "allAngles": false,
+    "entityTextureMode": false
+  },
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "wheel": "game:block/metal/ingot/iron",
+    "metal": "game:block/metal/ingot/iron",
+    "chalk": "game:block/cloth/wool/red1"
+  },
+  "elements": [
+    { "name": "PreviewDiskCore", "from": [5.75, 3.5, 3.5], "to": [10.25, 12.5, 12.5], "faces": { "north": { "texture": "#wheel", "uv": [3.5,3.5,12.5,12.5] }, "east": { "texture": "#wheel", "uv": [3.5,3.5,12.5,12.5] }, "south": { "texture": "#wheel", "uv": [3.5,3.5,12.5,12.5] }, "west": { "texture": "#wheel", "uv": [3.5,3.5,12.5,12.5] }, "up": { "texture": "#wheel", "uv": [5.75,3.5,10.25,12.5] }, "down": { "texture": "#wheel", "uv": [5.75,3.5,10.25,12.5] } } },
+    { "name": "PreviewHub", "from": [5.25, 5.75, 5.75], "to": [10.75, 10.25, 10.25], "faces": { "north": { "texture": "#metal", "uv": [5.75,5.75,10.25,10.25] }, "east": { "texture": "#metal", "uv": [5.75,5.75,10.25,10.25] }, "south": { "texture": "#metal", "uv": [5.75,5.75,10.25,10.25] }, "west": { "texture": "#metal", "uv": [5.75,5.75,10.25,10.25] }, "up": { "texture": "#metal", "uv": [5.25,5.75,10.75,10.25] }, "down": { "texture": "#metal", "uv": [5.25,5.75,10.75,10.25] } } },
+    { "name": "PreviewChalk", "from": [10.75, 7.25, 8.0], "to": [10.875, 8.75, 12.75], "faces": { "east": { "texture": "#chalk", "uv": [7.25,8.0,8.75,12.75] }, "west": { "texture": "#chalk", "uv": [7.25,8.0,8.75,12.75] } } }
+  ]
+}

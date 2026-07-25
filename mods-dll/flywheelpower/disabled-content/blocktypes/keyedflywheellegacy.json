@@ -1,0 +1,61 @@
+{
+  code: "keyedflywheel",
+  class: "BlockFlywheel",
+  entityClass: "Generic",
+  entityBehaviors: [
+    {
+      name: "MPFlywheel",
+      properties: {
+        axleShape: { base: "flywheelpower:block/flywheel-axle" },
+        flywheelShape: { base: "flywheelpower:block/flywheel-wheel" },
+        slipCoupled: false,
+        inertia: 8.0,
+        couplingStrength: 0.8,
+        maxTransferTorque: 0.35,
+        baseBearingLoss: 0.001,
+        viscousBearingLoss: 0.003,
+        windageLoss: 0.0015,
+        safeSpeed: 3.5
+      }
+    }
+  ],
+  attributes: {
+    mechanicalPower: {
+      renderer: "flywheelpower"
+    }
+  },
+  variantgroups: [
+    { code: "rotation", states: ["ud", "ns", "we"] }
+  ],
+  shapeByType: {
+    "*-ns": { base: "flywheelpower:block/flywheel-frame", rotateY: 90 },
+    "*-ud": { base: "flywheelpower:block/flywheel-frame", rotateZ: 90 },
+    "*-we": { base: "flywheelpower:block/flywheel-frame", rotateY: 0 }
+  },
+  blockmaterial: "Metal",
+  materialDensity: 7800,
+  textures: {
+    wheel: { base: "game:block/metal/ingot/iron" },
+    metal: { base: "game:block/metal/ingot/iron" },
+    chalk: { base: "game:block/cloth/wool/red1" },
+    wood: { base: "game:block/wood/planks/generic" }
+  },
+  sidesolid: { all: false },
+  sideopaque: { all: false },
+  rainPermeable: true,
+  resistance: 5,
+  lightAbsorption: 0,
+  maxStackSize: 8,
+  drops: [{ type: "block", code: "keyedflywheel-iron-iron-ud", quantity: { avg: 1 } }],
+  collisionSelectionBoxByType: {
+    "*-we": { x1: 0, y1: 0.0625, z1: 0.0625, x2: 1, y2: 0.9375, z2: 0.9375 },
+    "*-ns": { x1: 0, y1: 0.0625, z1: 0.0625, x2: 1, y2: 0.9375, z2: 0.9375, rotateY: 90 },
+    "*-ud": { x1: 0.0625, y1: 0, z1: 0.0625, x2: 0.9375, y2: 1, z2: 0.9375 }
+  },
+  sounds: {
+    hit: "game:block/metalhit",
+    break: "game:block/metalbreak",
+    place: "game:block/metalplace",
+    walk: "game:walk/stone"
+  }
+}
