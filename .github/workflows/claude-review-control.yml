@@ -2,22 +2,22 @@ name: Claude Review Control
 
 on:
   pull_request_target:
-    branches: [main]
-    types: [labeled]
+    types: [labeled, edited]
 
 permissions:
   contents: read
 
 concurrency:
-  # This repo-scoped group intentionally matches claude-review.yml so the skip label cancels that workflow.
-  group: ${{ github.event.label.name == 'skip-claude-review' && format('claude-review-{0}', github.event.pull_request.number) || format('claude-review-control-noop-{0}', github.run_id) }}
-  cancel-in-progress: ${{ github.event.label.name == 'skip-claude-review' }}
+  # Matching groups cancel the main workflow for skip labels and retargets away from main.
+  group: ${{ ((github.event.action == 'labeled' && github.event.pull_request.base.ref == 'main' && github.event.label.name == 'skip-claude-review') || (github.event.action == 'edited' && github.event.changes.base != null && github.event.pull_request.base.ref != 'main')) && format('claude-review-{0}', github.event.pull_request.number) || format('claude-review-control-noop-{0}', github.run_id) }}
+  cancel-in-progress: ${{ (github.event.action == 'labeled' && github.event.pull_request.base.ref == 'main' && github.event.label.name == 'skip-claude-review') || (github.event.action == 'edited' && github.event.changes.base != null && github.event.pull_request.base.ref != 'main') }}
 
 jobs:
   cancel-on-skip-label:
     name: Cancel Claude review on skip label
     if: >-
       github.event.label.name == 'skip-claude-review' &&
+      github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.state == 'open' &&
       !github.event.pull_request.head.repo.fork &&
       github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name &&
@@ -47,6 +47,71 @@ jobs:
           ## Claude Review
 
           Claude review was skipped for commit \`${PR_HEAD_SHA}\` because the \`skip-claude-review\` label is applied.
+          EOF
+
+          node - "$body_file" "$json_file" <<'NODE'
+          const fs = require("node:fs");
+
+          const [, , bodyFile, jsonFile] = process.argv;
+          fs.writeFileSync(jsonFile, JSON.stringify({ body: fs.readFileSync(bodyFile, "utf8") }));
+          NODE
+
+          comment_id="$(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- claude-pr-review -->"))) | .id' |
+              tail -n 1
+          )"
+
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
+              --input "$json_file" > /dev/null
+          else
+            gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              --input "$json_file" > /dev/null
+          fi
+
+  invalidate-on-base-retarget:
+    name: Invalidate Claude review after base retarget
+    if: >-
+      github.event.action == 'edited' &&
+      github.event.changes.base != null &&
+      github.event.pull_request.base.ref != 'main' &&
+      github.event.pull_request.state == 'open' &&
+      !github.event.pull_request.head.repo.fork &&
+      github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name &&
+      !endsWith(github.event.pull_request.user.login, '[bot]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Invalidate Claude review
+        env:
+          CURRENT_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_BASE_REF: ${{ github.event.changes.base.ref.from }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          STICKY_MARKER: '<!-- claude-pr-review -->'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          body_file="${RUNNER_TEMP}/claude-review-comment.md"
+          json_file="${RUNNER_TEMP}/claude-review-comment.json"
+
+          cat > "$body_file" <<EOF
+          ${STICKY_MARKER}
+          [AGENT]
+
+          ## Claude Review
+
+          Claude review for commit \`${PR_HEAD_SHA}\` was invalidated because the pull request base changed from \`${PREVIOUS_BASE_REF}\` to \`${CURRENT_BASE_REF}\`.
+
+          This is not an approval. Retarget to \`main\` or otherwise trigger a new eligible pull request event before treating this head as Claude-reviewed.
           EOF
 
           node - "$body_file" "$json_file" <<'NODE'
