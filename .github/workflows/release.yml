@@ -41,6 +41,23 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
         fetch-tags: true
+
+    - name: Validate release notes
+      shell: pwsh
+      env:
+        CUSTOM_RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+      run: |
+        $releaseNotes = $env:CUSTOM_RELEASE_NOTES
+
+        if ([string]::IsNullOrWhiteSpace($releaseNotes)) {
+          Write-Host "Error: Exact owner-approved release notes are required." -ForegroundColor Red
+          exit 1
+        }
+
+        if ($releaseNotes.Contains([char]0x2014)) {
+          Write-Host "Error: Public release notes must not contain U+2014." -ForegroundColor Red
+          exit 1
+        }
         
     - name: Validate version format
       shell: pwsh
@@ -337,11 +354,6 @@ jobs:
         $previousTag = "${{ steps.previous_release.outputs.tag }}"
         $customNotes = $env:CUSTOM_RELEASE_NOTES
         $newTag = "V$newVersion"
-
-        if ([string]::IsNullOrWhiteSpace($customNotes)) {
-          Write-Host "Error: Exact owner-approved release notes are required." -ForegroundColor Red
-          exit 1
-        }
         
          if ($customNotes -and $customNotes.Trim()) {
            $releaseNotes = $customNotes

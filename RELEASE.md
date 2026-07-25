@@ -4,13 +4,21 @@ This document explains how to create releases using the automated GitHub Actions
 
 ## How to Create a Release
 
-1. **Navigate to Actions**: Go to the repository's Actions tab on GitHub
-2. **Select Release Workflow**: Click on "Create Release" in the workflow list
-3. **Run Workflow**: Click "Run workflow" and fill in the inputs:
-   - **New Version**: Enter the semantic version (e.g., `5.1.1`, `6.0.0-rc.1`)
-   - **Pre-release**: Check if this is a pre-release version (optional)
-   - **Persist Version Commit**: Push version file updates to the default branch (optional; requires `RELEASE_PUSH_TOKEN`)
-   - **Release Notes**: Required. Paste the exact owner-approved GitHub release body. The workflow rejects blank notes.
+1. Save the exact owner-approved GitHub release body to a local UTF-8 Markdown file.
+2. Run the workflow with GitHub CLI so the file's line breaks are preserved:
+
+   ```powershell
+   $notesPath = Resolve-Path ".\release-notes.md"
+   gh workflow run release.yml --ref main `
+     --raw-field new_version=5.1.1 `
+     --raw-field prerelease=false `
+     --raw-field persist_version_commit=false `
+     --field "release_notes=@$notesPath"
+   ```
+
+3. Change `new_version` to the approved semantic version. Set `prerelease` when appropriate. Set `persist_version_commit=true` only when version changes should be pushed to the default branch and `RELEASE_PUSH_TOKEN` is configured.
+
+The Actions-tab form uses a single-line string field and is not suitable for an exact multiline release body. The workflow rejects blank notes and notes containing U+2014 before changing or pushing version files.
 
 ## Public Release Notes
 
