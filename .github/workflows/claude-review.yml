@@ -172,7 +172,7 @@ jobs:
 
           if [ -n "$comment_id" ]; then
             echo "Reusing Claude review sticky comment ${comment_id}."
-            if ! gh api --method PATCH \
+            if [ "${SECRET_AVAILABLE}" != "true" ] && ! gh api --method PATCH \
               "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
               --input "$json_file" > /dev/null; then
               echo "::notice::Skipping Claude review because the workflow token cannot reset the sticky review comment for the current head."
@@ -289,10 +289,8 @@ jobs:
 
             Review this pull request as an async Vintage Story Mods reviewer.
 
-            This workflow runs again on synchronize events. For follow-up
-            reviews after new commits, review the latest PR head and avoid
-            repeating resolved findings from earlier Claude comments unless the
-            issue is still present.
+            This workflow runs again on synchronize events. Review the latest PR
+            head on every run.
 
             Use the trusted base-commit contract at
             ${{ runner.temp }}/claude-review/trusted-review-contract.md as
@@ -462,9 +460,17 @@ jobs:
           json_file="${RUNNER_TEMP}/claude-review-comment.json"
           review_file="${RUNNER_TEMP}/claude-review-body.md"
 
+          pr_state="$(
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.state'
+          )"
           current_head_sha="$(
             gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha'
           )"
+
+          if [ "${pr_state}" != "open" ]; then
+            echo "::notice::Skipping Claude review publish because PR ${PR_NUMBER} is ${pr_state}."
+            exit 0
+          fi
 
           if [ "${current_head_sha}" != "${PR_HEAD_SHA}" ]; then
             echo "::notice::Skipping stale Claude review publish for ${PR_HEAD_SHA}; current PR head is ${current_head_sha}."
