@@ -475,6 +475,35 @@ jobs:
           json_file="${RUNNER_TEMP}/claude-review-comment.json"
           review_file="${RUNNER_TEMP}/claude-review-body.md"
 
+          publish_base_invalidation() {
+            local observed_base_sha="$1"
+
+            cat > "$body_file" <<EOF
+          ${STICKY_MARKER}
+          [AGENT]
+
+          ## Claude Review
+
+          Claude review for commit \`${PR_HEAD_SHA}\` was invalidated because the base advanced from \`${PR_BASE_SHA}\` to \`${observed_base_sha}\` while the review was running.
+
+          This is not an approval. Trigger a new eligible pull request event before treating this head as Claude-reviewed.
+          EOF
+
+            node - "$body_file" "$json_file" <<'NODE'
+          const fs = require("node:fs");
+
+          const [, , bodyFile, jsonFile] = process.argv;
+          fs.writeFileSync(jsonFile, JSON.stringify({ body: fs.readFileSync(bodyFile, "utf8") }));
+          NODE
+
+            if ! gh api --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" \
+              --input "$json_file" > /dev/null; then
+              echo "::error::Claude review was invalidated by a base change, but the workflow token could not update the sticky review comment."
+              exit 1
+            fi
+          }
+
           pr_state="$(
             gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.state'
           )"
@@ -497,32 +526,7 @@ jobs:
 
           if [ "${current_base_sha}" != "${PR_BASE_SHA}" ]; then
             echo "::notice::Skipping stale Claude review publish for base ${PR_BASE_SHA}; current PR base is ${current_base_sha}."
-
-            cat > "$body_file" <<EOF
-          ${STICKY_MARKER}
-          [AGENT]
-
-          ## Claude Review
-
-          Claude review for commit \`${PR_HEAD_SHA}\` was invalidated because the base advanced from \`${PR_BASE_SHA}\` to \`${current_base_sha}\` while the review was running.
-
-          This is not an approval. Trigger a new eligible pull request event before treating this head as Claude-reviewed.
-          EOF
-
-            node - "$body_file" "$json_file" <<'NODE'
-          const fs = require("node:fs");
-
-          const [, , bodyFile, jsonFile] = process.argv;
-          fs.writeFileSync(jsonFile, JSON.stringify({ body: fs.readFileSync(bodyFile, "utf8") }));
-          NODE
-
-            if ! gh api --method PATCH \
-              "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" \
-              --input "$json_file" > /dev/null; then
-              echo "::error::Claude review was invalidated by a base change, but the workflow token could not update the sticky review comment."
-              exit 1
-            fi
-
+            publish_base_invalidation "${current_base_sha}"
             exit 0
           fi
 
@@ -560,4 +564,13 @@ jobs:
             --input "$json_file" > /dev/null; then
             echo "::error::Claude review completed, but the workflow token could not update the sticky review comment."
             exit 1
+          fi
+
+          published_base_sha="$(
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.base.sha'
+          )"
+
+          if [ "${published_base_sha}" != "${PR_BASE_SHA}" ]; then
+            echo "::notice::Invalidating Claude review after publish because base ${PR_BASE_SHA} advanced to ${published_base_sha}."
+            publish_base_invalidation "${published_base_sha}"
           fi
