@@ -17,7 +17,7 @@ High-level systems:
  * Player stat tracking for deaths, player kills, NPC kills, block breaks, and distance travelled.
  * Permission-gated chat history search for staff, with GUI search, text command backup, export, and retention/purge controls.
  * TPA (teleport request) system with optional temporal gear cost, cooldowns, timeouts, and privileges.
- * Opt-in home, spawn, stuck, top, and back teleport command families with configurable privileges, warmups, cooldowns, and safety gates.
+ * Opt-in home, spawn, stuck, top, and back teleport command families with configurable privileges, warmups, cooldowns, safety gates, and optional per-command temporal gear costs. `/stuck` remains gear-free.
  * Admin repair utility for setting item durability.
 
 All features can be toggled.  If you want more granularity in any feature toggles, feel free to suggest it.

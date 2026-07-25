@@ -21,6 +21,7 @@ public class TeleportationConfigTests
         config.SetSpawnCommandPrivilege.Should().Be("commandplayer");
         config.Teleportation.StuckCommandPrivilege.Should().Be("chat");
         config.Teleportation.TopCommandPrivilege.Should().Be("chat");
+        config.Teleportation.TopRequireTemporalGear.Should().BeFalse();
         config.Teleportation.BackCommandPrivilege.Should().Be("chat");
     }
 
@@ -54,6 +55,7 @@ public class TeleportationConfigTests
                 "RegisterBackCommand": true,
                 "StuckCommandPrivilege": "custom-stuck",
                 "TopCommandPrivilege": "custom-top",
+                "TopRequireTemporalGear": true,
                 "BackCommandPrivilege": "custom-back"
               }
             }
@@ -70,6 +72,7 @@ public class TeleportationConfigTests
         config.SetSpawnCommandPrivilege.Should().Be("custom-setspawn");
         config.Teleportation.StuckCommandPrivilege.Should().Be("custom-stuck");
         config.Teleportation.TopCommandPrivilege.Should().Be("custom-top");
+        config.Teleportation.TopRequireTemporalGear.Should().BeTrue();
         config.Teleportation.BackCommandPrivilege.Should().Be("custom-back");
     }
 

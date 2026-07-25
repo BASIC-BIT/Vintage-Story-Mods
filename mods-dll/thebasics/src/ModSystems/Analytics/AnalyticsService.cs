@@ -166,6 +166,7 @@ public static class AnalyticsService
             ["stuck_blocks_when_privilege_online"] = !string.IsNullOrWhiteSpace(config.Teleportation.StuckBlockedByOnlinePrivilege),
             ["stuck_blocked_by_online_custom_privilege"] = UsesCustomPrivilege(config.Teleportation.StuckBlockedByOnlinePrivilege, "commandplayer"),
             ["top_custom_privilege"] = UsesCustomPrivilege(config.Teleportation.TopCommandPrivilege, "chat"),
+            ["top_requires_temporal_gear"] = config.Teleportation.TopRequireTemporalGear,
             ["back_custom_privilege"] = UsesCustomPrivilege(config.Teleportation.BackCommandPrivilege, "chat"),
             ["back_requires_temporal_gear"] = config.Teleportation.BackRequireTemporalGear,
             ["max_homes_bucket"] = AnalyticsBuckets.Count(config.Teleportation.MaxHomes),
