@@ -3,14 +3,14 @@ name: Claude Review
 on:
   pull_request_target:
     branches: [main]
-    types: [opened, reopened, ready_for_review, synchronize, unlabeled, converted_to_draft, closed]
+    types: [opened, reopened, ready_for_review, synchronize, edited, unlabeled, converted_to_draft, closed]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ (!github.event.pull_request.head.repo.fork && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && !endsWith(github.event.pull_request.user.login, '[bot]') && (github.event.action != 'unlabeled' || github.event.label.name == 'skip-claude-review')) && format('claude-review-{0}', github.event.pull_request.number) || format('claude-review-noop-{0}', github.run_id) }}
-  cancel-in-progress: ${{ !github.event.pull_request.head.repo.fork && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && !endsWith(github.event.pull_request.user.login, '[bot]') && (github.event.action != 'unlabeled' || github.event.label.name == 'skip-claude-review') }}
+  group: ${{ (!github.event.pull_request.head.repo.fork && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && !endsWith(github.event.pull_request.user.login, '[bot]') && (github.event.action != 'edited' || github.event.changes.base != null) && (github.event.action != 'unlabeled' || github.event.label.name == 'skip-claude-review')) && format('claude-review-{0}', github.event.pull_request.number) || format('claude-review-noop-{0}', github.run_id) }}
+  cancel-in-progress: ${{ !github.event.pull_request.head.repo.fork && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && !endsWith(github.event.pull_request.user.login, '[bot]') && (github.event.action != 'edited' || github.event.changes.base != null) && (github.event.action != 'unlabeled' || github.event.label.name == 'skip-claude-review') }}
 
 jobs:
   mark-unavailable-comment:
@@ -23,6 +23,8 @@ jobs:
       !endsWith(github.event.pull_request.user.login, '[bot]') &&
       github.event.pull_request.state == 'open' &&
       github.event.action != 'closed' &&
+      (github.event.action != 'edited' ||
+      github.event.changes.base != null) &&
       (github.event.action != 'unlabeled' ||
       github.event.label.name == 'skip-claude-review')
     runs-on: ubuntu-latest
@@ -97,6 +99,8 @@ jobs:
       !endsWith(github.event.pull_request.user.login, '[bot]') &&
       github.event.pull_request.state == 'open' &&
       github.event.action != 'closed' &&
+      (github.event.action != 'edited' ||
+      github.event.changes.base != null) &&
       !contains(github.event.pull_request.labels.*.name, 'skip-claude-review') &&
       (github.event.action != 'unlabeled' ||
       github.event.label.name == 'skip-claude-review')
@@ -458,6 +462,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           COMMENT_ID: ${{ needs.prepare-comment.outputs.comment_id }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REVIEW_RESULT: ${{ needs.review.result }}
           STICKY_MARKER: '<!-- claude-pr-review -->'
@@ -476,6 +481,9 @@ jobs:
           current_head_sha="$(
             gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha'
           )"
+          current_base_sha="$(
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.base.sha'
+          )"
 
           if [ "${pr_state}" != "open" ]; then
             echo "::notice::Skipping Claude review publish because PR ${PR_NUMBER} is ${pr_state}."
@@ -484,6 +492,11 @@ jobs:
 
           if [ "${current_head_sha}" != "${PR_HEAD_SHA}" ]; then
             echo "::notice::Skipping stale Claude review publish for ${PR_HEAD_SHA}; current PR head is ${current_head_sha}."
+            exit 0
+          fi
+
+          if [ "${current_base_sha}" != "${PR_BASE_SHA}" ]; then
+            echo "::notice::Skipping stale Claude review publish for base ${PR_BASE_SHA}; current PR base is ${current_base_sha}."
             exit 0
           fi
 
