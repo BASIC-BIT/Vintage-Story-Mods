@@ -3,7 +3,7 @@ name: Claude Review
 on:
   pull_request_target:
     branches: [main]
-    types: [opened, reopened, ready_for_review, synchronize, unlabeled, converted_to_draft]
+    types: [opened, reopened, ready_for_review, synchronize, unlabeled, converted_to_draft, closed]
 
 permissions:
   contents: read
@@ -20,7 +20,10 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'skip-claude-review')) &&
       !github.event.pull_request.head.repo.fork &&
       github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name &&
-      !endsWith(github.event.pull_request.user.login, '[bot]')
+      !endsWith(github.event.pull_request.user.login, '[bot]') &&
+      github.event.action != 'closed' &&
+      (github.event.action != 'unlabeled' ||
+      github.event.label.name == 'skip-claude-review')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -91,6 +94,7 @@ jobs:
       !github.event.pull_request.head.repo.fork &&
       github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name &&
       !endsWith(github.event.pull_request.user.login, '[bot]') &&
+      github.event.action != 'closed' &&
       !contains(github.event.pull_request.labels.*.name, 'skip-claude-review') &&
       (github.event.action != 'unlabeled' ||
       github.event.label.name == 'skip-claude-review')
@@ -339,8 +343,12 @@ jobs:
                   "mcp__github_inline_comment__create_inline_comment",
                   "Read(./pr-head/AGENTS.md)",
                   "Read(./pr-head/**/AGENTS.md)",
+                  "Read(./pr-head/AGENTS.local.md)",
+                  "Read(./pr-head/**/AGENTS.local.md)",
                   "Read(./pr-head/CLAUDE.md)",
                   "Read(./pr-head/**/CLAUDE.md)",
+                  "Read(./pr-head/CLAUDE.local.md)",
+                  "Read(./pr-head/**/CLAUDE.local.md)",
                   "Read(./pr-head/REVIEW.md)",
                   "Read(./pr-head/**/REVIEW.md)",
                   "Read(./pr-head/.claude/**)",
