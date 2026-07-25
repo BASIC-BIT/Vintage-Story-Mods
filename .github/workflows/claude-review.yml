@@ -90,6 +90,72 @@ jobs:
               --input "$json_file" > /dev/null
           fi
 
+  invalidate-closed-comment:
+    name: Invalidate Claude review after close
+    if: >-
+      github.event.action == 'closed' &&
+      !github.event.pull_request.head.repo.fork &&
+      github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name &&
+      !endsWith(github.event.pull_request.user.login, '[bot]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Invalidate existing Claude review sticky comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          STICKY_MARKER: '<!-- claude-pr-review -->'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          body_file="${RUNNER_TEMP}/claude-review-comment.md"
+          json_file="${RUNNER_TEMP}/claude-review-comment.json"
+
+          if [ "${PR_MERGED}" = "true" ]; then
+            lifecycle="merged"
+          else
+            lifecycle="closed"
+          fi
+
+          cat > "$body_file" <<EOF
+          ${STICKY_MARKER}
+          [AGENT]
+
+          ## Claude Review
+
+          Claude review status for commit \`${PR_HEAD_SHA}\` was invalidated because the pull request was ${lifecycle}.
+
+          This sticky status is no longer a current review or approval.
+          EOF
+
+          node - "$body_file" "$json_file" <<'NODE'
+          const fs = require("node:fs");
+
+          const [, , bodyFile, jsonFile] = process.argv;
+          fs.writeFileSync(jsonFile, JSON.stringify({ body: fs.readFileSync(bodyFile, "utf8") }));
+          NODE
+
+          comment_id="$(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- claude-pr-review -->"))) | .id' |
+              tail -n 1
+          )"
+
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
+              --input "$json_file" > /dev/null
+          else
+            echo "::notice::No Claude review sticky comment exists to invalidate."
+          fi
+
   prepare-comment:
     name: Prepare Claude review comment
     if: >-
@@ -178,20 +244,77 @@ jobs:
 
           if [ -n "$comment_id" ]; then
             echo "Reusing Claude review sticky comment ${comment_id}."
-            existing_body="$(
-              gh api \
-                "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
-                --jq '.body'
-            )"
-            if [ "${SECRET_AVAILABLE}" != "true" ] ||
-              [[ "${existing_body}" != *"<!-- claude-pr-review-complete -->"* ]]; then
-              if ! gh api --method PATCH \
+            existing_comment_file="${RUNNER_TEMP}/claude-review-existing-comment.json"
+            existing_body_file="${RUNNER_TEMP}/claude-review-existing-body.md"
+
+            gh api \
               "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
-                --input "$json_file" > /dev/null; then
-                echo "::notice::Skipping Claude review because the workflow token cannot reset the sticky review comment for the current head."
-                echo "comment_id=" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
+              > "$existing_comment_file"
+
+            node - "$existing_comment_file" "$existing_body_file" <<'NODE'
+            const fs = require("node:fs");
+
+            const [, , commentFile, bodyFile] = process.argv;
+            const comment = JSON.parse(fs.readFileSync(commentFile, "utf8"));
+            fs.writeFileSync(bodyFile, String(comment.body ?? ""));
+            NODE
+
+            if [ "${SECRET_AVAILABLE}" = "true" ] &&
+              grep -qF "<!-- claude-pr-review-complete -->" "$existing_body_file"; then
+              node - "$existing_body_file" "$body_file" "$PR_HEAD_SHA" <<'NODE'
+              const fs = require("node:fs");
+
+              const [, , previousFile, bodyFile, currentHead] = process.argv;
+              const maxCharacters = 60000;
+              const previousBody = fs.readFileSync(previousFile, "utf8");
+              const previousHead =
+                previousBody.match(/<!-- claude-pr-review-head:([0-9a-f]+) -->/)?.[1] ?? "a previous head";
+              const cleanedPrevious = previousBody
+                .replace(/^<!-- claude-pr-review -->\r?\n?/gm, "")
+                .replace(/^<!-- claude-pr-review-complete -->\r?\n?/gm, "")
+                .replace(/^<!-- claude-pr-review-(?:head|base):[^>]+ -->\r?\n?/gm, "")
+                .trim();
+              const prefix = [
+                "<!-- claude-pr-review -->",
+                "[AGENT]",
+                "",
+                "## Claude Review",
+                "",
+                `A replacement Claude review is queued for commit \`${currentHead}\`.`,
+                "",
+                `The preserved review below applies to \`${previousHead}\`, is stale for the current head, and is not a current approval.`,
+                "",
+                "<details>",
+                "<summary>Previous completed review</summary>",
+                "",
+              ].join("\n");
+              const suffix = "\n\n</details>\n";
+              const available = maxCharacters - Array.from(prefix + suffix).length;
+              const previousCharacters = Array.from(cleanedPrevious);
+              let boundedPrevious = cleanedPrevious;
+              if (previousCharacters.length > available) {
+                const notice = "\n\n_Previous review truncated to fit the GitHub comment limit._";
+                boundedPrevious =
+                  previousCharacters.slice(0, Math.max(0, available - Array.from(notice).length)).join("") +
+                  notice;
+              }
+              fs.writeFileSync(bodyFile, prefix + boundedPrevious + suffix);
+              NODE
+
+              node - "$body_file" "$json_file" <<'NODE'
+              const fs = require("node:fs");
+
+              const [, , bodyFile, jsonFile] = process.argv;
+              fs.writeFileSync(jsonFile, JSON.stringify({ body: fs.readFileSync(bodyFile, "utf8") }));
+              NODE
+            fi
+
+            if ! gh api --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
+              --input "$json_file" > /dev/null; then
+              echo "::notice::Skipping Claude review because the workflow token cannot reset the sticky review comment for the current head."
+              echo "comment_id=" >> "$GITHUB_OUTPUT"
+              exit 0
             fi
           else
             response_file="${RUNNER_TEMP}/claude-review-comment-response.json"
@@ -533,13 +656,34 @@ jobs:
 
           if [ "${REVIEW_RESULT}" = "success" ] && [ -n "${REVIEW_MARKDOWN_B64}" ]; then
             printf '%s' "${REVIEW_MARKDOWN_B64}" | base64 -d > "$review_file"
-            {
-              echo "${STICKY_MARKER}"
-              echo "<!-- claude-pr-review-complete -->"
-              echo "[AGENT]"
-              echo
-              grep -vF "${STICKY_MARKER}" "$review_file" || true
-            } > "$body_file"
+            if node - "$review_file" <<'NODE'
+            const fs = require("node:fs");
+
+            const review = fs.readFileSync(process.argv[2], "utf8");
+            process.exit(Array.from(review).length <= 58000 ? 0 : 1);
+            NODE
+            then
+              {
+                echo "${STICKY_MARKER}"
+                echo "<!-- claude-pr-review-complete -->"
+                echo "<!-- claude-pr-review-head:${PR_HEAD_SHA} -->"
+                echo "<!-- claude-pr-review-base:${PR_BASE_SHA} -->"
+                echo "[AGENT]"
+                echo
+                grep -vF "${STICKY_MARKER}" "$review_file" || true
+              } > "$body_file"
+            else
+              cat > "$body_file" <<EOF
+          ${STICKY_MARKER}
+          [AGENT]
+
+          ## Claude Review
+
+          Claude review completed for commit \`${PR_HEAD_SHA}\`, but its output exceeded the safe GitHub comment size and was not published.
+
+          This is a review-delivery failure, not an approval. Inspect the workflow logs before retrying.
+          EOF
+            fi
           else
             cat > "$body_file" <<EOF
           ${STICKY_MARKER}

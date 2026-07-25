@@ -9,8 +9,8 @@ permissions:
 
 concurrency:
   # Matching groups cancel the main workflow for skip labels and retargets away from main.
-  group: ${{ ((github.event.action == 'labeled' && github.event.pull_request.base.ref == 'main' && github.event.label.name == 'skip-claude-review') || (github.event.action == 'edited' && github.event.changes.base != null && github.event.pull_request.base.ref != 'main')) && format('claude-review-{0}', github.event.pull_request.number) || format('claude-review-control-noop-{0}', github.run_id) }}
-  cancel-in-progress: ${{ (github.event.action == 'labeled' && github.event.pull_request.base.ref == 'main' && github.event.label.name == 'skip-claude-review') || (github.event.action == 'edited' && github.event.changes.base != null && github.event.pull_request.base.ref != 'main') }}
+  group: ${{ ((github.event.action == 'labeled' && github.event.pull_request.base.ref == 'main' && github.event.label.name == 'skip-claude-review') || (github.event.action == 'edited' && github.event.changes.base.ref.from == 'main' && github.event.pull_request.base.ref != 'main')) && format('claude-review-{0}', github.event.pull_request.number) || format('claude-review-control-noop-{0}', github.run_id) }}
+  cancel-in-progress: ${{ (github.event.action == 'labeled' && github.event.pull_request.base.ref == 'main' && github.event.label.name == 'skip-claude-review') || (github.event.action == 'edited' && github.event.changes.base.ref.from == 'main' && github.event.pull_request.base.ref != 'main') }}
 
 jobs:
   cancel-on-skip-label:
@@ -77,7 +77,7 @@ jobs:
     name: Invalidate Claude review after base retarget
     if: >-
       github.event.action == 'edited' &&
-      github.event.changes.base != null &&
+      github.event.changes.base.ref.from == 'main' &&
       github.event.pull_request.base.ref != 'main' &&
       github.event.pull_request.state == 'open' &&
       !github.event.pull_request.head.repo.fork &&
