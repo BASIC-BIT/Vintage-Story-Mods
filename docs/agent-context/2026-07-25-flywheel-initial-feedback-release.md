@@ -2,7 +2,7 @@
 
 ## Objective
 
-Prepare the previously uncommitted Flywheel Power prototype as a bounded 0.5.0 feedback candidate without publishing it.
+Deliver Flywheel Power as a complete 0.5.0 initial-feedback implementation without publishing it.
 
 ## Reconstructed history
 
@@ -44,10 +44,29 @@ shape coordinates, and the 3x3x1 placement footprint is unchanged.
 `mods-dll/flywheelpower/disabled-content/` retains:
 
 - The unfinished slip transmission blocktype.
-- Pre-release legacy flywheel blocktypes that duplicate the active block codes.
 - Keyed flywheel blocktypes and preview shapes whose current behavior does not buffer power.
 
 Slip transmission C# and shape sources remain in place. Nothing under `disabled-content/` is packaged.
+
+## Deletion audit ledger
+
+An independent read-only audit reviewed repository history, the full PR diff, current source and assets, references, tests,
+documentation, generated files, and the exact package.
+
+- **Active required:** released blocktypes, horizontal/vertical frame shapes, coupled wheel shapes, axles, renderer, mechanics,
+  multiblock code, metadata, package wiring, and tests.
+- **Intentionally deferred source:** canonical Slip Transmission source/blocktype/localization/stand, non-legacy keyed
+  flywheel blocktypes/localization/preview shapes, rigid-coupling branches, and future-material density cases.
+- **Migration compatibility required:** none. Flywheel Power has never appeared on `main`, in a repository tag or release, or
+  in another merged PR, so no published world can depend on the prototype aliases or absolute part-link format.
+- **Test/evidence only:** this temporary QA handoff, the historical pre-implementation PRD, ignored build output, and the exact
+  local ZIP checkpoint.
+- **Deleted as obsolete/unreferenced:** never-published `flywheellegacy` and `keyedflywheellegacy` blocktypes; unreferenced
+  generic full-size and compact frame shapes; unreachable material/hub texture and localization branches; legacy-only
+  direction names; active keyed-only shaft text; and the superseded absolute `cx/cy/cz/cd` part-link fields.
+
+The shared `slip-transmission-shaft.json` name is historical, but the asset remains active because the released compact
+flywheel uses it for its axle and inventory overlay. Renaming it would add churn without changing player-facing discovery.
 
 ## Verification
 
@@ -81,14 +100,15 @@ Completed July 25, 2026:
 
 Revised geometry candidate staged July 26, 2026:
 
-- Focused Flywheel Power tests passed 18/18 after the proportional source-model and runtime-dimension update.
+- All six CI build and whitespace-format targets passed after the final deletion audit. The BASICs tests passed 488/488,
+  DimensionLib tests passed 58/58, Flywheel Power tests passed 18/18, and the repository Lizard gate passed.
 - The geometry-only package staged to the shared QA environment has SHA-256
   `3D85D75D3B2203A4470C1E836C5B969E188B7B827BFCD2BEFE2245A903D8CF05`.
-- The newer offline curated-material package contains exactly 18 entries and has SHA-256
-  `380932C7605B7E5E9770C1EFB0238C14879EF3F8C3F1E6A511C0215E0E086339`. It has not been copied to either
+- The final offline curated-material package contains exactly 16 entries, is 43,709 bytes, and has SHA-256
+  `4AD74CE091867052511498F85ABB66A2C49C53350AC5D38052A03597FE84FA9D`. It has not been copied to either
   client profile or the disposable server while the owner is using the computer.
-- Exact archive inspection confirms the packaged authored model matches the revised source model and contains no disabled-content,
-  Slip Transmission blocktype/localization, keyed flywheel, or legacy flywheel path.
+- The package script now enforces that exact 16-entry allowlist and rejects disabled content, unsupported material mappings or
+  localization, and missing renderer groups. Exact archive inspection confirms the authored model matches the revised source.
 - The older geometry-only package was staged to both dedicated QA profiles and the disposable server. The server reached `WorldReady` with
   `FlywheelPower.FlywheelPowerModSystem` loaded and no Flywheel startup error.
 - In-game visual, rotation/alignment, multiblock, and save/reload cards remain pending. The owner is actively using the computer;

@@ -45,19 +45,19 @@ public sealed class FlywheelPartSerializationTests
     }
 
     [Fact]
-    public void LegacyAbsolutePrincipalLinkStillLoads()
+    public void PrincipalSerializationOmitsUnpublishedAbsolutePrototypeFields()
     {
+        BEFlywheelPart source = new()
+        {
+            Principal = new BlockPos(-12, 34, -56, 7)
+        };
         TreeAttribute tree = new();
-        tree.SetBool("cp", true);
-        tree.SetInt("cx", -12);
-        tree.SetInt("cy", 34);
-        tree.SetInt("cz", -56);
-        tree.SetInt("cd", 7);
+        source.WritePrincipal(tree, new BlockPos(-11, 35, -56, 7));
 
-        BEFlywheelPart restored = new();
-        restored.ReadPrincipal(tree, new BlockPos(1, 2, 3, 0));
-
-        Assert.Equal(new BlockPos(-12, 34, -56, 7), restored.Principal);
+        Assert.False(tree.HasAttribute("cx"));
+        Assert.False(tree.HasAttribute("cy"));
+        Assert.False(tree.HasAttribute("cz"));
+        Assert.False(tree.HasAttribute("cd"));
     }
 
     [Theory]

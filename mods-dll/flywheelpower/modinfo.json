@@ -5,7 +5,7 @@
   "authors": [
     "BASIC"
   ],
-  "description": "Experimental flywheels for buffering vanilla mechanical power.",
+  "description": "Friction-coupled flywheels that buffer rotational energy in vanilla mechanical networks.",
   "version": "0.5.0",
   "dependencies": {
     "game": "",

@@ -18,16 +18,13 @@ public sealed class BEFlywheelPart : BlockEntity, IRotatable
 
     internal void ReadPrincipal(ITreeAttribute tree, BlockPos partPosition)
     {
-        bool hasPrincipal = tree.GetBool("cp", tree.HasAttribute("cx"));
-        if (!hasPrincipal)
+        if (!tree.GetBool("cp") || !tree.GetBool("pr") || partPosition == null)
         {
             Principal = null;
             return;
         }
 
-        Principal = tree.GetBool("pr") && partPosition != null
-            ? partPosition.AddCopy(tree.GetInt("rx"), tree.GetInt("ry"), tree.GetInt("rz"))
-            : new BlockPos(tree.GetInt("cx"), tree.GetInt("cy"), tree.GetInt("cz"), tree.GetInt("cd", 0));
+        Principal = partPosition.AddCopy(tree.GetInt("rx"), tree.GetInt("ry"), tree.GetInt("rz"));
     }
 
     public override void ToTreeAttributes(ITreeAttribute tree)
@@ -44,12 +41,6 @@ public sealed class BEFlywheelPart : BlockEntity, IRotatable
         tree.SetInt("rx", canWriteRelative ? Principal.X - partPosition.X : 0);
         tree.SetInt("ry", canWriteRelative ? Principal.Y - partPosition.Y : 0);
         tree.SetInt("rz", canWriteRelative ? Principal.Z - partPosition.Z : 0);
-
-        // Retain the absolute fields so older builds can still read worlds saved by this candidate.
-        tree.SetInt("cx", Principal?.X ?? -1);
-        tree.SetInt("cy", Principal?.Y ?? -1);
-        tree.SetInt("cz", Principal?.Z ?? -1);
-        tree.SetInt("cd", Principal?.dimension ?? 0);
     }
 
     public void OnTransformed(

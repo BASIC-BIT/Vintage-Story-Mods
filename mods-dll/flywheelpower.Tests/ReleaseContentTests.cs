@@ -28,14 +28,17 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
-    public void LegacyPrototypeBlocktypesAreOutsideActiveAssets()
+    public void UnpublishedLegacyAliasesAndUnreferencedShapesAreRemoved()
     {
         string activeBlocktypes = Path.Combine(ProjectRoot, "assets", "flywheelpower", "blocktypes");
+        string activeShapes = Path.Combine(ProjectRoot, "assets", "flywheelpower", "shapes", "block");
 
         Assert.False(File.Exists(Path.Combine(activeBlocktypes, "flywheellegacy.json")));
         Assert.False(File.Exists(Path.Combine(activeBlocktypes, "keyedflywheellegacy.json")));
-        Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "flywheellegacy.json")));
-        Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedflywheellegacy.json")));
+        Assert.False(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "flywheellegacy.json")));
+        Assert.False(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedflywheellegacy.json")));
+        Assert.False(File.Exists(Path.Combine(activeShapes, "flywheel-frame.json")));
+        Assert.False(File.Exists(Path.Combine(activeShapes, "compact-flywheel-frame.json")));
     }
 
     [Fact]
@@ -54,6 +57,16 @@ public sealed class ReleaseContentTests
         Assert.Contains("""{ code: "material", states: ["wood", "stone", "iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("""{ code: "hub", states: ["iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("""{ code: "material", states: ["iron"] }""", compactBlocktype, StringComparison.Ordinal);
+        Assert.DoesNotContain("bronze", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("meteoriciron", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("steel", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bronze", compactBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("meteoriciron", compactBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("steel", compactBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bronze", activeLanguage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("meteoriciron", activeLanguage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("steel", activeLanguage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("blockinfo-shaft", activeLanguage, StringComparison.Ordinal);
         Assert.Equal(4, FlywheelPowerModSystem.ReleasedRendererCodes.Length);
         Assert.Equal(4, FlywheelPowerModSystem.ReleasedRendererCodes.Distinct(StringComparer.Ordinal).Count());
         Assert.All(

@@ -59,4 +59,83 @@ finally {
     $zip.Dispose()
 }
 
-Write-Host "Successfully created Flywheel Power package at $zipFile"
+$expectedEntries = @(
+    'assets/flywheelpower/blocktypes/flywheel.json',
+    'assets/flywheelpower/blocktypes/compactflywheel.json',
+    'assets/flywheelpower/blocktypes/flywheelpart.json',
+    'assets/flywheelpower/lang/en.json',
+    'assets/flywheelpower/shapes/block/compact-flywheel-frame-horizontal.json',
+    'assets/flywheelpower/shapes/block/compact-flywheel-frame-vertical.json',
+    'assets/flywheelpower/shapes/block/compact-flywheel-wheel-coupled.json',
+    'assets/flywheelpower/shapes/block/flywheel-axle.json',
+    'assets/flywheelpower/shapes/block/flywheel-frame-horizontal.json',
+    'assets/flywheelpower/shapes/block/flywheel-frame-vertical.json',
+    'assets/flywheelpower/shapes/block/flywheel-wheel-coupled.json',
+    'assets/flywheelpower/shapes/block/slip-transmission-shaft.json',
+    'flywheelpower.dll',
+    'flywheelpower.pdb',
+    'modinfo.json',
+    'README.md'
+)
+$releasedRendererCodes = @(
+    'flywheelpower-full-wood-ironhub',
+    'flywheelpower-full-stone-ironhub',
+    'flywheelpower-full-iron-ironhub',
+    'flywheelpower-compact-iron'
+)
+
+$archive = [System.IO.Compression.ZipFile]::OpenRead($zipFile)
+try {
+    $entryNames = @($archive.Entries | ForEach-Object FullName)
+    $unexpectedEntries = @($entryNames | Where-Object { $_ -notin $expectedEntries })
+    $missingEntries = @($expectedEntries | Where-Object { $_ -notin $entryNames })
+
+    if ($missingEntries.Count -gt 0) {
+        throw "Required release entries are missing from package: $($missingEntries -join ', ')"
+    }
+
+    if ($unexpectedEntries.Count -gt 0) {
+        throw "Unexpected entries were included in package: $($unexpectedEntries -join ', ')"
+    }
+
+    $blocktypeText = foreach ($entry in @(
+        'assets/flywheelpower/blocktypes/flywheel.json',
+        'assets/flywheelpower/blocktypes/compactflywheel.json'
+    )) {
+        $reader = [System.IO.StreamReader]::new($archive.GetEntry($entry).Open())
+        try {
+            $reader.ReadToEnd()
+        }
+        finally {
+            $reader.Dispose()
+        }
+    }
+
+    foreach ($rendererCode in $releasedRendererCodes) {
+        if (-not ($blocktypeText -match [regex]::Escape($rendererCode))) {
+            throw "Released renderer group is missing from packaged blocktypes: $rendererCode"
+        }
+    }
+
+    if ($blocktypeText -match 'bronze|meteoriciron|steel') {
+        throw 'Unsupported material or hub mappings were included in packaged blocktypes.'
+    }
+
+    $languageReader = [System.IO.StreamReader]::new(
+        $archive.GetEntry('assets/flywheelpower/lang/en.json').Open())
+    try {
+        $languageText = $languageReader.ReadToEnd()
+    }
+    finally {
+        $languageReader.Dispose()
+    }
+
+    if ($languageText -match 'sliptransmission|keyedflywheel|blockinfo-shaft|bronze|meteoriciron|steel') {
+        throw 'Disabled or unsupported player-facing localization was included in the package.'
+    }
+}
+finally {
+    $archive.Dispose()
+}
+
+Write-Host "Successfully created and verified Flywheel Power package at $zipFile"

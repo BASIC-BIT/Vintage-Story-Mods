@@ -51,12 +51,6 @@
     chalk: { base: "game:block/cloth/wool/red1" },
     wood: { base: "game:block/wood/planks/generic" }
   },
-  texturesByType: {
-    "*-bronze-*": { wheel: { base: "game:block/metal/ingot/tinbronze" }, metal: { base: "game:block/metal/ingot/tinbronze" } },
-    "*-iron-*": { wheel: { base: "game:block/metal/ingot/iron" }, metal: { base: "game:block/metal/ingot/iron" } },
-    "*-meteoriciron-*": { wheel: { base: "game:block/metal/ingot/meteoriciron" }, metal: { base: "game:block/metal/ingot/meteoriciron" } },
-    "*-steel-*": { wheel: { base: "game:block/metal/ingot/steel" }, metal: { base: "game:block/metal/ingot/steel" } }
-  },
   sidesolid: { all: false },
   sideopaque: { all: false },
   rainPermeable: true,

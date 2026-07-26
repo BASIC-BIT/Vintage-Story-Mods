@@ -62,29 +62,9 @@
     wood: { base: "game:block/wood/planks/generic" }
   },
   texturesByType: {
-    "*-wood-bronze-*": {
-      wheel: { base: "game:block/wood/planks/generic" },
-      metal: { base: "game:block/metal/ingot/tinbronze" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
     "*-wood-iron-*": {
       wheel: { base: "game:block/wood/planks/generic" },
       metal: { base: "game:block/metal/ingot/iron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-wood-meteoriciron-*": {
-      wheel: { base: "game:block/wood/planks/generic" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-wood-steel-*": {
-      wheel: { base: "game:block/wood/planks/generic" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-stone-bronze-*": {
-      wheel: { base: "game:block/stone/rock/granite1" },
-      metal: { base: "game:block/metal/ingot/tinbronze" },
       wood: { base: "game:block/wood/planks/generic" }
     },
     "*-stone-iron-*": {
@@ -92,94 +72,9 @@
       metal: { base: "game:block/metal/ingot/iron" },
       wood: { base: "game:block/wood/planks/generic" }
     },
-    "*-stone-meteoriciron-*": {
-      wheel: { base: "game:block/stone/rock/granite1" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-stone-steel-*": {
-      wheel: { base: "game:block/stone/rock/granite1" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-bronze-bronze-*": {
-      wheel: { base: "game:block/metal/ingot/tinbronze" },
-      metal: { base: "game:block/metal/ingot/tinbronze" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-bronze-iron-*": {
-      wheel: { base: "game:block/metal/ingot/tinbronze" },
-      metal: { base: "game:block/metal/ingot/iron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-bronze-meteoriciron-*": {
-      wheel: { base: "game:block/metal/ingot/tinbronze" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-bronze-steel-*": {
-      wheel: { base: "game:block/metal/ingot/tinbronze" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-iron-bronze-*": {
-      wheel: { base: "game:block/metal/ingot/iron" },
-      metal: { base: "game:block/metal/ingot/tinbronze" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
     "*-iron-iron-*": {
       wheel: { base: "game:block/metal/ingot/iron" },
       metal: { base: "game:block/metal/ingot/iron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-iron-meteoriciron-*": {
-      wheel: { base: "game:block/metal/ingot/iron" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-iron-steel-*": {
-      wheel: { base: "game:block/metal/ingot/iron" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-meteoriciron-bronze-*": {
-      wheel: { base: "game:block/metal/ingot/meteoriciron" },
-      metal: { base: "game:block/metal/ingot/tinbronze" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-meteoriciron-iron-*": {
-      wheel: { base: "game:block/metal/ingot/meteoriciron" },
-      metal: { base: "game:block/metal/ingot/iron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-meteoriciron-meteoriciron-*": {
-      wheel: { base: "game:block/metal/ingot/meteoriciron" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-meteoriciron-steel-*": {
-      wheel: { base: "game:block/metal/ingot/meteoriciron" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-steel-bronze-*": {
-      wheel: { base: "game:block/metal/ingot/steel" },
-      metal: { base: "game:block/metal/ingot/tinbronze" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-steel-iron-*": {
-      wheel: { base: "game:block/metal/ingot/steel" },
-      metal: { base: "game:block/metal/ingot/iron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-steel-meteoriciron-*": {
-      wheel: { base: "game:block/metal/ingot/steel" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-steel-steel-*": {
-      wheel: { base: "game:block/metal/ingot/steel" },
-      metal: { base: "game:block/metal/ingot/steel" },
       wood: { base: "game:block/wood/planks/generic" }
     }
   },

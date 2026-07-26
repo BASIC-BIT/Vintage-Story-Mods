@@ -1,8 +1,5 @@
 {
   "block-keyedflywheel": "Keyed Flywheel",
-  "block-keyedflywheel-ud": "Keyed Flywheel",
-  "block-keyedflywheel-ns": "Keyed Flywheel",
-  "block-keyedflywheel-we": "Keyed Flywheel",
   "block-keyedflywheel-wood-bronze-*": "Wooden Keyed Flywheel (Bronze Hub)",
   "block-keyedflywheel-wood-iron-*": "Wooden Keyed Flywheel (Iron Hub)",
   "block-keyedflywheel-wood-meteoriciron-*": "Wooden Keyed Flywheel (Meteoric Iron Hub)",
@@ -31,5 +28,6 @@
   "block-keyedcompactflywheel-bronze-*": "Compact Bronze Keyed Flywheel",
   "block-keyedcompactflywheel-iron-*": "Compact Iron Keyed Flywheel",
   "block-keyedcompactflywheel-meteoriciron-*": "Compact Meteoric Iron Keyed Flywheel",
-  "block-keyedcompactflywheel-steel-*": "Compact Steel Keyed Flywheel"
+  "block-keyedcompactflywheel-steel-*": "Compact Steel Keyed Flywheel",
+  "flywheelpower:blockinfo-shaft": "Shaft torque: {0}, resistance: {1}"
 }
