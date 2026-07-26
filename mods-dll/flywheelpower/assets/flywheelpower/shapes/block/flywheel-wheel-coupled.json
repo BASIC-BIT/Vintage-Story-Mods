@@ -13,8 +13,8 @@
   "elements": [
     {
       "name": "DiscBand1",
-      "from": [7, -8, 4],
-      "to": [9, -4, 12],
+      "from": [7.5, 0, 6],
+      "to": [8.5, 2, 10],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -23,8 +23,8 @@
     },
     {
       "name": "DiscBand2",
-      "from": [7, -4, -2],
-      "to": [9, 0, 18],
+      "from": [7.5, 2, 3],
+      "to": [8.5, 4, 13],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -33,8 +33,8 @@
     },
     {
       "name": "DiscBand3",
-      "from": [7, 0, -6],
-      "to": [9, 4, 22],
+      "from": [7.5, 4, 1],
+      "to": [8.5, 6, 15],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -43,8 +43,8 @@
     },
     {
       "name": "DiscBand4",
-      "from": [7, 4, -8],
-      "to": [9, 12, 24],
+      "from": [7.5, 6, 0],
+      "to": [8.5, 10, 16],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -53,8 +53,8 @@
     },
     {
       "name": "DiscBand5",
-      "from": [7, 12, -6],
-      "to": [9, 16, 22],
+      "from": [7.5, 10, 1],
+      "to": [8.5, 12, 15],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -63,8 +63,8 @@
     },
     {
       "name": "DiscBand6",
-      "from": [7, 16, -2],
-      "to": [9, 20, 18],
+      "from": [7.5, 12, 3],
+      "to": [8.5, 14, 13],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -73,8 +73,8 @@
     },
     {
       "name": "DiscBand7",
-      "from": [7, 20, 4],
-      "to": [9, 24, 12],
+      "from": [7.5, 14, 6],
+      "to": [8.5, 16, 10],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -83,8 +83,8 @@
     },
     {
       "name": "Hub",
-      "from": [6.56, 4, 4],
-      "to": [9.44, 12, 12],
+      "from": [7.28, 4, 4],
+      "to": [8.72, 12, 12],
       "faces": {
         "north": { "texture": "#metal" }, "east": { "texture": "#metal" },
         "south": { "texture": "#metal" }, "west": { "texture": "#metal" },
@@ -93,8 +93,8 @@
     },
     {
       "name": "FrontCouplingPlate",
-      "from": [9.44, 4, 4],
-      "to": [9.76, 12, 12],
+      "from": [8.72, 4, 4],
+      "to": [8.88, 12, 12],
       "faces": {
         "north": { "texture": "#metal" }, "east": { "texture": "#metal" },
         "south": { "texture": "#metal" }, "west": { "texture": "#metal" },
@@ -103,8 +103,8 @@
     },
     {
       "name": "BackCouplingPlate",
-      "from": [6.24, 4, 4],
-      "to": [6.56, 12, 12],
+      "from": [7.12, 4, 4],
+      "to": [7.28, 12, 12],
       "faces": {
         "north": { "texture": "#metal" }, "east": { "texture": "#metal" },
         "south": { "texture": "#metal" }, "west": { "texture": "#metal" },
@@ -113,8 +113,8 @@
     },
     {
       "name": "ChalkLine",
-      "from": [9.77, 7.6, 8],
-      "to": [9.86, 8.4, 24],
+      "from": [8.885, 7.8, 8],
+      "to": [8.93, 8.2, 16],
       "faces": {
         "north": { "texture": "#chalk" }, "east": { "texture": "#chalk" },
         "south": { "texture": "#chalk" }, "west": { "texture": "#chalk" },

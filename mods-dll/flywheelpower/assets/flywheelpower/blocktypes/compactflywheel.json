@@ -24,7 +24,7 @@
   ],
   attributes: {
     mechanicalPower: {
-      renderer: "flywheelpower"
+      renderer: "flywheelpower-compact-iron"
     }
   },
   variantgroups: [

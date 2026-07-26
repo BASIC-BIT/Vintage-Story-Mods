@@ -6,6 +6,14 @@ namespace FlywheelPower;
 
 public sealed class FlywheelPowerModSystem : ModSystem
 {
+    internal static readonly string[] ReleasedRendererCodes =
+    {
+        "flywheelpower-full-wood-ironhub",
+        "flywheelpower-full-stone-ironhub",
+        "flywheelpower-full-iron-ironhub",
+        "flywheelpower-compact-iron"
+    };
+
     public override void Start(ICoreAPI api)
     {
         api.RegisterBlockClass("BlockFlywheel", typeof(BlockFlywheel));
@@ -17,6 +25,9 @@ public sealed class FlywheelPowerModSystem : ModSystem
 
     public override void StartClientSide(ICoreClientAPI api)
     {
-        MechNetworkRenderer.RendererByCode["flywheelpower"] = typeof(FlywheelMechBlockRenderer);
+        foreach (string rendererCode in ReleasedRendererCodes)
+        {
+            MechNetworkRenderer.RendererByCode[rendererCode] = typeof(FlywheelMechBlockRenderer);
+        }
     }
 }

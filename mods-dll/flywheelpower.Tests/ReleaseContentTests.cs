@@ -39,7 +39,7 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
-    public void UnreadyKeyedAndMultiMaterialSurfacesAreInactive()
+    public void ReleaseSurfaceUsesCuratedMaterialsWithDistinctRendererGroups()
     {
         string activeBlocktypes = Path.Combine(ProjectRoot, "assets", "flywheelpower", "blocktypes");
         string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
@@ -51,9 +51,15 @@ public sealed class ReleaseContentTests
         Assert.DoesNotContain("keyedflywheel", activeLanguage, StringComparison.OrdinalIgnoreCase);
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedflywheel.json")));
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedcompactflywheel.json")));
-        Assert.Contains("""{ code: "material", states: ["iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""{ code: "material", states: ["wood", "stone", "iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("""{ code: "hub", states: ["iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("""{ code: "material", states: ["iron"] }""", compactBlocktype, StringComparison.Ordinal);
+        Assert.Equal(4, FlywheelPowerModSystem.ReleasedRendererCodes.Length);
+        Assert.Equal(4, FlywheelPowerModSystem.ReleasedRendererCodes.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(
+            FlywheelPowerModSystem.ReleasedRendererCodes.Take(3),
+            rendererCode => Assert.Contains(rendererCode, fullSizeBlocktype, StringComparison.Ordinal));
+        Assert.Contains(FlywheelPowerModSystem.ReleasedRendererCodes[3], compactBlocktype, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -81,10 +87,11 @@ public sealed class ReleaseContentTests
         double minX = discBands.Min(element => element.GetProperty("from")[0].GetDouble());
         double maxX = discBands.Max(element => element.GetProperty("to")[0].GetDouble());
 
-        Assert.Equal(32d, maxY - minY);
-        Assert.Equal(32d, maxZ - minZ);
-        Assert.Equal(2d, maxX - minX);
+        Assert.Equal(16d, maxY - minY);
+        Assert.Equal(16d, maxZ - minZ);
+        Assert.Equal(1d, maxX - minX);
         Assert.Equal(8d, hub.GetProperty("to")[1].GetDouble() - hub.GetProperty("from")[1].GetDouble());
+        Assert.Equal(1.44d, hub.GetProperty("to")[0].GetDouble() - hub.GetProperty("from")[0].GetDouble(), 2);
     }
 
     [Fact]

@@ -14,14 +14,30 @@ Prepare the previously uncommitted Flywheel Power prototype as a bounded 0.5.0 f
 
 ## Initial feedback scope
 
-- Expose only the iron friction-coupled full-size and compact mechanics for player testing.
+- Expose wood/iron-hub, stone/iron-hub, and iron/iron-hub full-size constructions plus the compact iron flywheel for player testing.
 - Keep the full-size flywheel's 3x3x1 placement, collision, selection, pivot, axle, and network orientation semantics.
-- Reduce the full-size visible wheel to a 2-block diameter with 0.5-block edge clearance.
-- Reduce the radial core to a 0.5-block diameter and disc depth to 0.125 block.
+- Reduce the full-size visible wheel from a 2-block diameter to a 1-block diameter, leaving 1 block of edge clearance inside the unchanged 3x3 footprint.
+- Keep the radial core at a 0.5-block diameter while halving the complete authored depth profile: disc depth from 0.125 to 0.0625 block, hub depth from 0.18 to 0.09 block, and each coupling plate from 0.02 to 0.01 block.
 - Keep the slip transmission source and assets, but remove its active blocktype and runtime registrations.
 - Keep keyed flywheel blocktypes and preview assets inactive because their current rigid path does not return inertial torque.
-- Limit active material/hub states to iron/iron until renderer grouping includes material identity.
+- Use one iron-hub rule and distinct renderer grouping for each released construction; leave the broader material/hub Cartesian product dormant.
 - Keep survival recipes deferred and describe the candidate as creative-only.
+
+### Revised full-size geometry checkpoint
+
+All dimensions below are authored/runtime model dimensions in blocks. The rotation center remains exactly `(8, 8, 8)` in
+shape coordinates, and the 3x3x1 placement footprint is unchanged.
+
+| Dimension | Before owner update | Revised candidate | Change |
+| --- | ---: | ---: | ---: |
+| Disc outer radius | 1.0 | 0.5 | -0.5 block |
+| Disc diameter | 2.0 | 1.0 | -50% |
+| Edge clearance within 3-block footprint | 0.5 per side | 1.0 per side | +0.5 block per side |
+| Disc depth | 0.125 | 0.0625 | -50% |
+| Hub diameter | 0.5 | 0.5 | unchanged |
+| Hub depth | 0.18 | 0.09 | -50% |
+| Coupling plate depth | 0.02 each | 0.01 each | -50% |
+| Hub/plate assembly depth | 0.22 | 0.11 | -50% |
 
 ## Intentionally inactive source
 
@@ -49,24 +65,41 @@ Completed July 25, 2026:
 - Repository CI-equivalent builds and whitespace checks passed for all six configured projects.
 - The BASICs tests passed 481/481, DimensionLib tests passed 58/58, and Flywheel Power tests passed 18/18.
 - The repository Lizard complexity gate passed with Flywheel Power included.
-- `flywheelpower_0_5_0.zip` contains 18 entries and has SHA-256
-  `34F03EBE7DE3B4321C267304E932B545E90EAC0389C72613181EC29A2186D855`.
+- The earlier `flywheelpower_0_5_0.zip` checkpoint contained 18 entries and had SHA-256
+  `34F03EBE7DE3B4321C267304E932B545E90EAC0389C72613181EC29A2186D855`; it is superseded by the revised-geometry candidate.
 - Exact archive inspection confirmed that no disabled blocktype, disabled localization, or `disabled-content/` path is packaged.
 - A local Vintage Story 1.22.2 disposable server loaded the packaged mod after `game`, `creative`, and `survival`, instantiated
   `FlywheelPower.FlywheelPowerModSystem`, finalized assets without errors, and reached `WorldReady`. The only smoke warnings
   were expected blocked-mod-list network failures in the sandbox.
-- A source-geometry comparison was inspected from front, three-quarter, and side views. An independent taste review found
-  the two-block disc, half-block edge clearance, 0.5-block core, and 0.125-block depth consistent with the brief. This is
-  bounded schematic evidence, not human in-game visual approval.
-- An independent exact-commit code review found five issues. Before the next candidate, keyed and multi-material surfaces were
-  narrowed out, procedural normals and relative schematic links were added, and the inventory preview was rebuilt at released scale.
+- A superseded source-geometry comparison inspected the earlier 2-block disc and 0.125-block depth from front,
+  three-quarter, and side views. The owner subsequently directed a further 0.5-block radial reduction and a 50% depth
+  reduction. Fresh in-game visual evidence is required for the resulting 1-block disc, 1-block edge clearance, 0.5-block
+  core, and 0.0625-block disc depth; the earlier schematic is not approval of the revised model.
+- An independent exact-commit code review found five issues. Before the next candidate, keyed and unsafe Cartesian-product
+  material surfaces were narrowed out, procedural normals and relative schematic links were added, and the inventory preview
+  was rebuilt at released scale. Owner feedback then restored a curated wood/stone/iron set with deterministic renderer groups.
+
+Revised geometry candidate staged July 26, 2026:
+
+- Focused Flywheel Power tests passed 18/18 after the proportional source-model and runtime-dimension update.
+- The geometry-only package staged to the shared QA environment has SHA-256
+  `3D85D75D3B2203A4470C1E836C5B969E188B7B827BFCD2BEFE2245A903D8CF05`.
+- The newer offline curated-material package contains exactly 18 entries and has SHA-256
+  `380932C7605B7E5E9770C1EFB0238C14879EF3F8C3F1E6A511C0215E0E086339`. It has not been copied to either
+  client profile or the disposable server while the owner is using the computer.
+- Exact archive inspection confirms the packaged authored model matches the revised source model and contains no disabled-content,
+  Slip Transmission blocktype/localization, keyed flywheel, or legacy flywheel path.
+- The older geometry-only package was staged to both dedicated QA profiles and the disposable server. The server reached `WorldReady` with
+  `FlywheelPower.FlywheelPowerModSystem` loaded and no Flywheel startup error.
+- In-game visual, rotation/alignment, multiblock, and save/reload cards remain pending. The owner is actively using the computer;
+  do not touch the client/server or retry Computer Use until BASIC explicitly says the shared screen is free.
 
 Manual approval required before execution:
 
 1. **Full-size proportions and clearance** (P0)
    - Config: Creative world, any full-size flywheel material.
    - Do: Place a full-size flywheel and view it straight on, at roughly 45 degrees, and directly from the side.
-   - Expect: The disc spans about two blocks inside the 3x3 plane, leaves roughly half a block of clearance at each edge, has a visibly small center core, and reads as a thin sheet/disc.
+   - Expect: The disc spans about one block inside the 3x3 plane, leaves roughly one block of clearance at each edge, has a visibly small center core, and reads as a thin sheet/disc.
    - Watch for: A wheel that still nearly fills the footprint, a bulky central drum, clipping through the frame, or an edge-on profile that still reads as a thick cylinder.
 
 2. **Rotation and axle alignment** (P0)
@@ -84,7 +117,7 @@ Manual approval required before execution:
 4. **Creative and handbook surface** (P1)
    - Config: Creative mode and handbook/search available.
    - Do: Search for `flywheel` and `slip transmission`, and inspect relevant creative tabs.
-   - Expect: Active flywheel variants are discoverable; no Slip Transmission entry, item, recipe, or placeable block appears.
+   - Expect: Four active choices are discoverable—three full-size iron-hub constructions (wood, stone, and iron wheels) plus compact iron—and no Slip Transmission entry, item, recipe, or placeable block appears.
    - Watch for: Raw localization keys, legacy generic flywheel aliases, or hidden transmission variants.
 
 5. **Save/reload behavior** (P0)
@@ -98,10 +131,23 @@ Manual approval required before execution:
 - Replace the slip transmission's cross-network torque model before re-registering any content.
 - Decide whether compact variants belong in the long-term product surface or remain test fixtures.
 - Implement real inertial contribution for keyed flywheels before restoring their blocktypes.
-- Include material/hub identity in mechanical renderer grouping before restoring the dormant variant states.
+- Consider additional wheel materials and hub combinations only after the curated renderer-group approach and material progression receive feedback.
+- Commission richer material-specific wheel/frame models and textures if the initial silhouette and construction choices test well.
 - Design survival recipes and material progression after feedback establishes which variants are worth keeping.
 - Balance inertia, coupling, losses, safe speed, and block info against real windmill/machine rigs.
 - Add sound, wear, heat, and failure behavior only after the basic storage loop is understandable.
+
+### Minimal later visual-asset commission
+
+If feedback supports the three-construction release set, commission one coherent material pass rather than a new mechanic:
+
+- Three drop-in full-size appearances: timber construction with visible planking/banding, segmented dressed stone with iron
+  restraint, and a cast or fabricated iron wheel.
+- Preserve the exact `(8, 8, 8)` model center, rotation axis, 1-block wheel diameter, 0.0625-block disc depth, 0.5-block iron
+  hub, axle attachment semantics, and existing 3x3x1 collision/selection footprint.
+- Deliver Vintage Story shape JSON plus atlas-ready textures and front, three-quarter, and side previews for each construction.
+- Keep the iron hub/axle visually consistent across the set; focus the commission on readable material construction, restrained
+  edge detail, and a stronger real-flywheel silhouette rather than animation, new gameplay, or additional variants.
 
 ## Retirement condition
 

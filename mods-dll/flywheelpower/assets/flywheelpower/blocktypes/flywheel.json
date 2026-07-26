@@ -21,11 +21,22 @@
   ],
   attributes: {
     mechanicalPower: {
-      renderer: "flywheelpower"
+      renderer: "flywheelpower-full-iron-ironhub"
+    }
+  },
+  attributesByType: {
+    "*-wood-iron-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-wood-ironhub" }
+    },
+    "*-stone-iron-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-stone-ironhub" }
+    },
+    "*-iron-iron-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-iron-ironhub" }
     }
   },
   variantgroups: [
-    { code: "material", states: ["iron"] },
+    { code: "material", states: ["wood", "stone", "iron"] },
     { code: "hub", states: ["iron"] },
     { code: "rotation", states: ["ud", "ns", "we"] }
   ],

@@ -5,19 +5,21 @@ namespace FlywheelPower.Tests;
 public sealed class FlywheelModelDimensionsTests
 {
     [Fact]
-    public void FullSizeWheelLeavesHalfBlockClearanceInsideFootprint()
+    public void FullSizeWheelLeavesOneBlockClearanceInsideFootprint()
     {
         float wheelDiameter = FlywheelModelDimensions.WheelOuterRadius * 2f;
         float edgeClearance = (FlywheelModelDimensions.FootprintDiameter - wheelDiameter) / 2f;
 
-        Assert.Equal(2f, wheelDiameter);
-        Assert.Equal(0.5f, edgeClearance);
+        Assert.Equal(1f, wheelDiameter);
+        Assert.Equal(1f, edgeClearance);
     }
 
     [Fact]
-    public void FullSizeWheelUsesOneEighthBlockTotalDepth()
+    public void FullSizeWheelUsesOneSixteenthBlockTotalDepth()
     {
-        Assert.Equal(0.125f, FlywheelModelDimensions.WheelHalfThickness * 2f);
+        Assert.Equal(0.0625f, FlywheelModelDimensions.WheelHalfThickness * 2f);
+        Assert.Equal(0.09f, FlywheelModelDimensions.HubHalfThickness * 2f);
+        Assert.Equal(0.01f, FlywheelModelDimensions.CouplingPlateThickness);
     }
 
     [Fact]
