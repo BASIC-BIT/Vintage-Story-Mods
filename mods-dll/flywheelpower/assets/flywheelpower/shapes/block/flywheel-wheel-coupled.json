@@ -8,13 +8,14 @@
   "textures": {
     "wheel": "game:block/metal/ingot/iron",
     "metal": "game:block/metal/tarnished/sheet/iron1",
+    "bearing": "game:block/metal/tarnished/iron-riveted1",
     "chalk": "game:block/cloth/wool/red1"
   },
   "elements": [
     {
       "name": "DiscBand1",
-      "from": [7.5, 0, 6],
-      "to": [8.5, 2, 10],
+      "from": [6.5, -4.8, 4.8],
+      "to": [9.5, -1.6, 11.2],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -23,8 +24,8 @@
     },
     {
       "name": "DiscBand2",
-      "from": [7.5, 2, 3],
-      "to": [8.5, 4, 13],
+      "from": [6.5, -1.6, 0],
+      "to": [9.5, 1.6, 16],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -33,8 +34,8 @@
     },
     {
       "name": "DiscBand3",
-      "from": [7.5, 4, 1],
-      "to": [8.5, 6, 15],
+      "from": [6.5, 1.6, -3.2],
+      "to": [9.5, 4.8, 19.2],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -43,8 +44,8 @@
     },
     {
       "name": "DiscBand4",
-      "from": [7.5, 6, 0],
-      "to": [8.5, 10, 16],
+      "from": [6.5, 4.8, -4.8],
+      "to": [9.5, 11.2, 20.8],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -53,8 +54,8 @@
     },
     {
       "name": "DiscBand5",
-      "from": [7.5, 10, 1],
-      "to": [8.5, 12, 15],
+      "from": [6.5, 11.2, -3.2],
+      "to": [9.5, 14.4, 19.2],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -63,8 +64,8 @@
     },
     {
       "name": "DiscBand6",
-      "from": [7.5, 12, 3],
-      "to": [8.5, 14, 13],
+      "from": [6.5, 14.4, 0],
+      "to": [9.5, 17.6, 16],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -73,8 +74,8 @@
     },
     {
       "name": "DiscBand7",
-      "from": [7.5, 14, 6],
-      "to": [8.5, 16, 10],
+      "from": [6.5, 17.6, 4.8],
+      "to": [9.5, 20.8, 11.2],
       "faces": {
         "north": { "texture": "#wheel" }, "east": { "texture": "#wheel" },
         "south": { "texture": "#wheel" }, "west": { "texture": "#wheel" },
@@ -83,8 +84,8 @@
     },
     {
       "name": "Hub",
-      "from": [7.28, 4, 4],
-      "to": [8.72, 12, 12],
+      "from": [5.84, 3.52, 3.52],
+      "to": [10.16, 12.48, 12.48],
       "faces": {
         "north": { "texture": "#metal" }, "east": { "texture": "#metal" },
         "south": { "texture": "#metal" }, "west": { "texture": "#metal" },
@@ -92,9 +93,19 @@
       }
     },
     {
+      "name": "BearingCollar",
+      "from": [5.6, 4.96, 4.96],
+      "to": [10.4, 11.04, 11.04],
+      "faces": {
+        "north": { "texture": "#bearing" }, "east": { "texture": "#bearing" },
+        "south": { "texture": "#bearing" }, "west": { "texture": "#bearing" },
+        "up": { "texture": "#bearing" }, "down": { "texture": "#bearing" }
+      }
+    },
+    {
       "name": "FrontCouplingPlate",
-      "from": [8.72, 4, 4],
-      "to": [8.88, 12, 12],
+      "from": [9.692, 2.88, 2.88],
+      "to": [10.172, 13.12, 13.12],
       "faces": {
         "north": { "texture": "#metal" }, "east": { "texture": "#metal" },
         "south": { "texture": "#metal" }, "west": { "texture": "#metal" },
@@ -103,8 +114,8 @@
     },
     {
       "name": "BackCouplingPlate",
-      "from": [7.12, 4, 4],
-      "to": [7.28, 12, 12],
+      "from": [5.828, 2.88, 2.88],
+      "to": [6.308, 13.12, 13.12],
       "faces": {
         "north": { "texture": "#metal" }, "east": { "texture": "#metal" },
         "south": { "texture": "#metal" }, "west": { "texture": "#metal" },
@@ -113,8 +124,8 @@
     },
     {
       "name": "ChalkLine",
-      "from": [8.885, 7.8, 8],
-      "to": [8.93, 8.2, 16],
+      "from": [10.18, 7.68, 8],
+      "to": [10.225, 8.32, 20.8],
       "faces": {
         "north": { "texture": "#chalk" }, "east": { "texture": "#chalk" },
         "south": { "texture": "#chalk" }, "west": { "texture": "#chalk" },

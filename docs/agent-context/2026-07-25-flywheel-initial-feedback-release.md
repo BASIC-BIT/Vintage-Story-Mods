@@ -16,8 +16,9 @@ Deliver Flywheel Power as a complete 0.5.0 initial-feedback implementation witho
 
 - Expose wood/iron-hub, stone/iron-hub, and iron/iron-hub full-size constructions plus the compact iron flywheel for player testing.
 - Keep the full-size flywheel's 3x3x1 placement, collision, selection, pivot, axle, and network orientation semantics.
-- Reduce the full-size visible wheel from a 2-block diameter to a 1-block diameter, leaving 1 block of edge clearance inside the unchanged 3x3 footprint.
-- Keep the radial core at a 0.5-block diameter while halving the complete authored depth profile: disc depth from 0.125 to 0.0625 block, hub depth from 0.18 to 0.09 block, and each coupling plate from 0.02 to 0.01 block.
+- Set the full-size visible wheel to a 1.6-block diameter, leaving 0.7 block of edge clearance inside the unchanged 3x3 footprint.
+- Use a 0.1875-block disc depth, a 0.27-block hub depth, and 0.03-block coupling plates so the wheel reads as substantial without returning to the original oversized silhouette.
+- Add a distinct iron bearing collar between the axle and hub, with 0.002 block of radial running clearance around the authored axle.
 - Keep the slip transmission source and assets, but remove its active blocktype and runtime registrations.
 - Keep keyed flywheel blocktypes and preview assets inactive because their current rigid path does not return inertial torque.
 - Use one iron-hub rule and distinct renderer grouping for each released construction; leave the broader material/hub Cartesian product dormant.
@@ -28,16 +29,18 @@ Deliver Flywheel Power as a complete 0.5.0 initial-feedback implementation witho
 All dimensions below are authored/runtime model dimensions in blocks. The rotation center remains exactly `(8, 8, 8)` in
 shape coordinates, and the 3x3x1 placement footprint is unchanged.
 
-| Dimension | Before owner update | Revised candidate | Change |
+| Dimension | Original baseline | Previous candidate | Current candidate |
 | --- | ---: | ---: | ---: |
-| Disc outer radius | 1.0 | 0.5 | -0.5 block |
-| Disc diameter | 2.0 | 1.0 | -50% |
-| Edge clearance within 3-block footprint | 0.5 per side | 1.0 per side | +0.5 block per side |
-| Disc depth | 0.125 | 0.0625 | -50% |
-| Hub diameter | 0.5 | 0.5 | unchanged |
-| Hub depth | 0.18 | 0.09 | -50% |
-| Coupling plate depth | 0.02 each | 0.01 each | -50% |
-| Hub/plate assembly depth | 0.22 | 0.11 | -50% |
+| Disc outer radius | 1.0 | 0.5 | 0.8 |
+| Disc diameter | 2.0 | 1.0 | 1.6 |
+| Edge clearance within 3-block footprint | 0.5 per side | 1.0 per side | 0.7 per side |
+| Disc depth | 0.125 | 0.0625 | 0.1875 |
+| Hub diameter | 0.5 | 0.4 | 0.56 |
+| Hub depth | 0.18 | 0.09 | 0.27 |
+| Bearing outside diameter | not distinct | not distinct | 0.38 |
+| Axle-to-bearing radial clearance | 0.015 | 0.015 | 0.002 |
+| Coupling plate depth | 0.02 each | 0.01 each | 0.03 each |
+| Maximum bearing assembly depth | 0.22 | 0.11 | 0.30 |
 
 ## Intentionally inactive source
 
@@ -93,7 +96,7 @@ Completed July 25, 2026:
 - A superseded source-geometry comparison inspected the earlier 2-block disc and 0.125-block depth from front,
   three-quarter, and side views. The owner subsequently directed a further 0.5-block radial reduction and a 50% depth
   reduction. Fresh in-game visual evidence is required for the resulting 1-block disc, 1-block edge clearance, 0.5-block
-  core, and 0.0625-block disc depth; the earlier schematic is not approval of the revised model.
+  core, and 0.0625-block disc depth; the earlier schematic is not approval of that now-superseded model.
 - An independent exact-commit code review found five issues. Before the next candidate, keyed and unsafe Cartesian-product
   material surfaces were narrowed out, procedural normals and relative schematic links were added, and the inventory preview
   was rebuilt at released scale. Owner feedback then restored a curated wood/stone/iron set with deterministic renderer groups.
@@ -132,6 +135,19 @@ QA deployment correction, July 27, 2026:
   exception.
 - The client crash is a failed QA observation, not a pass. Visible QA remains paused after the owner stopped Computer Use;
   do not relaunch or control the client until BASIC explicitly resumes visible control.
+
+Owner-directed size and bearing revision, July 27, 2026:
+
+- The authored and procedural full-size models now use a 0.8-block radius, 0.1875-block disc depth, 0.27-block hub depth,
+  and 0.03-block coupling plates. The unchanged 3x3x1 footprint retains 0.7 block of clearance around the visible wheel.
+- The hub now steps through a distinct iron bearing collar. Its inner radius is 0.142 block around the authored 0.14-block
+  axle radius, leaving 0.002 block of radial running clearance; the bearing projects slightly beyond the hub faces.
+- All six CI build and whitespace-format targets passed. The BASICs tests passed 488/488, DimensionLib tests passed 58/58,
+  Flywheel Power tests passed 19/19, and the repository Lizard gate passed.
+- The resulting exact 16-entry package is 44,084 bytes and has SHA-256
+  `5A30AE49F5A6C872BBBC6C77B24DBED35DACD80C49CA2F8ECC4E7C20D84DDF53`.
+- This new package has not replaced the installed candidate because the owner is currently using the running client. Install,
+  restart, and fresh front/three-quarter/side evidence remain required.
 
 In-game cards remaining after the interrupted attempt:
 
@@ -182,8 +198,8 @@ If feedback supports the three-construction release set, commission one coherent
 
 - Three drop-in full-size appearances: timber construction with visible planking/banding, segmented dressed stone with iron
   restraint, and a cast or fabricated iron wheel.
-- Preserve the exact `(8, 8, 8)` model center, rotation axis, 1-block wheel diameter, 0.0625-block disc depth, 0.5-block iron
-  hub, axle attachment semantics, and existing 3x3x1 collision/selection footprint.
+- Preserve the exact `(8, 8, 8)` model center, rotation axis, 1.6-block wheel diameter, 0.1875-block disc depth, stepped iron
+  hub/bearing center, axle attachment semantics, and existing 3x3x1 collision/selection footprint.
 - Deliver Vintage Story shape JSON plus atlas-ready textures and front, three-quarter, and side previews for each construction.
 - Keep the iron hub/axle visually consistent across the set; focus the commission on readable material construction, restrained
   edge detail, and a stronger real-flywheel silhouette rather than animation, new gameplay, or additional variants.

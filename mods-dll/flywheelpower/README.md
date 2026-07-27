@@ -14,7 +14,7 @@ The release provides:
 - Mechanical rendering on all three axes with a distinct renderer group for each released construction.
 - Block information for state, flywheel and network speed, stored-energy percentage, coupling torque, losses, slipping, and overspeed risk.
 
-The full-size wheel keeps a 3x3x1 placement, collision, and selection footprint. Its visible disc is one block in diameter and 0.0625 block deep, with a 0.5-block iron hub and deliberate clearance around the wheel.
+The full-size wheel keeps a 3x3x1 placement, collision, and selection footprint. Its visible disc is 1.6 blocks in diameter and 0.1875 block deep, with a stepped iron hub and close-fitting bearing collar around the axle.
 
 ## Current content surface
 

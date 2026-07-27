@@ -63,6 +63,8 @@ public sealed class ReleaseContentTests
         Assert.DoesNotContain("bronze", compactBlocktype, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("meteoriciron", compactBlocktype, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("steel", compactBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("""bearing: { base: "game:block/metal/tarnished/iron-riveted1" }""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""bearing: { base: "game:block/metal/tarnished/iron-riveted1" }""", compactBlocktype, StringComparison.Ordinal);
         Assert.DoesNotContain("bronze", activeLanguage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("meteoriciron", activeLanguage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("steel", activeLanguage, StringComparison.OrdinalIgnoreCase);
@@ -92,6 +94,8 @@ public sealed class ReleaseContentTests
             .ToArray();
         JsonElement hub = elements.EnumerateArray()
             .Single(element => element.GetProperty("name").GetString() == "Hub");
+        JsonElement bearing = elements.EnumerateArray()
+            .Single(element => element.GetProperty("name").GetString() == "BearingCollar");
 
         double minY = discBands.Min(element => element.GetProperty("from")[1].GetDouble());
         double maxY = discBands.Max(element => element.GetProperty("to")[1].GetDouble());
@@ -100,11 +104,13 @@ public sealed class ReleaseContentTests
         double minX = discBands.Min(element => element.GetProperty("from")[0].GetDouble());
         double maxX = discBands.Max(element => element.GetProperty("to")[0].GetDouble());
 
-        Assert.Equal(16d, maxY - minY);
-        Assert.Equal(16d, maxZ - minZ);
-        Assert.Equal(1d, maxX - minX);
-        Assert.Equal(8d, hub.GetProperty("to")[1].GetDouble() - hub.GetProperty("from")[1].GetDouble());
-        Assert.Equal(1.44d, hub.GetProperty("to")[0].GetDouble() - hub.GetProperty("from")[0].GetDouble(), 2);
+        Assert.Equal(25.6d, maxY - minY, 2);
+        Assert.Equal(25.6d, maxZ - minZ, 2);
+        Assert.Equal(3d, maxX - minX);
+        Assert.Equal(8.96d, hub.GetProperty("to")[1].GetDouble() - hub.GetProperty("from")[1].GetDouble(), 2);
+        Assert.Equal(4.32d, hub.GetProperty("to")[0].GetDouble() - hub.GetProperty("from")[0].GetDouble(), 2);
+        Assert.Equal(6.08d, bearing.GetProperty("to")[1].GetDouble() - bearing.GetProperty("from")[1].GetDouble(), 2);
+        Assert.Equal(4.8d, bearing.GetProperty("to")[0].GetDouble() - bearing.GetProperty("from")[0].GetDouble(), 2);
     }
 
     [Fact]

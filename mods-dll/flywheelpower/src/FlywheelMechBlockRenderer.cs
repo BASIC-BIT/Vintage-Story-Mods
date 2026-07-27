@@ -133,6 +133,7 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         MeshData mesh = new(9000, 14000, withNormals: false, withUv: true, withRgba: true, withFlags: true);
         TextureAtlasPosition wheelTex = capi.BlockTextureAtlas.GetPosition(block, "wheel");
         TextureAtlasPosition metalTex = capi.BlockTextureAtlas.GetPosition(block, "metal");
+        TextureAtlasPosition bearingTex = capi.BlockTextureAtlas.GetPosition(block, "bearing");
         TextureAtlasPosition chalkTex = capi.BlockTextureAtlas.GetPosition(block, "chalk");
 
         float wheelMinX = Center - spec.WheelHalfThickness;
@@ -141,7 +142,7 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         if (coupled)
         {
             AddAnnularCylinder(mesh, wheelTex, new(spec.CoupledInnerRadius, spec.WheelOuterRadius, wheelMinX, wheelMaxX, WheelSegments, WheelRadialSteps, IncludeInnerSide: false));
-            AddCoupledHubAssembly(mesh, metalTex, spec, wheelMinX, wheelMaxX);
+            AddCoupledHubAssembly(mesh, metalTex, bearingTex, spec, wheelMinX, wheelMaxX);
         }
         else
         {
@@ -156,17 +157,17 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         return mesh;
     }
 
-    private static void AddCoupledHubAssembly(MeshData mesh, TextureAtlasPosition tex, FlywheelMeshSpec spec, float wheelMinX, float wheelMaxX)
+    private static void AddCoupledHubAssembly(MeshData mesh, TextureAtlasPosition metalTex, TextureAtlasPosition bearingTex, FlywheelMeshSpec spec, float wheelMinX, float wheelMaxX)
     {
-        float shaftClearanceRadius = Math.Max(spec.ShaftClearanceRadius, spec.AxleRadius * 1.12f);
-        float sleeveOuterRadius = GameMath.Clamp(spec.HubInnerRadius, shaftClearanceRadius + 0.025f, spec.HubOuterRadius - 0.01f);
+        float shaftClearanceRadius = Math.Max(spec.ShaftClearanceRadius, spec.AxleRadius * 1.01f);
+        float bearingOuterRadius = GameMath.Clamp(spec.BearingOuterRadius, shaftClearanceRadius + 0.02f, spec.HubOuterRadius - 0.02f);
         float plateOuterRadius = GameMath.Clamp(spec.CouplingPlateOuterRadius, spec.HubOuterRadius + 0.01f, spec.WheelOuterRadius - 0.02f);
         float plateGap = Math.Min(ChalkRaise * 2f, spec.CouplingPlateThickness * 0.4f);
 
-        AddAnnularCylinder(mesh, tex, new(shaftClearanceRadius, sleeveOuterRadius, Center - spec.HubHalfThickness, Center + spec.HubHalfThickness, 48, 2, IncludeInnerSide: true));
-        AddAnnularCylinder(mesh, tex, new(sleeveOuterRadius, spec.HubOuterRadius, Center - spec.HubHalfThickness, Center + spec.HubHalfThickness, WheelSegments, 2, IncludeInnerSide: false));
-        AddAnnularCylinder(mesh, tex, new(shaftClearanceRadius, plateOuterRadius, wheelMaxX + plateGap, wheelMaxX + plateGap + spec.CouplingPlateThickness, WheelSegments, 3, IncludeInnerSide: true));
-        AddAnnularCylinder(mesh, tex, new(shaftClearanceRadius, plateOuterRadius, wheelMinX - plateGap - spec.CouplingPlateThickness, wheelMinX - plateGap, WheelSegments, 3, IncludeInnerSide: true));
+        AddAnnularCylinder(mesh, bearingTex, new(shaftClearanceRadius, bearingOuterRadius, Center - spec.BearingHalfThickness, Center + spec.BearingHalfThickness, 48, 2, IncludeInnerSide: true));
+        AddAnnularCylinder(mesh, metalTex, new(bearingOuterRadius, spec.HubOuterRadius, Center - spec.HubHalfThickness, Center + spec.HubHalfThickness, WheelSegments, 2, IncludeInnerSide: true));
+        AddAnnularCylinder(mesh, metalTex, new(shaftClearanceRadius, plateOuterRadius, wheelMaxX + plateGap, wheelMaxX + plateGap + spec.CouplingPlateThickness, WheelSegments, 3, IncludeInnerSide: true));
+        AddAnnularCylinder(mesh, metalTex, new(shaftClearanceRadius, plateOuterRadius, wheelMinX - plateGap - spec.CouplingPlateThickness, wheelMinX - plateGap, WheelSegments, 3, IncludeInnerSide: true));
     }
 
     private static void AddAnnularCylinder(MeshData mesh, TextureAtlasPosition tex, AnnularCylinderSpec spec)
@@ -362,9 +363,10 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         {
             return new()
             {
-                WheelOuterRadius = 0.38f, CoupledInnerRadius = 0.20f, HubInnerRadius = 0.17f,
+                WheelOuterRadius = 0.38f, CoupledInnerRadius = 0.20f,
                 HubOuterRadius = 0.22f, KeyedHubOuterRadius = 0.22f, WheelHalfThickness = 0.16f,
-                HubHalfThickness = 0.20f, AxleRadius = 0.075f, AxleMinX = -0.08f, AxleMaxX = 1.08f,
+                HubHalfThickness = 0.20f, BearingOuterRadius = 0.17f, BearingHalfThickness = 0.22f,
+                AxleRadius = 0.075f, AxleMinX = -0.08f, AxleMaxX = 1.08f,
                 ChalkHalfWidth = 0.025f, ShaftClearanceRadius = 0.145f, CouplingPlateOuterRadius = 0.29f,
                 CouplingPlateThickness = 0.025f
             };
@@ -376,11 +378,12 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
             {
                 WheelOuterRadius = FlywheelModelDimensions.WheelOuterRadius,
                 CoupledInnerRadius = FlywheelModelDimensions.CoupledInnerRadius,
-                HubInnerRadius = FlywheelModelDimensions.HubInnerRadius,
                 HubOuterRadius = FlywheelModelDimensions.HubOuterRadius,
                 KeyedHubOuterRadius = FlywheelModelDimensions.KeyedHubOuterRadius,
                 WheelHalfThickness = FlywheelModelDimensions.WheelHalfThickness,
                 HubHalfThickness = FlywheelModelDimensions.HubHalfThickness,
+                BearingOuterRadius = FlywheelModelDimensions.BearingOuterRadius,
+                BearingHalfThickness = FlywheelModelDimensions.BearingHalfThickness,
                 AxleRadius = FlywheelModelDimensions.AxleRadius,
                 AxleMinX = FlywheelMechBlockRenderer.AxleMinX,
                 AxleMaxX = FlywheelMechBlockRenderer.AxleMaxX,
@@ -393,11 +396,12 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
 
         public float WheelOuterRadius { get; init; }
         public float CoupledInnerRadius { get; init; }
-        public float HubInnerRadius { get; init; }
         public float HubOuterRadius { get; init; }
         public float KeyedHubOuterRadius { get; init; }
         public float WheelHalfThickness { get; init; }
         public float HubHalfThickness { get; init; }
+        public float BearingOuterRadius { get; init; }
+        public float BearingHalfThickness { get; init; }
         public float AxleRadius { get; init; }
         public float AxleMinX { get; init; }
         public float AxleMaxX { get; init; }

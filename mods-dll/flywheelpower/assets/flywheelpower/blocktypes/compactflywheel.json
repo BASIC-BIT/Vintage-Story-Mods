@@ -48,6 +48,7 @@
   textures: {
     wheel: { base: "game:block/metal/ingot/iron" },
     metal: { base: "game:block/metal/ingot/iron" },
+    bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
     chalk: { base: "game:block/cloth/wool/red1" },
     wood: { base: "game:block/wood/planks/generic" }
   },
