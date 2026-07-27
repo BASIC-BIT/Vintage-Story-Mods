@@ -1,9 +1,9 @@
 using ProtoBuf;
 
-namespace thebasics.Models;
+namespace BasicConfig;
 
 [ProtoContract]
-public class ConfigAdminSettingValue
+public sealed class BasicConfigSettingValue
 {
     [ProtoMember(1)]
     public string Key { get; set; }

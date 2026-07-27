@@ -1,5 +1,6 @@
 using DimensionLib.Api;
 using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
 namespace PocketDimensions;
@@ -15,4 +16,8 @@ internal interface IPocketWaystoneService
     DimensionLibResult TravelElevator(IServerPlayer player, int direction, bool createMissingLayer = false);
 
     void ForgetWaystoneEndpoint(string endpointId);
+
+    DimensionLibResult CanPlaceWaystone(IServerPlayer player);
+
+    DimensionLibResult CanBreakWaystone(IServerPlayer player, BlockPos pos);
 }

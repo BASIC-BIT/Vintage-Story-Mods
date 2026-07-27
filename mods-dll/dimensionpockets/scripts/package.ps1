@@ -73,3 +73,75 @@ try {
 $msg = "Successfully created Pocket Dimensions package at $zipFile"
 $msg | Out-File -FilePath $logFile -Append
 Write-Host $msg
+
+# Deploy locally along with the mods pocketdimensions hard-depends on in modinfo.json.
+# Without dimensionlib and basicconfig present, Vintage Story refuses to load pocketdimensions
+# with ModError.Dependency, so shipping the zip alone is not enough for a local test install.
+# Directory selection matches thebasics/scripts/package.ps1 and honours the same override.
+$dependencyProjects = @("dimensionlib", "basicconfig")
+$packageFiles = @($zipFile)
+$packageCleanupPatterns = @("$($modId)*.zip")
+
+foreach ($dependencyId in $dependencyProjects) {
+    $dependencyRoot = Join-Path $solutionRoot "mods-dll/$dependencyId"
+    $dependencyZip = $null
+    if (Test-Path $dependencyRoot) {
+        $dependencyZip = Get-ChildItem -LiteralPath $dependencyRoot -Filter "$($dependencyId)_*.zip" -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTimeUtc -Descending |
+            Select-Object -First 1
+    }
+
+    if ($dependencyZip) {
+        $packageFiles += $dependencyZip.FullName
+        $packageCleanupPatterns += "$($dependencyId)*.zip"
+    } else {
+        $msg = "Warning: $dependencyId package not found in $dependencyRoot; dependency zip will not be deployed"
+        Write-Host $msg
+        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+    }
+}
+
+$localModsDirectories = @()
+if ($env:THEBASICS_LOCAL_MOD_DIRS) {
+    $env:THEBASICS_LOCAL_MOD_DIRS.Split(';') | ForEach-Object {
+        $p = $_.Trim()
+        if (-not [string]::IsNullOrWhiteSpace($p)) {
+            $localModsDirectories += $p
+        }
+    }
+}
+
+if ($localModsDirectories.Count -eq 0) {
+    $localModsDirectories += (Join-Path $env:APPDATA "VintagestoryData/Mods")
+    if ($env:VS_PROFILES_DIR -and (Test-Path $env:VS_PROFILES_DIR)) {
+        Get-ChildItem -Path $env:VS_PROFILES_DIR -Directory -Filter "Profile*" -ErrorAction SilentlyContinue |
+            Sort-Object Name |
+            ForEach-Object { $localModsDirectories += (Join-Path $_.FullName "Mods") }
+    }
+}
+
+foreach ($localModsDir in $localModsDirectories) {
+    try {
+        if (-not (Test-Path $localModsDir)) {
+            New-Item -ItemType Directory -Path $localModsDir -Force | Out-Null
+        }
+
+        foreach ($pattern in $packageCleanupPatterns) {
+            Get-ChildItem -Path $localModsDir -Filter $pattern -ErrorAction SilentlyContinue | ForEach-Object {
+                Remove-Item -Path $_.FullName -Force
+            }
+        }
+
+        foreach ($packageFile in $packageFiles) {
+            $localModFile = Join-Path $localModsDir (Split-Path $packageFile -Leaf)
+            Copy-Item -Path $packageFile -Destination $localModFile -Force
+            $msg = "Successfully copied package to $localModFile"
+            Write-Host $msg
+            "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+        }
+    } catch {
+        $msg = "Error copying to local mods directory $localModsDir : $($_.Exception.Message)"
+        Write-Host $msg
+        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+    }
+}

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using BasicConfig;
 using HarmonyLib;
 using thebasics.Configs;
 using thebasics.Extensions;
@@ -34,6 +35,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     public LanguageSystem LanguageSystem { get; set; }
     public DistanceObfuscationSystem DistanceObfuscationSystem { get; set; }
     private IServerNetworkChannel _serverConfigChannel;
+    private BasicConfigServerController<ModConfig> _basicConfigController;
     public ProximityCheckUtils ProximityCheckUtils { get; set; }
     public TransformerSystem TransformerSystem { get; set; }
     private Th3EssentialsDiscordRelay _th3EssentialsDiscordRelay;
@@ -417,7 +419,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return TextCommandResult.Error("This command can only be used by a player.");
         }
 
-        SendConfigAdminOpen(player, null);
+        if (_basicConfigController == null)
+        {
+            return TextCommandResult.Error("The BASICs config panel is unavailable.");
+        }
+
+        _basicConfigController.SendOpen(player);
+
         return TextCommandResult.Success("Opening The BASICs config panel.");
     }
 
@@ -445,15 +453,16 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private TextCommandResult HandleReloadConfigCommand(TextCommandCallingArgs args)
     {
-        var before = CloneConfig(Config);
-        ReloadSharedConfigFromDisk(API);
-        var changedKeys = GetChangedConfigKeys(before, Config);
-        ApplyConfigChangeSideEffects(changedKeys);
-        BroadcastClientConfigs();
+        if (_basicConfigController == null)
+        {
+            return TextCommandResult.Error("The BASICs config panel is unavailable.");
+        }
+
+        var changedKeys = _basicConfigController.ReloadAndApply();
 
         if (args.Caller.Player is IServerPlayer player)
         {
-            SendConfigAdminOpen(player, $"Reloaded The BASICs config from disk. Changed settings: {changedKeys.Count}.");
+            _basicConfigController.SendOpen(player, $"Reloaded The BASICs config from disk. Changed settings: {changedKeys.Count}.");
         }
 
         return TextCommandResult.Success($"Reloaded The BASICs config from disk. Changed settings: {changedKeys.Count}.");
@@ -563,9 +572,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         _serverConfigChannel = API.Network.RegisterChannel("thebasics")
             .RegisterMessageType<TheBasicsConfigMessage>()
-            .RegisterMessageType<TheBasicsConfigAdminOpenMessage>()
-            .RegisterMessageType<TheBasicsConfigAdminSaveMessage>()
-            .RegisterMessageType<TheBasicsConfigAdminResultMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenRequest>()
             .RegisterMessageType<TheBasicsLanguageConfigOpenMessage>()
             .RegisterMessageType<TheBasicsLanguageConfigSaveMessage>()
@@ -607,8 +613,27 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .SetMessageHandler<TheBasicsCharacterSheetFieldConfigSaveMessage>(OnCharacterSheetFieldConfigSaveMessage)
             .SetMessageHandler<TheBasicsNotesOpenRequest>(OnNotesOpenRequest)
             .SetMessageHandler<TheBasicsNotesSaveMessage>(OnNotesSaveMessage)
-            .SetMessageHandler<TheBasicsChatHistoryQueryRequest>(OnChatHistoryQueryRequest)
-            .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
+            .SetMessageHandler<TheBasicsChatHistoryQueryRequest>(OnChatHistoryQueryRequest);
+
+        _basicConfigController = API.ModLoader.GetModSystem<BasicConfigModSystem>()?.RegisterServer(new BasicConfigServerControllerOptions<ModConfig>
+        {
+            ConfigId = TheBasicsBasicConfigSchema.ConfigId,
+            DisplayName = "The BASICs",
+            Schema = TheBasicsBasicConfigSchema.Build(),
+            CanEdit = player => player?.HasPrivilege(Privilege.root) == true,
+            GetConfig = () => Config,
+            ReloadConfig = () => ReloadSharedConfigFromDisk(API),
+            SaveConfig = () => SaveSharedConfig(API),
+            CloneConfig = CloneConfig,
+            CopyConfig = CopyConfigValues,
+            GetReviewedKeys = config => config.ReviewedConfigSettingKeys,
+            SetReviewedKeys = (config, keys) => config.ReviewedConfigSettingKeys = keys,
+            AfterChanged = changedKeys =>
+            {
+                ApplyConfigChangeSideEffects(changedKeys);
+                BroadcastClientConfigs();
+            }
+        });
     }
 
     /// <summary>
@@ -749,77 +774,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         _serverConfigChannel.SendPacket(response, player);
     }
 
-    private void OnConfigAdminSaveMessage(IServerPlayer player, TheBasicsConfigAdminSaveMessage message)
-    {
-        if (player?.HasPrivilege(Privilege.root) != true)
-        {
-            SendConfigAdminResult(player, false, "You do not have permission to edit The BASICs config.", Array.Empty<string>());
-            return;
-        }
-
-        if (TryHandleConfigAdminReload(player, message))
-        {
-            return;
-        }
-
-        if (!TryBuildConfigAdminDraft(message, out var draft, out var errors))
-        {
-            TrackConfigEditorFailure("config_admin", "save", errors.Count);
-            SendConfigAdminResult(player, false, string.Join("\n", errors), Array.Empty<string>());
-            return;
-        }
-
-        SaveConfigAdminDraft(player, draft);
-    }
-
-    private bool TryHandleConfigAdminReload(IServerPlayer player, TheBasicsConfigAdminSaveMessage message)
-    {
-        if (message?.ReloadFromDisk != true)
-        {
-            return false;
-        }
-
-        var reloadChangedKeys = ReloadConfigAndGetChangedKeys();
-        AnalyticsService.TrackFeatureUsed("config_admin", "reload");
-        SendConfigAdminResult(player, true, $"Reloaded config from disk. Changed settings: {reloadChangedKeys.Count}.", reloadChangedKeys);
-        return true;
-    }
-
-    private bool TryBuildConfigAdminDraft(TheBasicsConfigAdminSaveMessage message, out ModConfig draft, out List<string> errors)
-    {
-        draft = CloneConfig(Config);
-        errors = ConfigAdminSaveWorkflow.ApplyValues(draft, message?.Values);
-        if (errors.Count > 0)
-        {
-            return false;
-        }
-
-        if (message?.MarkReviewedKeys != null && message.MarkReviewedKeys.Count > 0)
-        {
-            ConfigAdminSaveWorkflow.MarkReviewedKeys(draft, message.MarkReviewedKeys);
-        }
-
-        errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(draft));
-        return errors.Count == 0;
-    }
-
-    private void SaveConfigAdminDraft(IServerPlayer player, ModConfig draft)
-    {
-        var changedKeys = GetChangedConfigKeys(Config, draft);
-        CopyConfigValues(draft, Config);
-        SaveSharedConfig(API);
-        ApplyConfigChangeSideEffects(changedKeys);
-        BroadcastClientConfigs();
-
-        var restartRequired = GetRestartRequiredKeys(changedKeys);
-        AnalyticsService.TrackFeatureUsed("config_admin", "save", properties: new Dictionary<string, object>
-        {
-            ["changed_settings_bucket"] = AnalyticsBuckets.Count(changedKeys.Count),
-            ["restart_required_settings_bucket"] = AnalyticsBuckets.Count(restartRequired.Count)
-        });
-        SendConfigAdminResult(player, true, ConfigAdminSaveWorkflow.BuildConfigSaveMessage(changedKeys, restartRequired), changedKeys);
-    }
-
     private void OnLanguageConfigSaveMessage(IServerPlayer player, TheBasicsLanguageConfigSaveMessage message)
     {
         if (player?.HasPrivilege(Privilege.root) != true)
@@ -851,7 +805,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var changedKeys = ReloadConfigAndGetChangedKeys();
+        var changedKeys = _basicConfigController.ReloadAndApply();
         AnalyticsService.TrackFeatureUsed("language_config", "reload");
         SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {changedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config));
         return true;
@@ -859,13 +813,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private bool TryBuildLanguageConfigDraft(List<LanguageConfigEntryMessage> submittedLanguages, out ModConfig draft, out List<string> errors)
     {
-        draft = CloneConfig(Config);
+        draft = _basicConfigController.CreateDraft();
         if (!LanguageConfigAdmin.TryApplyEntries(draft, submittedLanguages, out errors))
         {
             return false;
         }
 
-        errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(draft));
+        errors.AddRange(_basicConfigController.ValidateDraft(draft));
         return errors.Count == 0;
     }
 
@@ -873,14 +827,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         var renameMap = LanguageConfigAdmin.BuildRenameMap(submittedLanguages);
         TrackLanguageRenamesForJoiningPlayers(renameMap);
-        CopyConfigValues(draft, Config);
-        SaveSharedConfig(API);
-
         var changedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { nameof(Config.Languages) };
-        ReconcileOnlinePlayerLanguages(renameMap);
-        ReconcileStoredPlayerLanguages(renameMap);
-        ApplyConfigChangeSideEffects(changedKeys);
-        BroadcastClientConfigs();
+        _basicConfigController.SaveDraft(draft, changedKeys, _ =>
+        {
+            ReconcileOnlinePlayerLanguages(renameMap);
+            ReconcileStoredPlayerLanguages(renameMap);
+        });
 
         AnalyticsService.TrackFeatureUsed("language_config", "save", properties: new Dictionary<string, object>
         {
@@ -924,7 +876,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var changedKeys = ReloadConfigAndGetChangedKeys();
+        var changedKeys = _basicConfigController.ReloadAndApply();
         AnalyticsService.TrackFeatureUsed("character_sheet_fields", "reload");
         SendCharacterSheetFieldConfigResult(player, true, $"Reloaded character sheet fields from disk. Changed settings: {changedKeys.Count}.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
         return true;
@@ -932,24 +884,20 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private bool TryBuildCharacterSheetFieldConfigDraft(List<CharacterSheetFieldConfigEntryMessage> submittedFields, out ModConfig draft, out List<string> errors)
     {
-        draft = CloneConfig(Config);
+        draft = _basicConfigController.CreateDraft();
         if (!CharacterSheetFieldConfigAdmin.TryApplyEntries(draft, submittedFields, out errors))
         {
             return false;
         }
 
-        errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(draft));
+        errors.AddRange(_basicConfigController.ValidateDraft(draft));
         return errors.Count == 0;
     }
 
     private void SaveCharacterSheetFieldConfigDraft(IServerPlayer player, ModConfig draft)
     {
-        CopyConfigValues(draft, Config);
-        SaveSharedConfig(API);
-
         var changedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { nameof(Config.CharacterSheetFields) };
-        ApplyConfigChangeSideEffects(changedKeys);
-        BroadcastClientConfigs();
+        _basicConfigController.SaveDraft(draft, changedKeys);
 
         AnalyticsService.TrackFeatureUsed("character_sheet_fields", "save", properties: new Dictionary<string, object>
         {
@@ -967,16 +915,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         AnalyticsService.TrackFeatureUsed(featureName, action, false, "validation_failed", properties);
         AnalyticsService.TrackFailure(featureName, action, "warning", "validation_failed", properties: properties);
-    }
-
-    private HashSet<string> ReloadConfigAndGetChangedKeys()
-    {
-        var before = CloneConfig(Config);
-        ReloadSharedConfigFromDisk(API);
-        var changedKeys = GetChangedConfigKeys(before, Config);
-        ApplyConfigChangeSideEffects(changedKeys);
-        BroadcastClientConfigs();
-        return changedKeys;
     }
 
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
@@ -1240,17 +1178,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
     }
 
-    private void SendConfigAdminOpen(IServerPlayer player, string statusMessage)
-    {
-        _serverConfigChannel?.SendPacket(new TheBasicsConfigAdminOpenMessage
-        {
-            Config = Config,
-            Values = GetConfigAdminValues(Config),
-            ReviewedKeys = (Config.ReviewedConfigSettingKeys ?? Array.Empty<string>()).ToList(),
-            StatusMessage = statusMessage
-        }, player);
-    }
-
     private void SendLanguageConfigOpen(IServerPlayer player, string message)
     {
         _serverConfigChannel?.SendPacket(new TheBasicsLanguageConfigOpenMessage
@@ -1299,55 +1226,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             Message = message,
             Fields = (fields ?? CharacterSheetFieldConfigAdmin.BuildEntries(Config)).ToList()
         }, player);
-    }
-
-    private void SendConfigAdminResult(IServerPlayer player, bool success, string message, IReadOnlyCollection<string> changedKeys)
-    {
-        if (player == null)
-        {
-            return;
-        }
-
-        var restartRequired = GetRestartRequiredKeys(changedKeys);
-        var liveApplied = changedKeys.Where(key => !restartRequired.Contains(key, StringComparer.OrdinalIgnoreCase)).ToList();
-
-        _serverConfigChannel?.SendPacket(new TheBasicsConfigAdminResultMessage
-        {
-            Success = success,
-            Message = message,
-            Config = Config,
-            Values = GetConfigAdminValues(Config),
-            ReviewedKeys = (Config.ReviewedConfigSettingKeys ?? Array.Empty<string>()).ToList(),
-            LiveAppliedKeys = liveApplied,
-            RestartRequiredKeys = restartRequired
-        }, player);
-    }
-
-    private static List<ConfigAdminSettingValue> GetConfigAdminValues(ModConfig config)
-    {
-        return ConfigAdminSettingRegistry.Settings
-            .Select(setting => new ConfigAdminSettingValue
-            {
-                Key = setting.Key,
-                Value = setting.GetValue(config)
-            })
-            .ToList();
-    }
-
-    private static HashSet<string> GetChangedConfigKeys(ModConfig before, ModConfig after)
-    {
-        return ConfigAdminSettingRegistry.Settings
-            .Where(setting => !string.Equals(setting.GetValue(before), setting.GetValue(after), StringComparison.Ordinal))
-            .Select(setting => setting.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static List<string> GetRestartRequiredKeys(IEnumerable<string> changedKeys)
-    {
-        return changedKeys
-            .Where(key => ConfigAdminSettingRegistry.TryGet(key, out var setting) && setting.ReloadBehavior == ConfigAdminReloadBehavior.RestartRequired)
-            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
-            .ToList();
     }
 
     protected override void OnConfigReloaded(IReadOnlySet<string> changedKeys)

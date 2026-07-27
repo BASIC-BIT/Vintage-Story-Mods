@@ -4,6 +4,7 @@ $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
 $releaseDir = Join-Path $projectRoot "bin/Release"
 $outputDir = $null
 $projectFile = Join-Path $projectRoot "thebasics.csproj"
+$basicConfigProjectRoot = Join-Path $solutionRoot "mods-dll/basicconfig"
 $targetFramework = $null
 
 if (Test-Path $projectFile) {
@@ -139,6 +140,26 @@ try {
 # Default targets cover the primary data dir plus one secondary profile directory.
 # You can override with a semicolon-separated list in THEBASICS_LOCAL_MOD_DIRS.
 $localModsDirectories = $null
+$dependencyZipFiles = @()
+
+if (Test-Path $basicConfigProjectRoot) {
+    $basicConfigZip = Get-ChildItem -LiteralPath $basicConfigProjectRoot -Filter "basicconfig_*.zip" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1
+    if ($basicConfigZip) {
+        $dependencyZipFiles += $basicConfigZip.FullName
+    } else {
+        $msg = "Warning: BasicConfig package not found in $basicConfigProjectRoot; dependency zip will not be deployed"
+        Write-Host $msg
+        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+    }
+}
+
+$packageFiles = @($zipFile) + $dependencyZipFiles
+$packageCleanupPatterns = @("thebasics*.zip")
+if ($dependencyZipFiles.Count -gt 0) {
+    $packageCleanupPatterns += "basicconfig*.zip"
+}
 
 if ($env:THEBASICS_LOCAL_MOD_DIRS) {
     $localModsDirectories = @()
@@ -172,8 +193,6 @@ Write-Host $msg
 "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
 
 foreach ($localModsDir in $localModsDirectories) {
-    $localModFile = Join-Path $localModsDir (Split-Path $zipFile -Leaf)
-    
     try {
         if (-not (Test-Path $localModsDir)) {
             New-Item -ItemType Directory -Path $localModsDir -Force | Out-Null
@@ -182,19 +201,23 @@ foreach ($localModsDir in $localModsDirectories) {
             "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
         }
         
-        # Remove old versions of the mod
-        $oldVersions = Get-ChildItem -Path $localModsDir -Filter "thebasics*.zip" -ErrorAction SilentlyContinue
-        foreach ($oldVersion in $oldVersions) {
-            Remove-Item -Path $oldVersion.FullName -Force
-            $msg = "Removed old version: $($oldVersion.Name)"
+        foreach ($pattern in $packageCleanupPatterns) {
+            $oldVersions = Get-ChildItem -Path $localModsDir -Filter $pattern -ErrorAction SilentlyContinue
+            foreach ($oldVersion in $oldVersions) {
+                Remove-Item -Path $oldVersion.FullName -Force
+                $msg = "Removed old version: $($oldVersion.Name)"
+                Write-Host $msg
+                "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+            }
+        }
+
+        foreach ($packageFile in $packageFiles) {
+            $localModFile = Join-Path $localModsDir (Split-Path $packageFile -Leaf)
+            Copy-Item -Path $packageFile -Destination $localModFile -Force
+            $msg = "Successfully copied mod to local mods directory at $localModFile"
             Write-Host $msg
             "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
         }
-        
-        Copy-Item -Path $zipFile -Destination $localModFile -Force
-        $msg = "Successfully copied mod to local mods directory at $localModFile"
-        Write-Host $msg
-        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
     } catch {
         $msg = "Error copying to local mods directory $localModsDir : $($_.Exception.Message)"
         Write-Host $msg
@@ -289,24 +312,28 @@ if (Test-Path $envPath) {
                 "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
 
                 $remoteModsDirectory = "/data/Mods"
-                $currentZipName = Split-Path $zipFile -Leaf
+                $currentZipNames = @($packageFiles | ForEach-Object { Split-Path $_ -Leaf })
 
                 # Now attempt the file transfer
-                $ftpDestinationFile = "$remoteModsDirectory/$currentZipName"
                 $transferOptions = New-Object WinSCP.TransferOptions
                 $transferOptions.TransferMode = [WinSCP.TransferMode]::Binary
 
-                $msg = "Uploading $zipFile to $ftpDestinationFile..."
-                Write-Host $msg
-                "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+                foreach ($packageFile in $packageFiles) {
+                    $currentZipName = Split-Path $packageFile -Leaf
+                    $ftpDestinationFile = "$remoteModsDirectory/$currentZipName"
 
-                $transferResult = $session.PutFiles($zipFile, $ftpDestinationFile, $false, $transferOptions)
-                $transferResult.Check()
-
-                foreach ($transfer in $transferResult.Transfers) {
-                    $msg = "Successfully uploaded mod to SFTP server at $($transfer.FileName)"
+                    $msg = "Uploading $packageFile to $ftpDestinationFile..."
                     Write-Host $msg
                     "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+
+                    $transferResult = $session.PutFiles($packageFile, $ftpDestinationFile, $false, $transferOptions)
+                    $transferResult.Check()
+
+                    foreach ($transfer in $transferResult.Transfers) {
+                        $msg = "Successfully uploaded mod to SFTP server at $($transfer.FileName)"
+                        Write-Host $msg
+                        "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
+                    }
                 }
 
                 # Remove old remote versions after a successful upload to avoid duplicate mod-id warnings
@@ -317,7 +344,8 @@ if (Test-Path $envPath) {
                         continue
                     }
 
-                    if ($remoteFile.Name -like "thebasics*.zip" -and $remoteFile.Name -ne $currentZipName) {
+                    $isManagedPackage = $remoteFile.Name -like "thebasics*.zip" -or ($dependencyZipFiles.Count -gt 0 -and $remoteFile.Name -like "basicconfig*.zip")
+                    if ($isManagedPackage -and $currentZipNames -notcontains $remoteFile.Name) {
                         $remotePath = "$remoteModsDirectory/$($remoteFile.Name)"
                         $session.RemoveFiles($remotePath).Check()
                         $msg = "Removed old remote version: $($remoteFile.Name)"

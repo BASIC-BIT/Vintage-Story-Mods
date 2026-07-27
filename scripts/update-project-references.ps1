@@ -7,6 +7,7 @@ param(
 )
 
 $projectFiles = @(
+    "mods-dll\basicconfig\basicconfig.csproj",
     "mods-dll\thebasics\thebasics.csproj",
     "mods-dll\litchimneys\litchimneys.csproj",
     "mods\thaumstory\thaumstory.csproj",
@@ -133,4 +134,4 @@ Write-Host ""
 Write-Host "Usage examples:" -ForegroundColor Gray
 Write-Host "  .\update-project-references.ps1 -DryRun     # Preview changes" -ForegroundColor Gray
 Write-Host "  .\update-project-references.ps1             # Apply changes" -ForegroundColor Gray
-Write-Host "  .\update-project-references.ps1 -Revert     # Revert changes" -ForegroundColor Gray 
+Write-Host "  .\update-project-references.ps1 -Revert     # Revert changes" -ForegroundColor Gray

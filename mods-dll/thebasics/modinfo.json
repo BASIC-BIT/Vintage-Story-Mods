@@ -9,6 +9,7 @@
   "version": "5.8.1",
   "dependencies": {
     "game": "",
+    "basicconfig": "0.1.0",
     "creative": "",
     "survival": ""
   },

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
+using BasicConfig;
 using DimensionLib.Api;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -52,6 +54,9 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private ICoreClientAPI _clientApi;
     private IDimensionLibApi _dimensionLib;
     private PocketLinkStore _linkStore;
+    private BasicConfigStore<PocketDimensionsConfig> _configStore;
+    private BasicConfigServerController<PocketDimensionsConfig> _configController;
+    private BasicConfigClientController _clientConfigController;
     private PocketDimensionsConfig _config = new PocketDimensionsConfig();
     private IServerNetworkChannel _serverChannel;
     private IClientNetworkChannel _clientChannel;
@@ -61,9 +66,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
     private readonly Dictionary<string, PocketWaystoneLink> _linksByEndpointId = new Dictionary<string, PocketWaystoneLink>(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _activeIngressByPlayer = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, DimensionLocation>> _unanchoredReturnsByPlayer = new Dictionary<string, Dictionary<string, DimensionLocation>>(StringComparer.Ordinal);
+    private readonly Dictionary<string, long> _pendingTransfersByPlayer = new Dictionary<string, long>(StringComparer.Ordinal);
     private readonly Dictionary<string, PocketLayerStack> _layerStacksById = new Dictionary<string, PocketLayerStack>(StringComparer.Ordinal);
     private readonly HashSet<string> _playersWithPocketHud = new HashSet<string>(StringComparer.Ordinal);
     private readonly HashSet<string> _layersNeedingInitialSend = new HashSet<string>(StringComparer.Ordinal);
+    private long _nextPendingTransferId;
 
     public override double ExecuteOrder()
     {
@@ -108,7 +115,19 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         _linkStore = new PocketLinkStore(api);
         LoadLinkState();
         api.ObjectCache[WaystoneServiceCacheKey] = this;
-        _config = LoadConfig(api);
+        _configStore = new BasicConfigStore<PocketDimensionsConfig>(api, ConfigName, "Pocket Dimensions", config => config.Normalize());
+        _config = _configStore.GetOrLoad();
+        _configController = api.ModLoader.GetModSystem<BasicConfigModSystem>()?.RegisterServer(new BasicConfigServerControllerOptions<PocketDimensionsConfig>
+        {
+            ConfigId = PocketDimensionsConfigSchema.ConfigId,
+            DisplayName = "Pocket Dimensions",
+            Store = _configStore,
+            Schema = PocketDimensionsConfigSchema.Build(),
+            CanEdit = CanEditConfig,
+            GetReviewedKeys = config => config.ReviewedConfigSettingKeys,
+            SetReviewedKeys = (config, keys) => config.ReviewedConfigSettingKeys = keys,
+            AfterChanged = _ => _config = _configStore.GetOrLoad()
+        });
         var policyResult = _dimensionLib.RegisterPolicyProvider(ModId, this);
         if (!policyResult.Success)
         {
@@ -116,6 +135,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         RegisterCommands();
+        ApplyRecipeConfig();
         api.Event.GameWorldSave += SaveLinkState;
         _hudUpdateListenerId = api.Event.RegisterGameTickListener(OnHudUpdateTick, HudUpdateTickMs);
         api.Logger.Notification("[PocketDimensions] Registered /pocket commands.");
@@ -140,6 +160,16 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             .SetMessageHandler<PocketElevatorPlacementPrompt>(OnElevatorPlacementPrompt)
             .SetMessageHandler<PocketHudStateMessage>(OnPocketHudState)
             .SetMessageHandler<PocketDirectoryStateMessage>(OnPocketDirectoryState);
+
+        _clientConfigController = api.ModLoader.GetModSystem<BasicConfigModSystem>()?.RegisterClient(new BasicConfigClientOptions
+        {
+            ConfigId = PocketDimensionsConfigSchema.ConfigId,
+            DisplayName = "Pocket Dimensions",
+            Title = "Pocket Dimensions Config",
+            DialogCode = "pocketdimensions-basicconfig-admin",
+            Api = api,
+            Settings = PocketDimensionsConfigSchema.Settings.Cast<IBasicConfigSettingDefinition>().ToList()
+        });
 
         api.Input.RegisterHotKey("pocketelevatorup", "Pocket Elevator Up", GlKeys.PageUp, HotkeyType.CharacterControls);
         api.Input.RegisterHotKey("pocketelevatordown", "Pocket Elevator Down", GlKeys.PageDown, HotkeyType.CharacterControls);
@@ -256,8 +286,16 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return DimensionLibResult.Fail(linked.Message, linked.ErrorCode);
         }
 
-        var ensured = EnsurePocketInfrastructure(lookup.Value, player);
-        return ensured.Success ? EnterPocket(player, lookup.Value, linked.Value.EndpointId) : ensured;
+        if (_config.PrepareChunksDuringTeleportDelay)
+        {
+            var prepared = EnsurePocketInfrastructure(lookup.Value, player);
+            if (!prepared.Success)
+            {
+                return prepared;
+            }
+        }
+
+        return BeginDelayedWaystoneEntry(player, blockSelection.Position.Copy(), lookup.Value.DimensionId, linked.Value.EndpointId);
     }
 
     public DimensionLibResult ReturnFromPocket(IServerPlayer player, BlockSelection blockSelection = null)
@@ -267,10 +305,37 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return DimensionLibResult.Fail("Online player is required.", "missing-player");
         }
 
+        if (blockSelection != null && !HasPrivilege(player, _config.UseReturnPedestalPrivilege))
+        {
+            return DimensionLibResult.Fail($"Missing privilege '{_config.UseReturnPedestalPrivilege}'.", "missing-return-pedestal-use-privilege");
+        }
+
         var lookup = _dimensionLib.GetDimensionAt(player.Entity.Pos.AsBlockPos);
         if (!lookup.Success || !IsOwnedPocket(lookup.Value))
         {
             return DimensionLibResult.Fail("You are not inside a Pocket Dimensions pocket.", "not-in-pocket");
+        }
+
+        var dimension = lookup.Value;
+
+        if (_config.PrepareChunksDuringTeleportDelay)
+        {
+            var ensured = EnsurePocketInfrastructure(dimension, player);
+            if (!ensured.Success)
+            {
+                return ensured;
+            }
+        }
+
+        return BeginDelayedPocketReturn(player, dimension.DimensionId);
+    }
+
+    private DimensionLibResult CompletePocketReturn(IServerPlayer player, string dimensionId)
+    {
+        var lookup = _dimensionLib.GetDimensionAt(player.Entity.Pos.AsBlockPos);
+        if (!lookup.Success || !IsOwnedPocket(lookup.Value) || !string.Equals(lookup.Value.DimensionId, dimensionId, StringComparison.Ordinal))
+        {
+            return DimensionLibResult.Fail("You are no longer inside the pocket where this return started.", "pocket-return-context-changed");
         }
 
         var dimension = lookup.Value;
@@ -323,6 +388,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         ClearActiveIngress(player, dimension.DimensionId);
         ClearUnanchoredReturn(player, dimension.DimensionId);
+        PlayTeleportSound(player, _config.TeleportCompleteSound);
         return DimensionLibResult.Ok(successMessage);
     }
 
@@ -405,9 +471,225 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         return string.Equals(errorCode, "missing-target-pocketelevator", StringComparison.Ordinal);
     }
 
+    private DimensionLibResult BeginDelayedWaystoneEntry(IServerPlayer player, BlockPos waystonePos, string dimensionId, string endpointId)
+    {
+        if (!TryBeginTransfer(player, out var transferId, out var error))
+        {
+            return error;
+        }
+
+        PlayTeleportSound(player, _config.TeleportStartSound);
+        RegisterTransferCallback(() => CompleteDelayedWaystoneEntry(player.PlayerUID, transferId, waystonePos, dimensionId, endpointId));
+        return DimensionLibResult.Ok($"Pocket Waystone activates. Transfer in {_config.TeleportDelaySeconds:0.#}s...");
+    }
+
+    private DimensionLibResult BeginDelayedPocketReturn(IServerPlayer player, string dimensionId)
+    {
+        if (!TryBeginTransfer(player, out var transferId, out var error))
+        {
+            return error;
+        }
+
+        PlayTeleportSound(player, _config.TeleportStartSound);
+        RegisterTransferCallback(() => CompleteDelayedPocketReturn(player.PlayerUID, transferId, dimensionId));
+        return DimensionLibResult.Ok($"Pocket return pedestal activates. Transfer in {_config.TeleportDelaySeconds:0.#}s...");
+    }
+
+    private void RegisterTransferCallback(Action action)
+    {
+        var delayMs = (int)Math.Round(_config.TeleportDelaySeconds * 1000);
+        _api.Event.RegisterCallback(_ => action(), Math.Max(0, delayMs));
+    }
+
+    private bool TryBeginTransfer(IServerPlayer player, out long transferId, out DimensionLibResult error)
+    {
+        transferId = 0;
+        error = null;
+        if (player?.Entity == null)
+        {
+            error = DimensionLibResult.Fail("Online player is required.", "missing-player");
+            return false;
+        }
+
+        var playerKey = PlayerKey(player);
+        if (_pendingTransfersByPlayer.ContainsKey(playerKey))
+        {
+            error = DimensionLibResult.Fail("A Pocket Dimensions transfer is already pending.", "pocket-transfer-pending");
+            return false;
+        }
+
+        transferId = ++_nextPendingTransferId;
+        _pendingTransfersByPlayer[playerKey] = transferId;
+        return true;
+    }
+
+    private bool TryCompleteTransfer(string playerUid, long transferId, out IServerPlayer player)
+    {
+        player = FindOnlinePlayerByUid(playerUid);
+        if (player?.Entity == null)
+        {
+            _pendingTransfersByPlayer.Remove(playerUid ?? string.Empty);
+            return false;
+        }
+
+        if (!_pendingTransfersByPlayer.TryGetValue(playerUid, out var pendingTransferId) || pendingTransferId != transferId)
+        {
+            return false;
+        }
+
+        _pendingTransfersByPlayer.Remove(playerUid);
+        return true;
+    }
+
+    private void CompleteDelayedWaystoneEntry(string playerUid, long transferId, BlockPos waystonePos, string dimensionId, string endpointId)
+    {
+        if (!TryCompleteTransfer(playerUid, transferId, out var player))
+        {
+            return;
+        }
+
+        NotifyTransferResult(player, CompleteWaystoneEntry(player, waystonePos, dimensionId, endpointId));
+    }
+
+    private DimensionLibResult CompleteWaystoneEntry(IServerPlayer player, BlockPos waystonePos, string dimensionId, string endpointId)
+    {
+        var lookup = _dimensionLib.GetDimension(dimensionId);
+        if (!lookup.Success)
+        {
+            return DimensionLibResult.Fail(lookup.Message, lookup.ErrorCode);
+        }
+
+        if (!CanUseWaystone(player, lookup.Value))
+        {
+            return DimensionLibResult.Fail(CapabilityDeniedReason(_config.UseWaystoneCapabilityMode, _config.UseWaystonePrivilege, "use a Pocket Waystone"), "missing-waystone-use-privilege");
+        }
+
+        if (!IsBlockCode(waystonePos, PocketWaystoneBlockCode))
+        {
+            return DimensionLibResult.Fail("The activated Waystone is missing.", "missing-pocket-waystone-block");
+        }
+
+        var blockEntity = _api.World.BlockAccessor.GetBlockEntity(waystonePos) as PocketWaystoneBlockEntity;
+        if (blockEntity == null || !string.Equals(blockEntity.EndpointId, endpointId, StringComparison.Ordinal) || !string.Equals(blockEntity.BoundDimensionId, dimensionId, StringComparison.Ordinal))
+        {
+            return DimensionLibResult.Fail("The activated Waystone binding changed before transfer completed.", "waystone-binding-mismatch");
+        }
+
+        if (!IsOwnedPocket(lookup.Value))
+        {
+            return DimensionLibResult.Fail($"Dimension '{DisplayName(dimensionId)}' is not owned by Pocket Dimensions.", "not-pocket-dimension");
+        }
+
+        if (_dimensionLib.IsDimensionOrphaned(dimensionId))
+        {
+            return DimensionLibResult.Fail($"Bound pocket '{DisplayName(dimensionId)}' is orphaned.", "dimension-orphaned");
+        }
+
+        var ensured = EnsurePocketInfrastructure(lookup.Value, player);
+        if (!ensured.Success)
+        {
+            return ensured;
+        }
+
+        var entered = EnterPocket(player, lookup.Value, endpointId);
+        if (entered.Success)
+        {
+            PlayTeleportSound(player, _config.TeleportCompleteSound);
+        }
+
+        return entered;
+    }
+
+    private void CompleteDelayedPocketReturn(string playerUid, long transferId, string dimensionId)
+    {
+        if (!TryCompleteTransfer(playerUid, transferId, out var player))
+        {
+            return;
+        }
+
+        NotifyTransferResult(player, CompletePocketReturn(player, dimensionId));
+    }
+
+    private void NotifyTransferResult(IServerPlayer player, DimensionLibResult result)
+    {
+        if (player == null || result == null)
+        {
+            return;
+        }
+
+        if (result.Success)
+        {
+            player.SendMessage(GlobalConstants.GeneralChatGroup, result.Message, EnumChatType.Notification);
+        }
+        else
+        {
+            player.SendIngameError(result.ErrorCode ?? "pocket-transfer-failed", result.Message);
+        }
+    }
+
+    private void PlayTeleportSound(IServerPlayer player, string sound)
+    {
+        if (!_config.EnableTeleportSounds || string.IsNullOrWhiteSpace(sound) || player?.Entity == null || _config.TeleportSoundVolume <= 0 || _config.TeleportSoundRange <= 0)
+        {
+            return;
+        }
+
+        _api.World.PlaySoundAt(new AssetLocation(sound), player.Entity, null, randomizePitch: false, _config.TeleportSoundRange, _config.TeleportSoundVolume);
+    }
+
+    private IServerPlayer FindOnlinePlayerByUid(string playerUid)
+    {
+        return _api.World.AllOnlinePlayers
+            .OfType<IServerPlayer>()
+            .FirstOrDefault(player => string.Equals(player.PlayerUID, playerUid, StringComparison.Ordinal));
+    }
+
+    private void ApplyRecipeConfig()
+    {
+        if (_config.AllowWaystoneCrafting)
+        {
+            return;
+        }
+
+        var removed = _api.World.GridRecipes.RemoveAll(IsPocketWaystoneRecipe);
+        if (removed > 0)
+        {
+            _api.Logger.Notification("[PocketDimensions] Disabled {0} Pocket Waystone grid recipe(s) by config.", removed);
+        }
+    }
+
+    private static bool IsPocketWaystoneRecipe(GridRecipe recipe)
+    {
+        var outputCode = recipe?.Output?.Code?.ToString();
+        return string.Equals(outputCode, "pocketdimensions:pocketwaystone", StringComparison.Ordinal)
+            || string.Equals(outputCode, "pocketwaystone", StringComparison.Ordinal)
+            || string.Equals(recipe?.Name?.ToString(), "pocketdimensions:recipes/grid/pocketwaystone", StringComparison.Ordinal)
+            || string.Equals(recipe?.Name?.ToString(), "pocketdimensions:grid/pocketwaystone", StringComparison.Ordinal);
+    }
+
     public void ForgetWaystoneEndpoint(string endpointId)
     {
         RemoveWaystoneLink(endpointId);
+    }
+
+    public DimensionLibResult CanPlaceWaystone(IServerPlayer player)
+    {
+        return HasPrivilege(player, _config.PlaceWaystonePrivilege)
+            ? DimensionLibResult.Ok("Waystone placement allowed.")
+            : DimensionLibResult.Fail($"Missing privilege '{_config.PlaceWaystonePrivilege}'.", "missing-waystone-place-privilege");
+    }
+
+    public DimensionLibResult CanBreakWaystone(IServerPlayer player, BlockPos pos)
+    {
+        var blockEntity = pos == null ? null : _api?.World.BlockAccessor.GetBlockEntity(pos) as PocketWaystoneBlockEntity;
+        if (blockEntity?.IsBound == true)
+        {
+            return DimensionLibResult.Fail($"This Waystone is bound to '{DisplayName(blockEntity.BoundDimensionId)}'. Run /pocket unbind before breaking it.", "pocketwaystone-bound-break-denied");
+        }
+
+        return HasPrivilege(player, _config.BreakWaystonePrivilege)
+            ? DimensionLibResult.Ok("Waystone breaking allowed.")
+            : DimensionLibResult.Fail($"Missing privilege '{_config.BreakWaystonePrivilege}'.", "missing-waystone-break-privilege");
     }
 
     public DimensionLibResult TravelElevator(IServerPlayer player, int direction, bool createMissingLayer = false)
@@ -1554,6 +1836,17 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
                 .RequiresPrivilege(_config.EnterPrivilege)
                 .HandleWith(HandleInspect)
                 .EndSubCommand()
+            .BeginSubCommand("links")
+                .WithDescription("List Pocket Dimensions Waystone links")
+                .RequiresPrivilege(_config.ConfigPrivilege)
+                .HandleWith(HandleLinks)
+                .EndSubCommand()
+            .BeginSubCommand("config")
+                .WithDescription("Open the Pocket Dimensions config panel")
+                .RequiresPrivilege(_config.ConfigPrivilege)
+                .RequiresPlayer()
+                .HandleWith(HandleConfig)
+                .EndSubCommand()
             .BeginSubCommand("bind")
                 .WithDescription("Bind the selected placed Waystone to a pocket dimension")
                 .WithArgs(new StringArgParser("name", true))
@@ -1563,7 +1856,7 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
                 .EndSubCommand()
             .BeginSubCommand("unbind")
                 .WithDescription("Clear the selected placed Waystone binding")
-                .RequiresPrivilege(_config.BindPrivilege)
+                .RequiresPrivilege(_config.UnbindPrivilege)
                 .RequiresPlayer()
                 .HandleWith(HandleUnbindWaystone)
                 .EndSubCommand()
@@ -1755,6 +2048,28 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
 
         var dimension = lookup.Value;
         return TextCommandResult.Success(BuildPocketInspection(dimension));
+    }
+
+    private TextCommandResult HandleLinks(TextCommandCallingArgs args)
+    {
+        if (!CanEditConfig(args.Caller.Player as IServerPlayer))
+        {
+            return TextCommandResult.Error($"Missing privilege '{_config.ConfigPrivilege}'.", "missing-pocket-config-privilege");
+        }
+
+        return TextCommandResult.Success(BuildWaystoneLinkReport());
+    }
+
+    private TextCommandResult HandleConfig(TextCommandCallingArgs args)
+    {
+        var player = args.Caller.Player as IServerPlayer;
+        if (!CanEditConfig(player))
+        {
+            return TextCommandResult.Error($"Missing privilege '{_config.ConfigPrivilege}'.", "missing-pocket-config-privilege");
+        }
+
+        _configController?.SendOpen(player);
+        return TextCommandResult.Success("Opening Pocket Dimensions config panel.");
     }
 
     private TextCommandResult HandleBindWaystone(TextCommandCallingArgs args)
@@ -2019,13 +2334,47 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             return;
         }
 
-        if (!_linksByEndpointId.Remove(endpointId))
+        if (!_linksByEndpointId.TryGetValue(endpointId, out var link))
         {
             return;
         }
 
+        PreserveActiveIngressReturns(endpointId, link);
+        _linksByEndpointId.Remove(endpointId);
         RemoveActiveIngressReferences(endpointId);
         SaveLinkState();
+    }
+
+    private void PreserveActiveIngressReturns(string endpointId, PocketWaystoneLink link)
+    {
+        if (link == null)
+        {
+            return;
+        }
+
+        var returnLocation = new DimensionLocation
+        {
+            DimensionId = link.SourceDimensionId,
+            DimensionPlaneId = link.DimensionPlaneId,
+            X = link.X + 0.5,
+            Y = link.Y + 1,
+            Z = link.Z + 0.5,
+        };
+
+        foreach (var playerKey in _activeIngressByPlayer.Keys.ToArray())
+        {
+            var activeIngress = _activeIngressByPlayer[playerKey];
+            foreach (var dimensionId in activeIngress.Where(entry => string.Equals(entry.Value, endpointId, StringComparison.Ordinal)).Select(entry => entry.Key).ToArray())
+            {
+                if (!_unanchoredReturnsByPlayer.TryGetValue(playerKey, out var returnsByPocket))
+                {
+                    returnsByPocket = new Dictionary<string, DimensionLocation>(StringComparer.Ordinal);
+                    _unanchoredReturnsByPlayer[playerKey] = returnsByPocket;
+                }
+
+                returnsByPocket[dimensionId] = CloneLocation(returnLocation);
+            }
+        }
     }
 
     private void RemoveLinksForPocket(string dimensionId)
@@ -2273,6 +2622,56 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }));
     }
 
+    private string BuildWaystoneLinkReport()
+    {
+        var links = _linksByEndpointId.Values
+            .OrderBy(link => link.PocketDimensionId, StringComparer.Ordinal)
+            .ThenBy(link => link.EndpointId, StringComparer.Ordinal)
+            .ToArray();
+        if (links.Length == 0)
+        {
+            return "No Pocket Dimensions Waystone links are registered.";
+        }
+
+        var report = new StringBuilder();
+        foreach (var link in links)
+        {
+            var pocket = _dimensionLib.GetDimension(link.PocketDimensionId);
+            var pos = new BlockPos(link.X, link.Y, link.Z, link.DimensionPlaneId);
+            var blockOk = IsBlockCode(pos, PocketWaystoneBlockCode);
+            var blockEntity = _api.World.BlockAccessor.GetBlockEntity(pos) as PocketWaystoneBlockEntity;
+            var bindingOk = blockEntity != null
+                && string.Equals(blockEntity.EndpointId, link.EndpointId, StringComparison.Ordinal)
+                && string.Equals(blockEntity.BoundDimensionId, link.PocketDimensionId, StringComparison.Ordinal);
+
+            var status = new List<string>
+            {
+                pocket.Success ? "pocket=ok" : "pocket=missing",
+                pocket.Success && _dimensionLib.IsDimensionOrphaned(link.PocketDimensionId) ? "orphaned=yes" : "orphaned=no",
+                blockOk ? "block=ok" : "block=missing",
+                bindingOk ? "binding=ok" : "binding=stale"
+            };
+
+            report.Append(DisplayName(link.PocketDimensionId))
+                .Append(" <- ")
+                .Append(link.SourceDimensionId == null ? "overworld" : DisplayName(link.SourceDimensionId))
+                .Append(" @ ")
+                .Append(link.X).Append(',').Append(link.Y).Append(',').Append(link.Z)
+                .Append(" dim=").Append(link.DimensionPlaneId)
+                .Append(" endpoint=").Append(link.EndpointId)
+                .Append(" (").Append(string.Join(", ", status)).Append(')');
+
+            if (!string.IsNullOrWhiteSpace(link.BoundByPlayerName))
+            {
+                report.Append(" boundBy=").Append(link.BoundByPlayerName);
+            }
+
+            report.AppendLine();
+        }
+
+        return report.ToString().TrimEnd();
+    }
+
     private string BuildPocketInspection(Dimension dimension)
     {
         var stack = EnsureLayerStack(dimension);
@@ -2414,6 +2813,11 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
 
         return _config.ResolveCapabilityMode(modeName) == PocketCapabilityMode.Public && player != null;
+    }
+
+    private bool CanEditConfig(IServerPlayer player)
+    {
+        return HasPrivilege(player, _config.ConfigPrivilege);
     }
 
     private bool HasStackCapability(IServerPlayer player, PocketLayerStack stack, string modeName, params string[] overridePrivileges)
@@ -2664,24 +3068,6 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
             : _api.WorldManager.MapSizeY / 2;
     }
 
-    private static PocketDimensionsConfig LoadConfig(ICoreServerAPI api)
-    {
-        PocketDimensionsConfig config;
-        try
-        {
-            config = api.LoadModConfig<PocketDimensionsConfig>(ConfigName) ?? new PocketDimensionsConfig();
-        }
-        catch (Exception ex)
-        {
-            api.Logger.Warning("[PocketDimensions] Failed to load config; using defaults: {0}", ex.Message);
-            config = new PocketDimensionsConfig();
-        }
-
-        config.Normalize();
-        api.StoreModConfig(config, ConfigName);
-        return config;
-    }
-
     private sealed class PocketPlatformSource : IBlockVolumeSource
     {
         private readonly ICoreServerAPI _api;
@@ -2786,107 +3172,4 @@ public sealed class PocketDimensionModSystem : ModSystem, IDimensionPolicyProvid
         }
     }
 
-    private sealed class PocketDimensionsConfig
-    {
-        public string CreatePrivilege { get; set; } = Privilege.root;
-
-        public string EnterPrivilege { get; set; } = Privilege.root;
-
-        public string ExitPrivilege { get; set; } = Privilege.root;
-
-        public string UseWaystonePrivilege { get; set; } = Privilege.root;
-
-        public string UseElevatorPrivilege { get; set; } = Privilege.root;
-
-        public string UsePocketBlocksPrivilege { get; set; } = Privilege.root;
-
-        public string MutatePocketBlocksPrivilege { get; set; } = Privilege.root;
-
-        public string BindPrivilege { get; set; } = Privilege.root;
-
-        public string ReleasePrivilege { get; set; } = Privilege.root;
-
-        public string CreatePocketCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
-
-        public string CreateLayerCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
-
-        public string EditLayerCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
-
-        public string DirectoryVisibilityCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
-
-        public string DirectoryTeleportCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
-
-        public string UseWaystoneCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
-
-        public string UseElevatorCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
-
-        public string UsePocketBlocksCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
-
-        public string MutatePocketBlocksCapabilityMode { get; set; } = nameof(PocketCapabilityMode.Privilege);
-
-        public string ElevatorLandingMode { get; set; } = nameof(PocketElevatorLandingMode.RequireElevatorBlock);
-
-        public int DefaultSizeChunks { get; set; } = 3;
-
-        public int MaxSizeChunks { get; set; } = 16;
-
-        public int DefaultSpawnY { get; set; }
-
-        public void Normalize()
-        {
-            CreatePrivilege = NormalizePrivilege(CreatePrivilege, Privilege.root);
-            EnterPrivilege = NormalizePrivilege(EnterPrivilege, Privilege.root);
-            ExitPrivilege = NormalizePrivilege(ExitPrivilege, Privilege.root);
-            UseWaystonePrivilege = NormalizePrivilege(UseWaystonePrivilege, EnterPrivilege);
-            UseElevatorPrivilege = NormalizePrivilege(UseElevatorPrivilege, UseWaystonePrivilege);
-            UsePocketBlocksPrivilege = NormalizePrivilege(UsePocketBlocksPrivilege, Privilege.root);
-            MutatePocketBlocksPrivilege = NormalizePrivilege(MutatePocketBlocksPrivilege, Privilege.root);
-            BindPrivilege = NormalizePrivilege(BindPrivilege, Privilege.root);
-            ReleasePrivilege = NormalizePrivilege(ReleasePrivilege, Privilege.root);
-            CreatePocketCapabilityMode = NormalizeCapabilityMode(CreatePocketCapabilityMode);
-            CreateLayerCapabilityMode = NormalizeCapabilityMode(CreateLayerCapabilityMode);
-            EditLayerCapabilityMode = NormalizeCapabilityMode(EditLayerCapabilityMode);
-            DirectoryVisibilityCapabilityMode = NormalizeCapabilityMode(DirectoryVisibilityCapabilityMode);
-            DirectoryTeleportCapabilityMode = NormalizeCapabilityMode(DirectoryTeleportCapabilityMode);
-            UseWaystoneCapabilityMode = NormalizeCapabilityMode(UseWaystoneCapabilityMode);
-            UseElevatorCapabilityMode = NormalizeCapabilityMode(UseElevatorCapabilityMode);
-            UsePocketBlocksCapabilityMode = NormalizeCapabilityMode(UsePocketBlocksCapabilityMode);
-            MutatePocketBlocksCapabilityMode = NormalizeCapabilityMode(MutatePocketBlocksCapabilityMode);
-            if (!Enum.TryParse<PocketElevatorLandingMode>(ElevatorLandingMode, ignoreCase: true, out var parsed))
-            {
-                parsed = PocketElevatorLandingMode.RequireElevatorBlock;
-            }
-
-            ElevatorLandingMode = parsed.ToString();
-            MaxSizeChunks = ClampInt(MaxSizeChunks, 1, 64);
-            DefaultSizeChunks = ClampInt(DefaultSizeChunks, 1, MaxSizeChunks);
-            DefaultSpawnY = Math.Max(0, DefaultSpawnY);
-        }
-
-        private static string NormalizePrivilege(string value, string fallback)
-        {
-            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-        }
-
-        private static string NormalizeCapabilityMode(string value)
-        {
-            return Enum.TryParse<PocketCapabilityMode>(value, ignoreCase: true, out var parsed)
-                ? parsed.ToString()
-                : nameof(PocketCapabilityMode.Privilege);
-        }
-
-        public PocketCapabilityMode ResolveCapabilityMode(string value)
-        {
-            return Enum.TryParse<PocketCapabilityMode>(value, ignoreCase: true, out var parsed)
-                ? parsed
-                : PocketCapabilityMode.Privilege;
-        }
-
-        public PocketElevatorLandingMode ResolveElevatorLandingMode()
-        {
-            return Enum.TryParse<PocketElevatorLandingMode>(ElevatorLandingMode, ignoreCase: true, out var parsed)
-                ? parsed
-                : PocketElevatorLandingMode.RequireElevatorBlock;
-        }
-    }
 }

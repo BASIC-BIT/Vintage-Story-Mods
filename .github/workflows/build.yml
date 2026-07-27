@@ -259,6 +259,7 @@ jobs:
     - name: Restore Dependencies
       run: |
         $projects = @(
+          "mods-dll/basicconfig/basicconfig.csproj",
           "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
           "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
@@ -279,6 +280,7 @@ jobs:
         Write-Host "Building code mods and tests..." -ForegroundColor Yellow
 
         $projects = @(
+          "mods-dll/basicconfig/basicconfig.csproj",
           "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
           "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
@@ -297,6 +299,7 @@ jobs:
     - name: Check Formatting
       run: |
         $projects = @(
+          "mods-dll/basicconfig/basicconfig.csproj",
           "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
           "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
@@ -481,7 +484,7 @@ jobs:
       if: always()
       run: |
         pip install lizard
-        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/
+        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/basicconfig/src/ ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/
       shell: bash
 
     - name: Test Build Output
@@ -490,6 +493,7 @@ jobs:
         Write-Host "Checking build outputs..." -ForegroundColor Yellow
         
         $dllPaths = @(
+          "mods-dll\basicconfig\bin\Release\net10.0\basicconfig.dll",
           "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll",
           "mods-dll\dimensionlib\bin\Release\net10.0\dimensionlib.dll",
           "mods-dll\dimensionpockets\bin\Release\net10.0\pocketdimensions.dll",
@@ -516,6 +520,7 @@ jobs:
         Write-Host "Creating distribution packages..." -ForegroundColor Yellow
 
         $modDirs = @(
+          "mods-dll\basicconfig",
           "mods-dll\thebasics",
           "mods-dll\dimensionlib",
           "mods-dll\dimensionpockets",

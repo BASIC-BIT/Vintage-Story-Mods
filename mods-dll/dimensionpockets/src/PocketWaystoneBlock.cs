@@ -9,6 +9,22 @@ public sealed class PocketWaystoneBlock : Block
 {
     private const string WaystoneServiceCacheKey = "pocketdimensions:waystone-service";
 
+    public override bool CanPlaceBlock(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref string failureCode)
+    {
+        if (world.Side == EnumAppSide.Server && byPlayer is IServerPlayer player)
+        {
+            var allowed = GetWaystoneService()?.CanPlaceWaystone(player);
+            if (allowed?.Success == false)
+            {
+                failureCode = allowed.ErrorCode;
+                player.SendIngameError(allowed.ErrorCode ?? "pocketwaystone-place-denied", allowed.Message);
+                return false;
+            }
+        }
+
+        return base.CanPlaceBlock(world, byPlayer, blockSel, ref failureCode);
+    }
+
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel)
     {
         if (world.Side != EnumAppSide.Server)
@@ -44,6 +60,14 @@ public sealed class PocketWaystoneBlock : Block
     {
         if (world.Side == EnumAppSide.Server)
         {
+            var player = byPlayer as IServerPlayer;
+            var allowed = GetWaystoneService()?.CanBreakWaystone(player, pos);
+            if (allowed?.Success == false)
+            {
+                player?.SendIngameError(allowed.ErrorCode ?? "pocketwaystone-break-denied", allowed.Message);
+                return;
+            }
+
             var blockEntity = world.BlockAccessor.GetBlockEntity(pos) as PocketWaystoneBlockEntity;
             GetWaystoneService()?.ForgetWaystoneEndpoint(blockEntity?.EndpointId);
         }
