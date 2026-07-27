@@ -16,7 +16,7 @@ internal static class FlywheelModelDimensions
     internal const float CouplingPlateOuterRadius = 0.32f;
     internal const float CouplingPlateThickness = 0.03f;
 
-    internal const float CompactWheelOuterRadius = 0.38f;
+    internal const float CompactWheelOuterRadius = 0.46f;
     internal const float CompactCoupledInnerRadius = 0.20f;
     internal const float CompactWheelHalfThickness = 0.16f;
     internal const float CompactHubOuterRadius = 0.22f;

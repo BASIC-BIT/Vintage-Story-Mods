@@ -123,9 +123,29 @@
       }
     },
     {
-      "name": "ChalkLine",
-      "from": [10.18, 7.68, 8],
-      "to": [10.225, 8.32, 20.8],
+      "name": "ChalkLineFront",
+      "from": [9.596, 7.36, 10.304],
+      "to": [9.692, 8.64, 20.992],
+      "faces": {
+        "north": { "texture": "#chalk" }, "east": { "texture": "#chalk" },
+        "south": { "texture": "#chalk" }, "west": { "texture": "#chalk" },
+        "up": { "texture": "#chalk" }, "down": { "texture": "#chalk" }
+      }
+    },
+    {
+      "name": "ChalkLineBack",
+      "from": [6.308, 7.36, 10.304],
+      "to": [6.404, 8.64, 20.992],
+      "faces": {
+        "north": { "texture": "#chalk" }, "east": { "texture": "#chalk" },
+        "south": { "texture": "#chalk" }, "west": { "texture": "#chalk" },
+        "up": { "texture": "#chalk" }, "down": { "texture": "#chalk" }
+      }
+    },
+    {
+      "name": "ChalkLineRim",
+      "from": [6.308, 7.36, 20.8],
+      "to": [9.692, 8.64, 20.896],
       "faces": {
         "north": { "texture": "#chalk" }, "east": { "texture": "#chalk" },
         "south": { "texture": "#chalk" }, "west": { "texture": "#chalk" },

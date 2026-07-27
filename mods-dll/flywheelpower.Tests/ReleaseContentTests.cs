@@ -59,15 +59,16 @@ public sealed class ReleaseContentTests
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedcompactflywheel.json")));
         Assert.Contains("""{ code: "material", states: ["wood", "iron", "meteoriciron", "steel"] }""", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("""{ code: "hub", states: ["iron", "meteoriciron", "steel"] }""", fullSizeBlocktype, StringComparison.Ordinal);
-        Assert.Contains("flywheel-wood-meteoriciron-*", fullSizeBlocktype, StringComparison.Ordinal);
-        Assert.Contains("flywheel-wood-steel-*", fullSizeBlocktype, StringComparison.Ordinal);
-        Assert.Contains("flywheel-iron-meteoriciron-*", fullSizeBlocktype, StringComparison.Ordinal);
-        Assert.Contains("flywheel-iron-steel-*", fullSizeBlocktype, StringComparison.Ordinal);
-        Assert.Contains("flywheel-meteoriciron-iron-*", fullSizeBlocktype, StringComparison.Ordinal);
-        Assert.Contains("flywheel-meteoriciron-steel-*", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"flywheel-wood-meteoriciron-*\"", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"flywheel-wood-steel-*\"", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"flywheel-iron-meteoriciron-*\"", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"flywheel-iron-steel-*\"", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"flywheel-meteoriciron-iron-*\"", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"flywheel-meteoriciron-steel-*\"", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("flywheel-steel-iron-*", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("flywheel-steel-meteoriciron-*", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("""{ code: "material", states: ["wood", "stone", "iron", "meteoriciron", "steel"] }""", compactBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""{ code: "hub", states: ["iron", "meteoriciron", "steel"] }""", compactBlocktype, StringComparison.Ordinal);
         Assert.DoesNotContain("bronze", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("""states: ["wood", "stone""", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("*-stone-iron-*", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
@@ -79,8 +80,8 @@ public sealed class ReleaseContentTests
         Assert.Contains("""flywheelpower-full-steel-steelhub""", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("\"*-meteoriciron-meteoriciron-*\": {", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("\"*-steel-steel-*\": {", fullSizeBlocktype, StringComparison.Ordinal);
-        Assert.Contains("\"*-meteoriciron-*\": {", compactBlocktype, StringComparison.Ordinal);
-        Assert.Contains("\"*-steel-*\": {", compactBlocktype, StringComparison.Ordinal);
+        Assert.Contains("\"*-meteoriciron-steel-*\": {", compactBlocktype, StringComparison.Ordinal);
+        Assert.Contains("\"*-steel-steel-*\": {", compactBlocktype, StringComparison.Ordinal);
         Assert.True(CountOccurrences(fullSizeBlocktype, """metal: { base: "game:block/metal/ingot/meteoriciron" }""") >= 1);
         Assert.True(CountOccurrences(fullSizeBlocktype, """metal: { base: "game:block/metal/ingot/steel" }""") >= 1);
         Assert.True(CountOccurrences(compactBlocktype, """metal: { base: "game:block/metal/ingot/meteoriciron" }""") >= 1);
@@ -95,14 +96,27 @@ public sealed class ReleaseContentTests
         Assert.Contains("meteoriciron", activeLanguage, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("steel", activeLanguage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("blockinfo-shaft", activeLanguage, StringComparison.Ordinal);
-        Assert.Equal(9, FlywheelPowerModSystem.ReleasedRendererCodes.Length);
-        Assert.Equal(9, FlywheelPowerModSystem.ReleasedRendererCodes.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(23, FlywheelPowerModSystem.ReleasedRendererCodes.Length);
+        Assert.Equal(23, FlywheelPowerModSystem.ReleasedRendererCodes.Distinct(StringComparer.Ordinal).Count());
         Assert.All(
-            FlywheelPowerModSystem.ReleasedRendererCodes.Take(4),
+            FlywheelPowerModSystem.ReleasedRendererCodes.Take(10),
             rendererCode => Assert.Contains(rendererCode, fullSizeBlocktype, StringComparison.Ordinal));
         Assert.All(
-            FlywheelPowerModSystem.ReleasedRendererCodes.Skip(4),
+            FlywheelPowerModSystem.ReleasedRendererCodes.Skip(10),
             rendererCode => Assert.Contains(rendererCode, compactBlocktype, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void HubTierMustMeetOrExceedWheelTier()
+    {
+        Assert.True(FlywheelPowerModSystem.IsReleasedMaterialCombination("wood", "iron"));
+        Assert.True(FlywheelPowerModSystem.IsReleasedMaterialCombination("stone", "meteoriciron"));
+        Assert.True(FlywheelPowerModSystem.IsReleasedMaterialCombination("iron", "meteoriciron"));
+        Assert.True(FlywheelPowerModSystem.IsReleasedMaterialCombination("meteoriciron", "iron"));
+        Assert.True(FlywheelPowerModSystem.IsReleasedMaterialCombination("iron", "steel"));
+        Assert.True(FlywheelPowerModSystem.IsReleasedMaterialCombination("steel", "steel"));
+        Assert.False(FlywheelPowerModSystem.IsReleasedMaterialCombination("steel", "iron"));
+        Assert.False(FlywheelPowerModSystem.IsReleasedMaterialCombination("steel", "meteoriciron"));
     }
 
     [Fact]
@@ -158,6 +172,12 @@ public sealed class ReleaseContentTests
             .Single(element => element.GetProperty("name").GetString() == "Hub");
         JsonElement bearing = elements.EnumerateArray()
             .Single(element => element.GetProperty("name").GetString() == "BearingCollar");
+        JsonElement chalkFront = elements.EnumerateArray()
+            .Single(element => element.GetProperty("name").GetString() == "ChalkLineFront");
+        JsonElement chalkBack = elements.EnumerateArray()
+            .Single(element => element.GetProperty("name").GetString() == "ChalkLineBack");
+        JsonElement chalkRim = elements.EnumerateArray()
+            .Single(element => element.GetProperty("name").GetString() == "ChalkLineRim");
 
         double minY = discBands.Min(element => element.GetProperty("from")[1].GetDouble());
         double maxY = discBands.Max(element => element.GetProperty("to")[1].GetDouble());
@@ -173,6 +193,30 @@ public sealed class ReleaseContentTests
         Assert.Equal(4.32d, hub.GetProperty("to")[0].GetDouble() - hub.GetProperty("from")[0].GetDouble(), 2);
         Assert.Equal(6.08d, bearing.GetProperty("to")[1].GetDouble() - bearing.GetProperty("from")[1].GetDouble(), 2);
         Assert.Equal(4.8d, bearing.GetProperty("to")[0].GetDouble() - bearing.GetProperty("from")[0].GetDouble(), 2);
+        Assert.True(chalkFront.GetProperty("to")[2].GetDouble() > chalkRim.GetProperty("from")[2].GetDouble());
+        Assert.True(chalkBack.GetProperty("to")[2].GetDouble() > chalkRim.GetProperty("from")[2].GetDouble());
+        Assert.True(chalkRim.GetProperty("from")[0].GetDouble() <= chalkBack.GetProperty("to")[0].GetDouble());
+        Assert.True(chalkRim.GetProperty("to")[0].GetDouble() >= chalkFront.GetProperty("from")[0].GetDouble());
+    }
+
+    [Fact]
+    public void CompactInventoryPreviewMatchesPointNineTwoMeterRuntimeDiameter()
+    {
+        JsonElement[] elements = ReadShapeElements("compact-flywheel-wheel-coupled.json");
+        JsonElement[] ring = elements
+            .Where(element => element.GetProperty("name").GetString()!.StartsWith("PreviewRing", StringComparison.Ordinal))
+            .ToArray();
+
+        double minY = ring.Min(element => element.GetProperty("from")[1].GetDouble());
+        double maxY = ring.Max(element => element.GetProperty("to")[1].GetDouble());
+        double minZ = ring.Min(element => element.GetProperty("from")[2].GetDouble());
+        double maxZ = ring.Max(element => element.GetProperty("to")[2].GetDouble());
+        double minX = ring.Min(element => element.GetProperty("from")[0].GetDouble());
+        double maxX = ring.Max(element => element.GetProperty("to")[0].GetDouble());
+
+        Assert.Equal(14.72d, maxY - minY, 2);
+        Assert.Equal(14.72d, maxZ - minZ, 2);
+        Assert.Equal(5.12d, maxX - minX, 2);
     }
 
     [Fact]
@@ -201,10 +245,19 @@ public sealed class ReleaseContentTests
         Assert.Contains("RightGroundSleeper", fullNames);
         Assert.Contains("LeftBearingCap", fullNames);
         Assert.Contains("RightBearingCap", fullNames);
+        Assert.Contains("LeftFrontBrace", fullNames);
+        Assert.Contains("LeftRearBrace", fullNames);
+        Assert.Contains("RightFrontBrace", fullNames);
+        Assert.Contains("RightRearBrace", fullNames);
         Assert.Contains("LeftGreaseCup", fullNames);
         Assert.Contains("RightGreaseCup", fullNames);
         Assert.Contains("FrontLeftHoldDown", fullNames);
         Assert.Equal(-16d, fullElements.Min(element => element.GetProperty("from")[1].GetDouble()));
+        Assert.All(
+            fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("BearingCap", StringComparison.Ordinal)),
+            cap => Assert.All(
+                cap.GetProperty("faces").EnumerateObject(),
+                face => Assert.Equal("#wood", face.Value.GetProperty("texture").GetString())));
 
         JsonElement[] compactElements = ReadShapeElements("compact-flywheel-frame-horizontal.json");
         string[] compactNames = compactElements
@@ -216,6 +269,11 @@ public sealed class ReleaseContentTests
         Assert.Contains("RightBearingPost", compactNames);
         Assert.Contains("LeftGreaseCup", compactNames);
         Assert.Contains("RightGreaseCup", compactNames);
+        Assert.All(
+            compactElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("BearingCap", StringComparison.Ordinal)),
+            cap => Assert.All(
+                cap.GetProperty("faces").EnumerateObject(),
+                face => Assert.Equal("#wood", face.Value.GetProperty("texture").GetString())));
     }
 
     [Fact]

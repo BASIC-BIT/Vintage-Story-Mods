@@ -50,17 +50,17 @@
     {
       "name": "LeftBearingCap", "from": [1.0, 6.25, 3.75], "to": [5.75, 10.0, 12.25],
       "faces": {
-        "north": { "texture": "#metal", "uv": [0,0,4.75,3.75] }, "east": { "texture": "#metal", "uv": [0,0,8.5,3.75] },
-        "south": { "texture": "#metal", "uv": [0,0,4.75,3.75] }, "west": { "texture": "#metal", "uv": [0,0,8.5,3.75] },
-        "up": { "texture": "#metal", "uv": [0,0,4.75,8.5] }, "down": { "texture": "#metal", "uv": [0,0,4.75,8.5] }
+        "north": { "texture": "#wood", "uv": [0,0,4.75,3.75] }, "east": { "texture": "#wood", "uv": [0,0,8.5,3.75] },
+        "south": { "texture": "#wood", "uv": [0,0,4.75,3.75] }, "west": { "texture": "#wood", "uv": [0,0,8.5,3.75] },
+        "up": { "texture": "#wood", "uv": [0,0,4.75,8.5] }, "down": { "texture": "#wood", "uv": [0,0,4.75,8.5] }
       }
     },
     {
       "name": "RightBearingCap", "from": [10.25, 6.25, 3.75], "to": [15.0, 10.0, 12.25],
       "faces": {
-        "north": { "texture": "#metal", "uv": [0,0,4.75,3.75] }, "east": { "texture": "#metal", "uv": [0,0,8.5,3.75] },
-        "south": { "texture": "#metal", "uv": [0,0,4.75,3.75] }, "west": { "texture": "#metal", "uv": [0,0,8.5,3.75] },
-        "up": { "texture": "#metal", "uv": [0,0,4.75,8.5] }, "down": { "texture": "#metal", "uv": [0,0,4.75,8.5] }
+        "north": { "texture": "#wood", "uv": [0,0,4.75,3.75] }, "east": { "texture": "#wood", "uv": [0,0,8.5,3.75] },
+        "south": { "texture": "#wood", "uv": [0,0,4.75,3.75] }, "west": { "texture": "#wood", "uv": [0,0,8.5,3.75] },
+        "up": { "texture": "#wood", "uv": [0,0,4.75,8.5] }, "down": { "texture": "#wood", "uv": [0,0,4.75,8.5] }
       }
     },
     {

@@ -16,6 +16,7 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
     private const float AxleMaxX = 1.25f;
     private const float TextureMeters = 0.72f;
     private const float ChalkRaise = 0.006f;
+    private const float ChalkEdgeOverlap = 0.012f;
     private const float DegToRad = MathF.PI / 180f;
 
     private CustomMeshDataPartFloat matrixAndLightFloats;
@@ -151,9 +152,9 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
             AddAnnularCylinder(mesh, metalTex, new(0f, spec.AxleRadius, spec.AxleMinX, spec.AxleMaxX, 32, 2, IncludeInnerSide: false));
         }
 
-        AddChalkLine(mesh, chalkTex, wheelMaxX + ChalkRaise, spec.WheelOuterRadius * 0.18f, spec.WheelOuterRadius, spec.ChalkHalfWidth, frontFace: true);
-        AddChalkLine(mesh, chalkTex, wheelMinX - ChalkRaise, spec.WheelOuterRadius * 0.18f, spec.WheelOuterRadius, spec.ChalkHalfWidth, frontFace: false);
-        AddChalkRimLine(mesh, chalkTex, spec.WheelOuterRadius + ChalkRaise, wheelMinX, wheelMaxX, spec.ChalkHalfWidth);
+        AddChalkLine(mesh, chalkTex, wheelMaxX + ChalkRaise, spec.WheelOuterRadius * 0.18f, spec.WheelOuterRadius + ChalkEdgeOverlap, spec.ChalkHalfWidth, frontFace: true);
+        AddChalkLine(mesh, chalkTex, wheelMinX - ChalkRaise, spec.WheelOuterRadius * 0.18f, spec.WheelOuterRadius + ChalkEdgeOverlap, spec.ChalkHalfWidth, frontFace: false);
+        AddChalkRimLine(mesh, chalkTex, spec.WheelOuterRadius + ChalkRaise, wheelMinX - ChalkEdgeOverlap, wheelMaxX + ChalkEdgeOverlap, spec.ChalkHalfWidth);
         return mesh;
     }
 

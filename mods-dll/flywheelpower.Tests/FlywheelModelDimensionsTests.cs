@@ -23,6 +23,13 @@ public sealed class FlywheelModelDimensionsTests
     }
 
     [Fact]
+    public void CompactWheelUsesRequestedPointNineTwoMeterDiameter()
+    {
+        Assert.Equal(0.92f, FlywheelModelDimensions.CompactWheelOuterRadius * 2f);
+        Assert.True(FlywheelModelDimensions.CompactWheelOuterRadius < 0.5f);
+    }
+
+    [Fact]
     public void BearingRingCloselyFitsAxleAndStepsIntoHub()
     {
         Assert.True(FlywheelModelDimensions.ShaftClearanceRadius > FlywheelModelDimensions.AxleRadius);

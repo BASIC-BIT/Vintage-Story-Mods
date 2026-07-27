@@ -96,6 +96,20 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         return PassiveResistance;
     }
 
+    public override void SetPropagationDirection(MechPowerPath path)
+    {
+        BlockFacing nextDirection = path?.NetworkDir();
+        bool directionRebased = FlywheelDirectionRebase.IsOpposite(propagationDir, nextDirection);
+
+        base.SetPropagationDirection(path);
+
+        if (directionRebased)
+        {
+            (flywheelSpeed, lastNetworkSpeed, lastTransferTorque, flywheelAngleRad) =
+                FlywheelDirectionRebase.Rebase(flywheelSpeed, lastNetworkSpeed, lastTransferTorque, flywheelAngleRad);
+        }
+    }
+
     public override float GetTorque(long tick, float speed, out float resistance)
     {
         float dt = GetDeltaTime(tick);
@@ -154,6 +168,7 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
 
     public override void FromTreeAttributes(ITreeAttribute tree, IWorldAccessor worldAccessForResolve)
     {
+        BlockFacing previousDirection = propagationDir;
         flywheelSpeed = tree.GetFloat("flywheelSpeed");
         lastNetworkSpeed = tree.GetFloat("lastNetworkSpeed");
         lastTransferTorque = tree.GetFloat("lastTransferTorque");
@@ -161,6 +176,13 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         lastResistance = tree.GetFloat("lastResistance");
         lastLossTorque = tree.GetFloat("lastLossTorque");
         base.FromTreeAttributes(tree, worldAccessForResolve);
+
+        // Speeds arrive already signed in the server's current direction basis.
+        // Mirror only the local render phase when the serialized basis reverses.
+        if (FlywheelDirectionRebase.IsOpposite(previousDirection, propagationDir))
+        {
+            flywheelAngleRad = FlywheelDirectionRebase.MirrorAngle(flywheelAngleRad);
+        }
     }
 
     public override void ToTreeAttributes(ITreeAttribute tree)

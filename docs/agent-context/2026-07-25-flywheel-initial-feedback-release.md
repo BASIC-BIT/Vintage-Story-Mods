@@ -191,19 +191,41 @@ Matching-hub, comparison-info, and stand-render correction, July 27, 2026:
 - Visual confirmation of the newly registered stand, matching advanced hubs, tooltip values, and the remaining five cards is
   still required. Package and log evidence do not count as visual approval.
 
-In-game cards remaining after the interrupted attempt:
+Ordered hubs, model-review tooling, and direction-rebase candidate, July 27, 2026:
+
+- Full-size and compact constructions now expose independently selected iron, meteoric-iron, or steel hubs. The hub must
+  meet or exceed the wheel tier; iron and meteoric iron are equivalent for this rule, while steel wheels require steel hubs.
+  This produces 23 intentional construction choices rather than the unrestricted 27-choice Cartesian product.
+- The compact wheel radius increased from 0.38 to 0.46 block. The full-size support gained mirrored cross-bracing that
+  reaches the wooden bearing housings. The face and rim registration marks overlap slightly across the wheel edge so texture
+  filtering cannot expose a gap.
+- A repository `vintage-story-model-renderer` skill now produces deterministic front, back, left, right, top, bottom, and
+  isometric images plus bounds and source-hash metadata from the authored shapes and procedural dimension authority. This is
+  automated geometry evidence only, not in-game or human visual approval.
+- Flywheel signed speed, last network speed, torque, and render phase now rebase together when vanilla network discovery
+  reverses the propagation basis. This preserves stored energy and avoids treating an unchanged rotating flywheel as suddenly
+  counter-rotating after a connect or disconnect operation.
+- The full solution builds with four pre-existing The BASICs analyzer warnings and no errors. The BASICs tests pass 488/488,
+  DimensionLib tests pass 58/58, Flywheel Power tests pass 32/32, all six whitespace checks pass, the Lizard complexity gate
+  passes, the agent-tooling index passes, and `git diff --check` reports no errors.
+- The exact 15-entry package is 52,818 bytes and has SHA-256
+  `43AF076D7CE344B4727604D6EC4A3307B0C0C0CD9847EE1D0CCD2820C25B0DD8`. It contains only the DLL, PDB, metadata, README,
+  active blocktypes/localization, two active flywheel models, the common wooden axle, and four stand shapes. It has not yet
+  been installed or smoke-tested in-game.
+
+In-game cards remaining:
 
 1. **Proportions, stand, and variant appearance** (P0)
-   - Config: Creative world, all nine released flywheels.
+   - Config: Creative world, representative full-size and compact choices covering all wheel and hub materials.
    - Do: Place full-size and compact examples and view them straight on, at roughly 45 degrees, and directly from the side.
-   - Expect: The full disc spans 1.6 blocks inside the 3x3 plane with deliberate edge clearance, a close-fitting bearing collar, and a thin 0.1875-block profile. The two-bearing timber stand visibly reaches the ground and reads as a braced, bolted support rather than a decorative floating frame. Wood, stone, iron, meteoric iron, and steel textures remain visually distinct where released; meteoric-iron and steel hubs match their wheels, while every compact axle is wood.
-   - Watch for: A wheel that nearly fills the footprint, a bulky central drum, an axle gap, wheel/frame clipping, floating sleepers, missing stand components, material variants sharing the wrong texture, or an edge-on profile that reads as a thick cylinder.
+   - Expect: The full disc spans 1.6 blocks inside the 3x3 plane with deliberate edge clearance, a close-fitting bearing collar, and a thin 0.1875-block profile. The compact disc spans 0.92 block. The two-bearing timber stand visibly reaches the ground, its four braces meet the wooden bearing housings, and it reads as a supported machine rather than a decorative floating frame. Wood, stone, iron, meteoric iron, and steel textures remain visually distinct; selected hub material is independently visible; every axle is wood; the red face and rim registration marks meet without a bright or dark gap.
+   - Watch for: A wheel that nearly fills the footprint, a bulky central drum, an axle gap, wheel/frame clipping, disconnected braces, floating sleepers, missing stand components, material variants sharing the wrong texture, a split registration mark, or an edge-on profile that reads as a thick cylinder.
 
 2. **Rotation and axle alignment** (P0)
    - Config: Creative world with a powered mechanical network.
-   - Do: Place full-size flywheels on X, Y, and Z axes, connect each to mechanical power, and observe rotation from front and side.
-   - Expect: Each wheel rotates around its axle without orbiting, wobbling, translating, or separating from the hub.
-   - Watch for: Wrong rotation axis, reversed model orientation, off-center pivots, or axle/frame misalignment.
+   - Do: Place full-size flywheels on X, Y, and Z axes, connect each to mechanical power, and observe rotation from front and side. On one rig, connect and disconnect a machine or axle from the opposite side while the flywheel is moving.
+   - Expect: Each wheel rotates around its axle without orbiting, wobbling, translating, or separating from the hub. Network rebuilding may rebase the displayed sign, but the wheel must not physically snap into the opposite direction or report a large new slip solely because topology changed.
+   - Watch for: Wrong rotation axis, reversed model orientation, off-center pivots, axle/frame misalignment, or sudden counter-rotation after a connection change.
 
 3. **Foundation, multiblock selection, and removal** (P0)
    - Config: Any full-size flywheel.
@@ -214,8 +236,8 @@ In-game cards remaining after the interrupted attempt:
 4. **Creative and handbook surface** (P1)
    - Config: Creative mode and handbook/search available.
    - Do: Search for `flywheel` and `slip transmission`, and inspect relevant creative tabs.
-   - Expect: Nine active choices are discoverable: full-size wood and iron with iron hubs, full-size meteoric iron and steel with matching hubs, plus compact wood, stone, iron, meteoric iron, and steel. Hovered items and placed blocks show rotating mass and effective inertia. No full-size stone flywheel, Slip Transmission entry, item, recipe, or placeable block appears.
-   - Watch for: Raw localization keys, missing physical comparison lines, freely mixed hub combinations, legacy generic flywheel aliases, or hidden transmission variants.
+   - Expect: Twenty-three active choices are discoverable. Wood and compact stone accept all three hubs; iron and meteoric-iron wheels accept all three hubs; steel wheels expose only steel hubs. Hovered items and placed blocks show rotating mass and effective inertia. No full-size stone flywheel, weak-hub steel-wheel combination, Slip Transmission entry, item, recipe, or placeable block appears.
+   - Watch for: Raw localization keys, missing physical comparison lines, a renderer crash, incorrect hub texture, steel wheels with weaker hubs, legacy generic flywheel aliases, or hidden transmission variants.
 
 5. **Save/reload behavior** (P0)
    - Config: A placed and mechanically connected full-size flywheel.
@@ -227,11 +249,29 @@ In-game cards remaining after the interrupted attempt:
 
 - Replace the slip transmission's cross-network torque model before re-registering any content.
 - Implement real inertial contribution for keyed flywheels before restoring their blocktypes.
-- Consider additional wheel materials and hub combinations only after the nine-construction renderer-group approach and material progression receive feedback.
+- Consider additional wheel materials only after the ordered-hub renderer grouping and material progression receive feedback.
 - Commission richer material-specific wheel/frame models and textures if the initial silhouette and construction choices test well.
-- Design survival recipes and material progression after feedback establishes which variants are worth keeping.
+- Design survival recipes and material progression after feedback establishes which variants are worth keeping. Include animal
+  fat as bearing lubricant and evaluate a filled 3x3x1 casting-mold workflow for the very large metal constructions rather
+  than pretending they fit a normal grid recipe.
 - Balance inertia, coupling, losses, safe speed, and block info against real windmill/machine rigs.
 - Add sound, wear, heat, and failure behavior only after the basic storage loop is understandable.
+
+### Balance harness for follow-up tuning
+
+Use a reproducible creative test rig before changing safe speed:
+
+1. Windmill rotor with one, two, and four sail sets feeding a large wooden gear.
+2. Record slow-side steady speed and spin-up time with no flywheel.
+3. Put the flywheel on the large gear's 5.5x fast side; record steady speed, time to 25/50/75 percent of safe energy, and
+   coast-down time.
+4. Add one helve hammer, then two, and record minimum speed during a work cycle plus recovery time.
+5. Repeat with representative wood/iron, iron/steel, and steel/steel full-size constructions and one compact construction.
+6. While moving, disconnect and reconnect the consumer on each side of the flywheel and verify direction continuity.
+
+The current 3.5 rps full-size safe speed is intentionally close to the approximately 3.3 rps expected from a vanilla
+0.6-rps windmill through the 5.5x large-gear ratio. More sails mostly add torque and shorten spin-up; a slow-side rig can show
+only a few percent stored energy because the tooltip reports the square of the speed ratio.
 
 ### Minimal later visual-asset commission
 
@@ -240,8 +280,9 @@ If feedback supports the curated release set, commission one coherent material p
 - Four drop-in full-size appearances: timber construction with visible planking/banding, cast or fabricated iron, meteoric
   iron with restrained crystalline differentiation, and worked steel. Add a compact segmented-stone appearance with iron
   restraint, but do not restore a monolithic full-size stone slab.
-- Preserve the exact `(8, 8, 8)` model center, rotation axis, 1.6-block wheel diameter, 0.1875-block disc depth, stepped iron
-  hub/bearing center, axle attachment semantics, and existing 3x3x1 collision/selection footprint.
+- Preserve the exact `(8, 8, 8)` model center, rotation axis, 1.6-block full-size diameter, 0.92-block compact diameter,
+  0.1875-block full-size disc depth, stepped hub/bearing center, axle attachment semantics, and existing collision/selection
+  footprints.
 - Deliver Vintage Story shape JSON plus atlas-ready textures and front, three-quarter, and side previews for each construction
   and its compact counterpart.
 - Keep the bearing collar and wooden axle visually consistent while giving the meteoric-iron and steel hubs restrained

@@ -30,11 +30,29 @@
     "*-wood-iron-*": {
       mechanicalPower: { renderer: "flywheelpower-full-wood-ironhub" }
     },
+    "*-wood-meteoriciron-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-wood-meteoricironhub" }
+    },
+    "*-wood-steel-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-wood-steelhub" }
+    },
     "*-iron-iron-*": {
       mechanicalPower: { renderer: "flywheelpower-full-iron-ironhub" }
     },
+    "*-iron-meteoriciron-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-iron-meteoricironhub" }
+    },
+    "*-iron-steel-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-iron-steelhub" }
+    },
+    "*-meteoriciron-iron-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-meteoriciron-ironhub" }
+    },
     "*-meteoriciron-meteoriciron-*": {
       mechanicalPower: { renderer: "flywheelpower-full-meteoriciron-meteoricironhub" }
+    },
+    "*-meteoriciron-steel-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-meteoriciron-steelhub" }
     },
     "*-steel-steel-*": {
       mechanicalPower: { renderer: "flywheelpower-full-steel-steelhub" }
@@ -46,12 +64,6 @@
     { code: "rotation", states: ["ud", "ns", "we"] }
   ],
   skipVariants: [
-    "flywheel-wood-meteoriciron-*",
-    "flywheel-wood-steel-*",
-    "flywheel-iron-meteoriciron-*",
-    "flywheel-iron-steel-*",
-    "flywheel-meteoriciron-iron-*",
-    "flywheel-meteoriciron-steel-*",
     "flywheel-steel-iron-*",
     "flywheel-steel-meteoriciron-*"
   ],
@@ -84,8 +96,38 @@
       bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
       wood: { base: "game:block/wood/planks/generic" }
     },
+    "*-wood-meteoriciron-*": {
+      wheel: { base: "game:block/wood/planks/generic" },
+      metal: { base: "game:block/metal/ingot/meteoriciron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-wood-steel-*": {
+      wheel: { base: "game:block/wood/planks/generic" },
+      metal: { base: "game:block/metal/ingot/steel" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
     "*-iron-iron-*": {
       wheel: { base: "game:block/metal/ingot/iron" },
+      metal: { base: "game:block/metal/ingot/iron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-iron-meteoriciron-*": {
+      wheel: { base: "game:block/metal/ingot/iron" },
+      metal: { base: "game:block/metal/ingot/meteoriciron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-iron-steel-*": {
+      wheel: { base: "game:block/metal/ingot/iron" },
+      metal: { base: "game:block/metal/ingot/steel" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-meteoriciron-iron-*": {
+      wheel: { base: "game:block/metal/ingot/meteoriciron" },
       metal: { base: "game:block/metal/ingot/iron" },
       bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
       wood: { base: "game:block/wood/planks/generic" }
@@ -93,6 +135,12 @@
     "*-meteoriciron-meteoriciron-*": {
       wheel: { base: "game:block/metal/ingot/meteoriciron" },
       metal: { base: "game:block/metal/ingot/meteoriciron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-meteoriciron-steel-*": {
+      wheel: { base: "game:block/metal/ingot/meteoriciron" },
+      metal: { base: "game:block/metal/ingot/steel" },
       bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
       wood: { base: "game:block/wood/planks/generic" }
     },

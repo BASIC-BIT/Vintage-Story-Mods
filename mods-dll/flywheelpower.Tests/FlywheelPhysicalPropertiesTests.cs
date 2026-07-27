@@ -44,4 +44,14 @@ public sealed class FlywheelPhysicalPropertiesTests
         Assert.True(compactIron.RotatingMassKg < fullIron.RotatingMassKg);
         Assert.True(compactIron.EffectiveInertia < fullIron.EffectiveInertia);
     }
+
+    [Fact]
+    public void IndependentlySelectedHubMaterialChangesPhysicalProfile()
+    {
+        FlywheelPhysicalProfile ironHub = FlywheelPhysicalProperties.ForVariant(false, "iron", "iron");
+        FlywheelPhysicalProfile steelHub = FlywheelPhysicalProperties.ForVariant(false, "iron", "steel");
+
+        Assert.NotEqual(steelHub.RotatingMassKg, ironHub.RotatingMassKg);
+        Assert.NotEqual(steelHub.EffectiveInertia, ironHub.EffectiveInertia);
+    }
 }

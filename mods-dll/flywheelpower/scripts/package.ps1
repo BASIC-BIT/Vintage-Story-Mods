@@ -76,16 +76,22 @@ $expectedEntries = @(
     'modinfo.json',
     'README.md'
 )
+$hubMaterials = @('iron', 'meteoriciron', 'steel')
 $releasedRendererCodes = @(
-    'flywheelpower-full-wood-ironhub',
-    'flywheelpower-full-iron-ironhub',
-    'flywheelpower-full-meteoriciron-meteoricironhub',
-    'flywheelpower-full-steel-steelhub',
-    'flywheelpower-compact-wood',
-    'flywheelpower-compact-stone',
-    'flywheelpower-compact-iron',
-    'flywheelpower-compact-meteoriciron',
-    'flywheelpower-compact-steel'
+    foreach ($size in @(
+        @{ Name = 'full'; Wheels = @('wood', 'iron', 'meteoriciron', 'steel') },
+        @{ Name = 'compact'; Wheels = @('wood', 'stone', 'iron', 'meteoriciron', 'steel') }
+    )) {
+        foreach ($wheel in $size.Wheels) {
+            foreach ($hub in $hubMaterials) {
+                $wheelTier = if ($wheel -in @('wood', 'stone')) { 0 } elseif ($wheel -in @('iron', 'meteoriciron')) { 1 } else { 2 }
+                $hubTier = if ($hub -in @('iron', 'meteoriciron')) { 1 } else { 2 }
+                if ($hubTier -ge $wheelTier) {
+                    "flywheelpower-$($size.Name)-$wheel-$($hub)hub"
+                }
+            }
+        }
+    }
 )
 
 $archive = [System.IO.Compression.ZipFile]::OpenRead($zipFile)
