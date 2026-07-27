@@ -210,8 +210,15 @@ Ordered hubs, model-review tooling, and direction-rebase candidate, July 27, 202
   passes, the agent-tooling index passes, and `git diff --check` reports no errors.
 - The exact 15-entry package is 52,818 bytes and has SHA-256
   `43AF076D7CE344B4727604D6EC4A3307B0C0C0CD9847EE1D0CCD2820C25B0DD8`. It contains only the DLL, PDB, metadata, README,
-  active blocktypes/localization, two active flywheel models, the common wooden axle, and four stand shapes. It has not yet
-  been installed or smoke-tested in-game.
+  active blocktypes/localization, two active flywheel models, the common wooden axle, and four stand shapes.
+- Both dedicated QA profiles contain that exact package hash. A copy uploaded to the disposable server by SFTP was downloaded
+  again and matched the same hash and 52,818-byte size. After restart, the Vintage Story 1.22.2 server loaded
+  `FlywheelPower.FlywheelPowerModSystem` and reached `WorldReady` without a Flywheel startup exception. Profile2 then joined
+  the server with the exact package and finalized the level without a new Flywheel startup or renderer-registration error.
+- The two clients remain available for the five in-game cards below. No observation-level interaction was performed after
+  the guarded attempt to enable the installed Agent Control mod was rejected before execution; no focus or input reached
+  either client. The owner can enable Agent Control in Profile2 with `Ctrl+Alt+F8`, or explicitly authorize that single
+  focus-and-enable action, before automated interaction resumes. Startup/package evidence does not pass the visual cards.
 
 In-game cards remaining:
 
