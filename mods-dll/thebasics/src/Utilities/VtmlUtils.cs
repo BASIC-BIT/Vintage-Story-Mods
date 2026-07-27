@@ -2,6 +2,7 @@ namespace thebasics.Utilities;
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Vintagestory.API.Common;
@@ -163,6 +164,152 @@ public static class VtmlUtils
     private static string BuildRawTag(string slash, string tagName, string attributes)
     {
         return $"<{slash}{tagName.ToLowerInvariant()}{attributes}>";
+    }
+
+    /// <summary>
+    /// Inserts real newlines inside plain-text tokens that render wider than <paramref name="maxWidthPx"/>.
+    /// </summary>
+    /// <remarks>
+    /// Vintage Story's line breaker (<c>TextDrawUtil.getNextWord</c>) only treats space, tab, CR and LF
+    /// as break opportunities. <c>TextDrawUtil.Lineize</c> does trim an over-long token to fit, but only
+    /// when that token is the first thing on a line (it requires <c>val.Length == 0 &amp;&amp;
+    /// startOffsetX == 0</c>). A long unspaced token that follows other text is therefore appended whole
+    /// and clipped by the Cairo clip rectangle. Splitting such tokens before the text reaches the engine
+    /// means the engine only ever sees tokens that fit, so its ordinary word wrapping handles them.
+    ///
+    /// Zero-width space, soft hyphen and word joiner do not work here: they are not break opportunities
+    /// for <c>getNextWord</c>, so they only add an invisible glyph.
+    ///
+    /// Tags are copied verbatim and act as token boundaries, so nothing is ever inserted inside markup.
+    ///
+    /// Widths are measured on the decoded text. <c>VtmlParser.Tokenize</c> renders <c>&amp;lt;</c>,
+    /// <c>&amp;gt;</c> and <c>&amp;nbsp;</c> as one character each, so measuring the source spelling
+    /// would count four or six glyphs where one is drawn and break the line early. Entities the engine
+    /// does not decode (numeric ones, <c>&amp;amp;</c>) are drawn literally and so measured literally.
+    ///
+    /// Locales whose line break behaviour is <see cref="Vintagestory.API.Client.EnumLinebreakBehavior.AfterCharacter"/>
+    /// (ja, ko) already wrap mid-token in the engine and should not be passed through here.
+    /// </remarks>
+    /// <param name="vtml">VTML source.</param>
+    /// <param name="measureWidthPx">Measures the rendered width of a plain-text run, in pixels.</param>
+    /// <param name="maxWidthPx">Widest a single token may render.</param>
+    public static string BreakLongTokens(string vtml, System.Func<string, double> measureWidthPx, double maxWidthPx)
+    {
+        if (string.IsNullOrEmpty(vtml) || measureWidthPx == null || maxWidthPx <= 0)
+        {
+            return vtml;
+        }
+
+        var output = new StringBuilder(vtml.Length + 16);
+        var token = new StringBuilder();
+        var index = 0;
+
+        while (index < vtml.Length)
+        {
+            var c = vtml[index];
+            if (c != '<' && !IsLineBreakOpportunity(c))
+            {
+                token.Append(c);
+                index++;
+                continue;
+            }
+
+            AppendBrokenToken(output, token, measureWidthPx, maxWidthPx);
+            index += CopyTokenSeparator(output, vtml, index);
+        }
+
+        AppendBrokenToken(output, token, measureWidthPx, maxWidthPx);
+        return output.ToString();
+    }
+
+    /// <summary>
+    /// The only characters <c>TextDrawUtil.getNextWord</c> treats as break opportunities.
+    /// </summary>
+    private static bool IsLineBreakOpportunity(char c)
+    {
+        return c is ' ' or '\t' or '\r' or '\n';
+    }
+
+    /// <summary>
+    /// Copies a whole tag, or a single break character, verbatim. Returns the number of characters consumed.
+    /// </summary>
+    private static int CopyTokenSeparator(StringBuilder output, string vtml, int index)
+    {
+        if (vtml[index] != '<')
+        {
+            output.Append(vtml[index]);
+            return 1;
+        }
+
+        // Unterminated tag: copy the remainder untouched rather than guess where it ends.
+        var tagEnd = vtml.IndexOf('>', index);
+        var length = tagEnd < 0 ? vtml.Length - index : tagEnd - index + 1;
+        output.Append(vtml, index, length);
+        return length;
+    }
+
+    private static void AppendBrokenToken(StringBuilder output, StringBuilder token, System.Func<string, double> measureWidthPx, double maxWidthPx)
+    {
+        if (token.Length == 0)
+        {
+            return;
+        }
+
+        var text = token.ToString();
+        token.Clear();
+
+        // UnescapeVtml decodes exactly what VtmlParser decodes, so this measures what gets drawn.
+        if (measureWidthPx(UnescapeVtml(text)) <= maxWidthPx)
+        {
+            output.Append(text);
+            return;
+        }
+
+        var chunk = new StringBuilder();
+        var index = 0;
+        while (index < text.Length)
+        {
+            var unit = text.Substring(index, GetAtomicUnitLength(text, index));
+            if (chunk.Length > 0 && measureWidthPx(UnescapeVtml(chunk.ToString() + unit)) > maxWidthPx)
+            {
+                output.Append(chunk).Append('\n');
+                chunk.Clear();
+            }
+
+            chunk.Append(unit);
+            index += unit.Length;
+        }
+
+        output.Append(chunk);
+    }
+
+    /// <summary>
+    /// Length of the smallest unit at <paramref name="index"/> that must not be split.
+    /// </summary>
+    private static int GetAtomicUnitLength(string text, int index)
+    {
+        var c = text[index];
+
+        // VtmlParser decodes &lt; &gt; &nbsp; after we run, so an entity must stay intact.
+        if (c == '&')
+        {
+            var limit = Math.Min(text.Length, index + 10);
+            for (var i = index + 1; i < limit; i++)
+            {
+                if (text[i] == ';')
+                {
+                    return i - index + 1;
+                }
+
+                if (!char.IsLetterOrDigit(text[i]) && text[i] != '#')
+                {
+                    break;
+                }
+            }
+        }
+
+        // Grapheme clusters, so a split never strands a combining mark or half a surrogate pair.
+        return StringInfo.GetNextTextElementLength(text, index);
     }
 
     /// <summary>
