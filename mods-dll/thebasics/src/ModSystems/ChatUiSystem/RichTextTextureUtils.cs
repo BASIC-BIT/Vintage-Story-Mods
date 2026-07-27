@@ -13,6 +13,10 @@ internal static class RichTextTextureUtils
     private const int LayoutSlackPx = 2;
     private const int MeasureHeightPx = 600;
 
+    // Keeps pre-split tokens clear of the engine's ">= available width" flush test, which
+    // compares against a flow path width that rounds slightly differently to our own.
+    private const int WrapSafetyPx = 4;
+
     /// <summary>
     /// Renders VTML into a Cairo texture, including &lt;icon&gt; tags.
     /// Returns null if rendering fails.
@@ -64,6 +68,15 @@ internal static class RichTextTextureUtils
             var guiScale = RuntimeEnv.GUIScale > 0 ? RuntimeEnv.GUIScale : 1;
             var maxTextWidthAtScalePx = GetScaledLengthPx(maxTextWidthPx, guiScale);
             var measureHeightAtScalePx = GetScaledLengthPx(MeasureHeightPx, guiScale);
+
+            // VS clips, rather than wraps, a token wider than the box unless that token happens to
+            // start a line. Split those tokens up front so the engine only ever wraps tokens that fit.
+            // ponytail: measured with the base font, so a token inside a <font size=...> tag that
+            // enlarges text can still overflow. Measure per component if that ever shows up.
+            vtml = VtmlUtils.BreakLongTokens(
+                vtml,
+                text => baseFont.GetTextExtents(text).Width,
+                maxTextWidthAtScalePx - GetScaledLengthPx(WrapSafetyPx, guiScale));
 
             // Pass 1: measure at max width to get actual text dimensions.
             var measureComps = VtmlUtil.Richtextify(capi, vtml, baseFont);
