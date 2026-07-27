@@ -396,7 +396,14 @@ public class HomeSpawnSystem : BaseBasicModSystem
             return Error("thebasics:home-spawn-error-no-safe-top", "no-safe-top");
         }
 
-        return BeginPlayerTeleport(player, GetTeleportationConfig().TopWarmupSeconds, "top", p => ExecuteTopTeleport(p, location),
+        var requireTemporalGear = GetTeleportationConfig().TopRequireTemporalGear;
+        var gearError = TryValidateTemporalGearForTeleport(player, requireTemporalGear, "top", "top");
+        if (gearError != null)
+        {
+            return gearError;
+        }
+
+        return BeginPlayerTeleport(player, GetTeleportationConfig().TopWarmupSeconds, "top", p => ExecuteTopTeleport(p, location, requireTemporalGear),
             (p, reason) => TrackCancelledTeleport("top", "top", reason));
     }
 
@@ -427,7 +434,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
             return cooldownError;
         }
 
-        var gearError = TryValidateTemporalGearForTeleport(player, GetTeleportationConfig().BackRequireTemporalGear, "back", "back");
+        var gearError = TryValidateTemporalGearForTeleport(player, "back", "back");
         if (gearError != null)
         {
             return gearError;
@@ -484,8 +491,14 @@ public class HomeSpawnSystem : BaseBasicModSystem
         return Success(Lang.Get("thebasics:home-spawn-success-stuck-teleported"));
     }
 
-    private static TextCommandResult ExecuteTopTeleport(IServerPlayer player, HomeSpawnLocation location)
+    private static TextCommandResult ExecuteTopTeleport(IServerPlayer player, HomeSpawnLocation location, bool requireTemporalGear)
     {
+        var gearError = TryConsumeTemporalGearForTeleport(player, requireTemporalGear, "top", "top");
+        if (gearError != null)
+        {
+            return gearError;
+        }
+
         Teleport(player, location);
         MarkCooldown(player, TopCooldownModDataKey);
 
@@ -497,7 +510,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
     private TextCommandResult ExecuteBackTeleport(IServerPlayer player, HomeSpawnLocation location)
     {
-        var gearError = TryConsumeTemporalGearForTeleport(player, GetTeleportationConfig().BackRequireTemporalGear, "back", "back");
+        var gearError = TryConsumeTemporalGearForTeleport(player, "back", "back");
         if (gearError != null)
         {
             return gearError;
@@ -673,17 +686,16 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
     private TextCommandResult TryValidateTemporalGearForTeleport(IServerPlayer player, string commandName, string featureAction)
     {
-        return TryValidateTemporalGearForTeleport(player, Config.HomeSpawnRequireTemporalGear, commandName, featureAction);
+        return TryValidateTemporalGearForTeleport(player, RequiresTemporalGearForCommand(Config, commandName), commandName, featureAction);
     }
 
     private static TextCommandResult TryValidateTemporalGearForTeleport(IServerPlayer player, bool requireTemporalGear, string commandName, string featureAction)
     {
-        if (!requireTemporalGear)
-        {
-            return null;
-        }
-
-        if (TemporalGearUtil.IsPlayerHoldingTemporalGear(player))
+        var requirement = new TeleportGearRequirement(
+            requireTemporalGear,
+            () => TemporalGearUtil.IsPlayerHoldingTemporalGear(player),
+            () => TemporalGearUtil.TryConsumeTemporalGear(player));
+        if (requirement.CanBegin())
         {
             return null;
         }
@@ -695,17 +707,16 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
     private TextCommandResult TryConsumeTemporalGearForTeleport(IServerPlayer player, string commandName, string featureAction)
     {
-        return TryConsumeTemporalGearForTeleport(player, Config.HomeSpawnRequireTemporalGear, commandName, featureAction);
+        return TryConsumeTemporalGearForTeleport(player, RequiresTemporalGearForCommand(Config, commandName), commandName, featureAction);
     }
 
     private static TextCommandResult TryConsumeTemporalGearForTeleport(IServerPlayer player, bool requireTemporalGear, string commandName, string featureAction)
     {
-        if (!requireTemporalGear)
-        {
-            return null;
-        }
-
-        if (!TemporalGearUtil.TryConsumeTemporalGear(player))
+        var requirement = new TeleportGearRequirement(
+            requireTemporalGear,
+            () => TemporalGearUtil.IsPlayerHoldingTemporalGear(player),
+            () => TemporalGearUtil.TryConsumeTemporalGear(player));
+        if (!requirement.TryPayOnCompletion())
         {
             AnalyticsService.TrackCommandUsed(commandName, false, "consume_gear_failed");
             AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "consume_gear_failed");
@@ -713,6 +724,23 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         return null;
+    }
+
+    internal static bool RequiresTemporalGearForCommand(ModConfig config, string commandName)
+    {
+        if (config == null)
+        {
+            return false;
+        }
+
+        config.InitializeDefaultsIfNeeded();
+        return commandName switch
+        {
+            "home" or "spawn" => config.HomeSpawnRequireTemporalGear,
+            "top" => config.Teleportation.TopRequireTemporalGear,
+            "back" => config.Teleportation.BackRequireTemporalGear,
+            _ => false
+        };
     }
 
     private static TextCommandResult TryCheckCooldown(IServerPlayer player, string modDataKey, int cooldownSeconds, string commandName, string featureAction)

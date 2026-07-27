@@ -72,19 +72,22 @@ public class TeleportationConfig
     public bool BackRequireTemporalGear { get; set; }
 
     [ProtoMember(23)]
-    public bool RegisterHomeCommands { get; set; } = true;
+    public bool RegisterHomeCommands { get; set; }
 
     [ProtoMember(24)]
-    public bool RegisterSpawnCommands { get; set; } = true;
+    public bool RegisterSpawnCommands { get; set; }
 
     [ProtoMember(25)]
-    public bool RegisterStuckCommand { get; set; } = true;
+    public bool RegisterStuckCommand { get; set; }
 
     [ProtoMember(26)]
-    public bool RegisterTopCommand { get; set; } = true;
+    public bool RegisterTopCommand { get; set; }
 
     [ProtoMember(27)]
-    public bool RegisterBackCommand { get; set; } = true;
+    public bool RegisterBackCommand { get; set; }
+
+    [ProtoMember(28)]
+    public bool TopRequireTemporalGear { get; set; }
 
     public void InitializeDefaultsIfNeeded()
     {

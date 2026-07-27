@@ -96,6 +96,7 @@ public class AnalyticsServiceTests : IDisposable
                 HomeCooldownSeconds = 120,
                 SpawnCooldownSeconds = 180,
                 TopCooldownSeconds = 240,
+                TopRequireTemporalGear = true,
                 BackCooldownSeconds = 300,
                 BackExpiresAfterSeconds = 600,
                 BackRequireTemporalGear = true,
@@ -125,6 +126,7 @@ public class AnalyticsServiceTests : IDisposable
         properties.Should().ContainKey("stuck_admin_notify_custom_privilege").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("stuck_blocks_when_privilege_online").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("top_custom_privilege").WhoseValue.Should().Be(true);
+        properties.Should().ContainKey("top_requires_temporal_gear").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("back_custom_privilege").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("back_requires_temporal_gear").WhoseValue.Should().Be(true);
         properties.Should().ContainKey("register_home_commands").WhoseValue.Should().Be(false);

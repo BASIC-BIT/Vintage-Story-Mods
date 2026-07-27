@@ -1,6 +1,6 @@
 ---
 name: moddb-release-playwright
-description: Automate ModDB release uploads using Playwright browser flow when direct API upload is unavailable.
+description: Prepare and publish Vintage Story ModDB releases, including owner-reviewed public changelog copy and Playwright browser upload when direct API upload is unavailable.
 compatibility: opencode
 metadata:
   audience: maintainers
@@ -11,39 +11,47 @@ metadata:
 
 ## Purpose
 
-Automate Vintage Story ModDB release publishing through browser actions when a direct upload API is not available.
+Prepare owner-reviewed public release copy and automate Vintage Story ModDB publishing through browser actions when a direct upload API is not available.
 
 Target site: `https://mods.vintagestory.at`
 
-## Inputs required
+For GitHub or ModDB release-note drafting, review, or platform conversion, read [references/public-release-notes.md](references/public-release-notes.md) before writing copy.
+
+## Drafting inputs
+
+- Release version or merged-change range.
+- Canonical source, pull request, tag, and packaged-artifact evidence needed to verify public claims.
+
+## ModDB publication inputs
 
 - `modId` (numeric mod id on ModDB)
 - `zipPath` (absolute path to built mod zip)
 - `changelogHtmlOrText`
 - `compatibleVersions` (array of semver strings, e.g. `1.21.6`)
 
-## Preconditions
+## ModDB publication preconditions
 
 - The zip already exists locally (build/package step completed).
 - Operator can complete any interactive auth challenge (account login/2FA) if prompted.
 
 ## Workflow
 
-1. Open login page: `https://mods.vintagestory.at/login`.
-2. Complete auth flow and wait until logged in.
-3. Navigate to release page:
+1. Prepare one fact-checked canonical release body using `references/public-release-notes.md`, derive each platform-ready body, and present the exact bodies plus rendered previews for owner approval.
+2. Open login page: `https://mods.vintagestory.at/login`.
+3. Complete auth flow and wait until logged in.
+4. Navigate to release page:
    - `https://mods.vintagestory.at/edit/release/?modid=<modId>`
-4. Upload file using file input selector:
+5. Upload file using file input selector:
    - `input[name="newfile"]`
-5. Wait for upload/parse completion:
+6. Wait for upload/parse completion:
    - no active upload progress
    - auto-detected mod id/version fields populated
-6. Set compatible versions by toggling:
+7. Set compatible versions by toggling:
    - `input[name="cgvs[]"]`
-7. Set changelog text in:
+8. Set the approved changelog text in:
    - `textarea[name="text"]`
-8. Click save button (`Save`), then wait for navigation.
-9. Verify success:
+9. Click save button (`Save`), then wait for navigation.
+10. Verify success:
    - URL includes `assetid=` OR
    - release appears in mod files tab
 

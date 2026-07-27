@@ -720,32 +720,13 @@ namespace thebasics.ModSystems.ProximityChat
         {
             return GetAllLanguages(allowBabble).FirstOrDefault(lang =>
                 (allowHidden || !lang.Hidden) &&
-                (lang?.Prefix?.ToLower() == text.ToLower() ||
-                lang?.Name?.ToLower() == text.ToLower()));
+                (string.Equals(lang?.Prefix, text, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(lang?.Name, text, StringComparison.OrdinalIgnoreCase)));
         }
 
         public List<Language> GetAllLanguages(bool allowBabble, bool includeHidden = true)
         {
-            List<Language> languages = new();
-
-            if (includeHidden)
-            {
-                languages.AddRange(Config.Languages);
-            }
-            else
-            {
-                languages.AddRange(Config.Languages.Where(lang => !lang.Hidden));
-            }
-
-            // Always include SignLanguage
-            languages.Add(SignLanguage);
-
-            if (allowBabble)
-            {
-                languages.Add(BabbleLang);
-            }
-
-            return languages;
+            return LanguageCatalog.GetAll(Config, allowBabble, includeHidden);
         }
 
         public void ProcessMessage(IServerPlayer receivingPlayer,

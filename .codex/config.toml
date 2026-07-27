@@ -1,0 +1,6 @@
+# Vintage-Story-Mods currently has no project-scoped OpenCode MCP servers to mirror.
+#
+# Keep repo-specific MCP servers here only when this repository adds a committed
+# OpenCode MCP inventory. Generic Codex MCPs such as Playwright, GitHub, Context7,
+# or Node REPL should stay in global/plugin config unless they become
+# Vintage-Story-Mods-specific.

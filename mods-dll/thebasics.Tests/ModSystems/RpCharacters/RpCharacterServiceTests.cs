@@ -141,6 +141,32 @@ public class RpCharacterServiceTests
     }
 
     [Fact]
+    public void RecreatedService_RestoresPersistedCharacterStateAfterReconnect()
+    {
+        var player = CreatePlayer();
+        var participant = new TestModDataParticipant();
+        var firstConnection = new RpCharacterService(CreateConfig(), participants: new[] { participant });
+        IServerPlayerExtensions.SetModData(player, TestModDataParticipant.ModDataKey, "Alice state");
+        firstConnection.EnsureRegistry(player);
+        firstConnection.CreateCharacter(player, "Bob", maxCharacters: 3).Success.Should().BeTrue();
+        var registry = firstConnection.ReadRegistry(player);
+        var bob = registry.Characters
+            .Should().ContainSingle(character => character.DisplayName == "Bob").Subject;
+        bob.SetExtensionSnapshot(TestModDataParticipant.ParticipantCode, SerializerUtil.Serialize("Bob state"));
+        IServerPlayerExtensions.SetModData(player, RpCharacterService.CharacterSlotsKey, registry);
+
+        var reconnectedService = new RpCharacterService(CreateConfig(), participants: new[] { participant });
+        var result = reconnectedService.SelectCharacter(player, bob.CharacterId);
+
+        result.Success.Should().BeTrue();
+        IServerPlayerExtensions.GetModData(player, TestModDataParticipant.ModDataKey, string.Empty).Should().Be("Bob state");
+        var alice = reconnectedService.ReadRegistry(player).Characters
+            .Should().ContainSingle(character => character.DisplayName == "Alice").Subject;
+        SerializerUtil.Deserialize<string>(alice.GetExtensionSnapshot(TestModDataParticipant.ParticipantCode))
+            .Should().Be("Alice state");
+    }
+
+    [Fact]
     public void SelectCharacter_DoesNotPrepareParticipantsWhenValidationFails()
     {
         var player = CreatePlayer();

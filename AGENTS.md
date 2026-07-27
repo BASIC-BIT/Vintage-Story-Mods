@@ -24,6 +24,10 @@ This file provides guidance to coding agents when working with code in this repo
 - For contributor PRs, complete code review and local validation first, then present a QA plan and findings before requesting merge approval.
 - For AI/bot review recycle loops on PRs, before pushing follow-up recycle commits: react to each addressed review comment, post a concise reply describing the fix, and resolve the corresponding review thread.
 
+## Public Release-Note Style
+
+- Public-facing Vintage Story release-note copy must never use em dashes (`—`). Use commas, colons, parentheses, semicolons, or sentence breaks instead. This requirement applies only to public release-note copy; it does not apply to code, other project documentation, or unrelated human communication.
+
 ## Agent Toolbox
 
 If the toolbox repo is present next to this repo, also read:
@@ -34,7 +38,7 @@ If the toolbox repo is present next to this repo, also read:
 
 ## Repository Skills
 
-OpenCode skills under `.opencode/skills/` are first-class workflow assets for this repository. When a task matches a skill, follow it and update it in the same PR as workflow changes.
+OpenCode skills under `.opencode/skills/` are first-class workflow assets for this repository. Codex wrappers under `.codex/skills/` are thin compatibility shims that point back to those source skills. When a task matches a skill, follow the source skill and update it in the same PR as workflow changes. After changing `.opencode/skills/`, `.codex/skills/`, or `docs/agentic/codex.md`, run `.\scripts\check-agent-tooling.ps1`.
 
 ## DimensionLib Product Direction
 

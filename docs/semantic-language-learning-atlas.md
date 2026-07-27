@@ -30,7 +30,7 @@ Current runtime behavior:
 Current MVP constraints:
 
 - Embeddings are required for organic learning and rendering-time bucket matching.
-- If no provider is available, the server still boots and admin-set bucket progress remains usable, but semantic matching is degraded.
+- If no provider is available, the server still boots. Known/unknown language behavior and admin-set whole-language proficiency remain usable, and admin-set bucket progress can still be inspected, but organic semantic learning and concept-aware comprehension matching are inactive.
 - There is no exact phrase matcher as a gameplay path; exact strings in atlas assets seed vectors only.
 - The current default atlas is a curated generated Vintage Story core atlas. It is broader than the original pilot but still intentionally marked experimental.
 - The packaged embedding model is intentionally small (`all-MiniLM-L6-v2`, quantized ONNX) for beta release ergonomics. Stronger server-local models can be configured through the sidecar model paths, but should be selected with an evaluation pass instead of by package size alone.

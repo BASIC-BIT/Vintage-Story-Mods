@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using thebasics.ModSystems.RpCharacters.Models;
 using Vintagestory.API.Common;
@@ -8,17 +7,6 @@ namespace thebasics.ModSystems.RpCharacters;
 
 public class RpCharacterSafetyParticipant : IRpCharacterSwitchParticipant, IRpCharacterSwitchPreparationParticipant
 {
-    private static readonly HashSet<string> AllowedOpenInventoryClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "hotbar",
-        "backpack",
-        "character",
-        "craftinggrid",
-        "mouse",
-        "ground",
-        "creative"
-    };
-
     private readonly System.Func<string, object[], string> _localize;
 
     public RpCharacterSafetyParticipant(System.Func<string, object[], string> localize = null)
@@ -91,7 +79,7 @@ public class RpCharacterSafetyParticipant : IRpCharacterSwitchParticipant, IRpCh
     {
     }
 
-    private static bool HasExternalOpenInventory(IPlayer player)
+    internal static bool HasExternalOpenInventory(IPlayer player)
     {
         if (player.InventoryManager?.OpenedInventories == null)
         {
@@ -105,13 +93,11 @@ public class RpCharacterSafetyParticipant : IRpCharacterSwitchParticipant, IRpCh
                 continue;
             }
 
-            var className = inventory.ClassName ?? string.Empty;
-            if (!AllowedOpenInventoryClasses.Contains(className))
-            {
-                return true;
-            }
-
-            if (!string.Equals(inventory.InventoryID, className + "-" + player.PlayerUID, StringComparison.OrdinalIgnoreCase))
+            if (inventory is not InventoryBasePlayer ||
+                !string.Equals(
+                    inventory.InventoryID,
+                    (inventory.ClassName ?? string.Empty) + "-" + player.PlayerUID,
+                    StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
