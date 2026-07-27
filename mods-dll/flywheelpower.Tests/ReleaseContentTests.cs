@@ -174,10 +174,12 @@ public sealed class ReleaseContentTests
         JsonElement[] tyreSegments = elements.EnumerateArray()
             .Where(element => element.GetProperty("name").GetString()!.StartsWith("OuterTyre", StringComparison.Ordinal))
             .ToArray();
-        JsonElement hub = elements.EnumerateArray()
-            .Single(element => element.GetProperty("name").GetString() == "Hub");
-        JsonElement bearing = elements.EnumerateArray()
-            .Single(element => element.GetProperty("name").GetString() == "BearingCollar");
+        JsonElement[] hub = elements.EnumerateArray()
+            .Where(element => element.GetProperty("name").GetString()!.StartsWith("Hub", StringComparison.Ordinal))
+            .ToArray();
+        JsonElement[] bearing = elements.EnumerateArray()
+            .Where(element => element.GetProperty("name").GetString()!.StartsWith("BearingCollar", StringComparison.Ordinal))
+            .ToArray();
         JsonElement chalkFront = elements.EnumerateArray()
             .Single(element => element.GetProperty("name").GetString() == "ChalkLineFront");
         JsonElement chalkBack = elements.EnumerateArray()
@@ -186,8 +188,10 @@ public sealed class ReleaseContentTests
             .Single(element => element.GetProperty("name").GetString() == "ChalkLineRim");
 
         Assert.Equal(8, spokes.Length);
-        Assert.Equal(8, felloes.Length);
-        Assert.Equal(8, tyreSegments.Length);
+        Assert.Equal(16, felloes.Length);
+        Assert.Equal(16, tyreSegments.Length);
+        Assert.Equal(16, hub.Length);
+        Assert.Equal(16, bearing.Length);
         Assert.All(spokes, spoke =>
             Assert.Equal("#wood", spoke.GetProperty("faces").GetProperty("north").GetProperty("texture").GetString()));
         Assert.All(felloes, felloe =>
@@ -197,10 +201,10 @@ public sealed class ReleaseContentTests
         Assert.All(tyreSegments, tyre =>
             Assert.Equal(3d, tyre.GetProperty("to")[0].GetDouble() - tyre.GetProperty("from")[0].GetDouble(), 2));
         Assert.Equal(1.92d, tyreSegments[0].GetProperty("to")[2].GetDouble() - tyreSegments[0].GetProperty("from")[2].GetDouble(), 2);
-        Assert.Equal(8.96d, hub.GetProperty("to")[1].GetDouble() - hub.GetProperty("from")[1].GetDouble(), 2);
-        Assert.Equal(4.32d, hub.GetProperty("to")[0].GetDouble() - hub.GetProperty("from")[0].GetDouble(), 2);
-        Assert.Equal(6.08d, bearing.GetProperty("to")[1].GetDouble() - bearing.GetProperty("from")[1].GetDouble(), 2);
-        Assert.Equal(4.8d, bearing.GetProperty("to")[0].GetDouble() - bearing.GetProperty("from")[0].GetDouble(), 2);
+        Assert.All(hub, segment =>
+            Assert.Equal(4.32d, segment.GetProperty("to")[0].GetDouble() - segment.GetProperty("from")[0].GetDouble(), 2));
+        Assert.All(bearing, segment =>
+            Assert.Equal(4.8d, segment.GetProperty("to")[0].GetDouble() - segment.GetProperty("from")[0].GetDouble(), 2));
         Assert.True(chalkFront.GetProperty("to")[2].GetDouble() > chalkRim.GetProperty("from")[2].GetDouble());
         Assert.True(chalkBack.GetProperty("to")[2].GetDouble() > chalkRim.GetProperty("from")[2].GetDouble());
         Assert.True(chalkRim.GetProperty("from")[0].GetDouble() <= chalkBack.GetProperty("to")[0].GetDouble());
@@ -212,19 +216,23 @@ public sealed class ReleaseContentTests
     {
         JsonElement[] elements = ReadShapeElements("compact-flywheel-wheel-coupled.json");
         JsonElement[] ring = elements
-            .Where(element => element.GetProperty("name").GetString()!.StartsWith("PreviewRing", StringComparison.Ordinal))
+            .Where(element => element.GetProperty("name").GetString()!.StartsWith("CompactWheel", StringComparison.Ordinal))
             .ToArray();
 
-        double minY = ring.Min(element => element.GetProperty("from")[1].GetDouble());
-        double maxY = ring.Max(element => element.GetProperty("to")[1].GetDouble());
-        double minZ = ring.Min(element => element.GetProperty("from")[2].GetDouble());
-        double maxZ = ring.Max(element => element.GetProperty("to")[2].GetDouble());
         double minX = ring.Min(element => element.GetProperty("from")[0].GetDouble());
         double maxX = ring.Max(element => element.GetProperty("to")[0].GetDouble());
 
-        Assert.Equal(14.72d, maxY - minY, 2);
-        Assert.Equal(14.72d, maxZ - minZ, 2);
         Assert.Equal(5.12d, maxX - minX, 2);
+        Assert.Equal(16, ring.Length);
+        Assert.All(
+            ring,
+            segment => Assert.Equal(
+                4.16d,
+                segment.GetProperty("to")[2].GetDouble() - segment.GetProperty("from")[2].GetDouble(),
+                2));
+        Assert.Equal(
+            Enumerable.Range(0, 16).Select(index => index * 22.5d),
+            ring.Select(segment => segment.GetProperty("rotationX").GetDouble()));
     }
 
     [Fact]
@@ -259,8 +267,11 @@ public sealed class ReleaseContentTests
         Assert.Contains("RightRearBrace", fullNames);
         Assert.Contains("LeftGreaseCup", fullNames);
         Assert.Contains("RightGreaseCup", fullNames);
-        Assert.Contains("FrontLeftHoldDown", fullNames);
+        Assert.DoesNotContain(fullNames, name => name.EndsWith("HoldDown", StringComparison.Ordinal));
         Assert.Equal(-16d, fullElements.Min(element => element.GetProperty("from")[1].GetDouble()));
+        Assert.All(
+            fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("Brace", StringComparison.Ordinal)),
+            brace => Assert.Equal(-15.25d, brace.GetProperty("from")[1].GetDouble()));
         Assert.All(
             fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("FrontBrace", StringComparison.Ordinal)),
             brace => Assert.Equal(18d, brace.GetProperty("rotationX").GetDouble()));
@@ -283,6 +294,7 @@ public sealed class ReleaseContentTests
         Assert.Contains("RightBearingPost", compactNames);
         Assert.Contains("LeftGreaseCup", compactNames);
         Assert.Contains("RightGreaseCup", compactNames);
+        Assert.DoesNotContain(compactNames, name => name.EndsWith("HoldDown", StringComparison.Ordinal));
         Assert.All(
             compactElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("BearingCap", StringComparison.Ordinal)),
             cap => Assert.All(

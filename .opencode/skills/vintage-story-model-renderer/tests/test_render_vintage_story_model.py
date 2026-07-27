@@ -1,7 +1,10 @@
 import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+
+from PIL import Image
 
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "render_vintage_story_model.py"
@@ -96,6 +99,88 @@ class CuboidWindingTests(unittest.TestCase):
                     )
                 )
                 self.assertGreater(renderer.dot(normal, outward), 0.999)
+
+
+class RenderMatrixTests(unittest.TestCase):
+    def test_three_modes_cover_six_profiles_and_opposing_isometrics(self):
+        self.assertEqual(
+            [
+                "front",
+                "back",
+                "right",
+                "left",
+                "top",
+                "bottom",
+                "isometric",
+                "isometric-opposite",
+            ],
+            list(renderer.VIEWS),
+        )
+        self.assertEqual(("wireframe", "material", "textured"), renderer.RENDER_MODES)
+        self.assertEqual(24, len(renderer.VIEWS) * len(renderer.RENDER_MODES))
+
+    def test_game_domain_texture_resolves_from_survival_content_pack(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            texture = root / "survival" / "textures" / "block" / "test.png"
+            texture.parent.mkdir(parents=True)
+            Image.new("RGB", (2, 2), (1, 2, 3)).save(texture)
+
+            self.assertEqual(texture, renderer.resolve_texture("game:block/test", [root]))
+
+
+class UvTests(unittest.TestCase):
+    def test_missing_cuboid_uv_uses_face_dimensions(self):
+        uvs = renderer.face_uvs(
+            {},
+            texture_width=16,
+            texture_height=16,
+            direction="north",
+            start=(1, 2, 3),
+            end=(5, 8, 11),
+        )
+
+        self.assertEqual([(0, 0.375), (0, 0), (0.25, 0), (0.25, 0.375)], uvs)
+
+    def test_face_rotation_cycles_uv_corners(self):
+        unrotated = renderer.face_uvs(
+            {"uv": [0, 0, 8, 4]},
+            16,
+            16,
+            "north",
+            (0, 0, 0),
+            (1, 1, 1),
+        )
+        rotated = renderer.face_uvs(
+            {"uv": [0, 0, 8, 4], "rotation": 90},
+            16,
+            16,
+            "north",
+            (0, 0, 0),
+            (1, 1, 1),
+        )
+
+        self.assertEqual(unrotated[-1:] + unrotated[:-1], rotated)
+
+
+class RegistrationMarkWindingTests(unittest.TestCase):
+    def test_front_and_back_marks_face_opposite_directions(self):
+        root = Path(__file__).parents[4]
+        dimensions = root / "mods-dll" / "flywheelpower" / "src" / "FlywheelModelDimensions.cs"
+        faces = renderer.load_flywheel(dimensions, "full")
+        front = next(face for face in faces if face.element == "RegistrationMarkFaceFront")
+        back = next(face for face in faces if face.element == "RegistrationMarkFaceBack")
+
+        def normal(face):
+            return renderer.normalize(
+                renderer.cross(
+                    renderer.sub(face.vertices[1], face.vertices[0]),
+                    renderer.sub(face.vertices[2], face.vertices[0]),
+                )
+            )
+
+        self.assertGreater(renderer.dot(normal(front), (1, 0, 0)), 0.999)
+        self.assertGreater(renderer.dot(normal(back), (-1, 0, 0)), 0.999)
 
 
 if __name__ == "__main__":

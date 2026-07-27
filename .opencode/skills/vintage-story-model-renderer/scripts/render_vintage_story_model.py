@@ -11,8 +11,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
+Vec2 = tuple[float, float]
 Vec3 = tuple[float, float, float]
 
 
@@ -21,6 +22,7 @@ class Face:
     vertices: list[Vec3]
     material: str
     element: str
+    uvs: list[Vec2] | None = None
 
 
 VIEWS: dict[str, tuple[Vec3, Vec3]] = {
@@ -31,7 +33,10 @@ VIEWS: dict[str, tuple[Vec3, Vec3]] = {
     "top": ((0, 1, 0), (0, 0, -1)),
     "bottom": ((0, -1, 0), (0, 0, 1)),
     "isometric": ((1, 0.78, 1), (0, 1, 0)),
+    "isometric-opposite": ((-1, 0.78, -1), (0, 1, 0)),
 }
+
+RENDER_MODES = ("wireframe", "material", "textured")
 
 FACE_INDICES = {
     "north": (0, 2, 3, 1),
@@ -101,13 +106,49 @@ def cuboid(start: Vec3, end: Vec3) -> list[Vec3]:
     ]
 
 
+def face_uvs(
+    definition: dict,
+    texture_width: float,
+    texture_height: float,
+    direction: str,
+    start: Vec3,
+    end: Vec3,
+) -> list[Vec2]:
+    spans = sub(end, start)
+    automatic_size = {
+        "north": (spans[0], spans[1]),
+        "south": (spans[0], spans[1]),
+        "east": (spans[2], spans[1]),
+        "west": (spans[2], spans[1]),
+        "up": (spans[0], spans[2]),
+        "down": (spans[0], spans[2]),
+    }.get(direction, (texture_width, texture_height))
+    raw = definition.get("uv", (0, 0, automatic_size[0], automatic_size[1]))
+    u0, v0, u1, v1 = (float(value) for value in raw)
+    result = [
+        (u0 / texture_width, v1 / texture_height),
+        (u0 / texture_width, v0 / texture_height),
+        (u1 / texture_width, v0 / texture_height),
+        (u1 / texture_width, v1 / texture_height),
+    ]
+    quarter_turns = int(definition.get("rotation", 0)) // 90
+    if quarter_turns:
+        quarter_turns %= 4
+        result = result[-quarter_turns:] + result[:-quarter_turns]
+    return result
+
+
 def load_shape(path: Path) -> tuple[list[Face], dict[str, str]]:
     data = json.loads(path.read_text(encoding="utf-8"))
     faces: list[Face] = []
+    texture_width = float(data.get("textureWidth", 16))
+    texture_height = float(data.get("textureHeight", 16))
 
     def visit(elements: list[dict], inherited_angles: Vec3 = (0, 0, 0)) -> None:
         for element in elements:
-            vertices = cuboid(tuple(element["from"]), tuple(element["to"]))
+            start = tuple(element["from"])
+            end = tuple(element["to"])
+            vertices = cuboid(start, end)
             angles = (
                 inherited_angles[0] + float(element.get("rotationX", 0)),
                 inherited_angles[1] + float(element.get("rotationY", 0)),
@@ -123,6 +164,7 @@ def load_shape(path: Path) -> tuple[list[Face], dict[str, str]]:
                         [vertices[index] for index in indices],
                         str(definition.get("texture", "#missing")).lstrip("#"),
                         element.get("name", "unnamed"),
+                        face_uvs(definition, texture_width, texture_height, direction, start, end),
                     ))
             visit(element.get("children", []), angles)
 
@@ -151,16 +193,31 @@ def add_annulus(
     def vertex(x: float, radius: float, angle: float) -> Vec3:
         return (x, 8 + radius * math.sin(angle), 8 + radius * math.cos(angle))
 
+    def disc_uv(radius: float, angle: float) -> Vec2:
+        return (
+            0.5 + 0.5 * radius * math.sin(angle) / outer_radius,
+            0.5 - 0.5 * radius * math.cos(angle) / outer_radius,
+        )
+
     for segment in range(segments):
         a0 = math.tau * segment / segments
         a1 = math.tau * (segment + 1) / segments
+        t0 = segment / segments
+        t1 = (segment + 1) / segments
         faces.extend([
             Face([vertex(max_x, inner_radius, a0), vertex(max_x, inner_radius, a1),
-                  vertex(max_x, outer_radius, a1), vertex(max_x, outer_radius, a0)], material, element),
+                  vertex(max_x, outer_radius, a1), vertex(max_x, outer_radius, a0)],
+                 material, element,
+                 [disc_uv(inner_radius, a0), disc_uv(inner_radius, a1),
+                  disc_uv(outer_radius, a1), disc_uv(outer_radius, a0)]),
             Face([vertex(min_x, inner_radius, a0), vertex(min_x, outer_radius, a0),
-                  vertex(min_x, outer_radius, a1), vertex(min_x, inner_radius, a1)], material, element),
+                  vertex(min_x, outer_radius, a1), vertex(min_x, inner_radius, a1)],
+                 material, element,
+                 [disc_uv(inner_radius, a0), disc_uv(outer_radius, a0),
+                  disc_uv(outer_radius, a1), disc_uv(inner_radius, a1)]),
             Face([vertex(min_x, outer_radius, a0), vertex(max_x, outer_radius, a0),
-                  vertex(max_x, outer_radius, a1), vertex(min_x, outer_radius, a1)], material, element),
+                  vertex(max_x, outer_radius, a1), vertex(min_x, outer_radius, a1)],
+                 material, element, [(t0, 1), (t0, 0), (t1, 0), (t1, 1)]),
         ])
         if inner_radius:
             faces.append(Face(
@@ -168,6 +225,7 @@ def add_annulus(
                  vertex(min_x, inner_radius, a1), vertex(max_x, inner_radius, a1)],
                 material,
                 element,
+                [(t0, 0), (t0, 1), (t1, 1), (t1, 0)],
             ))
 
 
@@ -182,8 +240,9 @@ def add_rotated_cuboid(
     vertices = cuboid(start, end)
     if rotation_x:
         vertices = [rotate(vertex, (8, 8, 8), (rotation_x, 0, 0)) for vertex in vertices]
+    default_uvs = [(0, 1), (0, 0), (1, 0), (1, 1)]
     for indices in FACE_INDICES.values():
-        faces.append(Face([vertices[index] for index in indices], material, element))
+        faces.append(Face([vertices[index] for index in indices], material, element, default_uvs))
 
 
 def load_flywheel(path: Path, size: str) -> list[Face]:
@@ -242,13 +301,21 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
     marker_raise = 0.006 * 16
     marker_half = (0.025 if size == "compact" else 0.04) * 16
     marker_outer = wheel_radius + marker_raise * 2
-    for x in (wheel_min - marker_raise, wheel_max + marker_raise):
-        faces.append(Face([
-            (x, 8 - marker_half, 8 + wheel_radius * 0.18),
-            (x, 8 + marker_half, 8 + wheel_radius * 0.18),
-            (x, 8 + marker_half, 8 + marker_outer),
-            (x, 8 - marker_half, 8 + marker_outer),
-        ], "chalk", "RegistrationMarkFace"))
+    front_mark = [
+        (wheel_max + marker_raise, 8 - marker_half, 8 + wheel_radius * 0.18),
+        (wheel_max + marker_raise, 8 + marker_half, 8 + wheel_radius * 0.18),
+        (wheel_max + marker_raise, 8 + marker_half, 8 + marker_outer),
+        (wheel_max + marker_raise, 8 - marker_half, 8 + marker_outer),
+    ]
+    back_mark = [
+        (wheel_min - marker_raise, 8 - marker_half, 8 + wheel_radius * 0.18),
+        (wheel_min - marker_raise, 8 - marker_half, 8 + marker_outer),
+        (wheel_min - marker_raise, 8 + marker_half, 8 + marker_outer),
+        (wheel_min - marker_raise, 8 + marker_half, 8 + wheel_radius * 0.18),
+    ]
+    marker_uvs = [(0, 1), (0, 0), (1, 0), (1, 1)]
+    faces.append(Face(front_mark, "chalk", "RegistrationMarkFaceFront", marker_uvs))
+    faces.append(Face(back_mark, "chalk", "RegistrationMarkFaceBack", marker_uvs))
     radius = wheel_radius + marker_raise
     half_angle = marker_half / radius
 
@@ -260,19 +327,27 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
         rim(wheel_max + marker_raise * 2, -half_angle),
         rim(wheel_max + marker_raise * 2, half_angle),
         rim(wheel_min - marker_raise * 2, half_angle),
-    ], "chalk", "RegistrationMarkRim"))
+    ], "chalk", "RegistrationMarkRim", marker_uvs))
     return faces
 
 
 def resolve_texture(location: str, roots: list[Path]) -> Path | None:
+    if not location:
+        return None
     domain, relative = location.split(":", 1) if ":" in location else ("game", location)
     relative = relative.removeprefix("textures/")
     if not relative.endswith(".png"):
         relative += ".png"
     for root in roots:
-        candidate = root / domain / "textures" / relative
-        if candidate.exists():
-            return candidate
+        candidates = [
+            root / domain / "textures" / relative,
+            root / "textures" / relative,
+        ]
+        if domain == "game":
+            candidates.extend(root / pack / "textures" / relative for pack in ("game", "survival", "creative"))
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
     return None
 
 
@@ -286,7 +361,11 @@ def average_color(path: Path | None, material: str, location: str = "") -> tuple
     return tuple(Image.open(path).convert("RGB").resize((1, 1)).getpixel((0, 0)))
 
 
-def render(faces: list[Face], colors: dict[str, tuple[int, int, int]], view_name: str, output: Path, size: int) -> None:
+def projection(
+    faces: list[Face],
+    view_name: str,
+    size: int,
+) -> tuple[Vec3, Vec3, Vec3, Vec3, float]:
     view, nominal_up = VIEWS[view_name]
     view = normalize(view)
     right = normalize(cross(nominal_up, view))
@@ -302,26 +381,134 @@ def render(faces: list[Face], colors: dict[str, tuple[int, int, int]], view_name
         max(abs(point[1]) for point in projected) * 2,
         1,
     )
+    return view, right, up, center, scale
+
+
+def screen_point(vertex: Vec3, center: Vec3, right: Vec3, up: Vec3, size: int, scale: float) -> Vec2:
+    return (
+        size / 2 + dot(sub(vertex, center), right) * scale,
+        size / 2 - dot(sub(vertex, center), up) * scale,
+    )
+
+
+def affine_texture_coefficients(points: list[Vec2], uvs: list[Vec2], texture: Image.Image) -> tuple[float, ...] | None:
+    p0, p1, p2 = points[:3]
+    uv0, uv1, uv2 = uvs[:3]
+    dx1, dy1 = p1[0] - p0[0], p1[1] - p0[1]
+    dx2, dy2 = p2[0] - p0[0], p2[1] - p0[1]
+    determinant = dx1 * dy2 - dx2 * dy1
+    if abs(determinant) < 1e-8:
+        return None
+
+    def coefficients(values: tuple[float, float, float], extent: int) -> tuple[float, float, float]:
+        q0, q1, q2 = (value * max(1, extent - 1) for value in values)
+        dq1, dq2 = q1 - q0, q2 - q0
+        a = (dq1 * dy2 - dq2 * dy1) / determinant
+        b = (dx1 * dq2 - dx2 * dq1) / determinant
+        c = q0 - a * p0[0] - b * p0[1]
+        return a, b, c
+
+    u = coefficients((uv0[0], uv1[0], uv2[0]), texture.width)
+    v = coefficients((uv0[1], uv1[1], uv2[1]), texture.height)
+    return u + v
+
+
+def draw_textured_face(
+    image: Image.Image,
+    points: list[Vec2],
+    face: Face,
+    texture: Image.Image,
+    brightness: float,
+    line_width: int,
+) -> None:
+    coefficients = affine_texture_coefficients(
+        points,
+        face.uvs or [(0, 1), (0, 0), (1, 0), (1, 1)],
+        texture,
+    )
+    if coefficients is None:
+        return
+
+    left = max(0, math.floor(min(point[0] for point in points)))
+    top = max(0, math.floor(min(point[1] for point in points)))
+    right = min(image.width, math.ceil(max(point[0] for point in points)) + 1)
+    bottom = min(image.height, math.ceil(max(point[1] for point in points)) + 1)
+    if right <= left or bottom <= top:
+        return
+
+    a, b, c, d, e, f = coefficients
+    sampled = texture.transform(
+        (right - left, bottom - top),
+        Image.Transform.AFFINE,
+        (a, b, c + a * left + b * top, d, e, f + d * left + e * top),
+        resample=Image.Resampling.NEAREST,
+    ).convert("RGB")
+    if brightness != 1:
+        sampled = ImageEnhance.Brightness(sampled).enhance(brightness)
+    local_points = [(point[0] - left, point[1] - top) for point in points]
+    mask = Image.new("L", sampled.size, 0)
+    ImageDraw.Draw(mask).polygon(local_points, fill=255)
+    image.paste(sampled, (left, top), mask)
+    ImageDraw.Draw(image).line(points + [points[0]], fill=(18, 20, 22), width=line_width)
+
+
+def render(
+    faces: list[Face],
+    colors: dict[str, tuple[int, int, int]],
+    textures: dict[str, Image.Image | None],
+    view_name: str,
+    mode: str,
+    output: Path,
+    size: int,
+) -> None:
+    view, right, up, center, scale = projection(faces, view_name, size)
     image = Image.new("RGB", (size, size), (28, 31, 34))
     draw = ImageDraw.Draw(image)
-    light = normalize((0.55, 0.8, 0.45))
+    line_width = max(1, size // 420)
+    light = normalize(add(mul(view, 0.72), add(mul(up, 0.62), mul(right, -0.28))))
     ordered = sorted(faces, key=lambda face: sum(dot(sub(v, center), view) for v in face.vertices) / len(face.vertices))
-    for face in ordered:
-        normal = normalize(cross(sub(face.vertices[1], face.vertices[0]), sub(face.vertices[2], face.vertices[0])))
-        if dot(normal, view) <= 0.001:
-            continue
-        brightness = 0.48 + 0.52 * max(0, dot(normal, light))
-        base = colors.get(face.material, (155, 155, 155))
-        fill = tuple(round(channel * brightness) for channel in base)
-        points = [
-            (size / 2 + dot(sub(v, center), right) * scale, size / 2 - dot(sub(v, center), up) * scale)
-            for v in face.vertices
-        ]
-        draw.polygon(points, fill=fill)
-        draw.line(points + [points[0]], fill=(16, 18, 20), width=max(1, size // 420))
-    draw.rounded_rectangle((12, 12, 126, 42), radius=7, fill=(8, 10, 12), outline=(87, 94, 99))
-    draw.text((22, 20), view_name.upper(), fill=(235, 238, 240), font=ImageFont.load_default())
+
+    if mode == "wireframe":
+        for face in ordered:
+            normal = normalize(cross(sub(face.vertices[1], face.vertices[0]), sub(face.vertices[2], face.vertices[0])))
+            facing = dot(normal, view)
+            points = [screen_point(vertex, center, right, up, size, scale) for vertex in face.vertices]
+            edge = (188, 205, 214) if facing > 0.001 else (61, 70, 76)
+            draw.line(points + [points[0]], fill=edge, width=line_width)
+    else:
+        for face in ordered:
+            normal = normalize(cross(sub(face.vertices[1], face.vertices[0]), sub(face.vertices[2], face.vertices[0])))
+            if dot(normal, view) <= 0.001:
+                continue
+            points = [screen_point(vertex, center, right, up, size, scale) for vertex in face.vertices]
+            if mode == "textured" and textures.get(face.material) is not None:
+                brightness = 0.58 + 0.42 * max(0, dot(normal, light))
+                draw_textured_face(
+                    image,
+                    points,
+                    face,
+                    textures[face.material],  # type: ignore[arg-type]
+                    brightness,
+                    line_width,
+                )
+                continue
+            base = colors.get(face.material, (155, 155, 155))
+            fill = base if mode == "material" else tuple(round(channel * 0.72) for channel in base)
+            draw.polygon(points, fill=fill)
+            draw.line(points + [points[0]], fill=(16, 18, 20), width=line_width)
+
+    label = f"{mode.upper()} / {view_name.upper()}"
+    label_width = max(164, 12 + len(label) * 7)
+    draw.rounded_rectangle((12, 12, label_width, 42), radius=7, fill=(8, 10, 12), outline=(87, 94, 99))
+    draw.text((22, 20), label, fill=(235, 238, 240), font=ImageFont.load_default())
     image.save(output)
+
+
+def contact_sheet(paths: list[Path], output: Path, columns: int, rows: int, size: int) -> None:
+    sheet = Image.new("RGB", (size * columns, size * rows), (20, 22, 24))
+    for index, path in enumerate(paths):
+        sheet.paste(Image.open(path), ((index % columns) * size, (index // columns) * size))
+    sheet.save(output)
 
 
 def sha256(path: Path) -> str:
@@ -362,26 +549,32 @@ def main() -> None:
         inputs.append(path)
     textures.update(manifest.get("textures", {}))
 
-    resolved = {}
-    colors = {}
+    resolved: dict[str, str | None] = {}
+    colors: dict[str, tuple[int, int, int]] = {}
+    texture_images: dict[str, Image.Image | None] = {}
     for material in sorted({face.material for face in faces}):
         texture = resolve_texture(textures.get(material, ""), roots) if textures.get(material) else None
         resolved[material] = str(texture) if texture else None
         colors[material] = average_color(texture, material, textures.get(material, ""))
+        texture_images[material] = Image.open(texture).convert("RGB") if texture else None
 
-    images = []
-    for view_name in VIEWS:
-        path = output / f"{view_name}.png"
-        render(faces, colors, view_name, path, args.size)
-        images.append(path)
-    sheet = Image.new("RGB", (args.size * 4, args.size * 2), (20, 22, 24))
-    for index, path in enumerate(images):
-        sheet.paste(Image.open(path), ((index % 4) * args.size, (index // 4) * args.size))
-    sheet.save(output / "contact-sheet.png")
+    all_images: list[Path] = []
+    for mode in RENDER_MODES:
+        mode_output = output / mode
+        mode_output.mkdir(parents=True, exist_ok=True)
+        mode_images = []
+        for view_name in VIEWS:
+            path = mode_output / f"{view_name}.png"
+            render(faces, colors, texture_images, view_name, mode, path, args.size)
+            mode_images.append(path)
+            all_images.append(path)
+        contact_sheet(mode_images, mode_output / "contact-sheet.png", 4, 2, args.size)
+    contact_sheet(all_images, output / "contact-sheet.png", len(VIEWS), len(RENDER_MODES), args.size)
 
     vertices = [vertex for face in faces for vertex in face.vertices]
     metadata = {
         "name": manifest.get("name", manifest_path.stem),
+        "representation": manifest.get("representation", "placed"),
         "inputs": [{"path": str(path), "sha256": sha256(path)} for path in inputs],
         "faceCount": len(faces),
         "boundsModelUnits": {
@@ -391,6 +584,8 @@ def main() -> None:
         "resolvedTextures": resolved,
         "unresolvedTextures": sorted(key for key, path in resolved.items() if path is None),
         "views": list(VIEWS),
+        "renderModes": list(RENDER_MODES),
+        "renderedImageCount": len(all_images),
     }
     (output / "render-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(f"Rendered {metadata['name']} to {output}")

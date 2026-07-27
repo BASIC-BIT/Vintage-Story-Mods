@@ -358,3 +358,28 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   consumed in every bearing set.
 - A future smithing or 3x3 casting workflow may replace the grid abstraction if feedback shows the extra interaction is worth
   the content and maintenance cost. It is not required for the initial-feedback loop.
+
+## Twenty-four-view textured model review, July 27, 2026
+
+- The full-size A-frame braces extend 1.5 model units farther into the cross-tie so their lower corners remain visibly joined
+  from both isometric directions. Their upper endpoints, bearing alignment, rotation origins, footprint, and collision
+  behavior are unchanged.
+- The two full-size and two compact decorative hold-down blocks were removed. They read as unexplained metal squares on the
+  base and did not contribute to support, interaction, collision, recipes, or mechanical behavior. Bearing grease cups remain
+  at the actual axle supports.
+- The procedural review renderer now corrects opposite winding for the rear registration mark, which had allowed the red mark
+  to appear through the wheel in the first isometric view even though the runtime mesh used the correct front/back winding.
+- Every render manifest now produces eight views in three modes: six orthographic profiles and two opposing top-down
+  isometrics, each in wireframe, stable material-ID color, and resolved-texture/UV mode. This yields exactly 24 primary images,
+  three per-mode sheets, one combined sheet, and metadata containing input hashes, representation, texture resolution, bounds,
+  modes, views, and image count.
+- Texture lookup now follows Vintage Story's `game:` domain across installed `game`, `survival`, and `creative` content packs.
+  Authored face UV rectangles and quarter-turn rotations are sampled directly; omitted cuboid UVs receive deterministic
+  size-proportional mapping. Representative empty-stand and inventory/held-assembly manifests ensure those distinct shapes
+  are reviewed independently from the installed mechanical model.
+- The inventory/held assembly shapes are now generated from `FlywheelModelDimensions.cs`: eight full-size spokes plus
+  sixteen-segment felloe, tyre, bearing, hub, and coupling rings, and sixteen-segment compact wheel/bearing/hub rings. This
+  replaces the previous solid square hub and coarse overlapping preview bands. The evidence script fails if these authored
+  package shapes drift from the dimension-driven generator.
+- This renderer is automated geometry and texture evidence. It does not reproduce atlas padding, mipmaps, animation, game
+  lighting, the player skeleton or hands, or final held transforms, so those remain bounded in-game QA.

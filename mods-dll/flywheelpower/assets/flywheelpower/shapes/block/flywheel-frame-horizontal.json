@@ -69,7 +69,7 @@
     },
     {
       "name": "LeftFrontBrace",
-      "from": [0.75, -13.75, 0.0],
+      "from": [0.75, -15.25, 0.0],
       "to": [4.75, 8.0, 4.0],
       "rotationOrigin": [2.75, -13.75, 2.0],
       "rotationX": 18,
@@ -81,7 +81,7 @@
     },
     {
       "name": "LeftRearBrace",
-      "from": [0.75, -13.75, 12.0],
+      "from": [0.75, -15.25, 12.0],
       "to": [4.75, 8.0, 16.0],
       "rotationOrigin": [2.75, -13.75, 14.0],
       "rotationX": -18,
@@ -93,7 +93,7 @@
     },
     {
       "name": "RightFrontBrace",
-      "from": [11.25, -13.75, 0.0],
+      "from": [11.25, -15.25, 0.0],
       "to": [15.25, 8.0, 4.0],
       "rotationOrigin": [13.25, -13.75, 2.0],
       "rotationX": 18,
@@ -105,7 +105,7 @@
     },
     {
       "name": "RightRearBrace",
-      "from": [11.25, -13.75, 12.0],
+      "from": [11.25, -15.25, 12.0],
       "to": [15.25, 8.0, 16.0],
       "rotationOrigin": [13.25, -13.75, 14.0],
       "rotationX": -18,
@@ -153,26 +153,6 @@
         "north": { "texture": "#metal", "uv": [0,0,2,2.5] }, "east": { "texture": "#metal", "uv": [0,0,2.5,2.5] },
         "south": { "texture": "#metal", "uv": [0,0,2,2.5] }, "west": { "texture": "#metal", "uv": [0,0,2.5,2.5] },
         "up": { "texture": "#metal", "uv": [0,0,2,2.5] }, "down": { "texture": "#metal", "uv": [0,0,2,2.5] }
-      }
-    },
-    {
-      "name": "FrontLeftHoldDown",
-      "from": [2.0, -14.0, -2.5],
-      "to": [3.5, -12.25, -1.0],
-      "faces": {
-        "north": { "texture": "#metal", "uv": [0,0,1.5,1.75] }, "east": { "texture": "#metal", "uv": [0,0,1.5,1.75] },
-        "south": { "texture": "#metal", "uv": [0,0,1.5,1.75] }, "west": { "texture": "#metal", "uv": [0,0,1.5,1.75] },
-        "up": { "texture": "#metal", "uv": [0,0,1.5,1.5] }, "down": { "texture": "#metal", "uv": [0,0,1.5,1.5] }
-      }
-    },
-    {
-      "name": "RearRightHoldDown",
-      "from": [12.5, -14.0, 17.0],
-      "to": [14.0, -12.25, 18.5],
-      "faces": {
-        "north": { "texture": "#metal", "uv": [0,0,1.5,1.75] }, "east": { "texture": "#metal", "uv": [0,0,1.5,1.75] },
-        "south": { "texture": "#metal", "uv": [0,0,1.5,1.75] }, "west": { "texture": "#metal", "uv": [0,0,1.5,1.75] },
-        "up": { "texture": "#metal", "uv": [0,0,1.5,1.5] }, "down": { "texture": "#metal", "uv": [0,0,1.5,1.5] }
       }
     }
   ]
