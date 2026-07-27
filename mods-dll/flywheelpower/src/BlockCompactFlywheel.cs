@@ -1,4 +1,7 @@
+using System;
+using System.Text;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent.Mechanics;
 
@@ -40,6 +43,16 @@ public sealed class BlockCompactFlywheel : BlockMPBase
 
     public override void DidConnectAt(IWorldAccessor world, BlockPos pos, BlockFacing face)
     {
+    }
+
+    public override void AddExtraHeldItemInfoPostMaterial(ItemSlot inSlot, StringBuilder dsc, IWorldAccessor world)
+    {
+        base.AddExtraHeldItemInfoPostMaterial(inSlot, dsc, world);
+        FlywheelPhysicalProfile profile = FlywheelPhysicalProperties.ForBlock(this);
+        dsc.AppendLine(Lang.Get(
+            "flywheelpower:blockinfo-physical",
+            Math.Round(profile.RotatingMassKg),
+            Math.Round(profile.EffectiveInertia, 3)));
     }
 
     private static bool TryPlaceSupported(

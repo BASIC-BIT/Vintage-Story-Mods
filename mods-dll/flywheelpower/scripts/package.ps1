@@ -79,8 +79,8 @@ $expectedEntries = @(
 $releasedRendererCodes = @(
     'flywheelpower-full-wood-ironhub',
     'flywheelpower-full-iron-ironhub',
-    'flywheelpower-full-meteoriciron-ironhub',
-    'flywheelpower-full-steel-ironhub',
+    'flywheelpower-full-meteoriciron-meteoricironhub',
+    'flywheelpower-full-steel-steelhub',
     'flywheelpower-compact-wood',
     'flywheelpower-compact-stone',
     'flywheelpower-compact-iron',

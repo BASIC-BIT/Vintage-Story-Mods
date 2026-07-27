@@ -1,5 +1,5 @@
-using Vintagestory.API.Common;
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Vintagestory.GameContent.Mechanics;
 
 namespace FlywheelPower;
@@ -10,8 +10,8 @@ public sealed class FlywheelPowerModSystem : ModSystem
     {
         "flywheelpower-full-wood-ironhub",
         "flywheelpower-full-iron-ironhub",
-        "flywheelpower-full-meteoriciron-ironhub",
-        "flywheelpower-full-steel-ironhub",
+        "flywheelpower-full-meteoriciron-meteoricironhub",
+        "flywheelpower-full-steel-steelhub",
         "flywheelpower-compact-wood",
         "flywheelpower-compact-stone",
         "flywheelpower-compact-iron",

@@ -15,11 +15,14 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
     private const float PassiveResistance = 0.0005f;
     private const float Epsilon = 0.00001f;
     private const float StateSpeedDeltaTolerance = 0.00025f;
-    private const float IronDensity = 7800f;
 
     private CompositeShape axleShape;
     private CompositeShape flywheelShape;
+    private CompositeShape horizontalStandShape;
+    private CompositeShape verticalStandShape;
+    private CompositeShape standShape;
     private FlywheelDiskRenderable flywheelRenderable;
+    private FlywheelStandRenderable standRenderable;
     private float flywheelSpeed;
     private float inertia = 8f;
     private float couplingStrength = 0.8f;
@@ -29,9 +32,7 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
     private float windageLoss = 0.0015f;
     private float safeSpeed = 3.5f;
     private float couplingRampSeconds = 1.5f;
-    private float wheelOuterRadius = FlywheelModelDimensions.WheelOuterRadius;
-    private float coupledInnerRadius = FlywheelModelDimensions.CoupledInnerRadius;
-    private float wheelHalfThickness = FlywheelModelDimensions.WheelHalfThickness;
+    private float rotatingMassKg;
     private float couplingEngagement;
     private bool slipCoupled = true;
     private long lastTorqueTick = -1;
@@ -54,6 +55,8 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
     {
         axleShape = properties["axleShape"].AsObject<CompositeShape>();
         flywheelShape = properties["flywheelShape"].AsObject<CompositeShape>();
+        horizontalStandShape = properties["horizontalStandShape"].AsObject<CompositeShape>();
+        verticalStandShape = properties["verticalStandShape"].AsObject<CompositeShape>();
         inertia = properties["inertia"].AsFloat(inertia);
         couplingStrength = properties["couplingStrength"].AsFloat(couplingStrength);
         maxTransferTorque = properties["maxTransferTorque"].AsFloat(maxTransferTorque);
@@ -62,17 +65,22 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         windageLoss = properties["windageLoss"].AsFloat(windageLoss);
         safeSpeed = properties["safeSpeed"].AsFloat(safeSpeed);
         couplingRampSeconds = properties["couplingRampSeconds"].AsFloat(couplingRampSeconds);
-        wheelOuterRadius = properties["wheelOuterRadius"].AsFloat(wheelOuterRadius);
-        coupledInnerRadius = properties["coupledInnerRadius"].AsFloat(coupledInnerRadius);
-        wheelHalfThickness = properties["wheelHalfThickness"].AsFloat(wheelHalfThickness);
         slipCoupled = properties["slipCoupled"].AsBool(slipCoupled);
-        inertia = ComputeVariantInertia(properties["inertia"].AsFloat(inertia));
+        FlywheelPhysicalProfile physicalProfile = FlywheelPhysicalProperties.ForBlock(Blockentity.Block, properties["inertia"].AsFloat(inertia));
+        inertia = physicalProfile.EffectiveInertia;
+        rotatingMassKg = physicalProfile.RotatingMassKg;
 
         SetAxisAndShapeFromRotation();
         base.Initialize(api, properties);
 
         if (api.Side == EnumAppSide.Client && flywheelShape != null)
         {
+            if (standShape != null)
+            {
+                standRenderable = new FlywheelStandRenderable(this);
+                manager.AddDeviceForRender(standRenderable);
+            }
+
             flywheelRenderable = new FlywheelDiskRenderable(this);
             manager.AddDeviceForRender(flywheelRenderable);
         }
@@ -179,6 +187,7 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         sb.AppendLine(Lang.Get("flywheelpower:blockinfo-state", GetStateLabel()));
         sb.AppendLine(Lang.Get("flywheelpower:blockinfo-speed", Math.Round(displayFlywheelSpeed, 2), Math.Round(lastNetworkSpeed, 2)));
         sb.AppendLine(Lang.Get("flywheelpower:blockinfo-energy", Math.Round(storedPercent, 0)));
+        sb.AppendLine(Lang.Get("flywheelpower:blockinfo-physical", Math.Round(rotatingMassKg), Math.Round(inertia, 3)));
         string torqueKey = slipCoupled ? "flywheelpower:blockinfo-coupling" : "flywheelpower:blockinfo-shaft";
         sb.AppendLine(Lang.Get(torqueKey, Math.Round(lastTransferTorque, 3), Math.Round(lastResistance, 3)));
 
@@ -205,13 +214,13 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
 
     public override void OnBlockRemoved()
     {
-        RemoveFlywheelRenderable();
+        RemoveExtraRenderables();
         base.OnBlockRemoved();
     }
 
     public override void OnBlockUnloaded()
     {
-        RemoveFlywheelRenderable();
+        RemoveExtraRenderables();
         base.OnBlockUnloaded();
     }
 
@@ -232,32 +241,6 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         }
 
         return Math.Min(0.25f, tickDelta * SecondsPerMechanicalTick);
-    }
-
-    private float ComputeVariantInertia(float referenceInertia)
-    {
-        string material = Blockentity.Block?.Variant?["material"];
-        float densityFactor = GetMaterialDensity(material) / IronDensity;
-        float outerRadius = Math.Max(wheelOuterRadius, Epsilon);
-        float innerRadius = slipCoupled ? GameMath.Clamp(coupledInnerRadius, 0f, outerRadius - Epsilon) : 0f;
-        float radiusFactor = (MathF.Pow(outerRadius, 4f) - MathF.Pow(innerRadius, 4f)) / MathF.Pow(FlywheelModelDimensions.WheelOuterRadius, 4f);
-        float thicknessFactor = Math.Max(wheelHalfThickness, Epsilon) / FlywheelModelDimensions.WheelHalfThickness;
-
-        // Mechanical-network torque units are game-tuned, so normalize the real cylinder/ring inertia formula against the original iron 3x3 value.
-        return Math.Max(0.01f, referenceInertia * densityFactor * radiusFactor * thicknessFactor);
-    }
-
-    private static float GetMaterialDensity(string material)
-    {
-        return material switch
-        {
-            "wood" => 700f,
-            "stone" => 2600f,
-            "bronze" => 8800f,
-            "meteoriciron" => 7800f,
-            "steel" => 7850f,
-            _ => IronDensity
-        };
     }
 
     private void ApplyFlywheelTorque(float torque, float dt)
@@ -338,27 +321,37 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         switch (rotation)
         {
             case "we":
+                standShape = horizontalStandShape;
                 AxisSign = new[] { -1, 0, 0 };
                 OutFacingForNetworkDiscovery = BlockFacing.EAST;
-                SetShapeRotation(0f, 0f, 0f);
+                SetShapeRotation(0f, 0f, 0f, 0f, 0f, 0f);
                 break;
             case "ud":
+                standShape = verticalStandShape;
                 AxisSign = new[] { 0, 1, 0 };
                 OutFacingForNetworkDiscovery = BlockFacing.UP;
-                SetShapeRotation(0f, 0f, 90f);
+                SetShapeRotation(0f, 0f, 90f, 0f, 0f, 0f);
                 break;
             default:
+                standShape = horizontalStandShape;
                 AxisSign = new[] { 0, 0, -1 };
                 OutFacingForNetworkDiscovery = BlockFacing.SOUTH;
-                SetShapeRotation(0f, 90f, 0f);
+                SetShapeRotation(0f, 90f, 0f, 0f, 90f, 0f);
                 break;
         }
     }
 
-    private void SetShapeRotation(float rotateX, float rotateY, float rotateZ)
+    private void SetShapeRotation(
+        float rotatingX,
+        float rotatingY,
+        float rotatingZ,
+        float standX,
+        float standY,
+        float standZ)
     {
-        SetShapeRotation(axleShape, rotateX, rotateY, rotateZ);
-        SetShapeRotation(flywheelShape, rotateX, rotateY, rotateZ);
+        SetShapeRotation(axleShape, rotatingX, rotatingY, rotatingZ);
+        SetShapeRotation(flywheelShape, rotatingX, rotatingY, rotatingZ);
+        SetShapeRotation(standShape, standX, standY, standZ);
     }
 
     private static void SetShapeRotation(CompositeShape shape, float rotateX, float rotateY, float rotateZ)
@@ -408,15 +401,41 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
             : flywheelAngleRad;
     }
 
-    private void RemoveFlywheelRenderable()
+    private void RemoveExtraRenderables()
     {
-        if (flywheelRenderable == null)
+        if (flywheelRenderable != null)
         {
-            return;
+            manager?.RemoveDeviceForRender(flywheelRenderable);
+            flywheelRenderable = null;
         }
 
-        manager?.RemoveDeviceForRender(flywheelRenderable);
-        flywheelRenderable = null;
+        if (standRenderable != null)
+        {
+            manager?.RemoveDeviceForRender(standRenderable);
+            standRenderable = null;
+        }
+    }
+
+    private sealed class FlywheelStandRenderable : IMechanicalPowerRenderable
+    {
+        private readonly BEBehaviorMPFlywheel owner;
+
+        public FlywheelStandRenderable(BEBehaviorMPFlywheel owner)
+        {
+            this.owner = owner;
+        }
+
+        public float AngleRad => 0f;
+
+        public Block Block => owner.Blockentity.Block;
+
+        public BlockPos Position => owner.Position;
+
+        public Vec4f LightRgba => owner.LightRgba;
+
+        public int[] AxisSign => owner.AxisSign;
+
+        public CompositeShape Shape => owner.standShape;
     }
 
     private sealed class FlywheelDiskRenderable : IMechanicalPowerRenderable

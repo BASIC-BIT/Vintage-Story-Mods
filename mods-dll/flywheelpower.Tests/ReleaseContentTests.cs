@@ -58,7 +58,15 @@ public sealed class ReleaseContentTests
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedflywheel.json")));
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedcompactflywheel.json")));
         Assert.Contains("""{ code: "material", states: ["wood", "iron", "meteoriciron", "steel"] }""", fullSizeBlocktype, StringComparison.Ordinal);
-        Assert.Contains("""{ code: "hub", states: ["iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""{ code: "hub", states: ["iron", "meteoriciron", "steel"] }""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("flywheel-wood-meteoriciron-*", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("flywheel-wood-steel-*", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("flywheel-iron-meteoriciron-*", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("flywheel-iron-steel-*", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("flywheel-meteoriciron-iron-*", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("flywheel-meteoriciron-steel-*", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("flywheel-steel-iron-*", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("flywheel-steel-meteoriciron-*", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("""{ code: "material", states: ["wood", "stone", "iron", "meteoriciron", "steel"] }""", compactBlocktype, StringComparison.Ordinal);
         Assert.DoesNotContain("bronze", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("""states: ["wood", "stone""", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
@@ -67,6 +75,16 @@ public sealed class ReleaseContentTests
         Assert.Contains("stone", compactBlocktype, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("meteoriciron", compactBlocktype, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("steel", compactBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("""flywheelpower-full-meteoriciron-meteoricironhub""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""flywheelpower-full-steel-steelhub""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("\"*-meteoriciron-meteoriciron-*\": {", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("\"*-steel-steel-*\": {", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("\"*-meteoriciron-*\": {", compactBlocktype, StringComparison.Ordinal);
+        Assert.Contains("\"*-steel-*\": {", compactBlocktype, StringComparison.Ordinal);
+        Assert.True(CountOccurrences(fullSizeBlocktype, """metal: { base: "game:block/metal/ingot/meteoriciron" }""") >= 1);
+        Assert.True(CountOccurrences(fullSizeBlocktype, """metal: { base: "game:block/metal/ingot/steel" }""") >= 1);
+        Assert.True(CountOccurrences(compactBlocktype, """metal: { base: "game:block/metal/ingot/meteoriciron" }""") >= 1);
+        Assert.True(CountOccurrences(compactBlocktype, """metal: { base: "game:block/metal/ingot/steel" }""") >= 1);
         Assert.Contains("""axleShape: { base: "flywheelpower:block/flywheel-axle" }""", compactBlocktype, StringComparison.Ordinal);
         Assert.DoesNotContain("slip-transmission-shaft", compactBlocktype, StringComparison.Ordinal);
         Assert.Contains("""bearing: { base: "game:block/metal/tarnished/iron-riveted1" }""", fullSizeBlocktype, StringComparison.Ordinal);
@@ -85,6 +103,40 @@ public sealed class ReleaseContentTests
         Assert.All(
             FlywheelPowerModSystem.ReleasedRendererCodes.Skip(4),
             rendererCode => Assert.Contains(rendererCode, compactBlocktype, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PlacedFlywheelsRegisterStaticAxisAwareStandMeshes()
+    {
+        string behaviorSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BEBehaviorMPFlywheel.cs"));
+        string fullSizeBlocktype = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "blocktypes", "flywheel.json"));
+        string compactBlocktype = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "blocktypes", "compactflywheel.json"));
+
+        Assert.Contains("FlywheelStandRenderable", behaviorSource, StringComparison.Ordinal);
+        Assert.Contains("public float AngleRad => 0f;", behaviorSource, StringComparison.Ordinal);
+        Assert.Contains("manager.AddDeviceForRender(standRenderable);", behaviorSource, StringComparison.Ordinal);
+        Assert.Contains("""horizontalStandShape: { base: "flywheelpower:block/flywheel-frame-horizontal" }""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""verticalStandShape: { base: "flywheelpower:block/flywheel-frame-vertical" }""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""horizontalStandShape: { base: "flywheelpower:block/compact-flywheel-frame-horizontal" }""", compactBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""verticalStandShape: { base: "flywheelpower:block/compact-flywheel-frame-vertical" }""", compactBlocktype, StringComparison.Ordinal);
+        Assert.Contains("SetShapeRotation(0f, 0f, 90f, 0f, 0f, 0f);", behaviorSource, StringComparison.Ordinal);
+        Assert.Contains("SetShapeRotation(0f, 90f, 0f, 0f, 90f, 0f);", behaviorSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PhysicalComparisonAppearsOnHeldAndPlacedBlockInfo()
+    {
+        string fullBlockSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));
+        string compactBlockSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockCompactFlywheel.cs"));
+        string behaviorSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BEBehaviorMPFlywheel.cs"));
+        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+
+        Assert.Contains("AddExtraHeldItemInfoPostMaterial", fullBlockSource, StringComparison.Ordinal);
+        Assert.Contains("AddExtraHeldItemInfoPostMaterial", compactBlockSource, StringComparison.Ordinal);
+        Assert.Contains("flywheelpower:blockinfo-physical", fullBlockSource, StringComparison.Ordinal);
+        Assert.Contains("flywheelpower:blockinfo-physical", compactBlockSource, StringComparison.Ordinal);
+        Assert.Contains("flywheelpower:blockinfo-physical", behaviorSource, StringComparison.Ordinal);
+        Assert.Contains("Rotating mass: {0} kg; effective inertia: {1}", activeLanguage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -237,5 +289,10 @@ public sealed class ReleaseContentTests
             .EnumerateArray()
             .Select(element => element.Clone())
             .ToArray();
+    }
+
+    private static int CountOccurrences(string source, string value)
+    {
+        return source.Split(value, StringSplitOptions.None).Length - 1;
     }
 }

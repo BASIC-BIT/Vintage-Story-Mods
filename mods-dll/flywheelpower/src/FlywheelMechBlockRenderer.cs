@@ -363,12 +363,21 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         {
             return new()
             {
-                WheelOuterRadius = 0.38f, CoupledInnerRadius = 0.20f,
-                HubOuterRadius = 0.22f, KeyedHubOuterRadius = 0.22f, WheelHalfThickness = 0.16f,
-                HubHalfThickness = 0.20f, BearingOuterRadius = 0.17f, BearingHalfThickness = 0.22f,
-                AxleRadius = 0.075f, AxleMinX = -0.08f, AxleMaxX = 1.08f,
-                ChalkHalfWidth = 0.025f, ShaftClearanceRadius = 0.145f, CouplingPlateOuterRadius = 0.29f,
-                CouplingPlateThickness = 0.025f
+                WheelOuterRadius = FlywheelModelDimensions.CompactWheelOuterRadius,
+                CoupledInnerRadius = FlywheelModelDimensions.CompactCoupledInnerRadius,
+                HubOuterRadius = FlywheelModelDimensions.CompactHubOuterRadius,
+                KeyedHubOuterRadius = FlywheelModelDimensions.CompactHubOuterRadius,
+                WheelHalfThickness = FlywheelModelDimensions.CompactWheelHalfThickness,
+                HubHalfThickness = FlywheelModelDimensions.CompactHubHalfThickness,
+                BearingOuterRadius = FlywheelModelDimensions.CompactBearingOuterRadius,
+                BearingHalfThickness = FlywheelModelDimensions.CompactBearingHalfThickness,
+                AxleRadius = FlywheelModelDimensions.CompactAxleRadius,
+                AxleMinX = -0.08f,
+                AxleMaxX = 1.08f,
+                ChalkHalfWidth = 0.025f,
+                ShaftClearanceRadius = FlywheelModelDimensions.CompactShaftClearanceRadius,
+                CouplingPlateOuterRadius = FlywheelModelDimensions.CompactCouplingPlateOuterRadius,
+                CouplingPlateThickness = FlywheelModelDimensions.CompactCouplingPlateThickness
             };
         }
 

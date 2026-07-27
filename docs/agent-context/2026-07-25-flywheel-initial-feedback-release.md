@@ -171,12 +171,32 @@ Curated materials and grounded-stand candidate, July 27, 2026:
 - In-game appearance, variant texture identity, placement/foundation behavior, powered rotation, multiblock interaction, and
   save/reload remain observation-level manual QA gates. Startup and package evidence do not count as visual approval.
 
+Matching-hub, comparison-info, and stand-render correction, July 27, 2026:
+
+- The nine-item release set remains bounded. Full-size wood and iron retain iron hubs; full-size meteoric iron and steel now
+  use matching meteoric-iron and steel hubs. Compact iron, meteoric-iron, and steel constructions use matching visible hub
+  material without adding another variant axis. Wood and compact stone continue to use iron hubs.
+- Both held-item/handbook information and placed-block information now report physically derived rotating mass in kilograms
+  and normalized effective inertia. The calculation covers the rotating wheel, hub, bearing collar, coupling plates, and
+  wooden axle. Full iron remains the gameplay tuning reference at effective inertia 8.
+- The authored stand shapes existed in inventory previews but were suppressed after placement by the mechanical behavior's
+  custom tessellation path. Each placed flywheel now registers its horizontal or vertical stand as a separate static
+  mechanical renderable; only the axle and wheel receive live rotation.
+- The exact 15-entry package is 50,460 bytes and has SHA-256
+  `6CFF597A5E76E5448377FAAD81A97B3A5C33524E2696E6473E2024CC9EC6719B`. Both QA profiles and a downloaded copy of the
+  disposable-server package match that hash. The restarted server loaded `FlywheelPower.FlywheelPowerModSystem`, reached
+  `WorldReady`, and both clients relaunched without a new Flywheel startup exception.
+- All six CI build and whitespace-format targets passed. The BASICs tests passed 488/488, DimensionLib tests passed 58/58,
+  Flywheel Power tests passed 26/26, and the repository Lizard gate passed.
+- Visual confirmation of the newly registered stand, matching advanced hubs, tooltip values, and the remaining five cards is
+  still required. Package and log evidence do not count as visual approval.
+
 In-game cards remaining after the interrupted attempt:
 
 1. **Proportions, stand, and variant appearance** (P0)
    - Config: Creative world, all nine released flywheels.
    - Do: Place full-size and compact examples and view them straight on, at roughly 45 degrees, and directly from the side.
-   - Expect: The full disc spans 1.6 blocks inside the 3x3 plane with deliberate edge clearance, a close-fitting bearing collar, and a thin 0.1875-block profile. The two-bearing timber stand visibly reaches the ground and reads as a braced, bolted support rather than a decorative floating frame. Wood, stone, iron, meteoric iron, and steel textures remain visually distinct where released; every compact axle is wood.
+   - Expect: The full disc spans 1.6 blocks inside the 3x3 plane with deliberate edge clearance, a close-fitting bearing collar, and a thin 0.1875-block profile. The two-bearing timber stand visibly reaches the ground and reads as a braced, bolted support rather than a decorative floating frame. Wood, stone, iron, meteoric iron, and steel textures remain visually distinct where released; meteoric-iron and steel hubs match their wheels, while every compact axle is wood.
    - Watch for: A wheel that nearly fills the footprint, a bulky central drum, an axle gap, wheel/frame clipping, floating sleepers, missing stand components, material variants sharing the wrong texture, or an edge-on profile that reads as a thick cylinder.
 
 2. **Rotation and axle alignment** (P0)
@@ -194,8 +214,8 @@ In-game cards remaining after the interrupted attempt:
 4. **Creative and handbook surface** (P1)
    - Config: Creative mode and handbook/search available.
    - Do: Search for `flywheel` and `slip transmission`, and inspect relevant creative tabs.
-   - Expect: Nine active choices are discoverable: full-size wood, iron, meteoric iron, and steel with iron hubs, plus compact wood, stone, iron, meteoric iron, and steel. No full-size stone flywheel, Slip Transmission entry, item, recipe, or placeable block appears.
-   - Watch for: Raw localization keys, legacy generic flywheel aliases, or hidden transmission variants.
+   - Expect: Nine active choices are discoverable: full-size wood and iron with iron hubs, full-size meteoric iron and steel with matching hubs, plus compact wood, stone, iron, meteoric iron, and steel. Hovered items and placed blocks show rotating mass and effective inertia. No full-size stone flywheel, Slip Transmission entry, item, recipe, or placeable block appears.
+   - Watch for: Raw localization keys, missing physical comparison lines, freely mixed hub combinations, legacy generic flywheel aliases, or hidden transmission variants.
 
 5. **Save/reload behavior** (P0)
    - Config: A placed and mechanically connected full-size flywheel.
@@ -224,8 +244,9 @@ If feedback supports the curated release set, commission one coherent material p
   hub/bearing center, axle attachment semantics, and existing 3x3x1 collision/selection footprint.
 - Deliver Vintage Story shape JSON plus atlas-ready textures and front, three-quarter, and side previews for each construction
   and its compact counterpart.
-- Keep the iron hub/axle visually consistent across the set; focus the commission on readable material construction, restrained
-  edge detail, and a stronger real-flywheel silhouette rather than animation, new gameplay, or additional variants.
+- Keep the bearing collar and wooden axle visually consistent while giving the meteoric-iron and steel hubs restrained
+  matching finishes. Focus the commission on readable material construction, restrained edge detail, and a stronger
+  real-flywheel silhouette rather than animation, new gameplay, or additional variants.
 
 ## Retirement condition
 

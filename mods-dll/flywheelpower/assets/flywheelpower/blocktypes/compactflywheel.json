@@ -8,6 +8,8 @@
       properties: {
         axleShape: { base: "flywheelpower:block/flywheel-axle" },
         flywheelShape: { base: "flywheelpower:block/compact-flywheel-wheel-coupled" },
+        horizontalStandShape: { base: "flywheelpower:block/compact-flywheel-frame-horizontal" },
+        verticalStandShape: { base: "flywheelpower:block/compact-flywheel-frame-vertical" },
         slipCoupled: true,
         inertia: 8.0,
         couplingStrength: 0.55,
@@ -15,10 +17,7 @@
         baseBearingLoss: 0.0005,
         viscousBearingLoss: 0.0015,
         windageLoss: 0.0005,
-        safeSpeed: 4.5,
-        wheelOuterRadius: 0.38,
-        coupledInnerRadius: 0.20,
-        wheelHalfThickness: 0.16
+        safeSpeed: 4.5
       }
     }
   ],
@@ -90,13 +89,13 @@
     },
     "*-meteoriciron-*": {
       wheel: { base: "game:block/metal/ingot/meteoriciron" },
-      metal: { base: "game:block/metal/ingot/iron" },
+      metal: { base: "game:block/metal/ingot/meteoriciron" },
       bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
       wood: { base: "game:block/wood/planks/generic" }
     },
     "*-steel-*": {
       wheel: { base: "game:block/metal/ingot/steel" },
-      metal: { base: "game:block/metal/ingot/iron" },
+      metal: { base: "game:block/metal/ingot/steel" },
       bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
       wood: { base: "game:block/wood/planks/generic" }
     }
