@@ -206,14 +206,14 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         float tangentY = MathF.Cos(angle);
         float tangentZ = -MathF.Sin(angle);
 
-        MeshVertex fInnerLeft = SpokeVertex(maxX, innerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, 0f, 0f);
-        MeshVertex fInnerRight = SpokeVertex(maxX, innerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, 1f, 0f);
-        MeshVertex fOuterRight = SpokeVertex(maxX, outerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, 1f, 1f);
-        MeshVertex fOuterLeft = SpokeVertex(maxX, outerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, 0f, 1f);
-        MeshVertex bInnerLeft = SpokeVertex(minX, innerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, 0f, 0f);
-        MeshVertex bInnerRight = SpokeVertex(minX, innerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, 1f, 0f);
-        MeshVertex bOuterRight = SpokeVertex(minX, outerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, 1f, 1f);
-        MeshVertex bOuterLeft = SpokeVertex(minX, outerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, 0f, 1f);
+        MeshVertex fInnerLeft = SpokeVertex(maxX, innerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, new Vec2f(0f, 0f));
+        MeshVertex fInnerRight = SpokeVertex(maxX, innerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, new Vec2f(1f, 0f));
+        MeshVertex fOuterRight = SpokeVertex(maxX, outerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, new Vec2f(1f, 1f));
+        MeshVertex fOuterLeft = SpokeVertex(maxX, outerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, new Vec2f(0f, 1f));
+        MeshVertex bInnerLeft = SpokeVertex(minX, innerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, new Vec2f(0f, 0f));
+        MeshVertex bInnerRight = SpokeVertex(minX, innerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, new Vec2f(1f, 0f));
+        MeshVertex bOuterRight = SpokeVertex(minX, outerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, new Vec2f(1f, 1f));
+        MeshVertex bOuterLeft = SpokeVertex(minX, outerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, new Vec2f(0f, 1f));
 
         AddQuad(mesh, tex, fInnerLeft, fInnerRight, fOuterRight, fOuterLeft, new Vec3f(1f, 0f, 0f));
         AddQuad(mesh, tex, bInnerLeft, bOuterLeft, bOuterRight, bInnerRight, new Vec3f(-1f, 0f, 0f));
@@ -231,15 +231,14 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         float radialZ,
         float tangentY,
         float tangentZ,
-        float u,
-        float v)
+        Vec2f uv)
     {
         return new MeshVertex(
             x,
             Center + radius * radialY + tangentOffset * tangentY,
             Center + radius * radialZ + tangentOffset * tangentZ,
-            u,
-            v);
+            uv.X,
+            uv.Y);
     }
 
     private static void AddCoupledHubAssembly(MeshData mesh, TextureAtlasPosition metalTex, TextureAtlasPosition bearingTex, FlywheelMeshSpec spec, float wheelMinX, float wheelMaxX)
