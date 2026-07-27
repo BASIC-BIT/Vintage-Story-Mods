@@ -216,6 +216,9 @@ public class VtmlUtilsTests
         [InlineData("Just a normal sentence here.")]
         [InlineData("short\nlines\tand  spacing preserved")]
         [InlineData("<i>italic</i> and <font color=\"#ff0000\">colored</font>")]
+        // 20 and 18 source characters respectively, but VtmlParser draws 5 and 3 glyphs.
+        [InlineData("&lt;&lt;&lt;&lt;&lt;")]
+        [InlineData("&nbsp;&nbsp;&nbsp;")]
         public void LeavesMessagesWithoutLongTokensUntouched(string vtml)
         {
             Break(vtml).Should().Be(vtml);
@@ -258,8 +261,27 @@ public class VtmlUtilsTests
         public void NeverSplitsInsideAnEntity()
         {
             // "&lt;" is decoded to "<" by VtmlParser; splitting it would render as literal text.
+            // Each entity counts as the one glyph it draws, so the break lands after ten glyphs.
             Break("aaaaaaaa&lt;&lt;&lt;bbbb")
-                .Should().Be("aaaaaaaa\n&lt;&lt;\n&lt;bbbb");
+                .Should().Be("aaaaaaaa&lt;&lt;\n&lt;bbbb");
+        }
+
+        [Fact]
+        public void BreaksOnDecodedEntityWidthNotSourceWidth()
+        {
+            // 12 entities are 48 source characters but 12 glyphs, so exactly ten belong on line one.
+            static string Entities(int count) => string.Concat(Enumerable.Repeat("&lt;", count));
+
+            Break(Entities(12)).Should().Be(Entities(10) + "\n" + Entities(2));
+        }
+
+        [Fact]
+        public void MeasuresEntitiesVtmlParserDoesNotDecodeAtTheirSourceWidth()
+        {
+            // VtmlParser decodes only &lt; &gt; &nbsp;. "&amp;" is drawn as five literal glyphs,
+            // so two of them fill the box.
+            Break("&amp;&amp;&amp;")
+                .Should().Be("&amp;&amp;\n&amp;");
         }
 
         [Fact]
@@ -269,6 +291,18 @@ public class VtmlUtilsTests
 
             Break(new string('a', 9) + emoji + new string('a', 9))
                 .Should().Be("aaaaaaaaa\n" + emoji + "aaaaaaaa\na");
+        }
+
+        [Theory]
+        [InlineData("\U0001F1EF\U0001F1F5")]                       // regional indicator pair (flag)
+        [InlineData("\U0001F44D\U0001F3FD")]                       // emoji plus skin tone modifier
+        [InlineData("\U0001F468\u200D\U0001F469\u200D\U0001F467")] // ZWJ sequence (family)
+        public void NeverSplitsAMultiCodePointGraphemeCluster(string cluster)
+        {
+            // Eight chars leave room for one more code point but not for the whole cluster, so a
+            // code-point-wise splitter would break inside it and render separated or broken glyphs.
+            Break(new string('a', 8) + cluster)
+                .Should().Be("aaaaaaaa\n" + cluster);
         }
 
         [Fact]
@@ -315,27 +349,6 @@ public class VtmlUtilsTests
         {
             VtmlUtils.BreakLongTokens("aaaaaaaaaaaaaaa", Measure, 0)
                 .Should().Be("aaaaaaaaaaaaaaa");
-        }
-    }
-
-    /// <summary>
-    /// Cheap gate deciding whether a tag-free bubble needs the wrapping renderer at all.
-    /// </summary>
-    public class HasUnbrokenRun
-    {
-        [Theory]
-        [InlineData("aaaa", 4, true)]
-        [InlineData("aaa", 4, false)]
-        [InlineData("aaa aaa", 4, false)]           // breaks reset the run
-        [InlineData("aaa\naaaa", 4, true)]
-        [InlineData("hi aaaa hi", 4, true)]         // the run may sit anywhere
-        [InlineData("aa\taa", 4, false)]
-        [InlineData("", 4, false)]
-        [InlineData(null, 4, false)]
-        [InlineData("aaaa", 0, false)]
-        public void DetectsRunsOfNonBreakingCharacters(string? text, int minLength, bool expected)
-        {
-            VtmlUtils.HasUnbrokenRun(text!, minLength).Should().Be(expected);
         }
     }
 }

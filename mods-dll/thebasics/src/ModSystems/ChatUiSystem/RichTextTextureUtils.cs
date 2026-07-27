@@ -65,7 +65,7 @@ internal static class RichTextTextureUtils
         {
             vtml = VtmlUtils.NormalizeVtmlForRendering(vtml);
 
-            var guiScale = RuntimeEnv.GUIScale > 0 ? RuntimeEnv.GUIScale : 1;
+            var guiScale = GetGuiScale();
             var maxTextWidthAtScalePx = GetScaledLengthPx(maxTextWidthPx, guiScale);
             var measureHeightAtScalePx = GetScaledLengthPx(MeasureHeightPx, guiScale);
 
@@ -170,6 +170,28 @@ internal static class RichTextTextureUtils
     }
 
     /// <summary>
+    /// True when <paramref name="vtml"/> holds a token this renderer would have to pre-split, i.e. one
+    /// the engine would clip instead of wrap. Callers use it to decide whether to take a bubble over
+    /// from vanilla at all, so it asks the splitter itself rather than guessing from a glyph count:
+    /// same font, same GUI scale, same width budget as the render that follows.
+    /// </summary>
+    internal static bool HasTokenTooWideToWrap(string vtml, CairoFont baseFont, int maxTextWidthPx)
+    {
+        if (string.IsNullOrEmpty(vtml))
+        {
+            return false;
+        }
+
+        var guiScale = GetGuiScale();
+        return BreakTokensTooWideToWrap(vtml, baseFont, GetScaledLengthPx(maxTextWidthPx, guiScale), guiScale) != vtml;
+    }
+
+    private static float GetGuiScale()
+    {
+        return RuntimeEnv.GUIScale > 0 ? RuntimeEnv.GUIScale : 1;
+    }
+
+    /// <summary>
     /// VS clips, rather than wraps, a token wider than the box unless that token happens to start a
     /// line, so split those tokens up front and leave the engine only tokens that fit.
     /// </summary>
@@ -183,8 +205,12 @@ internal static class RichTextTextureUtils
         // Measured bold on purpose. VtmlUtil.Richtextify renders <strong> bold and <i> italic, and
         // both reach bubbles (accent delimiters, and every unknown-language, gesture or sign line).
         // Bold is the wider of the two, so a bold measure never under-estimates the rendered width.
-        // ponytail: one font for the whole string. Measure per RichTextComponent only if a tag that
-        // changes size (<font size=...>) ever reaches this text.
+        //
+        // One font for the whole string is enough because no tag reaching this text changes glyph
+        // size: <font> arrives here carrying only color, and the two transformers that emit
+        // `<font size=...>` (DistanceFontSizeTransformer, ICSpeechFormatTransformer) are registered
+        // *after* SpeechBubbleClientDataTransformer, so the bubble payload is built before either
+        // runs. ponytail: measure per RichTextComponent only if that ordering ever changes.
         var measureFont = baseFont.Clone().WithWeight(FontWeight.Bold);
         return VtmlUtils.BreakLongTokens(
             vtml,

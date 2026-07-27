@@ -182,9 +182,10 @@ public static class VtmlUtils
     ///
     /// Tags are copied verbatim and act as token boundaries, so nothing is ever inserted inside markup.
     ///
-    /// Widths are measured on the raw VTML, so a token carrying entities (<c>&amp;lt;</c> and friends,
-    /// which <c>VtmlParser.Tokenize</c> later decodes to one character) is over-measured and breaks
-    /// slightly early. That errs towards a narrower line, never towards a clip, so it is left alone.
+    /// Widths are measured on the decoded text. <c>VtmlParser.Tokenize</c> renders <c>&amp;lt;</c>,
+    /// <c>&amp;gt;</c> and <c>&amp;nbsp;</c> as one character each, so measuring the source spelling
+    /// would count four or six glyphs where one is drawn and break the line early. Entities the engine
+    /// does not decode (numeric ones, <c>&amp;amp;</c>) are drawn literally and so measured literally.
     ///
     /// Locales whose line break behaviour is <see cref="Vintagestory.API.Client.EnumLinebreakBehavior.AfterCharacter"/>
     /// (ja, ko) already wrap mid-token in the engine and should not be passed through here.
@@ -219,31 +220,6 @@ public static class VtmlUtils
 
         AppendBrokenToken(output, token, measureWidthPx, maxWidthPx);
         return output.ToString();
-    }
-
-    /// <summary>
-    /// True when <paramref name="text"/> holds an unbroken run of at least <paramref name="minLength"/>
-    /// characters, i.e. something <see cref="BreakLongTokens"/> might have to split. Cheap gate for
-    /// callers that have to decide whether to route text through the wrapping renderer at all.
-    /// </summary>
-    public static bool HasUnbrokenRun(string text, int minLength)
-    {
-        if (string.IsNullOrEmpty(text) || minLength <= 0)
-        {
-            return false;
-        }
-
-        var run = 0;
-        foreach (var c in text)
-        {
-            run = IsLineBreakOpportunity(c) ? 0 : run + 1;
-            if (run >= minLength)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /// <summary>
@@ -282,7 +258,8 @@ public static class VtmlUtils
         var text = token.ToString();
         token.Clear();
 
-        if (measureWidthPx(text) <= maxWidthPx)
+        // UnescapeVtml decodes exactly what VtmlParser decodes, so this measures what gets drawn.
+        if (measureWidthPx(UnescapeVtml(text)) <= maxWidthPx)
         {
             output.Append(text);
             return;
@@ -293,7 +270,7 @@ public static class VtmlUtils
         while (index < text.Length)
         {
             var unit = text.Substring(index, GetAtomicUnitLength(text, index));
-            if (chunk.Length > 0 && measureWidthPx(chunk.ToString() + unit) > maxWidthPx)
+            if (chunk.Length > 0 && measureWidthPx(UnescapeVtml(chunk.ToString() + unit)) > maxWidthPx)
             {
                 output.Append(chunk).Append('\n');
                 chunk.Clear();
