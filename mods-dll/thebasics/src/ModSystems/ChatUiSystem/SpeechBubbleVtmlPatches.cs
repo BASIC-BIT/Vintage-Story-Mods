@@ -181,9 +181,11 @@ public static class SpeechBubbleVtmlPatches
         // wrapping it. The width test asks the renderer's own splitter, so the gate and the render
         // agree exactly instead of relying on a glyph-count estimate.
         //
-        // Vanilla bubble mode never reaches here: Prefix returns early on IsSpeechBubbleVtmlEnabled,
-        // so those bubbles still clip. Taking them over changes their look for users who opted out
-        // of RP bubble rendering, so it is a product decision tracked in issue #201.
+        // Vanilla bubble mode never reaches here: Prefix returns early on IsSpeechBubbleVtmlEnabled.
+        // Those bubbles clip long tokens, and that is correct. OverheadChatBubbleMode=Vanilla promises
+        // vanilla rendering, and clipping an over-long token that follows other text is what vanilla
+        // does. Wrapping there would mean the mode no longer renders like vanilla, which is the whole
+        // point of the setting. Not a gap to close later: use RpText mode if you want wrapping.
         return bubbleVtml.Contains('<')
             || kind != null
             || mode != null
