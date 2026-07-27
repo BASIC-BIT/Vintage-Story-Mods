@@ -257,7 +257,7 @@ jobs:
             const [, , commentFile, bodyFile] = process.argv;
             const comment = JSON.parse(fs.readFileSync(commentFile, "utf8"));
             fs.writeFileSync(bodyFile, String(comment.body ?? ""));
-            NODE
+          NODE
 
             if [ "${SECRET_AVAILABLE}" = "true" ] &&
               grep -qF "<!-- claude-pr-review-complete -->" "$existing_body_file"; then
@@ -299,14 +299,14 @@ jobs:
                   notice;
               }
               fs.writeFileSync(bodyFile, prefix + boundedPrevious + suffix);
-              NODE
+          NODE
 
               node - "$body_file" "$json_file" <<'NODE'
               const fs = require("node:fs");
 
               const [, , bodyFile, jsonFile] = process.argv;
               fs.writeFileSync(jsonFile, JSON.stringify({ body: fs.readFileSync(bodyFile, "utf8") }));
-              NODE
+          NODE
             fi
 
             if ! gh api --method PATCH \
@@ -693,7 +693,7 @@ jobs:
               Array.from(review).length <= 58000 &&
               Buffer.byteLength(review, "utf8") <= 58000;
             process.exit(withinBudget ? 0 : 1);
-            NODE
+          NODE
             then
               {
                 echo "${STICKY_MARKER}"
