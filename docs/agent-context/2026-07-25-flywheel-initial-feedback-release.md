@@ -340,3 +340,21 @@ Open decisions for a survival-design follow-up:
 ## Retirement condition
 
 Remove this packet after the initial-feedback pull request is merged or closed and all surviving follow-ups have durable issues or product documentation.
+
+## Stand-first construction implementation, July 27, 2026
+
+- The finished flywheel block-items now act as installable wheel assemblies. Direct placement is rejected with a specific
+  stand-first message; the player places either a full-size or compact grounded stand and installs a matching assembly by
+  interacting with it.
+- Full-size empty stands reserve the same 3x3x1 cells and foundation as an installed wheel. Breaking an installed machine
+  returns the stand and wheel assembly separately.
+- The full-size rotating model is no longer a solid material annulus. It uses eight broad timber spokes, a timber felloe from
+  radius 0.56 to 0.68 block, and a material-specific outer tyre from radius 0.68 to 0.8 block. Pivots, axle alignment, overall
+  diameter, 0.1875-block depth, and the 3x3x1 interaction footprint remain unchanged.
+- The horizontal stand brace rotation was corrected so its front and rear A-frame members terminate at the bearing support
+  instead of projecting away into open space.
+- Survival construction is intentionally abstracted into three intermediates: a lubricated hub-and-bearing set, timber web,
+  and prepared rim or tyre. Full-size metal tyres require eight plates and compact metal blanks require four; animal fat is
+  consumed in every bearing set.
+- A future smithing or 3x3 casting workflow may replace the grid abstraction if feedback shows the extra interaction is worth
+  the content and maintenance cost. It is not required for the initial-feedback loop.

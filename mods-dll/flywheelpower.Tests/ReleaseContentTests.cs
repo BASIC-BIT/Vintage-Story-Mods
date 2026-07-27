@@ -165,8 +165,14 @@ public sealed class ReleaseContentTests
                 "block",
                 "flywheel-wheel-coupled.json")));
         JsonElement elements = document.RootElement.GetProperty("elements");
-        JsonElement[] discBands = elements.EnumerateArray()
-            .Where(element => element.GetProperty("name").GetString()!.StartsWith("DiscBand", StringComparison.Ordinal))
+        JsonElement[] spokes = elements.EnumerateArray()
+            .Where(element => element.GetProperty("name").GetString()!.StartsWith("WoodSpoke", StringComparison.Ordinal))
+            .ToArray();
+        JsonElement[] felloes = elements.EnumerateArray()
+            .Where(element => element.GetProperty("name").GetString()!.StartsWith("WoodFelloe", StringComparison.Ordinal))
+            .ToArray();
+        JsonElement[] tyreSegments = elements.EnumerateArray()
+            .Where(element => element.GetProperty("name").GetString()!.StartsWith("OuterTyre", StringComparison.Ordinal))
             .ToArray();
         JsonElement hub = elements.EnumerateArray()
             .Single(element => element.GetProperty("name").GetString() == "Hub");
@@ -179,16 +185,18 @@ public sealed class ReleaseContentTests
         JsonElement chalkRim = elements.EnumerateArray()
             .Single(element => element.GetProperty("name").GetString() == "ChalkLineRim");
 
-        double minY = discBands.Min(element => element.GetProperty("from")[1].GetDouble());
-        double maxY = discBands.Max(element => element.GetProperty("to")[1].GetDouble());
-        double minZ = discBands.Min(element => element.GetProperty("from")[2].GetDouble());
-        double maxZ = discBands.Max(element => element.GetProperty("to")[2].GetDouble());
-        double minX = discBands.Min(element => element.GetProperty("from")[0].GetDouble());
-        double maxX = discBands.Max(element => element.GetProperty("to")[0].GetDouble());
-
-        Assert.Equal(25.6d, maxY - minY, 2);
-        Assert.Equal(25.6d, maxZ - minZ, 2);
-        Assert.Equal(3d, maxX - minX);
+        Assert.Equal(8, spokes.Length);
+        Assert.Equal(8, felloes.Length);
+        Assert.Equal(8, tyreSegments.Length);
+        Assert.All(spokes, spoke =>
+            Assert.Equal("#wood", spoke.GetProperty("faces").GetProperty("north").GetProperty("texture").GetString()));
+        Assert.All(felloes, felloe =>
+            Assert.Equal("#wood", felloe.GetProperty("faces").GetProperty("north").GetProperty("texture").GetString()));
+        Assert.All(tyreSegments, tyre =>
+            Assert.Equal("#wheel", tyre.GetProperty("faces").GetProperty("north").GetProperty("texture").GetString()));
+        Assert.All(tyreSegments, tyre =>
+            Assert.Equal(3d, tyre.GetProperty("to")[0].GetDouble() - tyre.GetProperty("from")[0].GetDouble(), 2));
+        Assert.Equal(1.92d, tyreSegments[0].GetProperty("to")[2].GetDouble() - tyreSegments[0].GetProperty("from")[2].GetDouble(), 2);
         Assert.Equal(8.96d, hub.GetProperty("to")[1].GetDouble() - hub.GetProperty("from")[1].GetDouble(), 2);
         Assert.Equal(4.32d, hub.GetProperty("to")[0].GetDouble() - hub.GetProperty("from")[0].GetDouble(), 2);
         Assert.Equal(6.08d, bearing.GetProperty("to")[1].GetDouble() - bearing.GetProperty("from")[1].GetDouble(), 2);
@@ -254,6 +262,12 @@ public sealed class ReleaseContentTests
         Assert.Contains("FrontLeftHoldDown", fullNames);
         Assert.Equal(-16d, fullElements.Min(element => element.GetProperty("from")[1].GetDouble()));
         Assert.All(
+            fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("FrontBrace", StringComparison.Ordinal)),
+            brace => Assert.Equal(18d, brace.GetProperty("rotationX").GetDouble()));
+        Assert.All(
+            fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("RearBrace", StringComparison.Ordinal)),
+            brace => Assert.Equal(-18d, brace.GetProperty("rotationX").GetDouble()));
+        Assert.All(
             fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("BearingCap", StringComparison.Ordinal)),
             cap => Assert.All(
                 cap.GetProperty("faces").EnumerateObject(),
@@ -279,11 +293,11 @@ public sealed class ReleaseContentTests
     [Fact]
     public void FullSizePlacementExplainsItsReservedFootprint()
     {
-        string blockSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));
+        string multiblockSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "FlywheelMultiblock.cs"));
         string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
 
-        Assert.Contains("""failureCode = "flywheelrequiresclearance";""", blockSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("""failureCode = "notenoughspace";""", blockSource, StringComparison.Ordinal);
+        Assert.Contains("""failureCode = "flywheelrequiresclearance";""", multiblockSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("""failureCode = "notenoughspace";""", multiblockSource, StringComparison.Ordinal);
         Assert.Contains(
             """"placefailure-flywheelrequiresclearance": "Requires a clear 3x3 area around the flywheel plane."""",
             activeLanguage,
@@ -308,12 +322,49 @@ public sealed class ReleaseContentTests
         Assert.Equal(9, vertical.Length);
         Assert.All(vertical, pos => Assert.Equal(19, pos.Y));
 
+        string standSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheelStand.cs"));
+        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+        Assert.Contains("""failureCode = "flywheelrequiresfoundation";""", standSource, StringComparison.Ordinal);
+        Assert.Contains("placefailure-flywheelrequiresfoundation", activeLanguage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AssemblyBlocksRequireAPlacedStandAndReturnBothPartsWhenBroken()
+    {
         string fullSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));
         string compactSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockCompactFlywheel.cs"));
-        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
-        Assert.Contains("""failureCode = "flywheelrequiresfoundation";""", fullSource, StringComparison.Ordinal);
-        Assert.Contains("""failureCode = "flywheelrequiresfoundation";""", compactSource, StringComparison.Ordinal);
-        Assert.Contains("placefailure-flywheelrequiresfoundation", activeLanguage, StringComparison.Ordinal);
+        string standSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheelStand.cs"));
+        string fullBlocktype = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "blocktypes", "flywheel.json"));
+        string compactBlocktype = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "blocktypes", "compactflywheel.json"));
+
+        Assert.Contains("""failureCode = "flywheelrequiresstand";""", fullSource, StringComparison.Ordinal);
+        Assert.Contains("""failureCode = "flywheelrequiresstand";""", compactSource, StringComparison.Ordinal);
+        Assert.Contains("SetBlock(installed.BlockId", standSource, StringComparison.Ordinal);
+        Assert.Contains("slot.TakeOut(1)", standSource, StringComparison.Ordinal);
+        Assert.Contains("code: \"flywheelstand-full-ud\"", fullBlocktype, StringComparison.Ordinal);
+        Assert.Contains("code: \"flywheelstand-compact-ud\"", compactBlocktype, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SurvivalRecipesExposeTheStagedConstructionChain()
+    {
+        string recipes = string.Join(
+            "\n",
+            Directory.EnumerateFiles(
+                    Path.Combine(ProjectRoot, "assets", "flywheelpower", "recipes", "grid"),
+                    "*.json")
+                .Select(File.ReadAllText));
+
+        Assert.Contains("game:fat-rendered", recipes, StringComparison.Ordinal);
+        Assert.Contains("game:metalplate-iron", recipes, StringComparison.Ordinal);
+        Assert.Contains("game:metalplate-meteoriciron", recipes, StringComparison.Ordinal);
+        Assert.Contains("game:metalplate-steel", recipes, StringComparison.Ordinal);
+        Assert.Contains("flywheelbearing-full-", recipes, StringComparison.Ordinal);
+        Assert.Contains("flywheelweb-full", recipes, StringComparison.Ordinal);
+        Assert.Contains("flywheelrim-full-", recipes, StringComparison.Ordinal);
+        Assert.Contains("flywheelstand-full-ud", recipes, StringComparison.Ordinal);
+        Assert.Contains("flywheelstand-compact-ud", recipes, StringComparison.Ordinal);
+        Assert.DoesNotContain("flywheelrim-full-stone", recipes, StringComparison.Ordinal);
     }
 
     private static string FindProjectRoot()

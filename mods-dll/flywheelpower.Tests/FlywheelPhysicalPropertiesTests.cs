@@ -30,7 +30,7 @@ public sealed class FlywheelPhysicalPropertiesTests
     }
 
     [Fact]
-    public void CompactConstructionsRemainLighterAndStoneFillsTheMiddleTier()
+    public void CompactConstructionsPreserveInertiaOrderingAndStoneFillsTheMiddleTier()
     {
         FlywheelPhysicalProfile fullIron = FlywheelPhysicalProperties.ForVariant(false, "iron", "iron");
         FlywheelPhysicalProfile compactWood = FlywheelPhysicalProperties.ForVariant(true, "wood", "iron");
@@ -41,7 +41,6 @@ public sealed class FlywheelPhysicalPropertiesTests
         Assert.True(compactStone.RotatingMassKg < compactIron.RotatingMassKg);
         Assert.True(compactWood.EffectiveInertia < compactStone.EffectiveInertia);
         Assert.True(compactStone.EffectiveInertia < compactIron.EffectiveInertia);
-        Assert.True(compactIron.RotatingMassKg < fullIron.RotatingMassKg);
         Assert.True(compactIron.EffectiveInertia < fullIron.EffectiveInertia);
     }
 

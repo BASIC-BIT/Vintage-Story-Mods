@@ -78,11 +78,8 @@
   ],
   creativeinventory: { "general": ["*-ud"], "mechanics": ["*-ud"] },
   shapeInventory: {
-    base: "flywheelpower:block/compact-flywheel-frame-horizontal",
-    overlays: [
-      { base: "flywheelpower:block/compact-flywheel-wheel-coupled" },
-      { base: "flywheelpower:block/flywheel-axle" }
-    ]
+    base: "flywheelpower:block/compact-flywheel-wheel-coupled",
+    overlays: [{ base: "flywheelpower:block/flywheel-axle" }]
   },
   shapeByType: {
     "*-ns": { base: "flywheelpower:block/compact-flywheel-frame-horizontal", rotateY: 90 },
@@ -183,7 +180,10 @@
   resistance: 5,
   lightAbsorption: 0,
   maxStackSize: 16,
-  drops: [{ type: "block", code: "compactflywheel-{material}-{hub}-ud", quantity: { avg: 1 } }],
+  drops: [
+    { type: "block", code: "flywheelstand-compact-ud", quantity: { avg: 1 } },
+    { type: "block", code: "compactflywheel-{material}-{hub}-ud", quantity: { avg: 1 } }
+  ],
   collisionSelectionBoxByType: {
     "*-we": { x1: 0, y1: 0.0625, z1: 0.0625, x2: 1, y2: 0.9375, z2: 0.9375 },
     "*-ns": { x1: 0, y1: 0.0625, z1: 0.0625, x2: 1, y2: 0.9375, z2: 0.9375, rotateY: 90 },

@@ -23,6 +23,16 @@ public sealed class FlywheelModelDimensionsTests
     }
 
     [Fact]
+    public void FullSizeWheelConcentratesMaterialInANarrowTyreAroundATimberWeb()
+    {
+        Assert.Equal(0.12f, FlywheelModelDimensions.WheelOuterRadius - FlywheelModelDimensions.TyreInnerRadius, 3);
+        Assert.Equal(FlywheelModelDimensions.TyreInnerRadius, FlywheelModelDimensions.FelloeOuterRadius);
+        Assert.True(FlywheelModelDimensions.FelloeInnerRadius > FlywheelModelDimensions.HubOuterRadius);
+        Assert.Equal(8, FlywheelModelDimensions.SpokeCount);
+        Assert.True(FlywheelModelDimensions.SpokeHalfWidth * 2f < 0.15f);
+    }
+
+    [Fact]
     public void CompactWheelUsesRequestedPointNineTwoMeterDiameter()
     {
         Assert.Equal(0.92f, FlywheelModelDimensions.CompactWheelOuterRadius * 2f);

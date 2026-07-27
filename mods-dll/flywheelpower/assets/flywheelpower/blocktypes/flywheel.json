@@ -69,11 +69,8 @@
   ],
   creativeinventory: { "general": ["*-ud"], "mechanics": ["*-ud"] },
   shapeInventory: {
-    base: "flywheelpower:block/flywheel-frame-horizontal",
-    overlays: [
-      { base: "flywheelpower:block/flywheel-wheel-coupled" },
-      { base: "flywheelpower:block/flywheel-axle" }
-    ]
+    base: "flywheelpower:block/flywheel-wheel-coupled",
+    overlays: [{ base: "flywheelpower:block/flywheel-axle" }]
   },
   shapeByType: {
     "*-ns": { base: "flywheelpower:block/flywheel-frame-horizontal", rotateY: 90 },
@@ -157,7 +154,10 @@
   resistance: 5,
   lightAbsorption: 0,
   maxStackSize: 8,
-  drops: [{ type: "block", code: "flywheel-{material}-{hub}-ud", quantity: { avg: 1 } }],
+  drops: [
+    { type: "block", code: "flywheelstand-full-ud", quantity: { avg: 1 } },
+    { type: "block", code: "flywheel-{material}-{hub}-ud", quantity: { avg: 1 } }
+  ],
   groundTransform: {
     translation: { x: 0, y: 0, z: 0 },
     rotation: { x: -90, y: 0, z: 0 },

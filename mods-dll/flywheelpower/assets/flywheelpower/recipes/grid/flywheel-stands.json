@@ -1,0 +1,20 @@
+[
+  {
+    ingredientPattern: "NPN,PPP,P_P",
+    ingredients: {
+      "N": { type: "item", code: "game:metalnailsandstrips-*", quantity: 2 },
+      "P": { type: "block", code: "game:planks-*", quantity: 2 }
+    },
+    width: 3, height: 3,
+    output: { type: "block", code: "flywheelpower:flywheelstand-full-ud" }
+  },
+  {
+    ingredientPattern: "NPN,P_P",
+    ingredients: {
+      "N": { type: "item", code: "game:metalnailsandstrips-*", quantity: 1 },
+      "P": { type: "block", code: "game:planks-*", quantity: 1 }
+    },
+    width: 3, height: 2,
+    output: { type: "block", code: "flywheelpower:flywheelstand-compact-ud" }
+  }
+]

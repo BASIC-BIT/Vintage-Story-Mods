@@ -48,6 +48,7 @@ FALLBACK_COLORS = {
     "metal": (126, 132, 135),
     "bearing": (79, 82, 81),
     "chalk": (148, 38, 38),
+    "stone": (111, 105, 96),
 }
 
 
@@ -170,6 +171,21 @@ def add_annulus(
             ))
 
 
+def add_rotated_cuboid(
+    faces: list[Face],
+    start: Vec3,
+    end: Vec3,
+    material: str,
+    element: str,
+    rotation_x: float,
+) -> None:
+    vertices = cuboid(start, end)
+    if rotation_x:
+        vertices = [rotate(vertex, (8, 8, 8), (rotation_x, 0, 0)) for vertex in vertices]
+    for indices in FACE_INDICES.values():
+        faces.append(Face([vertices[index] for index in indices], material, element))
+
+
 def load_flywheel(path: Path, size: str) -> list[Face]:
     values = constants(path)
     prefix = "Compact" if size == "compact" else ""
@@ -182,7 +198,31 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
     wheel_inner = value("CoupledInnerRadius")
     wheel_half = value("WheelHalfThickness")
     wheel_min, wheel_max = 8 - wheel_half, 8 + wheel_half
-    add_annulus(faces, wheel_min, wheel_max, wheel_inner, wheel_radius, "wheel", "RuntimeWheel")
+    if size == "compact":
+        add_annulus(faces, wheel_min, wheel_max, wheel_inner, wheel_radius, "wheel", "RuntimeWheel")
+    else:
+        spoke_half = value("SpokeHalfWidth")
+        spoke_inner = value("HubOuterRadius") * 0.92
+        spoke_outer = value("FelloeInnerRadius") + 0.02 * 16
+        for index in range(8):
+            add_rotated_cuboid(
+                faces,
+                (wheel_min, 8 - spoke_half, 8 + spoke_inner),
+                (wheel_max, 8 + spoke_half, 8 + spoke_outer),
+                "wood",
+                f"RuntimeWoodSpoke{index}",
+                index * 45,
+            )
+        add_annulus(
+            faces, wheel_min, wheel_max,
+            value("FelloeInnerRadius"), value("FelloeOuterRadius"),
+            "wood", "RuntimeWoodFelloe",
+        )
+        add_annulus(
+            faces, wheel_min, wheel_max,
+            value("TyreInnerRadius"), wheel_radius,
+            "wheel", "RuntimeOuterTyre",
+        )
     add_annulus(
         faces, 8 - value("BearingHalfThickness"), 8 + value("BearingHalfThickness"),
         value("ShaftClearanceRadius"), value("BearingOuterRadius"), "bearing", "BearingCollar", 48,
@@ -236,8 +276,12 @@ def resolve_texture(location: str, roots: list[Path]) -> Path | None:
     return None
 
 
-def average_color(path: Path | None, material: str) -> tuple[int, int, int]:
+def average_color(path: Path | None, material: str, location: str = "") -> tuple[int, int, int]:
     if path is None:
+        if "/wood/" in location:
+            return FALLBACK_COLORS["wood"]
+        if "/stone/" in location:
+            return FALLBACK_COLORS["stone"]
         return FALLBACK_COLORS.get(material, (155, 155, 155))
     return tuple(Image.open(path).convert("RGB").resize((1, 1)).getpixel((0, 0)))
 
@@ -323,7 +367,7 @@ def main() -> None:
     for material in sorted({face.material for face in faces}):
         texture = resolve_texture(textures.get(material, ""), roots) if textures.get(material) else None
         resolved[material] = str(texture) if texture else None
-        colors[material] = average_color(texture, material)
+        colors[material] = average_color(texture, material, textures.get(material, ""))
 
     images = []
     for view_name in VIEWS:

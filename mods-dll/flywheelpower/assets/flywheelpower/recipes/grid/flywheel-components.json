@@ -1,0 +1,131 @@
+[
+  {
+    ingredientPattern: "PFP,AHA,P_P",
+    ingredients: {
+      "P": { type: "item", code: "game:metalplate-iron" },
+      "F": { type: "item", code: "game:fat-rendered" },
+      "A": { type: "block", code: "game:woodenaxle-ud" },
+      "H": { type: "item", code: "game:hammer-*", isTool: true, toolDurabilityCost: 4 }
+    },
+    width: 3, height: 3,
+    output: { type: "item", code: "flywheelbearing-full-iron" }
+  },
+  {
+    ingredientPattern: "PFP,AHA,P_P",
+    ingredients: {
+      "P": { type: "item", code: "game:metalplate-meteoriciron" },
+      "F": { type: "item", code: "game:fat-rendered" },
+      "A": { type: "block", code: "game:woodenaxle-ud" },
+      "H": { type: "item", code: "game:hammer-*", isTool: true, toolDurabilityCost: 4 }
+    },
+    width: 3, height: 3,
+    output: { type: "item", code: "flywheelbearing-full-meteoriciron" }
+  },
+  {
+    ingredientPattern: "PFP,AHA,P_P",
+    ingredients: {
+      "P": { type: "item", code: "game:metalplate-steel" },
+      "F": { type: "item", code: "game:fat-rendered" },
+      "A": { type: "block", code: "game:woodenaxle-ud" },
+      "H": { type: "item", code: "game:hammer-*", isTool: true, toolDurabilityCost: 4 }
+    },
+    width: 3, height: 3,
+    output: { type: "item", code: "flywheelbearing-full-steel" }
+  },
+  {
+    ingredientPattern: "PF_,AHA",
+    ingredients: {
+      "P": { type: "item", code: "game:metalplate-iron" },
+      "F": { type: "item", code: "game:fat-rendered" },
+      "A": { type: "block", code: "game:woodenaxle-ud" },
+      "H": { type: "item", code: "game:hammer-*", isTool: true, toolDurabilityCost: 2 }
+    },
+    width: 3, height: 2,
+    output: { type: "item", code: "flywheelbearing-compact-iron" }
+  },
+  {
+    ingredientPattern: "PF_,AHA",
+    ingredients: {
+      "P": { type: "item", code: "game:metalplate-meteoriciron" },
+      "F": { type: "item", code: "game:fat-rendered" },
+      "A": { type: "block", code: "game:woodenaxle-ud" },
+      "H": { type: "item", code: "game:hammer-*", isTool: true, toolDurabilityCost: 2 }
+    },
+    width: 3, height: 2,
+    output: { type: "item", code: "flywheelbearing-compact-meteoriciron" }
+  },
+  {
+    ingredientPattern: "PF_,AHA",
+    ingredients: {
+      "P": { type: "item", code: "game:metalplate-steel" },
+      "F": { type: "item", code: "game:fat-rendered" },
+      "A": { type: "block", code: "game:woodenaxle-ud" },
+      "H": { type: "item", code: "game:hammer-*", isTool: true, toolDurabilityCost: 2 }
+    },
+    width: 3, height: 2,
+    output: { type: "item", code: "flywheelbearing-compact-steel" }
+  },
+  {
+    ingredientPattern: "PPP,PSP,PPP",
+    ingredients: {
+      "P": { type: "block", code: "game:planks-*", quantity: 1 },
+      "S": { type: "item", code: "game:saw-*", isTool: true, toolDurabilityCost: 8 }
+    },
+    width: 3, height: 3,
+    output: { type: "item", code: "flywheelweb-full" }
+  },
+  {
+    ingredientPattern: "P_P,PSP",
+    ingredients: {
+      "P": { type: "block", code: "game:planks-*", quantity: 1 },
+      "S": { type: "item", code: "game:saw-*", isTool: true, toolDurabilityCost: 4 }
+    },
+    width: 3, height: 2,
+    output: { type: "item", code: "flywheelweb-compact" }
+  },
+  {
+    ingredientPattern: "PPP,PHP,PPP",
+    ingredients: {
+      "P": { type: "item", code: "game:metalplate-*", name: "metal", allowedVariants: ["iron", "meteoriciron", "steel"] },
+      "H": { type: "item", code: "game:hammer-*", isTool: true, toolDurabilityCost: 8 }
+    },
+    width: 3, height: 3,
+    output: { type: "item", code: "flywheelrim-full-{metal}" }
+  },
+  {
+    ingredientPattern: "PPP,PSP,PPP",
+    ingredients: {
+      "P": { type: "block", code: "game:planks-*", quantity: 1 },
+      "S": { type: "item", code: "game:saw-*", isTool: true, toolDurabilityCost: 8 }
+    },
+    width: 3, height: 3,
+    output: { type: "item", code: "flywheelrim-full-wood" }
+  },
+  {
+    ingredientPattern: "P_P,PHP",
+    ingredients: {
+      "P": { type: "item", code: "game:metalplate-*", name: "metal", allowedVariants: ["iron", "meteoriciron", "steel"] },
+      "H": { type: "item", code: "game:hammer-*", isTool: true, toolDurabilityCost: 4 }
+    },
+    width: 3, height: 2,
+    output: { type: "item", code: "flywheelrim-compact-{metal}" }
+  },
+  {
+    ingredientPattern: "P_P,PSP",
+    ingredients: {
+      "P": { type: "block", code: "game:planks-*", quantity: 1 },
+      "S": { type: "item", code: "game:saw-*", isTool: true, toolDurabilityCost: 4 }
+    },
+    width: 3, height: 2,
+    output: { type: "item", code: "flywheelrim-compact-wood" }
+  },
+  {
+    ingredientPattern: "R_R,CRC",
+    ingredients: {
+      "R": { type: "block", code: "game:rockpolished-granite" },
+      "C": { type: "item", code: "game:chisel-*", isTool: true, toolDurabilityCost: 4 }
+    },
+    width: 3, height: 2,
+    output: { type: "item", code: "flywheelrim-compact-stone" }
+  }
+]

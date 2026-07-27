@@ -16,6 +16,7 @@ public sealed class FlywheelPowerModSystem : ModSystem
     {
         api.RegisterBlockClass("BlockFlywheel", typeof(BlockFlywheel));
         api.RegisterBlockClass("BlockCompactFlywheel", typeof(BlockCompactFlywheel));
+        api.RegisterBlockClass("BlockFlywheelStand", typeof(BlockFlywheelStand));
         api.RegisterBlockClass("BlockFlywheelPart", typeof(BlockFlywheelPart));
         api.RegisterBlockEntityClass("FlywheelPart", typeof(BEFlywheelPart));
         api.RegisterBlockEntityBehaviorClass("MPFlywheel", typeof(BEBehaviorMPFlywheel));

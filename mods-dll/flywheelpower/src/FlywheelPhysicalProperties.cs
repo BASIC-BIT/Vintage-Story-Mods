@@ -49,7 +49,9 @@ internal static class FlywheelPhysicalProperties
 
     private static FlywheelPhysicalProfile Calculate(PhysicalSpec spec, float wheelDensity, float hubDensity, float referenceInertia)
     {
-        Component wheel = Annulus(wheelDensity, spec.WheelInnerRadius, spec.WheelOuterRadius, spec.WheelThickness);
+        Component wheel = spec.IsCompact
+            ? Annulus(wheelDensity, spec.WheelInnerRadius, spec.WheelOuterRadius, spec.WheelThickness)
+            : FullSizeWheel(wheelDensity, spec);
         Component hub = Annulus(hubDensity, spec.BearingOuterRadius, spec.HubOuterRadius, spec.HubThickness);
         Component bearing = Annulus(IronDensity, spec.ShaftClearanceRadius, spec.BearingOuterRadius, spec.BearingThickness);
         Component plates = Annulus(hubDensity, spec.ShaftClearanceRadius, spec.PlateOuterRadius, spec.PlateThickness * 2f);
@@ -65,7 +67,7 @@ internal static class FlywheelPhysicalProperties
     private static float FullIronReferencePolarInertia()
     {
         PhysicalSpec spec = FullSpec();
-        return Annulus(IronDensity, spec.WheelInnerRadius, spec.WheelOuterRadius, spec.WheelThickness).PolarInertia
+        return FullSizeWheel(IronDensity, spec).PolarInertia
             + Annulus(IronDensity, spec.BearingOuterRadius, spec.HubOuterRadius, spec.HubThickness).PolarInertia
             + Annulus(IronDensity, spec.ShaftClearanceRadius, spec.BearingOuterRadius, spec.BearingThickness).PolarInertia
             + Annulus(IronDensity, spec.ShaftClearanceRadius, spec.PlateOuterRadius, spec.PlateThickness * 2f).PolarInertia
@@ -83,6 +85,36 @@ internal static class FlywheelPhysicalProperties
     {
         float mass = density * MathF.PI * radius * radius * length;
         return new Component(mass, 0.5f * mass * radius * radius);
+    }
+
+    private static Component FullSizeWheel(float tyreDensity, PhysicalSpec spec)
+    {
+        Component tyre = Annulus(
+            tyreDensity,
+            FlywheelModelDimensions.TyreInnerRadius,
+            spec.WheelOuterRadius,
+            spec.WheelThickness);
+        Component felloe = Annulus(
+            WoodDensity,
+            FlywheelModelDimensions.FelloeInnerRadius,
+            FlywheelModelDimensions.FelloeOuterRadius,
+            spec.WheelThickness);
+
+        float spokeInner = spec.HubOuterRadius * 0.92f;
+        float spokeOuter = FlywheelModelDimensions.FelloeInnerRadius + 0.02f;
+        float spokeWidth = FlywheelModelDimensions.SpokeHalfWidth * 2f;
+        float spokeLength = spokeOuter - spokeInner;
+        float spokeMass = WoodDensity * spokeLength * spokeWidth * spec.WheelThickness;
+        float spokePolar = spokeMass * (
+            (spokeInner * spokeInner + spokeInner * spokeOuter + spokeOuter * spokeOuter) / 3f
+            + spokeWidth * spokeWidth / 12f);
+        Component spokes = new(
+            spokeMass * FlywheelModelDimensions.SpokeCount,
+            spokePolar * FlywheelModelDimensions.SpokeCount);
+
+        return new Component(
+            tyre.MassKg + felloe.MassKg + spokes.MassKg,
+            tyre.PolarInertia + felloe.PolarInertia + spokes.PolarInertia);
     }
 
     private static bool IsCompact(Block block)
@@ -109,7 +141,8 @@ internal static class FlywheelPhysicalProperties
             FlywheelModelDimensions.CouplingPlateOuterRadius,
             FlywheelModelDimensions.CouplingPlateThickness,
             FlywheelModelDimensions.AxleRadius,
-            FullAxleLength);
+            FullAxleLength,
+            IsCompact: false);
     }
 
     private static PhysicalSpec CompactSpec()
@@ -126,7 +159,8 @@ internal static class FlywheelPhysicalProperties
             FlywheelModelDimensions.CompactCouplingPlateOuterRadius,
             FlywheelModelDimensions.CompactCouplingPlateThickness,
             FlywheelModelDimensions.CompactAxleRadius,
-            CompactAxleLength);
+            CompactAxleLength,
+            IsCompact: true);
     }
 
     private readonly record struct Component(float MassKg, float PolarInertia);
@@ -143,5 +177,6 @@ internal static class FlywheelPhysicalProperties
         float PlateOuterRadius,
         float PlateThickness,
         float AxleRadius,
-        float AxleLength);
+        float AxleLength,
+        bool IsCompact);
 }

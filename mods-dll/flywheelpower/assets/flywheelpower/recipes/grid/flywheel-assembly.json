@@ -1,0 +1,62 @@
+[
+  {
+    ingredientPattern: "R,W,B",
+    ingredients: {
+      "R": { type: "item", code: "flywheelpower:flywheelrim-full-wood" },
+      "W": { type: "item", code: "flywheelpower:flywheelweb-full" },
+      "B": { type: "item", code: "flywheelpower:flywheelbearing-full-*", name: "hub", allowedVariants: ["iron", "meteoriciron", "steel"] }
+    },
+    width: 1, height: 3,
+    output: { type: "block", code: "flywheelpower:flywheel-wood-{hub}-ud" }
+  },
+  {
+    ingredientPattern: "R,W,B",
+    ingredients: {
+      "R": { type: "item", code: "flywheelpower:flywheelrim-full-*", name: "material", allowedVariants: ["iron", "meteoriciron"] },
+      "W": { type: "item", code: "flywheelpower:flywheelweb-full" },
+      "B": { type: "item", code: "flywheelpower:flywheelbearing-full-*", name: "hub", allowedVariants: ["iron", "meteoriciron", "steel"] }
+    },
+    width: 1, height: 3,
+    output: { type: "block", code: "flywheelpower:flywheel-{material}-{hub}-ud" }
+  },
+  {
+    ingredientPattern: "R,W,B",
+    ingredients: {
+      "R": { type: "item", code: "flywheelpower:flywheelrim-full-steel" },
+      "W": { type: "item", code: "flywheelpower:flywheelweb-full" },
+      "B": { type: "item", code: "flywheelpower:flywheelbearing-full-steel" }
+    },
+    width: 1, height: 3,
+    output: { type: "block", code: "flywheelpower:flywheel-steel-steel-ud" }
+  },
+  {
+    ingredientPattern: "R,W,B",
+    ingredients: {
+      "R": { type: "item", code: "flywheelpower:flywheelrim-compact-*", name: "material", allowedVariants: ["wood", "stone"] },
+      "W": { type: "item", code: "flywheelpower:flywheelweb-compact" },
+      "B": { type: "item", code: "flywheelpower:flywheelbearing-compact-*", name: "hub", allowedVariants: ["iron", "meteoriciron", "steel"] }
+    },
+    width: 1, height: 3,
+    output: { type: "block", code: "flywheelpower:compactflywheel-{material}-{hub}-ud" }
+  },
+  {
+    ingredientPattern: "R,W,B",
+    ingredients: {
+      "R": { type: "item", code: "flywheelpower:flywheelrim-compact-*", name: "material", allowedVariants: ["iron", "meteoriciron"] },
+      "W": { type: "item", code: "flywheelpower:flywheelweb-compact" },
+      "B": { type: "item", code: "flywheelpower:flywheelbearing-compact-*", name: "hub", allowedVariants: ["iron", "meteoriciron", "steel"] }
+    },
+    width: 1, height: 3,
+    output: { type: "block", code: "flywheelpower:compactflywheel-{material}-{hub}-ud" }
+  },
+  {
+    ingredientPattern: "R,W,B",
+    ingredients: {
+      "R": { type: "item", code: "flywheelpower:flywheelrim-compact-steel" },
+      "W": { type: "item", code: "flywheelpower:flywheelweb-compact" },
+      "B": { type: "item", code: "flywheelpower:flywheelbearing-compact-steel" }
+    },
+    width: 1, height: 3,
+    output: { type: "block", code: "flywheelpower:compactflywheel-steel-steel-ud" }
+  }
+]

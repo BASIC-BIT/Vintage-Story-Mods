@@ -133,6 +133,7 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
     {
         MeshData mesh = new(9000, 14000, withNormals: false, withUv: true, withRgba: true, withFlags: true);
         TextureAtlasPosition wheelTex = capi.BlockTextureAtlas.GetPosition(block, "wheel");
+        TextureAtlasPosition woodTex = capi.BlockTextureAtlas.GetPosition(block, "wood");
         TextureAtlasPosition metalTex = capi.BlockTextureAtlas.GetPosition(block, "metal");
         TextureAtlasPosition bearingTex = capi.BlockTextureAtlas.GetPosition(block, "bearing");
         TextureAtlasPosition chalkTex = capi.BlockTextureAtlas.GetPosition(block, "chalk");
@@ -142,7 +143,17 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
 
         if (coupled)
         {
-            AddAnnularCylinder(mesh, wheelTex, new(spec.CoupledInnerRadius, spec.WheelOuterRadius, wheelMinX, wheelMaxX, WheelSegments, WheelRadialSteps, IncludeInnerSide: false));
+            if (spec.IsCompact)
+            {
+                AddAnnularCylinder(mesh, wheelTex, new(spec.CoupledInnerRadius, spec.WheelOuterRadius, wheelMinX, wheelMaxX, WheelSegments, WheelRadialSteps, IncludeInnerSide: false));
+            }
+            else
+            {
+                AddSpokedWeb(mesh, woodTex, spec, wheelMinX, wheelMaxX);
+                AddAnnularCylinder(mesh, woodTex, new(spec.FelloeInnerRadius, spec.FelloeOuterRadius, wheelMinX, wheelMaxX, WheelSegments, 2, IncludeInnerSide: true));
+                AddAnnularCylinder(mesh, wheelTex, new(spec.TyreInnerRadius, spec.WheelOuterRadius, wheelMinX, wheelMaxX, WheelSegments, 2, IncludeInnerSide: true));
+            }
+
             AddCoupledHubAssembly(mesh, metalTex, bearingTex, spec, wheelMinX, wheelMaxX);
         }
         else
@@ -156,6 +167,79 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         AddChalkLine(mesh, chalkTex, wheelMinX - ChalkRaise, spec.WheelOuterRadius * 0.18f, spec.WheelOuterRadius + ChalkEdgeOverlap, spec.ChalkHalfWidth, frontFace: false);
         AddChalkRimLine(mesh, chalkTex, spec.WheelOuterRadius + ChalkRaise, wheelMinX - ChalkEdgeOverlap, wheelMaxX + ChalkEdgeOverlap, spec.ChalkHalfWidth);
         return mesh;
+    }
+
+    private static void AddSpokedWeb(
+        MeshData mesh,
+        TextureAtlasPosition woodTex,
+        FlywheelMeshSpec spec,
+        float minX,
+        float maxX)
+    {
+        for (int spoke = 0; spoke < spec.SpokeCount; spoke++)
+        {
+            float angle = GameMath.TWOPI * spoke / spec.SpokeCount;
+            AddSpoke(
+                mesh,
+                woodTex,
+                minX,
+                maxX,
+                spec.HubOuterRadius * 0.92f,
+                spec.FelloeInnerRadius + 0.02f,
+                spec.SpokeHalfWidth,
+                angle);
+        }
+    }
+
+    private static void AddSpoke(
+        MeshData mesh,
+        TextureAtlasPosition tex,
+        float minX,
+        float maxX,
+        float innerRadius,
+        float outerRadius,
+        float halfWidth,
+        float angle)
+    {
+        float radialY = MathF.Sin(angle);
+        float radialZ = MathF.Cos(angle);
+        float tangentY = MathF.Cos(angle);
+        float tangentZ = -MathF.Sin(angle);
+
+        MeshVertex fInnerLeft = SpokeVertex(maxX, innerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, 0f, 0f);
+        MeshVertex fInnerRight = SpokeVertex(maxX, innerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, 1f, 0f);
+        MeshVertex fOuterRight = SpokeVertex(maxX, outerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, 1f, 1f);
+        MeshVertex fOuterLeft = SpokeVertex(maxX, outerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, 0f, 1f);
+        MeshVertex bInnerLeft = SpokeVertex(minX, innerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, 0f, 0f);
+        MeshVertex bInnerRight = SpokeVertex(minX, innerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, 1f, 0f);
+        MeshVertex bOuterRight = SpokeVertex(minX, outerRadius, halfWidth, radialY, radialZ, tangentY, tangentZ, 1f, 1f);
+        MeshVertex bOuterLeft = SpokeVertex(minX, outerRadius, -halfWidth, radialY, radialZ, tangentY, tangentZ, 0f, 1f);
+
+        AddQuad(mesh, tex, fInnerLeft, fInnerRight, fOuterRight, fOuterLeft, new Vec3f(1f, 0f, 0f));
+        AddQuad(mesh, tex, bInnerLeft, bOuterLeft, bOuterRight, bInnerRight, new Vec3f(-1f, 0f, 0f));
+        AddQuad(mesh, tex, fInnerRight, bInnerRight, bOuterRight, fOuterRight, new Vec3f(0f, tangentY, tangentZ));
+        AddQuad(mesh, tex, fInnerLeft, fOuterLeft, bOuterLeft, bInnerLeft, new Vec3f(0f, -tangentY, -tangentZ));
+        AddQuad(mesh, tex, fOuterLeft, fOuterRight, bOuterRight, bOuterLeft, new Vec3f(0f, radialY, radialZ));
+        AddQuad(mesh, tex, fInnerLeft, bInnerLeft, bInnerRight, fInnerRight, new Vec3f(0f, -radialY, -radialZ));
+    }
+
+    private static MeshVertex SpokeVertex(
+        float x,
+        float radius,
+        float tangentOffset,
+        float radialY,
+        float radialZ,
+        float tangentY,
+        float tangentZ,
+        float u,
+        float v)
+    {
+        return new MeshVertex(
+            x,
+            Center + radius * radialY + tangentOffset * tangentY,
+            Center + radius * radialZ + tangentOffset * tangentZ,
+            u,
+            v);
     }
 
     private static void AddCoupledHubAssembly(MeshData mesh, TextureAtlasPosition metalTex, TextureAtlasPosition bearingTex, FlywheelMeshSpec spec, float wheelMinX, float wheelMaxX)
@@ -378,7 +462,8 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
                 ChalkHalfWidth = 0.025f,
                 ShaftClearanceRadius = FlywheelModelDimensions.CompactShaftClearanceRadius,
                 CouplingPlateOuterRadius = FlywheelModelDimensions.CompactCouplingPlateOuterRadius,
-                CouplingPlateThickness = FlywheelModelDimensions.CompactCouplingPlateThickness
+                CouplingPlateThickness = FlywheelModelDimensions.CompactCouplingPlateThickness,
+                IsCompact = true
             };
         }
 
@@ -400,7 +485,12 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
                 ChalkHalfWidth = 0.04f,
                 ShaftClearanceRadius = FlywheelModelDimensions.ShaftClearanceRadius,
                 CouplingPlateOuterRadius = FlywheelModelDimensions.CouplingPlateOuterRadius,
-                CouplingPlateThickness = FlywheelModelDimensions.CouplingPlateThickness
+                CouplingPlateThickness = FlywheelModelDimensions.CouplingPlateThickness,
+                TyreInnerRadius = FlywheelModelDimensions.TyreInnerRadius,
+                FelloeInnerRadius = FlywheelModelDimensions.FelloeInnerRadius,
+                FelloeOuterRadius = FlywheelModelDimensions.FelloeOuterRadius,
+                SpokeHalfWidth = FlywheelModelDimensions.SpokeHalfWidth,
+                SpokeCount = FlywheelModelDimensions.SpokeCount
             };
         }
 
@@ -419,5 +509,11 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
         public float ShaftClearanceRadius { get; init; }
         public float CouplingPlateOuterRadius { get; init; }
         public float CouplingPlateThickness { get; init; }
+        public bool IsCompact { get; init; }
+        public float TyreInnerRadius { get; init; }
+        public float FelloeInnerRadius { get; init; }
+        public float FelloeOuterRadius { get; init; }
+        public float SpokeHalfWidth { get; init; }
+        public int SpokeCount { get; init; }
     }
 }
