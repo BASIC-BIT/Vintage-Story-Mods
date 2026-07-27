@@ -9,7 +9,10 @@ internal static class FlywheelPhysicalProperties
 {
     private const float WoodDensity = 700f;
     private const float StoneDensity = 2600f;
-    private const float BronzeDensity = 8800f;
+    private const float CopperDensity = 8960f;
+    private const float TinBronzeDensity = 7600f;
+    private const float BismuthBronzeDensity = 7900f;
+    private const float BlackBronzeDensity = 9000f;
     private const float IronDensity = 7870f;
     private const float MeteoricIronDensity = 7800f;
     private const float SteelDensity = 7820f;
@@ -40,7 +43,10 @@ internal static class FlywheelPhysicalProperties
         {
             "wood" => WoodDensity,
             "stone" => StoneDensity,
-            "bronze" => BronzeDensity,
+            "copper" => CopperDensity,
+            "tinbronze" => TinBronzeDensity,
+            "bismuthbronze" => BismuthBronzeDensity,
+            "blackbronze" => BlackBronzeDensity,
             "meteoriciron" => MeteoricIronDensity,
             "steel" => SteelDensity,
             _ => IronDensity
@@ -124,7 +130,15 @@ internal static class FlywheelPhysicalProperties
 
     private static string DefaultCompactHub(string wheelMaterial)
     {
-        return wheelMaterial is "iron" or "meteoriciron" or "steel" ? wheelMaterial : "iron";
+        return wheelMaterial is "copper"
+            or "tinbronze"
+            or "bismuthbronze"
+            or "blackbronze"
+            or "iron"
+            or "meteoriciron"
+            or "steel"
+            ? wheelMaterial
+            : "copper";
     }
 
     private static PhysicalSpec FullSpec()

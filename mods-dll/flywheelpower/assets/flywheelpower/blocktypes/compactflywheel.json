@@ -1,198 +1,1077 @@
 {
-  code: "compactflywheel",
-  class: "BlockCompactFlywheel",
-  entityClass: "Generic",
-  entityBehaviors: [
+  "code": "compactflywheel",
+  "class": "BlockCompactFlywheel",
+  "entityClass": "Generic",
+  "entityBehaviors": [
     {
-      name: "MPFlywheel",
-      properties: {
-        axleShape: { base: "flywheelpower:block/flywheel-axle" },
-        flywheelShape: { base: "flywheelpower:block/compact-flywheel-wheel-coupled" },
-        horizontalStandShape: { base: "flywheelpower:block/compact-flywheel-frame-horizontal" },
-        verticalStandShape: { base: "flywheelpower:block/compact-flywheel-frame-vertical" },
-        slipCoupled: true,
-        inertia: 8.0,
-        couplingStrength: 0.55,
-        maxTransferTorque: 0.18,
-        baseBearingLoss: 0.0005,
-        viscousBearingLoss: 0.0015,
-        windageLoss: 0.0005,
-        safeSpeed: 4.5
+      "name": "MPFlywheel",
+      "properties": {
+        "axleShape": {
+          "base": "flywheelpower:block/flywheel-axle"
+        },
+        "flywheelShape": {
+          "base": "flywheelpower:block/compact-flywheel-wheel-coupled"
+        },
+        "horizontalStandShape": {
+          "base": "flywheelpower:block/compact-flywheel-frame-horizontal"
+        },
+        "verticalStandShape": {
+          "base": "flywheelpower:block/compact-flywheel-frame-vertical"
+        },
+        "slipCoupled": true,
+        "inertia": 8.0,
+        "couplingStrength": 0.55,
+        "maxTransferTorque": 0.18,
+        "baseBearingLoss": 0.0005,
+        "viscousBearingLoss": 0.0015,
+        "windageLoss": 0.0005,
+        "safeSpeed": 4.5
       }
     }
   ],
-  attributes: {
-    mechanicalPower: {
-      renderer: "flywheelpower-compact-iron-ironhub"
+  "attributes": {
+    "mechanicalPower": {
+      "renderer": "flywheelpower-compact-iron-ironhub"
     }
   },
-  attributesByType: {
+  "attributesByType": {
+    "*-wood-copper-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-wood-copperhub"
+      }
+    },
+    "*-wood-tinbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-wood-tinbronzehub"
+      }
+    },
+    "*-wood-bismuthbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-wood-bismuthbronzehub"
+      }
+    },
+    "*-wood-blackbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-wood-blackbronzehub"
+      }
+    },
     "*-wood-iron-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-wood-ironhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-wood-ironhub"
+      }
     },
     "*-wood-meteoriciron-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-wood-meteoricironhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-wood-meteoricironhub"
+      }
     },
     "*-wood-steel-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-wood-steelhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-wood-steelhub"
+      }
+    },
+    "*-stone-copper-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-stone-copperhub"
+      }
+    },
+    "*-stone-tinbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-stone-tinbronzehub"
+      }
+    },
+    "*-stone-bismuthbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-stone-bismuthbronzehub"
+      }
+    },
+    "*-stone-blackbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-stone-blackbronzehub"
+      }
     },
     "*-stone-iron-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-stone-ironhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-stone-ironhub"
+      }
     },
     "*-stone-meteoriciron-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-stone-meteoricironhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-stone-meteoricironhub"
+      }
     },
     "*-stone-steel-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-stone-steelhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-stone-steelhub"
+      }
+    },
+    "*-copper-copper-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-copper-copperhub"
+      }
+    },
+    "*-copper-tinbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-copper-tinbronzehub"
+      }
+    },
+    "*-copper-bismuthbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-copper-bismuthbronzehub"
+      }
+    },
+    "*-copper-blackbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-copper-blackbronzehub"
+      }
+    },
+    "*-copper-iron-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-copper-ironhub"
+      }
+    },
+    "*-copper-meteoriciron-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-copper-meteoricironhub"
+      }
+    },
+    "*-copper-steel-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-copper-steelhub"
+      }
+    },
+    "*-tinbronze-tinbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-tinbronze-tinbronzehub"
+      }
+    },
+    "*-tinbronze-bismuthbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-tinbronze-bismuthbronzehub"
+      }
+    },
+    "*-tinbronze-blackbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-tinbronze-blackbronzehub"
+      }
+    },
+    "*-tinbronze-iron-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-tinbronze-ironhub"
+      }
+    },
+    "*-tinbronze-meteoriciron-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-tinbronze-meteoricironhub"
+      }
+    },
+    "*-tinbronze-steel-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-tinbronze-steelhub"
+      }
+    },
+    "*-bismuthbronze-tinbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-bismuthbronze-tinbronzehub"
+      }
+    },
+    "*-bismuthbronze-bismuthbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-bismuthbronze-bismuthbronzehub"
+      }
+    },
+    "*-bismuthbronze-blackbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-bismuthbronze-blackbronzehub"
+      }
+    },
+    "*-bismuthbronze-iron-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-bismuthbronze-ironhub"
+      }
+    },
+    "*-bismuthbronze-meteoriciron-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-bismuthbronze-meteoricironhub"
+      }
+    },
+    "*-bismuthbronze-steel-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-bismuthbronze-steelhub"
+      }
+    },
+    "*-blackbronze-tinbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-blackbronze-tinbronzehub"
+      }
+    },
+    "*-blackbronze-bismuthbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-blackbronze-bismuthbronzehub"
+      }
+    },
+    "*-blackbronze-blackbronze-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-blackbronze-blackbronzehub"
+      }
+    },
+    "*-blackbronze-iron-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-blackbronze-ironhub"
+      }
+    },
+    "*-blackbronze-meteoriciron-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-blackbronze-meteoricironhub"
+      }
+    },
+    "*-blackbronze-steel-*": {
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-blackbronze-steelhub"
+      }
     },
     "*-iron-iron-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-iron-ironhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-iron-ironhub"
+      }
     },
     "*-iron-meteoriciron-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-iron-meteoricironhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-iron-meteoricironhub"
+      }
     },
     "*-iron-steel-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-iron-steelhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-iron-steelhub"
+      }
     },
     "*-meteoriciron-iron-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-meteoriciron-ironhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-meteoriciron-ironhub"
+      }
     },
     "*-meteoriciron-meteoriciron-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-meteoriciron-meteoricironhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-meteoriciron-meteoricironhub"
+      }
     },
     "*-meteoriciron-steel-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-meteoriciron-steelhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-meteoriciron-steelhub"
+      }
     },
     "*-steel-steel-*": {
-      mechanicalPower: { renderer: "flywheelpower-compact-steel-steelhub" }
+      "mechanicalPower": {
+        "renderer": "flywheelpower-compact-steel-steelhub"
+      }
     }
   },
-  variantgroups: [
-    { code: "material", states: ["wood", "stone", "iron", "meteoriciron", "steel"] },
-    { code: "hub", states: ["iron", "meteoriciron", "steel"] },
-    { code: "rotation", states: ["ud", "ns", "we"] }
+  "variantgroups": [
+    {
+      "code": "material",
+      "states": [
+        "wood",
+        "stone",
+        "copper",
+        "tinbronze",
+        "bismuthbronze",
+        "blackbronze",
+        "iron",
+        "meteoriciron",
+        "steel"
+      ]
+    },
+    {
+      "code": "hub",
+      "states": [
+        "copper",
+        "tinbronze",
+        "bismuthbronze",
+        "blackbronze",
+        "iron",
+        "meteoriciron",
+        "steel"
+      ]
+    },
+    {
+      "code": "rotation",
+      "states": [
+        "ud",
+        "ns",
+        "we"
+      ]
+    }
   ],
-  skipVariants: [
+  "skipVariants": [
+    "compactflywheel-tinbronze-copper-*",
+    "compactflywheel-bismuthbronze-copper-*",
+    "compactflywheel-blackbronze-copper-*",
+    "compactflywheel-iron-copper-*",
+    "compactflywheel-iron-tinbronze-*",
+    "compactflywheel-iron-bismuthbronze-*",
+    "compactflywheel-iron-blackbronze-*",
+    "compactflywheel-meteoriciron-copper-*",
+    "compactflywheel-meteoriciron-tinbronze-*",
+    "compactflywheel-meteoriciron-bismuthbronze-*",
+    "compactflywheel-meteoriciron-blackbronze-*",
+    "compactflywheel-steel-copper-*",
+    "compactflywheel-steel-tinbronze-*",
+    "compactflywheel-steel-bismuthbronze-*",
+    "compactflywheel-steel-blackbronze-*",
     "compactflywheel-steel-iron-*",
     "compactflywheel-steel-meteoriciron-*"
   ],
-  creativeinventory: { "general": ["*-ud"], "mechanics": ["*-ud"] },
-  shapeInventory: {
-    base: "flywheelpower:block/compact-flywheel-wheel-coupled",
-    overlays: [{ base: "flywheelpower:block/flywheel-axle" }]
+  "creativeinventory": {
+    "general": [
+      "*-ud"
+    ],
+    "mechanics": [
+      "*-ud"
+    ]
   },
-  shapeByType: {
-    "*-ns": { base: "flywheelpower:block/compact-flywheel-frame-horizontal", rotateY: 90 },
-    "*-ud": { base: "flywheelpower:block/compact-flywheel-frame-vertical", rotateY: 0 },
-    "*-we": { base: "flywheelpower:block/compact-flywheel-frame-horizontal", rotateY: 0 }
+  "shapeInventory": {
+    "base": "flywheelpower:block/compact-flywheel-wheel-coupled",
+    "overlays": [
+      {
+        "base": "flywheelpower:block/flywheel-axle"
+      }
+    ]
   },
-  blockmaterial: "Metal",
-  textures: {
-    wheel: { base: "game:block/metal/ingot/iron" },
-    metal: { base: "game:block/metal/ingot/iron" },
-    bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-    chalk: { base: "game:block/cloth/wool/red1" },
-    wood: { base: "game:block/wood/planks/generic" }
-  },
-  texturesByType: {
-    "*-wood-iron-*": {
-      wheel: { base: "game:block/wood/planks/generic" },
-      metal: { base: "game:block/metal/ingot/iron" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
+  "shapeByType": {
+    "*-ns": {
+      "base": "flywheelpower:block/compact-flywheel-frame-horizontal",
+      "rotateY": 90
     },
-    "*-wood-meteoriciron-*": {
-      wheel: { base: "game:block/wood/planks/generic" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
+    "*-ud": {
+      "base": "flywheelpower:block/compact-flywheel-frame-vertical",
+      "rotateY": 0
     },
-    "*-wood-steel-*": {
-      wheel: { base: "game:block/wood/planks/generic" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-stone-iron-*": {
-      wheel: { base: "game:block/stone/rock/granite1" },
-      metal: { base: "game:block/metal/ingot/iron" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-stone-meteoriciron-*": {
-      wheel: { base: "game:block/stone/rock/granite1" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-stone-steel-*": {
-      wheel: { base: "game:block/stone/rock/granite1" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-iron-iron-*": {
-      wheel: { base: "game:block/metal/ingot/iron" },
-      metal: { base: "game:block/metal/ingot/iron" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-iron-meteoriciron-*": {
-      wheel: { base: "game:block/metal/ingot/iron" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-iron-steel-*": {
-      wheel: { base: "game:block/metal/ingot/iron" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-meteoriciron-iron-*": {
-      wheel: { base: "game:block/metal/ingot/meteoriciron" },
-      metal: { base: "game:block/metal/ingot/iron" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-meteoriciron-meteoriciron-*": {
-      wheel: { base: "game:block/metal/ingot/meteoriciron" },
-      metal: { base: "game:block/metal/ingot/meteoriciron" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-meteoriciron-steel-*": {
-      wheel: { base: "game:block/metal/ingot/meteoriciron" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
-    },
-    "*-steel-steel-*": {
-      wheel: { base: "game:block/metal/ingot/steel" },
-      metal: { base: "game:block/metal/ingot/steel" },
-      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
-      wood: { base: "game:block/wood/planks/generic" }
+    "*-we": {
+      "base": "flywheelpower:block/compact-flywheel-frame-horizontal",
+      "rotateY": 0
     }
   },
-  sidesolid: { all: false },
-  sideopaque: { all: false },
-  rainPermeable: true,
-  resistance: 5,
-  lightAbsorption: 0,
-  maxStackSize: 16,
-  drops: [
-    { type: "block", code: "flywheelstand-compact-ud", quantity: { avg: 1 } },
-    { type: "block", code: "compactflywheel-{material}-{hub}-ud", quantity: { avg: 1 } }
-  ],
-  collisionSelectionBoxByType: {
-    "*-we": { x1: 0, y1: 0.0625, z1: 0.0625, x2: 1, y2: 0.9375, z2: 0.9375 },
-    "*-ns": { x1: 0, y1: 0.0625, z1: 0.0625, x2: 1, y2: 0.9375, z2: 0.9375, rotateY: 90 },
-    "*-ud": { x1: 0.0625, y1: 0, z1: 0.0625, x2: 0.9375, y2: 1, z2: 0.9375 }
+  "blockmaterial": "Metal",
+  "textures": {
+    "wheel": {
+      "base": "game:block/metal/ingot/iron"
+    },
+    "metal": {
+      "base": "game:block/metal/ingot/iron"
+    },
+    "bearing": {
+      "base": "game:block/metal/tarnished/iron-riveted1"
+    },
+    "chalk": {
+      "base": "game:block/cloth/wool/red1"
+    },
+    "wood": {
+      "base": "game:block/wood/planks/generic"
+    }
   },
-  sounds: {
-    hit: "game:block/metalhit",
-    break: "game:block/metalbreak",
-    place: "game:block/metalplace",
-    walk: "game:walk/stone"
+  "texturesByType": {
+    "*-wood-copper-*": {
+      "wheel": {
+        "base": "game:block/wood/planks/generic"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-wood-tinbronze-*": {
+      "wheel": {
+        "base": "game:block/wood/planks/generic"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-wood-bismuthbronze-*": {
+      "wheel": {
+        "base": "game:block/wood/planks/generic"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-wood-blackbronze-*": {
+      "wheel": {
+        "base": "game:block/wood/planks/generic"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-wood-iron-*": {
+      "wheel": {
+        "base": "game:block/wood/planks/generic"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-wood-meteoriciron-*": {
+      "wheel": {
+        "base": "game:block/wood/planks/generic"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-wood-steel-*": {
+      "wheel": {
+        "base": "game:block/wood/planks/generic"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-stone-copper-*": {
+      "wheel": {
+        "base": "game:block/stone/rock/granite1"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-stone-tinbronze-*": {
+      "wheel": {
+        "base": "game:block/stone/rock/granite1"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-stone-bismuthbronze-*": {
+      "wheel": {
+        "base": "game:block/stone/rock/granite1"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-stone-blackbronze-*": {
+      "wheel": {
+        "base": "game:block/stone/rock/granite1"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-stone-iron-*": {
+      "wheel": {
+        "base": "game:block/stone/rock/granite1"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-stone-meteoriciron-*": {
+      "wheel": {
+        "base": "game:block/stone/rock/granite1"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-stone-steel-*": {
+      "wheel": {
+        "base": "game:block/stone/rock/granite1"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-copper-copper-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-copper-tinbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-copper-bismuthbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-copper-blackbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-copper-iron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-copper-meteoriciron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-copper-steel-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-tinbronze-tinbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-tinbronze-bismuthbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-tinbronze-blackbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-tinbronze-iron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-tinbronze-meteoriciron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-tinbronze-steel-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-bismuthbronze-tinbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-bismuthbronze-bismuthbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-bismuthbronze-blackbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-bismuthbronze-iron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-bismuthbronze-meteoriciron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-bismuthbronze-steel-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-blackbronze-tinbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-blackbronze-bismuthbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-blackbronze-blackbronze-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-blackbronze-iron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-blackbronze-meteoriciron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-blackbronze-steel-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-iron-iron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-iron-meteoriciron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-iron-steel-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-meteoriciron-iron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-meteoriciron-meteoriciron-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-meteoriciron-steel-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-steel-steel-*": {
+      "wheel": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    }
+  },
+  "sidesolid": {
+    "all": false
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "rainPermeable": true,
+  "resistance": 5,
+  "lightAbsorption": 0,
+  "maxStackSize": 16,
+  "drops": [
+    {
+      "type": "block",
+      "code": "flywheelstand-compact-ud",
+      "quantity": {
+        "avg": 1
+      }
+    },
+    {
+      "type": "block",
+      "code": "compactflywheel-{material}-{hub}-ud",
+      "quantity": {
+        "avg": 1
+      }
+    }
+  ],
+  "collisionSelectionBoxByType": {
+    "*-we": {
+      "x1": 0,
+      "y1": 0.0625,
+      "z1": 0.0625,
+      "x2": 1,
+      "y2": 0.9375,
+      "z2": 0.9375
+    },
+    "*-ns": {
+      "x1": 0,
+      "y1": 0.0625,
+      "z1": 0.0625,
+      "x2": 1,
+      "y2": 0.9375,
+      "z2": 0.9375,
+      "rotateY": 90
+    },
+    "*-ud": {
+      "x1": 0.0625,
+      "y1": 0,
+      "z1": 0.0625,
+      "x2": 0.9375,
+      "y2": 1,
+      "z2": 0.9375
+    }
+  },
+  "sounds": {
+    "hit": "game:block/metalhit",
+    "break": "game:block/metalbreak",
+    "place": "game:block/metalplace",
+    "walk": "game:walk/stone"
   }
 }

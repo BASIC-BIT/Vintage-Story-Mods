@@ -24,11 +24,19 @@
       }
     },
     {
-      "name": "CrossTie", "from": [1.125, 0.75, 6.5], "to": [14.875, 2.0, 9.5],
+      "name": "FrontCrossTie", "from": [1.125, 0.75, 2.125], "to": [14.875, 2.0, 3.5],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,14,1.25] }, "east": { "texture": "#wood", "uv": [0,0,3,1.25] },
-        "south": { "texture": "#wood", "uv": [0,0,14,1.25] }, "west": { "texture": "#wood", "uv": [0,0,3,1.25] },
-        "up": { "texture": "#wood", "uv": [0,0,14,3] }, "down": { "texture": "#wood", "uv": [0,0,14,3] }
+        "north": { "texture": "#wood", "uv": [0,0,14,1.25] }, "east": { "texture": "#wood", "uv": [0,0,1.375,1.25] },
+        "south": { "texture": "#wood", "uv": [0,0,14,1.25] }, "west": { "texture": "#wood", "uv": [0,0,1.375,1.25] },
+        "up": { "texture": "#wood", "uv": [0,0,14,1.375] }, "down": { "texture": "#wood", "uv": [0,0,14,1.375] }
+      }
+    },
+    {
+      "name": "RearCrossTie", "from": [1.125, 0.75, 12.5], "to": [14.875, 2.0, 13.875],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0,0,14,1.25] }, "east": { "texture": "#wood", "uv": [0,0,1.375,1.25] },
+        "south": { "texture": "#wood", "uv": [0,0,14,1.25] }, "west": { "texture": "#wood", "uv": [0,0,1.375,1.25] },
+        "up": { "texture": "#wood", "uv": [0,0,14,1.375] }, "down": { "texture": "#wood", "uv": [0,0,14,1.375] }
       }
     },
     {
@@ -48,56 +56,56 @@
       }
     },
     {
-      "name": "LeftBearingHousingLower", "from": [1.0, 4.75, 3.75], "to": [5.75, 5.75, 12.25],
+      "name": "LeftBearingHousingLower", "from": [1.0, 4.75, 3.75], "to": [5.25, 5.75, 12.25],
       "faces": {
         "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
         "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "LeftBearingHousingUpper", "from": [1.0, 10.25, 3.75], "to": [5.75, 11.5, 12.25],
+      "name": "LeftBearingHousingUpper", "from": [1.0, 10.25, 3.75], "to": [5.25, 11.5, 12.25],
       "faces": {
         "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
         "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "LeftBearingHousingFront", "from": [1.0, 5.75, 3.75], "to": [5.75, 10.25, 5.75],
+      "name": "LeftBearingHousingFront", "from": [1.0, 5.75, 3.75], "to": [5.25, 10.25, 5.75],
       "faces": {
         "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
         "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "LeftBearingHousingRear", "from": [1.0, 5.75, 10.25], "to": [5.75, 10.25, 12.25],
+      "name": "LeftBearingHousingRear", "from": [1.0, 5.75, 10.25], "to": [5.25, 10.25, 12.25],
       "faces": {
         "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
         "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "RightBearingHousingLower", "from": [10.25, 4.75, 3.75], "to": [15.0, 5.75, 12.25],
+      "name": "RightBearingHousingLower", "from": [10.75, 4.75, 3.75], "to": [15.0, 5.75, 12.25],
       "faces": {
         "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
         "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "RightBearingHousingUpper", "from": [10.25, 10.25, 3.75], "to": [15.0, 11.5, 12.25],
+      "name": "RightBearingHousingUpper", "from": [10.75, 10.25, 3.75], "to": [15.0, 11.5, 12.25],
       "faces": {
         "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
         "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "RightBearingHousingFront", "from": [10.25, 5.75, 3.75], "to": [15.0, 10.25, 5.75],
+      "name": "RightBearingHousingFront", "from": [10.75, 5.75, 3.75], "to": [15.0, 10.25, 5.75],
       "faces": {
         "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
         "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "RightBearingHousingRear", "from": [10.25, 5.75, 10.25], "to": [15.0, 10.25, 12.25],
+      "name": "RightBearingHousingRear", "from": [10.75, 5.75, 10.25], "to": [15.0, 10.25, 12.25],
       "faces": {
         "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
         "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }

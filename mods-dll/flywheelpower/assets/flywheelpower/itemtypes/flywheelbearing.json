@@ -1,20 +1,81 @@
 {
-  code: "flywheelbearing",
-  variantgroups: [
-    { code: "size", states: ["full", "compact"] },
-    { code: "hub", states: ["iron", "meteoriciron", "steel"] }
+  "code": "flywheelbearing",
+  "variantgroups": [
+    {
+      "code": "size",
+      "states": [
+        "full",
+        "compact"
+      ]
+    },
+    {
+      "code": "hub",
+      "states": [
+        "copper",
+        "tinbronze",
+        "bismuthbronze",
+        "blackbronze",
+        "iron",
+        "meteoriciron",
+        "steel"
+      ]
+    }
   ],
-  shape: { base: "game:item/plate" },
-  textureByType: {
-    "*-iron": { base: "game:block/metal/ingot/iron" },
-    "*-meteoriciron": { base: "game:block/metal/ingot/meteoriciron" },
-    "*-steel": { base: "game:block/metal/ingot/steel" }
+  "skipVariants": [
+    "flywheelbearing-full-copper",
+    "flywheelbearing-full-tinbronze",
+    "flywheelbearing-full-bismuthbronze",
+    "flywheelbearing-full-blackbronze"
+  ],
+  "shape": {
+    "base": "game:item/plate"
   },
-  creativeinventory: { "general": ["*"], "items": ["*"], "mechanics": ["*"] },
-  maxstacksize: 8,
-  guiTransform: {
-    rotation: { x: -30, y: -44, z: -180 },
-    origin: { x: 0.5, y: 0.0625, z: 0.5 },
-    scale: 2.3
+  "textureByType": {
+    "*-copper": {
+      "base": "game:block/metal/ingot/copper"
+    },
+    "*-tinbronze": {
+      "base": "game:block/metal/ingot/tinbronze"
+    },
+    "*-bismuthbronze": {
+      "base": "game:block/metal/ingot/bismuthbronze"
+    },
+    "*-blackbronze": {
+      "base": "game:block/metal/ingot/blackbronze"
+    },
+    "*-iron": {
+      "base": "game:block/metal/ingot/iron"
+    },
+    "*-meteoriciron": {
+      "base": "game:block/metal/ingot/meteoriciron"
+    },
+    "*-steel": {
+      "base": "game:block/metal/ingot/steel"
+    }
+  },
+  "creativeinventory": {
+    "general": [
+      "*"
+    ],
+    "items": [
+      "*"
+    ],
+    "mechanics": [
+      "*"
+    ]
+  },
+  "maxstacksize": 8,
+  "guiTransform": {
+    "rotation": {
+      "x": -30,
+      "y": -44,
+      "z": -180
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.0625,
+      "z": 0.5
+    },
+    "scale": 2.3
   }
 }

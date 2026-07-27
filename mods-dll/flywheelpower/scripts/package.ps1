@@ -5,6 +5,12 @@ $projectFile = Join-Path $projectRoot 'flywheelpower.csproj'
 $modInfoFile = Join-Path $projectRoot 'modinfo.json'
 $readmeFile = Join-Path $projectRoot 'README.md'
 $assetsDir = Join-Path $projectRoot 'assets'
+$materialGenerator = Join-Path $PSScriptRoot 'generate-material-content.py'
+
+& python $materialGenerator --check
+if ($LASTEXITCODE -ne 0) {
+    throw 'Generated Flywheel material content is stale.'
+}
 
 [xml]$projectXml = Get-Content -LiteralPath $projectFile -Raw
 $targetFramework = $projectXml.Project.PropertyGroup |
@@ -83,16 +89,41 @@ $expectedEntries = @(
     'modinfo.json',
     'README.md'
 )
-$hubMaterials = @('iron', 'meteoriciron', 'steel')
 $releasedRendererCodes = @(
     foreach ($size in @(
-        @{ Name = 'full'; Wheels = @('wood', 'iron', 'meteoriciron', 'steel') },
-        @{ Name = 'compact'; Wheels = @('wood', 'stone', 'iron', 'meteoriciron', 'steel') }
+        @{
+            Name = 'full'
+            Wheels = @('wood', 'copper', 'tinbronze', 'bismuthbronze', 'blackbronze', 'iron', 'meteoriciron', 'steel')
+            Hubs = @('iron', 'meteoriciron', 'steel')
+        },
+        @{
+            Name = 'compact'
+            Wheels = @('wood', 'stone', 'copper', 'tinbronze', 'bismuthbronze', 'blackbronze', 'iron', 'meteoriciron', 'steel')
+            Hubs = @('copper', 'tinbronze', 'bismuthbronze', 'blackbronze', 'iron', 'meteoriciron', 'steel')
+        }
     )) {
         foreach ($wheel in $size.Wheels) {
-            foreach ($hub in $hubMaterials) {
-                $wheelTier = if ($wheel -in @('wood', 'stone')) { 0 } elseif ($wheel -in @('iron', 'meteoriciron')) { 1 } else { 2 }
-                $hubTier = if ($hub -in @('iron', 'meteoriciron')) { 1 } else { 2 }
+            foreach ($hub in $size.Hubs) {
+                $wheelTier = if ($wheel -in @('wood', 'stone')) {
+                    0
+                } elseif ($wheel -eq 'copper') {
+                    1
+                } elseif ($wheel -in @('tinbronze', 'bismuthbronze', 'blackbronze')) {
+                    2
+                } elseif ($wheel -in @('iron', 'meteoriciron')) {
+                    3
+                } else {
+                    4
+                }
+                $hubTier = if ($hub -eq 'copper') {
+                    1
+                } elseif ($hub -in @('tinbronze', 'bismuthbronze', 'blackbronze')) {
+                    2
+                } elseif ($hub -in @('iron', 'meteoriciron')) {
+                    3
+                } else {
+                    4
+                }
                 if ($hubTier -ge $wheelTier) {
                     "flywheelpower-$($size.Name)-$wheel-$($hub)hub"
                 }
@@ -134,7 +165,11 @@ try {
         }
     }
 
-    if ($blocktypeText -match 'bronze') {
+    if ($blocktypeText -match 'flywheelpower-full-[^-]+-(copper|tinbronze|bismuthbronze|blackbronze)hub') {
+        throw 'Compact-only copper or bronze hubs were included in full-size renderer groups.'
+    }
+
+    if ($blocktypeText -match 'cupronickel|brass|gold|silver|lead') {
         throw 'Unsupported material or hub mappings were included in packaged blocktypes.'
     }
 
@@ -147,7 +182,7 @@ try {
         $languageReader.Dispose()
     }
 
-    if ($languageText -match 'sliptransmission|keyedflywheel|blockinfo-shaft|bronze') {
+    if ($languageText -match 'sliptransmission|keyedflywheel|blockinfo-shaft|cupronickel|brass|gold|silver|lead') {
         throw 'Disabled or unsupported player-facing localization was included in the package.'
     }
 }

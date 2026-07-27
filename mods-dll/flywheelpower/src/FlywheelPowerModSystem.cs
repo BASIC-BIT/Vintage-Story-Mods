@@ -7,9 +7,13 @@ namespace FlywheelPower;
 
 public sealed class FlywheelPowerModSystem : ModSystem
 {
-    internal static readonly string[] FullWheelMaterials = { "wood", "iron", "meteoriciron", "steel" };
-    internal static readonly string[] CompactWheelMaterials = { "wood", "stone", "iron", "meteoriciron", "steel" };
-    internal static readonly string[] HubMaterials = { "iron", "meteoriciron", "steel" };
+    internal static readonly string[] FullWheelMaterials =
+        { "wood", "copper", "tinbronze", "bismuthbronze", "blackbronze", "iron", "meteoriciron", "steel" };
+    internal static readonly string[] CompactWheelMaterials =
+        { "wood", "stone", "copper", "tinbronze", "bismuthbronze", "blackbronze", "iron", "meteoriciron", "steel" };
+    internal static readonly string[] FullHubMaterials = { "iron", "meteoriciron", "steel" };
+    internal static readonly string[] CompactHubMaterials =
+        { "copper", "tinbronze", "bismuthbronze", "blackbronze", "iron", "meteoriciron", "steel" };
     internal static readonly string[] ReleasedRendererCodes = BuildReleasedRendererCodes();
 
     public override void Start(ICoreAPI api)
@@ -35,14 +39,18 @@ public sealed class FlywheelPowerModSystem : ModSystem
         int wheelTier = wheelMaterial switch
         {
             "wood" or "stone" => 0,
-            "iron" or "meteoriciron" => 1,
-            "steel" => 2,
+            "copper" => 1,
+            "tinbronze" or "bismuthbronze" or "blackbronze" => 2,
+            "iron" or "meteoriciron" => 3,
+            "steel" => 4,
             _ => int.MaxValue
         };
         int hubTier = hubMaterial switch
         {
-            "iron" or "meteoriciron" => 1,
-            "steel" => 2,
+            "copper" => 1,
+            "tinbronze" or "bismuthbronze" or "blackbronze" => 2,
+            "iron" or "meteoriciron" => 3,
+            "steel" => 4,
             _ => int.MinValue
         };
         return wheelTier <= hubTier;
@@ -56,11 +64,11 @@ public sealed class FlywheelPowerModSystem : ModSystem
     private static string[] BuildReleasedRendererCodes()
     {
         return FullWheelMaterials
-            .SelectMany(wheel => HubMaterials
+            .SelectMany(wheel => FullHubMaterials
                 .Where(hub => IsReleasedMaterialCombination(wheel, hub))
                 .Select(hub => RendererCode(compact: false, wheel, hub)))
             .Concat(CompactWheelMaterials
-                .SelectMany(wheel => HubMaterials
+                .SelectMany(wheel => CompactHubMaterials
                     .Where(hub => IsReleasedMaterialCombination(wheel, hub))
                     .Select(hub => RendererCode(compact: true, wheel, hub))))
             .ToArray();

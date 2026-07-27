@@ -6,9 +6,9 @@ Flywheel Power 0.5.0 is the complete initial-feedback implementation of rotation
 
 The release provides:
 
-- Full-size 3x3x1 friction-coupled flywheels with an eight-spoke timber web and a wood, iron, meteoric-iron, or steel outer tyre.
-- Compact wood, stone, iron, meteoric-iron, and steel friction-coupled flywheels on a wooden shaft.
-- Independently selected iron, meteoric-iron, or steel hubs, provided the hub is at least as strong as the wheel. Iron and meteoric iron share one strength tier.
+- Full-size 3x3x1 friction-coupled flywheels with an eight-spoke timber web and a wood, copper, tin-bronze, bismuth-bronze, black-bronze, iron, meteoric-iron, or steel outer tyre.
+- Compact wheels in the same materials plus stone, all on a wooden shaft.
+- Independently selected hubs, provided the hub is at least as strong as the wheel. Compact hubs range from copper through steel; full-size hubs start at iron. All three bronzes share one tier, and iron and meteoric iron share one tier.
 - Independent flywheel speed that charges from a faster network and contributes capped torque back to a slower network.
 - Material-density and geometry-based inertia, bearing and windage losses, a coupling ramp, and a safe-speed warning.
 - Persistent flywheel speed and schematic-safe relative links between the full-size principal block and its multiblock parts.
@@ -22,11 +22,11 @@ Horizontal full stands can be placed by targeting either the bottom-center groun
 
 ## Current content surface
 
-Twenty-three finished wheel assemblies are intentionally discoverable in creative mode and the handbook. Wood and compact stone accept any released hub. Iron and meteoric-iron wheels accept iron, meteoric-iron, or steel hubs. Steel wheels require steel hubs. Finished assemblies cannot be placed directly: place the matching grounded stand, then install the assembly by interacting with it.
+Sixty-eight finished wheel assemblies are discoverable in creative mode and the handbook: 22 full-size and 46 compact. The strength order is wood/stone, copper, bronze, iron/meteoric iron, then steel. Any hub at the wheel's tier or above is valid. Full-size construction requires an iron-tier or steel hub, while compact construction also permits copper and all three bronze hubs. Finished assemblies cannot be placed directly: place the matching grounded stand, then install the assembly by interacting with it.
 
 The monolithic full-size stone wheel is intentionally omitted because a slab at that scale would be structurally implausible. Stone remains available only for the compact construction.
 
-Survival recipes use animal fat as bearing lubricant, a wooden axle, metal plates for the selected hub, planks for the web and stand, and either prepared wood/stone or curved metal-plate rims. Full-size metal tyres consume eight plates; compact metal blanks consume four.
+Survival recipes use animal fat as bearing lubricant, wooden axles, metal plates for the selected hub, planks for the web and stand, and either prepared wood/stone or curved metal-plate rims. Full-size metal tyres consume eight plates; compact metal blanks consume four. Every valid wheel-and-hub pair has an exact final assembly recipe generated from the same tier policy as its block, renderer, texture, localization, and handbook surface.
 
 ## Deliberately deferred systems
 
@@ -34,7 +34,7 @@ The unfinished Slip Transmission remains under `src/` and `disabled-content/` fo
 
 Keyed flywheel blocktypes and their preview shapes are also retained only under `disabled-content/`. Their current rigid-coupling path follows network speed but does not return inertial torque, so exposing them would imply storage behavior they do not yet provide.
 
-Additional wheel materials, contextual smithing or casting, sound, wear, heat, failures, and richer commissioned models are follow-up work. The initial release deliberately avoids invalid weaker-hub combinations and broader material Cartesian products.
+Contextual smithing or casting, sound, wear, heat, failures, and richer commissioned models are follow-up work. The initial release includes the broad supported material matrix but deliberately excludes physically weaker-hub combinations.
 
 This mod has not had a public release, so obsolete prototype block aliases and their unused shapes were removed rather than carried as fictional migration compatibility.
 

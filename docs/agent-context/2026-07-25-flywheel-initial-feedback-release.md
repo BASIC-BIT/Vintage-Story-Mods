@@ -225,7 +225,7 @@ In-game cards remaining:
 1. **Proportions, stand, and variant appearance** (P0)
    - Config: Creative world, representative full-size and compact choices covering all wheel and hub materials.
    - Do: Place full-size and compact examples and view them straight on, at roughly 45 degrees, and directly from the side.
-   - Expect: The full disc spans 1.6 blocks inside the 3x3 plane with deliberate edge clearance, a close-fitting bearing collar, and a thin 0.1875-block profile. The compact disc spans 0.92 block. The two-bearing timber stand visibly reaches the ground, its four braces meet the wooden bearing housings, and it reads as a supported machine rather than a decorative floating frame. Wood, stone, iron, meteoric iron, and steel textures remain visually distinct; selected hub material is independently visible; every axle is wood; the red face and rim registration marks meet without a bright or dark gap.
+   - Expect: The full disc spans 1.6 blocks inside the 3x3 plane with deliberate edge clearance, a close-fitting bearing collar, and a thin 0.1875-block profile. The compact disc spans 0.92 block without intersecting its stand. The two-bearing timber stand visibly reaches the ground, its four braces meet the wooden bearing housings, and it reads as a supported machine rather than a decorative floating frame. Wood, stone, copper, the three bronzes, iron, meteoric iron, and steel textures remain correctly assigned; selected hub material is independently visible; every axle is wood; the red face and rim registration marks meet without a bright or dark gap.
    - Watch for: A wheel that nearly fills the footprint, a bulky central drum, an axle gap, wheel/frame clipping, disconnected braces, floating sleepers, missing stand components, material variants sharing the wrong texture, a split registration mark, or an edge-on profile that reads as a thick cylinder.
 
 2. **Rotation and axle alignment** (P0)
@@ -243,7 +243,7 @@ In-game cards remaining:
 4. **Creative and handbook surface** (P1)
    - Config: Creative mode and handbook/search available.
    - Do: Search for `flywheel` and `slip transmission`, and inspect relevant creative tabs.
-   - Expect: Twenty-three active choices are discoverable. Wood and compact stone accept all three hubs; iron and meteoric-iron wheels accept all three hubs; steel wheels expose only steel hubs. Hovered items and placed blocks show rotating mass and effective inertia. No full-size stone flywheel, weak-hub steel-wheel combination, Slip Transmission entry, item, recipe, or placeable block appears.
+   - Expect: Sixty-eight active choices are discoverable, 22 full-size and 46 compact. The strength order is wood/stone, copper, bronze, iron/meteoric iron, then steel; every exposed hub is at the wheel's tier or above. Full-size hubs start at iron, while compact hubs also include copper and all three bronze alloys. Hovered items and placed blocks show rotating mass and effective inertia. No full-size stone flywheel, weaker-hub combination, Slip Transmission entry, item, recipe, or placeable block appears.
    - Watch for: Raw localization keys, missing physical comparison lines, a renderer crash, incorrect hub texture, steel wheels with weaker hubs, legacy generic flywheel aliases, or hidden transmission variants.
 
 5. **Save/reload behavior** (P0)
@@ -398,3 +398,23 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   pieces surrounding a 4.5-by-4.5-model-unit shaft opening. The wooden axle passes through visible clearance instead of
   intersecting a solid timber block. The diagonal braces now terminate against the lower housing rail; their rotated maximum
   height is below the bore opening, so they no longer intrude into the axle path.
+
+## Expanded material matrix and compact clearance, July 27, 2026
+
+- The supported wheel materials are wood, copper, tin bronze, bismuth bronze, black bronze, iron, meteoric iron, and steel.
+  Compact wheels additionally support stone. Full-size hubs remain iron, meteoric iron, or steel; compact hubs support
+  copper, all three bronzes, iron, meteoric iron, and steel.
+- Hub eligibility follows one generated strength order: wood/stone (0), copper (1), all bronzes (2), iron/meteoric iron (3),
+  and steel (4). A hub must meet or exceed the wheel tier. The complete logical matrix contains 22 full-size and 46 compact
+  assemblies, with exact renderer, texture, recipe, localization, creative, and handbook mappings for all 68.
+- Copper and bronze physical profiles use the densities declared by Vintage Story 1.22.2's metal-plate assets: 8960 kg/m3
+  copper, 7600 tin bronze, 7900 bismuth bronze, and 9000 black bronze. The tooltip mass and inertia therefore distinguish
+  the alloys rather than treating bronze as one generic material.
+- A deterministic generator now owns the player-facing material matrix. Builds, packaging, and visual evidence fail if its
+  generated blocktypes, component items, recipes, or localization drift from the source policy.
+- The compact horizontal stand's center cross-tie was split into front and rear members, and its bearing housings were moved
+  outward by 0.5 model unit. The vertical bearing rails were shortened by 0.25 model unit. An axis-aware cylinder/cuboid test
+  proves neither orientation intersects the 0.92-meter compact wheel.
+- Representative copper/iron, black-bronze/steel, wood/copper, and mixed-bronze model manifests augment the existing
+  material evidence. All 17 manifests render 24 primary images apiece with resolved textures and zero coplanar overlaps.
+- The compact stone blank recipe now uses one chisel tool slot rather than accidentally requiring two chisels.

@@ -1,23 +1,86 @@
 {
-  code: "flywheelrim",
-  variantgroups: [
-    { code: "size", states: ["full", "compact"] },
-    { code: "material", states: ["wood", "stone", "iron", "meteoriciron", "steel"] }
+  "code": "flywheelrim",
+  "variantgroups": [
+    {
+      "code": "size",
+      "states": [
+        "full",
+        "compact"
+      ]
+    },
+    {
+      "code": "material",
+      "states": [
+        "wood",
+        "stone",
+        "copper",
+        "tinbronze",
+        "bismuthbronze",
+        "blackbronze",
+        "iron",
+        "meteoriciron",
+        "steel"
+      ]
+    }
   ],
-  skipVariants: ["flywheelrim-full-stone"],
-  shape: { base: "game:item/plate" },
-  textureByType: {
-    "*-wood": { base: "game:block/wood/planks/generic" },
-    "*-stone": { base: "game:block/stone/rock/granite1" },
-    "*-iron": { base: "game:block/metal/ingot/iron" },
-    "*-meteoriciron": { base: "game:block/metal/ingot/meteoriciron" },
-    "*-steel": { base: "game:block/metal/ingot/steel" }
+  "skipVariants": [
+    "flywheelrim-full-stone"
+  ],
+  "shape": {
+    "base": "game:item/plate"
   },
-  creativeinventory: { "general": ["*"], "items": ["*"], "mechanics": ["*"] },
-  maxstacksize: 8,
-  guiTransform: {
-    rotation: { x: -30, y: -44, z: -180 },
-    origin: { x: 0.5, y: 0.0625, z: 0.5 },
-    scale: 2.8
+  "textureByType": {
+    "*-wood": {
+      "base": "game:block/wood/planks/generic"
+    },
+    "*-stone": {
+      "base": "game:block/stone/rock/granite1"
+    },
+    "*-copper": {
+      "base": "game:block/metal/ingot/copper"
+    },
+    "*-tinbronze": {
+      "base": "game:block/metal/ingot/tinbronze"
+    },
+    "*-bismuthbronze": {
+      "base": "game:block/metal/ingot/bismuthbronze"
+    },
+    "*-blackbronze": {
+      "base": "game:block/metal/ingot/blackbronze"
+    },
+    "*-iron": {
+      "base": "game:block/metal/ingot/iron"
+    },
+    "*-meteoriciron": {
+      "base": "game:block/metal/ingot/meteoriciron"
+    },
+    "*-steel": {
+      "base": "game:block/metal/ingot/steel"
+    }
+  },
+  "creativeinventory": {
+    "general": [
+      "*"
+    ],
+    "items": [
+      "*"
+    ],
+    "mechanics": [
+      "*"
+    ]
+  },
+  "maxstacksize": 8,
+  "guiTransform": {
+    "rotation": {
+      "x": -30,
+      "y": -44,
+      "z": -180
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.0625,
+      "z": 0.5
+    },
+    "scale": 2.8
   }
 }
