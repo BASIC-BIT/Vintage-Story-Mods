@@ -8,6 +8,7 @@ internal static class FlywheelModelDimensions
     internal const float FelloeInnerRadius = 0.56f;
     internal const float FelloeOuterRadius = 0.68f;
     internal const float SpokeHalfWidth = 0.055f;
+    internal const float SpokeDepthInset = 0.00625f;
     internal const int SpokeCount = 8;
     internal const float WheelHalfThickness = 0.09375f;
     internal const float CoupledInnerRadius = 0.28f;

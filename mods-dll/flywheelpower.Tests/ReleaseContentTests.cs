@@ -219,11 +219,20 @@ public sealed class ReleaseContentTests
             .Where(element => element.GetProperty("name").GetString()!.StartsWith("CompactWheel", StringComparison.Ordinal))
             .ToArray();
 
-        double minX = ring.Min(element => element.GetProperty("from")[0].GetDouble());
-        double maxX = ring.Max(element => element.GetProperty("to")[0].GetDouble());
-
-        Assert.Equal(5.12d, maxX - minX, 2);
         Assert.Equal(16, ring.Length);
+        Assert.All(
+            ring,
+            segment => Assert.Equal(
+                5.12d,
+                segment.GetProperty("to")[0].GetDouble() - segment.GetProperty("from")[0].GetDouble(),
+                2));
+        for (int index = 0; index < ring.Length; index++)
+        {
+            Assert.Equal(
+                5.365d + index * 0.01d,
+                ring[index].GetProperty("from")[0].GetDouble(),
+                4);
+        }
         Assert.All(
             ring,
             segment => Assert.Equal(
@@ -259,19 +268,28 @@ public sealed class ReleaseContentTests
             .ToArray();
         Assert.Contains("LeftGroundSleeper", fullNames);
         Assert.Contains("RightGroundSleeper", fullNames);
-        Assert.Contains("LeftBearingCap", fullNames);
-        Assert.Contains("RightBearingCap", fullNames);
+        Assert.Contains("LeftBearingHousingLower", fullNames);
+        Assert.Contains("LeftBearingHousingUpper", fullNames);
+        Assert.Contains("LeftBearingHousingFront", fullNames);
+        Assert.Contains("LeftBearingHousingRear", fullNames);
+        Assert.Contains("RightBearingHousingLower", fullNames);
+        Assert.Contains("RightBearingHousingUpper", fullNames);
+        Assert.Contains("RightBearingHousingFront", fullNames);
+        Assert.Contains("RightBearingHousingRear", fullNames);
         Assert.Contains("LeftFrontBrace", fullNames);
         Assert.Contains("LeftRearBrace", fullNames);
         Assert.Contains("RightFrontBrace", fullNames);
         Assert.Contains("RightRearBrace", fullNames);
-        Assert.Contains("LeftGreaseCup", fullNames);
-        Assert.Contains("RightGreaseCup", fullNames);
+        Assert.DoesNotContain(fullNames, name => name.EndsWith("GreaseCup", StringComparison.Ordinal));
         Assert.DoesNotContain(fullNames, name => name.EndsWith("HoldDown", StringComparison.Ordinal));
         Assert.Equal(-16d, fullElements.Min(element => element.GetProperty("from")[1].GetDouble()));
         Assert.All(
             fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("Brace", StringComparison.Ordinal)),
-            brace => Assert.Equal(-15.25d, brace.GetProperty("from")[1].GetDouble()));
+            brace =>
+            {
+                Assert.Equal(-15.25d, brace.GetProperty("from")[1].GetDouble());
+                Assert.Equal(6d, brace.GetProperty("to")[1].GetDouble());
+            });
         Assert.All(
             fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("FrontBrace", StringComparison.Ordinal)),
             brace => Assert.Equal(18d, brace.GetProperty("rotationX").GetDouble()));
@@ -279,9 +297,9 @@ public sealed class ReleaseContentTests
             fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("RearBrace", StringComparison.Ordinal)),
             brace => Assert.Equal(-18d, brace.GetProperty("rotationX").GetDouble()));
         Assert.All(
-            fullElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("BearingCap", StringComparison.Ordinal)),
-            cap => Assert.All(
-                cap.GetProperty("faces").EnumerateObject(),
+            fullElements.Where(element => element.GetProperty("name").GetString()!.Contains("BearingHousing", StringComparison.Ordinal)),
+            housing => Assert.All(
+                housing.GetProperty("faces").EnumerateObject(),
                 face => Assert.Equal("#wood", face.Value.GetProperty("texture").GetString())));
 
         JsonElement[] compactElements = ReadShapeElements("compact-flywheel-frame-horizontal.json");
@@ -292,14 +310,31 @@ public sealed class ReleaseContentTests
         Assert.Contains("RightSleeper", compactNames);
         Assert.Contains("LeftBearingPost", compactNames);
         Assert.Contains("RightBearingPost", compactNames);
-        Assert.Contains("LeftGreaseCup", compactNames);
-        Assert.Contains("RightGreaseCup", compactNames);
+        Assert.Contains("LeftBearingHousingLower", compactNames);
+        Assert.Contains("LeftBearingHousingUpper", compactNames);
+        Assert.Contains("LeftBearingHousingFront", compactNames);
+        Assert.Contains("LeftBearingHousingRear", compactNames);
+        Assert.Contains("RightBearingHousingLower", compactNames);
+        Assert.Contains("RightBearingHousingUpper", compactNames);
+        Assert.Contains("RightBearingHousingFront", compactNames);
+        Assert.Contains("RightBearingHousingRear", compactNames);
+        Assert.DoesNotContain(compactNames, name => name.EndsWith("GreaseCup", StringComparison.Ordinal));
         Assert.DoesNotContain(compactNames, name => name.EndsWith("HoldDown", StringComparison.Ordinal));
         Assert.All(
-            compactElements.Where(element => element.GetProperty("name").GetString()!.EndsWith("BearingCap", StringComparison.Ordinal)),
-            cap => Assert.All(
-                cap.GetProperty("faces").EnumerateObject(),
+            compactElements.Where(element => element.GetProperty("name").GetString()!.Contains("BearingHousing", StringComparison.Ordinal)),
+            housing => Assert.All(
+                housing.GetProperty("faces").EnumerateObject(),
                 face => Assert.Equal("#wood", face.Value.GetProperty("texture").GetString())));
+
+        JsonElement[] axle = ReadShapeElements("flywheel-axle.json");
+        double axleMinY = axle.Min(element => element.GetProperty("from")[1].GetDouble());
+        double axleMaxY = axle.Max(element => element.GetProperty("to")[1].GetDouble());
+        double axleMinZ = axle.Min(element => element.GetProperty("from")[2].GetDouble());
+        double axleMaxZ = axle.Max(element => element.GetProperty("to")[2].GetDouble());
+        Assert.True(axleMinY > 5.75d);
+        Assert.True(axleMaxY < 10.25d);
+        Assert.True(axleMinZ > 5.75d);
+        Assert.True(axleMaxZ < 10.25d);
     }
 
     [Fact]

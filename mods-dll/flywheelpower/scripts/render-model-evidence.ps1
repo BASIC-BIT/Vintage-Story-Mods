@@ -21,7 +21,7 @@ if ($LASTEXITCODE -ne 0) {
 foreach ($manifest in Get-ChildItem -LiteralPath $manifestDirectory -Filter "*.json" | Sort-Object Name) {
     $name = [System.IO.Path]::GetFileNameWithoutExtension($manifest.Name)
     $target = Join-Path $OutputDirectory $name
-    python $renderer --manifest $manifest.FullName --output-dir $target
+    python $renderer --manifest $manifest.FullName --output-dir $target --fail-on-coplanar-overlap
     if ($LASTEXITCODE -ne 0) {
         throw "Model rendering failed for $($manifest.FullName)"
     }

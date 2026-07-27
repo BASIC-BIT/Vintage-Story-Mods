@@ -69,9 +69,9 @@
     },
     {
       "name": "LeftFrontBrace",
-      "from": [0.75, -15.25, 0.0],
-      "to": [4.75, 8.0, 4.0],
-      "rotationOrigin": [2.75, -13.75, 2.0],
+      "from": [0.875, -15.25, 0.0],
+      "to": [4.875, 6.0, 4.0],
+      "rotationOrigin": [2.875, -13.75, 2.0],
       "rotationX": 18,
       "faces": {
         "north": { "texture": "#wood", "uv": [0,0,4,16] }, "east": { "texture": "#wood", "uv": [0,0,4,16] },
@@ -81,9 +81,9 @@
     },
     {
       "name": "LeftRearBrace",
-      "from": [0.75, -15.25, 12.0],
-      "to": [4.75, 8.0, 16.0],
-      "rotationOrigin": [2.75, -13.75, 14.0],
+      "from": [1.125, -15.25, 12.0],
+      "to": [5.125, 6.0, 16.0],
+      "rotationOrigin": [3.125, -13.75, 14.0],
       "rotationX": -18,
       "faces": {
         "north": { "texture": "#wood", "uv": [0,0,4,16] }, "east": { "texture": "#wood", "uv": [0,0,4,16] },
@@ -93,9 +93,9 @@
     },
     {
       "name": "RightFrontBrace",
-      "from": [11.25, -15.25, 0.0],
-      "to": [15.25, 8.0, 4.0],
-      "rotationOrigin": [13.25, -13.75, 2.0],
+      "from": [11.125, -15.25, 0.0],
+      "to": [15.125, 6.0, 4.0],
+      "rotationOrigin": [13.125, -13.75, 2.0],
       "rotationX": 18,
       "faces": {
         "north": { "texture": "#wood", "uv": [0,0,4,16] }, "east": { "texture": "#wood", "uv": [0,0,4,16] },
@@ -105,9 +105,9 @@
     },
     {
       "name": "RightRearBrace",
-      "from": [11.25, -15.25, 12.0],
-      "to": [15.25, 8.0, 16.0],
-      "rotationOrigin": [13.25, -13.75, 14.0],
+      "from": [10.875, -15.25, 12.0],
+      "to": [14.875, 6.0, 16.0],
+      "rotationOrigin": [12.875, -13.75, 14.0],
       "rotationX": -18,
       "faces": {
         "north": { "texture": "#wood", "uv": [0,0,4,16] }, "east": { "texture": "#wood", "uv": [0,0,4,16] },
@@ -116,43 +116,59 @@
       }
     },
     {
-      "name": "LeftBearingCap",
-      "from": [0.75, 6.0, 3.5],
-      "to": [5.75, 10.0, 12.5],
+      "name": "LeftBearingHousingLower", "from": [0.75, 4.75, 3.5], "to": [5.75, 5.75, 12.5],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,5,4] }, "east": { "texture": "#wood", "uv": [0,0,9,4] },
-        "south": { "texture": "#wood", "uv": [0,0,5,4] }, "west": { "texture": "#wood", "uv": [0,0,9,4] },
-        "up": { "texture": "#wood", "uv": [0,0,5,9] }, "down": { "texture": "#wood", "uv": [0,0,5,9] }
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "RightBearingCap",
-      "from": [10.25, 6.0, 3.5],
-      "to": [15.25, 10.0, 12.5],
+      "name": "LeftBearingHousingUpper", "from": [0.75, 10.25, 3.5], "to": [5.75, 11.5, 12.5],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,5,4] }, "east": { "texture": "#wood", "uv": [0,0,9,4] },
-        "south": { "texture": "#wood", "uv": [0,0,5,4] }, "west": { "texture": "#wood", "uv": [0,0,9,4] },
-        "up": { "texture": "#wood", "uv": [0,0,5,9] }, "down": { "texture": "#wood", "uv": [0,0,5,9] }
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "LeftGreaseCup",
-      "from": [2.25, 10.0, 6.75],
-      "to": [4.25, 12.5, 9.25],
+      "name": "LeftBearingHousingFront", "from": [0.75, 5.75, 3.5], "to": [5.75, 10.25, 5.75],
       "faces": {
-        "north": { "texture": "#metal", "uv": [0,0,2,2.5] }, "east": { "texture": "#metal", "uv": [0,0,2.5,2.5] },
-        "south": { "texture": "#metal", "uv": [0,0,2,2.5] }, "west": { "texture": "#metal", "uv": [0,0,2.5,2.5] },
-        "up": { "texture": "#metal", "uv": [0,0,2,2.5] }, "down": { "texture": "#metal", "uv": [0,0,2,2.5] }
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     },
     {
-      "name": "RightGreaseCup",
-      "from": [11.75, 10.0, 6.75],
-      "to": [13.75, 12.5, 9.25],
+      "name": "LeftBearingHousingRear", "from": [0.75, 5.75, 10.25], "to": [5.75, 10.25, 12.5],
       "faces": {
-        "north": { "texture": "#metal", "uv": [0,0,2,2.5] }, "east": { "texture": "#metal", "uv": [0,0,2.5,2.5] },
-        "south": { "texture": "#metal", "uv": [0,0,2,2.5] }, "west": { "texture": "#metal", "uv": [0,0,2.5,2.5] },
-        "up": { "texture": "#metal", "uv": [0,0,2,2.5] }, "down": { "texture": "#metal", "uv": [0,0,2,2.5] }
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "RightBearingHousingLower", "from": [10.25, 4.75, 3.5], "to": [15.25, 5.75, 12.5],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "RightBearingHousingUpper", "from": [10.25, 10.25, 3.5], "to": [15.25, 11.5, 12.5],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "RightBearingHousingFront", "from": [10.25, 5.75, 3.5], "to": [15.25, 10.25, 5.75],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "RightBearingHousingRear", "from": [10.25, 5.75, 10.25], "to": [15.25, 10.25, 12.5],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
       }
     }
   ]

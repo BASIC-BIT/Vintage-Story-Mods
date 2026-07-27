@@ -183,5 +183,77 @@ class RegistrationMarkWindingTests(unittest.TestCase):
         self.assertGreater(renderer.dot(normal(back), (-1, 0, 0)), 0.999)
 
 
+class CoplanarOverlapTests(unittest.TestCase):
+    @staticmethod
+    def face(
+        element,
+        x0,
+        y0,
+        x1,
+        y1,
+        z=0,
+        reverse=False,
+    ):
+        vertices = [(x0, y0, z), (x1, y0, z), (x1, y1, z), (x0, y1, z)]
+        if reverse:
+            vertices.reverse()
+        return renderer.Face(vertices, "wood", element, surface="north", source="test")
+
+    def test_detects_positive_area_overlap_between_same_facing_coplanar_faces(self):
+        overlaps = renderer.find_coplanar_overlaps([
+            self.face("first", 0, 0, 2, 2),
+            self.face("second", 1, 1, 3, 3),
+        ])
+
+        self.assertEqual(1, len(overlaps))
+        self.assertAlmostEqual(1, overlaps[0].overlap_area)
+
+    def test_shared_edge_does_not_count_as_overlap(self):
+        overlaps = renderer.find_coplanar_overlaps([
+            self.face("first", 0, 0, 1, 1),
+            self.face("second", 1, 0, 2, 1),
+        ])
+
+        self.assertEqual([], overlaps)
+
+    def test_opposite_facing_internal_joint_does_not_count_as_z_fighting(self):
+        overlaps = renderer.find_coplanar_overlaps([
+            self.face("first", 0, 0, 2, 2),
+            self.face("second", 1, 1, 3, 3, reverse=True),
+        ])
+
+        self.assertEqual([], overlaps)
+
+    def test_small_plane_offset_clears_overlap(self):
+        overlaps = renderer.find_coplanar_overlaps([
+            self.face("first", 0, 0, 2, 2),
+            self.face("second", 1, 1, 3, 3, z=0.125),
+        ])
+
+        self.assertEqual([], overlaps)
+
+    def test_authored_flywheel_brace_offsets_clear_coplanar_overlaps(self):
+        root = Path(__file__).parents[4]
+        shape = (
+            root
+            / "mods-dll"
+            / "flywheelpower"
+            / "assets"
+            / "flywheelpower"
+            / "shapes"
+            / "block"
+            / "flywheel-frame-horizontal.json"
+        )
+        faces, _ = renderer.load_shape(shape)
+        pairs = {
+            frozenset((overlap.first_element, overlap.second_element))
+            for overlap in renderer.find_coplanar_overlaps(faces)
+        }
+
+        self.assertNotIn(frozenset(("LeftFrontBrace", "LeftRearBrace")), pairs)
+        self.assertNotIn(frozenset(("RightFrontBrace", "RightRearBrace")), pairs)
+        self.assertEqual(set(), pairs)
+
+
 if __name__ == "__main__":
     unittest.main()

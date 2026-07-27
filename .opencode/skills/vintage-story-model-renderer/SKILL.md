@@ -15,7 +15,8 @@ Use `scripts/render_vintage_story_model.py` before and after every model change.
    ```powershell
    python .opencode/skills/vintage-story-model-renderer/scripts/render_vintage_story_model.py `
      --manifest <manifest.json> `
-     --output-dir <bounded-output-directory>
+     --output-dir <bounded-output-directory> `
+     --fail-on-coplanar-overlap
    ```
 
    Every manifest produces 24 primary images: wireframe, material-ID, and textured renders from front, back, left, right,
@@ -33,7 +34,7 @@ Use `scripts/render_vintage_story_model.py` before and after every model change.
    for image inspection. Call out apparent missing faces, reversed winding, clipping, gaps, z-order artifacts, and ambiguous
    construction even when the authored dimensions are correct.
 4. Read `render-metadata.json`. Confirm expected input hashes, representation, element count, bounds, exactly 24 primary
-   images, and no unexpected unresolved textures.
+   images, no unexpected unresolved textures, and `coplanarOverlapCount: 0`.
 5. Compare before/after contact sheets. Do not infer in-game lighting, animation, selection, collision, or mechanical alignment.
 6. Present the bounded contact sheet or the relevant fixed views in chat so the human reviewer can inspect the same evidence.
    State clearly that the image is an automated render and record any human feedback separately.
@@ -87,6 +88,20 @@ Texture locations resolve against each `--assets-root`. Missing PNGs use determi
 For an installed Vintage Story tree, the renderer searches the `game`, `survival`, and `creative` content packs while
 preserving the `game:` asset domain used by block definitions. Shape face UV rectangles and 90-degree face rotations are
 honored. When a face omits UVs, the renderer generates a size-proportional cuboid mapping and records the source shape hash.
+
+## Coplanar overlap and Z-fighting audit
+
+The renderer compares every transformed face polygon against every face from another primitive. It reports faces when:
+
+- their outward normals point in the same direction;
+- every vertex lies on the same plane within the deterministic tolerance; and
+- their convex projected intersection has positive area, rather than merely sharing an edge.
+
+Opposite-facing faces at an intentional internal joint do not count. Each finding records both element and face names,
+overlap area, and plane distance in `render-metadata.json`. Use `--fail-on-coplanar-overlap` for model evidence and CI so a
+new conflict cannot be hidden by painter ordering or a favorable static view. Fix the source geometry with an intentional
+micro-offset, inset, phase change, or non-overlapping construction. Do not allowlist an overlap merely because a still image
+happens not to flicker.
 
 ## Geometry capabilities and limits
 

@@ -15,6 +15,9 @@ DIMENSIONS_SOURCE = PROJECT_ROOT / "src" / "FlywheelModelDimensions.cs"
 SHAPE_ROOT = PROJECT_ROOT / "assets" / "flywheelpower" / "shapes" / "block"
 CENTER = 8.0
 RING_SEGMENTS = 16
+SEGMENT_DEPTH_STEP = 0.01
+RING_DEPTH_STEP = 0.0005
+RING_PHASE_STEP_DEGREES = 0.05
 
 FACE_PLANES = {
     "north": (0, 1),
@@ -70,20 +73,24 @@ def ring_elements(
     max_x: float,
     inner_radius: float,
     outer_radius: float,
+    layer_index: int,
     segments: int = RING_SEGMENTS,
 ) -> list[dict]:
-    midpoint = (inner_radius + outer_radius) / 2
     half_tangent = outer_radius * math.tan(math.pi / segments) + 0.025
-    return [
-        cuboid_element(
-            f"{name}{segment}",
-            (min_x, CENTER - half_tangent, CENTER + inner_radius),
-            (max_x, CENTER + half_tangent, CENTER + outer_radius),
-            material,
-            360 * segment / segments,
+    elements = []
+    for segment in range(segments):
+        depth_offset = (
+            (segment - (segments - 1) / 2) * SEGMENT_DEPTH_STEP
+            + layer_index * RING_DEPTH_STEP
         )
-        for segment in range(segments)
-    ]
+        elements.append(cuboid_element(
+            f"{name}{segment}",
+            (min_x + depth_offset, CENTER - half_tangent, CENTER + inner_radius),
+            (max_x + depth_offset, CENTER + half_tangent, CENTER + outer_radius),
+            material,
+            360 * segment / segments + layer_index * RING_PHASE_STEP_DEGREES,
+        ))
+    return elements
 
 
 def spoke_elements(values: dict[str, float], min_x: float, max_x: float) -> list[dict]:
@@ -91,11 +98,12 @@ def spoke_elements(values: dict[str, float], min_x: float, max_x: float) -> list
     outer = (values["FelloeInnerRadius"] + 0.02) * 16
     half_width = values["SpokeHalfWidth"] * 16
     count = int(values["SpokeCount"])
+    depth_inset = values["SpokeDepthInset"] * 16
     return [
         cuboid_element(
             f"WoodSpoke{spoke}",
-            (min_x, CENTER - half_width, CENTER + inner),
-            (max_x, CENTER + half_width, CENTER + outer),
+            (min_x + depth_inset, CENTER - half_width, CENTER + inner),
+            (max_x - depth_inset, CENTER + half_width, CENTER + outer),
             "wood",
             360 * spoke / count,
         )
@@ -111,6 +119,7 @@ def registration_mark(
 ) -> list[dict]:
     raise_amount = 0.006 * 16
     overlap = 0.012 * 16
+    separation = 0.02
     start_radius = radius * 0.18
     return [
         cuboid_element(
@@ -127,8 +136,16 @@ def registration_mark(
         ),
         cuboid_element(
             "ChalkLineRim",
-            (wheel_min - overlap, CENTER - half_width, CENTER + radius + raise_amount),
-            (wheel_max + overlap, CENTER + half_width, CENTER + radius + raise_amount * 2),
+            (
+                wheel_min - overlap - separation,
+                CENTER - half_width - separation,
+                CENTER + radius + raise_amount,
+            ),
+            (
+                wheel_max + overlap + separation,
+                CENTER + half_width + separation,
+                CENTER + radius + raise_amount * 2 + separation,
+            ),
             "chalk",
         ),
     ]
@@ -154,6 +171,7 @@ def assembly_elements(values: dict[str, float], compact: bool) -> list[dict]:
                 wheel_max,
                 value("CoupledInnerRadius"),
                 wheel_radius,
+                layer_index=0,
             )
         )
     else:
@@ -166,6 +184,7 @@ def assembly_elements(values: dict[str, float], compact: bool) -> list[dict]:
                 wheel_max,
                 value("FelloeInnerRadius"),
                 value("FelloeOuterRadius"),
+                layer_index=0,
             )
         )
         elements.extend(
@@ -176,6 +195,7 @@ def assembly_elements(values: dict[str, float], compact: bool) -> list[dict]:
                 wheel_max,
                 value("TyreInnerRadius"),
                 wheel_radius,
+                layer_index=1,
             )
         )
 
@@ -188,6 +208,7 @@ def assembly_elements(values: dict[str, float], compact: bool) -> list[dict]:
             CENTER + value("BearingHalfThickness"),
             shaft_radius,
             value("BearingOuterRadius"),
+            layer_index=2,
         )
     )
     elements.extend(
@@ -198,6 +219,7 @@ def assembly_elements(values: dict[str, float], compact: bool) -> list[dict]:
             CENTER + value("HubHalfThickness"),
             value("BearingOuterRadius"),
             value("HubOuterRadius"),
+            layer_index=3,
         )
     )
 
@@ -212,6 +234,7 @@ def assembly_elements(values: dict[str, float], compact: bool) -> list[dict]:
             wheel_max + plate_gap + plate_thickness,
             shaft_radius,
             plate_radius,
+            layer_index=4,
         )
     )
     elements.extend(
@@ -222,6 +245,7 @@ def assembly_elements(values: dict[str, float], compact: bool) -> list[dict]:
             wheel_min - plate_gap,
             shaft_radius,
             plate_radius,
+            layer_index=5,
         )
     )
     chalk_half_width = (0.025 if compact else 0.04) * 16

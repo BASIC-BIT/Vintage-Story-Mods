@@ -13,7 +13,7 @@ The release provides:
 - Material-density and geometry-based inertia, bearing and windage losses, a coupling ramp, and a safe-speed warning.
 - Persistent flywheel speed and schematic-safe relative links between the full-size principal block and its multiblock parts.
 - Mechanical rendering on all three axes with a distinct renderer group for each released wheel-and-hub construction.
-- Two-bearing timber stands with connected cross-bracing, wooden bearing housings, and grease cups. Placement requires a solid supporting footprint beneath the stand.
+- Two-bearing timber stands with connected cross-bracing and open wooden bearing housings that visibly support the shaft without intersecting it. Placement requires a solid supporting footprint beneath the stand.
 - A staged survival construction loop: lubricated hub-and-bearing sets, timber webs, prepared rims or curved metal tyres, finished wheel assemblies, and separately placed stands.
 - Held-item and placed-block information for rotating mass and effective inertia, plus live state, flywheel and network speed, stored-energy percentage, coupling torque, losses, slipping, and overspeed risk.
 

@@ -149,7 +149,12 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
             }
             else
             {
-                AddSpokedWeb(mesh, woodTex, spec, wheelMinX, wheelMaxX);
+                AddSpokedWeb(
+                    mesh,
+                    woodTex,
+                    spec,
+                    wheelMinX + FlywheelModelDimensions.SpokeDepthInset,
+                    wheelMaxX - FlywheelModelDimensions.SpokeDepthInset);
                 AddAnnularCylinder(mesh, woodTex, new(spec.FelloeInnerRadius, spec.FelloeOuterRadius, wheelMinX, wheelMaxX, WheelSegments, 2, IncludeInnerSide: true));
                 AddAnnularCylinder(mesh, wheelTex, new(spec.TyreInnerRadius, spec.WheelOuterRadius, wheelMinX, wheelMaxX, WheelSegments, 2, IncludeInnerSide: true));
             }

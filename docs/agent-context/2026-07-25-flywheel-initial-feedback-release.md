@@ -365,8 +365,7 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   from both isometric directions. Their upper endpoints, bearing alignment, rotation origins, footprint, and collision
   behavior are unchanged.
 - The two full-size and two compact decorative hold-down blocks were removed. They read as unexplained metal squares on the
-  base and did not contribute to support, interaction, collision, recipes, or mechanical behavior. Bearing grease cups remain
-  at the actual axle supports.
+  base and did not contribute to support, interaction, collision, recipes, or mechanical behavior.
 - The procedural review renderer now corrects opposite winding for the rear registration mark, which had allowed the red mark
   to appear through the wheel in the first isometric view even though the runtime mesh used the correct front/back winding.
 - Every render manifest now produces eight views in three modes: six orthographic profiles and two opposing top-down
@@ -383,3 +382,19 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   package shapes drift from the dimension-driven generator.
 - This renderer is automated geometry and texture evidence. It does not reproduce atlas padding, mipmaps, animation, game
   lighting, the player skeleton or hands, or final held transforms, so those remain bounded in-game QA.
+
+## Coplanar-overlap and bearing-housing review, July 27, 2026
+
+- The renderer now tests every pair of transformed face polygons for same-facing coplanarity and positive-area overlap.
+  Shared edges and opposite-facing internal joints are excluded. Findings include element names, face names, overlap area,
+  and plane distance in metadata; Flywheel's evidence script fails on any finding.
+- The initial audit found same-plane overlap between the full-size crossed brace pairs. The front and rear layers are now
+  separated symmetrically by 0.25 model unit (1/64 block), with their rotation origins shifted identically so slope, base
+  connection, bearing connection, collision, and multiblock semantics remain unchanged.
+- The audit also exposed the compact cross-tie boundary, the shaft/cap intersection, full-size spoke/felloe face overlap,
+  and coplanar cuboid segments in the inventory/held preview shapes. These were fixed with source-level insets, deterministic
+  segment depth layering, and tiny per-ring phase offsets rather than suppressed warnings.
+- The metal grease-cup placeholders were removed from both stands. Each formerly solid bearing cap is now four wooden housing
+  pieces surrounding a 4.5-by-4.5-model-unit shaft opening. The wooden axle passes through visible clearance instead of
+  intersecting a solid timber block. The diagonal braces now terminate against the lower housing rail; their rotated maximum
+  height is below the bore opening, so they no longer intrude into the axle path.
