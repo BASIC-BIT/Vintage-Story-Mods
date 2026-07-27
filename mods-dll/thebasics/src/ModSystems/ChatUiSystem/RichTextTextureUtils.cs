@@ -13,6 +13,10 @@ internal static class RichTextTextureUtils
     private const int LayoutSlackPx = 2;
     private const int MeasureHeightPx = 600;
 
+    // Keeps pre-split tokens clear of the engine's ">= available width" flush test, which
+    // compares against a flow path width that rounds slightly differently to our own.
+    private const int WrapSafetyPx = 4;
+
     /// <summary>
     /// Renders VTML into a Cairo texture, including &lt;icon&gt; tags.
     /// Returns null if rendering fails.
@@ -61,9 +65,11 @@ internal static class RichTextTextureUtils
         {
             vtml = VtmlUtils.NormalizeVtmlForRendering(vtml);
 
-            var guiScale = RuntimeEnv.GUIScale > 0 ? RuntimeEnv.GUIScale : 1;
+            var guiScale = GetGuiScale();
             var maxTextWidthAtScalePx = GetScaledLengthPx(maxTextWidthPx, guiScale);
             var measureHeightAtScalePx = GetScaledLengthPx(MeasureHeightPx, guiScale);
+
+            vtml = BreakTokensTooWideToWrap(vtml, baseFont, maxTextWidthAtScalePx, guiScale);
 
             // Pass 1: measure at max width to get actual text dimensions.
             var measureComps = VtmlUtil.Richtextify(capi, vtml, baseFont);
@@ -161,6 +167,67 @@ internal static class RichTextTextureUtils
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// True when <paramref name="vtml"/> holds a token this renderer would have to pre-split, i.e. one
+    /// the engine would clip instead of wrap. Callers use it to decide whether to take a bubble over
+    /// from vanilla at all, so it asks the splitter itself rather than guessing from a glyph count:
+    /// same font, same GUI scale, same width budget as the render that follows.
+    /// </summary>
+    internal static bool HasTokenTooWideToWrap(string vtml, CairoFont baseFont, int maxTextWidthPx)
+    {
+        if (string.IsNullOrEmpty(vtml))
+        {
+            return false;
+        }
+
+        var guiScale = GetGuiScale();
+        return BreakTokensTooWideToWrap(vtml, baseFont, GetScaledLengthPx(maxTextWidthPx, guiScale), guiScale) != vtml;
+    }
+
+    private static float GetGuiScale()
+    {
+        return RuntimeEnv.GUIScale > 0 ? RuntimeEnv.GUIScale : 1;
+    }
+
+    /// <summary>
+    /// VS clips, rather than wraps, a token wider than the box unless that token happens to start a
+    /// line, so split those tokens up front and leave the engine only tokens that fit.
+    /// </summary>
+    private static string BreakTokensTooWideToWrap(string vtml, CairoFont baseFont, int maxTextWidthAtScalePx, double guiScale)
+    {
+        if (EngineWrapsMidToken())
+        {
+            return vtml;
+        }
+
+        // Measured bold on purpose. VtmlUtil.Richtextify renders <strong> bold and <i> italic, and
+        // both reach bubbles (accent delimiters, and every unknown-language, gesture or sign line).
+        // Bold is the wider of the two, so a bold measure never under-estimates the rendered width.
+        //
+        // One font for the whole string is enough because no tag reaching this text changes glyph
+        // size: <font> arrives here carrying only color, and the two transformers that emit
+        // `<font size=...>` (DistanceFontSizeTransformer, ICSpeechFormatTransformer) are registered
+        // *after* SpeechBubbleClientDataTransformer, so the bubble payload is built before either
+        // runs. ponytail: measure per RichTextComponent only if that ordering ever changes.
+        var measureFont = baseFont.Clone().WithWeight(FontWeight.Bold);
+        return VtmlUtils.BreakLongTokens(
+            vtml,
+            text => measureFont.GetTextExtents(text).Width,
+            maxTextWidthAtScalePx - GetScaledLengthPx(WrapSafetyPx, guiScale));
+    }
+
+    /// <summary>
+    /// True on locales that break after every character (ja and ko ship <c>linebreakBehavior</c>
+    /// <c>AfterCharacter</c>). RichTextComponent takes its behaviour from the locale, and
+    /// <c>getNextWord</c> then returns one character at a time, so the engine never clips there
+    /// and pre-splitting would only cost an extra line.
+    /// </summary>
+    private static bool EngineWrapsMidToken()
+    {
+        return Lang.AvailableLanguages.TryGetValue(Lang.CurrentLocale, out var locale)
+            && locale.LineBreakBehavior == EnumLinebreakBehavior.AfterCharacter;
     }
 
     private static bool UsesMultipleVisualLines(RichTextComponentBase[] components)

@@ -72,7 +72,8 @@ public static class SpeechBubbleVtmlPatches
         }
 
         var bubbleVtml = VtmlUtils.UnescapeRenderableVtmlTags(rawMsg);
-        if (!RequiresCustomBubbleRendering(bubbleVtml, kind, mode))
+        var baseFont = CreateBubbleFont(mode);
+        if (!RequiresCustomBubbleRendering(bubbleVtml, kind, mode, baseFont))
         {
             return true;
         }
@@ -80,7 +81,7 @@ public static class SpeechBubbleVtmlPatches
         var plainForTimer = VtmlUtils.StripVtmlTags(bubbleVtml, capi.Logger);
         MessageTexturesRef(renderer).Insert(0, new MessageTexture
         {
-            tex = CreateBubbleTexture(capi, bubbleVtml, kind, mode),
+            tex = CreateBubbleTexture(capi, bubbleVtml, kind, baseFont),
             message = plainForTimer,
             receivedTime = CalculateReceivedTimeForMinimumDuration(
                 capi.World.ElapsedMilliseconds,
@@ -173,15 +174,25 @@ public static class SpeechBubbleVtmlPatches
         return kind;
     }
 
-    private static bool RequiresCustomBubbleRendering(string bubbleVtml, string kind, string mode)
+    private static bool RequiresCustomBubbleRendering(string bubbleVtml, string kind, string mode, CairoFont baseFont)
     {
-        return bubbleVtml.Contains('<') || kind != null || mode != null;
+        // A tag-free normal-volume message (RpText mode with language colors off) carries no marker
+        // either, so it would fall through to vanilla, which clips an over-long token instead of
+        // wrapping it. The width test asks the renderer's own splitter, so the gate and the render
+        // agree exactly instead of relying on a glyph-count estimate.
+        //
+        // Vanilla bubble mode never reaches here: Prefix returns early on IsSpeechBubbleVtmlEnabled,
+        // so those bubbles still clip. Taking them over changes their look for users who opted out
+        // of RP bubble rendering, so it is a product decision tracked in issue #201.
+        return bubbleVtml.Contains('<')
+            || kind != null
+            || mode != null
+            || RichTextTextureUtils.HasTokenTooWideToWrap(bubbleVtml, baseFont, BubbleMaxTextWidthPx);
     }
 
-    private static LoadedTexture CreateBubbleTexture(ICoreClientAPI capi, string bubbleVtml, string kind, string mode)
+    private static LoadedTexture CreateBubbleTexture(ICoreClientAPI capi, string bubbleVtml, string kind, CairoFont baseFont)
     {
         var background = GetBubbleBackground(kind);
-        var baseFont = CreateBubbleFont(mode);
 
         var tex = RichTextTextureUtils.GenRichTextTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background);
         if (tex != null)
