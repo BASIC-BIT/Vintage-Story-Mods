@@ -97,7 +97,7 @@ public sealed class BlockFlywheel : BlockMPBase
         Block partBlock = GetPartBlock(world);
         if (partBlock == null)
         {
-            failureCode = "notenoughspace";
+            failureCode = "flywheelrequiresclearance";
             return false;
         }
 
@@ -107,7 +107,7 @@ public sealed class BlockFlywheel : BlockMPBase
             partSel.Position = partPos;
             if (!partBlock.CanPlaceBlock(world, byPlayer, partSel, ref failureCode))
             {
-                failureCode = "notenoughspace";
+                failureCode = "flywheelrequiresclearance";
                 return false;
             }
         }

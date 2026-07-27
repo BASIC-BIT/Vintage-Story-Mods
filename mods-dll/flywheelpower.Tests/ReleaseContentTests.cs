@@ -122,6 +122,20 @@ public sealed class ReleaseContentTests
         Assert.False(root.TryGetProperty("dependency", out _));
     }
 
+    [Fact]
+    public void FullSizePlacementExplainsItsReservedFootprint()
+    {
+        string blockSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));
+        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+
+        Assert.Contains("""failureCode = "flywheelrequiresclearance";""", blockSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("""failureCode = "notenoughspace";""", blockSource, StringComparison.Ordinal);
+        Assert.Contains(
+            """"placefailure-flywheelrequiresclearance": "Requires a clear 3x3 area around the flywheel plane."""",
+            activeLanguage,
+            StringComparison.Ordinal);
+    }
+
     private static string FindProjectRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

@@ -111,10 +111,29 @@ Revised geometry candidate staged July 26, 2026:
   localization, and missing renderer groups. Exact archive inspection confirms the authored model matches the revised source.
 - The older geometry-only package was staged to both dedicated QA profiles and the disposable server. The server reached `WorldReady` with
   `FlywheelPower.FlywheelPowerModSystem` loaded and no Flywheel startup error.
-- In-game visual, rotation/alignment, multiblock, and save/reload cards remain pending. The owner is actively using the computer;
-  do not touch the client/server or retry Computer Use until BASIC explicitly says the shared screen is free.
+- At that checkpoint, in-game visual, rotation/alignment, multiblock, and save/reload cards remained pending while the owner
+  was using the computer. BASIC later authorized a fresh build, install, server restart, and QA attempt.
 
-Manual approval required before execution:
+QA deployment correction, July 27, 2026:
+
+- The first authorized client attempt loaded an older `flywheelpower.zip` instead of the reviewed
+  `flywheelpower_0_5_0.zip`. Both files declared version 0.5.0, so Vintage Story reported a duplicate mod ID and selected the
+  stale prototype package. That package exposed old content and registered only renderer key `flywheelpower`, causing compact
+  placement to crash when current assets requested `flywheelpower-compact-iron`.
+- The stale packages were moved from both QA profiles into the recoverable local quarantine
+  `D:\Games\VSProfiles\FlywheelPower-Quarantine\20260727-055517`. Each profile now contains only the reviewed package name.
+- Full-size placement still intentionally reserves the unchanged 3x3x1 multiblock plane. The existing specific placement
+  message is now returned when any of its eight part cells is unavailable, instead of vanilla's ambiguous `Not enough space`.
+- After that correction, all six CI build and whitespace-format targets passed. The BASICs tests passed 488/488,
+  DimensionLib tests passed 58/58, Flywheel Power tests passed 19/19, and the repository Lizard gate passed.
+- The corrected package contains exactly 16 entries, is 43,722 bytes, and has SHA-256
+  `422D2738E48D1DBF6868945BA3FFE4E3E5972C0F8DC65341204BA18ED3514988`. Both QA profiles and the disposable server match that
+  hash. The server loaded `FlywheelPower.FlywheelPowerModSystem`, reached `WorldReady`, and began serving without a Flywheel
+  exception.
+- The client crash is a failed QA observation, not a pass. Visible QA remains paused after the owner stopped Computer Use;
+  do not relaunch or control the client until BASIC explicitly resumes visible control.
+
+In-game cards remaining after the interrupted attempt:
 
 1. **Full-size proportions and clearance** (P0)
    - Config: Creative world, any full-size flywheel material.
