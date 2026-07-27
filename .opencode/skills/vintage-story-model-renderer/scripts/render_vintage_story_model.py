@@ -154,10 +154,10 @@ def add_annulus(
         a0 = math.tau * segment / segments
         a1 = math.tau * (segment + 1) / segments
         faces.extend([
-            Face([vertex(max_x, inner_radius, a0), vertex(max_x, outer_radius, a0),
-                  vertex(max_x, outer_radius, a1), vertex(max_x, inner_radius, a1)], material, element),
-            Face([vertex(min_x, inner_radius, a0), vertex(min_x, inner_radius, a1),
-                  vertex(min_x, outer_radius, a1), vertex(min_x, outer_radius, a0)], material, element),
+            Face([vertex(max_x, inner_radius, a0), vertex(max_x, inner_radius, a1),
+                  vertex(max_x, outer_radius, a1), vertex(max_x, outer_radius, a0)], material, element),
+            Face([vertex(min_x, inner_radius, a0), vertex(min_x, outer_radius, a0),
+                  vertex(min_x, outer_radius, a1), vertex(min_x, inner_radius, a1)], material, element),
             Face([vertex(min_x, outer_radius, a0), vertex(max_x, outer_radius, a0),
                   vertex(max_x, outer_radius, a1), vertex(min_x, outer_radius, a1)], material, element),
         ])

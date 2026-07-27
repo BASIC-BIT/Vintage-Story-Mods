@@ -1,4 +1,4 @@
 interface:
   display_name: "Vintage Story Model Renderer"
-  short_description: "Render Vintage Story shape JSON from fixed views"
-  default_prompt: "Use $vintage-story-model-renderer to render and inspect Vintage Story model shapes from six orthographic directions and an isometric view."
+  short_description: "Render and visually review Vintage Story models"
+  default_prompt: "Use $vintage-story-model-renderer whenever editing or reviewing Vintage Story models. Render six orthographic directions and an isometric view, inspect the images with visual reasoning, and present bounded evidence in chat for human review."

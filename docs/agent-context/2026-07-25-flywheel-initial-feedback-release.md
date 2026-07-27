@@ -296,6 +296,47 @@ If feedback supports the curated release set, commission one coherent material p
   matching finishes. Focus the commission on readable material construction, restrained edge detail, and a stronger
   real-flywheel silhouette rather than animation, new gameplay, or additional variants.
 
+### Scoped survival construction direction
+
+The preferred full-size construction is a three-zone rotating assembly rather than the current solid material annulus:
+
+1. A tiered metal hub and bearing assembly around the wooden axle.
+2. An eight- or twelve-spoke timber web with a wooden felloe ring.
+3. Curved plates forming a narrow material-specific outer tyre.
+
+An illustrative 0.12-block radial iron tyre from radius 0.68 to 0.8 would use about 32 percent of the rotating metal mass of
+the current solid iron annulus while retaining about 49 percent of that annulus's polar inertia before adding the wooden
+felloe, spokes, hub, bearings, plates, and axle. This is not final balance, but it demonstrates why material concentrated at
+the perimeter can remain powerful while making plate-based construction and the displayed mass more credible.
+
+Recommended assembly progression:
+
+1. Forge or craft a hub-and-bearing assembly from the selected hub material, a wooden axle, two bearing components, fastening
+   hardware, and animal fat for lubrication.
+2. Build a timber wheel web from spokes and curved felloe segments.
+3. Curve several metal plates into tyre segments. The selected wheel material applies to this outer tyre, while the web
+   remains wood.
+4. Combine the hub assembly, timber web, and complete tyre set into a finished flywheel item.
+5. Place the grounded timber stand first, reserving the existing multiblock footprint, then install the finished wheel item
+   into the stand.
+
+The stand should remain the single multiblock principal and block entity. Its assembly state can change from empty to
+wheel-installed while storing wheel and hub material identity. This gives the desired physical installation interaction
+without creating an independently placeable rolling wheel entity or multiple competing mechanical-network principals.
+Breaking or disassembling the stand should return the installed wheel separately from the stand when safe.
+
+Open decisions for a survival-design follow-up:
+
+- Eight broad spokes versus twelve narrower spokes.
+- A 0.08- to 0.12-block tyre radial width, chosen using rendered readability and the balance harness rather than recipe cost
+  alone.
+- Dedicated bearing items versus reuse of a generic parts item. Dedicated paired bearings communicate the mechanic better;
+  generic parts keep the initial item surface smaller.
+- Grid recipes versus contextual assembly interactions. Start with item intermediates plus one stand-install interaction;
+  add staged in-world construction only if that interaction is fun in testing.
+- Exact plate and fastener counts. Treat recipes as gameplay abstraction, but keep the tooltip's derived mass honest to the
+  modeled timber and metal volumes.
+
 ## Retirement condition
 
 Remove this packet after the initial-feedback pull request is merged or closed and all surviving follow-ups have durable issues or product documentation.

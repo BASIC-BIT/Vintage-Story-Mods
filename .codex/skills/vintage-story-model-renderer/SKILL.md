@@ -1,6 +1,6 @@
 ---
 name: vintage-story-model-renderer
-description: Render Vintage Story shape JSON and Flywheel procedural geometry from fixed viewpoints for model review.
+description: Required visual review workflow for Vintage Story model edits. Render fixed views, inspect them with visual reasoning, and present bounded evidence in chat for human review.
 ---
 
 # vintage-story-model-renderer
