@@ -2,6 +2,7 @@ namespace thebasics.Utilities;
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Vintagestory.API.Common;
@@ -180,6 +181,13 @@ public static class VtmlUtils
     /// for <c>getNextWord</c>, so they only add an invisible glyph.
     ///
     /// Tags are copied verbatim and act as token boundaries, so nothing is ever inserted inside markup.
+    ///
+    /// Widths are measured on the raw VTML, so a token carrying entities (<c>&amp;lt;</c> and friends,
+    /// which <c>VtmlParser.Tokenize</c> later decodes to one character) is over-measured and breaks
+    /// slightly early. That errs towards a narrower line, never towards a clip, so it is left alone.
+    ///
+    /// Locales whose line break behaviour is <see cref="Vintagestory.API.Client.EnumLinebreakBehavior.AfterCharacter"/>
+    /// (ja, ko) already wrap mid-token in the engine and should not be passed through here.
     /// </remarks>
     /// <param name="vtml">VTML source.</param>
     /// <param name="measureWidthPx">Measures the rendered width of a plain-text run, in pixels.</param>
@@ -211,6 +219,31 @@ public static class VtmlUtils
 
         AppendBrokenToken(output, token, measureWidthPx, maxWidthPx);
         return output.ToString();
+    }
+
+    /// <summary>
+    /// True when <paramref name="text"/> holds an unbroken run of at least <paramref name="minLength"/>
+    /// characters, i.e. something <see cref="BreakLongTokens"/> might have to split. Cheap gate for
+    /// callers that have to decide whether to route text through the wrapping renderer at all.
+    /// </summary>
+    public static bool HasUnbrokenRun(string text, int minLength)
+    {
+        if (string.IsNullOrEmpty(text) || minLength <= 0)
+        {
+            return false;
+        }
+
+        var run = 0;
+        foreach (var c in text)
+        {
+            run = IsLineBreakOpportunity(c) ? 0 : run + 1;
+            if (run >= minLength)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -298,12 +331,8 @@ public static class VtmlUtils
             }
         }
 
-        if (char.IsHighSurrogate(c) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
-        {
-            return 2;
-        }
-
-        return 1;
+        // Grapheme clusters, so a split never strands a combining mark or half a surrogate pair.
+        return StringInfo.GetNextTextElementLength(text, index);
     }
 
     /// <summary>

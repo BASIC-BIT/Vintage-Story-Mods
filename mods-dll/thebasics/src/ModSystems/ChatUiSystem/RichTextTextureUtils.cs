@@ -69,14 +69,7 @@ internal static class RichTextTextureUtils
             var maxTextWidthAtScalePx = GetScaledLengthPx(maxTextWidthPx, guiScale);
             var measureHeightAtScalePx = GetScaledLengthPx(MeasureHeightPx, guiScale);
 
-            // VS clips, rather than wraps, a token wider than the box unless that token happens to
-            // start a line. Split those tokens up front so the engine only ever wraps tokens that fit.
-            // ponytail: measured with the base font, so a token inside a <font size=...> tag that
-            // enlarges text can still overflow. Measure per component if that ever shows up.
-            vtml = VtmlUtils.BreakLongTokens(
-                vtml,
-                text => baseFont.GetTextExtents(text).Width,
-                maxTextWidthAtScalePx - GetScaledLengthPx(WrapSafetyPx, guiScale));
+            vtml = BreakTokensTooWideToWrap(vtml, baseFont, maxTextWidthAtScalePx, guiScale);
 
             // Pass 1: measure at max width to get actual text dimensions.
             var measureComps = VtmlUtil.Richtextify(capi, vtml, baseFont);
@@ -174,6 +167,41 @@ internal static class RichTextTextureUtils
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// VS clips, rather than wraps, a token wider than the box unless that token happens to start a
+    /// line, so split those tokens up front and leave the engine only tokens that fit.
+    /// </summary>
+    private static string BreakTokensTooWideToWrap(string vtml, CairoFont baseFont, int maxTextWidthAtScalePx, double guiScale)
+    {
+        if (EngineWrapsMidToken())
+        {
+            return vtml;
+        }
+
+        // Measured bold on purpose. VtmlUtil.Richtextify renders <strong> bold and <i> italic, and
+        // both reach bubbles (accent delimiters, and every unknown-language, gesture or sign line).
+        // Bold is the wider of the two, so a bold measure never under-estimates the rendered width.
+        // ponytail: one font for the whole string. Measure per RichTextComponent only if a tag that
+        // changes size (<font size=...>) ever reaches this text.
+        var measureFont = baseFont.Clone().WithWeight(FontWeight.Bold);
+        return VtmlUtils.BreakLongTokens(
+            vtml,
+            text => measureFont.GetTextExtents(text).Width,
+            maxTextWidthAtScalePx - GetScaledLengthPx(WrapSafetyPx, guiScale));
+    }
+
+    /// <summary>
+    /// True on locales that break after every character (ja and ko ship <c>linebreakBehavior</c>
+    /// <c>AfterCharacter</c>). RichTextComponent takes its behaviour from the locale, and
+    /// <c>getNextWord</c> then returns one character at a time, so the engine never clips there
+    /// and pre-splitting would only cost an extra line.
+    /// </summary>
+    private static bool EngineWrapsMidToken()
+    {
+        return Lang.AvailableLanguages.TryGetValue(Lang.CurrentLocale, out var locale)
+            && locale.LineBreakBehavior == EnumLinebreakBehavior.AfterCharacter;
     }
 
     private static bool UsesMultipleVisualLines(RichTextComponentBase[] components)

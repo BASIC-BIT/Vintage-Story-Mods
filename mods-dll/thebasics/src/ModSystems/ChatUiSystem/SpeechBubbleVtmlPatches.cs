@@ -26,6 +26,12 @@ public static class SpeechBubbleVtmlPatches
     // Match vanilla speech bubbles so normal sentences do not wrap punctuation onto orphan lines.
     private const int BubbleMaxTextWidthPx = 350;
 
+    // Shortest unbroken run that could overflow BubbleMaxTextWidthPx. Tag-free bubbles always use the
+    // plain 25px font (yell/whisper set a mode marker, which already forces custom rendering), where
+    // even the widest Latin glyph runs about 24px, so 15 characters is the ceiling and 16 cannot miss.
+    // Chinese has no spaces so a whole sentence is one run; ja/ko wrap per character in the engine.
+    private const int MinTokenLengthNeedingWrap = 16;
+
     public static bool Prefix(EntityShapeRenderer __instance, int groupId, string message, EnumChatType chattype, string data)
     {
         // Feature flag is server-configured and delivered to client.
@@ -175,7 +181,13 @@ public static class SpeechBubbleVtmlPatches
 
     private static bool RequiresCustomBubbleRendering(string bubbleVtml, string kind, string mode)
     {
-        return bubbleVtml.Contains('<') || kind != null || mode != null;
+        // A tag-free normal-volume message (Vanilla bubble mode, or language colors off) would
+        // otherwise fall through to vanilla, which clips an over-long token instead of wrapping it.
+        // The real width test happens in RichTextTextureUtils; this is only a cheap gate.
+        return bubbleVtml.Contains('<')
+            || kind != null
+            || mode != null
+            || VtmlUtils.HasUnbrokenRun(bubbleVtml, MinTokenLengthNeedingWrap);
     }
 
     private static LoadedTexture CreateBubbleTexture(ICoreClientAPI capi, string bubbleVtml, string kind, string mode)

@@ -272,6 +272,16 @@ public class VtmlUtilsTests
         }
 
         [Fact]
+        public void NeverStrandsACombiningMark()
+        {
+            // "e" + U+0301 is one grapheme cluster; splitting it leaves a floating accent.
+            var accented = "e\u0301"; // decomposed: "e" plus combining acute
+
+            Break(new string('a', 9) + accented + new string('a', 4))
+                .Should().Be("aaaaaaaaa\n" + accented + "aaaa");
+        }
+
+        [Fact]
         public void KeepsAtLeastOneUnitPerLineWhenNothingFits()
         {
             // Degenerate limit: must still terminate and preserve every character.
@@ -305,6 +315,27 @@ public class VtmlUtilsTests
         {
             VtmlUtils.BreakLongTokens("aaaaaaaaaaaaaaa", Measure, 0)
                 .Should().Be("aaaaaaaaaaaaaaa");
+        }
+    }
+
+    /// <summary>
+    /// Cheap gate deciding whether a tag-free bubble needs the wrapping renderer at all.
+    /// </summary>
+    public class HasUnbrokenRun
+    {
+        [Theory]
+        [InlineData("aaaa", 4, true)]
+        [InlineData("aaa", 4, false)]
+        [InlineData("aaa aaa", 4, false)]           // breaks reset the run
+        [InlineData("aaa\naaaa", 4, true)]
+        [InlineData("hi aaaa hi", 4, true)]         // the run may sit anywhere
+        [InlineData("aa\taa", 4, false)]
+        [InlineData("", 4, false)]
+        [InlineData(null, 4, false)]
+        [InlineData("aaaa", 0, false)]
+        public void DetectsRunsOfNonBreakingCharacters(string? text, int minLength, bool expected)
+        {
+            VtmlUtils.HasUnbrokenRun(text!, minLength).Should().Be(expected);
         }
     }
 }
