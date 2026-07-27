@@ -345,7 +345,7 @@ jobs:
         New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
         
         # Find and copy the versioned mod packages
-        $sourceZip = Get-ChildItem "mods-dll\thebasics\thebasics_*.zip" | Select-Object -First 1
+        $sourceZip = Get-ChildItem "mods-dll\thebasics\thebasics_*.zip" | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
         $targetZip = "$releaseDir\thebasics-v$newVersion.zip"
         
         if ($sourceZip) {
@@ -358,7 +358,7 @@ jobs:
 
         $basicConfigModInfo = Get-Content "mods-dll\basicconfig\modinfo.json" | ConvertFrom-Json
         $basicConfigVersion = $basicConfigModInfo.version
-        $basicConfigSourceZip = Get-ChildItem "mods-dll\basicconfig\basicconfig_*.zip" | Select-Object -First 1
+        $basicConfigSourceZip = Get-ChildItem "mods-dll\basicconfig\basicconfig_*.zip" | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
         $basicConfigTargetZip = "$releaseDir\basicconfig-v$basicConfigVersion.zip"
 
         if ($basicConfigSourceZip) {
