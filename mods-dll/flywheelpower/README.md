@@ -18,6 +18,7 @@ The release provides:
 - Held-item and placed-block information for rotating mass and effective inertia, plus live state, flywheel and network speed, stored-energy percentage, coupling torque, losses, slipping, and overspeed risk.
 
 The full-size wheel keeps a 3x3x1 placement, collision, and selection footprint. Its visible wheel is 1.6 blocks in diameter and 0.1875 block deep, with a 0.12-block radial outer tyre, timber felloe, eight broad spokes, a stepped material-specific hub, and a close-fitting bearing collar around the axle. The compact wheel is 0.92 block in diameter.
+Horizontal full stands can be placed by targeting either the bottom-center ground cell or the center principal cell from the side.
 
 ## Current content surface
 

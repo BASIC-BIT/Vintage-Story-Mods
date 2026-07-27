@@ -15,41 +15,53 @@ public sealed class BlockFlywheelStand : Block
         BlockSelection blockSel,
         ref string failureCode)
     {
+        bool compact = IsCompact;
         EnumAxis axis = blockSel.Face.Axis == EnumAxis.Y
             ? BlockFacing.HorizontalFromAngle(byPlayer.Entity.Pos.Yaw).Axis
             : blockSel.Face.Axis;
+        BlockSelection placementSel = blockSel.Clone();
+        placementSel.Position = ResolvePlacementPosition(blockSel.Position, compact, blockSel.Face.Axis);
         string rotation = FlywheelMultiblock.RotationForAxis(axis);
         Block orientedBlock = world.GetBlock(CodeWithVariant("rotation", rotation));
-        if (orientedBlock == null || !orientedBlock.CanPlaceBlock(world, byPlayer, blockSel, ref failureCode))
+        if (orientedBlock == null || !orientedBlock.CanPlaceBlock(world, byPlayer, placementSel, ref failureCode))
         {
             return false;
         }
 
-        bool compact = IsCompact;
         if (!(compact
-                ? FlywheelGroundSupport.HasCompactFoundation(world, blockSel.Position)
-                : FlywheelGroundSupport.HasFullSizeFoundation(world, blockSel.Position, axis)))
+                ? FlywheelGroundSupport.HasCompactFoundation(world, placementSel.Position)
+                : FlywheelGroundSupport.HasFullSizeFoundation(world, placementSel.Position, axis)))
         {
             failureCode = "flywheelrequiresfoundation";
             return false;
         }
 
-        if (!compact && !FlywheelMultiblock.HasClearance(world, byPlayer, blockSel, axis, ref failureCode))
+        if (!compact && !FlywheelMultiblock.HasClearance(world, byPlayer, placementSel, axis, ref failureCode))
         {
             return false;
         }
 
-        if (!orientedBlock.DoPlaceBlock(world, byPlayer, blockSel, itemstack))
+        if (!orientedBlock.DoPlaceBlock(world, byPlayer, placementSel, itemstack))
         {
             return false;
         }
 
         if (!compact)
         {
-            FlywheelMultiblock.PlaceParts(world, blockSel.Position, axis);
+            FlywheelMultiblock.PlaceParts(world, placementSel.Position, axis);
         }
 
         return true;
+    }
+
+    internal static BlockPos ResolvePlacementPosition(
+        BlockPos selectedPosition,
+        bool compact,
+        EnumAxis selectedFaceAxis)
+    {
+        return !compact && selectedFaceAxis == EnumAxis.Y
+            ? selectedPosition.UpCopy()
+            : selectedPosition.Copy();
     }
 
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel)

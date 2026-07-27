@@ -236,8 +236,8 @@ In-game cards remaining:
 
 3. **Foundation, multiblock selection, and removal** (P0)
    - Config: Any full-size flywheel.
-   - Do: First attempt unsupported full-size and compact placement, then place on the required solid footing. Target and break the center and several outer footprint cells, including a placement with negative X/Z coordinates if practical.
-   - Expect: Unsupported placement gives the specific foundation message. Supported horizontal full-size placement uses three ground blocks under the lowest row; supported vertical placement uses the full 3x3 footing; compact placement uses the block beneath it. Every multiblock cell delegates to the principal flywheel, breaking any part removes the complete structure once, and no invisible blockers remain.
+   - Do: First attempt unsupported full-size and compact placement, then place on the required solid footing. Place one horizontal full stand by targeting its bottom-center ground cell and another by targeting the center principal cell from the side. Target and break the center and several outer footprint cells, including a placement with negative X/Z coordinates if practical.
+   - Expect: Unsupported placement gives the specific foundation message. Both bottom-center and center-principal targeting place the same supported horizontal full stand, using three ground blocks under the lowest row. Supported vertical placement uses the full 3x3 footing; compact placement uses the block beneath it. Every multiblock cell delegates to the principal flywheel, breaking any part removes the complete structure once, and no invisible blockers remain.
    - Watch for: Placement in midair, a vague `Not enough space` message for missing foundation, false rejection on solid ground, orphan part blocks, duplicate drops, missing selection, or a structure that fails after save/reload.
 
 4. **Creative and handbook surface** (P1)

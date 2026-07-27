@@ -376,6 +376,30 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
+    public void FullStandCanBePlacedFromItsCenterOrBottomCenterCell()
+    {
+        BlockPos selected = new(10, 20, 30, 2);
+
+        BlockPos groundTarget = BlockFlywheelStand.ResolvePlacementPosition(
+            selected,
+            compact: false,
+            EnumAxis.Y);
+        Assert.Equal(new BlockPos(10, 21, 30, 2), groundTarget);
+
+        BlockPos centerTarget = BlockFlywheelStand.ResolvePlacementPosition(
+            selected,
+            compact: false,
+            EnumAxis.Z);
+        Assert.Equal(selected, centerTarget);
+
+        BlockPos compactTarget = BlockFlywheelStand.ResolvePlacementPosition(
+            selected,
+            compact: true,
+            EnumAxis.Y);
+        Assert.Equal(selected, compactTarget);
+    }
+
+    [Fact]
     public void AssemblyBlocksRequireAPlacedStandAndReturnBothPartsWhenBroken()
     {
         string fullSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));
