@@ -34,12 +34,12 @@ VIEWS: dict[str, tuple[Vec3, Vec3]] = {
 }
 
 FACE_INDICES = {
-    "north": (0, 2, 6, 4),
-    "east": (1, 5, 7, 3),
-    "south": (1, 3, 7, 5),
+    "north": (0, 2, 3, 1),
+    "east": (1, 3, 7, 5),
+    "south": (4, 5, 7, 6),
     "west": (0, 4, 6, 2),
-    "up": (2, 3, 7, 6),
-    "down": (0, 4, 5, 1),
+    "up": (2, 6, 7, 3),
+    "down": (0, 1, 5, 4),
 }
 
 FALLBACK_COLORS = {

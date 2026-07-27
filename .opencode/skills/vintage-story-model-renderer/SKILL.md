@@ -69,6 +69,7 @@ Texture locations resolve against each `--assets-root`. Missing PNGs use determi
 
 ## Evidence boundary
 
-This deterministic renderer supports geometry review and regression evidence. Its front/back-face winding tests prevent a
-far cylinder cap from masquerading as the visible near cap in straight-on views. Vintage Story remains authoritative for
-atlas behavior, runtime registration, animation, lighting, and final visual taste.
+This deterministic renderer supports geometry review and regression evidence. Its winding tests cover every named cuboid
+plane plus procedural cylinder caps and radial walls, preventing inward faces or a far cap from masquerading as visible
+geometry. Vintage Story remains authoritative for atlas behavior, runtime registration, animation, lighting, and final
+visual taste.

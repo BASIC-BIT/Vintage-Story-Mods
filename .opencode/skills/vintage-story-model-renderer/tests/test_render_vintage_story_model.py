@@ -72,5 +72,31 @@ class AnnulusWindingTests(unittest.TestCase):
         self.assertGreater(renderer.dot(normal(inner_rim), (0, 0, -1)), 0.7)
 
 
+class CuboidWindingTests(unittest.TestCase):
+    def test_all_six_named_faces_use_the_correct_plane_and_outward_normal(self):
+        vertices = renderer.cuboid((1, 2, 3), (5, 7, 11))
+        expected = {
+            "north": ((2, 3), (0, 0, -1)),
+            "east": ((0, 5), (1, 0, 0)),
+            "south": ((2, 11), (0, 0, 1)),
+            "west": ((0, 1), (-1, 0, 0)),
+            "up": ((1, 7), (0, 1, 0)),
+            "down": ((1, 2), (0, -1, 0)),
+        }
+
+        for direction, (plane, outward) in expected.items():
+            with self.subTest(direction=direction):
+                face = [vertices[index] for index in renderer.FACE_INDICES[direction]]
+                axis, coordinate = plane
+                self.assertTrue(all(vertex[axis] == coordinate for vertex in face))
+                normal = renderer.normalize(
+                    renderer.cross(
+                        renderer.sub(face[1], face[0]),
+                        renderer.sub(face[2], face[0]),
+                    )
+                )
+                self.assertGreater(renderer.dot(normal, outward), 0.999)
+
+
 if __name__ == "__main__":
     unittest.main()
