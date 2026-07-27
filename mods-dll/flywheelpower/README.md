@@ -6,24 +6,32 @@ Flywheel Power 0.5.0 is the complete initial-feedback implementation of rotation
 
 The release provides:
 
-- Full-size 3x3x1 friction-coupled flywheels with wood, stone, or iron wheels and a consistent iron hub.
-- A compact iron friction-coupled flywheel.
+- Full-size 3x3x1 friction-coupled flywheels with wood, iron, meteoric-iron, or steel wheels and a consistent iron hub.
+- Compact wood, stone, iron, meteoric-iron, and steel friction-coupled flywheels on a wooden shaft.
 - Independent flywheel speed that charges from a faster network and contributes capped torque back to a slower network.
 - Material-density and geometry-based inertia, bearing and windage losses, a coupling ramp, and a safe-speed warning.
 - Persistent flywheel speed and schematic-safe relative links between the full-size principal block and its multiblock parts.
 - Mechanical rendering on all three axes with a distinct renderer group for each released construction.
+- Two-bearing timber stands with iron caps, hold-down hardware, and grease cups. Placement requires a solid supporting footprint beneath the stand.
 - Block information for state, flywheel and network speed, stored-energy percentage, coupling torque, losses, slipping, and overspeed risk.
 
 The full-size wheel keeps a 3x3x1 placement, collision, and selection footprint. Its visible disc is 1.6 blocks in diameter and 0.1875 block deep, with a stepped iron hub and close-fitting bearing collar around the axle.
 
 ## Current content surface
 
-Four choices are intentionally discoverable in creative mode and the handbook:
+Nine choices are intentionally discoverable in creative mode and the handbook:
 
 - Wooden Flywheel (Iron Hub)
-- Stone Flywheel (Iron Hub)
 - Iron Flywheel (Iron Hub)
+- Meteoric Iron Flywheel (Iron Hub)
+- Steel Flywheel (Iron Hub)
+- Compact Wooden Flywheel
+- Compact Stone Flywheel
 - Compact Iron Flywheel
+- Compact Meteoric Iron Flywheel
+- Compact Steel Flywheel
+
+The monolithic full-size stone wheel is intentionally omitted because a slab at that scale would be structurally implausible. Stone remains available only for the compact construction.
 
 Survival recipes and material progression are deferred until feedback establishes which constructions and balance targets are worth keeping.
 

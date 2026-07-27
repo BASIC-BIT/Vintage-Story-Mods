@@ -6,7 +6,7 @@
     {
       name: "MPFlywheel",
       properties: {
-        axleShape: { base: "flywheelpower:block/slip-transmission-shaft" },
+        axleShape: { base: "flywheelpower:block/flywheel-axle" },
         flywheelShape: { base: "flywheelpower:block/compact-flywheel-wheel-coupled" },
         slipCoupled: true,
         inertia: 8.0,
@@ -27,8 +27,25 @@
       renderer: "flywheelpower-compact-iron"
     }
   },
+  attributesByType: {
+    "*-wood-*": {
+      mechanicalPower: { renderer: "flywheelpower-compact-wood" }
+    },
+    "*-stone-*": {
+      mechanicalPower: { renderer: "flywheelpower-compact-stone" }
+    },
+    "*-iron-*": {
+      mechanicalPower: { renderer: "flywheelpower-compact-iron" }
+    },
+    "*-meteoriciron-*": {
+      mechanicalPower: { renderer: "flywheelpower-compact-meteoriciron" }
+    },
+    "*-steel-*": {
+      mechanicalPower: { renderer: "flywheelpower-compact-steel" }
+    }
+  },
   variantgroups: [
-    { code: "material", states: ["iron"] },
+    { code: "material", states: ["wood", "stone", "iron", "meteoriciron", "steel"] },
     { code: "rotation", states: ["ud", "ns", "we"] }
   ],
   creativeinventory: { "general": ["*-ud"], "mechanics": ["*-ud"] },
@@ -36,7 +53,7 @@
     base: "flywheelpower:block/compact-flywheel-frame-horizontal",
     overlays: [
       { base: "flywheelpower:block/compact-flywheel-wheel-coupled" },
-      { base: "flywheelpower:block/slip-transmission-shaft" }
+      { base: "flywheelpower:block/flywheel-axle" }
     ]
   },
   shapeByType: {
@@ -51,6 +68,38 @@
     bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
     chalk: { base: "game:block/cloth/wool/red1" },
     wood: { base: "game:block/wood/planks/generic" }
+  },
+  texturesByType: {
+    "*-wood-*": {
+      wheel: { base: "game:block/wood/planks/generic" },
+      metal: { base: "game:block/metal/ingot/iron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-stone-*": {
+      wheel: { base: "game:block/stone/rock/granite1" },
+      metal: { base: "game:block/metal/ingot/iron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-iron-*": {
+      wheel: { base: "game:block/metal/ingot/iron" },
+      metal: { base: "game:block/metal/ingot/iron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-meteoriciron-*": {
+      wheel: { base: "game:block/metal/ingot/meteoriciron" },
+      metal: { base: "game:block/metal/ingot/iron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-steel-*": {
+      wheel: { base: "game:block/metal/ingot/steel" },
+      metal: { base: "game:block/metal/ingot/iron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    }
   },
   sidesolid: { all: false },
   sideopaque: { all: false },

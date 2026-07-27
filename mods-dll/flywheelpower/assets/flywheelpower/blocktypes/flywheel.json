@@ -28,15 +28,18 @@
     "*-wood-iron-*": {
       mechanicalPower: { renderer: "flywheelpower-full-wood-ironhub" }
     },
-    "*-stone-iron-*": {
-      mechanicalPower: { renderer: "flywheelpower-full-stone-ironhub" }
-    },
     "*-iron-iron-*": {
       mechanicalPower: { renderer: "flywheelpower-full-iron-ironhub" }
+    },
+    "*-meteoriciron-iron-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-meteoriciron-ironhub" }
+    },
+    "*-steel-iron-*": {
+      mechanicalPower: { renderer: "flywheelpower-full-steel-ironhub" }
     }
   },
   variantgroups: [
-    { code: "material", states: ["wood", "stone", "iron"] },
+    { code: "material", states: ["wood", "iron", "meteoriciron", "steel"] },
     { code: "hub", states: ["iron"] },
     { code: "rotation", states: ["ud", "ns", "we"] }
   ],
@@ -69,14 +72,20 @@
       bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
       wood: { base: "game:block/wood/planks/generic" }
     },
-    "*-stone-iron-*": {
-      wheel: { base: "game:block/stone/rock/granite1" },
+    "*-iron-iron-*": {
+      wheel: { base: "game:block/metal/ingot/iron" },
       metal: { base: "game:block/metal/ingot/iron" },
       bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
       wood: { base: "game:block/wood/planks/generic" }
     },
-    "*-iron-iron-*": {
-      wheel: { base: "game:block/metal/ingot/iron" },
+    "*-meteoriciron-iron-*": {
+      wheel: { base: "game:block/metal/ingot/meteoriciron" },
+      metal: { base: "game:block/metal/ingot/iron" },
+      bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
+      wood: { base: "game:block/wood/planks/generic" }
+    },
+    "*-steel-iron-*": {
+      wheel: { base: "game:block/metal/ingot/steel" },
       metal: { base: "game:block/metal/ingot/iron" },
       bearing: { base: "game:block/metal/tarnished/iron-riveted1" },
       wood: { base: "game:block/wood/planks/generic" }

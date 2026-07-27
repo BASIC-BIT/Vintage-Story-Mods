@@ -149,13 +149,35 @@ Owner-directed size and bearing revision, July 27, 2026:
 - This new package has not replaced the installed candidate because the owner is currently using the running client. Install,
   restart, and fresh front/three-quarter/side evidence remain required.
 
+Curated materials and grounded-stand candidate, July 27, 2026:
+
+- The active full-size set is now wood, iron, meteoric iron, and steel with the simple iron-hub rule. The structurally
+  implausible full-size monolithic stone wheel is removed from discovery. Compact wood, stone, iron, meteoric-iron, and steel
+  constructions remain available.
+- All nine released constructions have deterministic renderer groups. The compact flywheels now use the authored wooden axle
+  instead of the preserved disabled Slip Transmission shaft.
+- The horizontal stands now reach the actual ground plane within the existing reserved footprint and visibly include two
+  timber bearing posts, iron bearing caps, sleepers, cross ties, hold-down hardware, bracing, and grease cups. Full-size
+  horizontal placement requires three solid support blocks beneath the lowest multiblock row; vertical full-size placement
+  requires its 3x3 footing, and compact placement requires solid ground immediately beneath the block.
+- The disabled Slip Transmission implementation remains preserved. Its shaft asset moved beside the rest of its canonical
+  source under `disabled-content/` and no longer ships in the active package.
+- All six CI build and whitespace-format targets passed. The BASICs tests passed 488/488, DimensionLib tests passed 58/58,
+  Flywheel Power tests passed 21/21, and the repository Lizard gate passed.
+- The exact 15-entry package is 46,290 bytes and has SHA-256
+  `6000A15236F233C9573C73DE84F678D46146A1D9FD8E2EEA7E797FDFE401B6F9`. Both QA profiles and a downloaded copy of the
+  disposable-server package match that hash. The server loaded `FlywheelPower.FlywheelPowerModSystem` and reached
+  `WorldReady`; both clients launched without a Flywheel startup exception.
+- In-game appearance, variant texture identity, placement/foundation behavior, powered rotation, multiblock interaction, and
+  save/reload remain observation-level manual QA gates. Startup and package evidence do not count as visual approval.
+
 In-game cards remaining after the interrupted attempt:
 
-1. **Full-size proportions and clearance** (P0)
-   - Config: Creative world, any full-size flywheel material.
-   - Do: Place a full-size flywheel and view it straight on, at roughly 45 degrees, and directly from the side.
-   - Expect: The disc spans about one block inside the 3x3 plane, leaves roughly one block of clearance at each edge, has a visibly small center core, and reads as a thin sheet/disc.
-   - Watch for: A wheel that still nearly fills the footprint, a bulky central drum, clipping through the frame, or an edge-on profile that still reads as a thick cylinder.
+1. **Proportions, stand, and variant appearance** (P0)
+   - Config: Creative world, all nine released flywheels.
+   - Do: Place full-size and compact examples and view them straight on, at roughly 45 degrees, and directly from the side.
+   - Expect: The full disc spans 1.6 blocks inside the 3x3 plane with deliberate edge clearance, a close-fitting bearing collar, and a thin 0.1875-block profile. The two-bearing timber stand visibly reaches the ground and reads as a braced, bolted support rather than a decorative floating frame. Wood, stone, iron, meteoric iron, and steel textures remain visually distinct where released; every compact axle is wood.
+   - Watch for: A wheel that nearly fills the footprint, a bulky central drum, an axle gap, wheel/frame clipping, floating sleepers, missing stand components, material variants sharing the wrong texture, or an edge-on profile that reads as a thick cylinder.
 
 2. **Rotation and axle alignment** (P0)
    - Config: Creative world with a powered mechanical network.
@@ -163,16 +185,16 @@ In-game cards remaining after the interrupted attempt:
    - Expect: Each wheel rotates around its axle without orbiting, wobbling, translating, or separating from the hub.
    - Watch for: Wrong rotation axis, reversed model orientation, off-center pivots, or axle/frame misalignment.
 
-3. **Multiblock selection and removal** (P0)
+3. **Foundation, multiblock selection, and removal** (P0)
    - Config: Any full-size flywheel.
-   - Do: Target and break the center and several outer footprint cells, including a placement with negative X/Z coordinates if practical.
-   - Expect: Every footprint cell delegates to the principal flywheel, breaking any part removes the complete structure once, and no invisible blockers remain.
-   - Watch for: Orphan part blocks, duplicate drops, missing selection, or a structure that fails after save/reload.
+   - Do: First attempt unsupported full-size and compact placement, then place on the required solid footing. Target and break the center and several outer footprint cells, including a placement with negative X/Z coordinates if practical.
+   - Expect: Unsupported placement gives the specific foundation message. Supported horizontal full-size placement uses three ground blocks under the lowest row; supported vertical placement uses the full 3x3 footing; compact placement uses the block beneath it. Every multiblock cell delegates to the principal flywheel, breaking any part removes the complete structure once, and no invisible blockers remain.
+   - Watch for: Placement in midair, a vague `Not enough space` message for missing foundation, false rejection on solid ground, orphan part blocks, duplicate drops, missing selection, or a structure that fails after save/reload.
 
 4. **Creative and handbook surface** (P1)
    - Config: Creative mode and handbook/search available.
    - Do: Search for `flywheel` and `slip transmission`, and inspect relevant creative tabs.
-   - Expect: Four active choices are discoverable—three full-size iron-hub constructions (wood, stone, and iron wheels) plus compact iron—and no Slip Transmission entry, item, recipe, or placeable block appears.
+   - Expect: Nine active choices are discoverable: full-size wood, iron, meteoric iron, and steel with iron hubs, plus compact wood, stone, iron, meteoric iron, and steel. No full-size stone flywheel, Slip Transmission entry, item, recipe, or placeable block appears.
    - Watch for: Raw localization keys, legacy generic flywheel aliases, or hidden transmission variants.
 
 5. **Save/reload behavior** (P0)
@@ -184,9 +206,8 @@ In-game cards remaining after the interrupted attempt:
 ## Follow-ups outside this candidate
 
 - Replace the slip transmission's cross-network torque model before re-registering any content.
-- Decide whether compact variants belong in the long-term product surface or remain test fixtures.
 - Implement real inertial contribution for keyed flywheels before restoring their blocktypes.
-- Consider additional wheel materials and hub combinations only after the curated renderer-group approach and material progression receive feedback.
+- Consider additional wheel materials and hub combinations only after the nine-construction renderer-group approach and material progression receive feedback.
 - Commission richer material-specific wheel/frame models and textures if the initial silhouette and construction choices test well.
 - Design survival recipes and material progression after feedback establishes which variants are worth keeping.
 - Balance inertia, coupling, losses, safe speed, and block info against real windmill/machine rigs.
@@ -194,13 +215,15 @@ In-game cards remaining after the interrupted attempt:
 
 ### Minimal later visual-asset commission
 
-If feedback supports the three-construction release set, commission one coherent material pass rather than a new mechanic:
+If feedback supports the curated release set, commission one coherent material pass rather than a new mechanic:
 
-- Three drop-in full-size appearances: timber construction with visible planking/banding, segmented dressed stone with iron
-  restraint, and a cast or fabricated iron wheel.
+- Four drop-in full-size appearances: timber construction with visible planking/banding, cast or fabricated iron, meteoric
+  iron with restrained crystalline differentiation, and worked steel. Add a compact segmented-stone appearance with iron
+  restraint, but do not restore a monolithic full-size stone slab.
 - Preserve the exact `(8, 8, 8)` model center, rotation axis, 1.6-block wheel diameter, 0.1875-block disc depth, stepped iron
   hub/bearing center, axle attachment semantics, and existing 3x3x1 collision/selection footprint.
-- Deliver Vintage Story shape JSON plus atlas-ready textures and front, three-quarter, and side previews for each construction.
+- Deliver Vintage Story shape JSON plus atlas-ready textures and front, three-quarter, and side previews for each construction
+  and its compact counterpart.
 - Keep the iron hub/axle visually consistent across the set; focus the commission on readable material construction, restrained
   edge detail, and a stronger real-flywheel silhouette rather than animation, new gameplay, or additional variants.
 

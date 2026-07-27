@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Vintagestory.API.MathTools;
 
 namespace FlywheelPower.Tests;
 
@@ -23,6 +24,8 @@ public sealed class ReleaseContentTests
             StringComparison.OrdinalIgnoreCase);
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "sliptransmission.json")));
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "lang", "en.sliptransmission.json")));
+        Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "shapes", "block", "slip-transmission-shaft.json")));
+        Assert.False(File.Exists(Path.Combine(ProjectRoot, "assets", "flywheelpower", "shapes", "block", "slip-transmission-shaft.json")));
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "src", "BlockSlipTransmission.cs")));
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "src", "BEBehaviorMPSlipTransmission.cs")));
     }
@@ -54,27 +57,34 @@ public sealed class ReleaseContentTests
         Assert.DoesNotContain("keyedflywheel", activeLanguage, StringComparison.OrdinalIgnoreCase);
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedflywheel.json")));
         Assert.True(File.Exists(Path.Combine(ProjectRoot, "disabled-content", "blocktypes", "keyedcompactflywheel.json")));
-        Assert.Contains("""{ code: "material", states: ["wood", "stone", "iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""{ code: "material", states: ["wood", "iron", "meteoriciron", "steel"] }""", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("""{ code: "hub", states: ["iron"] }""", fullSizeBlocktype, StringComparison.Ordinal);
-        Assert.Contains("""{ code: "material", states: ["iron"] }""", compactBlocktype, StringComparison.Ordinal);
+        Assert.Contains("""{ code: "material", states: ["wood", "stone", "iron", "meteoriciron", "steel"] }""", compactBlocktype, StringComparison.Ordinal);
         Assert.DoesNotContain("bronze", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("meteoriciron", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("steel", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("""states: ["wood", "stone""", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("*-stone-iron-*", fullSizeBlocktype, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("bronze", compactBlocktype, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("meteoriciron", compactBlocktype, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("steel", compactBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("stone", compactBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("meteoriciron", compactBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("steel", compactBlocktype, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("""axleShape: { base: "flywheelpower:block/flywheel-axle" }""", compactBlocktype, StringComparison.Ordinal);
+        Assert.DoesNotContain("slip-transmission-shaft", compactBlocktype, StringComparison.Ordinal);
         Assert.Contains("""bearing: { base: "game:block/metal/tarnished/iron-riveted1" }""", fullSizeBlocktype, StringComparison.Ordinal);
         Assert.Contains("""bearing: { base: "game:block/metal/tarnished/iron-riveted1" }""", compactBlocktype, StringComparison.Ordinal);
         Assert.DoesNotContain("bronze", activeLanguage, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("meteoriciron", activeLanguage, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("steel", activeLanguage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("block-flywheel-stone-iron", activeLanguage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("block-compactflywheel-stone", activeLanguage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("meteoriciron", activeLanguage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("steel", activeLanguage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("blockinfo-shaft", activeLanguage, StringComparison.Ordinal);
-        Assert.Equal(4, FlywheelPowerModSystem.ReleasedRendererCodes.Length);
-        Assert.Equal(4, FlywheelPowerModSystem.ReleasedRendererCodes.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(9, FlywheelPowerModSystem.ReleasedRendererCodes.Length);
+        Assert.Equal(9, FlywheelPowerModSystem.ReleasedRendererCodes.Distinct(StringComparer.Ordinal).Count());
         Assert.All(
-            FlywheelPowerModSystem.ReleasedRendererCodes.Take(3),
+            FlywheelPowerModSystem.ReleasedRendererCodes.Take(4),
             rendererCode => Assert.Contains(rendererCode, fullSizeBlocktype, StringComparison.Ordinal));
-        Assert.Contains(FlywheelPowerModSystem.ReleasedRendererCodes[3], compactBlocktype, StringComparison.Ordinal);
+        Assert.All(
+            FlywheelPowerModSystem.ReleasedRendererCodes.Skip(4),
+            rendererCode => Assert.Contains(rendererCode, compactBlocktype, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -129,6 +139,34 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
+    public void GroundedFramesIncludeServiceableBearingStandDetails()
+    {
+        JsonElement[] fullElements = ReadShapeElements("flywheel-frame-horizontal.json");
+        string[] fullNames = fullElements
+            .Select(element => element.GetProperty("name").GetString()!)
+            .ToArray();
+        Assert.Contains("LeftGroundSleeper", fullNames);
+        Assert.Contains("RightGroundSleeper", fullNames);
+        Assert.Contains("LeftBearingCap", fullNames);
+        Assert.Contains("RightBearingCap", fullNames);
+        Assert.Contains("LeftGreaseCup", fullNames);
+        Assert.Contains("RightGreaseCup", fullNames);
+        Assert.Contains("FrontLeftHoldDown", fullNames);
+        Assert.Equal(-16d, fullElements.Min(element => element.GetProperty("from")[1].GetDouble()));
+
+        JsonElement[] compactElements = ReadShapeElements("compact-flywheel-frame-horizontal.json");
+        string[] compactNames = compactElements
+            .Select(element => element.GetProperty("name").GetString()!)
+            .ToArray();
+        Assert.Contains("LeftSleeper", compactNames);
+        Assert.Contains("RightSleeper", compactNames);
+        Assert.Contains("LeftBearingPost", compactNames);
+        Assert.Contains("RightBearingPost", compactNames);
+        Assert.Contains("LeftGreaseCup", compactNames);
+        Assert.Contains("RightGreaseCup", compactNames);
+    }
+
+    [Fact]
     public void FullSizePlacementExplainsItsReservedFootprint()
     {
         string blockSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));
@@ -140,6 +178,32 @@ public sealed class ReleaseContentTests
             """"placefailure-flywheelrequiresclearance": "Requires a clear 3x3 area around the flywheel plane."""",
             activeLanguage,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StandsRequireGroundAcrossTheirPhysicalFootprints()
+    {
+        BlockPos center = new(10, 20, 30, 0);
+
+        BlockPos[] horizontal = FlywheelGroundSupport
+            .GetFullSizeSupportPositions(center, EnumAxis.X)
+            .ToArray();
+        Assert.Equal(3, horizontal.Length);
+        Assert.All(horizontal, pos => Assert.Equal(18, pos.Y));
+        Assert.Equal(new[] { 29, 30, 31 }, horizontal.Select(pos => pos.Z).ToArray());
+
+        BlockPos[] vertical = FlywheelGroundSupport
+            .GetFullSizeSupportPositions(center, EnumAxis.Y)
+            .ToArray();
+        Assert.Equal(9, vertical.Length);
+        Assert.All(vertical, pos => Assert.Equal(19, pos.Y));
+
+        string fullSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));
+        string compactSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockCompactFlywheel.cs"));
+        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+        Assert.Contains("""failureCode = "flywheelrequiresfoundation";""", fullSource, StringComparison.Ordinal);
+        Assert.Contains("""failureCode = "flywheelrequiresfoundation";""", compactSource, StringComparison.Ordinal);
+        Assert.Contains("placefailure-flywheelrequiresfoundation", activeLanguage, StringComparison.Ordinal);
     }
 
     private static string FindProjectRoot()
@@ -156,5 +220,22 @@ public sealed class ReleaseContentTests
         }
 
         throw new DirectoryNotFoundException("Could not locate the flywheelpower project root.");
+    }
+
+    private static JsonElement[] ReadShapeElements(string fileName)
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(
+                ProjectRoot,
+                "assets",
+                "flywheelpower",
+                "shapes",
+                "block",
+                fileName)));
+        return document.RootElement
+            .GetProperty("elements")
+            .EnumerateArray()
+            .Select(element => element.Clone())
+            .ToArray();
     }
 }

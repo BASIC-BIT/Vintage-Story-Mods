@@ -18,7 +18,7 @@ public sealed class BlockCompactFlywheel : BlockMPBase
         {
             EnumAxis axis = ChooseAxis(connectorFaces, blockSel.Face.Axis);
             Block block = world.GetBlock(CodeWithVariant("rotation", RotationForAxis(axis)));
-            if (!block.DoPlaceBlock(world, byPlayer, blockSel, itemstack))
+            if (!TryPlaceSupported(world, byPlayer, itemstack, blockSel, block, ref failureCode))
             {
                 return false;
             }
@@ -29,7 +29,7 @@ public sealed class BlockCompactFlywheel : BlockMPBase
 
         EnumAxis fallbackAxis = blockSel.Face.Axis;
         Block fallbackBlock = world.GetBlock(CodeWithVariant("rotation", RotationForAxis(fallbackAxis)));
-        if (fallbackBlock.DoPlaceBlock(world, byPlayer, blockSel, itemstack))
+        if (TryPlaceSupported(world, byPlayer, itemstack, blockSel, fallbackBlock, ref failureCode))
         {
             WasPlaced(world, blockSel.Position, null);
             return true;
@@ -40,6 +40,28 @@ public sealed class BlockCompactFlywheel : BlockMPBase
 
     public override void DidConnectAt(IWorldAccessor world, BlockPos pos, BlockFacing face)
     {
+    }
+
+    private static bool TryPlaceSupported(
+        IWorldAccessor world,
+        IPlayer byPlayer,
+        ItemStack itemstack,
+        BlockSelection blockSel,
+        Block block,
+        ref string failureCode)
+    {
+        if (block == null || !block.CanPlaceBlock(world, byPlayer, blockSel, ref failureCode))
+        {
+            return false;
+        }
+
+        if (!FlywheelGroundSupport.HasCompactFoundation(world, blockSel.Position))
+        {
+            failureCode = "flywheelrequiresfoundation";
+            return false;
+        }
+
+        return block.DoPlaceBlock(world, byPlayer, blockSel, itemstack);
     }
 
     private bool IsOrientedTo(BlockFacing facing)

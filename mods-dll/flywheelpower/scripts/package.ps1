@@ -71,7 +71,6 @@ $expectedEntries = @(
     'assets/flywheelpower/shapes/block/flywheel-frame-horizontal.json',
     'assets/flywheelpower/shapes/block/flywheel-frame-vertical.json',
     'assets/flywheelpower/shapes/block/flywheel-wheel-coupled.json',
-    'assets/flywheelpower/shapes/block/slip-transmission-shaft.json',
     'flywheelpower.dll',
     'flywheelpower.pdb',
     'modinfo.json',
@@ -79,9 +78,14 @@ $expectedEntries = @(
 )
 $releasedRendererCodes = @(
     'flywheelpower-full-wood-ironhub',
-    'flywheelpower-full-stone-ironhub',
     'flywheelpower-full-iron-ironhub',
-    'flywheelpower-compact-iron'
+    'flywheelpower-full-meteoriciron-ironhub',
+    'flywheelpower-full-steel-ironhub',
+    'flywheelpower-compact-wood',
+    'flywheelpower-compact-stone',
+    'flywheelpower-compact-iron',
+    'flywheelpower-compact-meteoriciron',
+    'flywheelpower-compact-steel'
 )
 
 $archive = [System.IO.Compression.ZipFile]::OpenRead($zipFile)
@@ -117,7 +121,7 @@ try {
         }
     }
 
-    if ($blocktypeText -match 'bronze|meteoriciron|steel') {
+    if ($blocktypeText -match 'bronze') {
         throw 'Unsupported material or hub mappings were included in packaged blocktypes.'
     }
 
@@ -130,7 +134,7 @@ try {
         $languageReader.Dispose()
     }
 
-    if ($languageText -match 'sliptransmission|keyedflywheel|blockinfo-shaft|bronze|meteoriciron|steel') {
+    if ($languageText -match 'sliptransmission|keyedflywheel|blockinfo-shaft|bronze') {
         throw 'Disabled or unsupported player-facing localization was included in the package.'
     }
 }

@@ -94,6 +94,12 @@ public sealed class BlockFlywheel : BlockMPBase
             return false;
         }
 
+        if (!FlywheelGroundSupport.HasFullSizeFoundation(world, blockSel.Position, axis))
+        {
+            failureCode = "flywheelrequiresfoundation";
+            return false;
+        }
+
         Block partBlock = GetPartBlock(world);
         if (partBlock == null)
         {

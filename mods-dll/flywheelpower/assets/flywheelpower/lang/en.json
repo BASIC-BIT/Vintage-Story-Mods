@@ -2,10 +2,15 @@
   "block-flywheel": "Friction-Coupled Flywheel",
   "block-flywheelpart": "Flywheel",
   "block-flywheel-wood-iron-*": "Wooden Friction-Coupled Flywheel (Iron Hub)",
-  "block-flywheel-stone-iron-*": "Stone Friction-Coupled Flywheel (Iron Hub)",
   "block-flywheel-iron-iron-*": "Iron Friction-Coupled Flywheel (Iron Hub)",
+  "block-flywheel-meteoriciron-iron-*": "Meteoric Iron Friction-Coupled Flywheel (Iron Hub)",
+  "block-flywheel-steel-iron-*": "Steel Friction-Coupled Flywheel (Iron Hub)",
   "block-compactflywheel": "Compact Friction-Coupled Flywheel",
+  "block-compactflywheel-wood-*": "Compact Wooden Friction-Coupled Flywheel",
+  "block-compactflywheel-stone-*": "Compact Stone Friction-Coupled Flywheel",
   "block-compactflywheel-iron-*": "Compact Iron Friction-Coupled Flywheel",
+  "block-compactflywheel-meteoriciron-*": "Compact Meteoric Iron Friction-Coupled Flywheel",
+  "block-compactflywheel-steel-*": "Compact Steel Friction-Coupled Flywheel",
   "flywheelpower:blockinfo-state": "Flywheel state: {0}",
   "flywheelpower:blockinfo-state-idle": "Idle",
   "flywheelpower:blockinfo-state-charging": "Charging",
@@ -17,5 +22,6 @@
   "flywheelpower:blockinfo-slipping": "Friction coupling is slipping",
   "flywheelpower:blockinfo-losses": "Bearing and windage losses: {0}",
   "flywheelpower:blockinfo-overspeed": "Overspeed risk",
-  "placefailure-flywheelrequiresclearance": "Requires a clear 3x3 area around the flywheel plane."
+  "placefailure-flywheelrequiresclearance": "Requires a clear 3x3 area around the flywheel plane.",
+  "placefailure-flywheelrequiresfoundation": "The flywheel stand requires solid ground beneath its full footing."
 }

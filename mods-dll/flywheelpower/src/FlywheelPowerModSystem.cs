@@ -9,9 +9,14 @@ public sealed class FlywheelPowerModSystem : ModSystem
     internal static readonly string[] ReleasedRendererCodes =
     {
         "flywheelpower-full-wood-ironhub",
-        "flywheelpower-full-stone-ironhub",
         "flywheelpower-full-iron-ironhub",
-        "flywheelpower-compact-iron"
+        "flywheelpower-full-meteoriciron-ironhub",
+        "flywheelpower-full-steel-ironhub",
+        "flywheelpower-compact-wood",
+        "flywheelpower-compact-stone",
+        "flywheelpower-compact-iron",
+        "flywheelpower-compact-meteoriciron",
+        "flywheelpower-compact-steel"
     };
 
     public override void Start(ICoreAPI api)
