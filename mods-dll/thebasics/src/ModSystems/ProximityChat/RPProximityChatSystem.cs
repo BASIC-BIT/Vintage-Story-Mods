@@ -2339,6 +2339,14 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         refusal = null;
 
+        // The override commands are not registered when RP chat is off, but the config can be
+        // flipped live, so guard the capability rather than relying on registration.
+        if (Config.DisableRPChat)
+        {
+            refusal = Lang.Get("thebasics:chat-override-cleared-rp-disabled");
+            return false;
+        }
+
         // Global OOC answers only to its own switch. AllowOOCToggle and OOCTogglePermission govern
         // local OOC; gating global OOC behind them would let an unrelated setting remove a working
         // feature, and refuse it with a message naming the wrong one.

@@ -44,9 +44,7 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
         var defaultSize = _config.ProximityChatDefaultFontSize[chatMode];
 
         // Unlimited range has no far edge to scale against, so every listener reads it at full size.
-        // Checked before reading positions: at unlimited range recipient selection never touches
-        // player entities, so a player still in the connect/spawn window can reach this transformer
-        // with no entity yet, and an exception here would abort delivery to everyone after them.
+        // Checked before reading positions so this never depends on both players having entities.
         if (ModConfig.IsUnlimitedRange(maxRange))
         {
             return GetClampedFontSize(defaultSize);

@@ -217,8 +217,9 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
 
         if (penalty > 0)
         {
-            // Recipient-phase transformers reuse this so obfuscation and font size fade with the
-            // same effective distance the range check used.
+            // Recipient-phase transformers reuse this penalty so obfuscation and font size fade
+            // with the same wall cost. Their base distance is Euclidean, not the Manhattan one
+            // used above, so the two are not numerically identical.
             occlusionPenalties[player.PlayerUID] = penalty;
         }
 

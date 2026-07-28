@@ -92,7 +92,8 @@ public class MessageContext
 
     // Player UID -> extra effective distance in blocks from sound-occluding geometry between the
     // speaker and that recipient. Populated during recipient determination so obfuscation and font
-    // size fade with the same effective distance the range check used.
+    // size fade with the same wall penalty the range check applied. Note the base distance differs:
+    // the range check is Manhattan, both consumers are Euclidean. Only the penalty is shared.
     public static readonly string OCCLUSION_PENALTY_BY_RECIPIENT = "occlusionPenaltyByRecipient";
 
     // Stores the pre-recipient-phase bubble text for speech messages.

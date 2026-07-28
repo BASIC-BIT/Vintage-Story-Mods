@@ -27,15 +27,21 @@ public class DistanceObfuscationSystem : BaseSubSystem
             return;
         }
 
-        // Walls between the two players read as extra distance, so speech degrades toward
-        // unintelligible instead of cutting out at a hard boundary.
-        var distance = sendingPlayer.GetDistance(receivingPlayer) + occlusionPenalty;
         var chatMode = sendingPlayer.GetChatMode(tempMode);
         var obfuscationRange = Config.ProximityChatModeObfuscationRanges[chatMode];
         var maxRange = Config.ProximityChatModeDistances[chatMode];
 
         // Unlimited range has no far edge to fade toward, so there is nothing to obfuscate against.
-        if (ModConfig.IsUnlimitedRange(maxRange) || distance < obfuscationRange)
+        // Checked before reading positions so this never depends on both players having entities.
+        if (ModConfig.IsUnlimitedRange(maxRange))
+        {
+            return;
+        }
+
+        // Walls between the two players read as extra distance, so speech degrades toward
+        // unintelligible instead of cutting out at a hard boundary.
+        var distance = sendingPlayer.GetDistance(receivingPlayer) + occlusionPenalty;
+        if (distance < obfuscationRange)
         {
             return;
         }

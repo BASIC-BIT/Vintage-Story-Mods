@@ -18,7 +18,8 @@ public class PlayerChatTransformer : MessageTransformerBase
         Emote,
         PlacedEnvironment,
         Environment,
-        DisabledGlobalOoc
+        DisabledGlobalOoc,
+        RejectedStaleOverride
     }
 
     private readonly struct ParsedPlayerChat
@@ -51,7 +52,8 @@ public class PlayerChatTransformer : MessageTransformerBase
 
         return parsed.Kind switch
         {
-            PlayerChatKind.DisabledGlobalOoc => RejectDisabledGlobalOoc(context),
+            PlayerChatKind.DisabledGlobalOoc => RejectStaleOverride(context, "thebasics:chat-gooc-disabled"),
+            PlayerChatKind.RejectedStaleOverride => RejectStaleOverride(context, "thebasics:chat-override-cleared-rp-disabled"),
             PlayerChatKind.GlobalOoc => ApplyGlobalOoc(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
             PlayerChatKind.Ooc => ApplyOoc(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
             PlayerChatKind.Emote => ApplyEmote(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
@@ -103,24 +105,17 @@ public class PlayerChatTransformer : MessageTransformerBase
     {
         var overrideMode = context.SendingPlayer.GetChatOverrideMode();
 
-        // With RP chat off none of the override commands are registered, so a leftover override
-        // would route every line with no way to escape it. Clear it rather than only skipping it:
-        // DisableRPChat needs a restart to change, and leaving the value in place means flipping it
-        // back off later drops the player into a channel they never rejoined.
-        if (_config.DisableRPChat)
+        // Two ways a player ends up holding an override the server no longer honours: RP chat gets
+        // switched off under them, or global OOC specifically does. Both clear the stale mode and
+        // reject the line rather than delivering it. Downgrading to speech instead would publish a
+        // message the player believed was going somewhere out of character, which is the whole
+        // reason they set the mode.
+        if (overrideMode != ChatOverrideMode.None && _config.DisableRPChat)
         {
-            if (overrideMode != ChatOverrideMode.None)
-            {
-                context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
-            }
-
-            return PlayerChatKind.Speech;
+            context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
+            return PlayerChatKind.RejectedStaleOverride;
         }
 
-        // A player can be left holding global OOC if an admin disables the feature afterwards.
-        // Reject this line the same way an explicit (( )) prefix would, and clear the mode so the
-        // next line is ordinary speech. Silently downgrading to speech instead would publish a
-        // message the player believed was going to an out-of-character channel.
         if (overrideMode == ChatOverrideMode.GlobalOoc && !_config.EnableGlobalOOC)
         {
             context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
@@ -136,11 +131,11 @@ public class PlayerChatTransformer : MessageTransformerBase
         };
     }
 
-    private MessageContext RejectDisabledGlobalOoc(MessageContext context)
+    private MessageContext RejectStaleOverride(MessageContext context, string langKey)
     {
         context.SendingPlayer?.SendMessage(
             _chatSystem.ProximityChatId,
-            Lang.Get("thebasics:chat-gooc-disabled"),
+            Lang.Get(langKey),
             EnumChatType.CommandError);
         context.State = MessageContextState.STOP;
         return context;

@@ -126,17 +126,31 @@ public class ChatOverrideModeTests
     }
 
     [Fact]
-    public void StickyOverridesAreIgnoredEntirelyWhenRpChatIsDisabled()
+    public void StaleOverrideRejectsTheLineWhenRpChatIsDisabled()
     {
-        // None of the override commands are registered with RP chat off, so an override left from
-        // before the switch was flipped would route every line with no way to escape it.
+        // Same hazard as the disabled-global-OOC case: downgrading to speech would publish a line
+        // the player meant for an out-of-character channel. Reject it once, clear the mode, and let
+        // the next line through as ordinary chat.
         var config = CreateConfig();
         config.DisableRPChat = true;
 
-        var context = Parse(config, CreatePlayer(ChatOverrideMode.Ooc), "hello");
+        var context = Parse(config, CreatePlayer(ChatOverrideMode.Ooc), "brb, wife's calling");
 
-        context.HasFlag(MessageContext.IS_SPEECH).Should().BeTrue();
+        context.State.Should().Be(MessageContextState.STOP);
+        context.HasFlag(MessageContext.IS_SPEECH).Should().BeFalse();
         context.HasFlag(MessageContext.IS_OOC).Should().BeFalse();
+    }
+
+    [Fact]
+    public void PlainSpeechIsUnaffectedWhenRpChatIsDisabled()
+    {
+        var config = CreateConfig();
+        config.DisableRPChat = true;
+
+        var context = Parse(config, CreatePlayer(), "hello");
+
+        context.State.Should().Be(MessageContextState.CONTINUE);
+        context.HasFlag(MessageContext.IS_SPEECH).Should().BeTrue();
     }
 
     [Fact]
