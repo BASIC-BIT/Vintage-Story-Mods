@@ -2640,7 +2640,14 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             {
                 API.Logger.Error("THEBASICS: proximity chat pipeline threw for player {0}: {1}", byPlayer?.PlayerName, ex);
                 byPlayer?.SendMessage(ProximityChatId, Lang.Get("thebasics:chat-pipeline-failed"), EnumChatType.CommandError);
+
+                // Report it here too. Handling the throw locally means it never reaches the outer
+                // catch, so without this a server whose pipeline is failing would report 100% chat
+                // success and zero failures, hiding the very problem this handler exists to surface.
+                AnalyticsService.TrackFailure("proximity_chat", "chat_tab_pipeline", "error", "pipeline_exception", ex);
+                return;
             }
+
             AnalyticsService.TrackFeatureUsed("proximity_chat", "send_chat_tab", properties: AnalyticsService.ChatProperties("chat_tab"));
         }
         catch (Exception e)
