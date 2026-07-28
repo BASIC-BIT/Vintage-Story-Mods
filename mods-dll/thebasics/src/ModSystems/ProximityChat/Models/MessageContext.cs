@@ -86,6 +86,10 @@ public class MessageContext
     public static readonly string SPEECH_TEXT = "speechText";
     public static readonly string PENDING_SIGN_LANGUAGE_RECIPIENTS = "pendingSignLanguageRecipients";
 
+    // The speech verb, resolved once in the sender phase. Verb lists are random-pick, so resolving
+    // per recipient would show two players standing together different verbs for the same line.
+    public static readonly string SPEECH_VERB = "speechVerb";
+
     // Player UID -> extra effective distance in blocks from sound-occluding geometry between the
     // speaker and that recipient. Populated during recipient determination so obfuscation and font
     // size fade with the same effective distance the range check used.

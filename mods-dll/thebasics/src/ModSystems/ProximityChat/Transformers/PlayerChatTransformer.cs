@@ -101,16 +101,23 @@ public class PlayerChatTransformer : MessageTransformerBase
     /// </summary>
     private PlayerChatKind GetStickyChatKind(MessageContext context)
     {
+        // With RP chat off, none of the override commands are even registered, so an override left
+        // over from before the switch was flipped would route every line with no way to escape it.
+        if (_config.DisableRPChat)
+        {
+            return PlayerChatKind.Speech;
+        }
+
         var overrideMode = context.SendingPlayer.GetChatOverrideMode();
 
         // A player can be left holding global OOC if an admin disables the feature afterwards.
-        // Clear it rather than only masking it: if the mask were left in place and an admin later
-        // re-enabled global OOC, the player's next ordinary line would go server-wide without them
-        // having run any command or seen any status change.
+        // Reject this line the same way an explicit (( )) prefix would, and clear the mode so the
+        // next line is ordinary speech. Silently downgrading to speech instead would publish a
+        // message the player believed was going to an out-of-character channel.
         if (overrideMode == ChatOverrideMode.GlobalOoc && !_config.EnableGlobalOOC)
         {
             context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
-            overrideMode = ChatOverrideMode.None;
+            return PlayerChatKind.DisabledGlobalOoc;
         }
 
         return overrideMode switch

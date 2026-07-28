@@ -129,9 +129,8 @@ public class TransformerSystem
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
         var presentationMode = ProximityChatPresentationModes.Normalize(_chatSystem.Config.ProximityChatPresentationMode);
-        var speechText = context.TryGetSpeechText(out var rawSpeech) ? rawSpeech : context.Message;
         var outputMessage = FormatLoggedSpeechBody(context, lang, presentationMode, nickname);
-        var verb = ChatHelper.GetProximityChatVerb(lang, mode, _chatSystem.Config, speechText);
+        var verb = GetResolvedSpeechVerb(context, lang, mode, _chatSystem.Config);
 
         return presentationMode switch
         {
@@ -172,6 +171,7 @@ public class TransformerSystem
             return;
         }
 
+        ResolveSpeechVerbOnce(context);
         LogChatMessageOnce(context);
 
         // History/logging happens even when no one can hear the message; delivery still stops here.
@@ -204,6 +204,42 @@ public class TransformerSystem
     internal static bool IsWithinSignLanguageRetryWindow(int elapsedMs)
     {
         return elapsedMs <= SignLanguageLineOfSightRetryWindowMs;
+    }
+
+    /// <summary>
+    /// Reads the verb resolved in the sender phase, falling back to resolving one for callers that
+    /// invoke a transformer directly without running the pipeline.
+    /// </summary>
+    internal static string GetResolvedSpeechVerb(MessageContext context, Language lang, ProximityChatMode mode, ModConfig config = null)
+    {
+        if (context.TryGetMetadata(MessageContext.SPEECH_VERB, out string verb) && !string.IsNullOrEmpty(verb))
+        {
+            return verb;
+        }
+
+        var speechText = context.TryGetSpeechText(out var raw) ? raw : context.Message;
+        return ChatHelper.GetProximityChatVerb(lang, mode, config, speechText);
+    }
+
+    /// <summary>
+    /// Picks the speech verb once, in the sender phase, and stores it for everyone downstream.
+    /// Verb lists are a random pick, so resolving in the recipient phase would show two players
+    /// standing side by side different verbs for the same line, and a third one in the chat log.
+    /// </summary>
+    private void ResolveSpeechVerbOnce(MessageContext context)
+    {
+        if (!context.HasFlag(MessageContext.IS_SPEECH) || context.HasMetadata(MessageContext.SPEECH_VERB))
+        {
+            return;
+        }
+
+        context.TryGetMetadata<Language>(MessageContext.LANGUAGE, out var lang);
+        var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+        var speechText = context.TryGetSpeechText(out var raw) ? raw : context.Message;
+
+        context.SetMetadata(
+            MessageContext.SPEECH_VERB,
+            ChatHelper.GetProximityChatVerb(lang, mode, _chatSystem.Config, speechText));
     }
 
     private void LogChatMessageOnce(MessageContext context)

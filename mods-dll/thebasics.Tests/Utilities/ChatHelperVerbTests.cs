@@ -2,6 +2,7 @@ using FluentAssertions;
 using thebasics.Configs;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Tests.Support;
 using thebasics.Utilities;
 
@@ -117,6 +118,38 @@ public class ChatHelperVerbTests
             var verb = ChatHelper.GetProximityChatVerb(LanguageSystem.BabbleLang, ProximityChatMode.Normal, config, "Are you there?");
 
             verb.Should().Be("gurgles");
+        }
+
+        [Fact]
+        public void ResolvedVerbIsReusedSoEveryRecipientSeesTheSameOne()
+        {
+            // Verb lists are a random pick. Resolving per recipient showed two players standing
+            // side by side different verbs for the same line, and a third one in the chat log.
+            var config = CreateConfig();
+            config.ProximityChatModeVerbs[ProximityChatMode.Normal] = ["says", "states", "mentions", "remarks", "observes"];
+
+            var context = new MessageContext { Message = "hello." };
+            context.SetFlag(MessageContext.IS_SPEECH);
+            context.SetMetadata(MessageContext.SPEECH_VERB, "states");
+
+            var picks = Enumerable
+                .Range(0, 50)
+                .Select(_ => TransformerSystem.GetResolvedSpeechVerb(context, null, ProximityChatMode.Normal, config))
+                .Distinct()
+                .ToList();
+
+            picks.Should().ContainSingle().Which.Should().Be("states");
+        }
+
+        [Fact]
+        public void ResolutionFallsBackWhenNoVerbWasStashed()
+        {
+            var config = CreateConfig();
+            var context = new MessageContext { Message = "anyone there?" };
+            context.SetFlag(MessageContext.IS_SPEECH);
+
+            TransformerSystem.GetResolvedSpeechVerb(context, null, ProximityChatMode.Normal, config)
+                .Should().Be("asks");
         }
 
         [Fact]

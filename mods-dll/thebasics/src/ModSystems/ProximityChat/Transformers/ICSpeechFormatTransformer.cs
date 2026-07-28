@@ -44,8 +44,9 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
             return FormatProseSpeech(context, lang, languageEnabled, nickname);
         }
 
-        // Resolve the verb from the sender-phase speech body, before recipient formatting rewrites it.
-        var verb = ChatHelper.GetProximityChatVerb(lang, mode, _config, GetSpeechTextForVerb(context));
+        // Resolved once in the sender phase; verb lists are a random pick, so re-resolving here
+        // would show two recipients of the same line different verbs.
+        var verb = TransformerSystem.GetResolvedSpeechVerb(context, lang, mode, _config);
 
         context.Message = FormatSpeechBody(context, lang, languageEnabled, presentationMode);
 
@@ -106,16 +107,6 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         }
 
         return ChatVisualPreferenceResolver.FormatLanguageText(message, lang, context.ReceivingPlayer);
-    }
-
-    /// <summary>
-    /// The speech text as it stood at the end of the sender phase. Recipient-phase transformers rewrite
-    /// <see cref="MessageContext.Message"/> per recipient (language scrambling, obfuscation, font tags),
-    /// so the raw speech body is the only source that yields the same verb for everyone.
-    /// </summary>
-    private static string GetSpeechTextForVerb(MessageContext context)
-    {
-        return context.TryGetSpeechText(out var speechText) ? speechText : context.Message;
     }
 
     private string ProcessProseQuotedText(MessageContext context, string text, Language lang, bool languageEnabled)

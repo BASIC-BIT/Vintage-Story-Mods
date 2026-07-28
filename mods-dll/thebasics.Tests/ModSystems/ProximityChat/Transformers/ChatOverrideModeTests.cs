@@ -113,15 +113,30 @@ public class ChatOverrideModeTests
     }
 
     [Fact]
-    public void StickyGlobalOocFallsBackToSpeechWhenGlobalOocDisabled()
+    public void StickyGlobalOocRejectsTheLineWhenGlobalOocDisabled()
     {
-        // An admin can disable global OOC after a player has already parked in it. Their lines
-        // should degrade to speech, not get rejected on every message.
-        var context = Parse(CreateConfig(enableGlobalOoc: false), CreatePlayer(ChatOverrideMode.GlobalOoc), "hello");
+        // An admin can disable global OOC after a player has already parked in it. Downgrading the
+        // line to in-character speech would publish something the player believed was going to an
+        // out-of-character channel, so reject it exactly as an explicit (( )) prefix would.
+        var context = Parse(CreateConfig(enableGlobalOoc: false), CreatePlayer(ChatOverrideMode.GlobalOoc), "brb, kid woke up");
+
+        context.State.Should().Be(MessageContextState.STOP);
+        context.HasFlag(MessageContext.IS_SPEECH).Should().BeFalse();
+        context.HasFlag(MessageContext.IS_GLOBAL_OOC).Should().BeFalse();
+    }
+
+    [Fact]
+    public void StickyOverridesAreIgnoredEntirelyWhenRpChatIsDisabled()
+    {
+        // None of the override commands are registered with RP chat off, so an override left from
+        // before the switch was flipped would route every line with no way to escape it.
+        var config = CreateConfig();
+        config.DisableRPChat = true;
+
+        var context = Parse(config, CreatePlayer(ChatOverrideMode.Ooc), "hello");
 
         context.HasFlag(MessageContext.IS_SPEECH).Should().BeTrue();
-        context.HasFlag(MessageContext.IS_GLOBAL_OOC).Should().BeFalse();
-        context.State.Should().Be(MessageContextState.CONTINUE);
+        context.HasFlag(MessageContext.IS_OOC).Should().BeFalse();
     }
 
     [Fact]

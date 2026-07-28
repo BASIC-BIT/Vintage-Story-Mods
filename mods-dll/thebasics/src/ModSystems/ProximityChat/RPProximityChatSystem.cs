@@ -2311,11 +2311,59 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         var current = GetEffectiveOverrideMode(player);
         var next = current == mode ? ChatOverrideMode.None : mode;
+
+        // Entering an OOC override is the same capability /oocToggle grants, so it answers to the
+        // same gates. Leaving one is always allowed; nobody should be trapped in a mode.
+        if (next != ChatOverrideMode.None && !CanEnterOverrideMode(player, next, out var refusal))
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = refusal,
+            };
+        }
+
         player.SetChatOverrideMode(next);
 
         AnalyticsService.TrackFeatureUsed("chat_override_mode", "set_" + next.ToString().ToLowerInvariant());
 
         return ChatModeStatus(player);
+    }
+
+    /// <summary>
+    /// Whether the player may park themselves in an override mode. Sending a one-off OOC line only
+    /// needs chat privilege, but staying in OOC is what <c>/oocToggle</c> grants, so it answers to
+    /// the same server switch and privilege rather than being reachable by a bare <c>/ooc</c>.
+    /// </summary>
+    private bool CanEnterOverrideMode(IServerPlayer player, ChatOverrideMode mode, out string refusal)
+    {
+        refusal = null;
+
+        if (mode == ChatOverrideMode.GlobalOoc && !Config.EnableGlobalOOC)
+        {
+            refusal = Lang.Get("thebasics:chat-gooc-disabled");
+            return false;
+        }
+
+        if (mode is not (ChatOverrideMode.Ooc or ChatOverrideMode.GlobalOoc))
+        {
+            return true;
+        }
+
+        if (!Config.AllowOOCToggle)
+        {
+            refusal = Lang.Get("thebasics:chat-ooc-disabled");
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(Config.OOCTogglePermission) &&
+            !player.HasPrivilege(Config.OOCTogglePermission))
+        {
+            refusal = Lang.Get("thebasics:chat-ooc-mode-no-privilege");
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
