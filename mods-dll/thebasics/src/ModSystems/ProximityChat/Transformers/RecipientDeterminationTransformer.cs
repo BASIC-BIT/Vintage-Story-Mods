@@ -13,8 +13,6 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 /// </summary>
 public class RecipientDeterminationTransformer : MessageTransformerBase
 {
-    private const int DefaultSignLanguageRange = 15;
-
     private readonly ProximityCheckUtils _proximityCheckUtils;
 
     public RecipientDeterminationTransformer(RPProximityChatSystem chatSystem, ProximityCheckUtils proximityCheckUtils) : base(chatSystem)
@@ -235,7 +233,7 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
             // Sign language has no unlimited sentinel: the admin panel bounds it to 0..512 and the
             // docs say so. A hand-edited negative would otherwise make signing server-wide and run
             // the default-on LOS raycast against every online player.
-            return _config.SignLanguageRange < 0 ? DefaultSignLanguageRange : _config.SignLanguageRange;
+            return _config.GetSignLanguageRange();
         }
 
         var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());

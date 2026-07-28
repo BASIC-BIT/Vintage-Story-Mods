@@ -68,6 +68,17 @@ namespace thebasics.Configs
         public int GetModeDefaultFontSize(ProximityChatMode mode) =>
             GetModeValue(ProximityChatDefaultFontSize, mode, DefaultModeFontSize(mode));
 
+        /// <summary>
+        /// Sign language has no unlimited sentinel, so a hand-edited negative falls back to the
+        /// default. Read through here everywhere: the recipient filter and the deferred-delivery
+        /// retry compare against this range, and normalising in only one of them means a queued
+        /// listener can never be delivered to.
+        /// </summary>
+        public int GetSignLanguageRange() =>
+            SignLanguageRange < 0 ? DefaultSignLanguageRange : SignLanguageRange;
+
+        private const int DefaultSignLanguageRange = 60;
+
         private static int DefaultModeDistance(ProximityChatMode mode) => mode switch
         {
             ProximityChatMode.Yell => 90,

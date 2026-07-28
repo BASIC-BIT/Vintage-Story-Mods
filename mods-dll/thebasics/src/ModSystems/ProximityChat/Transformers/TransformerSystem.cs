@@ -353,7 +353,7 @@ public class TransformerSystem
         }
 
         var distance = recipient.Entity.Pos.AsBlockPos.ManhattanDistance(GetPendingSignLanguageOrigin(context));
-        return distance < _chatSystem.Config.SignLanguageRange &&
+        return distance < _chatSystem.Config.GetSignLanguageRange() &&
                _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, recipient, useMultiPointTargets: true);
     }
 

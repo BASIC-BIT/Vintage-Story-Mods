@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using thebasics.Configs;
+using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.Analytics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -140,9 +141,31 @@ namespace thebasics.ModSystems
 
             // Ensure defaults are applied when loading existing/legacy configs (JSON won't trigger ProtoBuf hooks)
             config.InitializeDefaultsIfNeeded();
+            LogConfigValidationWarnings(api, config);
             // Optionally persist any backfilled defaults for future runs
             api.StoreModConfig(config, ConfigName);
             return config;
+        }
+
+        /// <summary>
+        /// The admin panel rejects invalid combinations on save, but a hand-edited file never passes
+        /// through that path. Warn rather than reject: refusing to boot on a bad value would be a
+        /// worse failure than running with the documented fallback, but the admin needs to know
+        /// their setting is not doing what they think.
+        /// </summary>
+        private static void LogConfigValidationWarnings(ICoreServerAPI api, ModConfig config)
+        {
+            try
+            {
+                foreach (var error in ConfigAdminSettingRegistry.ValidateConfig(config))
+                {
+                    api.Server.LogWarning("The BASICs config: " + error);
+                }
+            }
+            catch (Exception e)
+            {
+                api.Server.LogWarning("The BASICs: config validation failed to run: " + e.Message);
+            }
         }
 
         private static ModConfig TryRepairJsonStringConfig(ICoreServerAPI api)

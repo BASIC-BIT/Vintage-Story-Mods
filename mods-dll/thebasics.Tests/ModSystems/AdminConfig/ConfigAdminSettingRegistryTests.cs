@@ -42,6 +42,20 @@ public class ConfigAdminSettingRegistryTests
     }
 
     [Fact]
+    public void GetSignLanguageRange_FallsBackForNegativeValues()
+    {
+        // Both the recipient filter and the deferred-delivery retry read through this. Normalising
+        // in only one of them would queue a listener the retry could then never deliver to.
+        var config = CreateConfig();
+        config.SignLanguageRange = -1;
+
+        config.GetSignLanguageRange().Should().Be(60);
+
+        config.SignLanguageRange = 25;
+        config.GetSignLanguageRange().Should().Be(25);
+    }
+
+    [Fact]
     public void ValidateConfig_RejectsNegativeSignLanguageRange()
     {
         var config = CreateConfig();
