@@ -168,10 +168,40 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
             AddAnnularCylinder(mesh, metalTex, new(0f, spec.AxleRadius, spec.AxleMinX, spec.AxleMaxX, 32, 2, IncludeInnerSide: false));
         }
 
-        AddChalkLine(mesh, chalkTex, wheelMaxX + ChalkRaise, spec.WheelOuterRadius * 0.18f, spec.WheelOuterRadius + ChalkEdgeOverlap, spec.ChalkHalfWidth, frontFace: true);
-        AddChalkLine(mesh, chalkTex, wheelMinX - ChalkRaise, spec.WheelOuterRadius * 0.18f, spec.WheelOuterRadius + ChalkEdgeOverlap, spec.ChalkHalfWidth, frontFace: false);
+        if (coupled)
+        {
+            AddCoupledChalkLines(mesh, chalkTex, spec, wheelMinX, wheelMaxX);
+        }
+        else
+        {
+            AddChalkLine(mesh, chalkTex, wheelMaxX + ChalkRaise, spec.WheelOuterRadius * 0.18f, spec.WheelOuterRadius + ChalkEdgeOverlap, spec.ChalkHalfWidth, frontFace: true);
+            AddChalkLine(mesh, chalkTex, wheelMinX - ChalkRaise, spec.WheelOuterRadius * 0.18f, spec.WheelOuterRadius + ChalkEdgeOverlap, spec.ChalkHalfWidth, frontFace: false);
+        }
         AddChalkRimLine(mesh, chalkTex, spec.WheelOuterRadius + ChalkRaise, wheelMinX - ChalkEdgeOverlap, wheelMaxX + ChalkEdgeOverlap, spec.ChalkHalfWidth);
         return mesh;
+    }
+
+    private static void AddCoupledChalkLines(
+        MeshData mesh,
+        TextureAtlasPosition chalkTex,
+        FlywheelMeshSpec spec,
+        float wheelMinX,
+        float wheelMaxX)
+    {
+        float startRadius = spec.WheelOuterRadius * 0.18f;
+        float shaftClearanceRadius = Math.Max(spec.ShaftClearanceRadius, spec.AxleRadius * 1.01f);
+        float bearingOuterRadius = GameMath.Clamp(spec.BearingOuterRadius, shaftClearanceRadius + 0.02f, spec.HubOuterRadius - 0.02f);
+        float plateOuterRadius = GameMath.Clamp(spec.CouplingPlateOuterRadius, spec.HubOuterRadius + 0.01f, spec.WheelOuterRadius - 0.02f);
+        float plateGap = Math.Min(ChalkRaise * 2f, spec.CouplingPlateThickness * 0.4f);
+        float outerRadius = spec.WheelOuterRadius + ChalkEdgeOverlap;
+
+        AddChalkLine(mesh, chalkTex, Center + spec.BearingHalfThickness + ChalkRaise, startRadius, bearingOuterRadius, spec.ChalkHalfWidth, frontFace: true);
+        AddChalkLine(mesh, chalkTex, wheelMaxX + plateGap + spec.CouplingPlateThickness + ChalkRaise, bearingOuterRadius, plateOuterRadius, spec.ChalkHalfWidth, frontFace: true);
+        AddChalkLine(mesh, chalkTex, wheelMaxX + ChalkRaise, plateOuterRadius, outerRadius, spec.ChalkHalfWidth, frontFace: true);
+
+        AddChalkLine(mesh, chalkTex, Center - spec.BearingHalfThickness - ChalkRaise, startRadius, bearingOuterRadius, spec.ChalkHalfWidth, frontFace: false);
+        AddChalkLine(mesh, chalkTex, wheelMinX - plateGap - spec.CouplingPlateThickness - ChalkRaise, bearingOuterRadius, plateOuterRadius, spec.ChalkHalfWidth, frontFace: false);
+        AddChalkLine(mesh, chalkTex, wheelMinX - ChalkRaise, plateOuterRadius, outerRadius, spec.ChalkHalfWidth, frontFace: false);
     }
 
     private static void AddSpokedWeb(

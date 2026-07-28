@@ -1,111 +1,91 @@
 [
   {
-    "ingredientPattern": "PFP,AHA,P_P",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-iron"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-iron",
+        "quantity": 16
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 4
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "item",
       "code": "flywheelbearing-full-iron"
     }
   },
   {
-    "ingredientPattern": "PFP,AHA,P_P",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-meteoriciron"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-meteoriciron",
+        "quantity": 16
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 4
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "item",
       "code": "flywheelbearing-full-meteoriciron"
     }
   },
   {
-    "ingredientPattern": "PFP,AHA,P_P",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-steel"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-steel",
+        "quantity": 16
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 4
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "item",
       "code": "flywheelbearing-full-steel"
     }
   },
   {
-    "ingredientPattern": "PF_,AHA",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-copper"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-copper",
+        "quantity": 4
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 2
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,
@@ -116,25 +96,20 @@
     }
   },
   {
-    "ingredientPattern": "PF_,AHA",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-tinbronze"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-tinbronze",
+        "quantity": 4
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 2
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,
@@ -145,25 +120,20 @@
     }
   },
   {
-    "ingredientPattern": "PF_,AHA",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-bismuthbronze"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-bismuthbronze",
+        "quantity": 4
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 2
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,
@@ -174,25 +144,20 @@
     }
   },
   {
-    "ingredientPattern": "PF_,AHA",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-blackbronze"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-blackbronze",
+        "quantity": 4
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 2
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,
@@ -203,25 +168,20 @@
     }
   },
   {
-    "ingredientPattern": "PF_,AHA",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-iron"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-iron",
+        "quantity": 4
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 2
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,
@@ -232,25 +192,20 @@
     }
   },
   {
-    "ingredientPattern": "PF_,AHA",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-meteoriciron"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-meteoriciron",
+        "quantity": 4
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 2
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,
@@ -261,25 +216,20 @@
     }
   },
   {
-    "ingredientPattern": "PF_,AHA",
+    "ingredientPattern": "F_F,AL_",
     "ingredients": {
-      "P": {
-        "type": "item",
-        "code": "game:metalplate-steel"
-      },
       "F": {
         "type": "item",
-        "code": "game:fat-rendered"
+        "code": "flywheelpower:bearingfittings-steel",
+        "quantity": 4
       },
       "A": {
         "type": "block",
         "code": "game:woodenaxle-ud"
       },
-      "H": {
+      "L": {
         "type": "item",
-        "code": "game:hammer-*",
-        "isTool": true,
-        "toolDurabilityCost": 2
+        "code": "game:fat-rendered"
       }
     },
     "width": 3,

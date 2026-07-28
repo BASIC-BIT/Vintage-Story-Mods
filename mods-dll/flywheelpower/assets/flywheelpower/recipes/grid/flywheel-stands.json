@@ -1,9 +1,9 @@
 [
   {
-    ingredientPattern: "NPN,PPP,P_P",
+    ingredientPattern: "NBN,B_B,NBN",
     ingredients: {
-      "N": { type: "item", code: "game:metalnailsandstrips-*", quantity: 2 },
-      "P": { type: "block", code: "game:planks-*", quantity: 2 }
+      "N": { type: "item", code: "game:metalnailsandstrips-*", quantity: 1 },
+      "B": { type: "block", code: "game:supportbeam-*", quantity: 2 }
     },
     width: 3, height: 3,
     output: { type: "block", code: "flywheelpower:flywheelstand-full-ud" }

@@ -8,35 +8,35 @@
   },
   "elements": [
     {
-      "name": "LeftSleeper", "from": [1.0, 0.0, 2.0], "to": [5.25, 1.5, 14.0],
+      "name": "LeftSleeper", "from": [1.0, 0.0, 2.0], "to": [5.25, 4.0, 14.0],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,4.25,1.5] }, "east": { "texture": "#wood", "uv": [0,0,12,1.5] },
-        "south": { "texture": "#wood", "uv": [0,0,4.25,1.5] }, "west": { "texture": "#wood", "uv": [0,0,12,1.5] },
+        "north": { "texture": "#wood", "uv": [0,0,4.25,4] }, "east": { "texture": "#wood", "uv": [0,0,12,4] },
+        "south": { "texture": "#wood", "uv": [0,0,4.25,4] }, "west": { "texture": "#wood", "uv": [0,0,12,4] },
         "up": { "texture": "#wood", "uv": [0,0,4.25,12] }, "down": { "texture": "#wood", "uv": [0,0,4.25,12] }
       }
     },
     {
-      "name": "RightSleeper", "from": [10.75, 0.0, 2.0], "to": [15.0, 1.5, 14.0],
+      "name": "RightSleeper", "from": [10.75, 0.0, 2.0], "to": [15.0, 4.0, 14.0],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,4.25,1.5] }, "east": { "texture": "#wood", "uv": [0,0,12,1.5] },
-        "south": { "texture": "#wood", "uv": [0,0,4.25,1.5] }, "west": { "texture": "#wood", "uv": [0,0,12,1.5] },
+        "north": { "texture": "#wood", "uv": [0,0,4.25,4] }, "east": { "texture": "#wood", "uv": [0,0,12,4] },
+        "south": { "texture": "#wood", "uv": [0,0,4.25,4] }, "west": { "texture": "#wood", "uv": [0,0,12,4] },
         "up": { "texture": "#wood", "uv": [0,0,4.25,12] }, "down": { "texture": "#wood", "uv": [0,0,4.25,12] }
       }
     },
     {
-      "name": "FrontCrossTie", "from": [1.125, 0.75, 2.125], "to": [14.875, 2.0, 3.5],
+      "name": "FrontCrossTie", "from": [1.125, 0.5, 0.5], "to": [14.875, 3.0, 2.25],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,14,1.25] }, "east": { "texture": "#wood", "uv": [0,0,1.375,1.25] },
-        "south": { "texture": "#wood", "uv": [0,0,14,1.25] }, "west": { "texture": "#wood", "uv": [0,0,1.375,1.25] },
-        "up": { "texture": "#wood", "uv": [0,0,14,1.375] }, "down": { "texture": "#wood", "uv": [0,0,14,1.375] }
+        "north": { "texture": "#wood", "uv": [0,0,14,2.5] }, "east": { "texture": "#wood", "uv": [0,0,1.75,2.5] },
+        "south": { "texture": "#wood", "uv": [0,0,14,2.5] }, "west": { "texture": "#wood", "uv": [0,0,1.75,2.5] },
+        "up": { "texture": "#wood", "uv": [0,0,14,1.75] }, "down": { "texture": "#wood", "uv": [0,0,14,1.75] }
       }
     },
     {
-      "name": "RearCrossTie", "from": [1.125, 0.75, 12.5], "to": [14.875, 2.0, 13.875],
+      "name": "RearCrossTie", "from": [1.125, 0.5, 13.75], "to": [14.875, 3.0, 15.5],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,14,1.25] }, "east": { "texture": "#wood", "uv": [0,0,1.375,1.25] },
-        "south": { "texture": "#wood", "uv": [0,0,14,1.25] }, "west": { "texture": "#wood", "uv": [0,0,1.375,1.25] },
-        "up": { "texture": "#wood", "uv": [0,0,14,1.375] }, "down": { "texture": "#wood", "uv": [0,0,14,1.375] }
+        "north": { "texture": "#wood", "uv": [0,0,14,2.5] }, "east": { "texture": "#wood", "uv": [0,0,1.75,2.5] },
+        "south": { "texture": "#wood", "uv": [0,0,14,2.5] }, "west": { "texture": "#wood", "uv": [0,0,1.75,2.5] },
+        "up": { "texture": "#wood", "uv": [0,0,14,1.75] }, "down": { "texture": "#wood", "uv": [0,0,14,1.75] }
       }
     },
     {

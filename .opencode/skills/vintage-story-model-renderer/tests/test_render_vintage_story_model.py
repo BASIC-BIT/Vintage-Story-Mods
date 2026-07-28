@@ -129,6 +129,83 @@ class RenderMatrixTests(unittest.TestCase):
             self.assertEqual(texture, renderer.resolve_texture("game:block/test", [root]))
 
 
+class DepthBufferTests(unittest.TestCase):
+    def assert_crossing_depth_faces_render_per_pixel(self, view_name):
+        view = renderer.normalize(renderer.VIEWS[view_name][0])
+        nominal_up = renderer.VIEWS[view_name][1]
+        right = renderer.normalize(renderer.cross(nominal_up, view))
+        up = renderer.normalize(renderer.cross(view, right))
+
+        def point(depth, horizontal, vertical):
+            return renderer.add(
+                renderer.mul(view, depth),
+                renderer.add(
+                    renderer.mul(right, horizontal),
+                    renderer.mul(up, vertical),
+                ),
+            )
+
+        sloped = renderer.Face(
+            [
+                point(0, 0, 0),
+                point(0, 1, 0),
+                point(10, 0, 1),
+            ],
+            "sloped",
+            "sloped",
+        )
+        level = renderer.Face(
+            [
+                point(4, 0, 0),
+                point(4, 1, 0),
+                point(4, 0, 1),
+            ],
+            "level",
+            "level",
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / f"{view_name}.png"
+            renderer.render(
+                [sloped, level],
+                {"sloped": (220, 20, 20), "level": (20, 220, 20)},
+                {},
+                view_name,
+                "material",
+                output,
+                200,
+            )
+            image = Image.open(output).convert("RGB")
+            _, projected_right, projected_up, center, scale = renderer.projection(
+                [sloped, level],
+                view_name,
+                200,
+            )
+
+            def sample(horizontal, vertical):
+                screen = renderer.screen_point(
+                    point(0, horizontal, vertical),
+                    center,
+                    projected_right,
+                    projected_up,
+                    200,
+                    scale,
+                )
+                return image.getpixel((round(screen[0]), round(screen[1])))
+
+            self.assertEqual((220, 20, 20), sample(0.1, 0.8))
+            self.assertEqual((20, 220, 20), sample(0.1, 0.1))
+
+    def test_crossing_depth_faces_render_correctly_from_front(self):
+        self.assert_crossing_depth_faces_render_per_pixel("front")
+
+    def test_crossing_depth_faces_render_correctly_from_isometric(self):
+        self.assert_crossing_depth_faces_render_per_pixel("isometric")
+
+    def test_crossing_depth_faces_render_correctly_from_opposing_isometric(self):
+        self.assert_crossing_depth_faces_render_per_pixel("isometric-opposite")
+
+
 class UvTests(unittest.TestCase):
     def test_missing_cuboid_uv_uses_face_dimensions(self):
         uvs = renderer.face_uvs(

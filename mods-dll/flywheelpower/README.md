@@ -26,7 +26,7 @@ Sixty-eight finished wheel assemblies are discoverable in creative mode and the 
 
 The monolithic full-size stone wheel is intentionally omitted because a slab at that scale would be structurally implausible. Stone remains available only for the compact construction.
 
-Survival recipes use animal fat as bearing lubricant, wooden axles, metal plates for the selected hub, planks for the web and stand, and either prepared wood/stone or curved metal-plate rims. Full-size metal tyres consume eight plates; compact metal blanks consume four. Every valid wheel-and-hub pair has an exact final assembly recipe generated from the same tier policy as its block, renderer, texture, localization, and handbook surface.
+Survival construction starts by forging material-specific bearing fittings on an anvil. One ingot yields four fittings; compact bearing sets consume eight fittings, one wooden axle, and rendered fat, while full-size sets consume 32 fittings, one axle, and fat. Webs remain saw-cut from planks, full stands use eight support beams plus four nails/strips, compact stands use planks and nails/strips, and rims use prepared wood/stone or curved metal plates. Full-size metal tyres consume eight plates; compact metal blanks consume four. Every valid wheel-and-hub pair has an exact final assembly recipe generated from the same tier policy as its block, renderer, texture, localization, and handbook surface.
 
 ## Deliberately deferred systems
 

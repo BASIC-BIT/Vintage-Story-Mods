@@ -202,6 +202,20 @@ def bearing_itemtype() -> dict:
     }
 
 
+def bearing_fittings_itemtype() -> dict:
+    return {
+        "code": "bearingfittings",
+        "variantgroups": [{"code": "metal", "states": METALS}],
+        "shape": {"base": "game:item/resource/metalnailsandstrips"},
+        "texturesByType": {
+            f"*-{metal}": {"metal": {"base": f"game:block/metal/sheet/{metal}1"}}
+            for metal in METALS
+        },
+        "creativeinventory": {"general": ["*"], "items": ["*"], "mechanics": ["*"]},
+        "maxstacksize": 32,
+    }
+
+
 def rim_itemtype() -> dict:
     materials = ["wood", "stone", *METALS]
     return {
@@ -226,22 +240,46 @@ def rim_itemtype() -> dict:
 def bearing_recipe(size: str, hub: str) -> dict:
     full = size == "full"
     return {
-        "ingredientPattern": "PFP,AHA,P_P" if full else "PF_,AHA",
+        "ingredientPattern": "F_F,AL_",
         "ingredients": {
-            "P": {"type": "item", "code": f"game:metalplate-{hub}"},
-            "F": {"type": "item", "code": "game:fat-rendered"},
-            "A": {"type": "block", "code": "game:woodenaxle-ud"},
-            "H": {
+            "F": {
                 "type": "item",
-                "code": "game:hammer-*",
-                "isTool": True,
-                "toolDurabilityCost": 4 if full else 2,
+                "code": f"flywheelpower:bearingfittings-{hub}",
+                "quantity": 16 if full else 4,
             },
+            "A": {"type": "block", "code": "game:woodenaxle-ud"},
+            "L": {"type": "item", "code": "game:fat-rendered"},
         },
         "width": 3,
-        "height": 3 if full else 2,
+        "height": 2,
         "output": {"type": "item", "code": f"flywheelbearing-{size}-{hub}"},
     }
+
+
+def smithing_recipes() -> list[dict]:
+    return [{
+        "ingredient": {
+            "type": "item",
+            "code": "game:ingot-*",
+            "name": "metal",
+            "allowedVariants": METALS,
+        },
+        "pattern": [[
+            "########",
+            "##____##",
+            "###__###",
+            "###__###",
+            "##____##",
+            "########",
+        ]],
+        "name": "Flywheel bearing fittings",
+        "code": "bearingfittings-{metal}",
+        "output": {
+            "type": "item",
+            "code": "flywheelpower:bearingfittings-{metal}",
+            "stacksize": 4,
+        },
+    }]
 
 
 def components_recipes() -> list[dict]:
@@ -345,6 +383,7 @@ def language() -> dict:
     path = ROOT / "assets/flywheelpower/lang/en.json"
     existing = json.loads(path.read_text(encoding="utf-8"))
     generated_prefixes = (
+        "item-bearingfittings-",
         "item-flywheelbearing-",
         "item-flywheelrim-",
         "block-flywheel-",
@@ -352,6 +391,8 @@ def language() -> dict:
     )
     result = {key: value for key, value in existing.items() if not key.startswith(generated_prefixes)}
 
+    for metal in METALS:
+        result[f"item-bearingfittings-{metal}"] = f"{DISPLAY[metal]} Bearing Fittings"
     for hub in FULL_HUBS:
         result[f"item-flywheelbearing-full-{hub}"] = f"Full-Size {DISPLAY[hub]} Hub and Bearing Set"
     for hub in COMPACT_HUBS:
@@ -379,10 +420,12 @@ def outputs() -> dict[Path, object]:
     return {
         ROOT / "assets/flywheelpower/blocktypes/flywheel.json": blocktype(False),
         ROOT / "assets/flywheelpower/blocktypes/compactflywheel.json": blocktype(True),
+        ROOT / "assets/flywheelpower/itemtypes/bearingfittings.json": bearing_fittings_itemtype(),
         ROOT / "assets/flywheelpower/itemtypes/flywheelbearing.json": bearing_itemtype(),
         ROOT / "assets/flywheelpower/itemtypes/flywheelrim.json": rim_itemtype(),
         ROOT / "assets/flywheelpower/recipes/grid/flywheel-components.json": components_recipes(),
         ROOT / "assets/flywheelpower/recipes/grid/flywheel-assembly.json": assembly_recipes(),
+        ROOT / "assets/flywheelpower/recipes/smithing/bearingfittings.json": smithing_recipes(),
         ROOT / "assets/flywheelpower/lang/en.json": language(),
     }
 

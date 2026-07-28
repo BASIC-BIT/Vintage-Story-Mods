@@ -7,6 +7,9 @@ description: Required visual review workflow whenever editing or reviewing Vinta
 
 Use `scripts/render_vintage_story_model.py` before and after every model change. Treat its output as automated geometric evidence, not human in-game approval.
 
+The renderer requires Python 3 with Pillow and NumPy. Its material and textured modes use a deterministic software depth
+buffer; no GPU, display server, Blender installation, or native OpenGL context is required.
+
 ## Workflow
 
 1. Create or update a render manifest beside the mod's model tooling. Include authoritative shape files, texture overrides, and supported procedural geometry.

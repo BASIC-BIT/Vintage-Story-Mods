@@ -418,3 +418,31 @@ Remove this packet after the initial-feedback pull request is merged or closed a
 - Representative copper/iron, black-bronze/steel, wood/copper, and mixed-bronze model manifests augment the existing
   material evidence. All 17 manifests render 24 primary images apiece with resolved textures and zero coplanar overlaps.
 - The compact stone blank recipe now uses one chisel tool slot rather than accidentally requiring two chisels.
+
+## Ground-timber proportion pass, July 28, 2026
+
+- The horizontal full-size stand sleepers now rise 4 model units from the unchanged ground plane instead of 2; its front
+  and rear cross ties rise 3.75 model units instead of 2 and start halfway up the sleepers rather than passing through
+  nearly their full height. The horizontal compact stand sleepers likewise rise 4 model
+  units instead of 1.5, and its cross ties rise 2.5 model units instead of 1.25.
+- The compact cross ties moved outward to `z=0.5..2.25` and `z=13.75..15.5` so the heavier timber construction stays
+  outside the 0.92-meter wheel envelope. Axle center, pivots, rotation axis, placement origin, collision/selection behavior,
+  and reserved footprints remain unchanged.
+- Four affected placed-model manifests, empty and installed full/compact stands, each produce 24 wireframe, material-ID,
+  and textured views with resolved textures and zero coplanar overlaps. Automated cylinder/cuboid clearance and authored
+  ground-height tests pass; Vintage Story remains authoritative for final in-game appearance.
+- An independent renderer audit found that whole-face centroid sorting could paint one polygon in front even when its depth
+  crossed another polygon within the same projected area. Material and textured modes now triangulate faces and use a
+  deterministic NumPy per-pixel orthographic depth buffer with depth-tested outlines; three crossing-depth fixtures cover
+  front and both opposing isometric views. Wireframe intentionally retains through-model edges.
+- The audit also found that the registration mark was one flat quad spanning components at three different depths. Runtime,
+  procedural-review, inventory, and held geometry now split it across the bearing face, coupling plate, and wheel surface,
+  retaining continuous radial endpoints and the rim wrap without a floating sheet through the hub.
+- A read-only survey of vanilla and installed-mod construction surfaces selected a bounded mixed workflow. Each supported
+  hub metal has an anvil recipe producing four material-specific bearing fittings from one hot ingot. Compact bearing sets
+  consume eight fittings, one wooden axle, and rendered fat; full sets consume 32 fittings, one axle, and fat, preserving
+  the previous two-ingot and eight-ingot metal costs while removing hammer-in-grid smithing and the second whole axle.
+- The heavier full-size stand now consumes eight vanilla support beams and four nails/strips, matching its structural
+  timbers. Compact stands retain the simpler plank-and-nail recipe. Curved plate segments on the anvil and multi-stage
+  in-world construction remain follow-ups because plate-only smithing is not enforceable through vanilla JSON and partial
+  stand states would add serialization and model scope.

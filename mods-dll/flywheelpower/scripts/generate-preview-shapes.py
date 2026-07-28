@@ -112,28 +112,48 @@ def spoke_elements(values: dict[str, float], min_x: float, max_x: float) -> list
 
 
 def registration_mark(
+    values: dict[str, float],
+    compact: bool,
     wheel_min: float,
     wheel_max: float,
     radius: float,
     half_width: float,
 ) -> list[dict]:
+    prefix = "Compact" if compact else ""
+
+    def value(name: str) -> float:
+        return values[f"{prefix}{name}"] * 16
+
     raise_amount = 0.006 * 16
     overlap = 0.012 * 16
     separation = 0.02
     start_radius = radius * 0.18
+    bearing_radius = value("BearingOuterRadius")
+    plate_radius = value("CouplingPlateOuterRadius")
+    plate_thickness = value("CouplingPlateThickness")
+    plate_gap = min(raise_amount * 2, plate_thickness * 0.4)
+    bearing_front = CENTER + value("BearingHalfThickness") + raise_amount
+    bearing_back = CENTER - value("BearingHalfThickness") - raise_amount
+    plate_front = wheel_max + plate_gap + plate_thickness + raise_amount
+    plate_back = wheel_min - plate_gap - plate_thickness - raise_amount
+    wheel_front = wheel_max + raise_amount
+    wheel_back = wheel_min - raise_amount
+
+    def face_segment(name: str, min_x: float, max_x: float, inner: float, outer: float) -> dict:
+        return cuboid_element(
+            name,
+            (min_x, CENTER - half_width, CENTER + inner),
+            (max_x, CENTER + half_width, CENTER + outer),
+            "chalk",
+        )
+
     return [
-        cuboid_element(
-            "ChalkLineFront",
-            (wheel_max + raise_amount, CENTER - half_width, CENTER + start_radius),
-            (wheel_max + raise_amount * 2, CENTER + half_width, CENTER + radius + overlap),
-            "chalk",
-        ),
-        cuboid_element(
-            "ChalkLineBack",
-            (wheel_min - raise_amount * 2, CENTER - half_width, CENTER + start_radius),
-            (wheel_min - raise_amount, CENTER + half_width, CENTER + radius + overlap),
-            "chalk",
-        ),
+        face_segment("ChalkLineBearingFront", bearing_front, bearing_front + raise_amount, start_radius, bearing_radius),
+        face_segment("ChalkLinePlateFront", plate_front, plate_front + raise_amount, bearing_radius, plate_radius),
+        face_segment("ChalkLineFront", wheel_front, wheel_front + raise_amount, plate_radius, radius + overlap),
+        face_segment("ChalkLineBearingBack", bearing_back - raise_amount, bearing_back, start_radius, bearing_radius),
+        face_segment("ChalkLinePlateBack", plate_back - raise_amount, plate_back, bearing_radius, plate_radius),
+        face_segment("ChalkLineBack", wheel_back - raise_amount, wheel_back, plate_radius, radius + overlap),
         cuboid_element(
             "ChalkLineRim",
             (
@@ -249,7 +269,7 @@ def assembly_elements(values: dict[str, float], compact: bool) -> list[dict]:
         )
     )
     chalk_half_width = (0.025 if compact else 0.04) * 16
-    elements.extend(registration_mark(wheel_min, wheel_max, wheel_radius, chalk_half_width))
+    elements.extend(registration_mark(values, compact, wheel_min, wheel_max, wheel_radius, chalk_half_width))
     return elements
 
 

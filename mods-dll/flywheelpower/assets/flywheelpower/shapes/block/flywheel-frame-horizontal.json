@@ -10,40 +10,40 @@
     {
       "name": "LeftGroundSleeper",
       "from": [0.5, -16.0, -6.0],
-      "to": [5.0, -14.0, 22.0],
+      "to": [5.0, -12.0, 22.0],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,4.5,2] }, "east": { "texture": "#wood", "uv": [0,0,16,2] },
-        "south": { "texture": "#wood", "uv": [0,0,4.5,2] }, "west": { "texture": "#wood", "uv": [0,0,16,2] },
+        "north": { "texture": "#wood", "uv": [0,0,4.5,4] }, "east": { "texture": "#wood", "uv": [0,0,16,4] },
+        "south": { "texture": "#wood", "uv": [0,0,4.5,4] }, "west": { "texture": "#wood", "uv": [0,0,16,4] },
         "up": { "texture": "#wood", "uv": [0,0,4.5,16] }, "down": { "texture": "#wood", "uv": [0,0,4.5,16] }
       }
     },
     {
       "name": "RightGroundSleeper",
       "from": [11.0, -16.0, -6.0],
-      "to": [15.5, -14.0, 22.0],
+      "to": [15.5, -12.0, 22.0],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,4.5,2] }, "east": { "texture": "#wood", "uv": [0,0,16,2] },
-        "south": { "texture": "#wood", "uv": [0,0,4.5,2] }, "west": { "texture": "#wood", "uv": [0,0,16,2] },
+        "north": { "texture": "#wood", "uv": [0,0,4.5,4] }, "east": { "texture": "#wood", "uv": [0,0,16,4] },
+        "south": { "texture": "#wood", "uv": [0,0,4.5,4] }, "west": { "texture": "#wood", "uv": [0,0,16,4] },
         "up": { "texture": "#wood", "uv": [0,0,4.5,16] }, "down": { "texture": "#wood", "uv": [0,0,4.5,16] }
       }
     },
     {
       "name": "FrontCrossTie",
-      "from": [0.0, -15.5, -4.0],
-      "to": [16.0, -13.5, 0.0],
+      "from": [0.0, -14.0, -4.0],
+      "to": [16.0, -10.25, 0.0],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,16,2] }, "east": { "texture": "#wood", "uv": [0,0,4,2] },
-        "south": { "texture": "#wood", "uv": [0,0,16,2] }, "west": { "texture": "#wood", "uv": [0,0,4,2] },
+        "north": { "texture": "#wood", "uv": [0,0,16,3.75] }, "east": { "texture": "#wood", "uv": [0,0,4,3.75] },
+        "south": { "texture": "#wood", "uv": [0,0,16,3.75] }, "west": { "texture": "#wood", "uv": [0,0,4,3.75] },
         "up": { "texture": "#wood", "uv": [0,0,16,4] }, "down": { "texture": "#wood", "uv": [0,0,16,4] }
       }
     },
     {
       "name": "RearCrossTie",
-      "from": [0.0, -15.5, 16.0],
-      "to": [16.0, -13.5, 20.0],
+      "from": [0.0, -14.0, 16.0],
+      "to": [16.0, -10.25, 20.0],
       "faces": {
-        "north": { "texture": "#wood", "uv": [0,0,16,2] }, "east": { "texture": "#wood", "uv": [0,0,4,2] },
-        "south": { "texture": "#wood", "uv": [0,0,16,2] }, "west": { "texture": "#wood", "uv": [0,0,4,2] },
+        "north": { "texture": "#wood", "uv": [0,0,16,3.75] }, "east": { "texture": "#wood", "uv": [0,0,4,3.75] },
+        "south": { "texture": "#wood", "uv": [0,0,16,3.75] }, "west": { "texture": "#wood", "uv": [0,0,4,3.75] },
         "up": { "texture": "#wood", "uv": [0,0,16,4] }, "down": { "texture": "#wood", "uv": [0,0,16,4] }
       }
     },

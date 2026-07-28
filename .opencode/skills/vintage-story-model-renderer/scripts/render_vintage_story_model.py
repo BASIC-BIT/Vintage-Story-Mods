@@ -11,7 +11,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 Vec2 = tuple[float, float]
 Vec3 = tuple[float, float, float]
@@ -435,29 +436,49 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
     plate_thickness = value("CouplingPlateThickness")
     plate_radius = value("CouplingPlateOuterRadius")
     shaft_radius = value("ShaftClearanceRadius")
-    add_annulus(faces, wheel_max + 0.08, wheel_max + 0.08 + plate_thickness,
+    marker_raise = 0.006 * 16
+    plate_gap = min(marker_raise * 2, plate_thickness * 0.4)
+    add_annulus(faces, wheel_max + plate_gap, wheel_max + plate_gap + plate_thickness,
                 shaft_radius, plate_radius, "metal", "FrontCouplingPlate")
-    add_annulus(faces, wheel_min - 0.08 - plate_thickness, wheel_min - 0.08,
+    add_annulus(faces, wheel_min - plate_gap - plate_thickness, wheel_min - plate_gap,
                 shaft_radius, plate_radius, "metal", "BackCouplingPlate")
 
-    marker_raise = 0.006 * 16
     marker_half = (0.025 if size == "compact" else 0.04) * 16
     marker_outer = wheel_radius + marker_raise * 2
-    front_mark = [
-        (wheel_max + marker_raise, 8 - marker_half, 8 + wheel_radius * 0.18),
-        (wheel_max + marker_raise, 8 + marker_half, 8 + wheel_radius * 0.18),
-        (wheel_max + marker_raise, 8 + marker_half, 8 + marker_outer),
-        (wheel_max + marker_raise, 8 - marker_half, 8 + marker_outer),
-    ]
-    back_mark = [
-        (wheel_min - marker_raise, 8 - marker_half, 8 + wheel_radius * 0.18),
-        (wheel_min - marker_raise, 8 - marker_half, 8 + marker_outer),
-        (wheel_min - marker_raise, 8 + marker_half, 8 + marker_outer),
-        (wheel_min - marker_raise, 8 + marker_half, 8 + wheel_radius * 0.18),
-    ]
     marker_uvs = [(0, 1), (0, 0), (1, 0), (1, 1)]
-    faces.append(Face(front_mark, "chalk", "RegistrationMarkFaceFront", marker_uvs))
-    faces.append(Face(back_mark, "chalk", "RegistrationMarkFaceBack", marker_uvs))
+
+    def mark_face(x: float, inner: float, outer: float, front: bool, element: str) -> Face:
+        if front:
+            vertices = [
+                (x, 8 - marker_half, 8 + inner),
+                (x, 8 + marker_half, 8 + inner),
+                (x, 8 + marker_half, 8 + outer),
+                (x, 8 - marker_half, 8 + outer),
+            ]
+        else:
+            vertices = [
+                (x, 8 - marker_half, 8 + inner),
+                (x, 8 - marker_half, 8 + outer),
+                (x, 8 + marker_half, 8 + outer),
+                (x, 8 + marker_half, 8 + inner),
+            ]
+        return Face(vertices, "chalk", element, marker_uvs)
+
+    start_radius = wheel_radius * 0.18
+    bearing_radius = value("BearingOuterRadius")
+    bearing_front = 8 + value("BearingHalfThickness") + marker_raise
+    bearing_back = 8 - value("BearingHalfThickness") - marker_raise
+    plate_front = wheel_max + plate_gap + plate_thickness + marker_raise
+    plate_back = wheel_min - plate_gap - plate_thickness - marker_raise
+
+    faces.extend([
+        mark_face(bearing_front, start_radius, bearing_radius, True, "RegistrationMarkBearingFront"),
+        mark_face(plate_front, bearing_radius, plate_radius, True, "RegistrationMarkPlateFront"),
+        mark_face(wheel_max + marker_raise, plate_radius, marker_outer, True, "RegistrationMarkFaceFront"),
+        mark_face(bearing_back, start_radius, bearing_radius, False, "RegistrationMarkBearingBack"),
+        mark_face(plate_back, bearing_radius, plate_radius, False, "RegistrationMarkPlateBack"),
+        mark_face(wheel_min - marker_raise, plate_radius, marker_outer, False, "RegistrationMarkFaceBack"),
+    ])
     radius = wheel_radius + marker_raise
     half_angle = marker_half / radius
 
@@ -533,65 +554,97 @@ def screen_point(vertex: Vec3, center: Vec3, right: Vec3, up: Vec3, size: int, s
     )
 
 
-def affine_texture_coefficients(points: list[Vec2], uvs: list[Vec2], texture: Image.Image) -> tuple[float, ...] | None:
-    p0, p1, p2 = points[:3]
-    uv0, uv1, uv2 = uvs[:3]
-    dx1, dy1 = p1[0] - p0[0], p1[1] - p0[1]
-    dx2, dy2 = p2[0] - p0[0], p2[1] - p0[1]
-    determinant = dx1 * dy2 - dx2 * dy1
-    if abs(determinant) < 1e-8:
-        return None
-
-    def coefficients(values: tuple[float, float, float], extent: int) -> tuple[float, float, float]:
-        q0, q1, q2 = (value * max(1, extent - 1) for value in values)
-        dq1, dq2 = q1 - q0, q2 - q0
-        a = (dq1 * dy2 - dq2 * dy1) / determinant
-        b = (dx1 * dq2 - dx2 * dq1) / determinant
-        c = q0 - a * p0[0] - b * p0[1]
-        return a, b, c
-
-    u = coefficients((uv0[0], uv1[0], uv2[0]), texture.width)
-    v = coefficients((uv0[1], uv1[1], uv2[1]), texture.height)
-    return u + v
-
-
-def draw_textured_face(
-    image: Image.Image,
+def rasterize_triangle(
+    pixels: np.ndarray,
+    depths: np.ndarray,
     points: list[Vec2],
-    face: Face,
-    texture: Image.Image,
-    brightness: float,
-    line_width: int,
+    vertex_depths: list[float],
+    fill: tuple[int, int, int],
+    texture: Image.Image | None = None,
+    uvs: list[Vec2] | None = None,
+    brightness: float = 1,
 ) -> None:
-    coefficients = affine_texture_coefficients(
-        points,
-        face.uvs or [(0, 1), (0, 0), (1, 0), (1, 1)],
-        texture,
+    min_x = max(0, math.floor(min(point[0] for point in points)))
+    min_y = max(0, math.floor(min(point[1] for point in points)))
+    max_x = min(pixels.shape[1] - 1, math.ceil(max(point[0] for point in points)))
+    max_y = min(pixels.shape[0] - 1, math.ceil(max(point[1] for point in points)))
+    if min_x > max_x or min_y > max_y:
+        return
+
+    x0, y0 = points[0]
+    x1, y1 = points[1]
+    x2, y2 = points[2]
+    denominator = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+    if abs(denominator) < 1e-8:
+        return
+
+    grid_y, grid_x = np.mgrid[min_y:max_y + 1, min_x:max_x + 1]
+    sample_x = grid_x + 0.5
+    sample_y = grid_y + 0.5
+    weight0 = ((y1 - y2) * (sample_x - x2) + (x2 - x1) * (sample_y - y2)) / denominator
+    weight1 = ((y2 - y0) * (sample_x - x2) + (x0 - x2) * (sample_y - y2)) / denominator
+    weight2 = 1 - weight0 - weight1
+    inside = (weight0 >= -1e-9) & (weight1 >= -1e-9) & (weight2 >= -1e-9)
+    interpolated_depth = (
+        weight0 * vertex_depths[0]
+        + weight1 * vertex_depths[1]
+        + weight2 * vertex_depths[2]
     )
-    if coefficients is None:
+    current_depth = depths[min_y:max_y + 1, min_x:max_x + 1]
+    visible = inside & (interpolated_depth > current_depth + 1e-9)
+    if not np.any(visible):
         return
 
-    left = max(0, math.floor(min(point[0] for point in points)))
-    top = max(0, math.floor(min(point[1] for point in points)))
-    right = min(image.width, math.ceil(max(point[0] for point in points)) + 1)
-    bottom = min(image.height, math.ceil(max(point[1] for point in points)) + 1)
-    if right <= left or bottom <= top:
-        return
+    target = pixels[min_y:max_y + 1, min_x:max_x + 1]
+    if texture is not None and uvs is not None:
+        texture_pixels = np.asarray(texture.convert("RGB"))
+        interpolated_u = weight0 * uvs[0][0] + weight1 * uvs[1][0] + weight2 * uvs[2][0]
+        interpolated_v = weight0 * uvs[0][1] + weight1 * uvs[1][1] + weight2 * uvs[2][1]
+        texture_x = np.clip(
+            np.rint(interpolated_u * max(1, texture.width - 1)).astype(int),
+            0,
+            texture.width - 1,
+        )
+        texture_y = np.clip(
+            np.rint(interpolated_v * max(1, texture.height - 1)).astype(int),
+            0,
+            texture.height - 1,
+        )
+        sampled = texture_pixels[texture_y, texture_x]
+        if brightness != 1:
+            sampled = np.clip(np.rint(sampled * brightness), 0, 255).astype(np.uint8)
+        target[visible] = sampled[visible]
+    else:
+        target[visible] = fill
+    current_depth[visible] = interpolated_depth[visible]
 
-    a, b, c, d, e, f = coefficients
-    sampled = texture.transform(
-        (right - left, bottom - top),
-        Image.Transform.AFFINE,
-        (a, b, c + a * left + b * top, d, e, f + d * left + e * top),
-        resample=Image.Resampling.NEAREST,
-    ).convert("RGB")
-    if brightness != 1:
-        sampled = ImageEnhance.Brightness(sampled).enhance(brightness)
-    local_points = [(point[0] - left, point[1] - top) for point in points]
-    mask = Image.new("L", sampled.size, 0)
-    ImageDraw.Draw(mask).polygon(local_points, fill=255)
-    image.paste(sampled, (left, top), mask)
-    ImageDraw.Draw(image).line(points + [points[0]], fill=(18, 20, 22), width=line_width)
+
+def rasterize_edge(
+    pixels: np.ndarray,
+    depths: np.ndarray,
+    start: Vec2,
+    end: Vec2,
+    start_depth: float,
+    end_depth: float,
+    color: tuple[int, int, int],
+    width: int,
+) -> None:
+    steps = max(1, math.ceil(max(abs(end[0] - start[0]), abs(end[1] - start[1]))))
+    for step in range(steps + 1):
+        amount = step / steps
+        x = round(start[0] + (end[0] - start[0]) * amount)
+        y = round(start[1] + (end[1] - start[1]) * amount)
+        depth = start_depth + (end_depth - start_depth) * amount
+        for offset_y in range(-(width // 2), width - width // 2):
+            for offset_x in range(-(width // 2), width - width // 2):
+                pixel_x = x + offset_x
+                pixel_y = y + offset_y
+                if (
+                    0 <= pixel_x < pixels.shape[1]
+                    and 0 <= pixel_y < pixels.shape[0]
+                    and depth >= depths[pixel_y, pixel_x] - 1e-6
+                ):
+                    pixels[pixel_y, pixel_x] = color
 
 
 def render(
@@ -618,26 +671,51 @@ def render(
             edge = (188, 205, 214) if facing > 0.001 else (61, 70, 76)
             draw.line(points + [points[0]], fill=edge, width=line_width)
     else:
-        for face in ordered:
-            normal = normalize(cross(sub(face.vertices[1], face.vertices[0]), sub(face.vertices[2], face.vertices[0])))
+        pixels = np.asarray(image).copy()
+        depths = np.full((size, size), -np.inf)
+        visible_faces = []
+        for face in faces:
+            normal = face_normal(face)
             if dot(normal, view) <= 0.001:
                 continue
             points = [screen_point(vertex, center, right, up, size, scale) for vertex in face.vertices]
-            if mode == "textured" and textures.get(face.material) is not None:
-                brightness = 0.58 + 0.42 * max(0, dot(normal, light))
-                draw_textured_face(
-                    image,
-                    points,
-                    face,
-                    textures[face.material],  # type: ignore[arg-type]
-                    brightness,
-                    line_width,
-                )
-                continue
+            vertex_depths = [dot(sub(vertex, center), view) for vertex in face.vertices]
+            texture = textures.get(face.material) if mode == "textured" else None
+            brightness = 0.58 + 0.42 * max(0, dot(normal, light))
             base = colors.get(face.material, (155, 155, 155))
             fill = base if mode == "material" else tuple(round(channel * 0.72) for channel in base)
-            draw.polygon(points, fill=fill)
-            draw.line(points + [points[0]], fill=(16, 18, 20), width=line_width)
+            face_uvs = face.uvs or [(0, 1), (0, 0), (1, 0), (1, 1)]
+            for index in range(1, len(points) - 1):
+                triangle = [points[0], points[index], points[index + 1]]
+                triangle_depths = [vertex_depths[0], vertex_depths[index], vertex_depths[index + 1]]
+                triangle_uvs = [face_uvs[0], face_uvs[index], face_uvs[index + 1]]
+                rasterize_triangle(
+                    pixels,
+                    depths,
+                    triangle,
+                    triangle_depths,
+                    fill,
+                    texture,
+                    triangle_uvs,
+                    brightness,
+                )
+            visible_faces.append((points, vertex_depths))
+
+        for points, vertex_depths in visible_faces:
+            for index, start in enumerate(points):
+                end_index = (index + 1) % len(points)
+                rasterize_edge(
+                    pixels,
+                    depths,
+                    start,
+                    points[end_index],
+                    vertex_depths[index],
+                    vertex_depths[end_index],
+                    (16, 18, 20),
+                    line_width,
+                )
+        image = Image.fromarray(pixels)
+        draw = ImageDraw.Draw(image)
 
     label = f"{mode.upper()} / {view_name.upper()}"
     label_width = max(164, 12 + len(label) * 7)
