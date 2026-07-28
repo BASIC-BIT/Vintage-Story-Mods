@@ -5,6 +5,7 @@ using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
+using thebasics.Tests.Support;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
@@ -46,6 +47,10 @@ public class ChatOverrideModeTests
 
     private static MessageContext Parse(ModConfig config, IServerPlayer player, string message)
     {
+        // The stale-override rejections resolve a lang key, which throws if no translation service
+        // has been registered. Without this the class passes or fails on test ordering alone.
+        LangTestHelper.EnsureEnglish();
+
         var transformer = new PlayerChatTransformer(new RPProximityChatSystem { Config = config });
         var context = new MessageContext
         {
@@ -146,6 +151,7 @@ public class ChatOverrideModeTests
     {
         // A range command names a range and global OOC has none, so honouring the override would
         // turn "/w he's lying" into a server-wide broadcast of a line the player chose /w for.
+        LangTestHelper.EnsureEnglish();
         var transformer = new PlayerChatTransformer(new RPProximityChatSystem { Config = CreateConfig() });
         var context = new MessageContext
         {
