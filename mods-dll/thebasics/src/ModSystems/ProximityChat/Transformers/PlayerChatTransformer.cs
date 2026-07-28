@@ -101,13 +101,23 @@ public class PlayerChatTransformer : MessageTransformerBase
     /// </summary>
     private PlayerChatKind GetStickyChatKind(MessageContext context)
     {
-        return context.SendingPlayer.GetChatOverrideMode() switch
+        var overrideMode = context.SendingPlayer.GetChatOverrideMode();
+
+        // A player can be left holding global OOC if an admin disables the feature afterwards.
+        // Clear it rather than only masking it: if the mask were left in place and an admin later
+        // re-enabled global OOC, the player's next ordinary line would go server-wide without them
+        // having run any command or seen any status change.
+        if (overrideMode == ChatOverrideMode.GlobalOoc && !_config.EnableGlobalOOC)
+        {
+            context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
+            overrideMode = ChatOverrideMode.None;
+        }
+
+        return overrideMode switch
         {
             ChatOverrideMode.Emote => PlayerChatKind.Emote,
             ChatOverrideMode.Ooc => PlayerChatKind.Ooc,
-            // A player can be left holding global OOC if an admin disables the feature afterwards.
-            // Fall back to speech rather than rejecting every line they type.
-            ChatOverrideMode.GlobalOoc when _config.EnableGlobalOOC => PlayerChatKind.GlobalOoc,
+            ChatOverrideMode.GlobalOoc => PlayerChatKind.GlobalOoc,
             _ => PlayerChatKind.Speech
         };
     }

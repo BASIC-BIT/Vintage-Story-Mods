@@ -125,6 +125,22 @@ public class ChatOverrideModeTests
     }
 
     [Fact]
+    public void StickyGlobalOocIsClearedNotMaskedWhenGlobalOocDisabled()
+    {
+        // Masking alone would leave the stored value intact, so re-enabling global OOC later would
+        // silently drop the player back into a server-wide channel on their next ordinary line.
+        var player = CreatePlayer(ChatOverrideMode.GlobalOoc);
+        byte[]? written = null;
+        player.When(p => p.SetModdata(OverrideKey, Arg.Any<byte[]>()))
+            .Do(call => written = call.ArgAt<byte[]>(1));
+
+        Parse(CreateConfig(enableGlobalOoc: false), player, "hello");
+
+        written.Should().NotBeNull("the stale override must be persisted as cleared, not just masked");
+        SerializerUtil.Deserialize(written, ChatOverrideMode.GlobalOoc).Should().Be(ChatOverrideMode.None);
+    }
+
+    [Fact]
     public void LegacyEmoteModeMigratesIntoOverrideAxis()
     {
         var player = CreatePlayer(legacyEmoteMode: true);

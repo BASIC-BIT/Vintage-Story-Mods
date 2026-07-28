@@ -2320,15 +2320,20 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     /// <summary>
     /// A player parked in global OOC when an admin disables the feature would otherwise be stuck:
-    /// <c>/gooc</c> is no longer registered to toggle it back off. Treating the stale value as None
-    /// keeps their status honest and lets a single <c>/ooc</c> or <c>/me</c> move them somewhere real.
+    /// <c>/gooc</c> is no longer registered to toggle it back off. Clears the stale value outright
+    /// rather than masking it, so re-enabling global OOC later cannot silently drop the player back
+    /// into a server-wide channel they never asked to rejoin.
     /// </summary>
     private ChatOverrideMode GetEffectiveOverrideMode(IServerPlayer player)
     {
         var mode = player.GetChatOverrideMode();
-        return mode == ChatOverrideMode.GlobalOoc && !Config.EnableGlobalOOC
-            ? ChatOverrideMode.None
-            : mode;
+        if (mode != ChatOverrideMode.GlobalOoc || Config.EnableGlobalOOC)
+        {
+            return mode;
+        }
+
+        player.SetChatOverrideMode(ChatOverrideMode.None);
+        return ChatOverrideMode.None;
     }
 
     /// <summary>

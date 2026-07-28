@@ -154,7 +154,10 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         {
             penalty = _proximityCheckUtils.CountSoundOccluders(context.SendingPlayer, player) * rules.WallPenaltyBlocks;
 
-            if (distance + penalty >= rules.Range)
+            // The unlimited check is redundant today because BuildDeliveryRules disables muffling at
+            // unlimited range, but without it a future change there would make this compare against
+            // a negative range and silently reject every recipient.
+            if (!ModConfig.IsUnlimitedRange(rules.Range) && distance + penalty >= rules.Range)
             {
                 return false;
             }

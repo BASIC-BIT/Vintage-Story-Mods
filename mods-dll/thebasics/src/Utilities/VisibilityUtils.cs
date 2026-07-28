@@ -16,6 +16,8 @@ public static class VisibilityUtils
     // configurable chat range. Beyond this the count is already far past any useful penalty.
     private const int MaxSegmentSamples = 1024;
 
+    private static bool _warnedSegmentSampleCap;
+
     /// <summary>
     /// Block filter for sight raycasts. Returns true for blocks that should STOP the ray,
     /// false for blocks the ray should pass through.
@@ -211,7 +213,24 @@ public static class VisibilityUtils
         // Half-block steps: fine enough that a one-block-thick wall always lands at least one
         // sample inside it, coarse enough to stay cheap on long ranges. Capped so a caller that
         // forgets to bound the distance cannot walk the whole map on the chat hot path.
-        var steps = (int)Math.Min(MaxSegmentSamples, Math.Ceiling(length / SegmentSampleStep));
+        //
+        // The cap is inert for any range the admin panel accepts (max 512, and Manhattan distance
+        // is never below Euclidean), but a hand-edited config skips that validation. When the cap
+        // does bind the step size grows past one block and thin walls stop being counted, so say so
+        // once rather than letting muffling quietly stop working.
+        var uncappedSteps = Math.Ceiling(length / SegmentSampleStep);
+        if (uncappedSteps > MaxSegmentSamples && !_warnedSegmentSampleCap)
+        {
+            _warnedSegmentSampleCap = true;
+            world.Logger?.Warning(
+                "THEBASICS: chat occlusion sampled a {0:0} block segment, past the {1} sample cap. " +
+                "Wall muffling will under-count walls at this range; lower the chat range or disable " +
+                "SpeechOcclusionWallPenaltyBlocks.",
+                length,
+                MaxSegmentSamples);
+        }
+
+        var steps = (int)Math.Min(MaxSegmentSamples, uncappedSteps);
         var accessor = world.BlockAccessor;
 
         var occluders = 0;
