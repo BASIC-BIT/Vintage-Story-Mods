@@ -94,7 +94,7 @@ Features:
 - Sticky override modes toggle: running the same override command again returns you to speech, and running a different one replaces it. An explicit message prefix still wins for that single line.
 - Recipient filtering by distance, sign-language line of sight, and chat mode.
 - Sign-language line-of-sight checks use multiple target points and can deliver shortly after send if line of sight is acquired within the retry window.
-- Line-of-sight checks treat foliage as see-through. This is shared by every sight consumer: sign-language delivery, character-sheet look-up, nametags, speech bubbles, placed bubbles, and the typing indicator. Tree leaves previously blocked all of them because they declare no render pass and defaulted to opaque.
+- Sign-language line-of-sight treats foliage as see-through, so signing carries through a tree canopy. Scoped to sign language only: nametags, speech bubbles, the typing indicator, and the character-sheet look-up gate keep the stricter filter, so foliage still hides those.
 - Experimental, off by default: speech line-of-sight gating per chat mode, and wall muffling that converts sound-blocking geometry into extra effective distance. Sound and sight occlude differently: glass and water stop speech but not sight, and foliage stops neither.
 - Automatic IC formatting with configurable verbs, punctuation, delimiters, nicknames, nickname colors, OOC styling, and optional global OOC.
 - Question verbs: a message ending in `?` uses `ProximityChatModeQuestionVerbs` (default `asks`) instead of the mode's normal verbs.

@@ -20,7 +20,8 @@ public class ProximityCheckUtils : BaseSubSystem
             return true; // Player can always see themselves
         }
         // TODO: Implement FOV check to ensure player1 is looking at player2
-        return VisibilityUtils.HasLineOfSight(
+        // Sign language reads through foliage; the general sight filter deliberately does not.
+        return VisibilityUtils.HasSignLanguageLineOfSight(
             API.World,
             player1.Entity,
             player2.Entity,

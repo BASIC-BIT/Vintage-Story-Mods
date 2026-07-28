@@ -40,14 +40,26 @@ public static class VisibilityUtils
             return false; // Visually transparent — ray continues.
         }
 
-        // Tree leaves and plants declare no render pass, so they default to Opaque and would
-        // otherwise block sight through foliage. Their block material is the reliable signal.
-        if (block.BlockMaterial is EnumBlockMaterial.Leaves or EnumBlockMaterial.Plant)
+        return true; // Opaque — ray stops here.
+    };
+
+    /// <summary>
+    /// Sight filter for sign language specifically. Identical to <see cref="SightBlockFilter"/>
+    /// except that foliage does not block: tree leaves and plants declare no render pass, so they
+    /// default to Opaque and would otherwise stop signing through a canopy.
+    ///
+    /// Deliberately NOT applied to the general sight filter. That one also backs nametags, speech
+    /// bubbles, the typing indicator, and the character-sheet look-up gate, and relaxing it there
+    /// would let players read each other's sheets through a hedge.
+    /// </summary>
+    private static readonly BlockFilter SignLanguageBlockFilter = (BlockPos pos, Block block) =>
+    {
+        if (block?.BlockMaterial is EnumBlockMaterial.Leaves or EnumBlockMaterial.Plant)
         {
             return false;
         }
 
-        return true; // Opaque — ray stops here.
+        return SightBlockFilter(pos, block);
     };
 
     /// <summary>
@@ -124,6 +136,19 @@ public static class VisibilityUtils
             world.Logger?.Debug("THEBASICS VisibilityUtils: LOS raytrace to Vec3d threw: {0}", ex.Message);
             return failOpen;
         }
+    }
+
+    /// <summary>
+    /// Line of sight for sign language, which carries through foliage where general sight does not.
+    /// </summary>
+    public static bool HasSignLanguageLineOfSight(
+        IWorldAccessor world,
+        Entity observer,
+        Entity target,
+        bool failOpen,
+        bool useMultiPointTargets = false)
+    {
+        return HasClearPath(world, observer, target, failOpen, useMultiPointTargets, SignLanguageBlockFilter);
     }
 
     /// <summary>

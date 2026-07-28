@@ -52,7 +52,7 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
 
         var distance = sendingPlayer.GetDistance(receivingPlayer) + occlusionPenalty;
 
-        var minFontSize = _config.ProximityChatClampFontSizes.Min();
+        var minFontSize = ClampFontSizes.Min();
 
         var unclampedSize = ((defaultSize - minFontSize) * (1.0d - (distance / maxRange))) + minFontSize;
 
@@ -61,9 +61,17 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
         return clampedSize;
     }
 
+    private static readonly int[] FallbackClampFontSizes = [30, 16, 12, 6];
+
+    private int[] ClampFontSizes =>
+        _config.ProximityChatClampFontSizes is { Length: > 0 }
+            ? _config.ProximityChatClampFontSizes
+            : FallbackClampFontSizes;
+
     private int GetClampedFontSize(double unclamped)
     {
-        // Get the closest value in the Config.ProximityChatClampFontSizes array to the unclamped value
-        return _config.ProximityChatClampFontSizes.MinBy(size => Math.Abs(size - unclamped));
+        // Closest allowed size to the computed one. A hand-edited empty array survives the ??=
+        // default, so this reads through the guarded accessor rather than the config directly.
+        return ClampFontSizes.MinBy(size => Math.Abs(size - unclamped));
     }
 }

@@ -1824,8 +1824,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private (float gain, float falloff) CalculateSpeechAudioParameters(MessageContext context)
     {
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
-        var gain = Config.RPTTS_ModeGain[mode];
-        var falloff = Config.RPTTS_ModeFalloff[mode];
+        var gain = ModConfig.GetModeValue(Config.RPTTS_ModeGain, mode, 1f);
+        var falloff = ModConfig.GetModeValue(Config.RPTTS_ModeFalloff, mode, 1f);
 
         return (gain, falloff);
     }
@@ -2322,7 +2322,11 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     /// </summary>
     private TextCommandResult HandleOverrideModeCommand(IServerPlayer player, ChatOverrideMode mode)
     {
-        return SetOverrideMode(player, mode, enabled: GetEffectiveOverrideMode(player) != mode);
+        // Raw value, not the effective one: the effective getter clears and explains a mode the
+        // player may no longer hold, which for a player trying to LEAVE that mode would emit the
+        // refusal twice and never confirm the change. Leaving is always allowed, and /emotemode
+        // and /oocToggle already read the raw value for the same reason.
+        return SetOverrideMode(player, mode, enabled: player.GetChatOverrideMode() != mode);
     }
 
     /// <summary>
@@ -2605,8 +2609,9 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 return;
             }
 
-            // Only consume after we've validated the message — if our pipeline fails,
-            // vanilla chat handles the message instead of silently swallowing it.
+            // Consumed before processing: once we take the message, vanilla will not deliver it.
+            // That makes an unhandled pipeline exception a silent drop, so the call below is
+            // wrapped rather than left to propagate.
             consumed.value = true;
 
             // Create a player chat context
@@ -2625,8 +2630,17 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 }
             };
 
-            // Process the message through the pipeline
-            TransformerSystem?.ProcessMessagePipeline(context);
+            // The message is already consumed, so an exception here would drop the player's line with
+            // no delivery and no feedback. Tell them and log it rather than losing it silently.
+            try
+            {
+                TransformerSystem?.ProcessMessagePipeline(context);
+            }
+            catch (Exception ex)
+            {
+                API.Logger.Error("THEBASICS: proximity chat pipeline threw for player {0}: {1}", byPlayer?.PlayerName, ex);
+                byPlayer?.SendMessage(ProximityChatId, Lang.Get("thebasics:chat-pipeline-failed"), EnumChatType.CommandError);
+            }
             AnalyticsService.TrackFeatureUsed("proximity_chat", "send_chat_tab", properties: AnalyticsService.ChatProperties("chat_tab"));
         }
         catch (Exception e)
