@@ -130,6 +130,7 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         if (_distanceObfuscationSystem != null && context.SendingPlayer != null && context.ReceivingPlayer != null)
         {
             _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed,
+                tempMode: context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode()),
                 occlusionPenalty: context.GetOcclusionPenalty(context.ReceivingPlayer));
         }
 

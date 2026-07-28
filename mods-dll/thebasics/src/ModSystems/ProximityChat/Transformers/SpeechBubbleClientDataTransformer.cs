@@ -1,4 +1,5 @@
 using thebasics.Configs;
+using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 
@@ -219,6 +220,7 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
         if (_distanceObfuscationSystem != null && context.SendingPlayer != null && context.ReceivingPlayer != null)
         {
             _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed,
+                tempMode: context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode()),
                 occlusionPenalty: context.GetOcclusionPenalty(context.ReceivingPlayer));
         }
 

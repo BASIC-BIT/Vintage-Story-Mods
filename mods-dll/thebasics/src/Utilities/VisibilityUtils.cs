@@ -12,6 +12,10 @@ public static class VisibilityUtils
 {
     private const double SegmentSampleStep = 0.5;
 
+    // Backstop for the occluder walk: 512 blocks at half-block steps, matching the largest
+    // configurable chat range. Beyond this the count is already far past any useful penalty.
+    private const int MaxSegmentSamples = 1024;
+
     /// <summary>
     /// Block filter for sight raycasts. Returns true for blocks that should STOP the ray,
     /// false for blocks the ray should pass through.
@@ -205,8 +209,9 @@ public static class VisibilityUtils
         }
 
         // Half-block steps: fine enough that a one-block-thick wall always lands at least one
-        // sample inside it, coarse enough to stay cheap on long ranges.
-        var steps = (int)Math.Ceiling(length / SegmentSampleStep);
+        // sample inside it, coarse enough to stay cheap on long ranges. Capped so a caller that
+        // forgets to bound the distance cannot walk the whole map on the chat hot path.
+        var steps = (int)Math.Min(MaxSegmentSamples, Math.Ceiling(length / SegmentSampleStep));
         var accessor = world.BlockAccessor;
 
         var occluders = 0;

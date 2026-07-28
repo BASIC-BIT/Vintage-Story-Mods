@@ -2307,9 +2307,9 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     /// Toggles a sticky override mode. Running the command for the mode you are already in clears it,
     /// and running a different one replaces it, so the three override commands are mutually exclusive.
     /// </summary>
-    private static TextCommandResult HandleOverrideModeCommand(IServerPlayer player, ChatOverrideMode mode)
+    private TextCommandResult HandleOverrideModeCommand(IServerPlayer player, ChatOverrideMode mode)
     {
-        var current = player.GetChatOverrideMode();
+        var current = GetEffectiveOverrideMode(player);
         var next = current == mode ? ChatOverrideMode.None : mode;
         player.SetChatOverrideMode(next);
 
@@ -2319,13 +2319,26 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     }
 
     /// <summary>
+    /// A player parked in global OOC when an admin disables the feature would otherwise be stuck:
+    /// <c>/gooc</c> is no longer registered to toggle it back off. Treating the stale value as None
+    /// keeps their status honest and lets a single <c>/ooc</c> or <c>/me</c> move them somewhere real.
+    /// </summary>
+    private ChatOverrideMode GetEffectiveOverrideMode(IServerPlayer player)
+    {
+        var mode = player.GetChatOverrideMode();
+        return mode == ChatOverrideMode.GlobalOoc && !Config.EnableGlobalOOC
+            ? ChatOverrideMode.None
+            : mode;
+    }
+
+    /// <summary>
     /// Reports both axes at once. Range alone is ambiguous now that a player can be whispering in
     /// character or whispering out of character.
     /// </summary>
-    private static TextCommandResult ChatModeStatus(IServerPlayer player)
+    private TextCommandResult ChatModeStatus(IServerPlayer player)
     {
         var range = player.GetChatMode().ToString().ToLowerInvariant();
-        var overrideMode = player.GetChatOverrideMode();
+        var overrideMode = GetEffectiveOverrideMode(player);
 
         var message = overrideMode == ChatOverrideMode.None
             ? Lang.Get("thebasics:chat-chatmode-set", range)

@@ -1,4 +1,5 @@
 using thebasics.Configs;
+using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
 
@@ -24,7 +25,10 @@ public class ObfuscationTransformer : MessageTransformerBase
     {
         var content = context.Message;
 
+        // Pass the message's chat mode explicitly: a /yell from a player whose sticky mode is Normal
+        // must obfuscate against the yell range that chose the recipients, not the sticky one.
         _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref content,
+            tempMode: context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode()),
             occlusionPenalty: context.GetOcclusionPenalty(context.ReceivingPlayer));
 
         context.Message = content;

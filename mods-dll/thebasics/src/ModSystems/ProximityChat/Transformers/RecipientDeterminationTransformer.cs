@@ -111,11 +111,16 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
 
         var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
 
+        // An unlimited range means everyone hears you regardless of geometry, so occlusion has
+        // nothing to decide. Skipping it also keeps raycasts and segment walks off a distance that
+        // is bounded only by the size of the map.
+        var occludes = isAudibleSpeech && !ModConfig.IsUnlimitedRange(range);
+
         return new DeliveryRules(
             Range: range,
             RequiresSignLineOfSight: isSignLanguage && _config.RequireLineOfSightForSignLanguage,
-            RequiresSpeechLineOfSight: isAudibleSpeech && RequiresSpeechLineOfSight(chatMode),
-            WallPenaltyBlocks: isAudibleSpeech ? System.Math.Max(0, _config.SpeechOcclusionWallPenaltyBlocks) : 0);
+            RequiresSpeechLineOfSight: occludes && RequiresSpeechLineOfSight(chatMode),
+            WallPenaltyBlocks: occludes ? System.Math.Max(0, _config.SpeechOcclusionWallPenaltyBlocks) : 0);
     }
 
     private bool RequiresSpeechLineOfSight(ProximityChatMode chatMode)
@@ -123,6 +128,40 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         return _config.RequireLineOfSightForSpeech != null &&
                _config.RequireLineOfSightForSpeech.TryGetValue(chatMode, out var required) &&
                required;
+    }
+
+    /// <summary>
+    /// Applies the sound occlusion experiments. Returns false when the recipient is muffled or
+    /// walled off entirely; otherwise reports the effective-distance penalty to record for them.
+    /// Occlusion is already disabled at unlimited range, so no distance re-test is needed there.
+    /// </summary>
+    private bool TryApplySoundOcclusion(
+        MessageContext context,
+        IServerPlayer player,
+        DeliveryRules rules,
+        int distance,
+        bool isSelf,
+        out int penalty)
+    {
+        penalty = 0;
+
+        if (isSelf)
+        {
+            return true;
+        }
+
+        if (rules.UsesWallMuffling)
+        {
+            penalty = _proximityCheckUtils.CountSoundOccluders(context.SendingPlayer, player) * rules.WallPenaltyBlocks;
+
+            if (distance + penalty >= rules.Range)
+            {
+                return false;
+            }
+        }
+
+        return !rules.RequiresSpeechLineOfSight ||
+               _proximityCheckUtils.CanHearPlayer(context.SendingPlayer, player);
     }
 
     private bool CanReceive(
@@ -133,21 +172,20 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         List<IServerPlayer> pendingSignLanguageRecipients,
         IDictionary<string, int> occlusionPenalties)
     {
-        var penalty = 0;
-        if (rules.UsesWallMuffling && player.PlayerUID != context.SendingPlayer.PlayerUID)
-        {
-            penalty = _proximityCheckUtils.CountSoundOccluders(context.SendingPlayer, player) * rules.WallPenaltyBlocks;
-        }
-
         // An unlimited range skips the distance filter entirely; everyone online is in range.
-        if (!ModConfig.IsUnlimitedRange(rules.Range) &&
-            player.Entity.Pos.AsBlockPos.ManhattanDistance(originPos) + penalty >= rules.Range)
+        var unlimited = ModConfig.IsUnlimitedRange(rules.Range);
+        var distance = unlimited ? 0 : player.Entity.Pos.AsBlockPos.ManhattanDistance(originPos);
+
+        // Prefilter on raw distance before any raycasting. Occlusion only ever adds distance, so
+        // anyone already out of range stays out, and the expensive checks never run for them.
+        if (!unlimited && distance >= rules.Range)
         {
             return false;
         }
 
-        if (rules.RequiresSpeechLineOfSight &&
-            !_proximityCheckUtils.CanHearPlayer(context.SendingPlayer, player))
+        var isSelf = player.PlayerUID == context.SendingPlayer.PlayerUID;
+
+        if (!TryApplySoundOcclusion(context, player, rules, distance, isSelf, out var penalty))
         {
             return false;
         }
