@@ -47,6 +47,46 @@ namespace thebasics.Configs
 
         public static bool IsUnlimitedRange(int range) => range < 0;
 
+        /// <summary>
+        /// Per-mode dictionaries are only defaulted wholesale, so a hand-edited config can be missing
+        /// a mode entirely. Reading one of these with the indexer would throw on the chat hot path
+        /// and take the message down for every recipient, so every lookup falls back instead.
+        /// </summary>
+        public static T GetModeValue<T>(IDictionary<ProximityChatMode, T> valuesByMode, ProximityChatMode mode, T fallback)
+        {
+            return valuesByMode != null && valuesByMode.TryGetValue(mode, out var value) ? value : fallback;
+        }
+
+        public int GetModeDistance(ProximityChatMode mode) =>
+            GetModeValue(ProximityChatModeDistances, mode, DefaultModeDistance(mode));
+
+        public int GetModeObfuscationRange(ProximityChatMode mode) =>
+            GetModeValue(ProximityChatModeObfuscationRanges, mode, DefaultModeObfuscationRange(mode));
+
+        public int GetModeDefaultFontSize(ProximityChatMode mode) =>
+            GetModeValue(ProximityChatDefaultFontSize, mode, DefaultModeFontSize(mode));
+
+        private static int DefaultModeDistance(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => 90,
+            ProximityChatMode.Whisper => 5,
+            _ => 35
+        };
+
+        private static int DefaultModeObfuscationRange(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => 45,
+            ProximityChatMode.Whisper => 2,
+            _ => 15
+        };
+
+        private static int DefaultModeFontSize(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => 30,
+            ProximityChatMode.Whisper => 12,
+            _ => 16
+        };
+
         private void InitializeProximityChatDefaults()
         {
             ProximityChatModeDistances ??= new Dictionary<ProximityChatMode, int>

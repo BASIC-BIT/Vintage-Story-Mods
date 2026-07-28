@@ -40,8 +40,8 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
         // Doesn't check if the system is disabled, that's up to the consumer
 
         // Matches the obfuscation gradient: occluding geometry reads as extra distance.
-        var maxRange = _config.ProximityChatModeDistances[chatMode];
-        var defaultSize = _config.ProximityChatDefaultFontSize[chatMode];
+        var maxRange = _config.GetModeDistance(chatMode);
+        var defaultSize = _config.GetModeDefaultFontSize(chatMode);
 
         // Unlimited range has no far edge to scale against, so every listener reads it at full size.
         // Checked before reading positions so this never depends on both players having entities.

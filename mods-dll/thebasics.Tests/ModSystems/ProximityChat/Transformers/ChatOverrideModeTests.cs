@@ -221,6 +221,29 @@ public class ChatOverrideModeTests
     }
 
     [Fact]
+    public void GlobalOocPrefixIsRefusedWhenRpChatIsDisabled()
+    {
+        // The ((( ))) prefix used to check EnableGlobalOOC on its own, so it kept broadcasting
+        // server-wide while every sibling path refused. It now asks the same predicate.
+        var config = CreateConfig();
+        config.DisableRPChat = true;
+
+        var context = Parse(config, CreatePlayer(), "(((server restart soon)))");
+
+        context.State.Should().Be(MessageContextState.STOP);
+        context.HasFlag(MessageContext.IS_GLOBAL_OOC).Should().BeFalse();
+    }
+
+    [Fact]
+    public void GlobalOocPrefixStillWorksWhenAllGatesAllowIt()
+    {
+        var context = Parse(CreateConfig(), CreatePlayer(), "(((server restart soon)))");
+
+        context.HasFlag(MessageContext.IS_GLOBAL_OOC).Should().BeTrue();
+        context.State.Should().Be(MessageContextState.CONTINUE);
+    }
+
+    [Fact]
     public void PlainSpeechIsUnaffectedWhenRpChatIsDisabled()
     {
         var config = CreateConfig();

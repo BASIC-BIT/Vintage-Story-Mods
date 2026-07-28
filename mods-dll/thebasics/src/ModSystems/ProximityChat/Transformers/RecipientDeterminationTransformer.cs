@@ -234,6 +234,6 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         }
 
         var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
-        return _config.ProximityChatModeDistances[chatMode];
+        return _config.GetModeDistance(chatMode);
     }
 }

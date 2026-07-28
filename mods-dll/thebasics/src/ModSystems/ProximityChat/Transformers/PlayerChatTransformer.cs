@@ -22,7 +22,6 @@ public class PlayerChatTransformer : MessageTransformerBase
         Emote,
         PlacedEnvironment,
         Environment,
-        DisabledGlobalOoc,
         RejectedStaleOverride
     }
 
@@ -56,7 +55,6 @@ public class PlayerChatTransformer : MessageTransformerBase
 
         return parsed.Kind switch
         {
-            PlayerChatKind.DisabledGlobalOoc => RejectStaleOverride(context, "thebasics:chat-gooc-disabled"),
             PlayerChatKind.RejectedStaleOverride => RejectStaleOverride(
                 context,
                 context.GetMetadata(StaleOverrideRefusalKey, "thebasics:chat-override-cleared-rp-disabled")),
@@ -75,9 +73,11 @@ public class PlayerChatTransformer : MessageTransformerBase
         var hasGlobalOocPrefix = HasStartDelimiter(content, delimiters.GlobalOOC.Start, out var globalOocStartLen);
         if (hasGlobalOocPrefix)
         {
-            return _config.EnableGlobalOOC
+            // Same predicate as the sticky and command paths, so an admin flipping any gate cannot
+            // leave the prefix broadcasting while its siblings refuse.
+            return IsOverrideAvailable(context, ChatOverrideMode.GlobalOoc)
                 ? new ParsedPlayerChat(PlayerChatKind.GlobalOoc, globalOocStartLen, hasExplicitPrefix: true)
-                : new ParsedPlayerChat(PlayerChatKind.DisabledGlobalOoc);
+                : new ParsedPlayerChat(PlayerChatKind.RejectedStaleOverride);
         }
 
         if (HasStartDelimiter(content, delimiters.OOC.Start, out var oocStartLen))
@@ -154,13 +154,24 @@ public class PlayerChatTransformer : MessageTransformerBase
     /// </summary>
     private bool IsOverrideStale(MessageContext context, ChatOverrideMode overrideMode)
     {
+        return !IsOverrideAvailable(context, overrideMode);
+    }
+
+    /// <summary>
+    /// Asks the one predicate whether this mode is currently honoured, recording the refusal reason
+    /// so a rejection can name the gate that refused rather than guessing.
+    /// </summary>
+    private bool IsOverrideAvailable(MessageContext context, ChatOverrideMode overrideMode)
+    {
         if (_chatSystem.IsOverrideModeAvailable(context.SendingPlayer, overrideMode, out var refusalLangKey))
         {
-            return false;
+            return true;
         }
 
-        context.SetMetadata(StaleOverrideRefusalKey, refusalLangKey);
-        return true;
+        // Defensive default: the predicate always supplies a key today, and a null would otherwise
+        // reach Lang.Get on the chat path.
+        context.SetMetadata(StaleOverrideRefusalKey, refusalLangKey ?? "thebasics:chat-override-cleared-rp-disabled");
+        return false;
     }
 
     private MessageContext RejectStaleOverride(MessageContext context, string langKey)

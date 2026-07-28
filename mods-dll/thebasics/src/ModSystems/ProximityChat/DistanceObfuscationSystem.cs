@@ -28,8 +28,8 @@ public class DistanceObfuscationSystem : BaseSubSystem
         }
 
         var chatMode = sendingPlayer.GetChatMode(tempMode);
-        var obfuscationRange = Config.ProximityChatModeObfuscationRanges[chatMode];
-        var maxRange = Config.ProximityChatModeDistances[chatMode];
+        var obfuscationRange = Config.GetModeObfuscationRange(chatMode);
+        var maxRange = Config.GetModeDistance(chatMode);
 
         // Unlimited range has no far edge to fade toward, so there is nothing to obfuscate against.
         // Checked before reading positions so this never depends on both players having entities.

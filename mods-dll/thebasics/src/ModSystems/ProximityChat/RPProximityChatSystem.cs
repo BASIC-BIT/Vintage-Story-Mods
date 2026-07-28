@@ -468,15 +468,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return HandleOverrideModeCommand(player, ChatOverrideMode.GlobalOoc);
         }
 
-        // The command stays registered when the config is flipped live, and every sibling path
-        // (the ((( ))) prefix, bare /gooc, the sticky mode) refuses in that state. Without this the
-        // one-off form would still broadcast server-wide.
-        if (!Config.EnableGlobalOOC)
+        // The command stays registered when the config is flipped live, so the one-off form has to
+        // ask the same predicate every other global OOC path asks. Checking EnableGlobalOOC directly
+        // here would miss DisableRPChat and drift from the sticky and prefix paths again.
+        if (!CanEnterOverrideMode(player, ChatOverrideMode.GlobalOoc, out var goocRefusal))
         {
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Error,
-                StatusMessage = Lang.Get("thebasics:chat-gooc-disabled"),
+                StatusMessage = goocRefusal,
             };
         }
 
@@ -2441,12 +2441,18 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private ChatOverrideMode GetEffectiveOverrideMode(IServerPlayer player)
     {
         var mode = player.GetChatOverrideMode();
-        if (IsOverrideModeAvailable(player, mode, out _))
+        if (IsOverrideModeAvailable(player, mode, out var refusalLangKey))
         {
             return mode;
         }
 
         player.SetChatOverrideMode(ChatOverrideMode.None);
+
+        // Say why. This runs on status-adjacent commands like a bare /w, so dropping the mode
+        // quietly would leave the player reading "Chat mode: whisper" with the override clause
+        // simply gone, and their next line published in character.
+        player.SendMessage(ProximityChatId, Lang.Get(refusalLangKey), EnumChatType.CommandError);
+
         return ChatOverrideMode.None;
     }
 
