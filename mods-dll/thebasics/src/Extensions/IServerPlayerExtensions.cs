@@ -371,20 +371,9 @@ namespace thebasics.Extensions
             SetModData(player, ModDataEmoteMode, mode == ChatOverrideMode.Emote);
         }
 
-        public static void SetEmoteMode(this IServerPlayer player, bool emoteMode)
-        {
-            // Emote mode is one value on the override axis; setting it off only clears emote,
-            // it must not knock the player out of OOC or global OOC.
-            if (emoteMode)
-            {
-                SetChatOverrideMode(player, ChatOverrideMode.Emote);
-            }
-            else if (player.GetChatOverrideMode() == ChatOverrideMode.Emote)
-            {
-                SetChatOverrideMode(player, ChatOverrideMode.None);
-            }
-        }
-
+        // No SetEmoteMode/SetOOCEnabled counterparts: every write to the override axis goes through
+        // RPProximityChatSystem.SetOverrideMode so the gates cannot be bypassed. Adding a setter
+        // here would reopen exactly that hole.
         public static bool GetEmoteMode(this IServerPlayer player)
         {
             return player.GetChatOverrideMode() == ChatOverrideMode.Emote;
@@ -942,22 +931,6 @@ namespace thebasics.Extensions
             return null;
         }
         #endregion
-
-        /// <summary>
-        /// Backs <c>/oocToggle</c>. Before the override axis existed this wrote a mod data key that
-        /// nothing ever read, so the command reported success and did nothing.
-        /// </summary>
-        public static void SetOOCEnabled(this IServerPlayer player, bool enabled)
-        {
-            if (enabled)
-            {
-                SetChatOverrideMode(player, ChatOverrideMode.Ooc);
-            }
-            else if (player.GetChatOverrideMode() == ChatOverrideMode.Ooc)
-            {
-                SetChatOverrideMode(player, ChatOverrideMode.None);
-            }
-        }
 
         public static bool GetOOCEnabled(this IServerPlayer player)
         {

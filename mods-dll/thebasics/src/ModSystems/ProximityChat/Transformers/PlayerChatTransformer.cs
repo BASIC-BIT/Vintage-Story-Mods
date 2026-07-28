@@ -10,6 +10,10 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 public class PlayerChatTransformer : MessageTransformerBase
 {
+    // Which gate refused the player's stale override, so the rejection can name the real reason
+    // instead of always blaming the RP chat switch.
+    private const string StaleOverrideRefusalKey = "staleOverrideRefusalKey";
+
     private enum PlayerChatKind
     {
         Speech,
@@ -53,7 +57,9 @@ public class PlayerChatTransformer : MessageTransformerBase
         return parsed.Kind switch
         {
             PlayerChatKind.DisabledGlobalOoc => RejectStaleOverride(context, "thebasics:chat-gooc-disabled"),
-            PlayerChatKind.RejectedStaleOverride => RejectStaleOverride(context, "thebasics:chat-override-cleared-rp-disabled"),
+            PlayerChatKind.RejectedStaleOverride => RejectStaleOverride(
+                context,
+                context.GetMetadata(StaleOverrideRefusalKey, "thebasics:chat-override-cleared-rp-disabled")),
             PlayerChatKind.GlobalOoc => ApplyGlobalOoc(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
             PlayerChatKind.Ooc => ApplyOoc(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
             PlayerChatKind.Emote => ApplyEmote(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
@@ -110,10 +116,10 @@ public class PlayerChatTransformer : MessageTransformerBase
             return PlayerChatKind.Speech;
         }
 
-        if (IsOverrideStale(overrideMode, out var rejection))
+        if (IsOverrideStale(context, overrideMode))
         {
             context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
-            return rejection;
+            return PlayerChatKind.RejectedStaleOverride;
         }
 
         // A global OOC override plus an explicit range command is a contradiction: the command names
@@ -137,36 +143,24 @@ public class PlayerChatTransformer : MessageTransformerBase
     }
 
     /// <summary>
-    /// Whether the server no longer honours the mode the player is parked in. Every such case
-    /// clears the mode and rejects the line rather than delivering it: silently downgrading to
-    /// speech would publish a message the player believed was going somewhere out of character,
-    /// which is the whole reason they set the mode.
+    /// Whether the server no longer honours the mode the player is parked in. Such a line is
+    /// rejected and the mode cleared, rather than delivered: silently downgrading to speech would
+    /// publish a message the player believed was going somewhere out of character, which is the
+    /// whole reason they set the mode.
     ///
-    /// These mirror the entry gates in <c>CanEnterOverrideMode</c>. All of them are live-reloadable,
-    /// so gating entry alone would let an admin flip a switch that silently does nothing to the
-    /// players already holding the mode.
+    /// Delegates to the same predicate the entry gate uses. Keeping a second copy here is what let
+    /// entry and delivery drift apart repeatedly, each drift silently disabling a setting for
+    /// players who already held the mode.
     /// </summary>
-    private bool IsOverrideStale(ChatOverrideMode overrideMode, out PlayerChatKind rejection)
+    private bool IsOverrideStale(MessageContext context, ChatOverrideMode overrideMode)
     {
-        rejection = PlayerChatKind.RejectedStaleOverride;
-
-        if (_config.DisableRPChat)
+        if (_chatSystem.IsOverrideModeAvailable(context.SendingPlayer, overrideMode, out var refusalLangKey))
         {
-            return true;
+            return false;
         }
 
-        if (overrideMode == ChatOverrideMode.Ooc && !_config.AllowOOCToggle)
-        {
-            return true;
-        }
-
-        if (overrideMode == ChatOverrideMode.GlobalOoc && !_config.EnableGlobalOOC)
-        {
-            rejection = PlayerChatKind.DisabledGlobalOoc;
-            return true;
-        }
-
-        return false;
+        context.SetMetadata(StaleOverrideRefusalKey, refusalLangKey);
+        return true;
     }
 
     private MessageContext RejectStaleOverride(MessageContext context, string langKey)

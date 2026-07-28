@@ -25,6 +25,9 @@ public class ChatOverrideModeTests
         var player = Substitute.For<IServerPlayer>();
         player.GetModdata(Arg.Any<string>()).Returns((byte[])null!);
 
+        // OOC delivery re-checks OOCTogglePermission, and NSubstitute denies privileges by default.
+        player.HasPrivilege(Arg.Any<string>()).Returns(true);
+
         if (overrideMode.HasValue)
         {
             player.GetModdata(OverrideKey).Returns(SerializerUtil.Serialize(overrideMode.Value));
@@ -188,6 +191,33 @@ public class ChatOverrideModeTests
 
         context.State.Should().Be(MessageContextState.STOP);
         context.HasFlag(MessageContext.IS_OOC).Should().BeFalse();
+    }
+
+    [Fact]
+    public void StickyOocIsRejectedWhenThePlayerLosesTheTogglePrivilege()
+    {
+        // Roles change at runtime with no config edit, so the privilege that gates entry has to be
+        // re-checked on delivery. Otherwise a demoted player keeps posting OOC indefinitely.
+        var player = CreatePlayer(ChatOverrideMode.Ooc);
+        player.HasPrivilege(Arg.Any<string>()).Returns(false);
+
+        var context = Parse(CreateConfig(), player, "still chatting");
+
+        context.State.Should().Be(MessageContextState.STOP);
+        context.HasFlag(MessageContext.IS_OOC).Should().BeFalse();
+    }
+
+    [Fact]
+    public void EmoteOverrideSurvivesLosingTheOocTogglePrivilege()
+    {
+        // The OOC gates must not leak onto emote mode, which is deliberately ungated.
+        var player = CreatePlayer(ChatOverrideMode.Emote);
+        player.HasPrivilege(Arg.Any<string>()).Returns(false);
+
+        var context = Parse(CreateConfig(), player, "waves");
+
+        context.HasFlag(MessageContext.IS_EMOTE).Should().BeTrue();
+        context.State.Should().Be(MessageContextState.CONTINUE);
     }
 
     [Fact]

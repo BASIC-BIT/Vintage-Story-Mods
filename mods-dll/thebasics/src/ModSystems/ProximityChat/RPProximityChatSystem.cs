@@ -468,6 +468,18 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return HandleOverrideModeCommand(player, ChatOverrideMode.GlobalOoc);
         }
 
+        // The command stays registered when the config is flipped live, and every sibling path
+        // (the ((( ))) prefix, bare /gooc, the sticky mode) refuses in that state. Without this the
+        // one-off form would still broadcast server-wide.
+        if (!Config.EnableGlobalOOC)
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = Lang.Get("thebasics:chat-gooc-disabled"),
+            };
+        }
+
         var message = (string)args.Parsers[0].GetValue();
         var groupId = args.Caller.FromChatGroupId;
 
@@ -2354,13 +2366,33 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     /// </summary>
     private bool CanEnterOverrideMode(IServerPlayer player, ChatOverrideMode mode, out string refusal)
     {
-        refusal = null;
+        var allowed = IsOverrideModeAvailable(player, mode, out var refusalLangKey);
+        refusal = refusalLangKey == null ? null : Lang.Get(refusalLangKey);
+        return allowed;
+    }
+
+    /// <summary>
+    /// The single answer to "may this player be in this override mode right now?".
+    ///
+    /// Entry, delivery, and status all consult this. They each used to carry their own copy, and
+    /// every time the copies drifted, a setting silently stopped applying to players already holding
+    /// the mode. Every gate here is live-reloadable or role-dependent, so none can be checked only
+    /// at entry time.
+    /// </summary>
+    internal bool IsOverrideModeAvailable(IServerPlayer player, ChatOverrideMode mode, out string refusalLangKey)
+    {
+        refusalLangKey = null;
+
+        if (mode == ChatOverrideMode.None)
+        {
+            return true;
+        }
 
         // The override commands are not registered when RP chat is off, but the config can be
         // flipped live, so guard the capability rather than relying on registration.
         if (Config.DisableRPChat)
         {
-            refusal = Lang.Get("thebasics:chat-override-rp-disabled");
+            refusalLangKey = "thebasics:chat-override-rp-disabled";
             return false;
         }
 
@@ -2374,7 +2406,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 return true;
             }
 
-            refusal = Lang.Get("thebasics:chat-gooc-disabled");
+            refusalLangKey = "thebasics:chat-gooc-disabled";
             return false;
         }
 
@@ -2385,14 +2417,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (!Config.AllowOOCToggle)
         {
-            refusal = Lang.Get("thebasics:chat-ooc-disabled");
+            refusalLangKey = "thebasics:chat-ooc-disabled";
             return false;
         }
 
-        // Matches how /oocToggle is registered, so the two ways into the same state agree.
+        // Matches how /oocToggle is registered, so the two routes into the same state agree. Roles
+        // change at runtime with no config edit at all, so this must be re-checked on delivery.
         if (!player.HasPrivilege(Config.OOCTogglePermission))
         {
-            refusal = Lang.Get("thebasics:chat-ooc-mode-no-privilege");
+            refusalLangKey = "thebasics:chat-ooc-mode-no-privilege";
             return false;
         }
 
@@ -2408,7 +2441,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private ChatOverrideMode GetEffectiveOverrideMode(IServerPlayer player)
     {
         var mode = player.GetChatOverrideMode();
-        if (mode != ChatOverrideMode.GlobalOoc || Config.EnableGlobalOOC)
+        if (IsOverrideModeAvailable(player, mode, out _))
         {
             return mode;
         }
