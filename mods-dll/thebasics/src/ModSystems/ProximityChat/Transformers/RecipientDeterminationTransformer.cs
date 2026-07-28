@@ -175,6 +175,15 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         List<IServerPlayer> pendingSignLanguageRecipients,
         IDictionary<string, int> occlusionPenalties)
     {
+        // A player still in the connect/spawn window can appear in AllOnlinePlayers with no world
+        // entity yet. They are not in proximity of anything, and admitting them would hand a null
+        // entity to every distance-reading transformer in the recipient phase, where an exception
+        // aborts delivery for everyone after them.
+        if (player.Entity?.Pos == null)
+        {
+            return false;
+        }
+
         // An unlimited range skips the distance filter entirely; everyone online is in range.
         var unlimited = ModConfig.IsUnlimitedRange(rules.Range);
         var distance = unlimited ? 0 : player.Entity.Pos.AsBlockPos.ManhattanDistance(originPos);

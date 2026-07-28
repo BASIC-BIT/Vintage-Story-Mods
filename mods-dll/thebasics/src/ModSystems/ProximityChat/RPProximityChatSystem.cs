@@ -2339,13 +2339,21 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         refusal = null;
 
-        if (mode == ChatOverrideMode.GlobalOoc && !Config.EnableGlobalOOC)
+        // Global OOC answers only to its own switch. AllowOOCToggle and OOCTogglePermission govern
+        // local OOC; gating global OOC behind them would let an unrelated setting remove a working
+        // feature, and refuse it with a message naming the wrong one.
+        if (mode == ChatOverrideMode.GlobalOoc)
         {
+            if (Config.EnableGlobalOOC)
+            {
+                return true;
+            }
+
             refusal = Lang.Get("thebasics:chat-gooc-disabled");
             return false;
         }
 
-        if (mode is not (ChatOverrideMode.Ooc or ChatOverrideMode.GlobalOoc))
+        if (mode != ChatOverrideMode.Ooc)
         {
             return true;
         }
@@ -2356,8 +2364,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        if (!string.IsNullOrWhiteSpace(Config.OOCTogglePermission) &&
-            !player.HasPrivilege(Config.OOCTogglePermission))
+        // Matches how /oocToggle is registered, so the two ways into the same state agree.
+        if (!player.HasPrivilege(Config.OOCTogglePermission))
         {
             refusal = Lang.Get("thebasics:chat-ooc-mode-no-privilege");
             return false;

@@ -207,10 +207,10 @@ public class TransformerSystem
     }
 
     /// <summary>
-    /// Reads the verb resolved in the sender phase, falling back to resolving one for callers that
-    /// invoke a transformer directly without running the pipeline.
+    /// Reads the verb resolved in the sender phase, falling back to resolving one when a transformer
+    /// is driven directly without the pipeline having run.
     /// </summary>
-    internal static string GetResolvedSpeechVerb(MessageContext context, Language lang, ProximityChatMode mode, ModConfig config = null)
+    internal static string GetResolvedSpeechVerb(MessageContext context, Language lang, ProximityChatMode mode, ModConfig config)
     {
         if (context.TryGetMetadata(MessageContext.SPEECH_VERB, out string verb) && !string.IsNullOrEmpty(verb))
         {

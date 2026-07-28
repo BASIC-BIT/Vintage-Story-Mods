@@ -140,6 +140,24 @@ public class ChatOverrideModeTests
     }
 
     [Fact]
+    public void StaleOverrideIsClearedWhenRpChatIsDisabled()
+    {
+        // DisableRPChat needs a restart to change. Skipping the override without clearing it means
+        // flipping the setting back off later drops the player into a channel they never rejoined.
+        var config = CreateConfig();
+        config.DisableRPChat = true;
+        var player = CreatePlayer(ChatOverrideMode.GlobalOoc);
+        byte[]? written = null;
+        player.When(p => p.SetModdata(OverrideKey, Arg.Any<byte[]>()))
+            .Do(call => written = call.ArgAt<byte[]>(1));
+
+        Parse(config, player, "hello");
+
+        written.Should().NotBeNull();
+        SerializerUtil.Deserialize(written, ChatOverrideMode.GlobalOoc).Should().Be(ChatOverrideMode.None);
+    }
+
+    [Fact]
     public void StickyGlobalOocIsClearedNotMaskedWhenGlobalOocDisabled()
     {
         // Masking alone would leave the stored value intact, so re-enabling global OOC later would
