@@ -10,12 +10,16 @@ namespace thebasics.Utilities;
 
 public static class VisibilityUtils
 {
+    private const double SegmentSampleStep = 0.5;
+
     /// <summary>
-    /// Block filter for LOS raycasts that allows rays to pass through visually transparent
-    /// blocks (glass, leaves, water, fences, etc.). Returns true for blocks that should
-    /// STOP the ray, false for blocks the ray should pass through.
+    /// Block filter for sight raycasts. Returns true for blocks that should STOP the ray,
+    /// false for blocks the ray should pass through.
+    ///
+    /// Both checks are default-deny: an unrecognised block occludes rather than silently
+    /// leaking chat through it.
     /// </summary>
-    private static readonly BlockFilter LosBlockFilter = (BlockPos pos, Block block) =>
+    private static readonly BlockFilter SightBlockFilter = (BlockPos pos, Block block) =>
     {
         if (block == null || block.Id == 0)
         {
@@ -23,17 +27,56 @@ public static class VisibilityUtils
         }
 
         // Blocks rendered in transparent/blended/liquid passes are visually see-through.
-        // Let the ray pass through them so LOS checks behave consistently with what
-        // the player can actually see on screen.
         if (block.RenderPass is EnumChunkRenderPass.Transparent   // glass, ice
-                             or EnumChunkRenderPass.BlendNoCull   // leaves, lattices, cobweb
+                             or EnumChunkRenderPass.BlendNoCull   // lattices, cobweb, fallen leaves
                              or EnumChunkRenderPass.Liquid)        // water, lava
         {
             return false; // Visually transparent — ray continues.
         }
 
+        // Tree leaves and plants declare no render pass, so they default to Opaque and would
+        // otherwise block sight through foliage. Their block material is the reliable signal.
+        if (block.BlockMaterial is EnumBlockMaterial.Leaves or EnumBlockMaterial.Plant)
+        {
+            return false;
+        }
+
         return true; // Opaque — ray stops here.
     };
+
+    /// <summary>
+    /// Block filter for sound. Sound and sight occlude differently: glass and water stop speech
+    /// but not sight, while foliage stops neither.
+    ///
+    /// A block stops sound if it has a collision box or is a liquid. Collision boxes default to a
+    /// full cube, so blocks this mod has never heard of occlude by default, while non-collidable
+    /// decor (tall grass, loose ground cover) does not. Liquids need the extra check because water
+    /// has no collision box.
+    /// </summary>
+    private static readonly BlockFilter SoundBlockFilter = (BlockPos pos, Block block) => BlocksSound(block);
+
+    private static bool BlocksSound(Block block)
+    {
+        if (block == null || block.Id == 0)
+        {
+            return false; // Air.
+        }
+
+        if (block.BlockMaterial is EnumBlockMaterial.Leaves or EnumBlockMaterial.Plant)
+        {
+            return false; // Foliage muffles nothing worth modelling.
+        }
+
+        if (block.BlockMaterial is EnumBlockMaterial.Water or EnumBlockMaterial.Lava)
+        {
+            return true; // No collision box, but speech does not carry through it.
+        }
+
+        // ponytail: reads the static collision box rather than GetCollisionBoxes(world, pos), so a
+        // block whose collision changes at runtime (an open door) still counts as occluding. Swap to
+        // the positional call if that ever matters more than the per-message cost.
+        return block.CollisionBoxes is { Length: > 0 };
+    }
 
     public static bool HasLineOfSight(
         IWorldAccessor world,
@@ -42,31 +85,7 @@ public static class VisibilityUtils
         bool failOpen,
         bool useMultiPointTargets = false)
     {
-        if (world == null || observer == null || target == null)
-        {
-            return failOpen;
-        }
-
-        if (observer.EntityId == target.EntityId)
-        {
-            return true;
-        }
-
-        try
-        {
-            // RayTraceForSelection expects world-space coordinates.
-            var fromBase = observer.Pos.XYZ;
-            var toBase = target.Pos.XYZ;
-
-            var fromPos = fromBase.AddCopy(observer.LocalEyePos);
-
-            return GetEntityLineOfSightTargetPositions(toBase, target, useMultiPointTargets)
-                .Any(targetPos => IsRayClear(world, fromPos, targetPos, failOpen));
-        }
-        catch
-        {
-            return failOpen;
-        }
+        return HasClearPath(world, observer, target, failOpen, useMultiPointTargets, SightBlockFilter);
     }
 
     public static bool HasLineOfSight(IWorldAccessor world, Entity observer, Entity target)
@@ -92,13 +111,135 @@ public static class VisibilityUtils
             var fromBase = observer.Pos.XYZ;
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
 
-            return IsRayClear(world, fromPos, targetPos, failOpen);
+            return IsRayClear(world, fromPos, targetPos, failOpen, SightBlockFilter);
         }
         catch (Exception ex)
         {
             world.Logger?.Debug("THEBASICS VisibilityUtils: LOS raytrace to Vec3d threw: {0}", ex.Message);
             return failOpen;
         }
+    }
+
+    /// <summary>
+    /// Whether speech can reach the target unobstructed. Uses the sound occlusion rules, which
+    /// differ from sight: glass and water block speech, foliage does not.
+    /// </summary>
+    public static bool HasLineOfHearing(
+        IWorldAccessor world,
+        Entity observer,
+        Entity target,
+        bool failOpen,
+        bool useMultiPointTargets = false)
+    {
+        return HasClearPath(world, observer, target, failOpen, useMultiPointTargets, SoundBlockFilter);
+    }
+
+    private static bool HasClearPath(
+        IWorldAccessor world,
+        Entity observer,
+        Entity target,
+        bool failOpen,
+        bool useMultiPointTargets,
+        BlockFilter filter)
+    {
+        if (world == null || observer == null || target == null)
+        {
+            return failOpen;
+        }
+
+        if (observer.EntityId == target.EntityId)
+        {
+            return true;
+        }
+
+        try
+        {
+            // RayTraceForSelection expects world-space coordinates.
+            var fromBase = observer.Pos.XYZ;
+            var toBase = target.Pos.XYZ;
+
+            var fromPos = fromBase.AddCopy(observer.LocalEyePos);
+
+            return GetEntityLineOfSightTargetPositions(toBase, target, useMultiPointTargets)
+                .Any(targetPos => IsRayClear(world, fromPos, targetPos, failOpen, filter));
+        }
+        catch
+        {
+            return failOpen;
+        }
+    }
+
+    /// <summary>
+    /// Counts distinct sound-occluding blocks on the straight line between two entities, for use as
+    /// a muffling penalty. Samples the segment rather than raytracing because
+    /// <c>RayTraceForSelection</c> reports only the first hit and cannot count.
+    /// </summary>
+    public static int CountSoundOccluders(IWorldAccessor world, Entity observer, Entity target)
+    {
+        if (world?.BlockAccessor == null || observer == null || target == null || observer.EntityId == target.EntityId)
+        {
+            return 0;
+        }
+
+        try
+        {
+            var fromPos = observer.Pos.XYZ.AddCopy(observer.LocalEyePos);
+            var toPos = target.Pos.XYZ.AddCopy(target.LocalEyePos);
+
+            return CountSoundOccludersOnSegment(world, fromPos, toPos);
+        }
+        catch (Exception ex)
+        {
+            world.Logger?.Debug("THEBASICS VisibilityUtils: occluder count threw: {0}", ex.Message);
+            return 0;
+        }
+    }
+
+    private static int CountSoundOccludersOnSegment(IWorldAccessor world, Vec3d fromPos, Vec3d toPos)
+    {
+        var delta = toPos.SubCopy(fromPos);
+        var length = delta.Length();
+        if (length <= 0)
+        {
+            return 0;
+        }
+
+        // Half-block steps: fine enough that a one-block-thick wall always lands at least one
+        // sample inside it, coarse enough to stay cheap on long ranges.
+        var steps = (int)Math.Ceiling(length / SegmentSampleStep);
+        var accessor = world.BlockAccessor;
+
+        var occluders = 0;
+        var lastX = int.MinValue;
+        var lastY = int.MinValue;
+        var lastZ = int.MinValue;
+        var samplePos = new BlockPos(0);
+
+        for (var step = 1; step < steps; step++)
+        {
+            var t = (double)step / steps;
+            var x = (int)Math.Floor(fromPos.X + (delta.X * t));
+            var y = (int)Math.Floor(fromPos.Y + (delta.Y * t));
+            var z = (int)Math.Floor(fromPos.Z + (delta.Z * t));
+
+            // Consecutive samples land in the same block on most steps; only test on entry.
+            if (x == lastX && y == lastY && z == lastZ)
+            {
+                continue;
+            }
+
+            lastX = x;
+            lastY = y;
+            lastZ = z;
+
+            samplePos.Set(x, y, z);
+            if (BlocksSound(accessor.GetBlock(samplePos)))
+            {
+                occluders++;
+            }
+        }
+
+        return occluders;
     }
 
     private static IEnumerable<Vec3d> GetEntityLineOfSightTargetPositions(
@@ -134,16 +275,16 @@ public static class VisibilityUtils
         return target.LocalEyePos?.Y * 1.2 ?? 0;
     }
 
-    private static bool IsRayClear(IWorldAccessor world, Vec3d fromPos, Vec3d targetPos, bool failOpen)
+    private static bool IsRayClear(IWorldAccessor world, Vec3d fromPos, Vec3d targetPos, bool failOpen, BlockFilter filter)
     {
         try
         {
-            // For our purposes, we only want to know if any opaque block blocks the segment.
-            // Visually transparent blocks are skipped and entities are ignored as blockers.
+            // We only want to know whether any occluding block interrupts the segment.
+            // Pass-through blocks are skipped and entities are ignored as blockers.
             BlockSelection blockSel = null;
             EntitySelection entitySel = null;
             world.RayTraceForSelection(fromPos, targetPos, ref blockSel, ref entitySel,
-                bfilter: LosBlockFilter, efilter: _ => false);
+                bfilter: filter, efilter: _ => false);
 
             return blockSel?.Block == null || blockSel.Block.Id == 0;
         }

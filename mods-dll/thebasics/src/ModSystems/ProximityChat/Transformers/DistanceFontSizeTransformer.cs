@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
@@ -24,7 +25,8 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
     public override MessageContext Transform(MessageContext context)
     {
         var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
-        var fontSize = GetFontSize(context.SendingPlayer, context.ReceivingPlayer, chatMode);
+        var fontSize = GetFontSize(context.SendingPlayer, context.ReceivingPlayer, chatMode,
+            context.GetOcclusionPenalty(context.ReceivingPlayer));
 
         context.Message = $"<font size=\"{fontSize}\">{context.Message}</font>";
 
@@ -33,13 +35,20 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
 
 
     public int GetFontSize(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer,
-        ProximityChatMode chatMode)
+        ProximityChatMode chatMode, int occlusionPenalty = 0)
     {
         // Doesn't check if the system is disabled, that's up to the consumer
 
-        var distance = sendingPlayer.GetDistance(receivingPlayer);
+        // Matches the obfuscation gradient: occluding geometry reads as extra distance.
+        var distance = sendingPlayer.GetDistance(receivingPlayer) + occlusionPenalty;
         var maxRange = _config.ProximityChatModeDistances[chatMode];
         var defaultSize = _config.ProximityChatDefaultFontSize[chatMode];
+
+        // Unlimited range has no far edge to scale against, so every listener reads it at full size.
+        if (ModConfig.IsUnlimitedRange(maxRange))
+        {
+            return GetClampedFontSize(defaultSize);
+        }
 
         var minFontSize = _config.ProximityChatClampFontSizes.Min();
 

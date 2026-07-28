@@ -27,4 +27,36 @@ public class ProximityCheckUtils : BaseSubSystem
             failOpen: false,
             useMultiPointTargets: useMultiPointTargets);
     }
+
+    /// <summary>
+    /// Whether speech from <paramref name="speaker"/> reaches <paramref name="listener"/> unobstructed.
+    /// Sound occludes differently from sight: glass and water stop it, foliage does not.
+    /// </summary>
+    public bool CanHearPlayer(IServerPlayer speaker, IServerPlayer listener)
+    {
+        if (speaker.PlayerUID == listener.PlayerUID)
+        {
+            return true;
+        }
+
+        return VisibilityUtils.HasLineOfHearing(
+            API.World,
+            speaker.Entity,
+            listener.Entity,
+            failOpen: false,
+            useMultiPointTargets: true);
+    }
+
+    /// <summary>
+    /// Sound-occluding blocks between two players, used to inflate effective distance for muffling.
+    /// </summary>
+    public int CountSoundOccluders(IServerPlayer speaker, IServerPlayer listener)
+    {
+        if (speaker.PlayerUID == listener.PlayerUID)
+        {
+            return 0;
+        }
+
+        return VisibilityUtils.CountSoundOccluders(API.World, speaker.Entity, listener.Entity);
+    }
 }

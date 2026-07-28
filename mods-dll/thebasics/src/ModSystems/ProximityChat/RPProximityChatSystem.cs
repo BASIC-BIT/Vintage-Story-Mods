@@ -235,7 +235,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             API.ChatCommands.GetOrCreate("me")
                 .WithAlias("m")
                 .WithDescription(Lang.Get("thebasics:chat-cmd-me-desc"))
-                .WithArgs(new StringArgParser("emote", true))
+                .WithArgs(new StringArgParser("emote", false))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(Emote);
@@ -279,7 +279,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
             API.ChatCommands.GetOrCreate("ooc")
                     .WithDescription(Lang.Get("thebasics:chat-cmd-ooc-desc"))
-                .WithArgs(new StringArgParser("message", true))
+                .WithArgs(new StringArgParser("message", false))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(SendOOCMessage);
@@ -288,7 +288,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             {
                 API.ChatCommands.GetOrCreate("gooc")
                     .WithDescription(Lang.Get("thebasics:chat-cmd-gooc-desc"))
-                    .WithArgs(new StringArgParser("message", true))
+                    .WithArgs(new StringArgParser("message", false))
                     .RequiresPrivilege(Privilege.chat)
                     .RequiresPlayer()
                     .HandleWith(SendGlobalOOCMessage);
@@ -462,6 +462,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private TextCommandResult SendGlobalOOCMessage(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
+
+        if (args.Parsers[0].IsMissing)
+        {
+            return HandleOverrideModeCommand(player, ChatOverrideMode.GlobalOoc);
+        }
+
         var message = (string)args.Parsers[0].GetValue();
         var groupId = args.Caller.FromChatGroupId;
 
@@ -533,6 +539,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private TextCommandResult SendOOCMessage(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
+
+        if (args.Parsers[0].IsMissing)
+        {
+            return HandleOverrideModeCommand(player, ChatOverrideMode.Ooc);
+        }
+
         var message = (string)args.Parsers[0].GetValue();
         var groupId = args.Caller.FromChatGroupId;
 
@@ -2102,6 +2114,11 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
 
+        if (args.Parsers[0].IsMissing)
+        {
+            return HandleOverrideModeCommand(player, ChatOverrideMode.Emote);
+        }
+
         var context = new MessageContext
         {
             Message = (string)args.Parsers[0].GetValue(),
@@ -2283,12 +2300,51 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         // If no message provided, just set the player's chat mode
         player.SetChatMode(mode);
         AnalyticsService.TrackFeatureUsed("chat_mode", "set_" + mode.ToString().ToLowerInvariant(), properties: AnalyticsService.ChatProperties(mode.ToString().ToLowerInvariant()));
+        return ChatModeStatus(player);
+    }
+
+    /// <summary>
+    /// Toggles a sticky override mode. Running the command for the mode you are already in clears it,
+    /// and running a different one replaces it, so the three override commands are mutually exclusive.
+    /// </summary>
+    private static TextCommandResult HandleOverrideModeCommand(IServerPlayer player, ChatOverrideMode mode)
+    {
+        var current = player.GetChatOverrideMode();
+        var next = current == mode ? ChatOverrideMode.None : mode;
+        player.SetChatOverrideMode(next);
+
+        AnalyticsService.TrackFeatureUsed("chat_override_mode", "set_" + next.ToString().ToLowerInvariant());
+
+        return ChatModeStatus(player);
+    }
+
+    /// <summary>
+    /// Reports both axes at once. Range alone is ambiguous now that a player can be whispering in
+    /// character or whispering out of character.
+    /// </summary>
+    private static TextCommandResult ChatModeStatus(IServerPlayer player)
+    {
+        var range = player.GetChatMode().ToString().ToLowerInvariant();
+        var overrideMode = player.GetChatOverrideMode();
+
+        var message = overrideMode == ChatOverrideMode.None
+            ? Lang.Get("thebasics:chat-chatmode-set", range)
+            : Lang.Get("thebasics:chat-chatmode-set-with-override", range, Lang.Get(OverrideModeLangKey(overrideMode)));
+
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = Lang.Get("thebasics:chat-chatmode-set", mode.ToString().ToLower()),
+            StatusMessage = message,
         };
     }
+
+    private static string OverrideModeLangKey(ChatOverrideMode mode) => mode switch
+    {
+        ChatOverrideMode.Emote => "thebasics:chat-override-emote",
+        ChatOverrideMode.Ooc => "thebasics:chat-override-ooc",
+        ChatOverrideMode.GlobalOoc => "thebasics:chat-override-gooc",
+        _ => "thebasics:chat-override-none"
+    };
 
     private TextCommandResult Yell(TextCommandCallingArgs args)
     {
@@ -2313,11 +2369,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         player.SetEmoteMode(emoteMode);
         AnalyticsService.TrackCommandUsed("emotemode", true);
         AnalyticsService.TrackFeatureUsed("emote_mode", emoteMode ? "enable" : "disable");
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = Lang.Get("thebasics:chat-emotemode-set", ChatHelper.OnOff(emoteMode)),
-        };
+        return ChatModeStatus(player);
     }
 
     private TextCommandResult RpTextEnabled(TextCommandCallingArgs args)
@@ -2353,11 +2405,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         AnalyticsService.TrackCommandUsed("ooctoggle", true);
         AnalyticsService.TrackFeatureUsed("ooc_mode", newMode ? "enable" : "disable");
 
-        return new TextCommandResult
-        {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = Lang.Get("thebasics:chat-ooc-set", newMode ? Lang.Get("thebasics:chat-ooc-enabled") : Lang.Get("thebasics:chat-ooc-disabled-label")),
-        };
+        return ChatModeStatus(player);
     }
 
     private TextCommandResult ChatterToggle(TextCommandCallingArgs args)

@@ -33,8 +33,9 @@ namespace thebasics.Extensions
         private const string ModDataNametagBorderColor = "BASIC_NAMETAG_BORDER_COLOR";
         private const string ModDataChatMode = "BASIC_CHATMODE";
         private const string ModDataEmoteMode = "BASIC_EMOTEMODE";
+        private const string ModDataChatOverrideMode = "BASIC_CHAT_OVERRIDE_MODE";
         private const string ModDataRpTextEnabled = "BASIC_RPTEXTENABLED";
-        private const string ModDataOOCEnabled = "BASIC_OOCENABLED";
+        // BASIC_OOCENABLED was the write-only key behind the old /oocToggle; the override axis replaces it.
 
         private const string ModDataPlayerStatsPrefix = "BASIC_COUNT_";
 
@@ -346,14 +347,47 @@ namespace thebasics.Extensions
             SetModData(player, ModDataChatMode, mode);
         }
 
+        /// <summary>
+        /// The player's sticky chat override mode. Falls back to the pre-unification boolean emote
+        /// toggle so players who were in emote mode across the upgrade stay in emote mode.
+        /// </summary>
+        public static ChatOverrideMode GetChatOverrideMode(this IServerPlayer player)
+        {
+            if (player.GetModdata(ModDataChatOverrideMode) != null)
+            {
+                return GetModData(player, ModDataChatOverrideMode, ChatOverrideMode.None);
+            }
+
+            return GetModData(player, ModDataEmoteMode, false)
+                ? ChatOverrideMode.Emote
+                : ChatOverrideMode.None;
+        }
+
+        public static void SetChatOverrideMode(this IServerPlayer player, ChatOverrideMode mode)
+        {
+            SetModData(player, ModDataChatOverrideMode, mode);
+
+            // Keep the legacy key consistent so a downgrade does not resurrect a stale emote toggle.
+            SetModData(player, ModDataEmoteMode, mode == ChatOverrideMode.Emote);
+        }
+
         public static void SetEmoteMode(this IServerPlayer player, bool emoteMode)
         {
-            SetModData(player, ModDataEmoteMode, emoteMode);
+            // Emote mode is one value on the override axis; setting it off only clears emote,
+            // it must not knock the player out of OOC or global OOC.
+            if (emoteMode)
+            {
+                SetChatOverrideMode(player, ChatOverrideMode.Emote);
+            }
+            else if (player.GetChatOverrideMode() == ChatOverrideMode.Emote)
+            {
+                SetChatOverrideMode(player, ChatOverrideMode.None);
+            }
         }
 
         public static bool GetEmoteMode(this IServerPlayer player)
         {
-            return GetModData(player, ModDataEmoteMode, false);
+            return player.GetChatOverrideMode() == ChatOverrideMode.Emote;
         }
 
         public static void SetRpTextEnabled(this IServerPlayer player, bool enabled)
@@ -909,14 +943,25 @@ namespace thebasics.Extensions
         }
         #endregion
 
+        /// <summary>
+        /// Backs <c>/oocToggle</c>. Before the override axis existed this wrote a mod data key that
+        /// nothing ever read, so the command reported success and did nothing.
+        /// </summary>
         public static void SetOOCEnabled(this IServerPlayer player, bool enabled)
         {
-            SetModData(player, ModDataOOCEnabled, enabled);
+            if (enabled)
+            {
+                SetChatOverrideMode(player, ChatOverrideMode.Ooc);
+            }
+            else if (player.GetChatOverrideMode() == ChatOverrideMode.Ooc)
+            {
+                SetChatOverrideMode(player, ChatOverrideMode.None);
+            }
         }
 
         public static bool GetOOCEnabled(this IServerPlayer player)
         {
-            return GetModData(player, ModDataOOCEnabled, false);
+            return player.GetChatOverrideMode() == ChatOverrideMode.Ooc;
         }
 
         public static void SetChatterEnabled(this IServerPlayer player, bool enabled)

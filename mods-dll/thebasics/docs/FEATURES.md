@@ -89,13 +89,17 @@ The admin panel exposes fixed-shape complex settings as validated flattened rows
 Features:
 
 - Dedicated proximity chat group, or optional General-chat replacement via `UseGeneralChannelAsProximityChat`.
-- Whisper, normal, yell, and sign-language ranges.
+- Whisper, normal, yell, and sign-language ranges. A range of `-1` delivers server-wide.
+- Two independent chat axes: range (`/whisper`, `/say`, `/yell`) and sticky override kind (`/me`, `/ooc`, `/gooc`). Whispered OOC and yelled emotes are both valid combinations.
+- Sticky override modes toggle: running the same override command again returns you to speech, and running a different one replaces it. An explicit message prefix still wins for that single line.
 - Recipient filtering by distance, sign-language line of sight, and chat mode.
 - Sign-language line-of-sight checks use multiple target points and can deliver shortly after send if line of sight is acquired within the retry window.
+- Experimental, off by default: speech line-of-sight gating per chat mode, and wall muffling that converts sound-blocking geometry into extra effective distance.
 - Automatic IC formatting with configurable verbs, punctuation, delimiters, nicknames, nickname colors, OOC styling, and optional global OOC.
+- Question verbs: a message ending in `?` uses `ProximityChatModeQuestionVerbs` (default `asks`) instead of the mode's normal verbs.
 - Distance obfuscation and distance-based font-size changes.
 - RP text opt-out with `/rptext`.
-- Emote-only mode with `/emotemode`.
+- Emote-only mode with `/emotemode` or a bare `/me`.
 - Local OOC and optional global OOC.
 - Environmental messages and raycast-placed environmental messages.
 - Optional RPTTS bridge for speech text.
@@ -150,7 +154,10 @@ Primary config areas:
 - `ProximityChatDefaultFontSize`
 - `ProximityChatClampFontSizes`
 - `ProximityChatModeVerbs`
+- `ProximityChatModeQuestionVerbs`
 - `ProximityChatModePunctuation`
+- `RequireLineOfSightForSpeech`
+- `SpeechOcclusionWallPenaltyBlocks`
 - `ProximityChatName` defaults to the stable persisted group name `Proximity` when unset.
 - `ProximityChatModeBabbleVerb` is a legacy/custom override; default babble text uses lang key `thebasics:chat-babble-verb`.
 - `ChatDelimiters`

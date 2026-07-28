@@ -246,6 +246,8 @@ internal static class ProximityLifecycleMessageFilter
         return enabled && chatType == EnumChatType.Notification;
     }
 
+    // Deliberately keeps the default radius when Normal range is unlimited (-1): a server-wide IC
+    // channel should not turn every death into a server-wide notification.
     private static int GetNearbyDeathMessageRange(ModConfig config)
     {
         if (config?.ProximityChatModeDistances != null &&

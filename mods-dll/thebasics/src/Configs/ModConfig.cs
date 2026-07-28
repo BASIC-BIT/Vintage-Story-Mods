@@ -39,6 +39,14 @@ namespace thebasics.Configs
             InitializeHomeSpawnDefaults();
         }
 
+        /// <summary>
+        /// Sentinel for <see cref="ProximityChatModeDistances"/> meaning "deliver to every online player",
+        /// matching the convention <see cref="MapPlayerRenderDistance"/> already uses.
+        /// </summary>
+        public const int UnlimitedRange = -1;
+
+        public static bool IsUnlimitedRange(int range) => range < 0;
+
         private void InitializeProximityChatDefaults()
         {
             ProximityChatModeDistances ??= new Dictionary<ProximityChatMode, int>
@@ -64,12 +72,8 @@ namespace thebasics.Configs
 
             ProximityChatClampFontSizes ??= [30, 16, 12, 6];
 
-            ProximityChatModeVerbs ??= new Dictionary<ProximityChatMode, string[]>
-            {
-                { ProximityChatMode.Yell, new[] { "yells", "shouts", "exclaims" } },
-                { ProximityChatMode.Normal, new[] { "says", "states", "mentions" } },
-                { ProximityChatMode.Whisper, new[] { "whispers", "mumbles", "mutters" } }
-            };
+
+            InitializeProximityChatVerbDefaults();
 
             ProximityChatModePunctuation ??= new Dictionary<ProximityChatMode, string>
             {
@@ -84,6 +88,30 @@ namespace thebasics.Configs
             ProximityChatPresentationMode = ProximityChatPresentationModes.Normalize(ProximityChatPresentationMode);
             OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
             ProseNicknameToken ??= "@";
+        }
+
+        private void InitializeProximityChatVerbDefaults()
+        {
+            ProximityChatModeVerbs ??= new Dictionary<ProximityChatMode, string[]>
+            {
+                { ProximityChatMode.Yell, new[] { "yells", "shouts", "exclaims" } },
+                { ProximityChatMode.Normal, new[] { "says", "states", "mentions" } },
+                { ProximityChatMode.Whisper, new[] { "whispers", "mumbles", "mutters" } }
+            };
+
+            ProximityChatModeQuestionVerbs ??= new Dictionary<ProximityChatMode, string[]>
+            {
+                { ProximityChatMode.Yell, new[] { "asks" } },
+                { ProximityChatMode.Normal, new[] { "asks" } },
+                { ProximityChatMode.Whisper, new[] { "asks" } }
+            };
+
+            RequireLineOfSightForSpeech ??= new Dictionary<ProximityChatMode, bool>
+            {
+                { ProximityChatMode.Yell, false },
+                { ProximityChatMode.Normal, false },
+                { ProximityChatMode.Whisper, false }
+            };
         }
 
         private void InitializeLanguageDefaults()
@@ -385,6 +413,28 @@ namespace thebasics.Configs
 
         [ProtoMember(16)]
         public string ProximityChatModeBabbleVerb { get; set; } = "babbles";
+
+        /// <summary>
+        /// Verbs used when a message reads as a question. Falls back to <see cref="ProximityChatModeVerbs"/>
+        /// when a mode has no question verbs configured.
+        /// </summary>
+        [ProtoMember(147)]
+        public IDictionary<ProximityChatMode, string[]> ProximityChatModeQuestionVerbs { get; set; }
+
+        /// <summary>
+        /// Experimental, off by default. When set for a mode, speech in that mode only reaches players
+        /// the speaker has an unobstructed line to. Glass and water block speech; foliage does not.
+        /// </summary>
+        [ProtoMember(148)]
+        public IDictionary<ProximityChatMode, bool> RequireLineOfSightForSpeech { get; set; }
+
+        /// <summary>
+        /// Experimental, off by default (0). Blocks of effective distance added per sound-occluding
+        /// block between speaker and listener, so walls muffle speech toward unintelligibility and
+        /// then out of range instead of cutting it off outright.
+        /// </summary>
+        [ProtoMember(149)]
+        public int SpeechOcclusionWallPenaltyBlocks { get; set; }
 
         [ProtoMember(17)]
         public IDictionary<ProximityChatMode, string> ProximityChatModePunctuation { get; set; }

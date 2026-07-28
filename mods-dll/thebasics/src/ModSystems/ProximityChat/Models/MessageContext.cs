@@ -86,6 +86,11 @@ public class MessageContext
     public static readonly string SPEECH_TEXT = "speechText";
     public static readonly string PENDING_SIGN_LANGUAGE_RECIPIENTS = "pendingSignLanguageRecipients";
 
+    // Player UID -> extra effective distance in blocks from sound-occluding geometry between the
+    // speaker and that recipient. Populated during recipient determination so obfuscation and font
+    // size fade with the same effective distance the range check used.
+    public static readonly string OCCLUSION_PENALTY_BY_RECIPIENT = "occlusionPenaltyByRecipient";
+
     // Stores the pre-recipient-phase bubble text for speech messages.
     // Used when we want to keep overhead bubbles closer to vanilla behavior.
     public static readonly string BUBBLE_TEXT_BASE = "bubbleTextBase";
@@ -111,6 +116,21 @@ public class MessageContext
         }
 
         Metadata[SPEECH_TEXT] = text;
+    }
+
+    /// <summary>
+    /// Extra effective distance in blocks for this recipient from sound-occluding geometry.
+    /// Zero when wall muffling is disabled or nothing stands between the two players.
+    /// </summary>
+    public int GetOcclusionPenalty(IServerPlayer recipient)
+    {
+        if (recipient == null ||
+            !TryGetMetadata(OCCLUSION_PENALTY_BY_RECIPIENT, out IDictionary<string, int> penalties))
+        {
+            return 0;
+        }
+
+        return penalties.TryGetValue(recipient.PlayerUID, out var penalty) ? penalty : 0;
     }
 
     public bool TryGetSpeechText(out string text)

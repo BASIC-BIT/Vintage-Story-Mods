@@ -52,8 +52,8 @@ public class PlayerChatTransformer : MessageTransformerBase
         return parsed.Kind switch
         {
             PlayerChatKind.DisabledGlobalOoc => RejectDisabledGlobalOoc(context),
-            PlayerChatKind.GlobalOoc => ApplyGlobalOoc(context, delimiters, parsed.PrefixLength),
-            PlayerChatKind.Ooc => ApplyOoc(context, delimiters, parsed.PrefixLength),
+            PlayerChatKind.GlobalOoc => ApplyGlobalOoc(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
+            PlayerChatKind.Ooc => ApplyOoc(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
             PlayerChatKind.Emote => ApplyEmote(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
             PlayerChatKind.PlacedEnvironment => ApplyPlacedEnvironment(context, delimiters, parsed.PrefixLength),
             PlayerChatKind.Environment => ApplyEnvironment(context, delimiters, parsed.PrefixLength),
@@ -92,12 +92,24 @@ public class PlayerChatTransformer : MessageTransformerBase
             return new ParsedPlayerChat(PlayerChatKind.Emote, emoteStartLen, hasExplicitPrefix: true);
         }
 
-        if (context.SendingPlayer.GetEmoteMode())
-        {
-            return new ParsedPlayerChat(PlayerChatKind.Emote);
-        }
+        return new ParsedPlayerChat(GetStickyChatKind(context));
+    }
 
-        return new ParsedPlayerChat(PlayerChatKind.Speech);
+    /// <summary>
+    /// Applies the player's sticky override mode. Only reached when the line carried no explicit
+    /// prefix, so a prefixed message still wins for that one line.
+    /// </summary>
+    private PlayerChatKind GetStickyChatKind(MessageContext context)
+    {
+        return context.SendingPlayer.GetChatOverrideMode() switch
+        {
+            ChatOverrideMode.Emote => PlayerChatKind.Emote,
+            ChatOverrideMode.Ooc => PlayerChatKind.Ooc,
+            // A player can be left holding global OOC if an admin disables the feature afterwards.
+            // Fall back to speech rather than rejecting every line they type.
+            ChatOverrideMode.GlobalOoc when _config.EnableGlobalOOC => PlayerChatKind.GlobalOoc,
+            _ => PlayerChatKind.Speech
+        };
     }
 
     private MessageContext RejectDisabledGlobalOoc(MessageContext context)
@@ -110,19 +122,24 @@ public class PlayerChatTransformer : MessageTransformerBase
         return context;
     }
 
-    private static MessageContext ApplyGlobalOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength)
+    private static MessageContext ApplyGlobalOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength, bool hasExplicitPrefix)
     {
-        var updated = StripTrailingAll(context.Message[prefixLength..], delimiters.GlobalOOC.End);
+        // Only unwrap delimiters the player actually typed; in sticky mode the line has none.
+        var updated = hasExplicitPrefix
+            ? StripTrailingAll(context.Message[prefixLength..], delimiters.GlobalOOC.End)
+            : context.Message;
         context.SetFlag(MessageContext.IS_GLOBAL_OOC);
         context.UpdateMessage(updated.Trim(), updateSpeech: false);
         context.SetMetadata("clientData", (string)null);
         return context;
     }
 
-    private static MessageContext ApplyOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength)
+    private static MessageContext ApplyOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength, bool hasExplicitPrefix)
     {
         var updated = context.Message[prefixLength..];
-        if (!string.IsNullOrEmpty(delimiters.OOC.End) && TryConsumeDelimiterAtEnd(updated, delimiters.OOC.End, out var newLen))
+
+        // Only unwrap delimiters the player actually typed; in sticky mode the line has none.
+        if (hasExplicitPrefix && !string.IsNullOrEmpty(delimiters.OOC.End) && TryConsumeDelimiterAtEnd(updated, delimiters.OOC.End, out var newLen))
         {
             updated = updated[..newLen];
         }

@@ -218,7 +218,8 @@ public class SpeechBubbleClientDataTransformer : MessageTransformerBase
 
         if (_distanceObfuscationSystem != null && context.SendingPlayer != null && context.ReceivingPlayer != null)
         {
-            _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed);
+            _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed,
+                occlusionPenalty: context.GetOcclusionPenalty(context.ReceivingPlayer));
         }
 
         return processed;

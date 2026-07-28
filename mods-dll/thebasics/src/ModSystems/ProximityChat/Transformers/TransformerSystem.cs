@@ -102,29 +102,6 @@ public class TransformerSystem
         return context;
     }
 
-    // TODO: Refactor common usage
-    private string GetProximityChatVerb(Language lang, ProximityChatMode mode)
-    {
-        // Check for sign language first
-        if (lang == LanguageSystem.SignLanguage)
-        {
-            return Lang.Get("thebasics:chat-sign-verb");
-        }
-
-        if (lang == LanguageSystem.BabbleLang)
-        {
-            return string.IsNullOrWhiteSpace(_chatSystem.Config.ProximityChatModeBabbleVerb) || _chatSystem.Config.ProximityChatModeBabbleVerb == "babbles"
-                ? Lang.Get("thebasics:chat-babble-verb")
-                : _chatSystem.Config.ProximityChatModeBabbleVerb;
-        }
-
-        // Use the verbs from config
-        var verbs = _chatSystem.Config.ProximityChatModeVerbs[mode];
-
-        return verbs.GetRandomElement();
-    }
-
-    // TODO: Refactor common usage with ICSpeechFormatTransformer
     private string BuildChatLogMessage(MessageContext context)
     {
         return FormatChatLogMessage(context);
@@ -152,8 +129,9 @@ public class TransformerSystem
         var lang = context.GetMetadata<Language>(MessageContext.LANGUAGE);
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
         var presentationMode = ProximityChatPresentationModes.Normalize(_chatSystem.Config.ProximityChatPresentationMode);
+        var speechText = context.TryGetSpeechText(out var rawSpeech) ? rawSpeech : context.Message;
         var outputMessage = FormatLoggedSpeechBody(context, lang, presentationMode, nickname);
-        var verb = GetProximityChatVerb(lang, mode);
+        var verb = ChatHelper.GetProximityChatVerb(lang, mode, _chatSystem.Config, speechText);
 
         return presentationMode switch
         {

@@ -20,19 +20,22 @@ public class DistanceObfuscationSystem : BaseSubSystem
     }
 
     public void ObfuscateMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, ref string message,
-        ProximityChatMode? tempMode = null)
+        ProximityChatMode? tempMode = null, int occlusionPenalty = 0)
     {
         if (!Config.EnableDistanceObfuscationSystem)
         {
             return;
         }
 
-        var distance = sendingPlayer.GetDistance(receivingPlayer);
+        // Walls between the two players read as extra distance, so speech degrades toward
+        // unintelligible instead of cutting out at a hard boundary.
+        var distance = sendingPlayer.GetDistance(receivingPlayer) + occlusionPenalty;
         var chatMode = sendingPlayer.GetChatMode(tempMode);
         var obfuscationRange = Config.ProximityChatModeObfuscationRanges[chatMode];
         var maxRange = Config.ProximityChatModeDistances[chatMode];
 
-        if (distance < obfuscationRange)
+        // Unlimited range has no far edge to fade toward, so there is nothing to obfuscate against.
+        if (ModConfig.IsUnlimitedRange(maxRange) || distance < obfuscationRange)
         {
             return;
         }

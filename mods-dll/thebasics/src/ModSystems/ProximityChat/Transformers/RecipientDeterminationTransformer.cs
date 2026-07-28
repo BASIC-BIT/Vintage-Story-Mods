@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Collections.Generic;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.MathTools;
@@ -41,13 +42,19 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
         // Find players within range
         var allPlayers = _chatSystem.API.World.AllOnlinePlayers;
         context.TryGetMetadata<Language>(MessageContext.LANGUAGE, out var lang);
-        var requiresSignLineOfSight = lang == LanguageSystem.SignLanguage && _config.RequireLineOfSightForSignLanguage;
+        var rules = BuildDeliveryRules(context, lang, range);
         var pendingSignLanguageRecipients = new List<IServerPlayer>();
+        var occlusionPenalties = new Dictionary<string, int>();
 
         var nearbyPlayers = allPlayers
             .OfType<IServerPlayer>()
-            .Where(player => CanReceive(context, player, originPos, range, requiresSignLineOfSight, pendingSignLanguageRecipients))
+            .Where(player => CanReceive(context, player, originPos, rules, pendingSignLanguageRecipients, occlusionPenalties))
             .ToList();
+
+        if (occlusionPenalties.Count > 0)
+        {
+            context.SetMetadata(MessageContext.OCCLUSION_PENALTY_BY_RECIPIENT, occlusionPenalties);
+        }
 
         if (pendingSignLanguageRecipients.Count > 0)
         {
@@ -82,35 +89,90 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
             (int)System.Math.Floor(placedPos.Z));
     }
 
+    /// <summary>
+    /// Delivery constraints for one message, resolved once instead of per candidate recipient.
+    /// </summary>
+    private readonly record struct DeliveryRules(
+        int Range,
+        bool RequiresSignLineOfSight,
+        bool RequiresSpeechLineOfSight,
+        int WallPenaltyBlocks)
+    {
+        public bool UsesWallMuffling => WallPenaltyBlocks > 0;
+    }
+
+    private DeliveryRules BuildDeliveryRules(MessageContext context, Language lang, int range)
+    {
+        var isSignLanguage = lang == LanguageSystem.SignLanguage;
+
+        // Occlusion models sound, so it applies to audible speech only. Sign language is visual and
+        // already gated by the sight check; emotes, environmental text, and OOC are not sound at all.
+        var isAudibleSpeech = context.HasFlag(MessageContext.IS_SPEECH) && !isSignLanguage;
+
+        var chatMode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+
+        return new DeliveryRules(
+            Range: range,
+            RequiresSignLineOfSight: isSignLanguage && _config.RequireLineOfSightForSignLanguage,
+            RequiresSpeechLineOfSight: isAudibleSpeech && RequiresSpeechLineOfSight(chatMode),
+            WallPenaltyBlocks: isAudibleSpeech ? System.Math.Max(0, _config.SpeechOcclusionWallPenaltyBlocks) : 0);
+    }
+
+    private bool RequiresSpeechLineOfSight(ProximityChatMode chatMode)
+    {
+        return _config.RequireLineOfSightForSpeech != null &&
+               _config.RequireLineOfSightForSpeech.TryGetValue(chatMode, out var required) &&
+               required;
+    }
+
     private bool CanReceive(
         MessageContext context,
         IServerPlayer player,
         BlockPos originPos,
-        int range,
-        bool requiresSignLineOfSight,
-        List<IServerPlayer> pendingSignLanguageRecipients)
+        DeliveryRules rules,
+        List<IServerPlayer> pendingSignLanguageRecipients,
+        IDictionary<string, int> occlusionPenalties)
     {
-        var inRange = player.Entity.Pos.AsBlockPos.ManhattanDistance(originPos) < range;
-        if (!inRange)
+        var penalty = 0;
+        if (rules.UsesWallMuffling && player.PlayerUID != context.SendingPlayer.PlayerUID)
+        {
+            penalty = _proximityCheckUtils.CountSoundOccluders(context.SendingPlayer, player) * rules.WallPenaltyBlocks;
+        }
+
+        // An unlimited range skips the distance filter entirely; everyone online is in range.
+        if (!ModConfig.IsUnlimitedRange(rules.Range) &&
+            player.Entity.Pos.AsBlockPos.ManhattanDistance(originPos) + penalty >= rules.Range)
         {
             return false;
         }
 
-        if (!requiresSignLineOfSight)
+        if (rules.RequiresSpeechLineOfSight &&
+            !_proximityCheckUtils.CanHearPlayer(context.SendingPlayer, player))
         {
-            return true;
+            return false;
         }
 
-        var canSee = _proximityCheckUtils.CanSeePlayer(
-            context.SendingPlayer,
-            player,
-            useMultiPointTargets: true);
-        if (!canSee)
+        if (rules.RequiresSignLineOfSight)
         {
-            pendingSignLanguageRecipients.Add(player);
+            var canSee = _proximityCheckUtils.CanSeePlayer(
+                context.SendingPlayer,
+                player,
+                useMultiPointTargets: true);
+            if (!canSee)
+            {
+                pendingSignLanguageRecipients.Add(player);
+                return false;
+            }
         }
 
-        return canSee;
+        if (penalty > 0)
+        {
+            // Recipient-phase transformers reuse this so obfuscation and font size fade with the
+            // same effective distance the range check used.
+            occlusionPenalties[player.PlayerUID] = penalty;
+        }
+
+        return true;
     }
 
     private int GetCommunicationRange(MessageContext context)

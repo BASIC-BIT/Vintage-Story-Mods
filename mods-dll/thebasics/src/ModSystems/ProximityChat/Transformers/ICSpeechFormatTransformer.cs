@@ -44,9 +44,10 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
             return FormatProseSpeech(context, lang, languageEnabled, nickname);
         }
 
-        context.Message = FormatSpeechBody(context, lang, languageEnabled, presentationMode);
+        // Resolve the verb from the sender-phase speech body, before recipient formatting rewrites it.
+        var verb = ChatHelper.GetProximityChatVerb(lang, mode, _config, GetSpeechTextForVerb(context));
 
-        var verb = GetProximityChatVerb(lang, mode);
+        context.Message = FormatSpeechBody(context, lang, languageEnabled, presentationMode);
 
         context.Message = presentationMode switch
         {
@@ -107,25 +108,14 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         return ChatVisualPreferenceResolver.FormatLanguageText(message, lang, context.ReceivingPlayer);
     }
 
-    private string GetProximityChatVerb(Language lang, ProximityChatMode mode)
+    /// <summary>
+    /// The speech text as it stood at the end of the sender phase. Recipient-phase transformers rewrite
+    /// <see cref="MessageContext.Message"/> per recipient (language scrambling, obfuscation, font tags),
+    /// so the raw speech body is the only source that yields the same verb for everyone.
+    /// </summary>
+    private static string GetSpeechTextForVerb(MessageContext context)
     {
-        // Check for sign language first
-        if (_config.EnableLanguageSystem && !_config.DisableRPChat && lang == LanguageSystem.SignLanguage)
-        {
-            return Lang.Get("thebasics:chat-sign-verb");
-        }
-
-        if (_config.EnableLanguageSystem && !_config.DisableRPChat && lang == LanguageSystem.BabbleLang)
-        {
-            return string.IsNullOrWhiteSpace(_config.ProximityChatModeBabbleVerb) || _config.ProximityChatModeBabbleVerb == "babbles"
-                ? Lang.Get("thebasics:chat-babble-verb")
-                : _config.ProximityChatModeBabbleVerb;
-        }
-
-        // Use the verbs from config
-        var verbs = _config.ProximityChatModeVerbs[mode];
-
-        return verbs.GetRandomElement();
+        return context.TryGetSpeechText(out var speechText) ? speechText : context.Message;
     }
 
     private string ProcessProseQuotedText(MessageContext context, string text, Language lang, bool languageEnabled)
@@ -139,7 +129,8 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
 
         if (_distanceObfuscationSystem != null && context.SendingPlayer != null && context.ReceivingPlayer != null)
         {
-            _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed);
+            _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed,
+                occlusionPenalty: context.GetOcclusionPenalty(context.ReceivingPlayer));
         }
 
         return processed;

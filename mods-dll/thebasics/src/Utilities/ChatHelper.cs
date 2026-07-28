@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Globalization;
 using System.Text;
@@ -154,6 +155,98 @@ namespace thebasics.Utilities
         public static string LangColor(string message, Language lang)
         {
             return Color(message, lang.Color);
+        }
+
+        /// <summary>
+        /// True when the speech body reads as a question, i.e. its last non-decorator character is '?'.
+        /// </summary>
+        public static bool IsQuestion(string speechText)
+        {
+            if (string.IsNullOrWhiteSpace(speechText))
+            {
+                return false;
+            }
+
+            var index = speechText.Length - 1;
+            while (index >= 0 && (IsWhitespace(speechText[index]) || IsDecoratorChar(speechText[index])))
+            {
+                index--;
+            }
+
+            return index >= 0 && speechText[index] == '?';
+        }
+
+        /// <summary>
+        /// Resolves the speech verb for a message. Sign and babble languages override the chat mode's
+        /// verbs entirely; otherwise questions draw from the question verb list and everything else
+        /// draws from the mode's normal verb list.
+        /// </summary>
+        /// <param name="speechText">
+        /// The sender-phase speech body, not the recipient-formatted message. Recipient formatting adds
+        /// quotes, colors, and font tags, and language scrambling rewrites the text, so passing the
+        /// formatted message would make the verb differ between recipients of the same message.
+        /// </param>
+        public static string GetProximityChatVerb(Language lang, ProximityChatMode mode, ModConfig config, string speechText = null)
+        {
+            var languageVerb = GetLanguageOverrideVerb(lang, config);
+            if (languageVerb != null)
+            {
+                return languageVerb;
+            }
+
+            if (IsQuestion(speechText) &&
+                TryGetModeVerbs(config.ProximityChatModeQuestionVerbs, mode, out var questionVerbs))
+            {
+                return questionVerbs.GetRandomElement();
+            }
+
+            return TryGetModeVerbs(config.ProximityChatModeVerbs, mode, out var verbs)
+                ? verbs.GetRandomElement()
+                : mode.ToString().ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Sign and babble replace the chat mode's verbs outright. Returns null when no language override applies.
+        /// </summary>
+        private static string GetLanguageOverrideVerb(Language lang, ModConfig config)
+        {
+            if (!config.EnableLanguageSystem || config.DisableRPChat)
+            {
+                return null;
+            }
+
+            if (lang == LanguageSystem.SignLanguage)
+            {
+                return Lang.Get("thebasics:chat-sign-verb");
+            }
+
+            if (lang != LanguageSystem.BabbleLang)
+            {
+                return null;
+            }
+
+            return string.IsNullOrWhiteSpace(config.ProximityChatModeBabbleVerb) || config.ProximityChatModeBabbleVerb == "babbles"
+                ? Lang.Get("thebasics:chat-babble-verb")
+                : config.ProximityChatModeBabbleVerb;
+        }
+
+        private static bool TryGetModeVerbs(IDictionary<ProximityChatMode, string[]> verbsByMode, ProximityChatMode mode, out string[] verbs)
+        {
+            verbs = null;
+            if (verbsByMode == null || !verbsByMode.TryGetValue(mode, out var configured))
+            {
+                return false;
+            }
+
+            // Hand-edited configs can leave a mode's list empty; fall back rather than throwing on chat.
+            configured = configured?.Where(verb => !string.IsNullOrWhiteSpace(verb)).ToArray();
+            if (configured == null || configured.Length == 0)
+            {
+                return false;
+            }
+
+            verbs = configured;
+            return true;
         }
 
         public static string WrapSpeechQuotes(string message, Language language, ModConfig config, bool languageEnabled)

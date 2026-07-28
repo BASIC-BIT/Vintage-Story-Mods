@@ -24,7 +24,8 @@ public class ObfuscationTransformer : MessageTransformerBase
     {
         var content = context.Message;
 
-        _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref content);
+        _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref content,
+            occlusionPenalty: context.GetOcclusionPenalty(context.ReceivingPlayer));
 
         context.Message = content;
         return context;

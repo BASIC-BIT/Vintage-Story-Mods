@@ -33,7 +33,14 @@ public static class ConfigAdminSettingRegistry
         {
             var range = GetModeValue(config.ProximityChatModeDistances, mode, DefaultDistance(mode));
             var obfuscationStart = GetModeValue(config.ProximityChatModeObfuscationRanges, mode, DefaultObfuscationStart(mode));
-            if (range <= obfuscationStart)
+
+            if (range == 0)
+            {
+                // Would silently mute the mode; -1 is the documented way to opt out of a range limit.
+                errors.Add($"{mode} range must be a positive block count, or -1 for unlimited.");
+            }
+            // Unlimited range has no far edge, so the obfuscation ordering rule does not apply.
+            else if (!ModConfig.IsUnlimitedRange(range) && range <= obfuscationStart)
             {
                 errors.Add($"{mode} range must be greater than its obfuscation start.");
             }
@@ -227,14 +234,17 @@ public static class ConfigAdminSettingRegistry
     {
         foreach (var mode in EnumValues<ProximityChatMode>())
         {
-            settings.Add(ModeInt(ModeMeta("ProximityChatModeDistances", "Chat/Ranges", mode, "range", "Maximum delivery range in blocks."), mode, c => c.ProximityChatModeDistances, DefaultDistance(mode), (1, 512)));
+            settings.Add(ModeInt(ModeMeta("ProximityChatModeDistances", "Chat/Ranges", mode, "range", "Maximum delivery range in blocks. Use -1 for unlimited (server-wide)."), mode, c => c.ProximityChatModeDistances, DefaultDistance(mode), (ModConfig.UnlimitedRange, 512)));
             settings.Add(ModeInt(ModeMeta("ProximityChatModeObfuscationRanges", "Chat/Ranges", mode, "obfuscation start", "Distance where speech starts obfuscating."), mode, c => c.ProximityChatModeObfuscationRanges, DefaultObfuscationStart(mode), (0, 512)));
             settings.Add(ModeInt(ModeMeta("ProximityChatDefaultFontSize", "Chat/Font Sizes", mode, "default font size", "Font size used near the speaker."), mode, c => c.ProximityChatDefaultFontSize, DefaultFontSize(mode), (1, 128)));
             settings.Add(ModeText(ModeMeta("ProximityChatModePunctuation", "Chat/RP Text", mode, "punctuation", "Punctuation appended by auto-punctuation."), mode, c => c.ProximityChatModePunctuation, DefaultPunctuation(mode), maxLength: 8));
             settings.Add(ModeTextArray(ModeMeta("ProximityChatModeVerbs", "Chat/RP Text", mode, "verbs", "Comma-separated speech verbs for this mode."), mode, c => c.ProximityChatModeVerbs, DefaultVerbs(mode)));
+            settings.Add(ModeTextArray(ModeMeta("ProximityChatModeQuestionVerbs", "Chat/RP Text", mode, "question verbs", "Comma-separated verbs used when a message ends in a question mark."), mode, c => c.ProximityChatModeQuestionVerbs, DefaultQuestionVerbs()));
+            settings.Add(ModeBool(ModeMeta("RequireLineOfSightForSpeech", "Chat/Occlusion", mode, "require line of sight", "Experimental. Only deliver speech in this mode to players the speaker has a clear line to."), mode, c => c.RequireLineOfSightForSpeech, defaultValue: false));
         }
 
         settings.Add(IntArray(new SettingMeta("ProximityChatClampFontSizes", "Chat/Font Sizes", "Clamp font sizes", "Comma-separated allowed distance font sizes.", ConfigAdminReloadBehavior.Live), c => c.ProximityChatClampFontSizes, (c, v) => c.ProximityChatClampFontSizes = v, (1, 128)));
+        settings.Add(Int("SpeechOcclusionWallPenaltyBlocks", "Chat/Occlusion", "Wall muffling penalty", "Experimental. Blocks of extra effective distance per sound-blocking block between speaker and listener. 0 disables muffling.", ConfigAdminReloadBehavior.Live, (c => c.SpeechOcclusionWallPenaltyBlocks, (c, v) => c.SpeechOcclusionWallPenaltyBlocks = v), (0, 128)));
     }
 
     private static void AddAudioModeSettings(List<ConfigAdminSettingDefinition> settings)
@@ -277,6 +287,12 @@ public static class ConfigAdminSettingRegistry
     {
         return Int(meta.Key, meta.Group, meta.Label, meta.Description, meta.ReloadBehavior,
             (config => GetModeValue(get(config), mode, fallback), (config, value) => get(config)[mode] = value), range);
+    }
+
+    private static ConfigAdminSettingDefinition ModeBool(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, bool>> get, bool defaultValue)
+    {
+        return Bool(meta.Key, meta.Group, meta.Label, meta.Description, meta.ReloadBehavior,
+            config => GetModeValue(get(config), mode, defaultValue), (config, value) => get(config)[mode] = value);
     }
 
     private static ConfigAdminSettingDefinition ModeFloat(SettingMeta meta, ProximityChatMode mode, Func<ModConfig, IDictionary<ProximityChatMode, float>> get, float fallback, (double Min, double Max) range)
@@ -436,6 +452,8 @@ public static class ConfigAdminSettingRegistry
         ProximityChatMode.Whisper => new[] { "whispers", "mumbles", "mutters" },
         _ => new[] { "says", "states", "mentions" }
     };
+
+    private static string[] DefaultQuestionVerbs() => new[] { "asks" };
 
     private static string DefaultPunctuation(ProximityChatMode mode) => mode == ProximityChatMode.Yell ? "!" : ".";
 
