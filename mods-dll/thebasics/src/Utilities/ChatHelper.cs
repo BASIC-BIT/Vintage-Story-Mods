@@ -158,7 +158,9 @@ namespace thebasics.Utilities
         }
 
         /// <summary>
-        /// True when the speech body reads as a question, i.e. its last non-decorator character is '?'.
+        /// True when the speech body reads as a question: a question mark appears anywhere in the
+        /// trailing punctuation run. "Where are you?!" and "Wait, what?!?" both count, because people
+        /// type them, while "Look out!" does not.
         /// </summary>
         public static bool IsQuestion(string speechText)
         {
@@ -173,7 +175,16 @@ namespace thebasics.Utilities
                 index--;
             }
 
-            return index >= 0 && speechText[index] == '?';
+            // Scan back over the whole trailing punctuation run rather than testing one character.
+            for (; index >= 0 && (IsPunctuation(speechText[index]) || IsDecoratorChar(speechText[index])); index--)
+            {
+                if (speechText[index] == '?')
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

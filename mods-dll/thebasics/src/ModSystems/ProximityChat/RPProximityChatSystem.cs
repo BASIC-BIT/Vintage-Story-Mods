@@ -2313,7 +2313,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         // If no message provided, just set the player's chat mode
         player.SetChatMode(mode);
         AnalyticsService.TrackFeatureUsed("chat_mode", "set_" + mode.ToString().ToLowerInvariant(), properties: AnalyticsService.ChatProperties(mode.ToString().ToLowerInvariant()));
-        return ChatModeStatus(player);
+        return ChatModeStatus(player, ChatAxis.Mode);
     }
 
     /// <summary>
@@ -2344,7 +2344,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 player.SetChatOverrideMode(ChatOverrideMode.None);
             }
 
-            return ChatModeStatus(player);
+            return ChatModeStatus(player, ChatAxis.Type);
         }
 
         if (!CanEnterOverrideMode(player, mode, out var refusal))
@@ -2360,7 +2360,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         AnalyticsService.TrackFeatureUsed("chat_override_mode", "set_" + mode.ToString().ToLowerInvariant());
 
-        return ChatModeStatus(player);
+        return ChatModeStatus(player, ChatAxis.Type);
     }
 
     /// <summary>
@@ -2464,14 +2464,37 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     /// Reports both axes at once. Range alone is ambiguous now that a player can be whispering in
     /// character or whispering out of character.
     /// </summary>
-    private TextCommandResult ChatModeStatus(IServerPlayer player)
+    /// <summary>
+    /// Which of the two axes the player just changed. The confirmation leads with that one and
+    /// parenthesises the other, so a single line teaches that both exist without either looking
+    /// like the only setting.
+    /// </summary>
+    private enum ChatAxis
     {
-        var range = player.GetChatMode().ToString().ToLowerInvariant();
-        var overrideMode = GetEffectiveOverrideMode(player);
+        Mode,
+        Type
+    }
 
-        var message = overrideMode == ChatOverrideMode.None
-            ? Lang.Get("thebasics:chat-chatmode-set", range)
-            : Lang.Get("thebasics:chat-chatmode-set-with-override", range, Lang.Get(OverrideModeLangKey(overrideMode)));
+    private TextCommandResult ChatModeStatus(IServerPlayer player, ChatAxis changed)
+    {
+        var mode = player.GetChatMode().ToString().ToLowerInvariant();
+        var type = Lang.Get(ChatTypeLangKey(GetEffectiveOverrideMode(player)));
+
+        string message;
+        if (changed == ChatAxis.Type)
+        {
+            // Always show both here: the player just discovered the type axis exists, so naming the
+            // mode alongside it is the cheapest place to teach that they are independent.
+            message = Lang.Get("thebasics:chat-chattype-set", type, mode);
+        }
+        else
+        {
+            // Only mention the type when one is actually set; otherwise this is the plain, familiar
+            // confirmation that shipped before the type axis existed.
+            message = GetEffectiveOverrideMode(player) == ChatOverrideMode.None
+                ? Lang.Get("thebasics:chat-chatmode-set", mode)
+                : Lang.Get("thebasics:chat-chatmode-set-with-type", mode, type);
+        }
 
         return new TextCommandResult
         {
@@ -2480,12 +2503,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         };
     }
 
-    private static string OverrideModeLangKey(ChatOverrideMode mode) => mode switch
+    private static string ChatTypeLangKey(ChatOverrideMode mode) => mode switch
     {
-        ChatOverrideMode.Emote => "thebasics:chat-override-emote",
-        ChatOverrideMode.Ooc => "thebasics:chat-override-ooc",
-        ChatOverrideMode.GlobalOoc => "thebasics:chat-override-gooc",
-        _ => "thebasics:chat-override-none"
+        ChatOverrideMode.Emote => "thebasics:chat-type-emote",
+        ChatOverrideMode.Ooc => "thebasics:chat-type-ooc",
+        ChatOverrideMode.GlobalOoc => "thebasics:chat-type-gooc",
+        _ => "thebasics:chat-type-none"
     };
 
     private TextCommandResult Yell(TextCommandCallingArgs args)
