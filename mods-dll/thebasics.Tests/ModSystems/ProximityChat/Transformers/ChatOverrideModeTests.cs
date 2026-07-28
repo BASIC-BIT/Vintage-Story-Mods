@@ -142,6 +142,49 @@ public class ChatOverrideModeTests
     }
 
     [Fact]
+    public void ExplicitRangeCommandBeatsAGlobalOocOverride()
+    {
+        // A range command names a range and global OOC has none, so honouring the override would
+        // turn "/w he's lying" into a server-wide broadcast of a line the player chose /w for.
+        var transformer = new PlayerChatTransformer(new RPProximityChatSystem { Config = CreateConfig() });
+        var context = new MessageContext
+        {
+            Message = "he's lying about the trade",
+            SendingPlayer = CreatePlayer(ChatOverrideMode.GlobalOoc)
+        };
+        context.SetFlag(MessageContext.IS_PLAYER_CHAT);
+        context.SetFlag(MessageContext.IS_EXPLICIT_RANGE_COMMAND);
+
+        var result = transformer.Transform(context);
+
+        result.HasFlag(MessageContext.IS_GLOBAL_OOC).Should().BeFalse();
+        result.HasFlag(MessageContext.IS_SPEECH).Should().BeTrue();
+    }
+
+    [Fact]
+    public void PlainLineStillHonoursAGlobalOocOverride()
+    {
+        // The bypass must be scoped to explicit range commands, not applied to ordinary typing.
+        var context = Parse(CreateConfig(), CreatePlayer(ChatOverrideMode.GlobalOoc), "anyone around?");
+
+        context.HasFlag(MessageContext.IS_GLOBAL_OOC).Should().BeTrue();
+    }
+
+    [Fact]
+    public void StickyOocIsRejectedWhenTheOocToggleIsTurnedOffLive()
+    {
+        // AllowOOCToggle gates entry, so it has to gate delivery too, or an admin flipping it off
+        // mid-event leaves everyone already parked in OOC posting OOC indefinitely.
+        var config = CreateConfig();
+        config.AllowOOCToggle = false;
+
+        var context = Parse(config, CreatePlayer(ChatOverrideMode.Ooc), "still chatting");
+
+        context.State.Should().Be(MessageContextState.STOP);
+        context.HasFlag(MessageContext.IS_OOC).Should().BeFalse();
+    }
+
+    [Fact]
     public void PlainSpeechIsUnaffectedWhenRpChatIsDisabled()
     {
         var config = CreateConfig();

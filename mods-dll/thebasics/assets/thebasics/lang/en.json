@@ -333,6 +333,7 @@
   "chat-ooc-disabled": "OOC chat toggle is disabled on this server.",
   "chat-ooc-mode-no-privilege": "You do not have permission to stay in OOC mode. You can still send single OOC messages with /ooc [message].",
   "chat-override-cleared-rp-disabled": "Roleplay chat is disabled on this server, so your chat mode has been reset. That message was not sent; send it again to post it normally.",
+  "chat-override-rp-disabled": "Roleplay chat is disabled on this server, so chat modes are unavailable.",
   "chat-ooc-set": "OOC chat mode {0}.",
   "chat-ooc-enabled": "enabled",
   "chat-ooc-disabled-label": "disabled",

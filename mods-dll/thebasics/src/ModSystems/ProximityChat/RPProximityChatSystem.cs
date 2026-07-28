@@ -2279,7 +2279,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 Flags =
                 {
                     [MessageContext.IS_PLAYER_CHAT] = true, // Mark as player chat so it goes through player transformers
-                    [MessageContext.IS_FROM_COMMAND] = true
+                    [MessageContext.IS_FROM_COMMAND] = true,
+                    [MessageContext.IS_EXPLICIT_RANGE_COMMAND] = true
                 }
             };
 
@@ -2309,12 +2310,28 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     /// </summary>
     private TextCommandResult HandleOverrideModeCommand(IServerPlayer player, ChatOverrideMode mode)
     {
-        var current = GetEffectiveOverrideMode(player);
-        var next = current == mode ? ChatOverrideMode.None : mode;
+        return SetOverrideMode(player, mode, enabled: GetEffectiveOverrideMode(player) != mode);
+    }
 
-        // Entering an OOC override is the same capability /oocToggle grants, so it answers to the
-        // same gates. Leaving one is always allowed; nobody should be trapped in a mode.
-        if (next != ChatOverrideMode.None && !CanEnterOverrideMode(player, next, out var refusal))
+    /// <summary>
+    /// The single gated way any command changes the override axis. <c>/me</c>, <c>/ooc</c>,
+    /// <c>/gooc</c>, <c>/emotemode</c> and <c>/oocToggle</c> all route through here, so a gate added
+    /// in one place cannot be bypassed by a sibling command writing the same state directly.
+    /// Leaving a mode is always allowed; nobody should be trapped in one.
+    /// </summary>
+    private TextCommandResult SetOverrideMode(IServerPlayer player, ChatOverrideMode mode, bool enabled)
+    {
+        if (!enabled)
+        {
+            if (player.GetChatOverrideMode() == mode)
+            {
+                player.SetChatOverrideMode(ChatOverrideMode.None);
+            }
+
+            return ChatModeStatus(player);
+        }
+
+        if (!CanEnterOverrideMode(player, mode, out var refusal))
         {
             return new TextCommandResult
             {
@@ -2323,9 +2340,9 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             };
         }
 
-        player.SetChatOverrideMode(next);
+        player.SetChatOverrideMode(mode);
 
-        AnalyticsService.TrackFeatureUsed("chat_override_mode", "set_" + next.ToString().ToLowerInvariant());
+        AnalyticsService.TrackFeatureUsed("chat_override_mode", "set_" + mode.ToString().ToLowerInvariant());
 
         return ChatModeStatus(player);
     }
@@ -2343,7 +2360,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         // flipped live, so guard the capability rather than relying on registration.
         if (Config.DisableRPChat)
         {
-            refusal = Lang.Get("thebasics:chat-override-cleared-rp-disabled");
+            refusal = Lang.Get("thebasics:chat-override-rp-disabled");
             return false;
         }
 
@@ -2448,10 +2465,9 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
         // If no argument provided, toggle the current state
         var emoteMode = args.Parsers[0].IsMissing ? !player.GetEmoteMode() : (bool)args.Parsers[0].GetValue();
-        player.SetEmoteMode(emoteMode);
         AnalyticsService.TrackCommandUsed("emotemode", true);
         AnalyticsService.TrackFeatureUsed("emote_mode", emoteMode ? "enable" : "disable");
-        return ChatModeStatus(player);
+        return SetOverrideMode(player, ChatOverrideMode.Emote, emoteMode);
     }
 
     private TextCommandResult RpTextEnabled(TextCommandCallingArgs args)
@@ -2460,6 +2476,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         // If no argument provided, toggle the current state
         var rpTextEnabled = args.Parsers[0].IsMissing ? !player.GetRpTextEnabled() : (bool)args.Parsers[0].GetValue();
         player.SetRpTextEnabled(rpTextEnabled);
+
+        // With RP text off the pipeline hands the line to vanilla chat untouched, so a lingering
+        // override would never be applied and never be cleared: the player's next line would go out
+        // verbatim to the whole group while they still believed they were in OOC.
+        if (!rpTextEnabled)
+        {
+            player.SetChatOverrideMode(ChatOverrideMode.None);
+        }
+
         AnalyticsService.TrackCommandUsed("rptext", true);
         AnalyticsService.TrackFeatureUsed("rp_text", rpTextEnabled ? "enable" : "disable");
         return new TextCommandResult
@@ -2471,23 +2496,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private TextCommandResult OOCMode(TextCommandCallingArgs args)
     {
-        if (!Config.AllowOOCToggle)
-        {
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Error,
-                StatusMessage = Lang.Get("thebasics:chat-ooc-disabled"),
-            };
-        }
-
         var player = (IServerPlayer)args.Caller.Player;
         var newMode = args.Parsers[0].IsMissing ? !player.GetOOCEnabled() : (bool)args.Parsers[0].GetValue();
-        player.SetOOCEnabled(newMode);
 
         AnalyticsService.TrackCommandUsed("ooctoggle", true);
         AnalyticsService.TrackFeatureUsed("ooc_mode", newMode ? "enable" : "disable");
 
-        return ChatModeStatus(player);
+        return SetOverrideMode(player, ChatOverrideMode.Ooc, newMode);
     }
 
     private TextCommandResult ChatterToggle(TextCommandCallingArgs args)

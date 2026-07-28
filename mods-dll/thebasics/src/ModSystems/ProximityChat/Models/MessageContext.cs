@@ -77,6 +77,10 @@ public class MessageContext
     public static readonly string IS_ROLEPLAY = "isRoleplay";
     public static readonly string IS_GLOBAL_OOC = "isGlobalOOC";
     public static readonly string IS_FROM_COMMAND = "isFromCommand";
+
+    // Set only by /say, /yell and /whisper when given a message. Those name a range explicitly, and
+    // a global OOC override has no range, so the combination cannot be honoured as written.
+    public static readonly string IS_EXPLICIT_RANGE_COMMAND = "isExplicitRangeCommand";
     public static readonly string LANGUAGE = "language";
     public static readonly string CHAT_MODE = "chatMode";
     public static readonly string CHAT_TYPE = "chatType";

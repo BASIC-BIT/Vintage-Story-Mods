@@ -256,12 +256,11 @@ public static class VisibilityUtils
             lastY = y;
             lastZ = z;
 
-            // Entity positions carry a dimension-encoded Y. Set(x, y, z) would write it as a raw Y
-            // in dimension 0, sampling far above the world (always air) for anyone inside a pocket
-            // dimension, which silently disables muffling there. InternalY keeps the encoding.
-            samplePos.X = x;
-            samplePos.InternalY = y;
-            samplePos.Z = z;
+            // Entity positions carry a dimension-encoded Y. Plain Set(x, y, z) preserves the
+            // BlockPos's existing dimension and writes a raw Y, which samples far above the world
+            // (always air) for anyone inside a pocket dimension and silently disables muffling
+            // there. SetAndCorrectDimension splits the encoded Y back into Y plus dimension.
+            samplePos.SetAndCorrectDimension(x, y, z);
 
             if (BlocksSound(accessor.GetBlock(samplePos)))
             {

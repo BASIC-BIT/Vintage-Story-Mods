@@ -105,21 +105,26 @@ public class PlayerChatTransformer : MessageTransformerBase
     {
         var overrideMode = context.SendingPlayer.GetChatOverrideMode();
 
-        // Two ways a player ends up holding an override the server no longer honours: RP chat gets
-        // switched off under them, or global OOC specifically does. Both clear the stale mode and
-        // reject the line rather than delivering it. Downgrading to speech instead would publish a
-        // message the player believed was going somewhere out of character, which is the whole
-        // reason they set the mode.
-        if (overrideMode != ChatOverrideMode.None && _config.DisableRPChat)
+        if (overrideMode == ChatOverrideMode.None)
         {
-            context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
-            return PlayerChatKind.RejectedStaleOverride;
+            return PlayerChatKind.Speech;
         }
 
-        if (overrideMode == ChatOverrideMode.GlobalOoc && !_config.EnableGlobalOOC)
+        if (IsOverrideStale(overrideMode, out var rejection))
         {
             context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
-            return PlayerChatKind.DisabledGlobalOoc;
+            return rejection;
+        }
+
+        // A global OOC override plus an explicit range command is a contradiction: the command names
+        // a range and global OOC has none. Honouring the override would turn "/w he's lying" into a
+        // server-wide broadcast of something the player chose a whisper command for. The range wins,
+        // and the player sees their own line render as ranged speech. Local OOC is left alone, since
+        // it is delivered at the range axis, so whispered OOC is a coherent thing to ask for.
+        if (overrideMode == ChatOverrideMode.GlobalOoc &&
+            context.HasFlag(MessageContext.IS_EXPLICIT_RANGE_COMMAND))
+        {
+            return PlayerChatKind.Speech;
         }
 
         return overrideMode switch
@@ -129,6 +134,39 @@ public class PlayerChatTransformer : MessageTransformerBase
             ChatOverrideMode.GlobalOoc => PlayerChatKind.GlobalOoc,
             _ => PlayerChatKind.Speech
         };
+    }
+
+    /// <summary>
+    /// Whether the server no longer honours the mode the player is parked in. Every such case
+    /// clears the mode and rejects the line rather than delivering it: silently downgrading to
+    /// speech would publish a message the player believed was going somewhere out of character,
+    /// which is the whole reason they set the mode.
+    ///
+    /// These mirror the entry gates in <c>CanEnterOverrideMode</c>. All of them are live-reloadable,
+    /// so gating entry alone would let an admin flip a switch that silently does nothing to the
+    /// players already holding the mode.
+    /// </summary>
+    private bool IsOverrideStale(ChatOverrideMode overrideMode, out PlayerChatKind rejection)
+    {
+        rejection = PlayerChatKind.RejectedStaleOverride;
+
+        if (_config.DisableRPChat)
+        {
+            return true;
+        }
+
+        if (overrideMode == ChatOverrideMode.Ooc && !_config.AllowOOCToggle)
+        {
+            return true;
+        }
+
+        if (overrideMode == ChatOverrideMode.GlobalOoc && !_config.EnableGlobalOOC)
+        {
+            rejection = PlayerChatKind.DisabledGlobalOoc;
+            return true;
+        }
+
+        return false;
     }
 
     private MessageContext RejectStaleOverride(MessageContext context, string langKey)
