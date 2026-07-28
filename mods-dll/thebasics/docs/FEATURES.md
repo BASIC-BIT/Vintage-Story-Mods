@@ -89,7 +89,7 @@ The admin panel exposes fixed-shape complex settings as validated flattened rows
 Features:
 
 - Dedicated proximity chat group, or optional General-chat replacement via `UseGeneralChannelAsProximityChat`.
-- Whisper, normal, yell, and sign-language ranges. The three speech ranges accept `-1` to deliver server-wide; `SignLanguageRange` does not.
+- Whisper, normal, yell, and sign-language ranges. The three speech ranges accept exactly `-1` to deliver server-wide; any other negative value is rejected by config validation, and `SignLanguageRange` has no unlimited sentinel at all. An unlimited range cannot be combined with `RequireLineOfSightForSpeech`, since line of sight needs a bounded range to raycast against.
 - Two independent chat axes: range (`/whisper`, `/say`, `/yell`) and sticky override kind (`/me`, `/ooc`, `/gooc`). Whispered OOC and yelled emotes are both valid combinations.
 - Sticky override modes toggle: running the same override command again returns you to speech, and running a different one replaces it. An explicit message prefix still wins for that single line.
 - Recipient filtering by distance, sign-language line of sight, and chat mode.

@@ -9,6 +9,49 @@ namespace thebasics.Tests.ModSystems.AdminConfig;
 public class ConfigAdminSettingRegistryTests
 {
     [Fact]
+    public void ValidateConfig_AcceptsTheUnlimitedSentinel()
+    {
+        var config = CreateConfig();
+        config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsNegativeRangesOtherThanTheSentinel()
+    {
+        // A typo like -2 must be reported, not silently read as a server-wide channel.
+        var config = CreateConfig();
+        config.ProximityChatModeDistances[ProximityChatMode.Normal] = -2;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("Normal range must be a positive block count");
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsUnlimitedRangeCombinedWithSpeechLineOfSight()
+    {
+        // Line of sight needs a bounded range to raycast against, so the combination is refused
+        // rather than the setting being silently ignored.
+        var config = CreateConfig();
+        config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
+        config.RequireLineOfSightForSpeech[ProximityChatMode.Normal] = true;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("cannot combine an unlimited range with RequireLineOfSightForSpeech");
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsNegativeSignLanguageRange()
+    {
+        var config = CreateConfig();
+        config.SignLanguageRange = -1;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("SignLanguageRange must be a positive block count");
+    }
+
+    [Fact]
     public void ValidateConfig_RejectsRangeAtOrBelowObfuscationStart()
     {
         var config = CreateConfig();

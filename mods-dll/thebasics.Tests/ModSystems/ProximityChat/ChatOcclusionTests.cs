@@ -99,6 +99,14 @@ public class ChatOcclusionTests
         }
 
         [Fact]
+        public void OtherNegativeValuesAreNotUnlimited()
+        {
+            // A typo must not silently turn a proximity mode into a server-wide channel.
+            ModConfig.IsUnlimitedRange(-2).Should().BeFalse();
+            ModConfig.IsUnlimitedRange(-100).Should().BeFalse();
+        }
+
+        [Fact]
         public void SurvivesRoundTripThroughRangeConfig()
         {
             var config = CreateConfig();

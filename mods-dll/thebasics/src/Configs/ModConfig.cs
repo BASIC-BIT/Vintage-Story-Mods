@@ -45,7 +45,9 @@ namespace thebasics.Configs
         /// </summary>
         public const int UnlimitedRange = -1;
 
-        public static bool IsUnlimitedRange(int range) => range < 0;
+        // Exact match, not "any negative". A hand-edited typo such as -2 would otherwise turn a
+        // proximity mode into a server-wide channel silently; ValidateConfig rejects it instead.
+        public static bool IsUnlimitedRange(int range) => range == UnlimitedRange;
 
         /// <summary>
         /// Per-mode dictionaries are only defaulted wholesale, so a hand-edited config can be missing

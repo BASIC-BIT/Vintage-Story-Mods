@@ -34,16 +34,30 @@ public static class ConfigAdminSettingRegistry
             var range = GetModeValue(config.ProximityChatModeDistances, mode, DefaultDistance(mode));
             var obfuscationStart = GetModeValue(config.ProximityChatModeObfuscationRanges, mode, DefaultObfuscationStart(mode));
 
-            if (range == 0)
+            if (range == 0 || (range < 0 && !ModConfig.IsUnlimitedRange(range)))
             {
-                // Would silently mute the mode; -1 is the documented way to opt out of a range limit.
-                errors.Add($"{mode} range must be a positive block count, or -1 for unlimited.");
+                // 0 would silently mute the mode, and any other negative is a typo. Only the exact
+                // sentinel opts out of a range limit, so a stray -2 must not read as server-wide.
+                errors.Add($"{mode} range must be a positive block count, or {ModConfig.UnlimitedRange} for unlimited.");
             }
             // Unlimited range has no far edge, so the obfuscation ordering rule does not apply.
             else if (!ModConfig.IsUnlimitedRange(range) && range <= obfuscationStart)
             {
                 errors.Add($"{mode} range must be greater than its obfuscation start.");
             }
+
+            // Line of sight needs a bounded range to raycast against; at unlimited range the check
+            // is skipped rather than run against the whole map. Say so instead of ignoring it.
+            if (ModConfig.IsUnlimitedRange(range) &&
+                ModConfig.GetModeValue(config.RequireLineOfSightForSpeech, mode, false))
+            {
+                errors.Add($"{mode} cannot combine an unlimited range with RequireLineOfSightForSpeech. Set a bounded range or turn the line-of-sight requirement off.");
+            }
+        }
+
+        if (config.SignLanguageRange < 0)
+        {
+            errors.Add($"SignLanguageRange must be a positive block count. It has no unlimited sentinel, unlike the speech ranges.");
         }
 
         return errors;
