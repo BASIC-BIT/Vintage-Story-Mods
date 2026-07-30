@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -278,11 +279,87 @@ def face_uvs(
     return result
 
 
-def load_shape(path: Path) -> tuple[list[Face], dict[str, str]]:
+def lerp(left: float, right: float, amount: float) -> float:
+    return left + (right - left) * amount
+
+
+def sample_animation_pose(data: dict, animation_code: str, frame: float) -> dict[str, dict[str, Vec3]]:
+    animation = next(
+        (
+            candidate
+            for candidate in data.get("animations", [])
+            if candidate.get("code") == animation_code or candidate.get("name") == animation_code
+        ),
+        None,
+    )
+    if animation is None:
+        raise ValueError(f"Animation '{animation_code}' was not found in the shape.")
+
+    quantity = int(animation["quantityframes"])
+    if quantity <= 0:
+        raise ValueError(f"Animation '{animation_code}' has an invalid quantityframes value.")
+    frame %= quantity
+    keyframes = sorted(animation.get("keyframes", []), key=lambda keyframe: int(keyframe["frame"]))
+    channels = {
+        "offset": ("offsetX", "offsetY", "offsetZ"),
+        "rotation": ("rotationX", "rotationY", "rotationZ"),
+        "stretch": ("stretchX", "stretchY", "stretchZ"),
+        "origin": ("originX", "originY", "originZ"),
+    }
+    defaults = {
+        "offset": (0.0, 0.0, 0.0),
+        "rotation": (0.0, 0.0, 0.0),
+        "stretch": (1.0, 1.0, 1.0),
+        "origin": (0.0, 0.0, 0.0),
+    }
+    element_names = {
+        name
+        for keyframe in keyframes
+        for name in keyframe.get("elements", {})
+    }
+    poses: dict[str, dict[str, Vec3]] = {}
+    for name in element_names:
+        pose: dict[str, Vec3] = {}
+        for channel, properties in channels.items():
+            keyed = []
+            for keyframe in keyframes:
+                definition = keyframe.get("elements", {}).get(name)
+                if definition is not None and any(prop in definition for prop in properties):
+                    keyed.append((
+                        int(keyframe["frame"]),
+                        tuple(float(definition.get(prop, defaults[channel][index])) for index, prop in enumerate(properties)),
+                    ))
+            if not keyed:
+                continue
+
+            right_index = next((index for index, (at, _) in enumerate(keyed) if at > frame), 0)
+            right_frame, right_value = keyed[right_index]
+            left_frame, left_value = keyed[(right_index - 1) % len(keyed)]
+            if len(keyed) == 1:
+                amount = 0.0
+            elif right_frame <= left_frame:
+                distance = right_frame + quantity - left_frame
+                amount = ((frame - left_frame) % quantity) / distance
+            else:
+                amount = (frame - left_frame) / (right_frame - left_frame)
+            pose[channel] = tuple(
+                lerp(left_value[index], right_value[index], amount)
+                for index in range(3)
+            )  # type: ignore[assignment]
+        poses[name] = pose
+    return poses
+
+
+def load_shape(
+    path: Path,
+    animation_code: str | None = None,
+    animation_frame: float = 0,
+) -> tuple[list[Face], dict[str, str]]:
     data = json.loads(path.read_text(encoding="utf-8"))
     faces: list[Face] = []
     texture_width = float(data.get("textureWidth", 16))
     texture_height = float(data.get("textureHeight", 16))
+    poses = sample_animation_pose(data, animation_code, animation_frame) if animation_code else {}
 
     def identity(point: Vec3) -> Vec3:
         return point
@@ -292,6 +369,7 @@ def load_shape(path: Path) -> tuple[list[Face], dict[str, str]]:
             start = tuple(element["from"])
             end = tuple(element["to"])
             vertices = cuboid(start, end)
+            pose = poses.get(element.get("name", ""), {})
             angles = (
                 float(element.get("rotationX", 0)),
                 float(element.get("rotationY", 0)),
@@ -300,6 +378,25 @@ def load_shape(path: Path) -> tuple[list[Face], dict[str, str]]:
             origin = tuple(element.get("rotationOrigin", (8, 8, 8)))
             if angles != (0, 0, 0):
                 vertices = [rotate(vertex, origin, angles) for vertex in vertices]
+            animation_origin = pose.get("origin", origin)
+            animation_angles = pose.get("rotation", (0.0, 0.0, 0.0))
+            animation_stretch = pose.get("stretch", (1.0, 1.0, 1.0))
+            animation_offset = pose.get("offset", (0.0, 0.0, 0.0))
+            if animation_stretch != (1.0, 1.0, 1.0):
+                vertices = [
+                    add(
+                        tuple(
+                            (vertex[index] - animation_origin[index]) * animation_stretch[index]
+                            for index in range(3)
+                        ),
+                        animation_origin,
+                    )
+                    for vertex in vertices
+                ]
+            if animation_angles != (0.0, 0.0, 0.0):
+                vertices = [rotate(vertex, animation_origin, animation_angles) for vertex in vertices]
+            if animation_offset != (0.0, 0.0, 0.0):
+                vertices = [add(vertex, animation_offset) for vertex in vertices]
             vertices = [parent_transform(vertex) for vertex in vertices]
             for direction, definition in element.get("faces", {}).items():
                 indices = FACE_INDICES.get(direction)
@@ -313,10 +410,32 @@ def load_shape(path: Path) -> tuple[list[Face], dict[str, str]]:
                         str(path),
                     ))
 
-            def child_transform(point: Vec3, *, start=start, origin=origin, angles=angles) -> Vec3:
+            def child_transform(
+                point: Vec3,
+                *,
+                start=start,
+                origin=origin,
+                angles=angles,
+                animation_origin=animation_origin,
+                animation_angles=animation_angles,
+                animation_stretch=animation_stretch,
+                animation_offset=animation_offset,
+            ) -> Vec3:
                 point_in_parent = add(point, start)
                 if angles != (0, 0, 0):
                     point_in_parent = rotate(point_in_parent, origin, angles)
+                if animation_stretch != (1.0, 1.0, 1.0):
+                    point_in_parent = add(
+                        tuple(
+                            (point_in_parent[index] - animation_origin[index]) * animation_stretch[index]
+                            for index in range(3)
+                        ),
+                        animation_origin,
+                    )
+                if animation_angles != (0.0, 0.0, 0.0):
+                    point_in_parent = rotate(point_in_parent, animation_origin, animation_angles)
+                if animation_offset != (0.0, 0.0, 0.0):
+                    point_in_parent = add(point_in_parent, animation_offset)
                 return parent_transform(point_in_parent)
 
             visit(element.get("children", []), child_transform)
@@ -666,8 +785,10 @@ def render(
     mode: str,
     output: Path,
     size: int,
+    projection_override: tuple[Vec3, Vec3, Vec3, Vec3, float] | None = None,
+    label_override: str | None = None,
 ) -> None:
-    view, right, up, center, scale = projection(faces, view_name, size)
+    view, right, up, center, scale = projection_override or projection(faces, view_name, size)
     image = Image.new("RGB", (size, size), (28, 31, 34))
     draw = ImageDraw.Draw(image)
     line_width = max(1, size // 420)
@@ -728,11 +849,83 @@ def render(
         image = Image.fromarray(pixels)
         draw = ImageDraw.Draw(image)
 
-    label = f"{mode.upper()} / {view_name.upper()}"
+    label = label_override or f"{mode.upper()} / {view_name.upper()}"
     label_width = max(164, 12 + len(label) * 7)
     draw.rounded_rectangle((12, 12, label_width, 42), radius=7, fill=(8, 10, 12), outline=(87, 94, 99))
     draw.text((22, 20), label, fill=(235, 238, 240), font=ImageFont.load_default())
     image.save(output)
+
+
+def render_animation(
+    shape_path: Path,
+    animation_code: str,
+    colors: dict[str, tuple[int, int, int]],
+    textures: dict[str, Image.Image | None],
+    view_name: str,
+    output: Path,
+    size: int,
+    fps: int,
+    cycles: int,
+) -> dict:
+    data = json.loads(shape_path.read_text(encoding="utf-8"))
+    animation = next(
+        (
+            candidate
+            for candidate in data.get("animations", [])
+            if candidate.get("code") == animation_code or candidate.get("name") == animation_code
+        ),
+        None,
+    )
+    if animation is None:
+        raise ValueError(f"Animation '{animation_code}' was not found in {shape_path}.")
+    quantity = int(animation["quantityframes"])
+    frame_faces = [
+        load_shape(shape_path, animation_code, frame)[0]
+        for frame in range(quantity)
+    ]
+    camera_faces = [face for faces in frame_faces for face in faces]
+    fixed_projection = projection(camera_faces, view_name, size)
+    frame_directory = output.parent / f"{output.stem}-frames"
+    frame_directory.mkdir(parents=True, exist_ok=True)
+    for frame, faces in enumerate(frame_faces):
+        render(
+            faces,
+            colors,
+            textures,
+            view_name,
+            "textured",
+            frame_directory / f"{frame:04d}.png",
+            size,
+            fixed_projection,
+            f"TEXTURED / {view_name.upper()} / {animation_code.upper()} / {frame:02d}",
+        )
+
+    ffmpeg_command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-y",
+        "-stream_loop", str(max(0, cycles - 1)),
+        "-framerate", str(fps),
+        "-i", str(frame_directory / "%04d.png"),
+        "-frames:v", str(quantity * cycles),
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        str(output),
+    ]
+    subprocess.run(ffmpeg_command, check=True)
+    return {
+        "animation": animation_code,
+        "sourceFrameCount": quantity,
+        "cycles": cycles,
+        "videoFrameCount": quantity * cycles,
+        "framesPerSecond": fps,
+        "durationSeconds": quantity * cycles / fps,
+        "view": view_name,
+        "output": str(output),
+        "sha256": sha256(output),
+    }
 
 
 def contact_sheet(paths: list[Path], output: Path, columns: int, rows: int, size: int) -> None:
@@ -753,6 +946,11 @@ def main() -> None:
     parser.add_argument("--assets-root", type=Path, action="append", default=[])
     parser.add_argument("--size", type=int, default=720)
     parser.add_argument("--fail-on-coplanar-overlap", action="store_true")
+    parser.add_argument("--animation")
+    parser.add_argument("--animation-output", type=Path)
+    parser.add_argument("--animation-view", choices=VIEWS, default="isometric")
+    parser.add_argument("--animation-fps", type=int, default=30)
+    parser.add_argument("--animation-cycles", type=int, default=3)
     args = parser.parse_args()
 
     manifest_path = args.manifest.resolve()
@@ -804,6 +1002,31 @@ def main() -> None:
         contact_sheet(mode_images, mode_output / "contact-sheet.png", 4, 2, args.size)
     contact_sheet(all_images, output / "contact-sheet.png", len(VIEWS), len(RENDER_MODES), args.size)
 
+    animation_metadata = None
+    if args.animation:
+        shape_specs = manifest.get("shapes", [])
+        if len(shape_specs) != 1 or "proceduralFlywheel" in manifest:
+            raise ValueError("Animation rendering currently requires a manifest with exactly one JSON shape.")
+        if args.animation_fps <= 0 or args.animation_cycles <= 0:
+            raise ValueError("Animation FPS and cycles must be positive.")
+        animation_output = (
+            args.animation_output.resolve()
+            if args.animation_output
+            else output / f"{args.animation}.mp4"
+        )
+        animation_output.parent.mkdir(parents=True, exist_ok=True)
+        animation_metadata = render_animation(
+            (base / shape_specs[0]).resolve(),
+            args.animation,
+            colors,
+            texture_images,
+            args.animation_view,
+            animation_output,
+            args.size,
+            args.animation_fps,
+            args.animation_cycles,
+        )
+
     vertices = [vertex for face in faces for vertex in face.vertices]
     metadata = {
         "name": manifest.get("name", manifest_path.stem),
@@ -835,6 +1058,7 @@ def main() -> None:
             }
             for overlap in overlaps
         ],
+        "animationVideo": animation_metadata,
     }
     (output / "render-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     if overlaps:

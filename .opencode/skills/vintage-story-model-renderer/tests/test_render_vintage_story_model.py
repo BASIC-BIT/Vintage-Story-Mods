@@ -132,11 +132,11 @@ class RenderMatrixTests(unittest.TestCase):
 
 class HierarchicalShapeTests(unittest.TestCase):
     @staticmethod
-    def load_shape(data):
+    def load_shape(data, animation_code=None, animation_frame=0):
         with tempfile.TemporaryDirectory() as directory:
             shape = Path(directory) / "shape.json"
             shape.write_text(json.dumps(data), encoding="utf-8")
-            return renderer.load_shape(shape)
+            return renderer.load_shape(shape, animation_code, animation_frame)
 
     def test_child_coordinates_are_relative_to_parent_from(self):
         faces, _ = self.load_shape({
@@ -197,6 +197,59 @@ class HierarchicalShapeTests(unittest.TestCase):
         })
 
         self.assertEqual(["south"], [face.surface for face in faces])
+
+    def test_animation_pose_interpolates_and_wraps_channels_independently(self):
+        data = {
+            "animations": [{
+                "code": "walk",
+                "quantityframes": 20,
+                "keyframes": [
+                    {"frame": 0, "elements": {"Body": {
+                        "offsetX": 0, "offsetY": 0, "offsetZ": 0,
+                        "rotationX": 0, "rotationY": 0, "rotationZ": 0,
+                    }}},
+                    {"frame": 10, "elements": {"Body": {
+                        "offsetX": 10, "offsetY": 0, "offsetZ": 0,
+                    }}},
+                ],
+            }],
+        }
+
+        midpoint = renderer.sample_animation_pose(data, "walk", 5)["Body"]
+        wrapped = renderer.sample_animation_pose(data, "walk", 15)["Body"]
+
+        self.assertEqual((5, 0, 0), midpoint["offset"])
+        self.assertEqual((5, 0, 0), wrapped["offset"])
+        self.assertEqual((0, 0, 0), midpoint.get("rotation", (0, 0, 0)))
+
+    def test_animated_parent_rotation_moves_child(self):
+        faces, _ = self.load_shape({
+            "elements": [{
+                "name": "parent",
+                "from": [0, 0, 0],
+                "to": [1, 1, 1],
+                "rotationOrigin": [5, 0, 0],
+                "faces": {},
+                "children": [{
+                    "name": "child",
+                    "from": [6, 0, 0],
+                    "to": [7, 1, 1],
+                    "faces": {"north": {"texture": "#skin"}},
+                }],
+            }],
+            "animations": [{
+                "code": "walk",
+                "quantityframes": 2,
+                "keyframes": [
+                    {"frame": 0, "elements": {"parent": {
+                        "rotationX": 0, "rotationY": 0, "rotationZ": 90,
+                    }}},
+                ],
+            }],
+        }, "walk", 0)
+
+        self.assertAlmostEqual(5, faces[0].vertices[0][0])
+        self.assertAlmostEqual(1, faces[0].vertices[0][1])
 
 
 class DepthBufferTests(unittest.TestCase):

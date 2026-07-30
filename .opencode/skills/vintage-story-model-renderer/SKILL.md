@@ -51,6 +51,23 @@ python -m unittest discover `
   -p "test_*.py"
 ```
 
+For a single-shape entity manifest, render a looping authored animation from a fixed camera:
+
+```powershell
+python .opencode/skills/vintage-story-model-renderer/scripts/render_vintage_story_model.py `
+  --manifest <manifest.json> `
+  --output-dir <bounded-output-directory> `
+  --animation <animation-code> `
+  --animation-output <video.mp4> `
+  --animation-view isometric `
+  --animation-fps 30 `
+  --animation-cycles 3
+```
+
+Animation video output requires `ffmpeg`. It linearly interpolates independently keyed offset, rotation, stretch, and origin
+channels with the same end-to-start wrapping used by repeating Vintage Story animations. The clip plays the model in place;
+entity movement through the world is runtime behavior and is not inferred from the shape animation.
+
 ## Manifests and representations
 
 Paths are relative to the manifest. Give each materially different representation its own manifest. At minimum, cover the
@@ -114,8 +131,9 @@ happens not to flicker.
 - `CompositeShape` can also point to OBJ, and the game API can render arbitrary `MeshData`. Flywheel Power already uses
   procedural quads for its round wheel, felloe, spokes, bearing, hub, and marker.
 - This renderer currently supports Vintage Story cuboid JSON plus the Flywheel procedural manifest. Entity shapes render
-  in their authored rest pose; animation-keyframe posing, runtime shape alternates, step-parent attachments, OBJ/GLTF
-  import, atlas stitching, emissive/glow channels, and player-hand/body backdrops are not yet reproduced.
+  in their authored rest pose by default. Pass `--animation <code>` to render a fixed-camera textured MP4 of one looping
+  shape animation; runtime shape alternates, blended animations, step-parent attachments, OBJ/GLTF import, atlas stitching,
+  emissive/glow channels, and player-hand/body backdrops are not yet reproduced.
 - Add importers behind the same `Face` representation rather than converting external meshes into hundreds of cuboids.
   Triangulated OBJ is the sensible next importer; embedded GLTF should remain experimental until its game support is proven.
 - Texture mode samples source PNGs and UVs deterministically, but Vintage Story remains authoritative for atlas padding,
