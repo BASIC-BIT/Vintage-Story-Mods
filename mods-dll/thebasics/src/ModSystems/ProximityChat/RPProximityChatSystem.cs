@@ -473,6 +473,10 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         // here would miss DisableRPChat and drift from the sticky and prefix paths again.
         if (!CanEnterOverrideMode(player, ChatOverrideMode.GlobalOoc, out var goocRefusal))
         {
+            // Command-level counterpart to the failure recorded inside the gate, so a refused
+            // /gooc still appears in command analytics rather than vanishing.
+            AnalyticsService.TrackCommandUsed("gooc", false, "blocked", AnalyticsService.ChatProperties("gooc"));
+
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Error,
@@ -2374,6 +2378,21 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         var allowed = IsOverrideModeAvailable(player, mode, out var refusalLangKey);
         refusal = refusalLangKey == null ? null : Lang.Get(refusalLangKey);
+
+        if (!allowed)
+        {
+            // Measuring these is the whole reason the commands stay registered when a feature is off:
+            // a command that does not exist produces no signal that anyone wanted it. Recorded here
+            // because this is the one seam every command-layer gate check passes through, whereas
+            // IsOverrideModeAvailable is also consulted on join and on delivery, which are not
+            // player-initiated attempts and would pollute the count.
+            AnalyticsService.TrackFailure(
+                "chat_override_mode",
+                "enter_" + mode.ToString().ToLowerInvariant(),
+                "blocked",
+                refusalLangKey ?? "unknown");
+        }
+
         return allowed;
     }
 
