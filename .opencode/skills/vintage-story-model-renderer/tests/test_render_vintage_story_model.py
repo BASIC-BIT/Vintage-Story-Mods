@@ -155,6 +155,9 @@ class RenderMatrixTests(unittest.TestCase):
         self.assertEqual([0, 0.5, 1, 1.5], positions[:4])
         self.assertEqual(29.5, positions[-1])
 
+    def test_static_turntable_frame_count_preserves_requested_duration(self):
+        self.assertEqual(720, renderer.turntable_frame_count(60, 12))
+
 
 class HierarchicalShapeTests(unittest.TestCase):
     @staticmethod

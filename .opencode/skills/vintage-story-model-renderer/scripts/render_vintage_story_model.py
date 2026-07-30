@@ -711,6 +711,13 @@ def animation_sample_positions(quantity: int, output_fps: int, source_fps: int) 
     ]
 
 
+def turntable_frame_count(fps: int, duration_seconds: float) -> int:
+    total_frames = round(fps * duration_seconds)
+    if total_frames <= 0:
+        raise ValueError("Turntable sampling produced no output frames.")
+    return total_frames
+
+
 def fixed_animation_projections(
     frame_faces: list[list[Face]],
     views: list[Vec3],
@@ -1026,6 +1033,66 @@ def render_animation(
     }
 
 
+def render_turntable(
+    faces: list[Face],
+    colors: dict[str, tuple[int, int, int]],
+    textures: dict[str, Image.Image | None],
+    view_name: str,
+    output: Path,
+    size: int,
+    fps: int,
+    duration_seconds: float,
+) -> dict:
+    total_frames = turntable_frame_count(fps, duration_seconds)
+    frame_faces = [faces] * total_frames
+    base_view = VIEWS[view_name][0]
+    views = [
+        rotate_view_around_y(base_view, frame / total_frames)
+        for frame in range(total_frames)
+    ]
+    projections = fixed_animation_projections(frame_faces, views, size)
+    frame_directory = output.parent / f"{output.stem}-frames"
+    frame_directory.mkdir(parents=True, exist_ok=True)
+    for frame, frame_projection in enumerate(projections):
+        angle = 360 * frame / total_frames
+        render(
+            faces,
+            colors,
+            textures,
+            view_name,
+            "textured",
+            frame_directory / f"{frame:04d}.png",
+            size,
+            frame_projection,
+            f"TEXTURED / ORBIT {angle:06.2f} DEG / STATIC",
+        )
+
+    subprocess.run([
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-y",
+        "-framerate", str(fps),
+        "-i", str(frame_directory / "%04d.png"),
+        "-frames:v", str(total_frames),
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        str(output),
+    ], check=True)
+    return {
+        "pose": "authored-rest-pose",
+        "videoFrameCount": total_frames,
+        "framesPerSecond": fps,
+        "durationSeconds": duration_seconds,
+        "view": view_name,
+        "cameraMotion": "orbit-360",
+        "cameraRevolutions": 1,
+        "output": str(output),
+        "sha256": sha256(output),
+    }
+
+
 def contact_sheet(paths: list[Path], output: Path, columns: int, rows: int, size: int) -> None:
     sheet = Image.new("RGB", (size * columns, size * rows), (20, 22, 24))
     for index, path in enumerate(paths):
@@ -1051,6 +1118,10 @@ def main() -> None:
     parser.add_argument("--animation-source-fps", type=int, default=30)
     parser.add_argument("--animation-cycles", type=int, default=3)
     parser.add_argument("--animation-orbit", action="store_true")
+    parser.add_argument("--turntable-output", type=Path)
+    parser.add_argument("--turntable-view", choices=VIEWS, default="isometric")
+    parser.add_argument("--turntable-fps", type=int, default=60)
+    parser.add_argument("--turntable-seconds", type=float, default=12)
     args = parser.parse_args()
 
     manifest_path = args.manifest.resolve()
@@ -1129,6 +1200,23 @@ def main() -> None:
             args.animation_orbit,
         )
 
+    turntable_metadata = None
+    if args.turntable_output:
+        if args.turntable_fps <= 0 or args.turntable_seconds <= 0:
+            raise ValueError("Turntable FPS and duration must be positive.")
+        turntable_output = args.turntable_output.resolve()
+        turntable_output.parent.mkdir(parents=True, exist_ok=True)
+        turntable_metadata = render_turntable(
+            faces,
+            colors,
+            texture_images,
+            args.turntable_view,
+            turntable_output,
+            args.size,
+            args.turntable_fps,
+            args.turntable_seconds,
+        )
+
     vertices = [vertex for face in faces for vertex in face.vertices]
     metadata = {
         "name": manifest.get("name", manifest_path.stem),
@@ -1161,6 +1249,7 @@ def main() -> None:
             for overlap in overlaps
         ],
         "animationVideo": animation_metadata,
+        "turntableVideo": turntable_metadata,
     }
     (output / "render-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     if overlaps:

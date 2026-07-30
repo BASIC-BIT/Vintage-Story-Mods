@@ -73,6 +73,18 @@ completes one smooth 360-degree camera revolution across all requested animation
 The clip plays the model in place; entity movement through the world is runtime behavior and is not inferred from the shape
 animation.
 
+To isolate camera motion from animation, render the authored rest pose as a static turntable:
+
+```powershell
+python .opencode/skills/vintage-story-model-renderer/scripts/render_vintage_story_model.py `
+  --manifest <manifest.json> `
+  --output-dir <bounded-output-directory> `
+  --turntable-output <video.mp4> `
+  --turntable-view isometric `
+  --turntable-fps 60 `
+  --turntable-seconds 12
+```
+
 ## Manifests and representations
 
 Paths are relative to the manifest. Give each materially different representation its own manifest. At minimum, cover the
