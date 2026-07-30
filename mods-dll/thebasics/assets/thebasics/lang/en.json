@@ -336,6 +336,7 @@
   "chat-ooc-mode-no-privilege": "You do not have permission to set your chat type to OOC. You can still send single OOC messages with /ooc [message].",
   "chat-override-cleared-rp-disabled": "Roleplay chat is disabled on this server, so your chat type has been reset to in character. That message was not sent; send it again to post it normally.",
   "chat-override-rp-disabled": "Roleplay chat is disabled on this server, so chat types are unavailable.",
+  "chat-type-rptext-disabled": "You have RP text turned off, so chat types would not apply to your messages. Use /rptext on first, or send single messages with /ooc [message] or /me [action].",
   "chat-pipeline-failed": "Your message could not be sent because of a server-side chat error. It has been logged for the server owner.",
   "chat-ooc-set": "OOC chat mode {0}.",
   "chat-ooc-enabled": "enabled",

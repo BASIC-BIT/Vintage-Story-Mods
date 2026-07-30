@@ -1824,8 +1824,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private (float gain, float falloff) CalculateSpeechAudioParameters(MessageContext context)
     {
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
-        var gain = ModConfig.GetModeValue(Config.RPTTS_ModeGain, mode, 1f);
-        var falloff = ModConfig.GetModeValue(Config.RPTTS_ModeFalloff, mode, 1f);
+        var gain = Config.GetRpttsGain(mode);
+        var falloff = Config.GetRpttsFalloff(mode);
 
         return (gain, falloff);
     }
@@ -2402,6 +2402,16 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
+        // With RP text off for this player, plain lines bypass the pipeline entirely and go out as
+        // vanilla chat, so a stored type does nothing. Storing one anyway would leave it waiting to
+        // spring back to life the moment they re-enable RP text. One-off /ooc and /me still work,
+        // because those run the pipeline directly rather than through the chat event.
+        if (!player.GetRpTextEnabled())
+        {
+            refusalLangKey = "thebasics:chat-type-rptext-disabled";
+            return false;
+        }
+
         // Global OOC answers only to its own switch. AllowOOCToggle and OOCTogglePermission govern
         // local OOC; gating global OOC behind them would let an unrelated setting remove a working
         // feature, and refuse it with a message naming the wrong one.
@@ -2559,9 +2569,18 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
         // If no argument provided, toggle the current state
         var emoteMode = args.Parsers[0].IsMissing ? !player.GetEmoteMode() : (bool)args.Parsers[0].GetValue();
-        AnalyticsService.TrackCommandUsed("emotemode", true);
-        AnalyticsService.TrackFeatureUsed("emote_mode", emoteMode ? "enable" : "disable");
-        return SetOverrideMode(player, ChatOverrideMode.Emote, emoteMode);
+
+        // Track after the gate has had its say. Emitting the success events up front recorded
+        // refused attempts as completed mode changes.
+        var result = SetOverrideMode(player, ChatOverrideMode.Emote, emoteMode);
+        var succeeded = result.Status == EnumCommandStatus.Success;
+        AnalyticsService.TrackCommandUsed("emotemode", succeeded);
+        if (succeeded)
+        {
+            AnalyticsService.TrackFeatureUsed("emote_mode", emoteMode ? "enable" : "disable");
+        }
+
+        return result;
     }
 
     private TextCommandResult RpTextEnabled(TextCommandCallingArgs args)
@@ -2593,10 +2612,17 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var player = (IServerPlayer)args.Caller.Player;
         var newMode = args.Parsers[0].IsMissing ? !player.GetOOCEnabled() : (bool)args.Parsers[0].GetValue();
 
-        AnalyticsService.TrackCommandUsed("ooctoggle", true);
-        AnalyticsService.TrackFeatureUsed("ooc_mode", newMode ? "enable" : "disable");
+        // Track after the gate has had its say. Emitting the success events up front recorded
+        // refused attempts as completed mode changes.
+        var result = SetOverrideMode(player, ChatOverrideMode.Ooc, newMode);
+        var succeeded = result.Status == EnumCommandStatus.Success;
+        AnalyticsService.TrackCommandUsed("ooctoggle", succeeded);
+        if (succeeded)
+        {
+            AnalyticsService.TrackFeatureUsed("ooc_mode", newMode ? "enable" : "disable");
+        }
 
-        return SetOverrideMode(player, ChatOverrideMode.Ooc, newMode);
+        return result;
     }
 
     private TextCommandResult ChatterToggle(TextCommandCallingArgs args)

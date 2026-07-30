@@ -68,6 +68,35 @@ namespace thebasics.Configs
         public int GetModeDefaultFontSize(ProximityChatMode mode) =>
             GetModeValue(ProximityChatDefaultFontSize, mode, DefaultModeFontSize(mode));
 
+        public string GetModePunctuation(ProximityChatMode mode) =>
+            GetModeValue(ProximityChatModePunctuation, mode, DefaultModePunctuation(mode));
+
+        public float GetRpttsGain(ProximityChatMode mode) =>
+            GetModeValue(RPTTS_ModeGain, mode, DefaultRpttsGain(mode));
+
+        public float GetRpttsFalloff(ProximityChatMode mode) =>
+            GetModeValue(RPTTS_ModeFalloff, mode, DefaultRpttsFalloff(mode));
+
+        // These mirror the per-mode defaults above and in ConfigAdminSettingRegistry. A generic
+        // fallback would silently retune a mode that a partial config happens to omit, which is a
+        // worse failure than the exception the fallback was added to prevent.
+        private static string DefaultModePunctuation(ProximityChatMode mode) =>
+            mode == ProximityChatMode.Yell ? "!" : ".";
+
+        private static float DefaultRpttsGain(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => 1.7f,
+            ProximityChatMode.Whisper => 0.65f,
+            _ => 1f
+        };
+
+        private static float DefaultRpttsFalloff(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Whisper => 5f,
+            ProximityChatMode.Normal => 1.5f,
+            _ => 1f
+        };
+
         /// <summary>
         /// Sign language has no unlimited sentinel, so a hand-edited negative falls back to the
         /// default. Read through here everywhere: the recipient filter and the deferred-delivery
