@@ -61,12 +61,14 @@ python .opencode/skills/vintage-story-model-renderer/scripts/render_vintage_stor
   --animation-output <video.mp4> `
   --animation-view isometric `
   --animation-fps 30 `
-  --animation-cycles 3
+  --animation-cycles 4 `
+  --animation-orbit
 ```
 
 Animation video output requires `ffmpeg`. It linearly interpolates independently keyed offset, rotation, stretch, and origin
-channels with the same end-to-start wrapping used by repeating Vintage Story animations. The clip plays the model in place;
-entity movement through the world is runtime behavior and is not inferred from the shape animation.
+channels with the same end-to-start wrapping used by repeating Vintage Story animations. `--animation-orbit` completes one
+smooth 360-degree camera revolution across all requested animation cycles while retaining constant framing. The clip plays
+the model in place; entity movement through the world is runtime behavior and is not inferred from the shape animation.
 
 ## Manifests and representations
 

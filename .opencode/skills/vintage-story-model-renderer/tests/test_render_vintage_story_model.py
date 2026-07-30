@@ -129,6 +129,25 @@ class RenderMatrixTests(unittest.TestCase):
 
             self.assertEqual(texture, renderer.resolve_texture("game:block/test", [root]))
 
+    def test_orbit_view_completes_one_seamless_revolution(self):
+        start = (1, 0.78, 1)
+        quarter = renderer.rotate_view_around_y(start, 0.25)
+        complete = renderer.rotate_view_around_y(start, 1)
+        views = [
+            renderer.normalize(renderer.rotate_view_around_y(start, frame / 120))
+            for frame in range(120)
+        ]
+
+        self.assertAlmostEqual(1, quarter[0])
+        self.assertAlmostEqual(0.78, quarter[1])
+        self.assertAlmostEqual(-1, quarter[2])
+        for actual, expected in zip(complete, start):
+            self.assertAlmostEqual(expected, actual)
+        self.assertAlmostEqual(
+            renderer.dot(views[0], views[1]),
+            renderer.dot(views[-1], views[0]),
+        )
+
 
 class HierarchicalShapeTests(unittest.TestCase):
     @staticmethod

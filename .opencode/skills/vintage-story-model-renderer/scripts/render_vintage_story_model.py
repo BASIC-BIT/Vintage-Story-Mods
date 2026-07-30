@@ -660,21 +660,84 @@ def projection(
     size: int,
 ) -> tuple[Vec3, Vec3, Vec3, Vec3, float]:
     view, nominal_up = VIEWS[view_name]
+    return projection_for_view(faces, view, nominal_up, size)
+
+
+def projection_for_view(
+    faces: list[Face],
+    view: Vec3,
+    nominal_up: Vec3,
+    size: int,
+    center_override: Vec3 | None = None,
+    scale_override: float | None = None,
+) -> tuple[Vec3, Vec3, Vec3, Vec3, float]:
     view = normalize(view)
     right = normalize(cross(nominal_up, view))
     up = normalize(cross(view, right))
     vertices = [vertex for face in faces for vertex in face.vertices]
-    center = tuple(
+    center = center_override or tuple(
         (min(vertex[index] for vertex in vertices) + max(vertex[index] for vertex in vertices)) / 2
         for index in range(3)
     )
     projected = [(dot(sub(vertex, center), right), dot(sub(vertex, center), up)) for vertex in vertices]
-    scale = size * 0.78 / max(
-        max(abs(point[0]) for point in projected) * 2,
-        max(abs(point[1]) for point in projected) * 2,
-        1,
+    scale = scale_override or (
+        size * 0.78 / max(
+            max(abs(point[0]) for point in projected) * 2,
+            max(abs(point[1]) for point in projected) * 2,
+            1,
+        )
     )
     return view, right, up, center, scale
+
+
+def rotate_view_around_y(view: Vec3, turns: float) -> Vec3:
+    angle = turns * math.tau
+    cosine = math.cos(angle)
+    sine = math.sin(angle)
+    return (
+        view[0] * cosine + view[2] * sine,
+        view[1],
+        -view[0] * sine + view[2] * cosine,
+    )
+
+
+def fixed_animation_projections(
+    frame_faces: list[list[Face]],
+    views: list[Vec3],
+    size: int,
+) -> list[tuple[Vec3, Vec3, Vec3, Vec3, float]]:
+    all_vertices = [
+        vertex
+        for faces in frame_faces
+        for face in faces
+        for vertex in face.vertices
+    ]
+    center = tuple(
+        (min(vertex[index] for vertex in all_vertices) + max(vertex[index] for vertex in all_vertices)) / 2
+        for index in range(3)
+    )
+    bases = []
+    maximum_span = 1.0
+    for faces, view in zip(frame_faces, views):
+        normalized_view = normalize(view)
+        right = normalize(cross((0, 1, 0), normalized_view))
+        up = normalize(cross(normalized_view, right))
+        vertices = [vertex for face in faces for vertex in face.vertices]
+        projected = [
+            (dot(sub(vertex, center), right), dot(sub(vertex, center), up))
+            for vertex in vertices
+        ]
+        maximum_span = max(
+            maximum_span,
+            max(abs(point[0]) for point in projected) * 2,
+            max(abs(point[1]) for point in projected) * 2,
+        )
+        bases.append((normalized_view, right, up))
+    scale = size * 0.78 / maximum_span
+    return [
+        (view, right, up, center, scale)
+        for view, right, up in bases
+    ]
 
 
 def screen_point(vertex: Vec3, center: Vec3, right: Vec3, up: Vec3, size: int, scale: float) -> Vec2:
@@ -866,6 +929,7 @@ def render_animation(
     size: int,
     fps: int,
     cycles: int,
+    orbit: bool,
 ) -> dict:
     data = json.loads(shape_path.read_text(encoding="utf-8"))
     animation = next(
@@ -879,15 +943,29 @@ def render_animation(
     if animation is None:
         raise ValueError(f"Animation '{animation_code}' was not found in {shape_path}.")
     quantity = int(animation["quantityframes"])
-    frame_faces = [
+    source_frame_faces = [
         load_shape(shape_path, animation_code, frame)[0]
         for frame in range(quantity)
     ]
-    camera_faces = [face for faces in frame_faces for face in faces]
-    fixed_projection = projection(camera_faces, view_name, size)
+    total_frames = quantity * cycles
+    if orbit:
+        frame_faces = [
+            source_frame_faces[frame % quantity]
+            for frame in range(total_frames)
+        ]
+        base_view = VIEWS[view_name][0]
+        views = [
+            rotate_view_around_y(base_view, frame / total_frames)
+            for frame in range(total_frames)
+        ]
+    else:
+        frame_faces = source_frame_faces
+        views = [VIEWS[view_name][0]] * quantity
+    projections = fixed_animation_projections(frame_faces, views, size)
     frame_directory = output.parent / f"{output.stem}-frames"
     frame_directory.mkdir(parents=True, exist_ok=True)
-    for frame, faces in enumerate(frame_faces):
+    for frame, (faces, frame_projection) in enumerate(zip(frame_faces, projections)):
+        camera_label = f"ORBIT {360 * frame / total_frames:06.2f} DEG" if orbit else view_name.upper()
         render(
             faces,
             colors,
@@ -896,8 +974,8 @@ def render_animation(
             "textured",
             frame_directory / f"{frame:04d}.png",
             size,
-            fixed_projection,
-            f"TEXTURED / {view_name.upper()} / {animation_code.upper()} / {frame:02d}",
+            frame_projection,
+            f"TEXTURED / {camera_label} / {animation_code.upper()} / {frame % quantity:02d}",
         )
 
     ffmpeg_command = [
@@ -905,15 +983,18 @@ def render_animation(
         "-hide_banner",
         "-loglevel", "error",
         "-y",
-        "-stream_loop", str(max(0, cycles - 1)),
+    ]
+    if not orbit:
+        ffmpeg_command.extend(["-stream_loop", str(max(0, cycles - 1))])
+    ffmpeg_command.extend([
         "-framerate", str(fps),
         "-i", str(frame_directory / "%04d.png"),
-        "-frames:v", str(quantity * cycles),
+        "-frames:v", str(total_frames),
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
         str(output),
-    ]
+    ])
     subprocess.run(ffmpeg_command, check=True)
     return {
         "animation": animation_code,
@@ -923,6 +1004,8 @@ def render_animation(
         "framesPerSecond": fps,
         "durationSeconds": quantity * cycles / fps,
         "view": view_name,
+        "cameraMotion": "orbit-360" if orbit else "fixed",
+        "cameraRevolutions": 1 if orbit else 0,
         "output": str(output),
         "sha256": sha256(output),
     }
@@ -951,6 +1034,7 @@ def main() -> None:
     parser.add_argument("--animation-view", choices=VIEWS, default="isometric")
     parser.add_argument("--animation-fps", type=int, default=30)
     parser.add_argument("--animation-cycles", type=int, default=3)
+    parser.add_argument("--animation-orbit", action="store_true")
     args = parser.parse_args()
 
     manifest_path = args.manifest.resolve()
@@ -1025,6 +1109,7 @@ def main() -> None:
             args.size,
             args.animation_fps,
             args.animation_cycles,
+            args.animation_orbit,
         )
 
     vertices = [vertex for face in faces for vertex in face.vertices]
