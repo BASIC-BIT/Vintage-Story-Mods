@@ -415,17 +415,39 @@ public sealed class ReleaseContentTests
         double center = 8d;
         double radius = FlywheelModelDimensions.CompactWheelOuterRadius * 16d;
         double halfThickness = FlywheelModelDimensions.CompactWheelHalfThickness * 16d;
+        double minimumVisualGap = 0.04d * 16d;
 
         Assert.All(
             horizontal,
-            element => Assert.False(
-                IntersectsAxisAlignedCylinder(element, axis: 0, center, radius, halfThickness),
-                $"{element.GetProperty("name").GetString()} intersects the horizontal compact wheel."));
+            element =>
+            {
+                Assert.False(
+                    IntersectsAxisAlignedCylinder(element, axis: 0, center, radius, halfThickness),
+                    $"{element.GetProperty("name").GetString()} intersects the horizontal compact wheel.");
+                Assert.True(
+                    HasVisualClearanceFromAxisAlignedCylinder(
+                        element,
+                        axis: 0,
+                        center,
+                        radius,
+                        halfThickness,
+                        minimumVisualGap),
+                    $"{element.GetProperty("name").GetString()} sits too close to the horizontal compact wheel.");
+            });
         Assert.All(
             vertical,
             element => Assert.False(
                 IntersectsAxisAlignedCylinder(element, axis: 1, center, radius, halfThickness),
                 $"{element.GetProperty("name").GetString()} intersects the vertical compact wheel."));
+
+        double bearingMin = center - FlywheelModelDimensions.CompactBearingHalfThickness * 16d;
+        double bearingMax = center + FlywheelModelDimensions.CompactBearingHalfThickness * 16d;
+        JsonElement leftHousing = horizontal.Single(
+            element => element.GetProperty("name").GetString() == "LeftBearingHousingLower");
+        JsonElement rightHousing = horizontal.Single(
+            element => element.GetProperty("name").GetString() == "RightBearingHousingLower");
+        Assert.True(leftHousing.GetProperty("to")[0].GetDouble() > bearingMin);
+        Assert.True(rightHousing.GetProperty("from")[0].GetDouble() < bearingMax);
     }
 
     [Fact]
@@ -700,6 +722,31 @@ public sealed class ReleaseContentTests
         double deltaA = DistanceToInterval(center, from[radialAxisA], to[radialAxisA]);
         double deltaB = DistanceToInterval(center, from[radialAxisB], to[radialAxisB]);
         return deltaA * deltaA + deltaB * deltaB < radius * radius;
+    }
+
+    private static bool HasVisualClearanceFromAxisAlignedCylinder(
+        JsonElement element,
+        int axis,
+        double center,
+        double radius,
+        double halfThickness,
+        double minimumGap)
+    {
+        double[] from = element.GetProperty("from").EnumerateArray().Select(value => value.GetDouble()).ToArray();
+        double[] to = element.GetProperty("to").EnumerateArray().Select(value => value.GetDouble()).ToArray();
+        int radialAxisA = axis == 0 ? 1 : 0;
+        int radialAxisB = 2;
+        double deltaA = DistanceToInterval(center, from[radialAxisA], to[radialAxisA]);
+        double deltaB = DistanceToInterval(center, from[radialAxisB], to[radialAxisB]);
+        if (deltaA * deltaA + deltaB * deltaB >= radius * radius)
+        {
+            return true;
+        }
+
+        double cylinderMin = center - halfThickness;
+        double cylinderMax = center + halfThickness;
+        double axialGap = Math.Max(cylinderMin - to[axis], from[axis] - cylinderMax);
+        return axialGap >= minimumGap;
     }
 
     private static double DistanceToInterval(double value, double min, double max)
