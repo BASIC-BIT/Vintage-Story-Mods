@@ -284,15 +284,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 .RequiresPlayer()
                 .HandleWith(SendOOCMessage);
 
-            if (Config.EnableGlobalOOC)
-            {
-                API.ChatCommands.GetOrCreate("gooc")
-                    .WithDescription(Lang.Get("thebasics:chat-cmd-gooc-desc"))
-                    .WithArgs(new StringArgParser("message", false))
-                    .RequiresPrivilege(Privilege.chat)
-                    .RequiresPlayer()
-                    .HandleWith(SendGlobalOOCMessage);
-            }
+            // Registered even when global OOC is off. An unknown-command error tells the player
+            // nothing, and the command's own gate already refuses with a message that explains the
+            // state. It also keeps registration consistent when the config is flipped live.
+            API.ChatCommands.GetOrCreate("gooc")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-gooc-desc"))
+                .WithArgs(new StringArgParser("message", false))
+                .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
+                .HandleWith(SendGlobalOOCMessage);
         }
 
         // Chatter opt-out is always available (not gated behind DisableRPChat)
@@ -1916,6 +1916,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void Event_PlayerJoin(IServerPlayer byPlayer)
     {
+        ReconcileChatTypeOnJoin(byPlayer);
+
         if (!Config.UseGeneralChannelAsProximityChat)
         {
             var proximityGroup = GetProximityGroup();
@@ -2464,6 +2466,32 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     /// Reports both axes at once. Range alone is ambiguous now that a player can be whispering in
     /// character or whispering out of character.
     /// </summary>
+    /// <summary>
+    /// Puts a player back into ordinary chat when the type they were parked in is no longer allowed,
+    /// so they never start a session in a state the server will refuse.
+    ///
+    /// The delivery path clears stale types too, but only once the player has already tried to speak,
+    /// which costs them a message and reads as being stuck. Doing it at join makes that the rare
+    /// live-config-flip case rather than the normal one.
+    /// </summary>
+    private void ReconcileChatTypeOnJoin(IServerPlayer byPlayer)
+    {
+        var mode = byPlayer.GetChatOverrideMode();
+        if (mode == ChatOverrideMode.None || IsOverrideModeAvailable(byPlayer, mode, out var refusalLangKey))
+        {
+            return;
+        }
+
+        byPlayer.SetChatOverrideMode(ChatOverrideMode.None);
+
+        // Say why, and say what they are now. A silent change would leave them believing their next
+        // line goes somewhere it does not.
+        byPlayer.SendMessage(
+            ProximityChatId,
+            Lang.Get("thebasics:chat-type-reset-on-join", Lang.Get(refusalLangKey)),
+            EnumChatType.Notification);
+    }
+
     /// <summary>
     /// Which of the two axes the player just changed. The confirmation leads with that one and
     /// parenthesises the other, so a single line teaches that both exist without either looking
