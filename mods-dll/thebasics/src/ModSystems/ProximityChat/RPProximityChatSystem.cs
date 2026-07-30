@@ -506,11 +506,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             }
         };
 
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
-
-        var chatProperties = AnalyticsService.ChatProperties("gooc");
-        AnalyticsService.TrackCommandUsed("gooc", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("global_ooc", "send", properties: chatProperties);
+        SendThroughPipeline(context, "gooc", "global_ooc", "send");
 
         return new TextCommandResult
         {
@@ -583,11 +579,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             },
         };
 
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
-
-        var chatProperties = AnalyticsService.ChatProperties("ooc");
-        AnalyticsService.TrackCommandUsed("ooc", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("ooc", "send", properties: chatProperties);
+        SendThroughPipeline(context, "ooc", "ooc", "send");
 
         return new TextCommandResult
         {
@@ -2187,11 +2179,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         };
 
         // Process the entire pipeline
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
-
-        var chatProperties = AnalyticsService.ChatProperties("me");
-        AnalyticsService.TrackCommandUsed("me", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("proximity_emote", "send", properties: chatProperties);
+        SendThroughPipeline(context, "me", "proximity_emote", "send");
 
         return new TextCommandResult
         {
@@ -2215,11 +2203,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         };
 
         // Process the entire pipeline
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.Notification);
-
-        var chatProperties = AnalyticsService.ChatProperties("it");
-        AnalyticsService.TrackCommandUsed("it", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("environment_message", "send", properties: chatProperties);
+        SendThroughPipeline(context, "it", "environment_message", "send", EnumChatType.Notification);
 
         return new TextCommandResult
         {
@@ -2246,11 +2230,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         // Process the entire pipeline — PlacedEnvironmentTransformer will raycast and
         // either store the position or fall back to standard env.
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.Notification);
-
-        var chatProperties = AnalyticsService.ChatProperties("envhere");
-        AnalyticsService.TrackCommandUsed("envhere", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("environment_message", "place", properties: chatProperties);
+        SendThroughPipeline(context, "envhere", "environment_message", "place", EnumChatType.Notification);
 
         return new TextCommandResult
         {
@@ -2341,19 +2321,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             };
 
             // Process the entire pipeline
-            TransformerSystem.ProcessMessagePipeline(context);
-
-            // The pipeline can refuse the line, for instance when a stale chat type is cleared, and
-            // it tells the player itself when it does. Report what actually happened rather than
-            // assuming success, or a refused send counts as a completed one.
-            var delivered = context.State == MessageContextState.CONTINUE;
             var modeName = mode.ToString().ToLowerInvariant();
-            var chatProperties = AnalyticsService.ChatProperties(modeName);
-            AnalyticsService.TrackCommandUsed(modeName, delivered, delivered ? null : "rejected", chatProperties);
-            if (delivered)
-            {
-                AnalyticsService.TrackFeatureUsed("proximity_chat", "send_" + modeName, properties: chatProperties);
-            }
+            SendThroughPipeline(context, modeName, "proximity_chat", "send_" + modeName);
 
             // Status stays Success even on a refusal: the pipeline has already sent the player a
             // specific explanation, and an empty command error on top would just add noise.
@@ -2739,6 +2708,47 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         return string.IsNullOrWhiteSpace(Config.ProximityChatName) ? "Proximity" : Config.ProximityChatName;
     }
 
+    /// <summary>
+    /// Runs a message through the pipeline and records what actually happened to it.
+    /// </summary>
+    /// <remarks>
+    /// The pipeline can refuse a line without throwing — a cleared stale chat type, a disabled
+    /// surface — and it tells the player itself when it does. Every send reports through this one
+    /// exit so that no caller can drift back to assuming its own send landed; that assumption was
+    /// separately true of all seven call sites, which would have reported a server silently dropping
+    /// chat as one delivering every line.
+    /// </remarks>
+    private void SendThroughPipeline(MessageContext context, string surface, string featureName, string featureAction,
+        EnumChatType defaultChatType = EnumChatType.OthersMessage)
+    {
+        if (TransformerSystem == null)
+        {
+            // A missing pipeline is a dropped line, not a delivered one.
+            AnalyticsService.TrackFailure(featureName, surface, "error", "no_transformer_system");
+            return;
+        }
+
+        TransformerSystem.ProcessMessagePipeline(context, defaultChatType);
+
+        var delivered = context.State == MessageContextState.CONTINUE;
+        var chatProperties = AnalyticsService.ChatProperties(surface);
+
+        if (context.HasFlag(MessageContext.IS_FROM_COMMAND))
+        {
+            AnalyticsService.TrackCommandUsed(surface, delivered, delivered ? null : "rejected", chatProperties);
+        }
+        else if (!delivered)
+        {
+            // Chat-tab lines have no command event to carry the refusal, so record it as a failure.
+            AnalyticsService.TrackFailure(featureName, surface, "rejected", "pipeline_stopped");
+        }
+
+        if (delivered)
+        {
+            AnalyticsService.TrackFeatureUsed(featureName, featureAction, properties: chatProperties);
+        }
+    }
+
     private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
         Vintagestory.API.Datastructures.BoolRef consumed)
     {
@@ -2792,7 +2802,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             // no delivery and no feedback. Tell them and log it rather than losing it silently.
             try
             {
-                TransformerSystem?.ProcessMessagePipeline(context);
+                SendThroughPipeline(context, "chat_tab", "proximity_chat", "send_chat_tab");
             }
             catch (Exception ex)
             {
@@ -2805,8 +2815,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 AnalyticsService.TrackFailure("proximity_chat", "chat_tab_pipeline", "error", "pipeline_exception", ex);
                 return;
             }
-
-            AnalyticsService.TrackFeatureUsed("proximity_chat", "send_chat_tab", properties: AnalyticsService.ChatProperties("chat_tab"));
         }
         catch (Exception e)
         {
