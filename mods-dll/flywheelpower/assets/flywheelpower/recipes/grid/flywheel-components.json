@@ -1,0 +1,413 @@
+[
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-iron",
+        "quantity": 16
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-full-iron"
+    }
+  },
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-meteoriciron",
+        "quantity": 16
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-full-meteoriciron"
+    }
+  },
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-steel",
+        "quantity": 16
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-full-steel"
+    }
+  },
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-copper",
+        "quantity": 4
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-compact-copper"
+    }
+  },
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-tinbronze",
+        "quantity": 4
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-compact-tinbronze"
+    }
+  },
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-bismuthbronze",
+        "quantity": 4
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-compact-bismuthbronze"
+    }
+  },
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-blackbronze",
+        "quantity": 4
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-compact-blackbronze"
+    }
+  },
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-iron",
+        "quantity": 4
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-compact-iron"
+    }
+  },
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-meteoriciron",
+        "quantity": 4
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-compact-meteoriciron"
+    }
+  },
+  {
+    "ingredientPattern": "F_F,AL_",
+    "ingredients": {
+      "F": {
+        "type": "item",
+        "code": "flywheelpower:bearingfittings-steel",
+        "quantity": 4
+      },
+      "A": {
+        "type": "block",
+        "code": "game:woodenaxle-ud"
+      },
+      "L": {
+        "type": "item",
+        "code": "game:fat-rendered"
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelbearing-compact-steel"
+    }
+  },
+  {
+    "ingredientPattern": "PPP,PSP,PPP",
+    "ingredients": {
+      "P": {
+        "type": "block",
+        "code": "game:planks-*",
+        "quantity": 1
+      },
+      "S": {
+        "type": "item",
+        "code": "game:saw-*",
+        "isTool": true,
+        "toolDurabilityCost": 8
+      }
+    },
+    "width": 3,
+    "height": 3,
+    "output": {
+      "type": "item",
+      "code": "flywheelweb-full"
+    }
+  },
+  {
+    "ingredientPattern": "P_P,PSP",
+    "ingredients": {
+      "P": {
+        "type": "block",
+        "code": "game:planks-*",
+        "quantity": 1
+      },
+      "S": {
+        "type": "item",
+        "code": "game:saw-*",
+        "isTool": true,
+        "toolDurabilityCost": 4
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelweb-compact"
+    }
+  },
+  {
+    "ingredientPattern": "PPP,PHP,PPP",
+    "ingredients": {
+      "P": {
+        "type": "item",
+        "code": "game:metalplate-*",
+        "name": "metal",
+        "allowedVariants": [
+          "copper",
+          "tinbronze",
+          "bismuthbronze",
+          "blackbronze",
+          "iron",
+          "meteoriciron",
+          "steel"
+        ]
+      },
+      "H": {
+        "type": "item",
+        "code": "game:hammer-*",
+        "isTool": true,
+        "toolDurabilityCost": 8
+      }
+    },
+    "width": 3,
+    "height": 3,
+    "output": {
+      "type": "item",
+      "code": "flywheelrim-full-{metal}"
+    }
+  },
+  {
+    "ingredientPattern": "PPP,PSP,PPP",
+    "ingredients": {
+      "P": {
+        "type": "block",
+        "code": "game:planks-*",
+        "quantity": 1
+      },
+      "S": {
+        "type": "item",
+        "code": "game:saw-*",
+        "isTool": true,
+        "toolDurabilityCost": 8
+      }
+    },
+    "width": 3,
+    "height": 3,
+    "output": {
+      "type": "item",
+      "code": "flywheelrim-full-wood"
+    }
+  },
+  {
+    "ingredientPattern": "P_P,PHP",
+    "ingredients": {
+      "P": {
+        "type": "item",
+        "code": "game:metalplate-*",
+        "name": "metal",
+        "allowedVariants": [
+          "copper",
+          "tinbronze",
+          "bismuthbronze",
+          "blackbronze",
+          "iron",
+          "meteoriciron",
+          "steel"
+        ]
+      },
+      "H": {
+        "type": "item",
+        "code": "game:hammer-*",
+        "isTool": true,
+        "toolDurabilityCost": 4
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelrim-compact-{metal}"
+    }
+  },
+  {
+    "ingredientPattern": "P_P,PSP",
+    "ingredients": {
+      "P": {
+        "type": "block",
+        "code": "game:planks-*",
+        "quantity": 1
+      },
+      "S": {
+        "type": "item",
+        "code": "game:saw-*",
+        "isTool": true,
+        "toolDurabilityCost": 4
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelrim-compact-wood"
+    }
+  },
+  {
+    "ingredientPattern": "R_R,CR_",
+    "ingredients": {
+      "R": {
+        "type": "block",
+        "code": "game:rockpolished-granite"
+      },
+      "C": {
+        "type": "item",
+        "code": "game:chisel-*",
+        "isTool": true,
+        "toolDurabilityCost": 4
+      }
+    },
+    "width": 3,
+    "height": 2,
+    "output": {
+      "type": "item",
+      "code": "flywheelrim-compact-stone"
+    }
+  }
+]

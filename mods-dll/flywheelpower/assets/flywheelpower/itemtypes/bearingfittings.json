@@ -1,0 +1,69 @@
+{
+  "code": "bearingfittings",
+  "variantgroups": [
+    {
+      "code": "metal",
+      "states": [
+        "copper",
+        "tinbronze",
+        "bismuthbronze",
+        "blackbronze",
+        "iron",
+        "meteoriciron",
+        "steel"
+      ]
+    }
+  ],
+  "shape": {
+    "base": "game:item/resource/metalnailsandstrips"
+  },
+  "texturesByType": {
+    "*-copper": {
+      "metal": {
+        "base": "game:block/metal/sheet/copper1"
+      }
+    },
+    "*-tinbronze": {
+      "metal": {
+        "base": "game:block/metal/sheet/tinbronze1"
+      }
+    },
+    "*-bismuthbronze": {
+      "metal": {
+        "base": "game:block/metal/sheet/bismuthbronze1"
+      }
+    },
+    "*-blackbronze": {
+      "metal": {
+        "base": "game:block/metal/sheet/blackbronze1"
+      }
+    },
+    "*-iron": {
+      "metal": {
+        "base": "game:block/metal/sheet/iron1"
+      }
+    },
+    "*-meteoriciron": {
+      "metal": {
+        "base": "game:block/metal/sheet/meteoriciron1"
+      }
+    },
+    "*-steel": {
+      "metal": {
+        "base": "game:block/metal/sheet/steel1"
+      }
+    }
+  },
+  "creativeinventory": {
+    "general": [
+      "*"
+    ],
+    "items": [
+      "*"
+    ],
+    "mechanics": [
+      "*"
+    ]
+  },
+  "maxstacksize": 32
+}

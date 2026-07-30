@@ -1,0 +1,40 @@
+{
+  code: "flywheelstand",
+  class: "BlockFlywheelStand",
+  variantgroups: [
+    { code: "size", states: ["full", "compact"] },
+    { code: "rotation", states: ["ud", "ns", "we"] }
+  ],
+  creativeinventory: { "general": ["*-ud"], "mechanics": ["*-ud"] },
+  shapeInventoryByType: {
+    "flywheelstand-full-*": { base: "flywheelpower:block/flywheel-frame-horizontal" },
+    "flywheelstand-compact-*": { base: "flywheelpower:block/compact-flywheel-frame-horizontal" }
+  },
+  shapeByType: {
+    "flywheelstand-full-ns": { base: "flywheelpower:block/flywheel-frame-horizontal", rotateY: 90 },
+    "flywheelstand-full-ud": { base: "flywheelpower:block/flywheel-frame-vertical", rotateY: 0 },
+    "flywheelstand-full-we": { base: "flywheelpower:block/flywheel-frame-horizontal", rotateY: 0 },
+    "flywheelstand-compact-ns": { base: "flywheelpower:block/compact-flywheel-frame-horizontal", rotateY: 90 },
+    "flywheelstand-compact-ud": { base: "flywheelpower:block/compact-flywheel-frame-vertical", rotateY: 0 },
+    "flywheelstand-compact-we": { base: "flywheelpower:block/compact-flywheel-frame-horizontal", rotateY: 0 }
+  },
+  blockmaterial: "Wood",
+  textures: {
+    metal: { base: "game:block/metal/tarnished/sheet/iron1" },
+    wood: { base: "game:block/wood/planks/generic" }
+  },
+  sidesolid: { all: false },
+  sideopaque: { all: false },
+  rainPermeable: true,
+  resistance: 4,
+  lightAbsorption: 0,
+  maxStackSize: 16,
+  drops: [{ type: "block", code: "flywheelstand-{size}-ud", quantity: { avg: 1 } }],
+  collisionSelectionBox: { x1: 0.03125, y1: 0, z1: 0.03125, x2: 0.96875, y2: 0.875, z2: 0.96875 },
+  sounds: {
+    hit: "game:block/wood",
+    break: "game:block/wood",
+    place: "game:block/planks",
+    walk: "game:walk/wood"
+  }
+}

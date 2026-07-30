@@ -1,0 +1,13 @@
+{
+  code: "flywheelweb",
+  variantgroups: [{ code: "size", states: ["full", "compact"] }],
+  shape: { base: "game:item/plate" },
+  texture: { base: "game:block/wood/planks/generic" },
+  creativeinventory: { "general": ["*"], "items": ["*"], "mechanics": ["*"] },
+  maxstacksize: 8,
+  guiTransform: {
+    rotation: { x: -30, y: -44, z: -180 },
+    origin: { x: 0.5, y: 0.0625, z: 0.5 },
+    scale: 2.6
+  }
+}
