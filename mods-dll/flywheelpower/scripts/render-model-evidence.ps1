@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")
-$renderer = Join-Path $solutionRoot ".opencode\skills\vintage-story-model-renderer\scripts\render_vintage_story_model.py"
+$renderer = Join-Path $solutionRoot ".opencode\skills\vintage-story-model-renderer\scripts\vintage_story_model_renderer"
 $manifestDirectory = Join-Path $projectRoot "model-render"
 $previewGenerator = Join-Path $projectRoot "scripts\generate-preview-shapes.py"
 $materialGenerator = Join-Path $projectRoot "scripts\generate-material-content.py"

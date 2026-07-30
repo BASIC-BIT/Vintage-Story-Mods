@@ -64,3 +64,19 @@ attachment code. Do not infer grip placement or animation choice from asset name
 - New formats enter through explicit adapters rather than expanding one universal loader.
 - Every viewer feature needs a small fixture plus a headless regression before UI integration.
 - Vintage Story remains authoritative for registration, shaders, lighting, animation blending, and final in-game appearance.
+
+## Visual-judge calibration
+
+The headless renderer can optionally prepare or execute an advisory VLM review. Keep it separate from deterministic
+correctness:
+
+- deterministic blockers: render completion, exact input hashes, complete 24-view coverage, unresolved textures, winding,
+  and coplanar overlap;
+- advisory visual review: missing-looking faces, clipping, disconnected construction, texture readability, proportions,
+  camera continuity, and animation-loop continuity;
+- human/in-game authority: taste, intended construction, lighting, atlas behavior, collision, selection, registration,
+  held pose, and runtime animation blending.
+
+Calibrate the judge against a small corpus containing known-good models and deliberately seeded defects. Record
+false-positive and false-negative rates by category before promoting any VLM category to a CI blocker. Preserve the
+neutral-describe-first leg, artifact hashes, exact view/timestamp evidence, and human adjudication for disagreements.

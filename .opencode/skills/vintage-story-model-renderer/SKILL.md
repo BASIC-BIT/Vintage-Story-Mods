@@ -5,14 +5,14 @@ description: Required visual review workflow whenever editing or reviewing Vinta
 
 # Vintage Story Model Renderer
 
-Use `scripts/render_vintage_story_model.py` before and after every model change. Treat its output as automated geometric evidence, not human in-game approval.
+Use the executable `scripts/vintage_story_model_renderer/` package before and after every model change. Treat its output as
+automated geometric evidence, not human in-game approval.
 
 The renderer requires Python 3 with Pillow and NumPy. Its material and textured modes use a deterministic software depth
 buffer; no GPU, display server, Blender installation, or native OpenGL context is required.
 
-The command is a compatibility shim over the reusable `scripts/vintage_story_model_renderer/` package. Keep parsing,
-geometry, animation, rendering, audits, and export in their focused modules so future viewer work does not grow the CLI
-back into a monolith. See `VIEWER_ROADMAP.md` before adding interactive or held-model features.
+Keep parsing, geometry, animation, rendering, audits, judging, and export in their focused modules so future viewer work
+does not grow the executable back into a monolith. See `VIEWER_ROADMAP.md` before adding interactive or held-model features.
 
 ## Workflow
 
@@ -20,7 +20,7 @@ back into a monolith. See `VIEWER_ROADMAP.md` before adding interactive or held-
 2. Render all fixed views and modes:
 
    ```powershell
-   python .opencode/skills/vintage-story-model-renderer/scripts/render_vintage_story_model.py `
+   python .opencode/skills/vintage-story-model-renderer/scripts/vintage_story_model_renderer `
      --manifest <manifest.json> `
      --output-dir <bounded-output-directory> `
      --fail-on-coplanar-overlap
@@ -47,6 +47,29 @@ back into a monolith. See `VIEWER_ROADMAP.md` before adding interactive or held-
    State clearly that the image is an automated render and record any human feedback separately.
 7. After automated rendering passes, run relevant build/tests and use the repository `human-qa` skill for bounded in-game observation.
 
+## Optional LLM visual judge
+
+An LLM review is advisory evidence layered on top of deterministic rendering, never a substitute for the overlap audit,
+metadata checks, direct image inspection, or in-game QA. Prepare a hash-bound request locally without making an API call:
+
+```powershell
+python .opencode/skills/vintage-story-model-renderer/scripts/vintage_story_model_renderer judge `
+  --evidence-dir <bounded-output-directory> `
+  --out <bounded-output-directory>/visual-judge-request.json
+```
+
+The request includes the exact contact-sheet, metadata, and rubric hashes. It uses an adversarial visual rubric while first
+requiring a neutral description, reducing leading-question false passes. With explicit approval for external upload and
+paid model use, add `--execute` and provide `GEMINI_API_KEY` in the process environment. The default
+`gemini-3.1-pro-preview` accepts image and video input; pass `--video <bounded.mp4>` to review camera motion and animation
+continuity. Gemini normally samples uploaded video at about one frame per second, so use slow bounded turntables for gross
+motion/loop review and retain deterministic frame or optical-flow checks for brief jitter and single-frame clipping. The
+command never reads a key from a repository file and never writes it to output.
+
+Treat `needs-review`, model disagreement, or any uncertain source classification as a human review queue. During initial
+calibration, do not make LLM PASS a release gate. A clear objective LLM finding may block only after a human confirms the
+artifact and the corresponding deterministic or source-level check is added where practical.
+
 When changing this renderer, run its regression tests:
 
 ```powershell
@@ -58,7 +81,7 @@ python -m unittest discover `
 For a single-shape entity manifest, render a looping authored animation from a fixed camera:
 
 ```powershell
-python .opencode/skills/vintage-story-model-renderer/scripts/render_vintage_story_model.py `
+python .opencode/skills/vintage-story-model-renderer/scripts/vintage_story_model_renderer `
   --manifest <manifest.json> `
   --output-dir <bounded-output-directory> `
   --animation <animation-code> `
@@ -80,7 +103,7 @@ animation.
 To isolate camera motion from animation, render the authored rest pose as a static turntable:
 
 ```powershell
-python .opencode/skills/vintage-story-model-renderer/scripts/render_vintage_story_model.py `
+python .opencode/skills/vintage-story-model-renderer/scripts/vintage_story_model_renderer `
   --manifest <manifest.json> `
   --output-dir <bounded-output-directory> `
   --turntable-output <video.mp4> `

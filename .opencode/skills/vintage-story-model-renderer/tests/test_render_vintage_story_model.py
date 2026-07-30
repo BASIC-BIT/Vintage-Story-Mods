@@ -1,4 +1,3 @@
-import importlib.util
 import json
 import sys
 import tempfile
@@ -8,16 +7,15 @@ from pathlib import Path
 from PIL import Image
 
 
-SCRIPT = Path(__file__).parents[1] / "scripts" / "render_vintage_story_model.py"
-SPEC = importlib.util.spec_from_file_location("render_vintage_story_model", SCRIPT)
-assert SPEC is not None and SPEC.loader is not None
-renderer = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = renderer
-SPEC.loader.exec_module(renderer)
+SCRIPTS = Path(__file__).parents[1] / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
+import vintage_story_model_renderer as renderer
 
 
 class PackageBoundaryTests(unittest.TestCase):
-    def test_compatibility_script_exports_focused_package_modules(self):
+    def test_public_api_exports_focused_package_modules(self):
         self.assertEqual("vintage_story_model_renderer.cli", renderer.main.__module__)
         self.assertEqual("vintage_story_model_renderer.shapes", renderer.load_shape.__module__)
         self.assertEqual("vintage_story_model_renderer.rendering", renderer.render.__module__)
