@@ -120,22 +120,32 @@ public class PlayerChatTransformer : MessageTransformerBase
             return PlayerChatKind.Speech;
         }
 
-        if (IsOverrideStale(context, overrideMode))
-        {
-            context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
-            context.SetMetadata(StaleOverrideWasResetKey, true);
-            return PlayerChatKind.RejectedStaleOverride;
-        }
-
         // A global OOC override plus an explicit range command is a contradiction: the command names
         // a range and global OOC has none. Honouring the override would turn "/w he's lying" into a
         // server-wide broadcast of something the player chose a whisper command for. The range wins,
         // and the player sees their own line render as ranged speech. Local OOC is left alone, since
         // it is delivered at the range axis, so whispered OOC is a coherent thing to ask for.
+        //
+        // Checked before staleness on purpose. The outcome here is ranged speech whether or not
+        // global OOC is still enabled, so a stale type changes nothing about this line and must not
+        // drop it. The stale value is still cleared. Local OOC gets no such exemption: it would have
+        // been delivered as OOC, so losing the type does change the outcome and the line is refused.
         if (overrideMode == ChatOverrideMode.GlobalOoc &&
             context.HasFlag(MessageContext.IS_EXPLICIT_RANGE_COMMAND))
         {
+            if (IsOverrideStale(context, overrideMode))
+            {
+                context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
+            }
+
             return PlayerChatKind.Speech;
+        }
+
+        if (IsOverrideStale(context, overrideMode))
+        {
+            context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
+            context.SetMetadata(StaleOverrideWasResetKey, true);
+            return PlayerChatKind.RejectedStaleOverride;
         }
 
         return overrideMode switch

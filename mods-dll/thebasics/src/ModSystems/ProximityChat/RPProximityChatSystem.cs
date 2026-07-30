@@ -818,7 +818,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         if (!TryReloadConfigAndGetChangedKeys(out var reloadChangedKeys))
         {
             AnalyticsService.TrackFailure("config_admin", "reload", "error", "config_unreadable");
-            SendConfigAdminResult(player, false, Lang.Get("thebasics:config-reload-failed"), null);
+            SendConfigAdminResult(player, false, Lang.Get("thebasics:config-reload-failed"), []);
             return true;
         }
 
@@ -1373,6 +1373,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return;
         }
 
+        changedKeys ??= [];
         var restartRequired = GetRestartRequiredKeys(changedKeys);
         var liveApplied = changedKeys.Where(key => !restartRequired.Contains(key, StringComparer.OrdinalIgnoreCase)).ToList();
 

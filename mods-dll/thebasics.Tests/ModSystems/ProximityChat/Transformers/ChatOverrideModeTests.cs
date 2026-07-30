@@ -172,6 +172,52 @@ public class ChatOverrideModeTests
     }
 
     [Fact]
+    public void ExplicitRangeCommandStillDeliversWhenGlobalOocWentStale()
+    {
+        // The outcome is ranged speech whether or not global OOC is enabled, so a stale type must not
+        // drop this line. Dropping it would refuse a message that was never going to use the type.
+        LangTestHelper.EnsureEnglish();
+        var player = CreatePlayer(ChatOverrideMode.GlobalOoc);
+        var transformer = new PlayerChatTransformer(new RPProximityChatSystem { Config = CreateConfig(enableGlobalOoc: false) });
+        var context = new MessageContext
+        {
+            Message = "keep it down",
+            SendingPlayer = player
+        };
+        context.SetFlag(MessageContext.IS_PLAYER_CHAT);
+        context.SetFlag(MessageContext.IS_EXPLICIT_RANGE_COMMAND);
+
+        var result = transformer.Transform(context);
+
+        result.State.Should().Be(MessageContextState.CONTINUE);
+        result.HasFlag(MessageContext.IS_SPEECH).Should().BeTrue();
+        result.HasFlag(MessageContext.IS_GLOBAL_OOC).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ExplicitRangeCommandStillRefusesWhenLocalOocWentStale()
+    {
+        // Local OOC gets no exemption: it would have been delivered as OOC, so losing the type does
+        // change the outcome and publishing it in character would leak the intent.
+        LangTestHelper.EnsureEnglish();
+        var config = CreateConfig();
+        config.AllowOOCToggle = false;
+        var transformer = new PlayerChatTransformer(new RPProximityChatSystem { Config = config });
+        var context = new MessageContext
+        {
+            Message = "brb",
+            SendingPlayer = CreatePlayer(ChatOverrideMode.Ooc)
+        };
+        context.SetFlag(MessageContext.IS_PLAYER_CHAT);
+        context.SetFlag(MessageContext.IS_EXPLICIT_RANGE_COMMAND);
+
+        var result = transformer.Transform(context);
+
+        result.State.Should().Be(MessageContextState.STOP);
+        result.HasFlag(MessageContext.IS_SPEECH).Should().BeFalse();
+    }
+
+    [Fact]
     public void PlainLineStillHonoursAGlobalOocOverride()
     {
         // The bypass must be scoped to explicit range commands, not applied to ordinary typing.
