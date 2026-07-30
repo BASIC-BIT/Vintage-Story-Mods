@@ -701,6 +701,16 @@ def rotate_view_around_y(view: Vec3, turns: float) -> Vec3:
     )
 
 
+def animation_sample_positions(quantity: int, output_fps: int, source_fps: int) -> list[float]:
+    samples_per_cycle = round(quantity * output_fps / source_fps)
+    if samples_per_cycle <= 0:
+        raise ValueError("Animation sampling produced no output frames.")
+    return [
+        sample * source_fps / output_fps
+        for sample in range(samples_per_cycle)
+    ]
+
+
 def fixed_animation_projections(
     frame_faces: list[list[Face]],
     views: list[Vec3],
@@ -928,6 +938,7 @@ def render_animation(
     output: Path,
     size: int,
     fps: int,
+    source_fps: int,
     cycles: int,
     orbit: bool,
 ) -> dict:
@@ -943,14 +954,16 @@ def render_animation(
     if animation is None:
         raise ValueError(f"Animation '{animation_code}' was not found in {shape_path}.")
     quantity = int(animation["quantityframes"])
-    source_frame_faces = [
-        load_shape(shape_path, animation_code, frame)[0]
-        for frame in range(quantity)
+    source_positions = animation_sample_positions(quantity, fps, source_fps)
+    sampled_cycle_faces = [
+        load_shape(shape_path, animation_code, source_position)[0]
+        for source_position in source_positions
     ]
-    total_frames = quantity * cycles
+    samples_per_cycle = len(sampled_cycle_faces)
+    total_frames = samples_per_cycle * cycles
     if orbit:
         frame_faces = [
-            source_frame_faces[frame % quantity]
+            sampled_cycle_faces[frame % samples_per_cycle]
             for frame in range(total_frames)
         ]
         base_view = VIEWS[view_name][0]
@@ -959,13 +972,14 @@ def render_animation(
             for frame in range(total_frames)
         ]
     else:
-        frame_faces = source_frame_faces
-        views = [VIEWS[view_name][0]] * quantity
+        frame_faces = sampled_cycle_faces
+        views = [VIEWS[view_name][0]] * samples_per_cycle
     projections = fixed_animation_projections(frame_faces, views, size)
     frame_directory = output.parent / f"{output.stem}-frames"
     frame_directory.mkdir(parents=True, exist_ok=True)
     for frame, (faces, frame_projection) in enumerate(zip(frame_faces, projections)):
         camera_label = f"ORBIT {360 * frame / total_frames:06.2f} DEG" if orbit else view_name.upper()
+        source_position = source_positions[frame % samples_per_cycle]
         render(
             faces,
             colors,
@@ -975,7 +989,7 @@ def render_animation(
             frame_directory / f"{frame:04d}.png",
             size,
             frame_projection,
-            f"TEXTURED / {camera_label} / {animation_code.upper()} / {frame % quantity:02d}",
+            f"TEXTURED / {camera_label} / {animation_code.upper()} / {source_position:05.2f}",
         )
 
     ffmpeg_command = [
@@ -999,10 +1013,11 @@ def render_animation(
     return {
         "animation": animation_code,
         "sourceFrameCount": quantity,
+        "sourceFramesPerSecond": source_fps,
         "cycles": cycles,
-        "videoFrameCount": quantity * cycles,
+        "videoFrameCount": total_frames,
         "framesPerSecond": fps,
-        "durationSeconds": quantity * cycles / fps,
+        "durationSeconds": total_frames / fps,
         "view": view_name,
         "cameraMotion": "orbit-360" if orbit else "fixed",
         "cameraRevolutions": 1 if orbit else 0,
@@ -1033,6 +1048,7 @@ def main() -> None:
     parser.add_argument("--animation-output", type=Path)
     parser.add_argument("--animation-view", choices=VIEWS, default="isometric")
     parser.add_argument("--animation-fps", type=int, default=30)
+    parser.add_argument("--animation-source-fps", type=int, default=30)
     parser.add_argument("--animation-cycles", type=int, default=3)
     parser.add_argument("--animation-orbit", action="store_true")
     args = parser.parse_args()
@@ -1091,8 +1107,8 @@ def main() -> None:
         shape_specs = manifest.get("shapes", [])
         if len(shape_specs) != 1 or "proceduralFlywheel" in manifest:
             raise ValueError("Animation rendering currently requires a manifest with exactly one JSON shape.")
-        if args.animation_fps <= 0 or args.animation_cycles <= 0:
-            raise ValueError("Animation FPS and cycles must be positive.")
+        if args.animation_fps <= 0 or args.animation_source_fps <= 0 or args.animation_cycles <= 0:
+            raise ValueError("Animation output FPS, source FPS, and cycles must be positive.")
         animation_output = (
             args.animation_output.resolve()
             if args.animation_output
@@ -1108,6 +1124,7 @@ def main() -> None:
             animation_output,
             args.size,
             args.animation_fps,
+            args.animation_source_fps,
             args.animation_cycles,
             args.animation_orbit,
         )

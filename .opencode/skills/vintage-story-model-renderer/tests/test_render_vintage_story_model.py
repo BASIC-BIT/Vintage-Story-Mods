@@ -148,6 +148,13 @@ class RenderMatrixTests(unittest.TestCase):
             renderer.dot(views[-1], views[0]),
         )
 
+    def test_animation_sampling_interpolates_source_frames_at_higher_output_rate(self):
+        positions = renderer.animation_sample_positions(30, 60, 30)
+
+        self.assertEqual(60, len(positions))
+        self.assertEqual([0, 0.5, 1, 1.5], positions[:4])
+        self.assertEqual(29.5, positions[-1])
+
 
 class HierarchicalShapeTests(unittest.TestCase):
     @staticmethod
