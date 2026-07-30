@@ -2,6 +2,7 @@ using FluentAssertions;
 using NSubstitute;
 using thebasics.Configs;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.Utilities;
 using Vintagestory.API.Server;
 
 namespace thebasics.Tests.ModSystems.ProximityChat;
@@ -85,6 +86,39 @@ public class ChatOcclusionTests
         public void ReturnsRecordedPenaltyForRecipient()
         {
             ContextWithPenalties(("a", 12), ("b", 3)).GetOcclusionPenalty(PlayerWithUid("b")).Should().Be(3);
+        }
+    }
+
+    public class MarkupSafeObfuscation
+    {
+        // Language scrambling italicises text a listener cannot understand, so obfuscation can be
+        // handed VTML. Neither '<' nor '>' is punctuation, so a blind per-character pass corrupted
+        // the tag and the listener saw an empty line instead of a garbled one.
+        // percentage 1.0 garbles every eligible character, the worst case for tag corruption.
+        [Theory]
+        [InlineData("<i>gibberish here</i>", "<i>********* ****</i>")]
+        [InlineData("plain then <i>tagged</i> more", "***** **** <i>******</i> ****")]
+        [InlineData("<font color=\"#ABCDEF\">hi</font>", "<font color=\"#ABCDEF\">**</font>")]
+        [InlineData("no markup at all", "** ****** ** ***")]
+        public void GarblesTextButNeverTags(string input, string expected)
+        {
+            ChatHelper.ObfuscateOutsideMarkup(input, 1.0, () => 0.0).Should().Be(expected);
+        }
+
+        [Fact]
+        public void LeavesEverythingAloneAtZeroPercent()
+        {
+            const string input = "<i>hello there</i>";
+
+            ChatHelper.ObfuscateOutsideMarkup(input, 0.0, () => 0.5).Should().Be(input);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        public void HandlesEmptyInput(string? input)
+        {
+            ChatHelper.ObfuscateOutsideMarkup(input!, 1.0, () => 0.0).Should().Be(input);
         }
     }
 

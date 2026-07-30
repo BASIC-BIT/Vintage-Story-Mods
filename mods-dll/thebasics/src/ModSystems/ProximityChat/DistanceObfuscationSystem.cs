@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -48,14 +49,6 @@ public class DistanceObfuscationSystem : BaseSubSystem
 
         var percentage = (distance - obfuscationRange) / (maxRange - obfuscationRange);
 
-        message = string.Join("", message.Select(character =>
-        {
-            if (ChatHelper.IsPunctuation(character) || ChatHelper.IsWhitespace(character))
-            {
-                return character;
-            }
-
-            return _random.NextDouble() < percentage ? '*' : character;
-        }));
+        message = ChatHelper.ObfuscateOutsideMarkup(message, percentage, _random.NextDouble);
     }
 }

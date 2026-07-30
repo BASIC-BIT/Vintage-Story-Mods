@@ -446,7 +446,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private TextCommandResult HandleReloadConfigCommand(TextCommandCallingArgs args)
     {
         var before = CloneConfig(Config);
-        ReloadSharedConfigFromDisk(API);
+
+        // Refuse rather than apply defaults over a running server's settings. The file is
+        // unparseable, so "reloading" it would mean discarding every live setting and telling the
+        // admin it succeeded.
+        if (!TryReloadSharedConfigFromDisk(API, out _))
+        {
+            return TextCommandResult.Error(Lang.Get("thebasics:config-reload-failed"));
+        }
+
         var changedKeys = GetChangedConfigKeys(before, Config);
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();

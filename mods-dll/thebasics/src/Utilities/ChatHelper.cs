@@ -158,6 +158,56 @@ namespace thebasics.Utilities
         }
 
         /// <summary>
+        /// Garbles readable characters while leaving VTML tags intact.
+        ///
+        /// Callers may hand this text that earlier pipeline stages already wrapped in markup, such as
+        /// the italics language scrambling adds for text a listener cannot understand. Neither '&lt;'
+        /// nor '&gt;' is punctuation, so a blind per-character pass could turn "&lt;i&gt;" into "*i&gt;" or
+        /// "&lt;*&gt;", after which the parser swallows the body as a tag name and the reader sees an empty
+        /// line instead of a garbled one. Player-authored markup is stripped earlier in the pipeline,
+        /// so any tag still present is trusted and must survive.
+        /// </summary>
+        public static string ObfuscateOutsideMarkup(string message, double percentage, System.Func<double> nextRandom)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                return message;
+            }
+
+            var builder = new StringBuilder(message.Length);
+            var insideTag = false;
+
+            foreach (var character in message)
+            {
+                if (character == '<')
+                {
+                    insideTag = true;
+                }
+
+                if (insideTag)
+                {
+                    builder.Append(character);
+                    if (character == '>')
+                    {
+                        insideTag = false;
+                    }
+
+                    continue;
+                }
+
+                if (IsPunctuation(character) || IsWhitespace(character))
+                {
+                    builder.Append(character);
+                    continue;
+                }
+
+                builder.Append(nextRandom() < percentage ? '*' : character);
+            }
+
+            return builder.ToString();
+        }
+
+        /// <summary>
         /// True when the speech body reads as a question: a question mark appears anywhere in the
         /// trailing punctuation run. "Where are you?!" and "Wait, what?!?" both count, because people
         /// type them, while "Look out!" does not.

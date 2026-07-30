@@ -339,6 +339,7 @@
   "chat-override-cleared-rp-disabled": "Roleplay chat is disabled on this server, so your chat type has been reset to in character. That message was not sent; send it again to post it normally.",
   "chat-override-rp-disabled": "Roleplay chat is disabled on this server, so chat types are unavailable.",
   "chat-type-rptext-disabled": "You have RP text turned off, so chat types would not apply to your messages. Use /rptext on first, or send single messages with /ooc [message] or /me [action].",
+  "config-reload-failed": "Could not read ModConfig/the_basics.json, so nothing was reloaded and your live settings are unchanged. Check the server log for the parse error, fix the file, and try again.",
   "chat-pipeline-failed": "Your message could not be sent because of a server-side chat error. It has been logged for the server owner.",
   "chat-ooc-set": "OOC chat mode {0}.",
   "chat-ooc-enabled": "enabled",

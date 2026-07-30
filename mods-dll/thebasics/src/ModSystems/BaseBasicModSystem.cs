@@ -79,7 +79,29 @@ namespace thebasics.ModSystems
 
         protected static ModConfig ReloadSharedConfigFromDisk(ICoreServerAPI api)
         {
-            var loaded = LoadConfigFromDisk(api);
+            TryReloadSharedConfigFromDisk(api, out var config);
+            return config;
+        }
+
+        /// <summary>
+        /// Reloads from disk, refusing to apply a config that could not actually be read.
+        ///
+        /// An unparseable file (a stray comma in a hand-edited config) falls back to pure defaults.
+        /// Copying those over the live config would silently wipe every setting the server is
+        /// currently running, broadcast the defaults to clients, and leave the next admin-panel save
+        /// to persist them over the operator's real file. The load already declines to overwrite the
+        /// file itself; this declines to overwrite the running config to match.
+        /// </summary>
+        protected static bool TryReloadSharedConfigFromDisk(ICoreServerAPI api, out ModConfig config)
+        {
+            var loaded = LoadConfigFromDisk(api, out var usedFallbackDefaults);
+
+            if (usedFallbackDefaults && _sharedConfig != null)
+            {
+                config = _sharedConfig;
+                return false;
+            }
+
             if (_sharedConfig == null)
             {
                 _sharedConfig = loaded;
@@ -89,7 +111,8 @@ namespace thebasics.ModSystems
                 CopyConfigValues(loaded, _sharedConfig);
             }
 
-            return _sharedConfig;
+            config = _sharedConfig;
+            return true;
         }
 
         protected static void SaveSharedConfig(ICoreServerAPI api)
@@ -118,13 +141,19 @@ namespace thebasics.ModSystems
         /// </summary>
         private static ModConfig LoadConfigFromDisk(ICoreServerAPI api)
         {
-            var config = LoadOrRecoverConfig(api);
+            return LoadConfigFromDisk(api, out _);
+        }
+
+        private static ModConfig LoadConfigFromDisk(ICoreServerAPI api, out bool usedFallbackDefaults)
+        {
+            var config = LoadOrRecoverConfig(api, out usedFallbackDefaults);
             LogConfigValidationWarnings(api, config);
             return config;
         }
 
-        private static ModConfig LoadOrRecoverConfig(ICoreServerAPI api)
+        private static ModConfig LoadOrRecoverConfig(ICoreServerAPI api, out bool usedFallbackDefaults)
         {
+            usedFallbackDefaults = false;
             ModConfig config;
 
             try
@@ -133,7 +162,16 @@ namespace thebasics.ModSystems
             }
             catch (Exception e)
             {
-                return TryRepairJsonStringConfig(api) ?? CreateFallbackConfig(api, e);
+                // A repaired legacy file is a real config, so it is not a fallback. Only the
+                // defaults-after-parse-failure path loses the operator's settings.
+                var repaired = TryRepairJsonStringConfig(api);
+                if (repaired != null)
+                {
+                    return repaired;
+                }
+
+                usedFallbackDefaults = true;
+                return CreateFallbackConfig(api, e);
             }
 
             if (config == null)
@@ -161,11 +199,6 @@ namespace thebasics.ModSystems
         /// </summary>
         private static void LogConfigValidationWarnings(ICoreServerAPI api, ModConfig config)
         {
-            if (config == null)
-            {
-                return;
-            }
-
             try
             {
                 foreach (var error in ConfigAdminSettingRegistry.ValidateConfig(config))
