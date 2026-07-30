@@ -815,7 +815,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var reloadChangedKeys = ReloadConfigAndGetChangedKeys();
+        if (!TryReloadConfigAndGetChangedKeys(out var reloadChangedKeys))
+        {
+            AnalyticsService.TrackFailure("config_admin", "reload", "error", "config_unreadable");
+            SendConfigAdminResult(player, false, Lang.Get("thebasics:config-reload-failed"), null);
+            return true;
+        }
+
         AnalyticsService.TrackFeatureUsed("config_admin", "reload");
         SendConfigAdminResult(player, true, $"Reloaded config from disk. Changed settings: {reloadChangedKeys.Count}.", reloadChangedKeys);
         return true;
@@ -887,7 +893,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var changedKeys = ReloadConfigAndGetChangedKeys();
+        if (!TryReloadConfigAndGetChangedKeys(out var changedKeys))
+        {
+            AnalyticsService.TrackFailure("language_config", "reload", "error", "config_unreadable");
+            SendLanguageConfigResult(player, false, Lang.Get("thebasics:config-reload-failed"), LanguageConfigAdmin.BuildEntries(Config));
+            return true;
+        }
+
         AnalyticsService.TrackFeatureUsed("language_config", "reload");
         SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {changedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config));
         return true;
@@ -960,7 +972,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var changedKeys = ReloadConfigAndGetChangedKeys();
+        if (!TryReloadConfigAndGetChangedKeys(out var changedKeys))
+        {
+            AnalyticsService.TrackFailure("character_sheet_fields", "reload", "error", "config_unreadable");
+            SendCharacterSheetFieldConfigResult(player, false, Lang.Get("thebasics:config-reload-failed"), CharacterSheetFieldConfigAdmin.BuildEntries(Config));
+            return true;
+        }
+
         AnalyticsService.TrackFeatureUsed("character_sheet_fields", "reload");
         SendCharacterSheetFieldConfigResult(player, true, $"Reloaded character sheet fields from disk. Changed settings: {changedKeys.Count}.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
         return true;
@@ -1005,14 +1023,25 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         AnalyticsService.TrackFailure(featureName, action, "warning", "validation_failed", properties: properties);
     }
 
-    private HashSet<string> ReloadConfigAndGetChangedKeys()
+    /// <summary>
+    /// False when the file on disk could not be read. A Try shape rather than an empty set, because
+    /// "no settings changed" is a legitimate successful reload and must stay distinguishable from
+    /// "nothing was reloaded"; conflating them is what let the editors report success on a parse
+    /// failure.
+    /// </summary>
+    private bool TryReloadConfigAndGetChangedKeys(out HashSet<string> changedKeys)
     {
         var before = CloneConfig(Config);
-        ReloadSharedConfigFromDisk(API);
-        var changedKeys = GetChangedConfigKeys(before, Config);
+        if (!TryReloadSharedConfigFromDisk(API, out _))
+        {
+            changedKeys = [];
+            return false;
+        }
+
+        changedKeys = GetChangedConfigKeys(before, Config);
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();
-        return changedKeys;
+        return true;
     }
 
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)

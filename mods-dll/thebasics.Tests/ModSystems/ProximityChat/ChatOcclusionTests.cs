@@ -105,6 +105,25 @@ public class ChatOcclusionTests
             ChatHelper.ObfuscateOutsideMarkup(input, 1.0, () => 0.0).Should().Be(expected);
         }
 
+        // A bare '<' a player typed must still be garbled. Treating every '<' as markup would let
+        // anyone type one and have the rest of their line delivered legibly at any distance.
+        [Theory]
+        [InlineData("a < b secret", "* * * ******")]
+        [InlineData("a < b > secret", "* * * * ******")]
+        [InlineData("2 <3 hearts", "* ** ******")]
+        [InlineData("unclosed <i tag here", "******** ** *** ****")]
+        public void RawAngleBracketsAreStillGarbled(string input, string expected)
+        {
+            ChatHelper.ObfuscateOutsideMarkup(input, 1.0, () => 0.0).Should().Be(expected);
+        }
+
+        [Fact]
+        public void NestedOpenBracketDoesNotOpenATagSpan()
+        {
+            // "<i<b>" is not a tag; the first '<' must not swallow to the later '>'.
+            ChatHelper.ObfuscateOutsideMarkup("<i<b>x", 1.0, () => 0.0).Should().Be("**<b>*");
+        }
+
         [Fact]
         public void LeavesEverythingAloneAtZeroPercent()
         {

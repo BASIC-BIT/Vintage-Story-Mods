@@ -164,8 +164,12 @@ namespace thebasics.Utilities
         /// the italics language scrambling adds for text a listener cannot understand. Neither '&lt;'
         /// nor '&gt;' is punctuation, so a blind per-character pass could turn "&lt;i&gt;" into "*i&gt;" or
         /// "&lt;*&gt;", after which the parser swallows the body as a tag name and the reader sees an empty
-        /// line instead of a garbled one. Player-authored markup is stripped earlier in the pipeline,
-        /// so any tag still present is trusted and must survive.
+        /// line instead of a garbled one.
+        ///
+        /// Only complete, tag-shaped spans are preserved. A bare '&lt;' that a player typed as ordinary
+        /// text (user markup is stripped upstream, so raw angle brackets do reach here) must still be
+        /// garbled: treating every '&lt;' as the start of markup would let anyone type one and have the
+        /// entire rest of the line delivered legibly at any distance.
         /// </summary>
         public static string ObfuscateOutsideMarkup(string message, double percentage, System.Func<double> nextRandom)
         {
@@ -175,36 +179,71 @@ namespace thebasics.Utilities
             }
 
             var builder = new StringBuilder(message.Length);
-            var insideTag = false;
+            var index = 0;
 
-            foreach (var character in message)
+            while (index < message.Length)
             {
+                var character = message[index];
+
                 if (character == '<')
                 {
-                    insideTag = true;
-                }
-
-                if (insideTag)
-                {
-                    builder.Append(character);
-                    if (character == '>')
+                    var tagEnd = FindTagEnd(message, index);
+                    if (tagEnd > index)
                     {
-                        insideTag = false;
+                        builder.Append(message, index, tagEnd - index + 1);
+                        index = tagEnd + 1;
+                        continue;
                     }
-
-                    continue;
                 }
 
                 if (IsPunctuation(character) || IsWhitespace(character))
                 {
                     builder.Append(character);
-                    continue;
+                }
+                else
+                {
+                    builder.Append(nextRandom() < percentage ? '*' : character);
                 }
 
-                builder.Append(nextRandom() < percentage ? '*' : character);
+                index++;
             }
 
             return builder.ToString();
+        }
+
+        /// <summary>
+        /// Index of the '&gt;' closing a tag that opens at <paramref name="openIndex"/>, or -1 when this
+        /// '&lt;' does not begin one. Requires a letter or '/' immediately after the '&lt;', so "a &lt; b &gt; c"
+        /// is treated as text rather than as a tag, and rejects a nested '&lt;' before any '&gt;'.
+        /// </summary>
+        private static int FindTagEnd(string message, int openIndex)
+        {
+            var first = openIndex + 1;
+            if (first >= message.Length)
+            {
+                return -1;
+            }
+
+            var lead = message[first];
+            if (lead != '/' && !char.IsLetter(lead))
+            {
+                return -1;
+            }
+
+            for (var i = first; i < message.Length; i++)
+            {
+                if (message[i] == '<')
+                {
+                    return -1;
+                }
+
+                if (message[i] == '>')
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         /// <summary>
