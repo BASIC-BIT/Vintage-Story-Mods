@@ -39,6 +39,130 @@ namespace thebasics.Configs
             InitializeHomeSpawnDefaults();
         }
 
+        /// <summary>
+        /// Sentinel for <see cref="ProximityChatModeDistances"/> meaning "deliver to every online player",
+        /// matching the convention <see cref="MapPlayerRenderDistance"/> already uses.
+        /// </summary>
+        public const int UnlimitedRange = -1;
+
+        // Exact match, not "any negative". A hand-edited typo such as -2 would otherwise turn a
+        // proximity mode into a server-wide channel silently; ValidateConfig rejects it instead.
+        public static bool IsUnlimitedRange(int range) => range == UnlimitedRange;
+
+        /// <summary>
+        /// Per-mode dictionaries are only defaulted wholesale, so a hand-edited config can be missing
+        /// a mode entirely. Reading one of these with the indexer would throw on the chat hot path
+        /// and take the message down for every recipient, so every lookup falls back instead.
+        /// </summary>
+        public static T GetModeValue<T>(IDictionary<ProximityChatMode, T> valuesByMode, ProximityChatMode mode, T fallback)
+        {
+            return valuesByMode != null && valuesByMode.TryGetValue(mode, out var value) ? value : fallback;
+        }
+
+        public int GetModeDistance(ProximityChatMode mode) =>
+            GetModeValue(ProximityChatModeDistances, mode, DefaultModeDistance(mode));
+
+        public int GetModeObfuscationRange(ProximityChatMode mode) =>
+            GetModeValue(ProximityChatModeObfuscationRanges, mode, DefaultModeObfuscationRange(mode));
+
+        public int GetModeDefaultFontSize(ProximityChatMode mode) =>
+            GetModeValue(ProximityChatDefaultFontSize, mode, DefaultModeFontSize(mode));
+
+        public string GetModePunctuation(ProximityChatMode mode) =>
+            GetModeValue(ProximityChatModePunctuation, mode, DefaultModePunctuation(mode));
+
+        /// <summary>
+        /// Never empty. A mode missing from a hand-edited dictionary falls back to that mode's real
+        /// default verbs, not to the enum name, which would render as `Alice normal "Hello"`.
+        /// </summary>
+        public string[] GetModeVerbs(ProximityChatMode mode) =>
+            TryGetUsableVerbs(ProximityChatModeVerbs, mode, out var verbs) ? verbs : DefaultModeVerbs(mode);
+
+        /// <summary>
+        /// False when this mode has no question verbs configured, so callers fall back to the mode's
+        /// ordinary verbs. That fallback is deliberate: a server that clears the question verbs for a
+        /// mode is asking for questions to read like any other line in that mode, which is why this
+        /// is not defaulted the way <see cref="GetModeVerbs"/> is.
+        /// </summary>
+        public bool TryGetModeQuestionVerbs(ProximityChatMode mode, out string[] verbs) =>
+            TryGetUsableVerbs(ProximityChatModeQuestionVerbs, mode, out verbs);
+
+        private static bool TryGetUsableVerbs(IDictionary<ProximityChatMode, string[]> verbsByMode, ProximityChatMode mode, out string[] verbs)
+        {
+            // Hand-edited configs can leave a mode's list present but empty or blank-filled.
+            var usable = GetModeValue(verbsByMode, mode, null)?
+                .Where(verb => !string.IsNullOrWhiteSpace(verb))
+                .ToArray();
+
+            verbs = usable is { Length: > 0 } ? usable : [];
+            return verbs.Length > 0;
+        }
+
+        private static string[] DefaultModeVerbs(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => ["yells", "shouts", "exclaims"],
+            ProximityChatMode.Whisper => ["whispers", "mumbles", "mutters"],
+            _ => ["says", "states", "mentions"]
+        };
+
+        public float GetRpttsGain(ProximityChatMode mode) =>
+            GetModeValue(RPTTS_ModeGain, mode, DefaultRpttsGain(mode));
+
+        public float GetRpttsFalloff(ProximityChatMode mode) =>
+            GetModeValue(RPTTS_ModeFalloff, mode, DefaultRpttsFalloff(mode));
+
+        // These mirror the per-mode defaults above and in ConfigAdminSettingRegistry. A generic
+        // fallback would silently retune a mode that a partial config happens to omit, which is a
+        // worse failure than the exception the fallback was added to prevent.
+        private static string DefaultModePunctuation(ProximityChatMode mode) =>
+            mode == ProximityChatMode.Yell ? "!" : ".";
+
+        private static float DefaultRpttsGain(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => 1.7f,
+            ProximityChatMode.Whisper => 0.65f,
+            _ => 1f
+        };
+
+        private static float DefaultRpttsFalloff(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Whisper => 5f,
+            ProximityChatMode.Normal => 1.5f,
+            _ => 1f
+        };
+
+        /// <summary>
+        /// Sign language has no unlimited sentinel, so a hand-edited negative falls back to the
+        /// default. Read through here everywhere: the recipient filter and the deferred-delivery
+        /// retry compare against this range, and normalising in only one of them means a queued
+        /// listener can never be delivered to.
+        /// </summary>
+        public int GetSignLanguageRange() =>
+            SignLanguageRange < 0 ? DefaultSignLanguageRange : SignLanguageRange;
+
+        private const int DefaultSignLanguageRange = 60;
+
+        private static int DefaultModeDistance(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => 90,
+            ProximityChatMode.Whisper => 5,
+            _ => 35
+        };
+
+        private static int DefaultModeObfuscationRange(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => 45,
+            ProximityChatMode.Whisper => 2,
+            _ => 15
+        };
+
+        private static int DefaultModeFontSize(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => 30,
+            ProximityChatMode.Whisper => 12,
+            _ => 16
+        };
+
         private void InitializeProximityChatDefaults()
         {
             ProximityChatModeDistances ??= new Dictionary<ProximityChatMode, int>
@@ -64,12 +188,8 @@ namespace thebasics.Configs
 
             ProximityChatClampFontSizes ??= [30, 16, 12, 6];
 
-            ProximityChatModeVerbs ??= new Dictionary<ProximityChatMode, string[]>
-            {
-                { ProximityChatMode.Yell, new[] { "yells", "shouts", "exclaims" } },
-                { ProximityChatMode.Normal, new[] { "says", "states", "mentions" } },
-                { ProximityChatMode.Whisper, new[] { "whispers", "mumbles", "mutters" } }
-            };
+
+            InitializeProximityChatVerbDefaults();
 
             ProximityChatModePunctuation ??= new Dictionary<ProximityChatMode, string>
             {
@@ -84,6 +204,30 @@ namespace thebasics.Configs
             ProximityChatPresentationMode = ProximityChatPresentationModes.Normalize(ProximityChatPresentationMode);
             OverheadChatBubbleMode = OverheadChatBubbleModes.Normalize(OverheadChatBubbleMode, DisableRpOverheadBubbles);
             ProseNicknameToken ??= "@";
+        }
+
+        private void InitializeProximityChatVerbDefaults()
+        {
+            ProximityChatModeVerbs ??= new Dictionary<ProximityChatMode, string[]>
+            {
+                { ProximityChatMode.Yell, new[] { "yells", "shouts", "exclaims" } },
+                { ProximityChatMode.Normal, new[] { "says", "states", "mentions" } },
+                { ProximityChatMode.Whisper, new[] { "whispers", "mumbles", "mutters" } }
+            };
+
+            ProximityChatModeQuestionVerbs ??= new Dictionary<ProximityChatMode, string[]>
+            {
+                { ProximityChatMode.Yell, new[] { "asks" } },
+                { ProximityChatMode.Normal, new[] { "asks" } },
+                { ProximityChatMode.Whisper, new[] { "asks" } }
+            };
+
+            RequireLineOfSightForSpeech ??= new Dictionary<ProximityChatMode, bool>
+            {
+                { ProximityChatMode.Yell, false },
+                { ProximityChatMode.Normal, false },
+                { ProximityChatMode.Whisper, false }
+            };
         }
 
         private void InitializeLanguageDefaults()
@@ -385,6 +529,28 @@ namespace thebasics.Configs
 
         [ProtoMember(16)]
         public string ProximityChatModeBabbleVerb { get; set; } = "babbles";
+
+        /// <summary>
+        /// Verbs used when a message reads as a question. Falls back to <see cref="ProximityChatModeVerbs"/>
+        /// when a mode has no question verbs configured.
+        /// </summary>
+        [ProtoMember(147)]
+        public IDictionary<ProximityChatMode, string[]> ProximityChatModeQuestionVerbs { get; set; }
+
+        /// <summary>
+        /// Experimental, off by default. When set for a mode, speech in that mode only reaches players
+        /// the speaker has an unobstructed line to. Glass and water block speech; foliage does not.
+        /// </summary>
+        [ProtoMember(148)]
+        public IDictionary<ProximityChatMode, bool> RequireLineOfSightForSpeech { get; set; }
+
+        /// <summary>
+        /// Experimental, off by default (0). Blocks of effective distance added per sound-occluding
+        /// block between speaker and listener, so walls muffle speech toward unintelligibility and
+        /// then out of range instead of cutting it off outright.
+        /// </summary>
+        [ProtoMember(149)]
+        public int SpeechOcclusionWallPenaltyBlocks { get; set; }
 
         [ProtoMember(17)]
         public IDictionary<ProximityChatMode, string> ProximityChatModePunctuation { get; set; }

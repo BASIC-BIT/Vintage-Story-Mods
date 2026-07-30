@@ -10,6 +10,14 @@ namespace thebasics.ModSystems.ProximityChat.Transformers;
 
 public class PlayerChatTransformer : MessageTransformerBase
 {
+    // Which gate refused the player's stale override, so the rejection can name the real reason
+    // instead of always blaming the RP chat switch.
+    private const string StaleOverrideRefusalKey = "staleOverrideRefusalKey";
+
+    // Whether the stored chat type was actually cleared, so the rejection only claims a reset when
+    // one happened. The explicit-prefix path refuses without resetting anything.
+    private const string StaleOverrideWasResetKey = "staleOverrideWasReset";
+
     private enum PlayerChatKind
     {
         Speech,
@@ -18,7 +26,7 @@ public class PlayerChatTransformer : MessageTransformerBase
         Emote,
         PlacedEnvironment,
         Environment,
-        DisabledGlobalOoc
+        RejectedStaleOverride
     }
 
     private readonly struct ParsedPlayerChat
@@ -51,9 +59,11 @@ public class PlayerChatTransformer : MessageTransformerBase
 
         return parsed.Kind switch
         {
-            PlayerChatKind.DisabledGlobalOoc => RejectDisabledGlobalOoc(context),
-            PlayerChatKind.GlobalOoc => ApplyGlobalOoc(context, delimiters, parsed.PrefixLength),
-            PlayerChatKind.Ooc => ApplyOoc(context, delimiters, parsed.PrefixLength),
+            PlayerChatKind.RejectedStaleOverride => RejectStaleOverride(
+                context,
+                context.GetMetadata(StaleOverrideRefusalKey, "thebasics:chat-override-cleared-rp-disabled")),
+            PlayerChatKind.GlobalOoc => ApplyGlobalOoc(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
+            PlayerChatKind.Ooc => ApplyOoc(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
             PlayerChatKind.Emote => ApplyEmote(context, delimiters, parsed.PrefixLength, parsed.HasExplicitPrefix),
             PlayerChatKind.PlacedEnvironment => ApplyPlacedEnvironment(context, delimiters, parsed.PrefixLength),
             PlayerChatKind.Environment => ApplyEnvironment(context, delimiters, parsed.PrefixLength),
@@ -67,9 +77,11 @@ public class PlayerChatTransformer : MessageTransformerBase
         var hasGlobalOocPrefix = HasStartDelimiter(content, delimiters.GlobalOOC.Start, out var globalOocStartLen);
         if (hasGlobalOocPrefix)
         {
-            return _config.EnableGlobalOOC
+            // Same predicate as the sticky and command paths, so an admin flipping any gate cannot
+            // leave the prefix broadcasting while its siblings refuse.
+            return IsOverrideAvailable(context, ChatOverrideMode.GlobalOoc)
                 ? new ParsedPlayerChat(PlayerChatKind.GlobalOoc, globalOocStartLen, hasExplicitPrefix: true)
-                : new ParsedPlayerChat(PlayerChatKind.DisabledGlobalOoc);
+                : new ParsedPlayerChat(PlayerChatKind.RejectedStaleOverride);
         }
 
         if (HasStartDelimiter(content, delimiters.OOC.Start, out var oocStartLen))
@@ -92,37 +104,133 @@ public class PlayerChatTransformer : MessageTransformerBase
             return new ParsedPlayerChat(PlayerChatKind.Emote, emoteStartLen, hasExplicitPrefix: true);
         }
 
-        if (context.SendingPlayer.GetEmoteMode())
-        {
-            return new ParsedPlayerChat(PlayerChatKind.Emote);
-        }
-
-        return new ParsedPlayerChat(PlayerChatKind.Speech);
+        return new ParsedPlayerChat(GetStickyChatKind(context));
     }
 
-    private MessageContext RejectDisabledGlobalOoc(MessageContext context)
+    /// <summary>
+    /// Applies the player's sticky override mode. Only reached when the line carried no explicit
+    /// prefix, so a prefixed message still wins for that one line.
+    /// </summary>
+    private PlayerChatKind GetStickyChatKind(MessageContext context)
     {
+        var overrideMode = context.SendingPlayer.GetChatOverrideMode();
+
+        if (overrideMode == ChatOverrideMode.None)
+        {
+            return PlayerChatKind.Speech;
+        }
+
+        // A global OOC override plus an explicit range command is a contradiction: the command names
+        // a range and global OOC has none. Honouring the override would turn "/w he's lying" into a
+        // server-wide broadcast of something the player chose a whisper command for. The range wins,
+        // and the player sees their own line render as ranged speech. Local OOC is left alone, since
+        // it is delivered at the range axis, so whispered OOC is a coherent thing to ask for.
+        //
+        // Checked before staleness on purpose. The outcome here is ranged speech whether or not
+        // global OOC is still enabled, so a stale type changes nothing about this line and must not
+        // drop it. The stale value is still cleared. Local OOC gets no such exemption: it would have
+        // been delivered as OOC, so losing the type does change the outcome and the line is refused.
+        if (overrideMode == ChatOverrideMode.GlobalOoc &&
+            context.HasFlag(MessageContext.IS_EXPLICIT_RANGE_COMMAND))
+        {
+            if (IsOverrideStale(context, overrideMode))
+            {
+                context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
+            }
+
+            return PlayerChatKind.Speech;
+        }
+
+        if (IsOverrideStale(context, overrideMode))
+        {
+            context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
+            context.SetMetadata(StaleOverrideWasResetKey, true);
+            return PlayerChatKind.RejectedStaleOverride;
+        }
+
+        return overrideMode switch
+        {
+            ChatOverrideMode.Emote => PlayerChatKind.Emote,
+            ChatOverrideMode.Ooc => PlayerChatKind.Ooc,
+            ChatOverrideMode.GlobalOoc => PlayerChatKind.GlobalOoc,
+            _ => PlayerChatKind.Speech
+        };
+    }
+
+    /// <summary>
+    /// Whether the server no longer honours the mode the player is parked in. Such a line is
+    /// rejected and the mode cleared, rather than delivered: silently downgrading to speech would
+    /// publish a message the player believed was going somewhere out of character, which is the
+    /// whole reason they set the mode.
+    ///
+    /// Delegates to the same predicate the entry gate uses. Keeping a second copy here is what let
+    /// entry and delivery drift apart repeatedly, each drift silently disabling a setting for
+    /// players who already held the mode.
+    /// </summary>
+    private bool IsOverrideStale(MessageContext context, ChatOverrideMode overrideMode)
+    {
+        return !IsOverrideAvailable(context, overrideMode);
+    }
+
+    /// <summary>
+    /// Asks the one predicate whether this mode is currently honoured, recording the refusal reason
+    /// so a rejection can name the gate that refused rather than guessing.
+    /// </summary>
+    private bool IsOverrideAvailable(MessageContext context, ChatOverrideMode overrideMode)
+    {
+        if (_chatSystem.IsOverrideModeAvailable(context.SendingPlayer, overrideMode, out var refusalLangKey))
+        {
+            return true;
+        }
+
+        // Defensive default: the predicate always supplies a key today, and a null would otherwise
+        // reach Lang.Get on the chat path.
+        context.SetMetadata(StaleOverrideRefusalKey, refusalLangKey ?? "thebasics:chat-override-cleared-rp-disabled");
+        return false;
+    }
+
+    /// <summary>
+    /// The gate's refusal copy explains why the type is unavailable, which is the right thing to say
+    /// when a player tries to *enter* it. On delivery it is not enough on its own: the player also
+    /// needs to know their line was not sent, and, when it happened, that their type was reset. Left
+    /// as the bare reason, a player would retry blindly and have the retry published in character.
+    /// </summary>
+    private MessageContext RejectStaleOverride(MessageContext context, string reasonLangKey)
+    {
+        var reason = Lang.Get(reasonLangKey);
+
+        // Only claim a reset when one actually happened. The explicit-prefix path refuses without
+        // touching the stored type, so saying otherwise there would be a lie.
+        var message = context.GetMetadata(StaleOverrideWasResetKey, false)
+            ? Lang.Get("thebasics:chat-type-reset-dropped-message", reason)
+            : Lang.Get("thebasics:chat-message-not-sent", reason);
+
         context.SendingPlayer?.SendMessage(
             _chatSystem.ProximityChatId,
-            Lang.Get("thebasics:chat-gooc-disabled"),
+            message,
             EnumChatType.CommandError);
         context.State = MessageContextState.STOP;
         return context;
     }
 
-    private static MessageContext ApplyGlobalOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength)
+    private static MessageContext ApplyGlobalOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength, bool hasExplicitPrefix)
     {
-        var updated = StripTrailingAll(context.Message[prefixLength..], delimiters.GlobalOOC.End);
+        // Only unwrap delimiters the player actually typed; in sticky mode the line has none.
+        var updated = hasExplicitPrefix
+            ? StripTrailingAll(context.Message[prefixLength..], delimiters.GlobalOOC.End)
+            : context.Message;
         context.SetFlag(MessageContext.IS_GLOBAL_OOC);
         context.UpdateMessage(updated.Trim(), updateSpeech: false);
         context.SetMetadata("clientData", (string)null);
         return context;
     }
 
-    private static MessageContext ApplyOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength)
+    private static MessageContext ApplyOoc(MessageContext context, ChatDelimiters delimiters, int prefixLength, bool hasExplicitPrefix)
     {
         var updated = context.Message[prefixLength..];
-        if (!string.IsNullOrEmpty(delimiters.OOC.End) && TryConsumeDelimiterAtEnd(updated, delimiters.OOC.End, out var newLen))
+
+        // Only unwrap delimiters the player actually typed; in sticky mode the line has none.
+        if (hasExplicitPrefix && !string.IsNullOrEmpty(delimiters.OOC.End) && TryConsumeDelimiterAtEnd(updated, delimiters.OOC.End, out var newLen))
         {
             updated = updated[..newLen];
         }

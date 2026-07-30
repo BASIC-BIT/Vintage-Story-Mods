@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
@@ -20,18 +21,27 @@ public class DistanceObfuscationSystem : BaseSubSystem
     }
 
     public void ObfuscateMessage(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer, ref string message,
-        ProximityChatMode? tempMode = null)
+        ProximityChatMode? tempMode = null, int occlusionPenalty = 0)
     {
         if (!Config.EnableDistanceObfuscationSystem)
         {
             return;
         }
 
-        var distance = sendingPlayer.GetDistance(receivingPlayer);
         var chatMode = sendingPlayer.GetChatMode(tempMode);
-        var obfuscationRange = Config.ProximityChatModeObfuscationRanges[chatMode];
-        var maxRange = Config.ProximityChatModeDistances[chatMode];
+        var obfuscationRange = Config.GetModeObfuscationRange(chatMode);
+        var maxRange = Config.GetModeDistance(chatMode);
 
+        // Unlimited range has no far edge to fade toward, so there is nothing to obfuscate against.
+        // Checked before reading positions so this never depends on both players having entities.
+        if (ModConfig.IsUnlimitedRange(maxRange))
+        {
+            return;
+        }
+
+        // Walls between the two players read as extra distance, so speech degrades toward
+        // unintelligible instead of cutting out at a hard boundary.
+        var distance = sendingPlayer.GetDistance(receivingPlayer) + occlusionPenalty;
         if (distance < obfuscationRange)
         {
             return;
@@ -39,14 +49,6 @@ public class DistanceObfuscationSystem : BaseSubSystem
 
         var percentage = (distance - obfuscationRange) / (maxRange - obfuscationRange);
 
-        message = string.Join("", message.Select(character =>
-        {
-            if (ChatHelper.IsPunctuation(character) || ChatHelper.IsWhitespace(character))
-            {
-                return character;
-            }
-
-            return _random.NextDouble() < percentage ? '*' : character;
-        }));
+        message = ChatHelper.ObfuscateOutsideMarkup(message, percentage, _random.NextDouble);
     }
 }
