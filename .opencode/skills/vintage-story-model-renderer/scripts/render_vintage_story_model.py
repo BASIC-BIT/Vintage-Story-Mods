@@ -284,22 +284,26 @@ def load_shape(path: Path) -> tuple[list[Face], dict[str, str]]:
     texture_width = float(data.get("textureWidth", 16))
     texture_height = float(data.get("textureHeight", 16))
 
-    def visit(elements: list[dict], inherited_angles: Vec3 = (0, 0, 0)) -> None:
+    def identity(point: Vec3) -> Vec3:
+        return point
+
+    def visit(elements: list[dict], parent_transform=identity) -> None:
         for element in elements:
             start = tuple(element["from"])
             end = tuple(element["to"])
             vertices = cuboid(start, end)
             angles = (
-                inherited_angles[0] + float(element.get("rotationX", 0)),
-                inherited_angles[1] + float(element.get("rotationY", 0)),
-                inherited_angles[2] + float(element.get("rotationZ", 0)),
+                float(element.get("rotationX", 0)),
+                float(element.get("rotationY", 0)),
+                float(element.get("rotationZ", 0)),
             )
+            origin = tuple(element.get("rotationOrigin", (8, 8, 8)))
             if angles != (0, 0, 0):
-                origin = tuple(element.get("rotationOrigin", (8, 8, 8)))
                 vertices = [rotate(vertex, origin, angles) for vertex in vertices]
+            vertices = [parent_transform(vertex) for vertex in vertices]
             for direction, definition in element.get("faces", {}).items():
                 indices = FACE_INDICES.get(direction)
-                if indices:
+                if indices and definition.get("enabled", True):
                     faces.append(Face(
                         [vertices[index] for index in indices],
                         str(definition.get("texture", "#missing")).lstrip("#"),
@@ -308,7 +312,14 @@ def load_shape(path: Path) -> tuple[list[Face], dict[str, str]]:
                         direction,
                         str(path),
                     ))
-            visit(element.get("children", []), angles)
+
+            def child_transform(point: Vec3, *, start=start, origin=origin, angles=angles) -> Vec3:
+                point_in_parent = add(point, start)
+                if angles != (0, 0, 0):
+                    point_in_parent = rotate(point_in_parent, origin, angles)
+                return parent_transform(point_in_parent)
+
+            visit(element.get("children", []), child_transform)
 
     visit(data.get("elements", []))
     return faces, dict(data.get("textures", {}))

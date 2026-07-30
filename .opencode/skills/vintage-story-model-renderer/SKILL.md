@@ -108,12 +108,14 @@ happens not to flicker.
 
 ## Geometry capabilities and limits
 
-- Vintage Story JSON shapes are hierarchies of rotated cuboid elements. Complex silhouettes are commonly built from many
-  cuboids, which remains the most portable authored format.
+- Vintage Story JSON shapes are hierarchies of rotated cuboid elements. The renderer composes nested parent translation
+  and rotation for a static authored pose, so ordinary block, item, and entity shapes can share the same evidence workflow.
+  Complex silhouettes are commonly built from many cuboids, which remains the most portable authored format.
 - `CompositeShape` can also point to OBJ, and the game API can render arbitrary `MeshData`. Flywheel Power already uses
   procedural quads for its round wheel, felloe, spokes, bearing, hub, and marker.
-- This renderer currently supports Vintage Story cuboid JSON plus the Flywheel procedural manifest. OBJ/GLTF import,
-  animation, atlas stitching, emissive/glow channels, and player-hand/body backdrops are not yet reproduced.
+- This renderer currently supports Vintage Story cuboid JSON plus the Flywheel procedural manifest. Entity shapes render
+  in their authored rest pose; animation-keyframe posing, runtime shape alternates, step-parent attachments, OBJ/GLTF
+  import, atlas stitching, emissive/glow channels, and player-hand/body backdrops are not yet reproduced.
 - Add importers behind the same `Face` representation rather than converting external meshes into hundreds of cuboids.
   Triangulated OBJ is the sensible next importer; embedded GLTF should remain experimental until its game support is proven.
 - Texture mode samples source PNGs and UVs deterministically, but Vintage Story remains authoritative for atlas padding,

@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 import tempfile
 import unittest
@@ -127,6 +128,75 @@ class RenderMatrixTests(unittest.TestCase):
             Image.new("RGB", (2, 2), (1, 2, 3)).save(texture)
 
             self.assertEqual(texture, renderer.resolve_texture("game:block/test", [root]))
+
+
+class HierarchicalShapeTests(unittest.TestCase):
+    @staticmethod
+    def load_shape(data):
+        with tempfile.TemporaryDirectory() as directory:
+            shape = Path(directory) / "shape.json"
+            shape.write_text(json.dumps(data), encoding="utf-8")
+            return renderer.load_shape(shape)
+
+    def test_child_coordinates_are_relative_to_parent_from(self):
+        faces, _ = self.load_shape({
+            "elements": [{
+                "name": "parent",
+                "from": [10, 20, 30],
+                "to": [12, 22, 32],
+                "faces": {},
+                "children": [{
+                    "name": "child",
+                    "from": [1, 2, 3],
+                    "to": [2, 3, 4],
+                    "faces": {"north": {"texture": "#skin"}},
+                }],
+            }],
+        })
+
+        vertices = faces[0].vertices
+        self.assertEqual((11, 22, 33), vertices[0])
+        self.assertEqual((12, 23, 33), vertices[2])
+
+    def test_parent_rotation_is_composed_around_parent_origin(self):
+        faces, _ = self.load_shape({
+            "elements": [{
+                "name": "parent",
+                "from": [10, 0, 0],
+                "to": [12, 2, 2],
+                "rotationOrigin": [10, 0, 0],
+                "rotationY": 90,
+                "faces": {},
+                "children": [{
+                    "name": "child",
+                    "from": [1, 0, 0],
+                    "to": [2, 1, 1],
+                    "faces": {"north": {"texture": "#skin"}},
+                }],
+            }],
+        })
+
+        vertices = faces[0].vertices
+        self.assertAlmostEqual(10, vertices[0][0])
+        self.assertAlmostEqual(0, vertices[0][1])
+        self.assertAlmostEqual(-1, vertices[0][2])
+        self.assertAlmostEqual(10, vertices[3][0])
+        self.assertAlmostEqual(-2, vertices[3][2])
+
+    def test_disabled_faces_are_not_rendered(self):
+        faces, _ = self.load_shape({
+            "elements": [{
+                "name": "element",
+                "from": [0, 0, 0],
+                "to": [1, 1, 1],
+                "faces": {
+                    "north": {"texture": "#skin", "enabled": False},
+                    "south": {"texture": "#skin"},
+                },
+            }],
+        })
+
+        self.assertEqual(["south"], [face.surface for face in faces])
 
 
 class DepthBufferTests(unittest.TestCase):
