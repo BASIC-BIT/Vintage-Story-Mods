@@ -14,6 +14,11 @@ public static class ConfigAdminSettingRegistry
 {
     private readonly record struct SettingMeta(string Key, string Group, string Label, string Description, ConfigAdminReloadBehavior ReloadBehavior);
 
+    // Bounds shared by the setting definition and ValidateConfig. The definition alone only guards
+    // the admin UI; a hand-edited the_basics.json reaches the same fields without passing through it.
+    private const int MaxWallPenaltyBlocks = 128;
+    private const int MaxSignLanguageRange = 512;
+
     private static readonly IReadOnlyList<ConfigAdminSettingDefinition> _settings = BuildSettings();
     private static readonly IDictionary<string, ConfigAdminSettingDefinition> _settingsByKey =
         _settings.ToDictionary(setting => setting.Key, StringComparer.OrdinalIgnoreCase);
@@ -31,36 +36,52 @@ public static class ConfigAdminSettingRegistry
 
         foreach (var mode in EnumValues<ProximityChatMode>())
         {
-            var range = GetModeValue(config.ProximityChatModeDistances, mode, DefaultDistance(mode));
-            var obfuscationStart = GetModeValue(config.ProximityChatModeObfuscationRanges, mode, DefaultObfuscationStart(mode));
-
-            if (range == 0 || (range < 0 && !ModConfig.IsUnlimitedRange(range)))
-            {
-                // 0 would silently mute the mode, and any other negative is a typo. Only the exact
-                // sentinel opts out of a range limit, so a stray -2 must not read as server-wide.
-                errors.Add($"{mode} range must be a positive block count, or {ModConfig.UnlimitedRange} for unlimited.");
-            }
-            // Unlimited range has no far edge, so the obfuscation ordering rule does not apply.
-            else if (!ModConfig.IsUnlimitedRange(range) && range <= obfuscationStart)
-            {
-                errors.Add($"{mode} range must be greater than its obfuscation start.");
-            }
-
-            // Line of sight needs a bounded range to raycast against; at unlimited range the check
-            // is skipped rather than run against the whole map. Say so instead of ignoring it.
-            if (ModConfig.IsUnlimitedRange(range) &&
-                ModConfig.GetModeValue(config.RequireLineOfSightForSpeech, mode, false))
-            {
-                errors.Add($"{mode} cannot combine an unlimited range with RequireLineOfSightForSpeech. Set a bounded range or turn the line-of-sight requirement off.");
-            }
+            ValidateMode(config, mode, errors);
         }
 
         if (config.SignLanguageRange < 0)
         {
             errors.Add($"SignLanguageRange must be a positive block count. It has no unlimited sentinel, unlike the speech ranges.");
         }
+        else if (config.SignLanguageRange > MaxSignLanguageRange)
+        {
+            errors.Add($"SignLanguageRange must be {MaxSignLanguageRange} blocks or fewer.");
+        }
+
+        // A negative penalty is clamped to zero downstream, which silently disables the muffling the
+        // admin thought they configured, and an oversized one lets one wall cut off every listener.
+        if (config.SpeechOcclusionWallPenaltyBlocks < 0 || config.SpeechOcclusionWallPenaltyBlocks > MaxWallPenaltyBlocks)
+        {
+            errors.Add($"SpeechOcclusionWallPenaltyBlocks must be a whole number from 0 to {MaxWallPenaltyBlocks}.");
+        }
 
         return errors;
+    }
+
+    private static void ValidateMode(ModConfig config, ProximityChatMode mode, List<string> errors)
+    {
+        var range = GetModeValue(config.ProximityChatModeDistances, mode, DefaultDistance(mode));
+        var obfuscationStart = GetModeValue(config.ProximityChatModeObfuscationRanges, mode, DefaultObfuscationStart(mode));
+
+        if (range == 0 || (range < 0 && !ModConfig.IsUnlimitedRange(range)))
+        {
+            // 0 would silently mute the mode, and any other negative is a typo. Only the exact
+            // sentinel opts out of a range limit, so a stray -2 must not read as server-wide.
+            errors.Add($"{mode} range must be a positive block count, or {ModConfig.UnlimitedRange} for unlimited.");
+        }
+        // Unlimited range has no far edge, so the obfuscation ordering rule does not apply.
+        else if (!ModConfig.IsUnlimitedRange(range) && range <= obfuscationStart)
+        {
+            errors.Add($"{mode} range must be greater than its obfuscation start.");
+        }
+
+        // Line of sight needs a bounded range to raycast against; at unlimited range the check
+        // is skipped rather than run against the whole map. Say so instead of ignoring it.
+        if (ModConfig.IsUnlimitedRange(range) &&
+            ModConfig.GetModeValue(config.RequireLineOfSightForSpeech, mode, false))
+        {
+            errors.Add($"{mode} cannot combine an unlimited range with RequireLineOfSightForSpeech. Set a bounded range or turn the line-of-sight requirement off.");
+        }
     }
 
     private static TeleportationConfig Teleportation(ModConfig config)
@@ -212,7 +233,7 @@ public static class ConfigAdminSettingRegistry
             Bool("AllowPlayerTpa", "Restart Required", "Allow player TPA", "Requires restart because TPA commands are startup-shaped.", ConfigAdminReloadBehavior.RestartRequired, c => c.AllowPlayerTpa, (c, v) => c.AllowPlayerTpa = v),
             Bool("EnableLanguageSystem", "Restart Required", "Enable language system", "Requires restart because language commands and joins are startup-shaped.", ConfigAdminReloadBehavior.RestartRequired, c => c.EnableLanguageSystem, (c, v) => c.EnableLanguageSystem = v),
             Int("MaxLanguagesPerPlayer", "Restart Required", "Max languages per player", "Requires language-system reconciliation before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, (c => c.MaxLanguagesPerPlayer, (c, v) => c.MaxLanguagesPerPlayer = v), (1, 100)),
-            Int("SignLanguageRange", "Restart Required", "Sign language range", "Requires language-system reconciliation before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, (c => c.SignLanguageRange, (c, v) => c.SignLanguageRange = v), (0, 512)),
+            Int("SignLanguageRange", "Restart Required", "Sign language range", "Requires language-system reconciliation before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, (c => c.SignLanguageRange, (c, v) => c.SignLanguageRange = v), (0, MaxSignLanguageRange)),
             Bool("RemoveGrantedLanguagesOnChange", "Restart Required", "Remove granted languages on change", "Affects future class/model language reconciliation.", ConfigAdminReloadBehavior.RestartRequired, c => c.RemoveGrantedLanguagesOnChange, (c, v) => c.RemoveGrantedLanguagesOnChange = v),
             Bool("RequireLineOfSightForSignLanguage", "Restart Required", "Sign language requires LOS", "Requires language-system reconciliation before it can be fully live.", ConfigAdminReloadBehavior.RestartRequired, c => c.RequireLineOfSightForSignLanguage, (c, v) => c.RequireLineOfSightForSignLanguage = v),
             Bool("PlayerStatSystem", "Restart Required", "Enable player stats", "Requires restart until stat event subscriptions are refactored.", ConfigAdminReloadBehavior.RestartRequired, c => c.PlayerStatSystem, (c, v) => c.PlayerStatSystem = v),
@@ -258,7 +279,7 @@ public static class ConfigAdminSettingRegistry
         }
 
         settings.Add(IntArray(new SettingMeta("ProximityChatClampFontSizes", "Chat/Font Sizes", "Clamp font sizes", "Comma-separated allowed distance font sizes.", ConfigAdminReloadBehavior.Live), c => c.ProximityChatClampFontSizes, (c, v) => c.ProximityChatClampFontSizes = v, (1, 128)));
-        settings.Add(Int("SpeechOcclusionWallPenaltyBlocks", "Chat/Occlusion", "Wall muffling penalty", "Experimental. Blocks of extra effective distance per sound-blocking block between speaker and listener. 0 disables muffling.", ConfigAdminReloadBehavior.Live, (c => c.SpeechOcclusionWallPenaltyBlocks, (c, v) => c.SpeechOcclusionWallPenaltyBlocks = v), (0, 128)));
+        settings.Add(Int("SpeechOcclusionWallPenaltyBlocks", "Chat/Occlusion", "Wall muffling penalty", "Experimental. Blocks of extra effective distance per sound-blocking block between speaker and listener. 0 disables muffling.", ConfigAdminReloadBehavior.Live, (c => c.SpeechOcclusionWallPenaltyBlocks, (c, v) => c.SpeechOcclusionWallPenaltyBlocks = v), (0, MaxWallPenaltyBlocks)));
     }
 
     private static void AddAudioModeSettings(List<ConfigAdminSettingDefinition> settings)

@@ -65,6 +65,30 @@ public class ConfigAdminSettingRegistryTests
             .Should().ContainSingle().Which.Should().Contain("SignLanguageRange must be a positive block count");
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(129)]
+    public void ValidateConfig_RejectsOutOfBoundsWallPenalty(int penalty)
+    {
+        // The admin setting declares 0..128, but a hand-edited the_basics.json skips that check.
+        // A negative one is clamped to zero downstream, silently disabling configured muffling.
+        var config = CreateConfig();
+        config.SpeechOcclusionWallPenaltyBlocks = penalty;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("SpeechOcclusionWallPenaltyBlocks must be a whole number from 0 to 128");
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsOversizedSignLanguageRange()
+    {
+        var config = CreateConfig();
+        config.SignLanguageRange = 513;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("SignLanguageRange must be 512 blocks or fewer");
+    }
+
     [Fact]
     public void ValidateConfig_RejectsRangeAtOrBelowObfuscationStart()
     {
