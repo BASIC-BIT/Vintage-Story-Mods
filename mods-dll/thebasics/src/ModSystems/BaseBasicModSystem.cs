@@ -110,7 +110,20 @@ namespace thebasics.ModSystems
             return _sharedConfig;
         }
 
+        /// <summary>
+        /// Single exit on purpose. This has four ways of producing a config (loaded, JSON-string
+        /// repaired, fallback after a parse failure, and freshly created), and validation warnings
+        /// have to cover all of them. Validating at each return is how the repaired path silently
+        /// skipped it.
+        /// </summary>
         private static ModConfig LoadConfigFromDisk(ICoreServerAPI api)
+        {
+            var config = LoadOrRecoverConfig(api);
+            LogConfigValidationWarnings(api, config);
+            return config;
+        }
+
+        private static ModConfig LoadOrRecoverConfig(ICoreServerAPI api)
         {
             ModConfig config;
 
@@ -120,13 +133,7 @@ namespace thebasics.ModSystems
             }
             catch (Exception e)
             {
-                var repaired = TryRepairJsonStringConfig(api);
-                if (repaired != null)
-                {
-                    return repaired;
-                }
-
-                return CreateFallbackConfig(api, e);
+                return TryRepairJsonStringConfig(api) ?? CreateFallbackConfig(api, e);
             }
 
             if (config == null)
@@ -141,7 +148,6 @@ namespace thebasics.ModSystems
 
             // Ensure defaults are applied when loading existing/legacy configs (JSON won't trigger ProtoBuf hooks)
             config.InitializeDefaultsIfNeeded();
-            LogConfigValidationWarnings(api, config);
             // Optionally persist any backfilled defaults for future runs
             api.StoreModConfig(config, ConfigName);
             return config;
@@ -155,6 +161,11 @@ namespace thebasics.ModSystems
         /// </summary>
         private static void LogConfigValidationWarnings(ICoreServerAPI api, ModConfig config)
         {
+            if (config == null)
+            {
+                return;
+            }
+
             try
             {
                 foreach (var error in ConfigAdminSettingRegistry.ValidateConfig(config))
