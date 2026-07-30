@@ -294,15 +294,12 @@ namespace thebasics.Utilities
                 return languageVerb;
             }
 
-            if (IsQuestion(speechText) &&
-                TryGetModeVerbs(config.ProximityChatModeQuestionVerbs, mode, out var questionVerbs))
+            if (IsQuestion(speechText) && config.TryGetModeQuestionVerbs(mode, out var questionVerbs))
             {
                 return questionVerbs.GetRandomElement();
             }
 
-            return TryGetModeVerbs(config.ProximityChatModeVerbs, mode, out var verbs)
-                ? verbs.GetRandomElement()
-                : mode.ToString().ToLowerInvariant();
+            return config.GetModeVerbs(mode).GetRandomElement();
         }
 
         /// <summary>
@@ -330,24 +327,6 @@ namespace thebasics.Utilities
                 : config.ProximityChatModeBabbleVerb;
         }
 
-        private static bool TryGetModeVerbs(IDictionary<ProximityChatMode, string[]> verbsByMode, ProximityChatMode mode, out string[] verbs)
-        {
-            verbs = null;
-            if (verbsByMode == null || !verbsByMode.TryGetValue(mode, out var configured))
-            {
-                return false;
-            }
-
-            // Hand-edited configs can leave a mode's list empty; fall back rather than throwing on chat.
-            configured = configured?.Where(verb => !string.IsNullOrWhiteSpace(verb)).ToArray();
-            if (configured == null || configured.Length == 0)
-            {
-                return false;
-            }
-
-            verbs = configured;
-            return true;
-        }
 
         public static string WrapSpeechQuotes(string message, Language language, ModConfig config, bool languageEnabled)
         {

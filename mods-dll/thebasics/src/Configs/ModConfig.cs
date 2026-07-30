@@ -71,6 +71,40 @@ namespace thebasics.Configs
         public string GetModePunctuation(ProximityChatMode mode) =>
             GetModeValue(ProximityChatModePunctuation, mode, DefaultModePunctuation(mode));
 
+        /// <summary>
+        /// Never empty. A mode missing from a hand-edited dictionary falls back to that mode's real
+        /// default verbs, not to the enum name, which would render as `Alice normal "Hello"`.
+        /// </summary>
+        public string[] GetModeVerbs(ProximityChatMode mode) =>
+            TryGetUsableVerbs(ProximityChatModeVerbs, mode, out var verbs) ? verbs : DefaultModeVerbs(mode);
+
+        /// <summary>
+        /// False when this mode has no question verbs configured, so callers fall back to the mode's
+        /// ordinary verbs. That fallback is deliberate: a server that clears the question verbs for a
+        /// mode is asking for questions to read like any other line in that mode, which is why this
+        /// is not defaulted the way <see cref="GetModeVerbs"/> is.
+        /// </summary>
+        public bool TryGetModeQuestionVerbs(ProximityChatMode mode, out string[] verbs) =>
+            TryGetUsableVerbs(ProximityChatModeQuestionVerbs, mode, out verbs);
+
+        private static bool TryGetUsableVerbs(IDictionary<ProximityChatMode, string[]> verbsByMode, ProximityChatMode mode, out string[] verbs)
+        {
+            // Hand-edited configs can leave a mode's list present but empty or blank-filled.
+            var usable = GetModeValue(verbsByMode, mode, null)?
+                .Where(verb => !string.IsNullOrWhiteSpace(verb))
+                .ToArray();
+
+            verbs = usable is { Length: > 0 } ? usable : [];
+            return verbs.Length > 0;
+        }
+
+        private static string[] DefaultModeVerbs(ProximityChatMode mode) => mode switch
+        {
+            ProximityChatMode.Yell => ["yells", "shouts", "exclaims"],
+            ProximityChatMode.Whisper => ["whispers", "mumbles", "mutters"],
+            _ => ["says", "states", "mentions"]
+        };
+
         public float GetRpttsGain(ProximityChatMode mode) =>
             GetModeValue(RPTTS_ModeGain, mode, DefaultRpttsGain(mode));
 

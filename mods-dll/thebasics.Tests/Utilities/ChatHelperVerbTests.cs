@@ -90,16 +90,28 @@ public class ChatHelperVerbTests
             verb.Should().BeOneOf(config.ProximityChatModeVerbs[ProximityChatMode.Normal]);
         }
 
+        [Theory]
+        [InlineData(ProximityChatMode.Whisper, new[] { "whispers", "mumbles", "mutters" })]
+        [InlineData(ProximityChatMode.Yell, new[] { "yells", "shouts", "exclaims" })]
+        [InlineData(ProximityChatMode.Normal, new[] { "says", "states", "mentions" })]
+        public void FallsBackToTheModesRealDefaultVerbsWhenOmitted(ProximityChatMode mode, string[] expected)
+        {
+            // The old fallback used the enum name, rendering as `Alice normal "Hello"`.
+            var config = CreateConfig();
+            config.ProximityChatModeVerbs.Remove(mode);
+            config.ProximityChatModeQuestionVerbs.Remove(mode);
+
+            ChatHelper.GetProximityChatVerb(null, mode, config, "Hello.").Should().BeOneOf(expected);
+        }
+
         [Fact]
-        public void FallsBackToModeNameWhenNoVerbsConfiguredAtAll()
+        public void FallsBackToDefaultVerbsWhenTheListIsPresentButBlank()
         {
             var config = CreateConfig();
-            config.ProximityChatModeVerbs.Remove(ProximityChatMode.Whisper);
-            config.ProximityChatModeQuestionVerbs.Remove(ProximityChatMode.Whisper);
+            config.ProximityChatModeVerbs[ProximityChatMode.Yell] = ["", "   "];
 
-            var verb = ChatHelper.GetProximityChatVerb(null, ProximityChatMode.Whisper, config, "Hello.");
-
-            verb.Should().Be("whisper");
+            ChatHelper.GetProximityChatVerb(null, ProximityChatMode.Yell, config, "Hello.")
+                .Should().BeOneOf("yells", "shouts", "exclaims");
         }
 
         [Fact]

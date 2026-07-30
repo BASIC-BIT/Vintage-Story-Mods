@@ -2343,11 +2343,20 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             // Process the entire pipeline
             TransformerSystem.ProcessMessagePipeline(context);
 
+            // The pipeline can refuse the line, for instance when a stale chat type is cleared, and
+            // it tells the player itself when it does. Report what actually happened rather than
+            // assuming success, or a refused send counts as a completed one.
+            var delivered = context.State == MessageContextState.CONTINUE;
             var modeName = mode.ToString().ToLowerInvariant();
             var chatProperties = AnalyticsService.ChatProperties(modeName);
-            AnalyticsService.TrackCommandUsed(modeName, true, properties: chatProperties);
-            AnalyticsService.TrackFeatureUsed("proximity_chat", "send_" + modeName, properties: chatProperties);
+            AnalyticsService.TrackCommandUsed(modeName, delivered, delivered ? null : "rejected", chatProperties);
+            if (delivered)
+            {
+                AnalyticsService.TrackFeatureUsed("proximity_chat", "send_" + modeName, properties: chatProperties);
+            }
 
+            // Status stays Success even on a refusal: the pipeline has already sent the player a
+            // specific explanation, and an empty command error on top would just add noise.
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,

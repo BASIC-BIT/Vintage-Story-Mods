@@ -84,7 +84,10 @@ public class ModConfigUpgradeTests
     public void PartialModeDictionaryFallsBackInsteadOfThrowing()
     {
         // A hand-edited config can carry a dictionary that is missing a mode entirely. The old code
-        // indexed these directly; every new lookup must degrade instead of throwing on chat.
+        // indexed these directly; every lookup must degrade instead of throwing on chat.
+        //
+        // Degrading means the mode's real default, not a placeholder. An earlier version of this
+        // fallback used the enum name and rendered as `Alice whisper "anyone?"`.
         var config = LoadLegacyConfig();
         config.ProximityChatModeQuestionVerbs.Remove(ProximityChatMode.Whisper);
         config.ProximityChatModeVerbs.Remove(ProximityChatMode.Whisper);
@@ -92,7 +95,7 @@ public class ModConfigUpgradeTests
 
         var verb = ChatHelper.GetProximityChatVerb(null, ProximityChatMode.Whisper, config, "anyone?");
 
-        verb.Should().Be("whisper");
+        verb.Should().BeOneOf("whispers", "mumbles", "mutters");
     }
 
     [Fact]
