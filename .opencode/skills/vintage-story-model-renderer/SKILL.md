@@ -10,6 +10,10 @@ Use `scripts/render_vintage_story_model.py` before and after every model change.
 The renderer requires Python 3 with Pillow and NumPy. Its material and textured modes use a deterministic software depth
 buffer; no GPU, display server, Blender installation, or native OpenGL context is required.
 
+The command is a compatibility shim over the reusable `scripts/vintage_story_model_renderer/` package. Keep parsing,
+geometry, animation, rendering, audits, and export in their focused modules so future viewer work does not grow the CLI
+back into a monolith. See `VIEWER_ROADMAP.md` before adding interactive or held-model features.
+
 ## Workflow
 
 1. Create or update a render manifest beside the mod's model tooling. Include authoritative shape files, texture overrides, and supported procedural geometry.

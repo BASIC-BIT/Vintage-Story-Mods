@@ -16,6 +16,15 @@ sys.modules[SPEC.name] = renderer
 SPEC.loader.exec_module(renderer)
 
 
+class PackageBoundaryTests(unittest.TestCase):
+    def test_compatibility_script_exports_focused_package_modules(self):
+        self.assertEqual("vintage_story_model_renderer.cli", renderer.main.__module__)
+        self.assertEqual("vintage_story_model_renderer.shapes", renderer.load_shape.__module__)
+        self.assertEqual("vintage_story_model_renderer.rendering", renderer.render.__module__)
+        self.assertEqual("vintage_story_model_renderer.video", renderer.render_animation.__module__)
+        self.assertEqual("vintage_story_model_renderer.flywheel", renderer.load_flywheel.__module__)
+
+
 class AnnulusWindingTests(unittest.TestCase):
     def test_near_and_far_caps_face_their_respective_views(self):
         faces = []
