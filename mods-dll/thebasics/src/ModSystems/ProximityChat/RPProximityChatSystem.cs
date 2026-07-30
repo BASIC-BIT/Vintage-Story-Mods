@@ -465,7 +465,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (args.Parsers[0].IsMissing)
         {
-            return HandleOverrideModeCommand(player, ChatOverrideMode.GlobalOoc);
+            return HandleOverrideModeCommand(player, ChatOverrideMode.GlobalOoc, "gooc");
         }
 
         // The command stays registered when the config is flipped live, so the one-off form has to
@@ -558,7 +558,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (args.Parsers[0].IsMissing)
         {
-            return HandleOverrideModeCommand(player, ChatOverrideMode.Ooc);
+            return HandleOverrideModeCommand(player, ChatOverrideMode.Ooc, "ooc");
         }
 
         var message = (string)args.Parsers[0].GetValue();
@@ -2134,7 +2134,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (args.Parsers[0].IsMissing)
         {
-            return HandleOverrideModeCommand(player, ChatOverrideMode.Emote);
+            return HandleOverrideModeCommand(player, ChatOverrideMode.Emote, "me");
         }
 
         var context = new MessageContext
@@ -2326,13 +2326,28 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     /// Toggles a sticky override mode. Running the command for the mode you are already in clears it,
     /// and running a different one replaces it, so the three override commands are mutually exclusive.
     /// </summary>
-    private TextCommandResult HandleOverrideModeCommand(IServerPlayer player, ChatOverrideMode mode)
+    /// <summary>
+    /// Bare <c>/me</c>, <c>/ooc</c> and <c>/gooc</c>. Takes the command name because this returns
+    /// before each caller's own analytics, so without it both successful toggles and gate-refused
+    /// attempts would be missing from command analytics for exactly the three commands whose
+    /// disabled-demand this branch set out to measure.
+    /// </summary>
+    private TextCommandResult HandleOverrideModeCommand(IServerPlayer player, ChatOverrideMode mode, string commandName)
     {
         // Raw value, not the effective one: the effective getter clears and explains a mode the
         // player may no longer hold, which for a player trying to LEAVE that mode would emit the
         // refusal twice and never confirm the change. Leaving is always allowed, and /emotemode
         // and /oocToggle already read the raw value for the same reason.
-        return SetOverrideMode(player, mode, enabled: player.GetChatOverrideMode() != mode);
+        var result = SetOverrideMode(player, mode, enabled: player.GetChatOverrideMode() != mode);
+
+        var succeeded = result.Status == EnumCommandStatus.Success;
+        AnalyticsService.TrackCommandUsed(
+            commandName,
+            succeeded,
+            succeeded ? null : "blocked",
+            AnalyticsService.ChatProperties(commandName));
+
+        return result;
     }
 
     /// <summary>
