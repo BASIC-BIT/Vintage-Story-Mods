@@ -14,6 +14,10 @@ public class PlayerChatTransformer : MessageTransformerBase
     // instead of always blaming the RP chat switch.
     private const string StaleOverrideRefusalKey = "staleOverrideRefusalKey";
 
+    // Whether the stored chat type was actually cleared, so the rejection only claims a reset when
+    // one happened. The explicit-prefix path refuses without resetting anything.
+    private const string StaleOverrideWasResetKey = "staleOverrideWasReset";
+
     private enum PlayerChatKind
     {
         Speech,
@@ -119,6 +123,7 @@ public class PlayerChatTransformer : MessageTransformerBase
         if (IsOverrideStale(context, overrideMode))
         {
             context.SendingPlayer.SetChatOverrideMode(ChatOverrideMode.None);
+            context.SetMetadata(StaleOverrideWasResetKey, true);
             return PlayerChatKind.RejectedStaleOverride;
         }
 
@@ -174,11 +179,25 @@ public class PlayerChatTransformer : MessageTransformerBase
         return false;
     }
 
-    private MessageContext RejectStaleOverride(MessageContext context, string langKey)
+    /// <summary>
+    /// The gate's refusal copy explains why the type is unavailable, which is the right thing to say
+    /// when a player tries to *enter* it. On delivery it is not enough on its own: the player also
+    /// needs to know their line was not sent, and, when it happened, that their type was reset. Left
+    /// as the bare reason, a player would retry blindly and have the retry published in character.
+    /// </summary>
+    private MessageContext RejectStaleOverride(MessageContext context, string reasonLangKey)
     {
+        var reason = Lang.Get(reasonLangKey);
+
+        // Only claim a reset when one actually happened. The explicit-prefix path refuses without
+        // touching the stored type, so saying otherwise there would be a lie.
+        var message = context.GetMetadata(StaleOverrideWasResetKey, false)
+            ? Lang.Get("thebasics:chat-type-reset-dropped-message", reason)
+            : Lang.Get("thebasics:chat-message-not-sent", reason);
+
         context.SendingPlayer?.SendMessage(
             _chatSystem.ProximityChatId,
-            Lang.Get(langKey),
+            message,
             EnumChatType.CommandError);
         context.State = MessageContextState.STOP;
         return context;

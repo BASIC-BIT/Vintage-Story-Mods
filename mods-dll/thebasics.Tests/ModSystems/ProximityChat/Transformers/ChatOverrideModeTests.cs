@@ -6,6 +6,7 @@ using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.Tests.Support;
+using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
@@ -241,6 +242,40 @@ public class ChatOverrideModeTests
 
         context.HasFlag(MessageContext.IS_GLOBAL_OOC).Should().BeTrue();
         context.State.Should().Be(MessageContextState.CONTINUE);
+    }
+
+    [Fact]
+    public void StaleTypeRejectionReportsBothTheResetAndTheDroppedLine()
+    {
+        // The gate's refusal copy alone explains why the type is unavailable but not that the line
+        // was dropped or the type reset, so a player would retry blindly.
+        LangTestHelper.EnsureEnglish();
+        var config = CreateConfig();
+        config.AllowOOCToggle = false;
+        var sent = new List<string>();
+        var player = CreatePlayer(ChatOverrideMode.Ooc);
+        player.When(p => p.SendMessage(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<EnumChatType>(), Arg.Any<string>()))
+            .Do(call => sent.Add(call.ArgAt<string>(1)));
+
+        Parse(config, player, "still chatting");
+
+        sent.Should().ContainSingle().Which.Should().Be("thebasics:chat-type-reset-dropped-message");
+    }
+
+    [Fact]
+    public void RefusedPrefixDoesNotClaimTheTypeWasReset()
+    {
+        // The prefix path refuses without touching the stored type, so claiming a reset would lie.
+        LangTestHelper.EnsureEnglish();
+        var config = CreateConfig(enableGlobalOoc: false);
+        var sent = new List<string>();
+        var player = CreatePlayer();
+        player.When(p => p.SendMessage(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<EnumChatType>(), Arg.Any<string>()))
+            .Do(call => sent.Add(call.ArgAt<string>(1)));
+
+        Parse(config, player, "((server restart soon))");
+
+        sent.Should().ContainSingle().Which.Should().Be("thebasics:chat-message-not-sent");
     }
 
     [Fact]
