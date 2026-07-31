@@ -35,6 +35,24 @@ public sealed class RopewayLinkService
         if (packet?.FromTower != null && packet.ToTower != null) TryLink(fromPlayer, packet.FromTower, packet.ToTower);
     }
 
+    public void OnUnlinkRequest(IServerPlayer fromPlayer, TowerUnlinkRequest packet)
+    {
+        if (packet?.FromTower != null && packet.ToTower != null) TryUnlink(fromPlayer, packet.FromTower, packet.ToTower);
+    }
+
+    public void OnRenameRequest(IServerPlayer fromPlayer, TowerRenameRequest packet)
+    {
+        var be = TowerAt(packet?.Tower);
+        if (be == null) return;
+
+        if (!MayEdit(fromPlayer, packet.Tower)) return;
+
+        // BEPylonHead.SanitiseName is the trust boundary; Rename runs it and syncs only on a real change.
+        // Re-sending the list refreshes the open picker with whatever the sanitiser actually kept - straight
+        // through SendCandidateList, because the guards in SendCandidates would toast at a rename.
+        if (be.Rename(packet.Name)) SendCandidateList(fromPlayer, be, packet.Tower);
+    }
+
     // -------------------------------------------------------------- interaction
 
     /// <summary>Empty hand (or anything that is not the cabin item): call the cabin home, otherwise open the picker.</summary>
@@ -72,28 +90,44 @@ public sealed class RopewayLinkService
         var be = TowerAt(from);
         if (be == null || !be.StructureComplete) return;
 
-        // Otherwise a full tower opens an empty picker reading "No linkable towers in range", which is a
-        // completely different situation from the one the player is actually in.
-        if (be.Spans.Count >= BEPylonHead.MaxSpansPerTower)
-        {
-            player.SendIngameError("ropeway-tower-full", Lang.Get("ropeway:err-tower-full"));
-            return;
-        }
-
         // Same reason TryLink refuses below: with part of the line unloaded, every row would fail on click,
         // and an empty picker reading "No linkable towers in range" would blame the surroundings instead.
+        // A full tower is no longer refused here - its existing spans are exactly what the picker now shows,
+        // and unlinking one is the only way out of that state short of breaking the block.
         if (RopewayLine.GetOrBuild(modSystem, from)?.Truncated == true)
         {
             player.SendIngameError("ropeway-line-truncated", Lang.Get("ropeway:err-line-truncated-link"));
             return;
         }
 
+        SendCandidateList(player, be, from);
+    }
+
+    private void SendCandidateList(IServerPlayer player, BEPylonHead be, BlockPos from)
+    {
         var response = new TowerCandidatesResponse
         {
             FromTower = from.Copy(),
+            FromName = be.TowerName,
             RopeInInventory = CountRope(player),
             Candidates = new List<TowerCandidate>()
         };
+
+        // Existing spans first: they are the answer to "what am I already connected to", and the player
+        // reads down from the top.
+        var anchor = SpanMath.AnchorOf(from);
+        foreach (var peer in be.Spans)
+        {
+            var span = anchor.DistanceTo(SpanMath.AnchorOf(peer));
+            response.Candidates.Add(new TowerCandidate
+            {
+                Pos = peer.Copy(),
+                Distance = (int)Math.Round(span),
+                RopeCost = SpanMath.RopeRefund(span, be.RopePerBlock),
+                Name = TowerAt(peer)?.TowerName,
+                Linked = true
+            });
+        }
 
         foreach (var candidate in ScanCandidates(be, from))
         {
@@ -110,6 +144,11 @@ public sealed class RopewayLinkService
     private List<TowerCandidate> ScanCandidates(BEPylonHead be, BlockPos from)
     {
         var result = new List<TowerCandidate>();
+
+        // TryLink refuses on a full tower, so offering one a link row would break the "every row succeeds"
+        // contract the moment the picker started opening on full towers.
+        if (be.Spans.Count >= BEPylonHead.MaxSpansPerTower) return result;
+
         var anchorFrom = SpanMath.AnchorOf(from);
         var lineFrom = RopewayLine.GetOrBuild(modSystem, from);
         var lengthFrom = lineFrom?.TotalLength ?? 0;
@@ -148,7 +187,8 @@ public sealed class RopewayLinkService
             {
                 Pos = pos.Copy(),
                 Distance = (int)Math.Round(span),
-                RopeCost = SpanMath.RopeCost(span, be.RopePerBlock)
+                RopeCost = SpanMath.RopeCost(span, be.RopePerBlock),
+                Name = TowerAt(pos)?.TowerName
             });
         }
 
@@ -181,12 +221,7 @@ public sealed class RopewayLinkService
             return false;
         }
 
-        if (!sapi.World.Claims.TryAccess(player, from, EnumBlockAccessFlags.BuildOrBreak) ||
-            !sapi.World.Claims.TryAccess(player, to, EnumBlockAccessFlags.BuildOrBreak))
-        {
-            player.SendIngameError("ropeway-no-permission", Lang.Get("ropeway:err-no-permission"));
-            return false;
-        }
+        if (!MayEdit(player, from, to)) return false;
 
         if (beFrom.HasSpanTo(to) || beTo.HasSpanTo(from))
         {
@@ -273,10 +308,90 @@ public sealed class RopewayLinkService
         // without this a link is indistinguishable from a bug that ate the rope.
         player.SendMessage(
             GlobalConstants.InfoLogChatGroup,
-            Lang.Get("ropeway:span-linked", (int)Math.Round(span), cost),
+            Lang.Get("ropeway:span-linked", DisplayName(beTo, from, to), (int)Math.Round(span), cost),
             EnumChatType.Notification);
 
         return true;
+    }
+
+    /// <summary>
+    /// Drops one span between two named towers, the picker's counterpart to <see cref="TryLink"/>. Same
+    /// refund and same cabin re-base as <see cref="UnlinkAll"/>, but for a single peer: reading UnlinkAll's
+    /// loop would fire its "no survivor, drop the cabin" branch on the first peer of a two-span tower.
+    /// </summary>
+    public bool TryUnlink(IServerPlayer player, BlockPos from, BlockPos to)
+    {
+        var beFrom = TowerAt(from);
+        var beTo = TowerAt(to);
+
+        if (beFrom == null || beTo == null)
+        {
+            player.SendIngameError("ropeway-tower-gone", Lang.Get("ropeway:err-tower-gone"));
+            return false;
+        }
+
+        if (!beFrom.HasSpanTo(to) && !beTo.HasSpanTo(from))
+        {
+            player.SendIngameError("ropeway-not-linked", Lang.Get("ropeway:err-not-linked"));
+            return false;
+        }
+
+        if (!MayEdit(player, from, to)) return false;
+
+        // Same rule as breaking a pylon head: cutting the line under a seated rider moves them an arbitrary
+        // distance, which is a fall-damage vector and a free long-range teleport.
+        if (IsLineOccupied(from))
+        {
+            player.SendIngameError("ropeway-line-in-use", Lang.Get("ropeway:err-line-in-use"));
+            return false;
+        }
+
+        // ---- nothing above this line mutates ----
+
+        var span = SpanMath.AnchorOf(from).DistanceTo(SpanMath.AnchorOf(to));
+        var name = DisplayName(beTo, from, to);
+        var cabin = FindCabin(RopewayLine.GetOrBuild(modSystem, from));
+
+        beFrom.RemoveSpan(to);
+        beTo.RemoveSpan(from);
+
+        // Both towers were on one line, so invalidating from either end drops the whole old chain.
+        modSystem.InvalidateLine(from);
+        modSystem.LineCache.Remove(from);
+        modSystem.InvalidateLine(to);
+        modSystem.LineCache.Remove(to);
+
+        // The cabin's line just split. IsLineOccupied above means nobody is aboard, so a re-base is free.
+        if (cabin != null)
+        {
+            var survivor = PickSurvivor(
+                new[] { RopewayLine.GetOrBuild(modSystem, from), RopewayLine.GetOrBuild(modSystem, to) },
+                cabin.LineKey);
+
+            if (survivor != null) cabin.RebaseTo(survivor);
+            else cabin.DropAndDie(player);
+        }
+
+        var refund = SpanMath.RopeRefund(span, beFrom.RopePerBlock);
+        if (player.WorldData.CurrentGameMode != EnumGameMode.Creative) GiveRope(player, refund);
+
+        player.SendMessage(
+            GlobalConstants.InfoLogChatGroup,
+            Lang.Get("ropeway:span-cut", name, refund),
+            EnumChatType.Notification);
+
+        // The picker stays open on the tower that was clicked, so refresh what it is showing.
+        SendCandidateList(player, beFrom, from);
+        return true;
+    }
+
+    /// <summary>
+    /// What to call a tower in a message. Its player-set name, or the compass bearing from where the player
+    /// is standing - never a raw coordinate triple and never an "unnamed" placeholder.
+    /// </summary>
+    private static string DisplayName(BEPylonHead be, BlockPos from, BlockPos to)
+    {
+        return be?.TowerName ?? Lang.Get(SpanMath.CompassKey(to.X - from.X, to.Z - from.Z));
     }
 
     /// <summary>Drops every span on a tower, refunding floor(span) to the breaker and unlinking the peers.</summary>
@@ -471,6 +586,38 @@ public sealed class RopewayLinkService
     }
 
     // -------------------------------------------------------------- helpers
+
+    /// <summary>
+    /// The trust gate for every tower-mutating packet - link, unlink and rename. All three arrive as
+    /// client packets carrying an arbitrary BlockPos, so without a distance term any client can rename a
+    /// tower, or cut a span and be paid rope for it, on any loaded tower in the world from anywhere in it.
+    /// <paramref name="clicked"/> is the tower the click was on and is the one the player's reach has to
+    /// cover; <paramref name="peer"/> is the far end of a span, legitimately up to maxSpan away, so it gets
+    /// the claim check and not the distance one. Generous on range - PickingRange is the block reach and
+    /// the anchor is the sheave block's centre, so a couple of blocks of slack keeps a legitimate click
+    /// from being refused over rounding and the player's eye height.
+    /// </summary>
+    private bool MayEdit(IServerPlayer player, BlockPos clicked, BlockPos peer = null)
+    {
+        if (player?.Entity == null || clicked == null) return false;
+
+        var reach = player.WorldData.PickingRange + 3;
+        if (player.Entity.Pos.SquareDistanceTo(SpanMath.AnchorOf(clicked)) > reach * reach)
+        {
+            player.SendIngameError("ropeway-too-far", Lang.Get("ropeway:err-too-far"));
+            return false;
+        }
+
+        // Same gate as placing or breaking the block: a span and a name are both visible to everyone.
+        if (!sapi.World.Claims.TryAccess(player, clicked, EnumBlockAccessFlags.BuildOrBreak) ||
+            (peer != null && !sapi.World.Claims.TryAccess(player, peer, EnumBlockAccessFlags.BuildOrBreak)))
+        {
+            player.SendIngameError("ropeway-no-permission", Lang.Get("ropeway:err-no-permission"));
+            return false;
+        }
+
+        return true;
+    }
 
     private BEPylonHead TowerAt(BlockPos pos)
     {

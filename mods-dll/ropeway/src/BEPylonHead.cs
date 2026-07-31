@@ -18,7 +18,13 @@ public class BEPylonHead : BlockEntity
 {
     public const int MaxSpansPerTower = 2;
 
+    /// <summary>Longest name a tower keeps. A place name, not a paragraph - it has to fit a picker row.</summary>
+    public const int MaxNameLength = 24;
+
     public bool StructureComplete;
+
+    /// <summary>Player-set label, or null when unnamed. Sanitised on the way in, synced with the tree.</summary>
+    public string TowerName;
 
     /// <summary>Peer towers this one is linked to. Unordered, 0-2 entries, mirrored on the peer.</summary>
     public readonly List<BlockPos> Spans = new();
@@ -205,7 +211,15 @@ public class BEPylonHead : BlockEntity
 
         foreach (var peer in Spans)
         {
-            var mesh = BuildHalfCable(peer, texPos);
+            if (peer == null) continue;
+
+            // Half the span. InternalY on both sides keeps this right for a tower inside a pocket dimension.
+            var mesh = BuildHalfCable(
+                (peer.X - Pos.X) * 0.5,
+                (peer.InternalY - Pos.InternalY) * 0.5,
+                (peer.Z - Pos.Z) * 0.5,
+                texPos);
+
             if (mesh != null) mesher.AddMeshData(mesh);
         }
 
@@ -214,21 +228,29 @@ public class BEPylonHead : BlockEntity
 
     /// <summary>
     /// A thin box from this sheave to the midpoint of the span, in block-local coordinates, so the anchor is
-    /// the block centre. Null when the peer is missing or lands on top of us.
+    /// the block centre and the deltas are half the span. Null when the peer lands on top of us. Static and
+    /// therefore unit-tested: this mesh's failure mode is that it renders nothing at all, silently.
     /// </summary>
-    private MeshData BuildHalfCable(BlockPos peer, TextureAtlasPosition texPos)
+    public static MeshData BuildHalfCable(double dx, double dy, double dz, TextureAtlasPosition texPos)
     {
-        if (peer == null) return null;
-
-        // Half the span. InternalY on both sides keeps this right for a tower inside a pocket dimension.
-        var dx = (peer.X - Pos.X) * 0.5;
-        var dy = (peer.InternalY - Pos.InternalY) * 0.5;
-        var dz = (peer.Z - Pos.Z) * 0.5;
-
         var length = Math.Sqrt(dx * dx + dy * dy + dz * dz);
         if (length < 0.01) return null;
 
-        var mesh = CubeMeshUtil.GetCube(CableRadius, CableRadius, (float)(length / 2), new Vec3f(0, 0, 0));
+        // ScaleCubeMesh does `xyz = xyz * scale + scale`, so the box lands corner-at-origin; the translate
+        // argument is what puts it back around the origin the rotations below turn about.
+        var mesh = CubeMeshUtil.GetCube(
+            CableRadius, CableRadius, (float)(length / 2),
+            new Vec3f(-CableRadius, -CableRadius, (float)(-length / 2)));
+
+        // GetCube leaves XyzFaces empty, and the chunk tesselator emits geometry only inside
+        // `for (l = 0; l < sourceMesh.XyzFacesCount; l++)` (JsonTesselator.cs:709) - so without this the
+        // cable copies zero vertices into the chunk mesh, silently, with no exception and no log line.
+        CubeMeshUtil.SetXyzFacesAndPacketNormals(mesh);
+
+        // ...and once that loop runs it indexes Season/ClimateColorMapIds per face (JsonTesselator.cs:834),
+        // which GetCube leaves zero-length. Without this, fixing the face count only trades an invisible
+        // cable for an IndexOutOfRangeException.
+        mesh.WithColorMaps();
 
         // Aim the box's +Z down the span: pitch about X, then yaw about Y. Two calls rather than one
         // Rotate(rx, ry, 0) so the composition order is explicit here instead of a property of Mat4f.RotateXYZ.
@@ -279,6 +301,7 @@ public class BEPylonHead : BlockEntity
 
         StructureComplete = tree.GetBool("structureComplete");
         side = tree.GetString("side") ?? side;
+        TowerName = tree.GetString("towerName");
 
         Spans.Clear();
         var count = tree.GetInt("spanCount");
@@ -293,6 +316,11 @@ public class BEPylonHead : BlockEntity
         {
             Init();
         }
+
+        // The cable is chunk mesh, so a Spans list that arrives after the chunk has already been tesselated
+        // stays invisible until something else dirties the block. Vanilla's idiom for exactly this is
+        // BlockEntityDisplay.cs:119-126. Cheap: MarkBlockDirty only queues a re-tesselation.
+        if (Api is ICoreClientAPI) Api.World.BlockAccessor.MarkBlockDirty(Pos);
     }
 
     public override void ToTreeAttributes(ITreeAttribute tree)
@@ -301,9 +329,65 @@ public class BEPylonHead : BlockEntity
 
         tree.SetBool("structureComplete", StructureComplete);
         if (side != null) tree.SetString("side", side);
+        if (TowerName != null) tree.SetString("towerName", TowerName);
 
         tree.SetInt("spanCount", Spans.Count);
         for (var i = 0; i < Spans.Count; i++) WritePos(tree, "span" + i, Spans[i]);
+    }
+
+    /// <summary>
+    /// Server-side rename. False when nothing changed, so the caller can skip the sync. MarkDirty without
+    /// redrawOnClient: a name is not geometry, and re-tesselating every cable on a rename would be silly.
+    /// </summary>
+    public bool Rename(string raw)
+    {
+        var name = SanitiseName(raw);
+        if (name == TowerName) return false;
+
+        TowerName = name;
+        MarkDirty();
+        return true;
+    }
+
+    /// <summary>
+    /// Player text arriving over the network, so this is a trust boundary: control characters corrupt the
+    /// chat and GUI text renderers, and an unbounded string would be persisted verbatim on every tower and
+    /// re-sent to every client in range. Null when nothing readable survives. Pure, and therefore tested.
+    /// This is the single chokepoint every display path routes through, which is why the VTML strip lives
+    /// here and not per surface.
+    /// </summary>
+    public static string SanitiseName(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return null;
+
+        var builder = new StringBuilder(raw.Length);
+        foreach (var c in raw)
+        {
+            // A name reaches two VTML-rendered surfaces - GetBlockInfo's rich-text panel and the
+            // span-linked / span-cut chat lines, which HudDialogChat composes with AddRichtext - and 24
+            // characters is enough for <font color="red"> or a short <a href>. No tag can survive without
+            // its brackets, and a place name has no use for them.
+            if (c == '<' || c == '>') continue;
+
+            // Every flavour of whitespace collapses to one plain space - a tab or a newline inside a
+            // one-line GUI label is a layout bug, and runs of spaces are just padding to fake a longer name.
+            if (char.IsControl(c) || char.IsWhiteSpace(c))
+            {
+                if (builder.Length > 0 && builder[builder.Length - 1] != ' ') builder.Append(' ');
+                continue;
+            }
+
+            builder.Append(c);
+        }
+
+        var name = builder.ToString().Trim();
+        if (name.Length > MaxNameLength) name = name.Substring(0, MaxNameLength).TrimEnd();
+
+        // Cutting to a fixed length can land between the two halves of a surrogate pair, which renders as a
+        // replacement glyph rather than the character the player typed.
+        if (name.Length > 0 && char.IsHighSurrogate(name[name.Length - 1])) name = name.Substring(0, name.Length - 1);
+
+        return name.Length == 0 ? null : name;
     }
 
     // TreeAttributeUtil.SetBlockPos writes InternalY but GetBlockPos reads it back as a plain Y with
@@ -359,6 +443,10 @@ public class BEPylonHead : BlockEntity
     public override void GetBlockInfo(IPlayer forPlayer, StringBuilder dsc)
     {
         base.GetBlockInfo(forPlayer, dsc);
+
+        // No "unnamed" placeholder line: from in front of the tower there is no bearing to fall back to that
+        // the player does not already have, so the honest fallback is to say nothing.
+        if (TowerName != null) dsc.AppendLine(Lang.Get("ropeway:blockinfo-name", TowerName));
 
         if (!StructureComplete)
         {

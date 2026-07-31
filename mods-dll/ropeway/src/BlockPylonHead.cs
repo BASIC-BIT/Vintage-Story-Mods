@@ -49,6 +49,15 @@ public class BlockPylonHead : Block
             var service = world.Api.ModLoader.GetModSystem<RopewayModSystem>()?.LinkService;
             if (service == null) return true;
 
+            // Ctrl + right-click is always the picker. A plain right-click on an end station calls the cabin
+            // home and stops there, which left naming and unlinking unreachable on exactly the tower a
+            // player most wants to name. Ctrl rather than sneak, which already opens the guide.
+            if (byPlayer.Entity?.Controls?.CtrlKey == true)
+            {
+                service.SendCandidates(player, blockSel.Position);
+                return true;
+            }
+
             var slot = byPlayer.InventoryManager?.ActiveHotbarSlot;
             if (slot?.Itemstack?.Collectible?.Code?.ToString() == CabinItemCode)
             {
@@ -114,10 +123,11 @@ public class BlockPylonHead : Block
         }
         else if (be.IsEndpoint)
         {
+            // At an end station the plain click calls the cabin, so the picker is the ctrl one here.
             own = new[]
             {
-                new WorldInteraction { ActionLangCode = "ropeway:blockhelp-pick", MouseButton = EnumMouseButton.Right },
                 new WorldInteraction { ActionLangCode = "ropeway:blockhelp-call", MouseButton = EnumMouseButton.Right },
+                new WorldInteraction { ActionLangCode = "ropeway:blockhelp-pick", MouseButton = EnumMouseButton.Right, HotKeyCode = "ctrl" },
                 new WorldInteraction { ActionLangCode = "ropeway:blockhelp-place-cabin", MouseButton = EnumMouseButton.Right }
             };
         }

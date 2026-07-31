@@ -155,6 +155,120 @@ public class RopewayAssetContractTests
         Assert.Equal(seats.Select(s => s.GetProperty("apName").GetString()).ToList(), boxes);
     }
 
+    /// <summary>
+    /// Entity shapes are authored along X: EntityShapeRenderer adds +90 degrees to Pos.Yaw before building
+    /// the model matrix (EntityShapeRenderer.cs:808), so the model's X axis lands on the entity's heading,
+    /// and every vanilla entity whose long axis IS its heading - raft 4.5 x 2.25, arapaima 1.90 x 0.58,
+    /// pike 1.35 x 0.56 - is long in X. EntityRopewayCabin.Place sets Yaw = Atan2(dir.X, dir.Z), the same
+    /// convention. Built along Z the cabin flies sideways and presents its 4-block side to the tower's
+    /// 3-block passage, which it does not fit through.
+    /// </summary>
+    [Fact]
+    public void TheCabinIsBuiltAlongTheTravelAxis()
+    {
+        var (min, max, _) = CabinBounds();
+
+        Assert.Equal(4.0, (max[0] - min[0]) / 16, 3);
+        Assert.Equal(2.875, (max[2] - min[2]) / 16, 3);
+
+        // The tower's posts sit at block x = +/-2, leaving three free cells, and SpanMath.ClearanceRadius
+        // certifies exactly that corridor. Anything wider is a cabin no line can legally carry.
+        Assert.True((max[2] - min[2]) / 16 <= 2 * SpanMath.ClearanceRadius + 1,
+            "the cabin is wider than the passage it travels through");
+    }
+
+    /// <summary>
+    /// EntityRopewayCabin.SetSelectionBox hardcodes the box because hitboxSize is a Vec2f that cannot
+    /// describe a body hanging below its own Pos. The box must be YAW-INVARIANT: Entity.SelectionBox is
+    /// world-axis-aligned and nothing in Entity.IntersectsRay rotates it, while the cabin's world footprint
+    /// does turn with the line's bearing. So it is checked against the model's LONGEST horizontal
+    /// half-extent on both axes, not against each axis separately - a box that merely matches the model
+    /// bounds fits an east-west line and is transposed on a north-south one, and comparing axis-by-axis in
+    /// model space passes for either transposition. A future rectangular "optimisation" fails here.
+    /// </summary>
+    [Fact]
+    public void TheHardcodedSelectionBoxCircumscribesTheCabinAtAnyYaw()
+    {
+        var (min, max, _) = CabinBounds();
+
+        var cabin = new EntityRopewayCabin();
+        cabin.SetSelectionBox(0f, 0f);
+        var box = cabin.SelectionBox;
+
+        Assert.True(box.X1 == box.Z1 && box.X2 == box.Z2,
+            "selection box is not square in x/z, so it cannot be right at every yaw");
+
+        // Half-extents about Pos, in blocks. The model is centred horizontally on the shape origin.
+        var reach = Math.Max(
+            Math.Max(Math.Abs(min[0]), Math.Abs(max[0])),
+            Math.Max(Math.Abs(min[2]), Math.Abs(max[2]))) / 16;
+
+        Assert.True(-box.X1 >= reach && box.X2 >= reach,
+            "selection box is smaller than the cabin's longest horizontal half-extent");
+        Assert.True(box.Y1 <= min[1] / 16, "selection box does not reach the bottom of the model");
+    }
+
+    /// <summary>Both seats must stay on the cabin's centre line, one fore and one aft of the mast.</summary>
+    [Fact]
+    public void TheSeatAttachmentPointsStayOnTheCentreLine()
+    {
+        var (_, _, elements) = CabinBounds();
+        var seats = new Dictionary<string, double[]>();
+
+        foreach (var (_, element) in elements)
+        {
+            if (!element.TryGetProperty("attachmentpoints", out var points)) continue;
+
+            // Attachment point coordinates are relative to the owning element's `from` corner
+            // (ShapeElement.GetLocalTransformMatrix translates by From), with the model's own axes.
+            var from = element.GetProperty("from");
+            foreach (var point in points.EnumerateArray())
+            {
+                seats[point.GetProperty("code").GetString()!] = new[]
+                {
+                    from[0].GetDouble() + double.Parse(point.GetProperty("posX").GetString()!),
+                    from[1].GetDouble() + double.Parse(point.GetProperty("posY").GetString()!),
+                    from[2].GetDouble() + double.Parse(point.GetProperty("posZ").GetString()!)
+                };
+            }
+        }
+
+        Assert.Equal(2, seats.Count);
+        Assert.All(seats.Values, p => Assert.Equal(0, p[2], 3));
+
+        // Fore and aft along the travel axis, not stacked on top of each other.
+        Assert.True(seats["SeatAP"][0] * seats["Seat2AP"][0] < 0, "both seats are on the same side of the mast");
+    }
+
+    private static (double[] Min, double[] Max, List<(string Name, JsonElement Element)> Elements) CabinBounds()
+    {
+        var min = new[] { double.MaxValue, double.MaxValue, double.MaxValue };
+        var max = new[] { double.MinValue, double.MinValue, double.MinValue };
+        var elements = new List<(string, JsonElement)>();
+
+        void Visit(JsonElement parent, bool root)
+        {
+            foreach (var element in parent.EnumerateArray())
+            {
+                // The root element is a face-less 1x1x1 pivot node at the shape origin, not geometry.
+                if (!root)
+                {
+                    elements.Add((element.GetProperty("name").GetString()!, element));
+                    for (var axis = 0; axis < 3; axis++)
+                    {
+                        min[axis] = Math.Min(min[axis], element.GetProperty("from")[axis].GetDouble());
+                        max[axis] = Math.Max(max[axis], element.GetProperty("to")[axis].GetDouble());
+                    }
+                }
+
+                if (element.TryGetProperty("children", out var children)) Visit(children, false);
+            }
+        }
+
+        Visit(Load("shapes", "entity", "cabin.json").GetProperty("elements"), true);
+        return (min, max, elements);
+    }
+
     [Fact]
     public void EveryLangKeyTheCodeAsksForIsShipped()
     {

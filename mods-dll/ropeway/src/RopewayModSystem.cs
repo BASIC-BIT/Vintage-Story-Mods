@@ -38,6 +38,8 @@ public sealed class RopewayModSystem : ModSystem
         api.Network.RegisterChannel(ChannelName)
             .RegisterMessageType<TowerCandidatesResponse>()
             .RegisterMessageType<TowerLinkRequest>()
+            .RegisterMessageType<TowerUnlinkRequest>()
+            .RegisterMessageType<TowerRenameRequest>()
             .RegisterMessageType<TowerCandidate>();
     }
 
@@ -46,7 +48,9 @@ public sealed class RopewayModSystem : ModSystem
         LinkService = new RopewayLinkService(api, this);
 
         api.Network.GetChannel(ChannelName)
-            .SetMessageHandler<TowerLinkRequest>(LinkService.OnLinkRequest);
+            .SetMessageHandler<TowerLinkRequest>(LinkService.OnLinkRequest)
+            .SetMessageHandler<TowerUnlinkRequest>(LinkService.OnUnlinkRequest)
+            .SetMessageHandler<TowerRenameRequest>(LinkService.OnRenameRequest);
 
         // Disconnect while riding is handled by EntityRopewayCabin.DropGhostPassengers on the server tick,
         // which also covers a crashed client and a despawned rider. One mechanism, not two.

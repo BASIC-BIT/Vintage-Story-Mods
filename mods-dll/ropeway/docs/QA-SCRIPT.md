@@ -1,6 +1,12 @@
 # Ropeway v0.1 — in-game QA script
 
-Manual operator checklist. Nothing in v0.1 has been play-verified; this is the script that does it.
+Manual operator checklist. One in-game session has happened: the mod loaded clean, and it produced the
+four findings this round fixed — cabin built across the travel axis, cable rendering nothing, the picker
+showing only link candidates, and no way to name a tower. Steps 8, 10, 10b–10d, 12, 15 and 16 are the ones
+that changed; everything else is still unverified in play.
+Step 12's clearance figure was wrong by 16× in an earlier draft ("about a block of air"); the real margin
+is **1/16 of a block** and a visibly tight fit is the correct result. Every other measurement in this
+script was re-checked against the shipped shapes and `blocktypes/pylonhead.json` on 2026-07-31.
 See [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for what source review already found and did not fix.
 
 
@@ -51,24 +57,67 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    The count in the block-info panel counts down, and within ~1 s of the last block the panel reads
    *"Tower complete / Spans: 0/2"* and every remaining highlight clears itself.
 
-8. **Check the passage.** Walk through the tower at ground level between the posts.
+8. **Check the passage.** Walk through the tower at ground level between the posts, *along the axis the
+   rear gantry points down* — that is the direction the cabin travels, and the posts flank it 3 wide.
    **PASS:** a clear 3-wide, 4-long, 3-tall tunnel — no post in the way.
+   The cabin's own dimensions are **4 blocks along travel × 2.875 across × 3.25 tall**. The 2.875 is the
+   one that has to fit between the posts; if you ever see the 4-block side facing them, the cabin shape
+   has been re-authored along Z again and item 1 of this round has regressed.
 
 9. **Build a second tower** 20-40 blocks away with clear line of sight, same procedure. Keep both towers
    at similar height for the first test. **Deliberately orient this one so its facing is 90° from the
    line between the two towers** — that is the case the tower's own posts used to block silently.
 
 10. **Link them.** Right-click the first tower's pylon head with an empty hand.
-    **PASS:** the "Link to tower" dialog lists the second tower with its distance and rope cost, and shows
-    your haul rope count. **PASS:** it is listed *despite* the 90° orientation from step 9 — an empty
+    **PASS:** the "Tower connections" dialog opens. It lists the second tower as
+    *"Link \<bearing\> - N blocks - M rope"*, where \<bearing\> is the eight-point compass direction you
+    would walk to reach it — **never a raw coordinate and never the word "unnamed"**. It also shows your
+    haul rope count. **PASS:** it is listed *despite* the 90° orientation from step 9 — an empty
     list here is the tower-post clearance bug back. Click the row.
-    **PASS:** a chat line *"Span strung: N blocks, M haul rope."*, no error toast; both towers now read
-    *"Spans: 1/2"* and *"End of line - the cabin stops here"*, and *"Line: N blocks, 2 towers"*. Your
-    haul rope drops by `ceil(distance / 4)` — a 30-block span is **8**, not 30.
+    **PASS:** a chat line *"Span strung to \<bearing or name\>: N blocks, M haul rope."*, no error toast;
+    both towers now read *"Spans: 1/2"* and *"End of line - the cabin stops here"*, and
+    *"Line: N blocks, 2 towers"*. Your haul rope drops by `ceil(distance / 4)` — a 30-block span is
+    **8**, not 30.
     **Also check the refusals:** with too little rope the row is prefixed `[!]` and clicking it gives
-    *"Not enough haul rope"*; a tower with something solid between them does not appear in the list;
-    right-clicking a tower that already carries two spans gives *"That tower already carries two
-    spans."* instead of an empty picker.
+    *"Not enough haul rope"*; a tower with something solid between them does not appear in the list.
+
+10b. **The cable is visible.** Look at the span you just strung.
+     **PASS:** a thin rope-textured cable runs from each sheave to the midpoint of the span, **immediately,
+     without reloading anything**. Each tower draws its own half, so the two halves meet in the middle and
+     there is no z-fighting seam.
+     **FAIL:** nothing there at all. That is the silent-mesh bug — `CubeMeshUtil.GetCube` hands back a mesh
+     with `XyzFacesCount == 0` and the chunk tesselator's emit loop never runs, so the cable is dropped with
+     no exception and no log line. Nothing in either log will tell you; only looking will.
+     Then **quit to menu and reload the world**, and (multiplayer) have a **second player who did not build
+     the line** walk up to it. **PASS:** the cable is there for them too, straight away.
+
+10c. **Name the towers.** With the picker open on tower 1, type a name into the **"This tower:"** field at
+     the top and press **Rename**. **PASS:** the row list refreshes and the block-info panel on that pylon
+     head now shows the name in quotes above *"Tower complete"*. Name tower 2 as well, from its own picker.
+     **PASS:** each tower's picker row for the other now shows that **name instead of the bearing**, and a
+     link or unlink chat line names it too.
+     **PASS:** the names survive a save/reload, and (multiplayer) a second player sees them without
+     relogging.
+     **Check the sanitiser:** paste a name with tabs or newlines in it — **PASS:** it comes back as a
+     single line with single spaces. Paste 200 characters — **PASS:** it is cut to 24 with no trailing
+     space and no broken half-character. Save an all-whitespace name — **PASS:** the tower goes back to
+     being called by its bearing, not by an empty label. Save `<font color="red">Hot` — **PASS:** the name
+     comes back with the angle brackets gone and shows as literal text in the block-info panel and in the
+     link/cut chat lines. **FAIL:** the panel or the chat line turns red, or part of the name vanishes into
+     a tag — the name is reaching a VTML renderer unescaped.
+
+10d. **Unlink from the picker.** Right-click tower 1 again. **PASS:** the span you strung is listed at the
+     **top**, styled differently from the link rows and reading
+     *"Connected: \<name\> - N blocks - click to cut (+M rope)"*. Click it.
+     **PASS:** `floor(distance / 4)` haul rope comes back, both towers drop to *"Spans: 0/2"*, both halves
+     of the cable disappear, and **the picker stays open and refreshes** to show the tower as a link
+     candidate again. Re-link it before carrying on.
+     **PASS:** with a rider seated on the line, the same click gives *"Someone is riding this line."* and
+     changes nothing.
+     Later, once a tower carries **two** spans (step 16), right-click it: **PASS:** the picker opens
+     showing both connections rather than refusing with *"That tower already carries two spans."* — an
+     unlinkable full tower is the whole point of the row list. It offers **no link rows**, because every
+     one of them would fail on click.
 
 11. **Hang the cabin.** Hold the Ropeway Cabin item and right-click the first tower's pylon head.
     **PASS:** a cabin appears hanging 2 blocks below the sheave, the item leaves your hand (survival), and
@@ -79,18 +128,30 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     panel, not at a seat.** That is the `mountAnySeat` fallback path and it is the single highest-risk
     untested thing in the mod. Then dismount and repeat aiming at the **floor or a lower wall panel,
     below the seats** — that band is what the §3c.4 selection-box fix added; before it the click hit
-    nothing at all. **PASS:** both aims seat you. **FAIL:** the lower half is dead to clicks (the
-    `EntityRopewayCabin.SetSelectionBox` override regressed), or the crosshair highlights a block *behind*
-    the cabin's lower half instead of the cabin. Re-check this **after riding a full trip and after a
-    relog** — §3d.1 is precisely about a later attribute sync putting the JSON box back, so a box that
-    works on placement and dies later is the same bug returning.
+    nothing at all. **PASS:** both aims seat you, **from every side** — the override is
+    `x ±2.05, y -1.3..2.05, z ±2.05`, square in x/z because `Entity.SelectionBox` is world-axis-aligned and
+    is never rotated by yaw, so it has to circumscribe the cabin at any bearing rather than fit it at one.
+    **Do this on a line running north-south as well as one running east-west** — a box that fits only one
+    of the two is the exact defect this round closed. **FAIL:** the lower half is dead to clicks, or the
+    two ends of the cabin are dead while the sides work on one bearing but not the other, or the crosshair
+    highlights a block *behind* the cabin's lower half instead of the cabin. Re-check this **after riding a
+    full trip and after a relog** — §3d.1 is precisely about a later attribute sync putting the JSON box
+    back, so a box that works on placement and dies later is the same bug returning.
     **PASS:** you are seated, you can look around freely, and after ~3 s it departs toward the far tower.
     If nothing happens, retry aiming directly at a seat; a seat-only mount means `mountAnySeat` is not
     reaching its non-controllable fallback loop and `controllable: true` on seat 0 is the fix (at the
     cost of a stutter for the controlling client).
     **PASS:** motion is smooth, not a 30 Hz stutter — this is the seat `controllable: false` fix; a
-    stutter means the fix regressed. The cabin passes *through* the far tower's gantry without clipping
-    the posts. Expect the mast/grip to visually pass through the gantry beams — known, cosmetic.
+    stutter means the fix regressed.
+    **PASS — the axis check, watch for this one:** the cabin's **long side points down the line**, so it
+    goes through the tower nose-first. The fit is **deliberately tight: 1/16 of a block of air on each
+    side** — a 2.875-block-wide cabin in the 3-block passage — so a gap you can barely see is the CORRECT
+    result and is exactly what `gen_manifests.py` asserts (`roof to west/east post = 1.0 unit`). Do not
+    report a fail for a tight fit; report one only if it clips. **FAIL:** it flies broadside, presenting
+    its 4-block side to a 3-block gap and clipping both posts on every pass. That is the shape-axis bug and it means the cabin shape has gone back to being
+    built along Z. Expect the mast/grip to visually pass through the gantry beams — known, cosmetic.
+    **PASS:** the sway animation rocks the cabin **fore and aft along the line**, like a real hanging
+    cabin, not side to side.
 
 13. **Arrive.** **PASS:** it stops at the far tower and holds. Try to dismount while it is still moving —
     you should get *"The cabin is moving. It stops at the next tower."* and stay seated. Once stopped,
@@ -100,11 +161,17 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 
 15. **Call it home.** Walk to the other end tower with the cabin parked and empty at the far end.
     Right-click that tower with an empty hand. **PASS:** the empty cabin travels back to you.
+    Now **Ctrl + right-click** that same tower while the cabin is away, and again with someone seated on
+    the line. **PASS:** the picker opens both times, so you can name or unlink an end station without
+    having to park the cabin next to it first. Sneak + right-click must still open the *guide*, and a plain
+    right-click must still call the cabin — if Ctrl calls the cabin instead, the modifier is not reaching
+    the server.
 
 16. **Extend the line.** Build a third tower beyond the second and link tower 2 → tower 3.
     **PASS:** tower 2 now reads *"Spans: 2/2"* and no longer says "End of line"; towers 1 and 3 do.
     Ride end to end. **PASS:** the cabin passes through tower 2 without stopping and reverses only at the
-    ends. Try to link a fourth tower to tower 2. **PASS:** *"That tower already carries two spans."*
+    ends. Open tower 2's picker. **PASS:** two "Connected:" rows and **no link rows at all** — a full
+    tower is not offered a fourth link it would then have to refuse (see step 10d).
 
 17. **Break safety.** With a passenger seated, try to break any pylon head on that line.
     **PASS:** *"Someone is riding this line."* and the block survives. Dismount, then break an end

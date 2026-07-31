@@ -31,6 +31,12 @@
       <HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <!-- Constructing an EntityRopewayCabin loads VSSurvivalMod: it implements IMountableListener and
+         reads EntityBehaviorSeatable from there. -->
+    <Reference Include="VSSurvivalMod">
+      <HintPath>$(VINTAGE_STORY)\Mods\VSSurvivalMod.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="protobuf-net">
       <HintPath>$(VINTAGE_STORY)\Lib\protobuf-net.dll</HintPath>
       <Private>True</Private>

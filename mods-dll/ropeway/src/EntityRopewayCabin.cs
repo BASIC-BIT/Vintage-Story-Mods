@@ -95,7 +95,17 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// hitboxSize is a Vec2f and the base implementation hard-codes Y1 = 0, so JSON cannot describe a box
     /// around a model that hangs below its own Pos. The whole passenger compartment sits at Pos.Y-1.25 to
     /// Pos.Y, which left it unclickable - and boarding by clicking the body is exactly what
-    /// interactMountAnySeat is for. Model bounds are x +/-1.4375, y -1.25..2.0, z +/-2.0.
+    /// interactMountAnySeat is for.
+    /// <para>
+    /// The horizontal extents are SQUARE on purpose. Entity.SelectionBox is world-axis-aligned and is never
+    /// rotated by yaw - Entity.IntersectsRay ends in RayIntersectsWithCuboid(SelectionBox, Pos...) with no
+    /// yaw term anywhere in the chain - while the cabin's world footprint does follow its yaw. An AABB that
+    /// cannot rotate must CIRCUMSCRIBE the model at any yaw, not fit it at one: a box matching the model
+    /// bounds (x +/-2.0 travel, z +/-1.4375 across) is correct only on an east-west line and is transposed
+    /// on a north-south one, killing half a block of each cabin end. So both horizontal half-extents are
+    /// the long axis. The surplus off the sides is harmless: EntityBehaviorSelectionBoxes.IntersectsRay
+    /// tests the yaw-rotated seat boxes first and returns PreventDefault on a hit.
+    /// </para>
     /// Overriding rather than assigning after Initialize because this is the one funnel every reset routes
     /// through: SyncedTreeAttribute.FromBytes invokes every registered modified listener with no path
     /// filter, so any full WatchedAttributes sync re-runs Entity.updateColSelBoxes and would put the JSON
@@ -103,7 +113,7 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// </summary>
     public override void SetSelectionBox(float length, float height)
     {
-        SelectionBox = new Cuboidf(-1.5f, -1.3f, -2.05f, 1.5f, 2.05f, 2.05f);
+        SelectionBox = new Cuboidf(-2.05f, -1.3f, -2.05f, 2.05f, 2.05f, 2.05f);
         OriginSelectionBox = SelectionBox.Clone();
     }
 

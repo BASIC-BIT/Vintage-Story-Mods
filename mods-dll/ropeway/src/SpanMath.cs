@@ -75,6 +75,31 @@ public static class SpanMath
     }
 
     /// <summary>
+    /// Lang key for the eight-point compass bearing from one tower to another. This is what an unnamed tower
+    /// is called, so it has to be a bearing a player can act on rather than a placeholder. Returns whole lang
+    /// keys rather than a bare code so the shipped-lang-key test can see every one of them. Pure.
+    /// </summary>
+    public static string CompassKey(double dx, double dz)
+    {
+        // Two towers on the same column have no bearing, and -0.0 would otherwise send atan2 due south.
+        if (dx == 0 && dz == 0) return "ropeway:dir-n";
+
+        // -dz because north is -Z, and atan2(east, north) puts 0 at north and grows clockwise.
+        var octant = ((int)Math.Round(Math.Atan2(dx, -dz) / (Math.PI / 4)) + 8) % 8;
+        return octant switch
+        {
+            0 => "ropeway:dir-n",
+            1 => "ropeway:dir-ne",
+            2 => "ropeway:dir-e",
+            3 => "ropeway:dir-se",
+            4 => "ropeway:dir-s",
+            5 => "ropeway:dir-sw",
+            6 => "ropeway:dir-w",
+            _ => "ropeway:dir-nw"
+        };
+    }
+
+    /// <summary>
     /// How much to take out of each candidate slot to reach <paramref name="quantity"/>, or null when the
     /// stacks do not add up. Null means the caller mutates nothing - a short inventory must never be
     /// partially drained.

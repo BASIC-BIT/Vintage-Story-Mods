@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 
 namespace Ropeway.Tests;
@@ -331,6 +332,143 @@ public class RopewayMathTests
         Assert.Equal(dx / length, x2, 5);
         Assert.Equal(dy / length, y2, 5);
         Assert.Equal(dz / length, z2, 5);
+    }
+
+    /// <summary>
+    /// The cable's failure mode is silence: <c>CubeMeshUtil.GetCube</c> hands back a mesh whose XyzFaces is
+    /// <c>Array.Empty</c>, and the chunk tesselator emits geometry only inside
+    /// <c>for (l = 0; l &lt; sourceMesh.XyzFacesCount; l++)</c> (JsonTesselator.cs:709), so
+    /// <c>mesher.AddMeshData</c> copies zero vertices with no exception and no log line. Nothing but a test
+    /// or standing in the world tells you the cable is gone.
+    /// </summary>
+    [Fact]
+    public void TheCableMeshIsCentredAndCarriesTheFaceCountTheTesselatorLoopsOver()
+    {
+        // Half of an 8-block span due east.
+        var mesh = BEPylonHead.BuildHalfCable(4, 0, 0, new TextureAtlasPosition { x1 = 0, y1 = 0, x2 = 1, y2 = 1 });
+
+        Assert.NotNull(mesh);
+        Assert.Equal(6, mesh.XyzFacesCount);
+
+        // The tesselator indexes both colour maps once per face (JsonTesselator.cs:834); zero-length arrays
+        // trade an invisible cable for an IndexOutOfRangeException.
+        Assert.True(mesh.SeasonColorMapIds.Length >= 6);
+        Assert.True(mesh.ClimateColorMapIds.Length >= 6);
+
+        // ScaleCubeMesh puts the box corner-at-origin, so without the centring translate the rotate-about-
+        // origin below swings the cable out by half its own box on every axis.
+        var min = new[] { double.MaxValue, double.MaxValue, double.MaxValue };
+        var max = new[] { double.MinValue, double.MinValue, double.MinValue };
+        for (var i = 0; i < mesh.VerticesCount; i++)
+        {
+            for (var axis = 0; axis < 3; axis++)
+            {
+                min[axis] = Math.Min(min[axis], mesh.xyz[3 * i + axis]);
+                max[axis] = Math.Max(max[axis], mesh.xyz[3 * i + axis]);
+            }
+        }
+
+        // Block-local: it leaves the block centre (0.5) and runs to the midpoint of the span, 4 blocks east.
+        Assert.Equal(0.5, min[0], 4);
+        Assert.Equal(4.5, max[0], 4);
+        for (var axis = 1; axis < 3; axis++)
+        {
+            Assert.Equal(0.5 - 0.06, min[axis], 4);
+            Assert.Equal(0.5 + 0.06, max[axis], 4);
+        }
+    }
+
+    [Fact]
+    public void ACableToNowhereIsNotDrawn()
+    {
+        Assert.Null(BEPylonHead.BuildHalfCable(0, 0, 0, new TextureAtlasPosition()));
+    }
+
+    /// <summary>
+    /// Tower names arrive from a client packet, so this is a trust boundary: control characters corrupt the
+    /// chat and GUI text renderers, and an unbounded string is persisted on the tower and re-sent to every
+    /// client in range.
+    /// </summary>
+    [Fact]
+    public void TowerNamesAreSanitised()
+    {
+        Assert.Equal("Summit Station", BEPylonHead.SanitiseName("  Summit Station  "));
+
+        // Control characters out, every flavour of whitespace collapsed to one plain space.
+        Assert.Equal("Summit Station", BEPylonHead.SanitiseName("Summit\tStation"));
+        Assert.Equal("Summit Station", BEPylonHead.SanitiseName("Summit\r\n   Station"));
+        Assert.DoesNotContain("\n", BEPylonHead.SanitiseName("a\nb"));
+
+        // Nothing readable left is null, not an empty label the GUI then has to special-case.
+        Assert.Null(BEPylonHead.SanitiseName(null));
+        Assert.Null(BEPylonHead.SanitiseName(""));
+        Assert.Null(BEPylonHead.SanitiseName("   \t\r\n "));
+        Assert.Null(BEPylonHead.SanitiseName(" "));
+    }
+
+    /// <summary>
+    /// A tower name reaches two VTML-rendered surfaces - GetBlockInfo's rich-text block-info panel and the
+    /// span-linked / span-cut chat lines, which HudDialogChat composes with AddRichtext - and it is visible
+    /// to everyone who looks at the tower, not only whoever set it. 24 characters is enough for
+    /// &lt;font color="red"&gt; or a short &lt;a href&gt;, so no tag may survive the sanitiser.
+    /// </summary>
+    [Theory]
+    [InlineData("<font color=\"red\">Hot")]
+    [InlineData("<a href=\"x\">click</a>")]
+    [InlineData("<strong>Summit")]
+    [InlineData("Summit</br>")]
+    public void TowerNamesCannotCarryVtml(string payload)
+    {
+        var name = BEPylonHead.SanitiseName(payload);
+
+        Assert.NotNull(name);
+        Assert.DoesNotContain("<", name);
+        Assert.DoesNotContain(">", name);
+    }
+
+    [Fact]
+    public void ANameThatIsNothingButMarkupIsNoName()
+    {
+        Assert.Null(BEPylonHead.SanitiseName("<>"));
+        Assert.Null(BEPylonHead.SanitiseName("< >"));
+    }
+
+    [Fact]
+    public void TowerNamesAreCappedWithoutSplittingACharacter()
+    {
+        var long_ = BEPylonHead.SanitiseName(new string('x', 200));
+        Assert.Equal(BEPylonHead.MaxNameLength, long_!.Length);
+
+        // A cut that lands mid-word must not leave trailing padding either.
+        Assert.Equal(BEPylonHead.MaxNameLength - 1, BEPylonHead.SanitiseName(new string('x', 23) + "   yyy")!.Length);
+
+        // Cutting a fixed number of chars can land between the halves of a surrogate pair, which renders as
+        // a replacement glyph rather than the character the player typed.
+        var emoji = BEPylonHead.SanitiseName(new string('x', BEPylonHead.MaxNameLength - 1) + "\U0001F6A1");
+        Assert.Equal(BEPylonHead.MaxNameLength - 1, emoji!.Length);
+        Assert.DoesNotContain(emoji, c => char.IsHighSurrogate(c));
+    }
+
+    /// <summary>
+    /// An unnamed tower is called by its bearing, so a wrong octant sends a player walking the wrong way.
+    /// North is -Z and east is +X, and the boundaries are half-octants either side of each direction.
+    /// </summary>
+    [Theory]
+    [InlineData(0, -10, "ropeway:dir-n")]
+    [InlineData(10, -10, "ropeway:dir-ne")]
+    [InlineData(10, 0, "ropeway:dir-e")]
+    [InlineData(10, 10, "ropeway:dir-se")]
+    [InlineData(0, 10, "ropeway:dir-s")]
+    [InlineData(-10, 10, "ropeway:dir-sw")]
+    [InlineData(-10, 0, "ropeway:dir-w")]
+    [InlineData(-10, -10, "ropeway:dir-nw")]
+    // Just off due north on either side is still north; the whole point is that it never reads "unnamed".
+    [InlineData(1, -10, "ropeway:dir-n")]
+    [InlineData(-1, -10, "ropeway:dir-n")]
+    [InlineData(0, 0, "ropeway:dir-n")]
+    public void CompassKeyNamesTheBearing(double dx, double dz, string expected)
+    {
+        Assert.Equal(expected, SpanMath.CompassKey(dx, dz));
     }
 
     private static RopewayLine Line(params (int X, int Y, int Z)[] towers)
