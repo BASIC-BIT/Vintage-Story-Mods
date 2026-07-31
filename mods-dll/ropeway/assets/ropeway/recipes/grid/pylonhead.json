@@ -1,0 +1,11 @@
+{
+  "ingredientPattern": "R,B,M",
+  "ingredients": {
+    "R": { "type": "item", "code": "game:rope" },
+    "B": { "type": "block", "code": "ropeway:brace-*", "name": "side" },
+    "M": { "type": "item", "code": "game:metalbit-*", "name": "metal" }
+  },
+  "width": 1,
+  "height": 3,
+  "output": { "type": "block", "code": "pylonhead-north", "quantity": 1 }
+}

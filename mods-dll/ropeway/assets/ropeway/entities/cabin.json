@@ -1,0 +1,55 @@
+{
+  "code": "cabin",
+  "class": "EntityRopewayCabin",
+  "attributes": {
+    "speed": 2.2,
+    "hangDrop": 2.0,
+    "mountAnimations": {
+      "idle": "idle",
+      "ready": "idle",
+      "forwards": "idle",
+      "backwards": "idle"
+    }
+  },
+  "hitboxSize": { "x": 2.9, "y": 2.5 },
+  "behaviorConfigs": {
+    "seatable": {
+      "interactMountAnySeat": true,
+      "seats": [
+        { "apName": "SeatAP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.4 },
+        { "apName": "Seat2AP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.4 }
+      ]
+    },
+    "selectionboxes": {
+      "selectionBoxes": [ "SeatAP", "Seat2AP" ]
+    }
+  },
+  "client": {
+    "size": 1,
+    "renderer": "Shape",
+    "shape": { "base": "ropeway:entity/cabin" },
+    "behaviors": [
+      { "code": "selectionboxes" },
+      { "code": "interpolateposition" },
+      { "code": "seatable" },
+      { "code": "repulseagents", "movable": false }
+    ],
+    "animations": [
+      {
+        "code": "sway",
+        "animation": "sway",
+        "animationSpeed": 1,
+        "easeInSpeed": 1,
+        "easeOutSpeed": 1
+      }
+    ]
+  },
+  "server": {
+    "behaviors": [
+      { "code": "selectionboxes" },
+      { "code": "seatable" },
+      { "code": "repulseagents", "movable": false }
+    ]
+  },
+  "sounds": {}
+}

@@ -1,0 +1,10 @@
+{
+  "ingredientPattern": "R,M,R",
+  "ingredients": {
+    "R": { "type": "item", "code": "game:rope" },
+    "M": { "type": "item", "code": "game:metalbit-*", "name": "metal" }
+  },
+  "width": 1,
+  "height": 3,
+  "output": { "type": "item", "code": "haulrope", "quantity": 1 }
+}

@@ -1,0 +1,10 @@
+{
+  "ingredientPattern": "SPS",
+  "ingredients": {
+    "S": { "type": "item", "code": "game:stick" },
+    "P": { "type": "item", "code": "game:metalplate-*", "name": "metal" }
+  },
+  "width": 3,
+  "height": 1,
+  "output": { "type": "block", "code": "brace-north", "quantity": 4 }
+}

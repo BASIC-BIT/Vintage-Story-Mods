@@ -1,0 +1,11 @@
+{
+  "ingredientPattern": "R_R,BPB,PPP",
+  "ingredients": {
+    "R": { "type": "item", "code": "ropeway:haulrope" },
+    "B": { "type": "block", "code": "ropeway:brace-*", "name": "side" },
+    "P": { "type": "item", "code": "game:plank-*", "name": "wood" }
+  },
+  "width": 3,
+  "height": 3,
+  "output": { "type": "item", "code": "cabin", "quantity": 1 }
+}

@@ -1,0 +1,215 @@
+using System;
+using System.Collections.Generic;
+using Vintagestory.API.MathTools;
+
+namespace Ropeway;
+
+/// <summary>
+/// Runtime-only geometry of one ropeway line: the ordered tower chain and the cumulative distances
+/// along it. Derived from the block entities, never persisted.
+/// </summary>
+public sealed class RopewayLine
+{
+    /// <summary>A corrupt self-referential span must terminate rather than hang the tick.</summary>
+    public const int MaxTowersPerLine = 64;
+
+    public BlockPos[] Towers;
+    public Vec3d[] Anchors;
+    public double[] Cumulative;
+    public double TotalLength;
+
+    /// <summary>
+    /// The walk ended on a tower it could not query, so this may be a prefix of the real line rather than
+    /// the whole of it - a shorter <see cref="TotalLength"/> and possibly the opposite canonical
+    /// orientation. See <see cref="MarkLoadedEnds"/>.
+    /// </summary>
+    public bool Truncated;
+
+    /// <summary>
+    /// The stretch of the line the loaded chunks can vouch for, as distances from <c>Towers[0]</c>. The whole
+    /// line when nothing is truncated. Otherwise the unloaded end tower is excluded: it is not a proven
+    /// endpoint - the real line may carry on into the chunk nobody can see - so reversing there is exactly
+    /// the false-endpoint teleport. Running to the last loaded tower and holding is safe, and the window
+    /// widens by itself when the chunk loads.
+    /// </summary>
+    public double MinTravel;
+
+    /// <summary>See <see cref="MinTravel"/>.</summary>
+    public double MaxTravel;
+
+    /// <summary>Builds the cumulative-length table for an already-ordered tower chain. Pure.</summary>
+    public static RopewayLine FromTowers(IReadOnlyList<BlockPos> towers)
+    {
+        if (towers == null || towers.Count < 2) return null;
+
+        var line = new RopewayLine
+        {
+            Towers = new BlockPos[towers.Count],
+            Anchors = new Vec3d[towers.Count],
+            Cumulative = new double[towers.Count]
+        };
+
+        for (var i = 0; i < towers.Count; i++)
+        {
+            line.Towers[i] = towers[i];
+            line.Anchors[i] = SpanMath.AnchorOf(towers[i]);
+            if (i > 0)
+            {
+                line.Cumulative[i] = line.Cumulative[i - 1] + line.Anchors[i - 1].DistanceTo(line.Anchors[i]);
+            }
+        }
+
+        line.TotalLength = line.Cumulative[towers.Count - 1];
+        line.MaxTravel = line.TotalLength;
+        return line;
+    }
+
+    /// <summary>Index of the span the given distance falls inside, clamped to the line.</summary>
+    public int AnchorIndexAt(double travelled)
+    {
+        if (Cumulative == null || Cumulative.Length < 2) return 0;
+        if (travelled <= 0) return 0;
+        if (travelled >= TotalLength) return Cumulative.Length - 2;
+
+        for (var i = 1; i < Cumulative.Length; i++)
+        {
+            if (travelled < Cumulative[i]) return i - 1;
+        }
+
+        return Cumulative.Length - 2;
+    }
+
+    public Vec3d PositionAt(double travelled)
+    {
+        if (Anchors == null || Anchors.Length == 0) return null;
+        if (Anchors.Length == 1) return Anchors[0].Clone();
+        if (travelled <= 0) return Anchors[0].Clone();
+        if (travelled >= TotalLength) return Anchors[Anchors.Length - 1].Clone();
+
+        var i = AnchorIndexAt(travelled);
+        var segment = Cumulative[i + 1] - Cumulative[i];
+        var t = segment <= 0 ? 0 : (travelled - Cumulative[i]) / segment;
+        var a = Anchors[i];
+        var b = Anchors[i + 1];
+        return new Vec3d(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t, a.Z + (b.Z - a.Z) * t);
+    }
+
+    public Vec3d DirectionAt(double travelled)
+    {
+        if (Anchors == null || Anchors.Length < 2) return new Vec3d(0, 0, 1);
+
+        var i = AnchorIndexAt(travelled);
+        var dir = Anchors[i + 1].Clone().Sub(Anchors[i]);
+        return dir.Length() < 1e-9 ? new Vec3d(0, 0, 1) : dir.Normalize();
+    }
+
+    /// <summary>
+    /// Walks the span chain from any member tower out to both ends. A tower carries at most two spans, so a
+    /// line is a path and this is a walk rather than a search. Pure: <paramref name="peersOf"/> is the only
+    /// world access, which is what makes it testable.
+    /// </summary>
+    public static List<BlockPos> WalkChain(BlockPos start, Func<BlockPos, IReadOnlyList<BlockPos>> peersOf)
+    {
+        var chain = new List<BlockPos>();
+        if (start == null || peersOf == null) return chain;
+
+        chain.Add(start);
+        var seen = new HashSet<BlockPos> { start };
+
+        var peers = peersOf(start);
+        if (peers == null) return chain;
+
+        if (peers.Count > 0) Extend(chain, seen, start, peers[0], peersOf, append: true);
+        if (peers.Count > 1) Extend(chain, seen, start, peers[1], peersOf, append: false);
+
+        // Canonical orientation. Travelled is measured from Towers[0], so the chain must not flip just
+        // because the walk started from the other end of the line.
+        if (chain.Count > 1 && ComparePos(chain[0], chain[chain.Count - 1]) > 0) chain.Reverse();
+
+        return chain;
+    }
+
+    /// <summary>
+    /// Records which of the chain's two ends <see cref="WalkChain"/> could actually query, as
+    /// <see cref="Truncated"/> plus the <see cref="MinTravel"/>/<see cref="MaxTravel"/> window.
+    /// <see cref="Extend"/> adds a tower before asking it for peers, so an unloaded tower joins the chain and
+    /// then terminates the walk one hop past the loaded region - which means only the two ends can ever be
+    /// the unloaded one, and an unloaded end is exactly the tower whose remaining peers nobody can see.
+    /// Conservative on purpose: it cannot tell "unloaded and last" from "unloaded and there is more line
+    /// behind it", so it treats both as unproven. Pure.
+    /// </summary>
+    public void MarkLoadedEnds(Func<BlockPos, bool> isLoaded)
+    {
+        if (Towers == null || Towers.Length < 2 || isLoaded == null) return;
+
+        var startLoaded = isLoaded(Towers[0]);
+        var endLoaded = isLoaded(Towers[Towers.Length - 1]);
+
+        Truncated = !startLoaded || !endLoaded;
+        MinTravel = startLoaded ? 0 : Cumulative[1];
+        MaxTravel = endLoaded ? TotalLength : Cumulative[Cumulative.Length - 2];
+    }
+
+    private static int ComparePos(BlockPos a, BlockPos b)
+    {
+        if (a.X != b.X) return a.X.CompareTo(b.X);
+        if (a.Z != b.Z) return a.Z.CompareTo(b.Z);
+        if (a.Y != b.Y) return a.Y.CompareTo(b.Y);
+        return a.dimension.CompareTo(b.dimension);
+    }
+
+    private static void Extend(
+        List<BlockPos> chain,
+        HashSet<BlockPos> seen,
+        BlockPos previous,
+        BlockPos current,
+        Func<BlockPos, IReadOnlyList<BlockPos>> peersOf,
+        bool append)
+    {
+        var steps = 0;
+        while (current != null && seen.Add(current) && ++steps <= MaxTowersPerLine)
+        {
+            if (append) chain.Add(current);
+            else chain.Insert(0, current);
+
+            var peers = peersOf(current);
+            BlockPos next = null;
+            if (peers != null)
+            {
+                for (var i = 0; i < peers.Count; i++)
+                {
+                    if (peers[i] != null && !peers[i].Equals(previous))
+                    {
+                        next = peers[i];
+                        break;
+                    }
+                }
+            }
+
+            previous = current;
+            current = next;
+        }
+    }
+
+    /// <summary>
+    /// Cached line through any member tower. Never persisted - it is derived from the blocks, so it cannot
+    /// desync from them. Returns null while the tower is unknown or the chain has fewer than two towers.
+    /// </summary>
+    public static RopewayLine GetOrBuild(RopewayModSystem modSystem, BlockPos anyTower)
+    {
+        if (modSystem == null || anyTower == null) return null;
+        if (modSystem.LineCache.TryGetValue(anyTower, out var cached)) return cached;
+        if (!modSystem.LoadedTowers.ContainsKey(anyTower)) return null;
+
+        var towers = WalkChain(anyTower, pos => modSystem.LoadedTowers.TryGetValue(pos, out var be) ? be.Spans : null);
+        var line = FromTowers(towers);
+        if (line == null) return null;
+
+        // Still a real line - the cabin's "line is gone for good" test wants it - but with the unproven end
+        // fenced off so nobody parks or reverses on a false endpoint.
+        line.MarkLoadedEnds(pos => modSystem.LoadedTowers.ContainsKey(pos));
+
+        foreach (var tower in line.Towers) modSystem.LineCache[tower] = line;
+        return line;
+    }
+}
