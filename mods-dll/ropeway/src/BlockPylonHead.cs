@@ -121,15 +121,22 @@ public class BlockPylonHead : Block
                 new WorldInteraction { ActionLangCode = "ropeway:blockhelp-missing", MouseButton = EnumMouseButton.Right }
             };
         }
-        else if (be.IsEndpoint)
+        else if (be.Spans.Count > 0)
         {
-            // At an end station the plain click calls the cabin, so the picker is the ctrl one here.
+            // Any tower on a line is a station: the plain click calls the cabin to it, so the picker is the
+            // ctrl one on all of them. Only a tower with no spans yet has nothing to call and keeps the
+            // picker on the plain click, which is how a line gets built in the first place.
             own = new[]
             {
                 new WorldInteraction { ActionLangCode = "ropeway:blockhelp-call", MouseButton = EnumMouseButton.Right },
-                new WorldInteraction { ActionLangCode = "ropeway:blockhelp-pick", MouseButton = EnumMouseButton.Right, HotKeyCode = "ctrl" },
-                new WorldInteraction { ActionLangCode = "ropeway:blockhelp-place-cabin", MouseButton = EnumMouseButton.Right }
+                new WorldInteraction { ActionLangCode = "ropeway:blockhelp-pick", MouseButton = EnumMouseButton.Right, HotKeyCode = "ctrl" }
             };
+
+            // The cabin still hangs at an end tower only.
+            if (be.IsEndpoint)
+            {
+                own = own.Append(new WorldInteraction { ActionLangCode = "ropeway:blockhelp-place-cabin", MouseButton = EnumMouseButton.Right });
+            }
         }
         else
         {

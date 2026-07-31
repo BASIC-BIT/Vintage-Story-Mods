@@ -55,7 +55,11 @@ public sealed class RopewayLinkService
 
     // -------------------------------------------------------------- interaction
 
-    /// <summary>Empty hand (or anything that is not the cabin item): call the cabin home, otherwise open the picker.</summary>
+    /// <summary>
+    /// Empty hand (or anything that is not the cabin item): call the cabin to this tower, otherwise open the
+    /// picker. Every complete tower on the line is a station, not only the two ends - on a four-tower line
+    /// the end-only rule made the two middle towers scenery and most of the rope pointless.
+    /// </summary>
     public void OnTowerInteract(IServerPlayer player, BlockPos pos)
     {
         var be = TowerAt(pos);
@@ -64,7 +68,7 @@ public sealed class RopewayLinkService
         var line = RopewayLine.GetOrBuild(modSystem, pos);
         var cabin = FindCabin(line);
 
-        if (cabin != null && be.IsEndpoint && line != null)
+        if (cabin != null && line != null)
         {
             if (cabin.HasPassenger)
             {
@@ -72,9 +76,25 @@ public sealed class RopewayLinkService
                 return;
             }
 
-            if (cabin.CallTo(line, pos)) return;
+            switch (cabin.CallTo(line, pos, player.PlayerUID))
+            {
+                case CabinCall.Called:
+                    // Bearing from the cabin to the tower, for an unnamed one: it says which way the thing
+                    // the player is waiting for is coming from.
+                    var anchor = SpanMath.AnchorOf(pos);
+                    player.SendMessage(
+                        GlobalConstants.InfoLogChatGroup,
+                        Lang.Get("ropeway:cabin-called", DisplayName(be, anchor.X - cabin.Pos.X, anchor.Z - cabin.Pos.Z)),
+                        EnumChatType.Notification);
+                    return;
 
-            // Otherwise the empty-hand right-click does nothing at all: no cabin, no picker, no error.
+                case CabinCall.AlreadyHere:
+                    player.SendIngameError("ropeway-cabin-here", Lang.Get("ropeway:err-cabin-here"));
+                    return;
+            }
+
+            // Unreachable. On a truncated line that is why, and saying so beats opening a picker that is
+            // about to refuse the same click for the same reason.
             if (line.Truncated)
             {
                 player.SendIngameError("ropeway-line-truncated", Lang.Get("ropeway:err-line-truncated"));
@@ -308,7 +328,7 @@ public sealed class RopewayLinkService
         // without this a link is indistinguishable from a bug that ate the rope.
         player.SendMessage(
             GlobalConstants.InfoLogChatGroup,
-            Lang.Get("ropeway:span-linked", DisplayName(beTo, from, to), (int)Math.Round(span), cost),
+            Lang.Get("ropeway:span-linked", DisplayName(beTo, to.X - from.X, to.Z - from.Z), (int)Math.Round(span), cost),
             EnumChatType.Notification);
 
         return true;
@@ -349,7 +369,7 @@ public sealed class RopewayLinkService
         // ---- nothing above this line mutates ----
 
         var span = SpanMath.AnchorOf(from).DistanceTo(SpanMath.AnchorOf(to));
-        var name = DisplayName(beTo, from, to);
+        var name = DisplayName(beTo, to.X - from.X, to.Z - from.Z);
         var cabin = FindCabin(RopewayLine.GetOrBuild(modSystem, from));
 
         beFrom.RemoveSpan(to);
@@ -386,12 +406,12 @@ public sealed class RopewayLinkService
     }
 
     /// <summary>
-    /// What to call a tower in a message. Its player-set name, or the compass bearing from where the player
-    /// is standing - never a raw coordinate triple and never an "unnamed" placeholder.
+    /// What to call a tower in a message. Its player-set name, or the compass bearing to it from wherever
+    /// the message is about - never a raw coordinate triple and never an "unnamed" placeholder.
     /// </summary>
-    private static string DisplayName(BEPylonHead be, BlockPos from, BlockPos to)
+    private static string DisplayName(BEPylonHead be, double dx, double dz)
     {
-        return be?.TowerName ?? Lang.Get(SpanMath.CompassKey(to.X - from.X, to.Z - from.Z));
+        return be?.TowerName ?? Lang.Get(SpanMath.CompassKey(dx, dz));
     }
 
     /// <summary>Drops every span on a tower, refunding floor(span) to the breaker and unlinking the peers.</summary>
@@ -492,17 +512,9 @@ public sealed class RopewayLinkService
     }
 
     /// <summary>The cabin belonging to a line, if it is loaded.</summary>
-    // ponytail: O(loaded entities) scan, only ever on a click or a block break. Index by line if a profile ever shows it.
     public EntityRopewayCabin FindCabin(RopewayLine line)
     {
-        if (line == null) return null;
-
-        foreach (var entity in sapi.World.LoadedEntities.Values)
-        {
-            if (entity is EntityRopewayCabin cabin && cabin.LineKey != null && Contains(line, cabin.LineKey)) return cabin;
-        }
-
-        return null;
+        return EntityRopewayCabin.FindOn(sapi.World, line);
     }
 
     public bool IsLineOccupied(BlockPos anyTower)
@@ -651,12 +663,6 @@ public sealed class RopewayLinkService
 
     private static bool Contains(RopewayLine line, BlockPos pos)
     {
-        if (line?.Towers == null || pos == null) return false;
-        for (var i = 0; i < line.Towers.Length; i++)
-        {
-            if (pos.Equals(line.Towers[i])) return true;
-        }
-
-        return false;
+        return line?.IndexOf(pos) >= 0;
     }
 }

@@ -1,6 +1,6 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 66 ropeway tests passing. Everything in the tables below was found by reading code,
+State: build green, 74 ropeway tests passing. Everything in the tables below was found by reading code,
 not by playing — none of *it* has been observed in game.
 
 ## Fixed after the first in-game session
@@ -63,6 +63,19 @@ the diff before the next play session.
 | **Q2** | LOW | **`TowerCandidate.RopeCost` carries two different quantities**: `SpanMath.RopeCost` (ceil) on a link row and `SpanMath.RopeRefund` (floor) on a `Linked` row. Both display paths read it correctly today, but a future caller that charges `RopeCost` without checking `Linked` hands out free rope. A second field, or renaming it `Rope`, removes the trap. |
 | **Q3** | LOW | **A rename re-tesselates the chunk.** `Rename`'s comment says "MarkDirty without redrawOnClient: … re-tesselating every cable on a rename would be silly", but the unconditional `MarkBlockDirty` at the end of `FromTreeAttributes` queues a re-tesselation on *every* BE sync, rename included. Harmless — one chunk, on a rare action — but the two comments now contradict each other and one will mislead the next reader. |
 | **Q4** | LOW | **An unsaved rename is discarded by an unlink click.** `PylonPickerDialog.OnCandidates` resets `nameDraft = packet.FromName ?? ""` on every refresh, and `TryUnlink` ends with `SendCandidateList`. Type a name, click an unlink row before pressing Rename, and the typed text is gone. Related: `OnRenameRequest` only re-sends the list when `Rename` returns true, so a name that sanitises to the current one leaves the field showing the raw text with no feedback. |
+
+## From the calling review — recorded, not fixed
+
+Source review of destination-based cabin calling (`docs/agentic/ingest/cablecar/CALLING-REVIEW.md`). Its
+three blockers and the mount race were fixed in the same pass; these five were judged not worth the diff.
+
+| id | severity | mechanism |
+|---|---|---|
+| **C1** | LOW | **The resume path validates `Travelled` against the loaded window but not `Destination`.** A line that shrank while the cabin was unloaded can leave a destination that now lands mid-span; the cabin halts in mid-air for one tick before the `!departed && !IsAtTower` recovery parks it at an end. Self-correcting and visibly odd. Validating `Destination` with `IsAtTower` on the resume path is the cheap fix. |
+| **C2** | LOW | **`ropeway:cantride-moving` says "It stops at the next tower."** It stops at its destination, or at an end — never at "the next tower". Pre-existing string, but calling to a chosen tower is what makes it wrong rather than merely vague. |
+| **C3** | LOW/MED | **Boarding direction at an interior station is uncontrollable.** Called backward to tower 2, `Outbound` stays false, so a rider boarding there is carried on to tower 0 with no way to ask for tower 3. Follows from the existing "a ride runs to the end" model rather than from calling, but interior stations make it a question a player will now actually ask. |
+| **C4** | LOW | **A stale `LineKey` falls through to opening the picker** rather than saying anything (`RopewayLinkService.cs:96-105`). Surprising, not silent, and self-healing: the next tick re-bases and the second click calls the cabin. |
+| **C5** | — | **Interior towers lost the plain-click picker.** Any tower carrying spans now calls the cabin on a plain right-click; the picker is Ctrl-only there. Deliberate — note it in the release notes. |
 
 ## Deliberate behaviour worth knowing
 

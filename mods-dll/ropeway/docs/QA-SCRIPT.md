@@ -159,13 +159,40 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 
 14. **Return trip.** Board again at the far end. **PASS:** it departs back the way it came.
 
-15. **Call it home.** Walk to the other end tower with the cabin parked and empty at the far end.
-    Right-click that tower with an empty hand. **PASS:** the empty cabin travels back to you.
-    Now **Ctrl + right-click** that same tower while the cabin is away, and again with someone seated on
-    the line. **PASS:** the picker opens both times, so you can name or unlink an end station without
-    having to park the cabin next to it first. Sneak + right-click must still open the *guide*, and a plain
-    right-click must still call the cabin — if Ctrl calls the cabin instead, the modifier is not reaching
-    the server.
+15. **Call it to any tower.** Do this one on a **three-or-more-tower line** — build step 16 first if you
+    have not. Calling used to work at the two ends only, and the middle towers are the point.
+    Park the cabin empty at one end, walk to a **middle** tower, right-click it with an empty hand.
+    **PASS:** the chat line reads *"Cabin called to \<name\>."* — the name you set in step 10c, or a
+    compass bearing if that tower is unnamed, never a coordinate triple — and the cabin travels to **that**
+    tower and **stops there**. **FAIL:** it sails past you to the far end, or it stops at your tower and
+    then slides off to an end a second later.
+    Look at that tower while the cabin is on its way — stand where you can see the cabin, so it is inside
+    your entity range. **PASS:** the block-info panel reads *"The cabin is on its way here."*, then *"The
+    cabin is at this tower."* once it arrives. Look at another tower on the same line while still in sight
+    of the cabin: *"The cabin is elsewhere on the line."* **FAIL:** all three lines are missing — this
+    readout is client-side and matches the cabin by a key that used to exist only on the server, so silence
+    here is the bug, not the range. Do not accept "the cabin must be out of range" as the explanation: put
+    the cabin in range and read the panel again.
+    Right-click that same tower again with the cabin sitting on it. **PASS:** *"The cabin is already at
+    this tower."* — it must not be silent and it must not open the picker.
+    Now call it **backward** to a tower the other side of it, and call it **across two spans**.
+    **PASS:** both trips stop where you clicked; the two-span trip does not stop at the tower in between.
+    **PASS:** an end tower still calls it, and a rider boarding there afterwards departs back down the line
+    on the first boarding rather than needing a second.
+    **PASS:** with someone seated on the line, calling from any tower gives *"The cabin is in use."*
+    **Ctrl + right-click** any tower on the line, cabin away and again with someone seated. **PASS:** the
+    picker opens both times, so you can name or unlink any tower without parking the cabin next to it
+    first. Sneak + right-click must still open the *guide*, and a plain right-click must still call the
+    cabin — if Ctrl calls the cabin instead, the modifier is not reaching the server. The one exception is
+    a complete tower with **no spans yet**: a plain right-click there opens the picker, because there is no
+    line to call anything along.
+    **Relog mid-journey.** Call it across a long stretch and quit to menu **while it is still moving**.
+    Reload. **PASS:** it carries on to the tower it was called to. **FAIL:** it parks at the nearest end —
+    the destination is not surviving the save.
+    **Abandon a call.** Call it across a span and, while it is still moving, wall off the span ahead of it
+    or cut a span on its route. **PASS:** a chat line tells *you* the cabin you called stopped, and why.
+    **FAIL:** it stops silently — you were already told *"Cabin called to \<name\>."*, so silence here is
+    a promise the mod did not keep.
 
 16. **Extend the line.** Build a third tower beyond the second and link tower 2 → tower 3.
     **PASS:** tower 2 now reads *"Spans: 2/2"* and no longer says "End of line"; towers 1 and 3 do.

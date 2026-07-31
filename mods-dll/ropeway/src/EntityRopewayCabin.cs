@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -8,6 +10,15 @@ using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
 namespace Ropeway;
+
+/// <summary>What a call to a tower would do. Not a bool: "it is already here" and "it cannot get here" are
+/// different things to tell the player, and reporting either as failure is what made calling look broken.</summary>
+public enum CabinCall
+{
+    Called,
+    AlreadyHere,
+    Unreachable
+}
 
 /// <summary>
 /// The rideable cabin. Server-authoritative motion along the line polyline; the client only
@@ -20,8 +31,29 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     public const double DefaultSpeed = 2.2;
     public const double DefaultHangDrop = 2.0;
 
-    /// <summary>The tower at travelled == 0. Every other bit of route state is derived from the blocks.</summary>
-    public BlockPos LineKey;
+    /// <summary>Close enough to a tower to count as standing at it, in metres along the line.</summary>
+    public const double ArrivalTolerance = 0.5;
+
+    /// <summary>Nobody called the cabin: it rides to the end of the line the way it always did.</summary>
+    public const double NoDestination = -1;
+
+    /// <summary>
+    /// The tower at travelled == 0. Every other bit of route state is derived from the blocks.
+    /// <para>
+    /// WatchedAttributes for the same reason as <see cref="Destination"/>, and it is not optional here:
+    /// <c>Entity.ToBytes</c> writes <see cref="Entity.Attributes"/> only <c>if (!forClient)</c> and
+    /// <c>FromBytes</c> reads it only <c>if (!isSync)</c>, so a key kept there is ALWAYS null client side -
+    /// and <see cref="FindOn"/> matches on it, for a block-info panel that only ever runs client side.
+    /// </para>
+    /// </summary>
+    public BlockPos LineKey
+    {
+        get => BEPylonHead.ReadPos(WatchedAttributes, "lineKey");
+        set
+        {
+            if (value != null) BEPylonHead.WritePos(WatchedAttributes, "lineKey", value);
+        }
+    }
 
     /// <summary>
     /// Metres from the line's canonical <c>Towers[0]</c>, which <see cref="RopewayLine.WalkChain"/> picks by
@@ -32,6 +64,12 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// </summary>
     public double Travelled;
 
+    /// <summary>
+    /// Which way along the line the cabin is currently running. Still a stored flag rather than a function
+    /// of <see cref="Destination"/>: an ordinary ride has no destination at all - it runs to the end and
+    /// turns around - so deriving direction from one would leave the plain ride with nothing to derive from.
+    /// A call sets it once, from where the target is relative to where the cabin stands.
+    /// </summary>
     public bool Outbound = true;
 
     private double speed = DefaultSpeed;
@@ -40,6 +78,12 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     private bool boarding;
     private double boardAccum;
     private int lastSegment = -1;
+
+    /// <summary>
+    /// Who asked for the current trip, for the one message they are owed if it is abandoned. Persisted
+    /// alongside the destination, and kept out of WatchedAttributes because no client has a use for it.
+    /// </summary>
+    private string calledBy;
 
     public double HangDropDefault => hangDrop;
 
@@ -68,6 +112,28 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             if (WatchedAttributes.GetBool("moving") != value) WatchedAttributes.SetBool("moving", value);
         }
     }
+
+    /// <summary>
+    /// The tower a call is running to, as a distance from <c>Towers[0]</c> - the same scale as
+    /// <see cref="Travelled"/> and meaningless under a different canonical chain, which is why every
+    /// <see cref="Hold"/> drops it. <see cref="NoDestination"/> when nothing was called.
+    /// <para>
+    /// WatchedAttributes rather than <see cref="Entity.Attributes"/>, unlike Travelled: both are persisted
+    /// (Entity.ToBytes writes WatchedAttributes on the save path too), but Attributes is written
+    /// <c>if (!forClient)</c>, and the block-info panel that says "the cabin is on its way here" is client
+    /// side and has nothing else to read. Written only on change, as <see cref="IsMoving"/> is.
+    /// </para>
+    /// </summary>
+    public double Destination
+    {
+        get => WatchedAttributes.GetDouble("destination", NoDestination);
+        set
+        {
+            if (WatchedAttributes.GetDouble("destination", NoDestination) != value) WatchedAttributes.SetDouble("destination", value);
+        }
+    }
+
+    public bool HasDestination => Destination >= 0;
 
     public bool HasPassenger
     {
@@ -169,7 +235,7 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             // from a tower that is no longer index 0 and points somewhere else entirely. Re-basing parks the
             // cabin at a known tower, which is a teleport: fine for an empty cabin, not for a seated rider,
             // who waits instead for the chain to rebuild the way it was.
-            Hold();
+            Hold("ropeway:call-abandoned-line");
             if (!HasPassenger) RebaseTo(line);
             return;
         }
@@ -183,8 +249,9 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             // to the last loaded tower would be the false-endpoint teleport again. Hold for the chunk.
             if (line.Truncated)
             {
-                IsMoving = false;
-                departed = false;
+                // Hold rather than a bare stop: a call whose route has just gone out from under it cannot be
+                // honoured, and a destination left pending would restart the trip on every tick.
+                Hold("ropeway:call-abandoned-truncated");
                 return;
             }
 
@@ -193,8 +260,19 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         if (!departed)
         {
-            // Server restart, chunk reload, or a tower broken under us: never resume from mid-span.
-            if (Travelled > line.MinTravel && Travelled < line.MaxTravel) ParkAtNearestEnd(line);
+            // A cabin that was called before the save resumes instead of parking: the destination outlived
+            // the process (departed did not), and with nobody aboard there is nothing to park for.
+            // lastSegment is cleared with it, so the span it resumes into is re-checked for clearance.
+            if (HasDestination)
+            {
+                departed = true;
+                lastSegment = -1;
+            }
+
+            // Server restart, chunk reload, or a tower broken under us: never resume from mid-span. Standing
+            // at a tower is not mid-span, at ANY tower - a cabin called to an interior one is parked at a
+            // station, and testing "is it at an end" instead would drag it off again on the next tick.
+            else if (!line.IsAtTower(Travelled, ArrivalTolerance)) ParkAtNearestEnd(line);
 
             if (boarding && HasPassenger)
             {
@@ -217,22 +295,33 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             return;
         }
 
-        var segment = line.AnchorIndexAt(Travelled);
+        // Direction-aware, or an inbound cabin standing at an interior tower certifies the span in FRONT of
+        // the tower while it is about to travel the one behind it.
+        var segment = line.SpanAheadOf(Travelled, Outbound);
         if (segment != lastSegment)
         {
             lastSegment = segment;
             if (!SegmentClear(line, segment))
             {
-                // Mounted riders have no block collision, so this is a safety gate rather than polish.
-                Travelled = Outbound ? line.Cumulative[segment] : line.Cumulative[segment + 1];
-                Hold();
-                IsMoving = false;
+                // Mounted riders have no block collision, so this is a safety gate rather than polish - and
+                // the gate must not itself be the thing that moves them. Travelled is deliberately NOT
+                // written: the cabin is standing on the tower it was about to leave in every case this fires
+                // for, so there is nowhere to snap it to that is not ACROSS the span just proven blocked.
+                // The one exception - a mid-span resume - is caught by the !departed mid-span recovery on
+                // the very next tick, which parks at a proven end rather than driving through the block.
+                Hold("ropeway:call-abandoned-blocked");
                 Place(line);
                 return;
             }
         }
 
         Travelled += (Outbound ? 1 : -1) * speed * dt;
+
+        // Called to a tower: stop exactly there rather than running on to the end of the line. Clamped here
+        // but held below the endpoint branches, so a call to a genuine end still leaves the cabin turned
+        // around for the next ride - which is the only thing those branches do that this must not skip.
+        var arrived = HasDestination && Reached(Travelled, Destination, Outbound);
+        if (arrived) Travelled = Destination;
 
         // Reverse only at a proven endpoint. The unloaded end of a truncated chain is not one, so the cabin
         // runs up to the last loaded tower, holds there with Outbound unchanged, and carries on outward on
@@ -242,27 +331,71 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             Travelled = line.MaxTravel;
             if (line.MaxTravel >= line.TotalLength) Outbound = false;
             else NotifyRiders("ropeway-line-truncated", "ropeway:cabin-held-truncated");
-            Hold();
+
+            // Stopping at a proven end IS the arrival for a call to it. Stopping at the last loaded tower
+            // short of one is a trip that gave up, and the caller is not aboard to be told by NotifyRiders.
+            Hold(arrived || line.MaxTravel >= line.TotalLength ? null : "ropeway:call-abandoned-truncated");
         }
         else if (Travelled <= line.MinTravel)
         {
             Travelled = line.MinTravel;
             if (line.MinTravel <= 0) Outbound = true;
             else NotifyRiders("ropeway-line-truncated", "ropeway:cabin-held-truncated");
-            Hold();
+            Hold(arrived || line.MinTravel <= 0 ? null : "ropeway:call-abandoned-truncated");
         }
+
+        if (arrived) Hold();
 
         IsMoving = departed;
         Place(line);
     }
 
-    private void Hold()
+    /// <summary>
+    /// Whether a cabin running in the given direction has reached the point it was called to. Pure, and
+    /// therefore tested: an inverted comparison here is a cabin that sails straight through its own station.
+    /// </summary>
+    public static bool Reached(double travelled, double destination, bool outbound)
     {
+        return outbound ? travelled >= destination : travelled <= destination;
+    }
+
+    /// <summary>
+    /// Everything that stops the cabin. Drops the destination with it: a hold is either the arrival itself
+    /// or a route that stopped being travellable - a blocked span, an endpoint, a re-based chain - and in
+    /// none of those cases may the trip silently resume later toward a number that no longer means anything.
+    /// <para>
+    /// <paramref name="abandonedReason"/> is the lang key for "your call is not happening", passed by every
+    /// hold that is NOT the arrival. Null means the trip ended the way it was meant to.
+    /// </para>
+    /// </summary>
+    private void Hold(string abandonedReason = null)
+    {
+        if (abandonedReason != null) NotifyCaller(abandonedReason);
+
         departed = false;
         boarding = false;
         boardAccum = 0;
         lastSegment = -1;
+        Destination = NoDestination;
+        calledBy = null;
         IsMoving = false;
+    }
+
+    /// <summary>
+    /// Tells whoever called the cabin that it gave up on the way. The click already banked a "Cabin called
+    /// to X" message, a call requires an EMPTY cabin, and <see cref="NotifyRiders"/> only reaches passengers
+    /// - so without this every abandoned call is the silent no-op the successful-looking message promised
+    /// against. Offline callers are dropped rather than queued: a login toast about a trip that ended an
+    /// hour ago tells them nothing they can act on.
+    /// </summary>
+    private void NotifyCaller(string langKey)
+    {
+        if (!HasDestination || calledBy == null) return;
+
+        if (World?.PlayerByUid(calledBy) is IServerPlayer player)
+        {
+            player.SendMessage(GlobalConstants.InfoLogChatGroup, Lang.Get(langKey), EnumChatType.Notification);
+        }
     }
 
     /// <summary>
@@ -276,7 +409,10 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         var middle = (line.MinTravel + line.MaxTravel) / 2;
         Travelled = Travelled <= middle ? line.MinTravel : line.MaxTravel;
         Outbound = Travelled <= middle;
-        Hold();
+
+        // Parking is never an arrival - RebaseTo reaches here with a live destination whenever a line is
+        // linked or cut under a called cabin.
+        Hold("ropeway:call-abandoned-line");
     }
 
     /// <summary>
@@ -349,29 +485,87 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     }
 
     /// <summary>
-    /// Sends an empty cabin back to an end tower. False when it is already there, occupied, or the trip
-    /// would cross into an unloaded stretch - the caller reports that rather than reporting success and
-    /// then not moving.
+    /// Where a call to <paramref name="tower"/> would send a cabin standing at <paramref name="travelled"/>,
+    /// and whether it can go at all. Any tower on the line is a station, not only the two ends: the target is
+    /// simply that tower's entry in <see cref="RopewayLine.Cumulative"/>. Pure - the entity half of a call is
+    /// only the state it writes - and therefore tested.
     /// </summary>
-    public bool CallTo(RopewayLine line, BlockPos tower)
+    public static CabinCall PlanCall(RopewayLine line, BlockPos tower, double travelled, out double destination)
     {
-        if (line?.Towers == null || tower == null || HasPassenger) return false;
+        destination = NoDestination;
+
+        var index = line?.IndexOf(tower) ?? -1;
+        if (index < 0) return CabinCall.Unreachable;
+
+        var target = line.Cumulative[index];
+
+        // Neither end of the trip may sit outside the loaded window. Past it the cabin cannot be proven to
+        // be where its Travelled says, and the target cannot be proven to still be on this line at all.
+        if (target < line.MinTravel || target > line.MaxTravel) return CabinCall.Unreachable;
+        if (travelled < line.MinTravel || travelled > line.MaxTravel) return CabinCall.Unreachable;
+
+        if (Math.Abs(travelled - target) < ArrivalTolerance) return CabinCall.AlreadyHere;
+
+        destination = target;
+        return CabinCall.Called;
+    }
+
+    /// <summary>
+    /// Sends an empty cabin to any tower on the line, where it stops. Reports why not rather than reporting
+    /// success and then not moving.
+    /// </summary>
+    public CabinCall CallTo(RopewayLine line, BlockPos tower, string callerUid)
+    {
+        if (line?.Towers == null || HasPassenger) return CabinCall.Unreachable;
 
         // Travelled is measured from Towers[0]; a chain that re-canonicalised makes both it and the target
-        // below mean different places. The tick re-bases, and the call works on the next click.
-        if (!line.Towers[0].Equals(LineKey)) return false;
+        // mean different places. The tick re-bases, and the call works on the next click.
+        if (!line.Towers[0].Equals(LineKey)) return CabinCall.Unreachable;
 
-        var atStart = tower.Equals(line.Towers[0]);
-        var target = atStart ? 0 : line.TotalLength;
-        if (target < line.MinTravel || target > line.MaxTravel) return false;
-        if (Travelled < line.MinTravel || Travelled > line.MaxTravel) return false;
-        if (Math.Abs(Travelled - target) < 0.5) return false;
+        var outcome = PlanCall(line, tower, Travelled, out var target);
+        if (outcome != CabinCall.Called) return outcome;
 
+        Destination = target;
         Outbound = target > Travelled;
         departed = true;
         boarding = false;
         lastSegment = -1;
-        return true;
+        calledBy = callerUid;
+
+        // Written here rather than left to the end of the next ServerTick: CanMount reads IsMoving, so one
+        // tick of "departed but not moving" lets a player board a cabin that has already left - skipping the
+        // boarding grace (DidMount early-returns on departed) and producing the passenger-with-a-live-
+        // destination combination OnTowerInteract's HasPassenger guard assumes cannot exist.
+        IsMoving = true;
+        return CabinCall.Called;
+    }
+
+    /// <summary>
+    /// The cabin belonging to a line, if it is loaded. Sided by hand because <c>LoadedEntities</c> is
+    /// declared on the two side-specific world interfaces and not on <see cref="IWorldAccessor"/>, and the
+    /// block-info panel that reads this runs client side.
+    /// ponytail: O(loaded entities) scan, on a click, a block break, or a block-info refresh. Index by line
+    /// if a profile ever shows it.
+    /// </summary>
+    public static EntityRopewayCabin FindOn(IWorldAccessor world, RopewayLine line)
+    {
+        if (line == null) return null;
+
+        var entities = world switch
+        {
+            IServerWorldAccessor server => (ICollection<Entity>)server.LoadedEntities.Values,
+            IClientWorldAccessor client => client.LoadedEntities.Values,
+            _ => null
+        };
+
+        if (entities == null) return null;
+
+        foreach (var entity in entities)
+        {
+            if (entity is EntityRopewayCabin cabin && line.IndexOf(cabin.LineKey) >= 0) return cabin;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -431,7 +625,8 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     {
         Attributes.SetDouble("travelled", Travelled);
         Attributes.SetBool("outbound", Outbound);
-        if (LineKey != null) BEPylonHead.WritePos(Attributes, "lineKey", LineKey);
+        if (calledBy != null) Attributes.SetString("calledBy", calledBy);
+        else Attributes.RemoveAttribute("calledBy");
         base.ToBytes(writer, forClient);
     }
 
@@ -440,6 +635,11 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         base.FromBytes(reader, isSync);
         Travelled = Attributes.GetDouble("travelled");
         Outbound = Attributes.GetBool("outbound", defaultValue: true);
-        LineKey = BEPylonHead.ReadPos(Attributes, "lineKey");
+        calledBy = Attributes.GetString("calledBy");
+
+        // Cabins saved before the key moved to WatchedAttributes still carry it in Attributes. Without the
+        // carry-over they resolve no line at all, and a null LineKey also skips the DropAndDie backstop -
+        // an immortal cabin nothing can remove.
+        if (!isSync && LineKey == null) LineKey = BEPylonHead.ReadPos(Attributes, "lineKey");
     }
 }

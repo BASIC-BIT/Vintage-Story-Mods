@@ -472,6 +472,41 @@ public class BEPylonHead : BlockEntity
             // Otherwise the shortfall is invisible: the panel reports a line that stops at a tower which is
             // only the end of the loaded part of it, and a cabin holding there looks broken rather than held.
             if (line.Truncated) dsc.AppendLine(Lang.Get("ropeway:blockinfo-line-truncated"));
+
+            AppendCabinLine(line, dsc);
         }
+    }
+
+    /// <summary>
+    /// Where the cabin is relative to THIS tower, now that every tower on the line can call it. Says nothing
+    /// at all when no cabin is loaded: the far end of a long line is outside the client's entity tracking
+    /// range, so "elsewhere" would be a claim this cannot tell apart from "there is no cabin".
+    /// </summary>
+    private void AppendCabinLine(RopewayLine line, StringBuilder dsc)
+    {
+        var cabin = EntityRopewayCabin.FindOn(Api.World, line);
+        if (cabin == null) return;
+
+        // Position rather than Travelled: Travelled is on the server-only half of the entity's attributes,
+        // so the copy a client holds is whatever it was at spawn time.
+        var anchor = SpanMath.AnchorOf(Pos);
+        var dx = anchor.X - cabin.Pos.X;
+        var dz = anchor.Z - cabin.Pos.Z;
+        if (dx * dx + dz * dz <= 1)
+        {
+            dsc.AppendLine(Lang.Get("ropeway:blockinfo-cabin-here"));
+            return;
+        }
+
+        // Destination is a distance from the cabin's OWN Towers[0], so it only names a place on this line
+        // when this line was walked from that same base. A client whose chunk view is short walks a
+        // contiguous run of the chain and no more, so a matching base is enough: every tower it does have
+        // then carries the same Cumulative the server computed. A different base means the client is
+        // measuring from somewhere else entirely, and "coming here" would be a guess.
+        var index = line.IndexOf(Pos);
+        var bound = index >= 0 && cabin.HasDestination && line.Towers[0].Equals(cabin.LineKey)
+            && Math.Abs(cabin.Destination - line.Cumulative[index]) < EntityRopewayCabin.ArrivalTolerance;
+
+        dsc.AppendLine(Lang.Get(bound ? "ropeway:blockinfo-cabin-coming" : "ropeway:blockinfo-cabin-elsewhere"));
     }
 }

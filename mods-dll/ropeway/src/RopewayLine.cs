@@ -64,6 +64,41 @@ public sealed class RopewayLine
         return line;
     }
 
+    /// <summary>
+    /// Position of a tower in the chain, or -1 when it is not on this line. The one place anything turns a
+    /// tower into a distance along the line - <see cref="Cumulative"/> at that index - so calling the cabin
+    /// to a tower never recomputes geometry that is already tabulated here.
+    /// </summary>
+    public int IndexOf(BlockPos tower)
+    {
+        if (Towers == null || tower == null) return -1;
+
+        for (var i = 0; i < Towers.Length; i++)
+        {
+            if (tower.Equals(Towers[i])) return i;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Whether a distance along the line lands on a tower rather than out in the middle of a span. Any tower
+    /// can now be called to and parked at, so the cabin's "never resume from mid-span" recovery has to ask
+    /// this - assuming the two ends are the only places a cabin can legitimately be standing would drag one
+    /// off the interior tower it was called to on the very next tick.
+    /// </summary>
+    public bool IsAtTower(double travelled, double tolerance)
+    {
+        if (Cumulative == null) return false;
+
+        for (var i = 0; i < Cumulative.Length; i++)
+        {
+            if (Math.Abs(Cumulative[i] - travelled) <= tolerance) return true;
+        }
+
+        return false;
+    }
+
     /// <summary>Index of the span the given distance falls inside, clamped to the line.</summary>
     public int AnchorIndexAt(double travelled)
     {
@@ -77,6 +112,25 @@ public sealed class RopewayLine
         }
 
         return Cumulative.Length - 2;
+    }
+
+    /// <summary>
+    /// The span a cabin standing at <paramref name="travelled"/> is about to travel THROUGH, given which way
+    /// it is running. <see cref="AnchorIndexAt"/> has no direction term: standing exactly on tower k it
+    /// answers k, the span k-&gt;k+1, which is the span ahead of an outbound cabin and the span BEHIND an
+    /// inbound one - that is entering k-1-&gt;k. Only ever right by accident while the two ends were the sole
+    /// place a cabin could stand and depart; "parked at an interior tower, running inbound" is what calling
+    /// to any tower makes ordinary, and certifying the wrong span there is a rider driven through stone.
+    /// </summary>
+    public int SpanAheadOf(double travelled, bool outbound)
+    {
+        var index = AnchorIndexAt(travelled);
+
+        // Exactly on a tower boundary is the only case that differs: mid-span, both directions traverse the
+        // same span. index > 0 can only come from the loop, so Cumulative is real here.
+        if (!outbound && index > 0 && travelled <= Cumulative[index]) index--;
+
+        return index;
     }
 
     public Vec3d PositionAt(double travelled)

@@ -282,6 +282,234 @@ public class RopewayMathTests
         Assert.Null(RopewayLinkService.PickSurvivor(null, new BlockPos(0, 64, 0)));
     }
 
+    /// <summary>
+    /// Calling the cabin to a tower is that tower's own cumulative distance, whichever tower it is - the
+    /// end-only version could only ever pick 0 or TotalLength, which made every middle tower on a line
+    /// scenery. Direction is that target against where the cabin stands, which is what CallTo writes to
+    /// Outbound.
+    /// </summary>
+    [Fact]
+    public void ACallTargetsTheClickedTowerAndNotTheNearestEnd()
+    {
+        var line = FourTowerLine(out var a, out var b, out var c, out var d);
+
+        // Forward past one interior tower, from the near end.
+        Assert.Equal(CabinCall.Called, EntityRopewayCabin.PlanCall(line, c, 0, out var target));
+        Assert.Equal(20, target);
+        Assert.True(target > 0, "a call to a tower ahead of the cabin must run outbound");
+
+        // Backward to the other interior tower, from the far end.
+        Assert.Equal(CabinCall.Called, EntityRopewayCabin.PlanCall(line, b, 30, out target));
+        Assert.Equal(10, target);
+        Assert.True(target < 30, "a call to a tower behind the cabin must run inbound");
+
+        // The two ends still work, and still mean the ends.
+        Assert.Equal(CabinCall.Called, EntityRopewayCabin.PlanCall(line, a, 10, out target));
+        Assert.Equal(0, target);
+        Assert.Equal(CabinCall.Called, EntityRopewayCabin.PlanCall(line, d, 10, out target));
+        Assert.Equal(line.TotalLength, target);
+
+        // A tower that is not on this line at all is not a destination.
+        Assert.Equal(CabinCall.Unreachable, EntityRopewayCabin.PlanCall(line, new BlockPos(99, 64, 0), 0, out _));
+        Assert.Equal(CabinCall.Unreachable, EntityRopewayCabin.PlanCall(null, a, 0, out _));
+    }
+
+    /// <summary>
+    /// "It is already here" is not "it cannot come": reporting the first as failure is what made a click on
+    /// the tower the cabin is parked at look like a broken call.
+    /// </summary>
+    [Fact]
+    public void CallingTheCabinToWhereItAlreadyStandsIsNotATrip()
+    {
+        var line = FourTowerLine(out _, out _, out var c, out _);
+
+        Assert.Equal(CabinCall.AlreadyHere, EntityRopewayCabin.PlanCall(line, c, 20, out _));
+        Assert.Equal(CabinCall.AlreadyHere, EntityRopewayCabin.PlanCall(line, c, 20.4, out _));
+
+        // Half a metre out is a real trip - it is the resolution the arrival test itself works at.
+        Assert.Equal(CabinCall.Called, EntityRopewayCabin.PlanCall(line, c, 20.5, out _));
+    }
+
+    /// <summary>
+    /// Neither end of the trip may be outside the loaded window. Past it the cabin cannot be proven to be
+    /// where its Travelled says, and the target cannot be proven to still be on this line - both of which
+    /// end in the false-endpoint teleport the window exists to prevent.
+    /// </summary>
+    [Fact]
+    public void ACallIsRefusedWhenEitherEndIsOutsideTheLoadedWindow()
+    {
+        var a = new BlockPos(0, 64, 0);
+        var b = new BlockPos(10, 64, 0);
+        var c = new BlockPos(20, 64, 0);
+        var d = new BlockPos(30, 64, 0);
+
+        // D unloaded: the window is 0..20, so C is still a station and D is not.
+        var line = Marked(new[] { a, b, c, d }, new HashSet<BlockPos> { a, b, c });
+
+        Assert.Equal(CabinCall.Called, EntityRopewayCabin.PlanCall(line, c, 0, out var target));
+        Assert.Equal(20, target);
+
+        Assert.Equal(CabinCall.Unreachable, EntityRopewayCabin.PlanCall(line, d, 0, out _));
+
+        // And a cabin sitting in the unloaded stretch cannot be summoned out of it either.
+        Assert.Equal(CabinCall.Unreachable, EntityRopewayCabin.PlanCall(line, a, 30, out _));
+    }
+
+    /// <summary>
+    /// The halt. A called cabin stops at its destination rather than running on to the end, and an inverted
+    /// comparison here is a cabin that sails straight through the station it was called to.
+    /// </summary>
+    [Fact]
+    public void ACalledCabinHaltsAtItsDestinationAndNotBefore()
+    {
+        // Outbound: not yet at 20, then on it, then past it.
+        Assert.False(EntityRopewayCabin.Reached(19.9, 20, outbound: true));
+        Assert.True(EntityRopewayCabin.Reached(20, 20, outbound: true));
+        Assert.True(EntityRopewayCabin.Reached(20.1, 20, outbound: true));
+
+        // Inbound the comparison flips, or the cabin halts the instant it is called.
+        Assert.False(EntityRopewayCabin.Reached(10.1, 10, outbound: false));
+        Assert.True(EntityRopewayCabin.Reached(10, 10, outbound: false));
+        Assert.True(EntityRopewayCabin.Reached(9.9, 10, outbound: false));
+
+        // Walk a call from tower A to tower C at one tick of travel, and check it stops on C rather than
+        // carrying on to D. Same arithmetic the tick runs, without the tick.
+        var line = FourTowerLine(out _, out _, out var c, out _);
+        Assert.Equal(CabinCall.Called, EntityRopewayCabin.PlanCall(line, c, 0, out var destination));
+
+        var travelled = 0.0;
+        var steps = 0;
+        while (!EntityRopewayCabin.Reached(travelled, destination, outbound: true) && ++steps < 1000)
+        {
+            travelled += EntityRopewayCabin.DefaultSpeed * 0.1;
+        }
+
+        Assert.True(steps < 1000, "the cabin never reached the tower it was called to");
+        Assert.Equal(destination, Math.Min(travelled, destination), 6);
+        Assert.True(travelled < line.TotalLength, "the cabin ran past its destination toward the end of the line");
+    }
+
+    /// <summary>
+    /// The other half of the halt: a cabin standing at an interior tower is parked at a station, not stopped
+    /// mid-span. The tick's "never resume from mid-span" recovery reads this, and reading it as "is it at an
+    /// end" instead teleports a just-called cabin off its destination on the very next tick.
+    /// </summary>
+    [Fact]
+    public void EveryTowerCountsAsParkedAndTheSpansBetweenThemDoNot()
+    {
+        var line = FourTowerLine(out _, out _, out _, out _);
+
+        foreach (var cumulative in line.Cumulative)
+        {
+            Assert.True(line.IsAtTower(cumulative, EntityRopewayCabin.ArrivalTolerance), $"tower at {cumulative} is not a park");
+        }
+
+        Assert.False(line.IsAtTower(15, EntityRopewayCabin.ArrivalTolerance));
+        Assert.False(line.IsAtTower(20 - 2 * EntityRopewayCabin.ArrivalTolerance, EntityRopewayCabin.ArrivalTolerance));
+    }
+
+    /// <summary>
+    /// The clearance gate asks which span the cabin is about to travel through, and the answer depends on
+    /// which way it is running. Standing on tower 2 of [0,10,20,30] an outbound cabin enters 20-&gt;30 and an
+    /// inbound one enters 10-&gt;20. Answering 20-&gt;30 for both is what certified the wrong span - harmless
+    /// while the cabin could only ever stand and depart at an endpoint, a rider driven through stone the
+    /// moment calling to an interior tower made "parked inside the line, running inbound" ordinary.
+    /// </summary>
+    [Fact]
+    public void TheSpanAheadIsTheOneTheCabinEntersAndNotTheOneItStandsOn()
+    {
+        var line = FourTowerLine(out _, out _, out _, out _);
+
+        // At an interior tower the two directions are different spans. This is the whole defect.
+        Assert.Equal(2, line.SpanAheadOf(20, outbound: true));
+        Assert.Equal(1, line.SpanAheadOf(20, outbound: false));
+        Assert.Equal(1, line.SpanAheadOf(10, outbound: true));
+        Assert.Equal(0, line.SpanAheadOf(10, outbound: false));
+
+        // Mid-span there is one span and it is travelled both ways, so direction cannot change the answer.
+        Assert.Equal(1, line.SpanAheadOf(15, outbound: true));
+        Assert.Equal(1, line.SpanAheadOf(15, outbound: false));
+        Assert.Equal(0, line.SpanAheadOf(0.1, outbound: false));
+        Assert.Equal(2, line.SpanAheadOf(29.9, outbound: true));
+
+        // An end tower touches exactly one span whichever flag it is asked with, so neither direction can
+        // index off the line.
+        Assert.Equal(0, line.SpanAheadOf(0, outbound: true));
+        Assert.Equal(0, line.SpanAheadOf(0, outbound: false));
+        Assert.Equal(2, line.SpanAheadOf(30, outbound: false));
+        Assert.Equal(2, line.SpanAheadOf(30, outbound: true));
+
+        // Outside the line, and a line too short to have a span.
+        Assert.Equal(0, line.SpanAheadOf(-5, outbound: false));
+        Assert.Equal(2, line.SpanAheadOf(99, outbound: true));
+        Assert.Equal(0, RopewayLine.FromTowers(new List<BlockPos> { new(0, 64, 0), new(10, 64, 0) })
+            .SpanAheadOf(10, outbound: false));
+    }
+
+    /// <summary>
+    /// A blocked span holds the cabin exactly where it stands and writes nothing to Travelled, which is only
+    /// safe because where it stands is a boundary of the span being refused rather than a point inside it.
+    /// The previous recovery wrote <c>Cumulative[segment + 1]</c> for an inbound cabin, which - with the
+    /// direction-blind index feeding it - was a full span FORWARD across the span just proven blocked.
+    /// </summary>
+    [Fact]
+    public void HoldingWhereItStandsNeverPutsTheCabinThroughTheRefusedSpan()
+    {
+        var line = FourTowerLine(out _, out _, out _, out _);
+
+        foreach (var travelled in line.Cumulative)
+        {
+            foreach (var outbound in new[] { true, false })
+            {
+                var span = line.SpanAheadOf(travelled, outbound);
+                var start = line.Cumulative[span];
+                var end = line.Cumulative[span + 1];
+
+                Assert.True(
+                    travelled == start || travelled == end,
+                    $"at {travelled} running {(outbound ? "outbound" : "inbound")}: span {start}..{end} does not touch the cabin");
+            }
+        }
+
+        // And at an interior tower it is the span the cabin moves INTO: it begins where the cabin stands
+        // when outbound and ends where the cabin stands when inbound.
+        for (var i = 1; i < line.Cumulative.Length - 1; i++)
+        {
+            Assert.Equal(line.Cumulative[i], line.Cumulative[line.SpanAheadOf(line.Cumulative[i], outbound: true)]);
+            Assert.Equal(line.Cumulative[i], line.Cumulative[line.SpanAheadOf(line.Cumulative[i], outbound: false) + 1]);
+        }
+    }
+
+    /// <summary>
+    /// Same rule on geometry that is not round numbers - the boundary case is an exact comparison against a
+    /// cumulative sum of distances, not against tidy multiples of ten - and a hair off a tower is mid-span,
+    /// not a boundary, in both directions.
+    /// </summary>
+    [Fact]
+    public void TheSpanAheadIsBoundaryExactOnUnevenGeometry()
+    {
+        // Cumulative 0, 7, 26, 49.
+        var line = Line((0, 64, 0), (7, 64, 0), (7, 64, 19), (30, 64, 19));
+
+        Assert.Equal(1, line.SpanAheadOf(line.Cumulative[1], outbound: true));
+        Assert.Equal(0, line.SpanAheadOf(line.Cumulative[1], outbound: false));
+        Assert.Equal(2, line.SpanAheadOf(line.Cumulative[2], outbound: true));
+        Assert.Equal(1, line.SpanAheadOf(line.Cumulative[2], outbound: false));
+
+        // Just past tower 1 inbound is still inside span 1, running back down toward tower 1.
+        Assert.Equal(1, line.SpanAheadOf(line.Cumulative[1] + 0.001, outbound: false));
+        Assert.Equal(0, line.SpanAheadOf(line.Cumulative[1] - 0.001, outbound: false));
+    }
+
+    private static RopewayLine FourTowerLine(out BlockPos a, out BlockPos b, out BlockPos c, out BlockPos d)
+    {
+        a = new BlockPos(0, 64, 0);
+        b = new BlockPos(10, 64, 0);
+        c = new BlockPos(20, 64, 0);
+        d = new BlockPos(30, 64, 0);
+        return RopewayLine.FromTowers(new List<BlockPos> { a, b, c, d });
+    }
+
     private static RopewayLine Marked(IReadOnlyList<BlockPos> chain, HashSet<BlockPos> loaded)
     {
         var line = RopewayLine.FromTowers(chain);
