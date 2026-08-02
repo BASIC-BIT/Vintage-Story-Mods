@@ -1,0 +1,12 @@
+{
+  "//": "Cheap and wood-first, per DECISIONS.md 3: loose stone for the pad, a plank sill, and one metal bit for the drive plate. The only metal in a whole tower is still the braces and the sheave.",
+  "ingredientPattern": "PMP,SSS",
+  "ingredients": {
+    "P": { "type": "item", "code": "game:plank-*", "name": "wood" },
+    "M": { "type": "item", "code": "game:metalbit-*", "name": "metal" },
+    "S": { "type": "item", "code": "game:stone-*", "name": "rock" }
+  },
+  "width": 3,
+  "height": 2,
+  "output": { "type": "block", "code": "pylonbase-north", "quantity": 1 }
+}

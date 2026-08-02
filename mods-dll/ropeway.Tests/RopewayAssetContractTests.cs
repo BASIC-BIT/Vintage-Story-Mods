@@ -35,10 +35,11 @@ public class RopewayAssetContractTests
     }
 
     [Theory]
-    // RopewayLinkService.HaulRopeCode, BlockPylonHead.CabinItemCode, RopewayLinkService.CabinEntityCode.
+    // RopewayLinkService.HaulRopeCode, BlockPylonBase.CabinItemCode, RopewayLinkService.CabinEntityCode.
     [InlineData("itemtypes/haulrope.json", "haulrope")]
     [InlineData("itemtypes/cabin.json", "cabin")]
     [InlineData("entities/cabin.json", "cabin")]
+    [InlineData("blocktypes/pylonbase.json", "pylonbase")]
     [InlineData("blocktypes/pylonhead.json", "pylonhead")]
     [InlineData("blocktypes/brace.json", "brace")]
     public void CodesTheGameplayCodeHardcodesExist(string file, string expectedCode)
@@ -49,26 +50,38 @@ public class RopewayAssetContractTests
     [Fact]
     public void RegisteredClassNamesMatchTheJson()
     {
-        var pylon = Load("blocktypes", "pylonhead.json");
-        Assert.Equal("BlockPylonHead", pylon.GetProperty("class").GetString());
-        Assert.Equal("PylonHead", pylon.GetProperty("entityClass").GetString());
+        var pylon = Load("blocktypes", "pylonbase.json");
+        Assert.Equal("BlockPylonBase", pylon.GetProperty("class").GetString());
+
+        // MIGRATION, and the reason this is asserted rather than left to the JSON: this string is what
+        // discards a pre-footing world's tower block entities on load - ServerChunk.cs:531 logs and drops a
+        // block entity whose class will not instantiate - so every legacy tower comes back as inert
+        // decoration with no spans and no route state. Putting "PylonHead" back would instead resurrect
+        // them four blocks below their own geometry.
+        Assert.Equal("PylonBase", pylon.GetProperty("entityClass").GetString());
+
+        // The sheave is inert: one cell of the pattern, no block entity, none of the gameplay attributes.
+        var head = Load("blocktypes", "pylonhead.json");
+        Assert.Equal("BlockPylonHead", head.GetProperty("class").GetString());
+        Assert.False(head.TryGetProperty("entityClass", out _));
+        Assert.False(head.GetProperty("attributes").TryGetProperty("multiblockStructure", out _));
 
         Assert.Equal("EntityRopewayCabin", Load("entities", "cabin.json").GetProperty("class").GetString());
     }
 
     [Fact]
-    public void PylonHeadHasTheSideVariantGroupBEPylonHeadReads()
+    public void PylonBaseHasTheSideVariantGroupBEPylonBaseReads()
     {
-        var groups = Load("blocktypes", "pylonhead.json").GetProperty("variantgroups")
+        var groups = Load("blocktypes", "pylonbase.json").GetProperty("variantgroups")
             .EnumerateArray().Select(g => g.GetProperty("code").GetString()).ToList();
 
         Assert.Contains("side", groups);
     }
 
     [Fact]
-    public void PylonHeadCarriesTheAttributesBEPylonHeadReads()
+    public void PylonBaseCarriesTheAttributesBEPylonBaseReads()
     {
-        var attributes = Load("blocktypes", "pylonhead.json").GetProperty("attributes");
+        var attributes = Load("blocktypes", "pylonbase.json").GetProperty("attributes");
 
         Assert.Equal(48, attributes.GetProperty("maxSpan").GetDouble());
         Assert.Equal(16, attributes.GetProperty("maxCandidates").GetInt32());
@@ -85,30 +98,38 @@ public class RopewayAssetContractTests
         Assert.True(maxLineLength <= 320, "maxLineLength must stay inside the default server chunk radius");
         Assert.True(attributes.TryGetProperty("multiblockStructure", out _));
 
-        // BEPylonHead.RopePerBlock. At 1.0 a 48-block span is 96 vanilla rope = 576 cattail tops, which is
+        // BEPylonBase.RopePerBlock. At 1.0 a 48-block span is 96 vanilla rope = 576 cattail tops, which is
         // the most expensive thing in the game; DECISIONS.md 3 asked for cheap.
         var ropePerBlock = attributes.GetProperty("ropePerBlock").GetDouble();
         Assert.InRange(ropePerBlock, 0.01, 0.5);
         Assert.Equal(12, SpanMath.RopeCost(48, ropePerBlock));
     }
 
+    /// <summary>
+    /// The sheave is the same seen from either end of the line, because the rope runs through its throat in
+    /// both directions and nothing about the tower is asymmetric any more. The old shape carried a spur
+    /// pointing at the rear gantry; with one gantry that spur is a hint at something that does not exist.
+    /// </summary>
     [Fact]
-    public void PylonHeadShapeIsAsymmetricAlongTheRearGantryAxis()
+    public void ThePylonHeadShapeIsSymmetricAlongTheRopeAxis()
     {
-        // All four side variants are the same shape rotated. If every element is symmetric in z the
-        // player cannot see which way the head faces and builds the 21-block rear gantry on the wrong
-        // side of it, with nothing but the block info panel to say so.
-        var elements = Load("shapes", "block", "pylonhead.json").GetProperty("elements").EnumerateArray()
-            .Select(e => (From: e.GetProperty("from")[2].GetDouble(), To: e.GetProperty("to")[2].GetDouble()))
-            .ToList();
+        // Symmetric as a SET, not element by element: the two sheave cheek plates sit at z 3-5 and 11-13
+        // and are each other's mirror. So the whole box list has to map onto itself under z -> 16 - z.
+        var boxes = Load("shapes", "block", "pylonhead.json").GetProperty("elements").EnumerateArray()
+            .Select(e => (e.GetProperty("from"), e.GetProperty("to")))
+            .Select(e => (
+                X0: e.Item1[0].GetDouble(), Y0: e.Item1[1].GetDouble(), Z0: e.Item1[2].GetDouble(),
+                X1: e.Item2[0].GetDouble(), Y1: e.Item2[1].GetDouble(), Z1: e.Item2[2].GetDouble()))
+            .ToHashSet();
 
-        Assert.Contains(elements, e => Math.Abs(e.From + e.To - 16.0) > 0.001);
+        Assert.NotEmpty(boxes);
+        Assert.Equal(boxes, boxes.Select(b => (b.X0, b.Y0, 16 - b.Z1, b.X1, b.Y1, 16 - b.Z0)).ToHashSet());
     }
 
     [Fact]
     public void MultiblockOffsetsAreTheTowerShellAndNothingElse()
     {
-        var structure = Load("blocktypes", "pylonhead.json").GetProperty("attributes").GetProperty("multiblockStructure");
+        var structure = Load("blocktypes", "pylonbase.json").GetProperty("attributes").GetProperty("multiblockStructure");
 
         var numbers = structure.GetProperty("blockNumbers").EnumerateObject()
             .Select(p => p.Value.GetInt32()).ToHashSet();
@@ -118,17 +139,83 @@ public class RopewayAssetContractTests
                           Z: o.GetProperty("z").GetInt32(), W: o.GetProperty("w").GetInt32()))
             .ToList();
 
-        Assert.Equal(21, offsets.Count);
+        // One crossarm of five on two posts of four, plus the footing that owns them: 14 cells, 13 offsets.
+        Assert.Equal(13, offsets.Count);
         Assert.Equal(offsets.Count, offsets.Select(o => (o.X, o.Y, o.Z)).Distinct().Count());
 
-        // The controller is the pylon head itself and must not be one of the cells it checks.
+        // The controller is the footing itself and must not be one of the cells it checks.
         Assert.DoesNotContain(offsets, o => o.X == 0 && o.Y == 0 && o.Z == 0);
 
         // Every w must resolve, or MultiblockStructure.InCompleteBlockCount throws on BlockCodes[w].
         Assert.All(offsets, o => Assert.Contains(o.W, numbers));
 
-        // The 3 wide x 4 long x 3 tall passage the cabin travels through has to stay empty.
-        Assert.DoesNotContain(offsets, o => o.X is >= -1 and <= 1 && o.Y is >= -3 and <= -1 && o.Z is >= 0 and <= 3);
+        // One block deep. The 4-long cabin passes through a 1-deep frame; a second gantry is a tunnel.
+        Assert.All(offsets, o => Assert.Equal(0, o.Z));
+
+        // The 3-wide, 4-tall archway the cabin travels through has to stay empty.
+        Assert.DoesNotContain(offsets, o => o.X is >= -1 and <= 1 && o.Y is >= 0 and <= 3);
+
+        // The sheave is the crossarm's centre cell, directly SheaveHeight above the footing - AnchorOf,
+        // BEPylonBase's cable mesh and BlockPylonHead's block-info lookup all assume exactly this cell.
+        Assert.Contains(offsets, o => o.X == 0 && o.Y == SpanMath.SheaveHeight && o.Z == 0);
+
+        // Posts reach the ground the footing stands on. Starting them a cell higher leaves the legs hanging
+        // in the air, which is what "posts three tall" would have produced.
+        foreach (var x in new[] { -2, 2 })
+        {
+            for (var y = 0; y < SpanMath.SheaveHeight; y++)
+            {
+                Assert.Contains(offsets, o => o.X == x && o.Y == y && o.Z == 0);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The whole restructure in one assertion: with the controller on the ground the cabin has to pass
+    /// through its own tower without clipping the footing it sits on or the crossarm it hangs under. Three
+    /// numbers own that fit - <see cref="SpanMath.SheaveHeight"/>, the cabin's <c>hangDrop</c> and the
+    /// authored shapes - and any one of them moving alone breaks it silently, in a way only visible by
+    /// riding through a tower and watching the floor cut the plinth.
+    /// </summary>
+    [Fact]
+    public void TheCabinFitsThroughTheTower()
+    {
+        var hangDrop = Load("entities", "cabin.json").GetProperty("attributes").GetProperty("hangDrop").GetDouble();
+        Assert.Equal(EntityRopewayCabin.DefaultHangDrop, hangDrop);
+
+        var (_, _, elements) = CabinBounds();
+        double Bottom(string element) => Find(elements, element).GetProperty("from")[1].GetDouble() / 16;
+        double Top(string element) => Find(elements, element).GetProperty("to")[1].GetDouble() / 16;
+
+        // Heights in blocks above the footing block's own bottom face, which is the ground the tower stands on.
+        var anchor = SpanMath.SheaveHeight + 0.5;
+        var cabinFloor = anchor - hangDrop + Bottom("floor");
+        var cabinRoof = anchor - hangDrop + Top("roof");
+        var mastTip = anchor - hangDrop + Top("mast");
+
+        var footingTop = Load("shapes", "block", "pylonbase.json").GetProperty("elements").EnumerateArray()
+            .Max(e => e.GetProperty("to")[1].GetDouble()) / 16;
+        var crossarmUnderside = SpanMath.SheaveHeight
+            + Load("shapes", "block", "brace.json").GetProperty("elements").EnumerateArray()
+                .Min(e => e.GetProperty("from")[1].GetDouble()) / 16;
+
+        Assert.True(cabinFloor > footingTop,
+            $"the cabin floor at {cabinFloor} cuts through the footing, which tops out at {footingTop}");
+        Assert.True(cabinRoof < crossarmUnderside,
+            $"the cabin roof at {cabinRoof} cuts through the crossarm, whose underside is at {crossarmUnderside}");
+
+        // BASIC's figure, and the reason SheaveHeight is 4 rather than 3: three quarters of a block of air
+        // between the footing and the cabin passing over it.
+        Assert.Equal(0.75, cabinFloor - footingTop, 3);
+
+        // The mast has to reach the sheave throat, or the cabin visibly hangs from nothing. It lands exactly
+        // on the anchor - the centre of the sheave block, and the point the cable is drawn from.
+        Assert.Equal(anchor, mastTip, 3);
+    }
+
+    private static JsonElement Find(List<(string Name, JsonElement Element)> elements, string name)
+    {
+        return elements.First(e => e.Name == name).Element;
     }
 
     [Fact]

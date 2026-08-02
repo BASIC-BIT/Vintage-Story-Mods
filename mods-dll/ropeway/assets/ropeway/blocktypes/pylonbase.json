@@ -1,0 +1,82 @@
+{
+  "code": "pylonbase",
+  "class": "BlockPylonBase",
+  "entityClass": "PylonBase",
+  "behaviors": [
+    { "name": "HorizontalOrientable" }
+  ],
+  "variantgroups": [
+    { "code": "side", "states": [ "north", "east", "south", "west" ] }
+  ],
+  "shapeByType": {
+    "*-north": { "base": "ropeway:block/pylonbase", "rotateY": 0 },
+    "*-east": { "base": "ropeway:block/pylonbase", "rotateY": 270 },
+    "*-south": { "base": "ropeway:block/pylonbase", "rotateY": 180 },
+    "*-west": { "base": "ropeway:block/pylonbase", "rotateY": 90 }
+  },
+  "textures": {
+    "stone": { "base": "game:block/stone/rock/granite1" },
+    "metal": { "base": "game:block/metal/sheet/iron1" },
+    "rope": { "base": "game:item/resource/rope" }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Stone",
+  "creativeinventory": { "general": [ "*-north" ], "construction": [ "*-north" ] },
+  "attributes": {
+    "handbook": {
+      "groupBy": [ "pylonbase-*" ]
+    },
+    "reinforcable": false,
+    "maxSpan": 48,
+    "//maxLineLength": "320 = 10 chunks. The server keeps chunks loaded within MaxChunkRadius of a player, default 12 chunks / 384 blocks (ServerConfig.cs:925), and ServerMain.cs:789 only ever raises it. Chain length is an upper bound on the straight-line distance between any two towers, so a line under that radius can never have a tower unload while a rider is anywhere on it - which is the precondition for the whole truncated-line failure class (see docs/KNOWN-ISSUES.md R1-R4). 320 leaves two chunks of margin. Raising this back toward 512 re-opens that class; so does a server configured below MaxChunkRadius 10.",
+    "maxLineLength": 320,
+    "ropePerBlock": 0.25,
+    "maxCandidates": 16,
+    "//multiblockStructure": "One crossarm on two posts, all offsets from the footing you place on the ground. The crossarm is at y +4 and not lower: the cabin is 2.5 blocks tall, hangs 2 below the rope, and passes over this very block, so the sheave has to sit 4.5 above the footing's bottom for the floor to clear the footing and the roof to clear the braces. The posts run the whole way down to ground level, y 0..3, or they hang in the air beside the footing. The passage cells (x -1..1, y 0..3) are deliberately absent.",
+    "multiblockStructure": {
+      "blockNumbers": {
+        "ropeway:pylonhead-*": 1,
+        "ropeway:brace-*": 2,
+        "game:@(log-placed-.*|debarkedlog-.*|planks-.*)": 3
+      },
+      "offsets": [
+        { "x": 0, "y": 4, "z": 0, "w": 1 },
+
+        { "x": -2, "y": 4, "z": 0, "w": 2 },
+        { "x": -1, "y": 4, "z": 0, "w": 2 },
+        { "x": 1, "y": 4, "z": 0, "w": 2 },
+        { "x": 2, "y": 4, "z": 0, "w": 2 },
+
+        { "x": -2, "y": 0, "z": 0, "w": 3 },
+        { "x": -2, "y": 1, "z": 0, "w": 3 },
+        { "x": -2, "y": 2, "z": 0, "w": 3 },
+        { "x": -2, "y": 3, "z": 0, "w": 3 },
+        { "x": 2, "y": 0, "z": 0, "w": 3 },
+        { "x": 2, "y": 1, "z": 0, "w": 3 },
+        { "x": 2, "y": 2, "z": 0, "w": 3 },
+        { "x": 2, "y": 3, "z": 0, "w": 3 }
+      ]
+    }
+  },
+  "replaceable": 500,
+  "resistance": 4.5,
+  "lightAbsorption": 0,
+  "sidesolid": { "all": false },
+  "sideopaque": { "all": false },
+  "collisionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.5, "z2": 1 },
+  "selectionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.5, "z2": 1 },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/rock-break-pickaxe",
+    "hit": "game:block/rock-hit-pickaxe",
+    "byTool": {
+      "Pickaxe": { "hit": "game:block/rock-hit-pickaxe", "break": "game:block/rock-break-pickaxe" }
+    }
+  },
+  "guiTransform": {
+    "rotation": { "x": -22.6, "y": 45, "z": 0 },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

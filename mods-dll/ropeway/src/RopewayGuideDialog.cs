@@ -9,8 +9,8 @@ using Vintagestory.GameContent;
 namespace Ropeway;
 
 /// <summary>
-/// The journal guide: the tower spec next to a live 3D render of the two blocks it is made of and of
-/// the cabin entity itself, all turning. Opened with sneak + right-click on a pylon head.
+/// The journal guide: the tower spec next to a live 3D render of the three blocks it is made of and of
+/// the cabin entity itself, all turning. Opened with sneak + right-click on a pylon footing.
 ///
 /// The cabin is an EntityRopewayCabin that is never spawned into the world, so nothing creates its
 /// renderer for us - we build the EntityShapeRenderer by hand, the way ClientSystemEntities does on
@@ -23,7 +23,8 @@ public sealed class RopewayGuideDialog : GuiDialog
     private const double ViewportHeight = 190;
 
     private ElementBounds viewportBounds;
-    private ItemSlot pylonSlot;
+    private ItemSlot baseSlot;
+    private ItemSlot headSlot;
     private ItemSlot braceSlot;
 
     private Entity cabin;
@@ -75,7 +76,8 @@ public sealed class RopewayGuideDialog : GuiDialog
     {
         base.OnGuiOpened();
 
-        pylonSlot ??= SlotFor("pylonhead-north");
+        baseSlot ??= SlotFor("pylonbase-north");
+        headSlot ??= SlotFor("pylonhead-north");
         braceSlot ??= SlotFor("brace-north");
         EnsureCabin();
     }
@@ -133,16 +135,19 @@ public sealed class RopewayGuideDialog : GuiDialog
 
         yaw += dt * 0.6f;
 
-        var cell = viewportBounds.InnerWidth / 3;
+        // Four cells: the three blocks a tower is made of, then the cabin. The posts are player-chosen wood
+        // and have no one block to show.
+        var cell = viewportBounds.InnerWidth / 4;
         var y = viewportBounds.renderY + viewportBounds.InnerHeight / 2;
-        var size = (float)GuiElement.scaled(70);
+        var size = (float)GuiElement.scaled(60);
 
         capi.Render.GlPushMatrix();
         capi.Render.GlRotate(-14f, 1f, 0f, 0f);
 
-        RenderStack(dt, pylonSlot, viewportBounds.renderX + cell * 0.5, y, size);
-        RenderStack(dt, braceSlot, viewportBounds.renderX + cell * 1.5, y, size);
-        RenderCabin(dt, viewportBounds.renderX + cell * 2.5, y);
+        RenderStack(dt, baseSlot, viewportBounds.renderX + cell * 0.5, y, size);
+        RenderStack(dt, headSlot, viewportBounds.renderX + cell * 1.5, y, size);
+        RenderStack(dt, braceSlot, viewportBounds.renderX + cell * 2.5, y, size);
+        RenderCabin(dt, viewportBounds.renderX + cell * 3.5, y);
 
         capi.Render.GlPopMatrix();
     }
@@ -161,7 +166,7 @@ public sealed class RopewayGuideDialog : GuiDialog
         {
             // ponytail: size and the downward nudge are eyeballed against a 3x4x2.5 cabin whose shape
             // origin sits mid-body. They are the calibration knob if the cabin sits high or low in the box.
-            capi.Render.RenderEntityToGui(dt, cabin, x, y + GuiElement.scaled(30), 250.0, yaw, (float)GuiElement.scaled(34), -1);
+            capi.Render.RenderEntityToGui(dt, cabin, x, y + GuiElement.scaled(30), 250.0, yaw, (float)GuiElement.scaled(28), -1);
         }
         catch (Exception e)
         {

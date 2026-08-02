@@ -1,0 +1,53 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "stone": "game:block/stone/rock/granite1",
+    "metal": "game:block/metal/sheet/iron1"
+  },
+  "elements": [
+    {
+      "name": "pad",
+      "from": [ 0.0, 0.0, 0.0 ],
+      "to": [ 16.0, 3.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 3.0 ] },
+        "east": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 3.0 ] },
+        "south": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 3.0 ] },
+        "west": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 3.0 ] },
+        "up": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 16.0 ] },
+        "down": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 16.0 ] }
+      }
+    },
+    {
+      "name": "plate",
+      "from": [ 2.0, 3.0, 2.0 ],
+      "to": [ 14.0, 5.0, 14.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
+        "east": { "texture": "#metal", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
+        "south": { "texture": "#metal", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
+        "west": { "texture": "#metal", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
+        "up": { "texture": "#metal", "uv": [ 2.0, 2.0, 14.0, 14.0 ] },
+        "down": { "texture": "#metal", "uv": [ 2.0, 2.0, 14.0, 14.0 ] }
+      }
+    },
+    {
+      "//": "The drive boss, and the highest thing on the footing at 8/16. The cabin floor passes 0.75 blocks above it - nothing on this block may grow past y 8 without moving the whole tower up a cell. Cosmetic today; it is where mechanical power attaches when that lands, which is why it sits across the crossarm axis rather than down the line.",
+      "name": "boss",
+      "from": [ 5.0, 5.0, 6.0 ],
+      "to": [ 11.0, 8.0, 10.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [ 5.0, 5.0, 11.0, 8.0 ] },
+        "east": { "texture": "#metal", "uv": [ 6.0, 5.0, 10.0, 8.0 ] },
+        "south": { "texture": "#metal", "uv": [ 5.0, 5.0, 11.0, 8.0 ] },
+        "west": { "texture": "#metal", "uv": [ 6.0, 5.0, 10.0, 8.0 ] },
+        "up": { "texture": "#metal", "uv": [ 5.0, 6.0, 11.0, 10.0 ] },
+        "down": { "texture": "#metal", "uv": [ 5.0, 6.0, 11.0, 10.0 ] }
+      }
+    }
+  ]
+}

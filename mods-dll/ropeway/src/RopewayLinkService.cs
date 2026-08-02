@@ -47,7 +47,7 @@ public sealed class RopewayLinkService
 
         if (!MayEdit(fromPlayer, packet.Tower)) return;
 
-        // BEPylonHead.SanitiseName is the trust boundary; Rename runs it and syncs only on a real change.
+        // BEPylonBase.SanitiseName is the trust boundary; Rename runs it and syncs only on a real change.
         // Re-sending the list refreshes the open picker with whatever the sanitiser actually kept - straight
         // through SendCandidateList, because the guards in SendCandidates would toast at a rename.
         if (be.Rename(packet.Name)) SendCandidateList(fromPlayer, be, packet.Tower);
@@ -123,7 +123,7 @@ public sealed class RopewayLinkService
         SendCandidateList(player, be, from);
     }
 
-    private void SendCandidateList(IServerPlayer player, BEPylonHead be, BlockPos from)
+    private void SendCandidateList(IServerPlayer player, BEPylonBase be, BlockPos from)
     {
         var response = new TowerCandidatesResponse
         {
@@ -161,13 +161,13 @@ public sealed class RopewayLinkService
     /// Every row the picker shows must succeed on click, so this applies the same rules TryLink does.
     /// Cheap filters first, then the clearance sweep on at most maxCandidates towers.
     /// </summary>
-    private List<TowerCandidate> ScanCandidates(BEPylonHead be, BlockPos from)
+    private List<TowerCandidate> ScanCandidates(BEPylonBase be, BlockPos from)
     {
         var result = new List<TowerCandidate>();
 
         // TryLink refuses on a full tower, so offering one a link row would break the "every row succeeds"
         // contract the moment the picker started opening on full towers.
-        if (be.Spans.Count >= BEPylonHead.MaxSpansPerTower) return result;
+        if (be.Spans.Count >= BEPylonBase.MaxSpansPerTower) return result;
 
         var anchorFrom = SpanMath.AnchorOf(from);
         var lineFrom = RopewayLine.GetOrBuild(modSystem, from);
@@ -180,7 +180,7 @@ public sealed class RopewayLinkService
             var other = entry.Value;
             if (pos.Equals(from) || pos.dimension != from.dimension) continue;
             if (other == null || !other.StructureComplete) continue;
-            if (other.Spans.Count >= BEPylonHead.MaxSpansPerTower) continue;
+            if (other.Spans.Count >= BEPylonBase.MaxSpansPerTower) continue;
             if (be.HasSpanTo(pos)) continue;
             if (lineFrom != null && Contains(lineFrom, pos)) continue;
 
@@ -249,7 +249,7 @@ public sealed class RopewayLinkService
             return false;
         }
 
-        if (beFrom.Spans.Count >= BEPylonHead.MaxSpansPerTower || beTo.Spans.Count >= BEPylonHead.MaxSpansPerTower)
+        if (beFrom.Spans.Count >= BEPylonBase.MaxSpansPerTower || beTo.Spans.Count >= BEPylonBase.MaxSpansPerTower)
         {
             player.SendIngameError("ropeway-tower-full", Lang.Get("ropeway:err-tower-full"));
             return false;
@@ -409,7 +409,7 @@ public sealed class RopewayLinkService
     /// What to call a tower in a message. Its player-set name, or the compass bearing to it from wherever
     /// the message is about - never a raw coordinate triple and never an "unnamed" placeholder.
     /// </summary>
-    private static string DisplayName(BEPylonHead be, double dx, double dz)
+    private static string DisplayName(BEPylonBase be, double dx, double dz)
     {
         return be?.TowerName ?? Lang.Get(SpanMath.CompassKey(dx, dz));
     }
@@ -606,15 +606,20 @@ public sealed class RopewayLinkService
     /// <paramref name="clicked"/> is the tower the click was on and is the one the player's reach has to
     /// cover; <paramref name="peer"/> is the far end of a span, legitimately up to maxSpan away, so it gets
     /// the claim check and not the distance one. Generous on range - PickingRange is the block reach and
-    /// the anchor is the sheave block's centre, so a couple of blocks of slack keeps a legitimate click
-    /// from being refused over rounding and the player's eye height.
+    /// this is measured to a block centre, so a couple of blocks of slack keeps a legitimate click from
+    /// being refused over rounding and the player's eye height.
+    /// <para>
+    /// CentreOf, not AnchorOf: the click landed on the footing at the player's feet, while the anchor is
+    /// the sheave four blocks above it. Measuring to the anchor charges every click four blocks of reach
+    /// it never used, which on a tower dug into a slope is the difference between working and not.
+    /// </para>
     /// </summary>
     private bool MayEdit(IServerPlayer player, BlockPos clicked, BlockPos peer = null)
     {
         if (player?.Entity == null || clicked == null) return false;
 
         var reach = player.WorldData.PickingRange + 3;
-        if (player.Entity.Pos.SquareDistanceTo(SpanMath.AnchorOf(clicked)) > reach * reach)
+        if (player.Entity.Pos.SquareDistanceTo(SpanMath.CentreOf(clicked)) > reach * reach)
         {
             player.SendIngameError("ropeway-too-far", Lang.Get("ropeway:err-too-far"));
             return false;
@@ -631,11 +636,11 @@ public sealed class RopewayLinkService
         return true;
     }
 
-    private BEPylonHead TowerAt(BlockPos pos)
+    private BEPylonBase TowerAt(BlockPos pos)
     {
         if (pos == null) return null;
         if (modSystem.LoadedTowers.TryGetValue(pos, out var be) && be != null) return be;
-        return sapi.World.BlockAccessor.GetBlockEntity(pos) as BEPylonHead;
+        return sapi.World.BlockAccessor.GetBlockEntity(pos) as BEPylonBase;
     }
 
     /// <summary>

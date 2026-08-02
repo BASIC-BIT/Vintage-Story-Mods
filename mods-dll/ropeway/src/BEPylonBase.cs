@@ -13,8 +13,14 @@ namespace Ropeway;
 /// Per-tower state: the multiblock validation tick and the 0-2 spans this tower carries.
 /// Modelled on BlockEntityBeeHiveKiln - Initialize loads the structure, Init sets up the tick and the
 /// rotation, FromTreeAttributes re-Inits on the client.
+/// <para>
+/// This lives on the GROUND-PLACED footing, which is the tower's one canonical position: LoadedTowers,
+/// LineCache, RopewayLine.Towers, every persisted span and the cabin's LineKey are all footing positions.
+/// The sheave up on the crossarm is an inert cell of the pattern, and <see cref="SpanMath.AnchorOf"/> is
+/// the only thing that turns a footing position into the height the rope actually runs at.
+/// </para>
 /// </summary>
-public class BEPylonHead : BlockEntity
+public class BEPylonBase : BlockEntity
 {
     public const int MaxSpansPerTower = 2;
 
@@ -43,11 +49,12 @@ public class BEPylonHead : BlockEntity
     public double RopePerBlock => Block?.Attributes?["ropePerBlock"].AsDouble(0.25) ?? 0.25;
 
     /// <summary>
-    /// Which way the rear gantry sits from the pylon head. The side variant is what
-    /// Block.SuggestedHVOrientation returned, which points back at whoever placed it, so the rear gantry
-    /// - the structure's +Z offsets - is its opposite.
+    /// The axis the cabin threads through the frame on, as one of its two facings. The crossarm is the
+    /// structure's +/-X offsets and the frame is one block deep, so the passage runs along the tower's
+    /// local Z - which the side variant names directly. With the rear gantry gone this is the only thing
+    /// orientation still decides, and getting it 90 degrees out is a tower the line cannot pass through.
     /// </summary>
-    public BlockFacing RearFacing => BlockFacing.FromCode(side ?? "north")?.Opposite ?? BlockFacing.SOUTH;
+    public BlockFacing PassageFacing => BlockFacing.FromCode(side ?? "north") ?? BlockFacing.NORTH;
 
     /// <summary>A tower is an end tower - a station - iff it is complete and carries exactly one span.</summary>
     public bool IsEndpoint => StructureComplete && Spans.Count == 1;
@@ -183,6 +190,10 @@ public class BEPylonHead : BlockEntity
     /// Draws this tower's half of every span it carries. Each end draws only to the midpoint rather than one
     /// end drawing the whole cable, which means there is never coincident geometry to z-fight and a span
     /// whose far chunk is unloaded still shows the half you are standing next to.
+    /// ponytail: drawn by the footing and pushed up <see cref="SpanMath.SheaveHeight"/>, not by the sheave.
+    /// The sheave has no block entity since the controller moved to the ground, and giving it one purely to
+    /// hold a mesh would mean a second position to key spans by - which is the exact class of bug the one
+    /// canonical position exists to prevent. One offset, the same constant AnchorOf uses.
     /// ponytail: straight, not sagging - the cabin travels the straight chord and IsSpanClear certifies a
     /// straight corridor, so a drawn catenary would be a cable that lies about where the cabin goes. Sag
     /// becomes worth drawing when the cabin follows a curve too, and then all three must share one function.
@@ -227,9 +238,12 @@ public class BEPylonHead : BlockEntity
     }
 
     /// <summary>
-    /// A thin box from this sheave to the midpoint of the span, in block-local coordinates, so the anchor is
-    /// the block centre and the deltas are half the span. Null when the peer lands on top of us. Static and
-    /// therefore unit-tested: this mesh's failure mode is that it renders nothing at all, silently.
+    /// A thin box from this tower's sheave to the midpoint of the span, in coordinates local to the FOOTING
+    /// block that draws it - hence the <see cref="SpanMath.SheaveHeight"/> in the translate, which is what
+    /// makes the drawn cable and <see cref="SpanMath.AnchorOf"/> agree. Deltas are half the span, and they
+    /// need no correction: both ends are footings, so footing-to-footing and sheave-to-sheave are the same
+    /// vector. Null when the peer lands on top of us. Static and therefore unit-tested: this mesh's failure
+    /// mode is that it renders nothing at all, silently.
     /// </summary>
     public static MeshData BuildHalfCable(double dx, double dy, double dz, TextureAtlasPosition texPos)
     {
@@ -258,7 +272,7 @@ public class BEPylonHead : BlockEntity
         mesh.Rotate(new Vec3f(0, 0, 0), radX, 0, 0);
         mesh.Rotate(new Vec3f(0, 0, 0), 0, radY, 0);
 
-        mesh.Translate((float)(0.5 + dx / 2), (float)(0.5 + dy / 2), (float)(0.5 + dz / 2));
+        mesh.Translate((float)(0.5 + dx / 2), (float)(0.5 + SpanMath.SheaveHeight + dy / 2), (float)(0.5 + dz / 2));
         mesh.SetTexPos(texPos);
         return mesh;
     }
@@ -453,9 +467,13 @@ public class BEPylonHead : BlockEntity
             var missing = Math.Max(0, IncompleteCount());
             dsc.AppendLine(Lang.Get("ropeway:tower-incomplete", missing));
 
-            // All four shape variants look alike from most angles, so this is the only way to tell which
-            // side of the head the rear gantry belongs on before building 21 blocks in the wrong place.
-            dsc.AppendLine(Lang.Get("ropeway:blockinfo-rear", Lang.Get("game:facing-" + RearFacing.Code)));
+            // The frame is one block deep and symmetric, so nothing about a placed footing shows which way
+            // its crossarm will go until the braces are up. Naming the passage axis is what lets a player
+            // face the tower down the line BEFORE building it rather than after.
+            dsc.AppendLine(Lang.Get(
+                "ropeway:blockinfo-passage",
+                Lang.Get("game:facing-" + PassageFacing.Code),
+                Lang.Get("game:facing-" + PassageFacing.Opposite.Code)));
             return;
         }
 

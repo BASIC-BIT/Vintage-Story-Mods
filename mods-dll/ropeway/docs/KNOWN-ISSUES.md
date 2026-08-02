@@ -1,7 +1,24 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 74 ropeway tests passing. Everything in the tables below was found by reading code,
+State: build green, 77 ropeway tests passing. Everything in the tables below was found by reading code,
 not by playing — none of *it* has been observed in game.
+
+## Tower restructure (2026-08-01) — what it costs
+
+The controller moved from the pylon head at head height to a ground-placed `ropeway:pylonbase` footing and
+the rear gantry is gone (see `DECISIONS.md`, "2026-07-31 — tower restructure"). Two consequences worth
+knowing before playing:
+
+- **Every pre-existing world loses its towers.** The block entity class name changed from `PylonHead` to
+  `PylonBase`, so `ServerChunk` logs *"Failed loading blockentity PylonHead … Will discard it"* and drops
+  it. That IS the migration: no crash, no half-converted tower, no orphaned span — a legacy tower comes
+  back as inert decoration, because every tower in the world loses its block entity at once and there is
+  nothing left holding a reference to anything. Deliberate, and cheaper and safer than an upgrader for a
+  pre-release mod. `BlockPylonHead.GetPlacedBlockInfo` says so on the block: *"Not part of a tower…"*.
+- **A cabin left on a legacy line is stranded.** Its `LineKey` names a tower that no longer registers, so
+  `ResolveLine` returns null and the tick holds — which is exactly what an unloaded chunk looks like, so
+  the `DropAndDie` backstop cannot fire without also eating cabins on genuinely unloaded lines. It hangs
+  there inert. Remove it with `/entity remove` or ignore it. Not fixed: the cure is worse than the disease.
 
 ## Fixed after the first in-game session
 
@@ -92,10 +109,11 @@ three blockers and the mount race were fixed in the same pass; these five were j
   view frustum even while the cable is still on screen. Per-chunk segments are the fix if it reads badly.
 - **Unlinking is not offered on a truncated line.** `SendCandidates` still refuses to open the picker when
   part of the line is unloaded, because the link rows would be unprovable. That also takes the unlink rows
-  with it. Breaking the pylon head still works, so this is an inconvenience rather than a trap.
+  with it. Breaking the footing still works, so this is an inconvenience rather than a trap.
 - **The cable is straight, not sagging.** The cabin travels the straight chord and `IsSpanClear`
   certifies a straight corridor; a drawn catenary would be a cable that lies about where the cabin goes.
 - **Span ends are not clearance-checked.** `TrimForTowers` skips 4 blocks at each end so a tower's own
   posts don't block its own line, so an obstruction inside those end zones goes undetected.
-- **Metal cost is higher than intended.** Two 5-wide brace gantries per tower is roughly 2.5 iron
-  plates, above the "don't gate this behind a bunch of metal" target in `DECISIONS.md`.
+- **Metal cost.** Closed by the restructure: one 5-wide crossarm is 4 braces (1 iron plate) plus the
+  sheave, down from two gantries at roughly 2.5 plates. Inside the "don't gate this behind a bunch of
+  metal" target in `DECISIONS.md`.

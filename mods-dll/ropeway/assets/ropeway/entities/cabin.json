@@ -3,6 +3,7 @@
   "class": "EntityRopewayCabin",
   "attributes": {
     "speed": 2.2,
+    "//hangDrop": "Not a taste knob. The sheave sits 4 cells above the pylon footing and the cabin passes over that footing, so the floor (origin -1.25) must clear the footing's plinth top at +0.5 and the roof (origin +1.25) must clear the crossarm's underside at +4.0625. That gives 1.6875 < hangDrop < 2.75. 2.0 is NOT the midpoint of that window (2.219 is) - it deliberately sits low in it, leaving 0.75 blocks of air under the floor against 0.3125 over the roof, because clipping the crossarm reads far worse than a low floor. RopewayAssetContractTests.TheCabinFitsThroughTheTower fails if this or SpanMath.SheaveHeight moves alone.",
     "hangDrop": 2.0,
     "mountAnimations": {
       "idle": "idle",

@@ -54,9 +54,9 @@ public class RopewayMathTests
     [Fact]
     public void SpanCheckSkipsTheTowerVolumeAtBothEndsButNeverMoreThanHalf()
     {
-        // A tower's posts are player-chosen logs, invisible to the block filter, and reach 3.6 blocks out
-        // from the sheave. Without the trim, every ray leaving the sheave exits through the tower's own
-        // post and any span off the tower's axis is silently refused.
+        // A tower's posts are player-chosen logs, invisible to the block filter, and stand under the sheave
+        // at up to 2.55 blocks horizontally. Without the trim, the clearance rays leave the sheave, drop
+        // three blocks and run straight into the tower's own posts, and every span is silently refused.
         Assert.Equal(SpanMath.TowerClearance, SpanMath.TrimForTowers(48));
         Assert.Equal(SpanMath.TowerClearance, SpanMath.TrimForTowers(9));
 
@@ -573,7 +573,7 @@ public class RopewayMathTests
     public void TheCableMeshIsCentredAndCarriesTheFaceCountTheTesselatorLoopsOver()
     {
         // Half of an 8-block span due east.
-        var mesh = BEPylonHead.BuildHalfCable(4, 0, 0, new TextureAtlasPosition { x1 = 0, y1 = 0, x2 = 1, y2 = 1 });
+        var mesh = BEPylonBase.BuildHalfCable(4, 0, 0, new TextureAtlasPosition { x1 = 0, y1 = 0, x2 = 1, y2 = 1 });
 
         Assert.NotNull(mesh);
         Assert.Equal(6, mesh.XyzFacesCount);
@@ -596,20 +596,55 @@ public class RopewayMathTests
             }
         }
 
-        // Block-local: it leaves the block centre (0.5) and runs to the midpoint of the span, 4 blocks east.
+        // Local to the FOOTING that draws it: it leaves the sheave, SheaveHeight above the footing's centre,
+        // and runs to the midpoint of the span, 4 blocks east. That vertical offset is what makes the drawn
+        // cable meet SpanMath.AnchorOf - without it the cable hangs at the footing and the cabin at the rope.
         Assert.Equal(0.5, min[0], 4);
         Assert.Equal(4.5, max[0], 4);
-        for (var axis = 1; axis < 3; axis++)
-        {
-            Assert.Equal(0.5 - 0.06, min[axis], 4);
-            Assert.Equal(0.5 + 0.06, max[axis], 4);
-        }
+        Assert.Equal(0.5 + SpanMath.SheaveHeight - 0.06, min[1], 4);
+        Assert.Equal(0.5 + SpanMath.SheaveHeight + 0.06, max[1], 4);
+        Assert.Equal(0.5 - 0.06, min[2], 4);
+        Assert.Equal(0.5 + 0.06, max[2], 4);
+    }
+
+    /// <summary>
+    /// The one conversion from a tower's canonical position - its ground-placed footing - to the height its
+    /// rope actually runs at. Every spatial consumer goes through it, so an offset applied anywhere else as
+    /// well is a cable and a cabin at different heights.
+    /// </summary>
+    [Fact]
+    public void TheAnchorIsTheSheaveAndNotTheFootingItIsKeyedBy()
+    {
+        var footing = new BlockPos(10, 64, -3);
+
+        var centre = SpanMath.CentreOf(footing);
+        var anchor = SpanMath.AnchorOf(footing);
+
+        Assert.Equal(10.5, centre.X, 6);
+        Assert.Equal(64.5, centre.Y, 6);
+        Assert.Equal(-2.5, centre.Z, 6);
+
+        // Purely vertical, so it survives the tower's rotation and needs no facing term at any caller.
+        Assert.Equal(centre.X, anchor.X, 6);
+        Assert.Equal(centre.Z, anchor.Z, 6);
+        Assert.Equal(centre.Y + SpanMath.SheaveHeight, anchor.Y, 6);
+
+        // A span is therefore the same length measured footing to footing or sheave to sheave, which is why
+        // the cable mesh can take raw footing deltas and only shift its own origin.
+        var peer = new BlockPos(40, 70, -3);
+        Assert.Equal(
+            SpanMath.CentreOf(footing).DistanceTo(SpanMath.CentreOf(peer)),
+            SpanMath.AnchorOf(footing).DistanceTo(SpanMath.AnchorOf(peer)),
+            6);
+
+        Assert.Null(SpanMath.AnchorOf(null));
+        Assert.Null(SpanMath.CentreOf(null));
     }
 
     [Fact]
     public void ACableToNowhereIsNotDrawn()
     {
-        Assert.Null(BEPylonHead.BuildHalfCable(0, 0, 0, new TextureAtlasPosition()));
+        Assert.Null(BEPylonBase.BuildHalfCable(0, 0, 0, new TextureAtlasPosition()));
     }
 
     /// <summary>
@@ -620,18 +655,18 @@ public class RopewayMathTests
     [Fact]
     public void TowerNamesAreSanitised()
     {
-        Assert.Equal("Summit Station", BEPylonHead.SanitiseName("  Summit Station  "));
+        Assert.Equal("Summit Station", BEPylonBase.SanitiseName("  Summit Station  "));
 
         // Control characters out, every flavour of whitespace collapsed to one plain space.
-        Assert.Equal("Summit Station", BEPylonHead.SanitiseName("Summit\tStation"));
-        Assert.Equal("Summit Station", BEPylonHead.SanitiseName("Summit\r\n   Station"));
-        Assert.DoesNotContain("\n", BEPylonHead.SanitiseName("a\nb"));
+        Assert.Equal("Summit Station", BEPylonBase.SanitiseName("Summit\tStation"));
+        Assert.Equal("Summit Station", BEPylonBase.SanitiseName("Summit\r\n   Station"));
+        Assert.DoesNotContain("\n", BEPylonBase.SanitiseName("a\nb"));
 
         // Nothing readable left is null, not an empty label the GUI then has to special-case.
-        Assert.Null(BEPylonHead.SanitiseName(null));
-        Assert.Null(BEPylonHead.SanitiseName(""));
-        Assert.Null(BEPylonHead.SanitiseName("   \t\r\n "));
-        Assert.Null(BEPylonHead.SanitiseName(" "));
+        Assert.Null(BEPylonBase.SanitiseName(null));
+        Assert.Null(BEPylonBase.SanitiseName(""));
+        Assert.Null(BEPylonBase.SanitiseName("   \t\r\n "));
+        Assert.Null(BEPylonBase.SanitiseName(" "));
     }
 
     /// <summary>
@@ -647,7 +682,7 @@ public class RopewayMathTests
     [InlineData("Summit</br>")]
     public void TowerNamesCannotCarryVtml(string payload)
     {
-        var name = BEPylonHead.SanitiseName(payload);
+        var name = BEPylonBase.SanitiseName(payload);
 
         Assert.NotNull(name);
         Assert.DoesNotContain("<", name);
@@ -657,23 +692,23 @@ public class RopewayMathTests
     [Fact]
     public void ANameThatIsNothingButMarkupIsNoName()
     {
-        Assert.Null(BEPylonHead.SanitiseName("<>"));
-        Assert.Null(BEPylonHead.SanitiseName("< >"));
+        Assert.Null(BEPylonBase.SanitiseName("<>"));
+        Assert.Null(BEPylonBase.SanitiseName("< >"));
     }
 
     [Fact]
     public void TowerNamesAreCappedWithoutSplittingACharacter()
     {
-        var long_ = BEPylonHead.SanitiseName(new string('x', 200));
-        Assert.Equal(BEPylonHead.MaxNameLength, long_!.Length);
+        var long_ = BEPylonBase.SanitiseName(new string('x', 200));
+        Assert.Equal(BEPylonBase.MaxNameLength, long_!.Length);
 
         // A cut that lands mid-word must not leave trailing padding either.
-        Assert.Equal(BEPylonHead.MaxNameLength - 1, BEPylonHead.SanitiseName(new string('x', 23) + "   yyy")!.Length);
+        Assert.Equal(BEPylonBase.MaxNameLength - 1, BEPylonBase.SanitiseName(new string('x', 23) + "   yyy")!.Length);
 
         // Cutting a fixed number of chars can land between the halves of a surrogate pair, which renders as
         // a replacement glyph rather than the character the player typed.
-        var emoji = BEPylonHead.SanitiseName(new string('x', BEPylonHead.MaxNameLength - 1) + "\U0001F6A1");
-        Assert.Equal(BEPylonHead.MaxNameLength - 1, emoji!.Length);
+        var emoji = BEPylonBase.SanitiseName(new string('x', BEPylonBase.MaxNameLength - 1) + "\U0001F6A1");
+        Assert.Equal(BEPylonBase.MaxNameLength - 1, emoji!.Length);
         Assert.DoesNotContain(emoji, c => char.IsHighSurrogate(c));
     }
 

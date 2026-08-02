@@ -16,7 +16,7 @@ public static class SpanMath
 
     /// <summary>
     /// Rows below the rope line that must also be clear. The cabin hangs 2 blocks under the rope and its
-    /// body runs anchor-3.25..anchor+0.19, so certifying only the rope line lets a rise two blocks under
+    /// body runs anchor-3.25..anchor (mast tip in the sheave), so certifying only the rope line lets a rise two blocks under
     /// the rope drag a seated rider through solid stone - riders have no block collision to stop it.
     /// </summary>
     public const int ClearanceBelow = 3;
@@ -24,11 +24,26 @@ public static class SpanMath
     /// <summary>
     /// Length of each end of a span that the tower's own structure occupies and that is therefore not
     /// checked. The posts are player-chosen logs and planks, so <see cref="RopewayBlockFilter"/> cannot
-    /// tell them from terrain; without this every ray leaving the sheave exits through the tower's own
-    /// post and any span more than ~20 degrees off the tower's axis is silently refused. The far corner
-    /// of the tower envelope is (2, -3, 3) relative to the head, 3.6 blocks out, so 4 clears it.
+    /// tell them from terrain; without this the <see cref="ClearanceBelow"/> rays leave the sheave, drop
+    /// three blocks and run straight into the tower's own posts, and every span is silently refused.
+    /// The posts stand at x = +/-2, y = 0..3 above the footing; their far corners sit 2.55 blocks
+    /// horizontally from the sheave column, so 4 clears them with margin on any bearing.
     /// </summary>
     public const double TowerClearance = 4.0;
+
+    /// <summary>
+    /// Cells from the ground-placed controller (<c>ropeway:pylonbase</c>) up to the sheave block
+    /// (<c>ropeway:pylonhead</c>) at the top of its crossarm. The one number that turns a tower's
+    /// canonical position into its geometry, which is why it lives next to <see cref="AnchorOf"/>.
+    /// <para>
+    /// Forced by the cabin, not chosen: the cabin body runs 1.25 below its origin to 1.25 above it, the
+    /// origin hangs <c>hangDrop</c> = 2 below the sheave, and the footing occupies the ground cell the
+    /// cabin passes over. Floor above the footing needs <c>SheaveHeight + 0.5 - 2 - 1.25 &gt; 0.5</c>
+    /// and roof under the crossarm needs <c>SheaveHeight + 0.5 - 2 + 1.25 &lt; SheaveHeight + 1/16</c>;
+    /// together those admit only 4. See <c>RopewayAssetContractTests.TheCabinFitsThroughTheTower</c>.
+    /// </para>
+    /// </summary>
+    public const int SheaveHeight = 4;
 
     private const double Epsilon = 1e-6;
 
@@ -56,10 +71,24 @@ public static class SpanMath
         return trim > 0 ? trim : 0;
     }
 
-    /// <summary>Centre of the sheave block. Dimension-encoded Y, the same space Vec3d world positions and raycasts use.</summary>
-    public static Vec3d AnchorOf(BlockPos pos)
+    /// <summary>Centre of a block. Dimension-encoded Y, the same space Vec3d world positions and raycasts use.</summary>
+    public static Vec3d CentreOf(BlockPos pos)
     {
         return pos == null ? null : new Vec3d(pos.X + 0.5, pos.InternalY + 0.5, pos.Z + 0.5);
+    }
+
+    /// <summary>
+    /// Where the haul rope actually runs for a tower whose canonical position is its ground-placed footing:
+    /// the centre of the sheave block, <see cref="SheaveHeight"/> cells up. Every spatial consumer -
+    /// clearance sweeps, span length, rope cost, picker distances, the drawn cable and the cabin's own
+    /// position - goes through here, so the offset belongs in this one function and nowhere else. A
+    /// per-caller offset is how the cable and the cabin end up at different heights.
+    /// </summary>
+    public static Vec3d AnchorOf(BlockPos pos)
+    {
+        var centre = CentreOf(pos);
+        if (centre != null) centre.Y += SheaveHeight;
+        return centre;
     }
 
     /// <summary>

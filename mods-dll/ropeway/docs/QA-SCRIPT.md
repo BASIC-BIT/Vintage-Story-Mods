@@ -1,21 +1,34 @@
 # Ropeway v0.1 — in-game QA script
 
 Manual operator checklist. One in-game session has happened: the mod loaded clean, and it produced the
-four findings this round fixed — cabin built across the travel axis, cable rendering nothing, the picker
-showing only link candidates, and no way to name a tower. Steps 8, 10, 10b–10d, 12, 15 and 16 are the ones
-that changed; everything else is still unverified in play.
-Step 12's clearance figure was wrong by 16× in an earlier draft ("about a block of air"); the real margin
-is **1/16 of a block** and a visibly tight fit is the correct result. Every other measurement in this
-script was re-checked against the shipped shapes and `blocktypes/pylonhead.json` on 2026-07-31.
+four findings the previous round fixed — cabin built across the travel axis, cable rendering nothing, the
+picker showing only link candidates, and no way to name a tower.
+
+**This round restructured the tower** (`DECISIONS.md`, "2026-07-31 — tower restructure"): the rear gantry
+is gone, and the controller moved from the pylon head at head height to a **pylon footing on the ground**.
+Steps 0, 2, 4–8 and 11 are rewritten for it, and everywhere the old script said "right-click the pylon
+head" it now says "right-click the footing" — every verb moved. Every measurement in this script was
+re-derived from `blocktypes/pylonbase.json` and the shipped shapes on 2026-08-01, and the same numbers are
+asserted by `renders/scenes/gen_manifests.py` and `RopewayAssetContractTests.TheCabinFitsThroughTheTower`.
 See [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for what source review already found and did not fix.
 
 
 Creative mode is fine for steps 5+; do steps 1-4 in survival at least once to check the recipes.
 Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` throughout.
 
+0. **Migration, if and only if you have a world with towers built before this round.** Load it.
+   **PASS:** the world loads, and `server-main.log` carries one *"Failed loading blockentity PylonHead …
+   Will discard it"* line per old tower — that is the intended migration, not a bug. The old towers are
+   now inert decoration: their blocks are all still there, their spans and names are gone, and nothing
+   crashes. Look at an old pylon head: **PASS:** *"Not part of a tower. A tower starts with a pylon
+   footing on the ground…"*. **FAIL:** a crash on load, an old tower that still reports spans, or a
+   cable still drawn between two of them.
+   **Known and accepted:** a cabin that was on an old line stays hanging where it was, holding, with no
+   line to resolve. Break it out with `/entity remove` or leave it; it is inert. Pre-release, no upgrader.
+
 1. **Install and load.** Copy `ropeway_0_1_0.zip` into `%APPDATA%\VintagestoryData\Mods\`, start the game,
    open a world. **PASS:** no `Ropeway:` error lines in either log at startup. In particular there must be
-   no *"multiblockStructure on ropeway:pylonhead-… lists '…', which matches no loaded block"* — that line
+   no *"multiblockStructure on ropeway:pylonbase-… lists '…', which matches no loaded block"* — that line
    means the `@(log-placed-.*|debarkedlog-.*|planks-.*)` wildcard does not resolve at runtime and the
    fallback is to replace it with plain `game:planks-*`.
 
@@ -23,52 +36,72 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    - **Ropeway brace ×4** — stick, metal plate (any metal), stick in a 1×3 *row*.
    - **Haul rope ×1** — rope / metal bit / rope in a 1×3 *column*.
    - **Pylon head ×1** — rope / brace / metal bit, top to bottom in a 1×3 *column*.
+   - **Pylon footing ×1** — plank, metal bit, plank on the top row; three loose stones under them.
    - **Ropeway cabin ×1** — haul rope, empty, haul rope / brace, plank, brace / plank, plank, plank.
-   **PASS:** all four appear in the crafting output and are named "Ropeway Brace", "Haul Rope",
-   "Pylon Head", "Ropeway Cabin" — no raw lang keys.
+   **PASS:** all five appear in the crafting output and are named "Ropeway Brace", "Haul Rope",
+   "Pylon Head", "Pylon Footing", "Ropeway Cabin" — no raw lang keys.
 
 3. **Handbook.** Press `H`, find the **Ropeway** category tab. **PASS:** the tab is labelled "Ropeway"
    (not `handbook-category-ropeway`), both pages open, the `<itemstack>` renders spin, and the
-   "Building a Line" ↔ "Aerial Ropeways" links work.
+   "Building a Line" ↔ "Aerial Ropeways" links work. **PASS:** the overview page describes a footing and
+   one crossarm, not two gantries.
 
-4. **Place the pylon head.** Stand where you want the tower and place it at head height or above.
-   **PASS:** it turns to face *you*, and the small spur on the crossarm points **away** from you — that
-   spur is the only asymmetric part of the shape and it points at where the rear gantry goes.
+4. **Place the pylon footing.** Stand where you want the tower and place it **on the ground** — this is
+   the first block of a tower and nothing has to exist above it.
+   **PASS:** it lands flat, it is a half-height plinth you can walk over rather than a full cube, and it
+   turns to face you.
 
-5. **Read the guidance.** Look at the pylon head. **PASS:** the block-info panel says
-   *"Tower is not complete, 21 blocks missing or wrong."* followed by *"Rear gantry goes three blocks to
-   the \<compass direction\>"*. **PASS:** that direction is the one the spur points at, and it is the
-   opposite of the direction you were standing in when you placed it. Right-click it. **PASS:** a red
-   toast with the same message, and 21 translucent ghost cells light up around it — the colour of the
-   block wanted where the cell is empty, red where the wrong block sits.
+5. **Read the guidance.** Look at the footing. **PASS:** the block-info panel says
+   *"Tower is not complete, 13 blocks missing or wrong."* followed by *"The cabin will pass through
+   \<direction\> to \<the opposite direction\>"*. **PASS:** those two directions are the axis you were
+   standing on when you placed it — the crossarm goes across them. Turn the footing (break and replace
+   facing the other way) and check the line changes with it; this is the only orientation cue there is,
+   and building the crossarm 90° out is a tower no line can pass through.
+   Right-click the footing. **PASS:** a red toast with the same missing-block message, and **13**
+   translucent ghost cells light up above and around it — a five-wide row four blocks up and two
+   four-block columns under its ends — the colour of the block wanted where the cell is empty, red where
+   the wrong block sits. **PASS:** no ghost cell anywhere in the three columns directly above the footing;
+   that is the archway the cabin goes through.
 
-6. **Open the guide.** Sneak (hold Shift) and right-click the pylon head with an empty hand.
-   **PASS:** the "Ropeway Tower" dialog opens; the left two cells show the pylon head and the brace slowly
-   turning in 3D, the right cell shows the cabin turning, and the build steps are readable underneath.
+6. **Open the guide.** Sneak (hold Shift) and right-click the footing with an empty hand.
+   **PASS:** the "Ropeway Tower" dialog opens; the left three cells show the pylon footing, the pylon head
+   and the brace slowly turning in 3D, the right cell shows the cabin turning, and the build steps are
+   readable underneath. **PASS:** all four fit inside the inset — the cells got narrower this round.
    **FAIL modes to report:** cabin invisible (renderer/tesselation), cabin clipped out of the inset
    (the size/offset knob in §4.6), a `Ropeway: could not build the guide cabin preview` log line.
 
-7. **Build the tower.** Following the guide: four more braces either side of the pylon head (x = ±1, ±2)
-   to make a 5-wide front gantry; five more braces three blocks behind it **in the direction the block
-   info panel named in step 5** (away from where you stood); then three blocks of log/debarked
-   log/planks under each of the four outer corners.
+7. **Build the tower.** Following the guide: two posts of **four** log/debarked log/plank blocks each,
+   standing on the ground two blocks either side of the footing; then the crossarm across their tops,
+   four blocks up: **ropeway braces** at x = ±1 and ±2 and the **pylon head** in the middle, directly
+   above the footing.
    **PASS:** each ghost cell disappears within ~0.5 s of you filling it, **without re-right-clicking** —
    this is the live-overlay fix; a stale ghost sitting on top of a placed block means it regressed.
    The count in the block-info panel counts down, and within ~1 s of the last block the panel reads
    *"Tower complete / Spans: 0/2"* and every remaining highlight clears itself.
+   **PASS:** the posts stand **on the ground**, level with the footing — no gap under them. A tower whose
+   legs start one block up is the "posts three tall" mistake and means the offsets moved.
+   **PASS:** the tower is **one block deep**. There is no second gantry and nothing behind it.
+   **PASS:** the pylon head validates whichever of its four facings you place it in. Point its throat down
+   the line anyway; it is the slot the cabin's mast rides in and a crosswise sheave looks wrong.
 
-8. **Check the passage.** Walk through the tower at ground level between the posts, *along the axis the
-   rear gantry points down* — that is the direction the cabin travels, and the posts flank it 3 wide.
-   **PASS:** a clear 3-wide, 4-long, 3-tall tunnel — no post in the way.
+8. **Check the passage.** Walk through the tower between the posts, along the axis the block-info panel
+   named in step 5.
+   **PASS:** a clear 3-wide, 4-tall archway — no post in the way, and you walk over the footing rather
+   than around it (its collision box is half a block).
+   **PASS:** stand on the footing and look up: the sheave is four blocks above you, the underside of the
+   crossarm three.
    The cabin's own dimensions are **4 blocks along travel × 2.875 across × 3.25 tall**. The 2.875 is the
    one that has to fit between the posts; if you ever see the 4-block side facing them, the cabin shape
-   has been re-authored along Z again and item 1 of this round has regressed.
+   has been re-authored along Z again and the previous round's item 1 has regressed.
 
 9. **Build a second tower** 20-40 blocks away with clear line of sight, same procedure. Keep both towers
-   at similar height for the first test. **Deliberately orient this one so its facing is 90° from the
-   line between the two towers** — that is the case the tower's own posts used to block silently.
+   at similar height for the first test. **Deliberately orient this one so its passage axis is 90° from
+   the line between the two towers** — its crossarm then lies along the line instead of across it. That is
+   the case the tower's own posts used to block silently, and it must still *link*: the clearance check
+   trims four blocks off each end for exactly this. Its cabin fit will be wrong (step 16 covers that), the
+   link must not be.
 
-10. **Link them.** Right-click the first tower's pylon head with an empty hand.
+10. **Link them.** Right-click the first tower's footing with an empty hand.
     **PASS:** the "Tower connections" dialog opens. It lists the second tower as
     *"Link \<bearing\> - N blocks - M rope"*, where \<bearing\> is the eight-point compass direction you
     would walk to reach it — **never a raw coordinate and never the word "unnamed"**. It also shows your
@@ -93,7 +126,7 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 
 10c. **Name the towers.** With the picker open on tower 1, type a name into the **"This tower:"** field at
      the top and press **Rename**. **PASS:** the row list refreshes and the block-info panel on that pylon
-     head now shows the name in quotes above *"Tower complete"*. Name tower 2 as well, from its own picker.
+     footing now shows the name in quotes above *"Tower complete"*. Name tower 2 as well, from its own picker.
      **PASS:** each tower's picker row for the other now shows that **name instead of the bearing**, and a
      link or unlink chat line names it too.
      **PASS:** the names survive a save/reload, and (multiplayer) a second player sees them without
@@ -119,10 +152,20 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      unlinkable full tower is the whole point of the row list. It offers **no link rows**, because every
      one of them would fail on click.
 
-11. **Hang the cabin.** Hold the Ropeway Cabin item and right-click the first tower's pylon head.
-    **PASS:** a cabin appears hanging 2 blocks below the sheave, the item leaves your hand (survival), and
-    right-clicking the *middle* of a three-tower line with the cabin item instead gives
-    *"The cabin can only be placed at an end tower."*
+11. **Hang the cabin.** Hold the Ropeway Cabin item and right-click the first tower's footing.
+    **PASS:** a cabin appears hanging 2 blocks below the sheave — that is **at the tower it was placed on,
+    inside its own archway**, not somewhere near it: its floor a little over a block above the footing, its
+    roof just under the crossarm, its mast up in the sheave throat. **FAIL, and this is the one this round
+    is most likely to get wrong:** the cabin appears four blocks lower, at footing height, sitting in the
+    ground. That is `SpanMath.AnchorOf` handing back the footing centre instead of the sheave.
+    **PASS:** the item leaves your hand (survival), and right-clicking the *middle* of a three-tower line
+    with the cabin item instead gives *"The cabin can only be placed at an end tower."*
+
+11b. **The cable meets the cabin.** Stand back and look at a strung span with the cabin parked on it.
+     **PASS:** the drawn cable runs sheave to sheave, and the cabin's mast tip touches it. **FAIL:** the
+     cable runs at footing level, four blocks under the cabin, or the cabin hangs four blocks under the
+     cable — that is the cable mesh and `AnchorOf` disagreeing, which is the whole point of drawing the
+     cable from the footing with the same offset `AnchorOf` uses.
 
 12. **Board and ride.** Right-click the cabin with an empty hand — **aim at the roof or an upper wall
     panel, not at a seat.** That is the `mountAnySeat` fallback path and it is the single highest-risk
@@ -149,7 +192,15 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     result and is exactly what `gen_manifests.py` asserts (`roof to west/east post = 1.0 unit`). Do not
     report a fail for a tight fit; report one only if it clips. **FAIL:** it flies broadside, presenting
     its 4-block side to a 3-block gap and clipping both posts on every pass. That is the shape-axis bug and it means the cabin shape has gone back to being
-    built along Z. Expect the mast/grip to visually pass through the gantry beams — known, cosmetic.
+    built along Z.
+    **PASS — the vertical fit, new this round and the reason the tower got a block taller:** as the cabin
+    passes through a tower, its **floor clears the footing by three quarters of a block** and its **roof
+    clears the underside of the crossarm by about a third**. Both are visible margins, not hairlines.
+    **FAIL:** the floor cuts through the footing plinth, or the roof eats into the braces. Either one means
+    `SpanMath.SheaveHeight` and the cabin's `hangDrop` have drifted apart — the unit test
+    `TheCabinFitsThroughTheTower` and `gen_manifests.py` both assert exactly these two gaps.
+    The mast **should** pass up into the sheave throat and stop level with its centre; that is the fit, not
+    a clip. The grip passing close under the braces is expected.
     **PASS:** the sway animation rocks the cabin **fore and aft along the line**, like a real hanging
     cabin, not side to side.
 
@@ -166,8 +217,9 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     compass bearing if that tower is unnamed, never a coordinate triple — and the cabin travels to **that**
     tower and **stops there**. **FAIL:** it sails past you to the far end, or it stops at your tower and
     then slides off to an end a second later.
-    Look at that tower while the cabin is on its way — stand where you can see the cabin, so it is inside
-    your entity range. **PASS:** the block-info panel reads *"The cabin is on its way here."*, then *"The
+    Look at that tower's **footing** while the cabin is on its way — that is where every block-info line
+    lives now — and stand where you can see the cabin, so it is inside your entity range.
+    **PASS:** the block-info panel reads *"The cabin is on its way here."*, then *"The
     cabin is at this tower."* once it arrives. Look at another tower on the same line while still in sight
     of the cabin: *"The cabin is elsewhere on the line."* **FAIL:** all three lines are missing — this
     readout is client-side and matches the cabin by a key that used to exist only on the server, so silence
@@ -200,14 +252,14 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     ends. Open tower 2's picker. **PASS:** two "Connected:" rows and **no link rows at all** — a full
     tower is not offered a fourth link it would then have to refuse (see step 10d).
 
-17. **Break safety.** With a passenger seated, try to break any pylon head on that line.
+17. **Break safety.** With a passenger seated, try to break any footing on that line.
     **PASS:** *"Someone is riding this line."* and the block survives. Dismount, then break an end
-    tower's pylon head. **PASS:** you get `floor(span / 4)` haul rope back and the neighbouring tower
+    tower's footing. **PASS:** you get `floor(span / 4)` haul rope back and the neighbouring tower
     drops to one fewer span. **PASS:** the cabin is still there, parked at an end of what is left of the
     line — not stuck mid-air where the removed span used to be.
 
 17b. **Teardown returns the cabin.** Reduce the line back to two towers with one cabin on it, dismount,
-     then break one of the two pylon heads. **PASS:** the cabin disappears and **one Ropeway Cabin item
+     then break one of the two footings. **PASS:** the cabin disappears and **one Ropeway Cabin item
      goes into your inventory** (or drops at the cabin if your inventory is full), along with the rope
      refund. **FAIL:** a cabin still hanging in mid-air that you cannot break, collect or interact with
      — that was the item-loss blocker. Also verify it is not possible to accumulate two cabins from one
@@ -239,7 +291,7 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     consequence: an obstruction inside those trimmed end zones is not detected.
 
 24. **Blow up a tower** (§3c.2 — C2). On a two-tower line A–B with the cabin parked and **nobody seated**,
-    set off a powder barrel on A's pylon head (or `/we` a fill of air over it, or `/blockset air` — any
+    set off a powder barrel on A's footing (or `/we` a fill of air over it, or `/blockset air` — any
     path that is not a pick/hand break).
     **PASS:** B's block-info panel drops to *"Spans: 0/2"* immediately and B no longer says *"End of line"*.
     **PASS:** B's half of the cable disappears too.

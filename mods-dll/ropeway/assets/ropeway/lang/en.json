@@ -1,4 +1,8 @@
 {
+  "block-pylonbase-north": "Pylon Footing",
+  "block-pylonbase-east": "Pylon Footing",
+  "block-pylonbase-south": "Pylon Footing",
+  "block-pylonbase-west": "Pylon Footing",
   "block-pylonhead-north": "Pylon Head",
   "block-pylonhead-east": "Pylon Head",
   "block-pylonhead-south": "Pylon Head",
@@ -10,21 +14,20 @@
   "item-haulrope": "Haul Rope",
   "item-cabin": "Ropeway Cabin",
   "item-creature-cabin": "Ropeway Cabin",
-
   "game:handbook-category-ropeway": "Ropeway",
   "ropeway:handbook-title-50": "Aerial Ropeways",
   "ropeway:handbook-title-51": "Building a Line",
-
   "ropeway:blockhelp-missing": "Show what is missing",
   "ropeway:blockhelp-pick": "Link, unlink or name towers",
   "ropeway:blockhelp-call": "Call the cabin",
   "ropeway:blockhelp-place-cabin": "Place the cabin",
   "ropeway:blockhelp-guide": "Tower guide",
-
   "ropeway:tower-incomplete": "Tower is not complete, {0} blocks missing or wrong.",
   "ropeway:tower-complete": "Tower complete",
   "ropeway:blockinfo-name": "\"{0}\"",
-  "ropeway:blockinfo-rear": "Rear gantry goes three blocks to the {0}",
+  "ropeway:blockinfo-passage": "The cabin will pass through {0} to {1}",
+  "ropeway:sheave-attached": "Sheave of the tower whose footing is four blocks below.",
+  "ropeway:sheave-orphan": "Not part of a tower. A tower starts with a pylon footing on the ground; the sheave goes on top of its crossarm.",
   "ropeway:blockinfo-spans": "Spans: {0}/2",
   "ropeway:blockinfo-endpoint": "End of line - rides turn around here",
   "ropeway:blockinfo-line": "Line: {0} blocks, {1} towers",
@@ -32,7 +35,6 @@
   "ropeway:blockinfo-cabin-here": "The cabin is at this tower.",
   "ropeway:blockinfo-cabin-coming": "The cabin is on its way here.",
   "ropeway:blockinfo-cabin-elsewhere": "The cabin is elsewhere on the line.",
-
   "ropeway:err-tower-gone": "That tower is gone.",
   "ropeway:err-tower-incomplete": "Finish building the tower first.",
   "ropeway:err-tower-full": "That tower already carries two spans.",
@@ -52,7 +54,6 @@
   "ropeway:err-cabin-here": "The cabin is already at this tower.",
   "ropeway:err-line-truncated": "Part of this line is in unloaded chunks. The cabin waits at the last loaded tower until they load.",
   "ropeway:err-line-truncated-link": "Part of that line is in unloaded chunks, so it cannot be measured. Get closer to the rest of it first.",
-
   "ropeway:span-linked": "Span strung to {0}: {1} blocks, {2} haul rope.",
   "ropeway:span-cut": "Span to {0} cut. {1} haul rope recovered.",
   "ropeway:cabin-called": "Cabin called to {0}.",
@@ -61,7 +62,6 @@
   "ropeway:call-abandoned-truncated": "The cabin you called stopped at the last loaded tower: part of the line is in unloaded chunks.",
   "ropeway:call-abandoned-line": "The cabin you called stopped on the way: the line changed under it.",
   "ropeway:cantride-moving": "The cabin is moving. It stops at the next tower.",
-
   "ropeway:dir-n": "North",
   "ropeway:dir-ne": "Northeast",
   "ropeway:dir-e": "East",
@@ -70,7 +70,6 @@
   "ropeway:dir-sw": "Southwest",
   "ropeway:dir-w": "West",
   "ropeway:dir-nw": "Northwest",
-
   "ropeway:dlg-picker-title": "Tower connections",
   "ropeway:dlg-picker-name": "This tower:",
   "ropeway:dlg-picker-name-save": "Rename",
@@ -78,7 +77,6 @@
   "ropeway:dlg-picker-row-linked": "Connected: {0} - {1} blocks - click to cut (+{2} rope)",
   "ropeway:dlg-picker-rope": "Haul rope in inventory: {0}",
   "ropeway:dlg-picker-empty": "No connections, and no linkable towers in range.",
-
   "ropeway:dlg-guide-title": "Ropeway Tower",
-  "ropeway:dlg-guide-body": "A tower is <strong>22 blocks</strong>: the pylon head you already placed, plus 21 more.\n\n<strong>1.</strong> Two gantries, one level with the pylon head and one <strong>three blocks behind</strong> it - behind meaning the far side from where you stood when you placed it. Look at the pylon head: while the tower is unfinished the block info panel names the compass direction the rear gantry goes.\n<strong>2.</strong> Each gantry is <strong>five ropeway braces</strong> wide. The pylon head is the middle brace of the front gantry, so the front gantry needs four more and the rear gantry needs five.\n<strong>3.</strong> Under each of the four outer corners, <strong>three blocks of post</strong> - logs, debarked logs or planks, any wood you like.\n\nThat leaves a clear <strong>3 wide, 4 long, 3 tall</strong> tunnel for the cabin. Right-click the pylon head to light up every cell that is still wrong: <strong>red</strong> where the wrong block sits, the wanted block's own colour where nothing does."
+  "ropeway:dlg-guide-body": "A tower is <strong>14 blocks</strong>: the pylon footing you already placed, plus 13 more. One crossarm on two legs - it is a doorway, not a tunnel.\n\n<strong>1.</strong> Two posts of <strong>four blocks</strong> each, standing on the ground two blocks either side of the footing - logs, debarked logs or planks, any wood you like.\n<strong>2.</strong> A <strong>five-wide crossarm</strong> across their tops: the <strong>pylon head</strong> in the middle, directly four above the footing, and <strong>two ropeway braces</strong> either side of it.\n\nThat leaves a clear <strong>3 wide, 4 tall</strong> archway, and the cabin passes through it along the axis the footing's block info panel names - so face the footing down the line before you build. Right-click the footing to light up every cell that is still wrong: <strong>red</strong> where the wrong block sits, the wanted block's own colour where nothing does."
 }

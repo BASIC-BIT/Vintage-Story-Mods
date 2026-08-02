@@ -29,6 +29,18 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 {
     public const double BoardingGraceSeconds = 3.0;
     public const double DefaultSpeed = 2.2;
+
+    /// <summary>
+    /// How far the cabin's origin hangs below the rope. Re-derived for the ground-controller tower rather
+    /// than carried over, and it lands on the same 2.0 by arithmetic rather than by luck: with the sheave
+    /// <see cref="SpanMath.SheaveHeight"/> = 4 cells above the footing, the roof (origin + 1.25) has to
+    /// clear the crossarm's underside and the floor (origin - 1.25) has to clear the footing's top, which
+    /// leaves 1.6875 &lt; hangDrop &lt; 2.75 (plinth top at +0.5, crossarm underside at +4.0625). 2.0 is NOT
+    /// the midpoint of that window - 2.219 is - it deliberately sits low in it, giving 0.75 blocks of air
+    /// under the floor against 0.3125 over the roof, because clipping the crossarm reads far worse than a
+    /// low floor. The mast tip lands exactly in the sheave throat either way. Changing this or
+    /// SheaveHeight alone breaks the fit; TheCabinFitsThroughTheTower is what catches it.
+    /// </summary>
     public const double DefaultHangDrop = 2.0;
 
     /// <summary>Close enough to a tower to count as standing at it, in metres along the line.</summary>
@@ -48,10 +60,10 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// </summary>
     public BlockPos LineKey
     {
-        get => BEPylonHead.ReadPos(WatchedAttributes, "lineKey");
+        get => BEPylonBase.ReadPos(WatchedAttributes, "lineKey");
         set
         {
-            if (value != null) BEPylonHead.WritePos(WatchedAttributes, "lineKey", value);
+            if (value != null) BEPylonBase.WritePos(WatchedAttributes, "lineKey", value);
         }
     }
 
@@ -471,7 +483,7 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         UnseatAll();
 
-        var item = World.GetItem(new AssetLocation(BlockPylonHead.CabinItemCode));
+        var item = World.GetItem(new AssetLocation(BlockPylonBase.CabinItemCode));
         if (item != null)
         {
             var stack = new ItemStack(item);
@@ -591,8 +603,15 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
             // Not TeleportTo: that defers behind a chunk load the despawning player will not wait for, and
             // its Pos.SetPos is dimension-unaware. Anchors carry a dimension-encoded Y, so strip it.
+            // Dropped at the tower's own FOOTING level rather than the cabin's, which is the whole point of
+            // this - they relog standing on the tower they built, not 1.25 blocks above it in the cabin's
+            // floor. ParkAtNearestEnd ran just above, so Travelled is on a tower and this is that tower.
+            // park.Y is the SHEAVE centre = footingY + SheaveHeight + 0.5, so subtracting SheaveHeight
+            // alone lands on footingY + 0.5 - the top of the footing's plinth. Subtracting the 0.5 as well
+            // would drop them at footingY, which is inside that plinth's own collision box.
             var park = line.PositionAt(Travelled);
-            agent.Pos.SetPos(park.X, park.Y % BlockPos.DimensionBoundary - hangDrop, park.Z);
+            var footing = park.Y % BlockPos.DimensionBoundary - SpanMath.SheaveHeight;
+            agent.Pos.SetPos(park.X, footing, park.Z);
         }
     }
 
@@ -640,6 +659,6 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         // Cabins saved before the key moved to WatchedAttributes still carry it in Attributes. Without the
         // carry-over they resolve no line at all, and a null LineKey also skips the DropAndDie backstop -
         // an immortal cabin nothing can remove.
-        if (!isSync && LineKey == null) LineKey = BEPylonHead.ReadPos(Attributes, "lineKey");
+        if (!isSync && LineKey == null) LineKey = BEPylonBase.ReadPos(Attributes, "lineKey");
     }
 }

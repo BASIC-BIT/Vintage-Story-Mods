@@ -11,8 +11,12 @@ public sealed class RopewayModSystem : ModSystem
 {
     public const string ChannelName = "ropeway";
 
-    /// <summary>Every loaded pylon head, keyed by position. BEPylonHead.Initialize adds, OnBlockUnloaded removes.</summary>
-    public readonly Dictionary<BlockPos, BEPylonHead> LoadedTowers = new();
+    /// <summary>
+    /// Every loaded tower, keyed by its FOOTING position - the one canonical position, the same one
+    /// <see cref="LineCache"/>, <see cref="RopewayLine.Towers"/>, every persisted span and the cabin's
+    /// LineKey use. BEPylonBase.Initialize adds, OnBlockUnloaded removes.
+    /// </summary>
+    public readonly Dictionary<BlockPos, BEPylonBase> LoadedTowers = new();
 
     /// <summary>Derived line geometry, keyed by every member tower. Never persisted; InvalidateLine drops it.</summary>
     public readonly Dictionary<BlockPos, RopewayLine> LineCache = new();
@@ -27,8 +31,16 @@ public sealed class RopewayModSystem : ModSystem
     {
         base.Start(api);
 
+        api.RegisterBlockClass("BlockPylonBase", typeof(BlockPylonBase));
         api.RegisterBlockClass("BlockPylonHead", typeof(BlockPylonHead));
-        api.RegisterBlockEntityClass("PylonHead", typeof(BEPylonHead));
+
+        // MIGRATION, deliberate: the block entity class name changed from "PylonHead" with the controller.
+        // A pre-footing world has its towers' block entities saved under the old name, and ServerChunk.cs:531
+        // logs and DISCARDS a block entity whose class will not instantiate - so every legacy tower loads as
+        // inert decoration with no spans, no route state and nothing to walk a line through. That is the
+        // whole migration: it fails safe by construction, no upgrader, no half-converted towers. Reusing the
+        // old name would instead resurrect those towers four blocks below their own geometry.
+        api.RegisterBlockEntityClass("PylonBase", typeof(BEPylonBase));
         api.RegisterEntity("EntityRopewayCabin", typeof(EntityRopewayCabin));
 
         // Both sides, or EntityAgent.Initialize cannot re-resolve WatchedAttributes["mountedOn"] after a relog
