@@ -280,7 +280,101 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     public override void OnGameTick(float dt)
     {
         if (World.Side == EnumAppSide.Server) ServerTick(dt);
+        ConstrainRiderYaw();
         base.OnGameTick(dt);
+    }
+
+    /// <summary>
+    /// Stops a rider swivelling right round on a bench that faces one way. <c>bodyYawLimit</c> was dead JSON
+    /// in this entity, and not because the key is decorative: <see cref="SeatConfig.BodyYawLimit"/> is only
+    /// ever READ by <c>EntityBoat.SeatsToMotion</c> and <c>EntityBehaviorRideable.SeatsToMotion</c>, and the
+    /// cabin is neither a boat nor rideable - nothing was going to apply it for us. This is those eight
+    /// lines, kept identical to vanilla's so the JSON key means what the wiki says it means, and it needs no
+    /// controllable seat: it is a constraint on the PASSENGER, not a control on the mount.
+    /// <para>
+    /// What it actually clamps, exactly: <see cref="EntityPlayer.HeadYawLimits"/> is read by
+    /// <c>ClientMain.UpdateCameraYawPitch</c> (:2377-2383), which clamps <c>mouseYaw</c> - so this limits
+    /// the seated player's own CAMERA, client side, and only for the player sitting there.
+    /// <see cref="EntityPlayer.BodyYawLimits"/> clamps that same player's rendered body through the BodyYaw
+    /// setter (EntityPlayer.cs:140-143). Neither reaches what OTHER players see of the rider: for a mounted
+    /// player who is not you, <c>EntityPlayerShapeRenderer</c> (:429-431) forces the drawn body yaw to the
+    /// MOUNT's Pos.Yaw outright, so onlookers already see the rider squared to the cabin no matter which way
+    /// he is looking. Running it server side too would not change that - the server assigns
+    /// <c>BodyYawServer</c> from the position packet, not BodyYaw, so the clamping setter never sees it.
+    /// </para>
+    /// <para>
+    /// Centred on the cabin's own yaw plus the seat's <c>mountRotation.y</c>, which is vanilla's formula.
+    /// That centre is the bench facing and not an approximation of it: the yaw those benches were built
+    /// around IS this one - the renderer above pins a rider's body to <c>Pos.Yaw</c>, which is why both rows
+    /// face cabin -X with their backrests at +X of their own pan (see the shape's //backrest note) - and it
+    /// is the same yaw <c>EntityRideableSeat.DidMount</c> snaps the camera to on boarding. mountRotation.y
+    /// stays the calibration knob if in-game says otherwise; it is the only thing here a render cannot
+    /// settle. Cleanup is vanilla's: <c>EntityRideableSeat.DidUnmount</c> (:228-232) nulls both.
+    /// </para>
+    /// </summary>
+    private void ConstrainRiderYaw()
+    {
+        var seats = GetBehavior<EntityBehaviorSeatable>()?.Seats;
+        if (seats == null) return;
+
+        for (var i = 0; i < seats.Length; i++)
+        {
+            if (seats[i]?.Passenger is not EntityPlayer rider) continue;
+
+            var config = seats[i].Config;
+            var centre = Pos.Yaw + config.MountRotation.Y * GameMath.DEG2RAD;
+
+            // Both, not just one: they are only ever set and cleared as a pair, and mutating a null one
+            // because the other happened to be set is a crash on the client's own player entity.
+            if (rider.BodyYawLimits == null || rider.HeadYawLimits == null)
+            {
+                rider.BodyYawLimits = new AngleConstraint(centre, config.BodyYawLimit ?? GameMath.PIHALF);
+                rider.HeadYawLimits = new AngleConstraint(centre, GameMath.PIHALF);
+            }
+            else
+            {
+                rider.BodyYawLimits.X = centre;
+                rider.BodyYawLimits.Y = config.BodyYawLimit ?? GameMath.PIHALF;
+                rider.HeadYawLimits.X = centre;
+                rider.HeadYawLimits.Y = GameMath.PIHALF;
+            }
+        }
+    }
+
+    /// <summary>
+    /// "The world is not ready" - every way there is to be in that state, in one predicate, because there is
+    /// exactly one safe recovery from it and three branches each writing their own version of it is how one
+    /// of them ended up calling <see cref="Hold"/> and undoing the other two. See the call site in
+    /// <see cref="ServerTick"/> for the recovery; this is only the question. Pure, and therefore tested.
+    /// <para>
+    /// Order matters. A truncated chain cannot be asked about the cabin's position until it has been asked
+    /// whether it is even measuring from the same tower, and neither question may be answered by falling
+    /// through into the rest of the tick - that would run it with <see cref="Travelled"/> measured from one
+    /// base and the chain from another.
+    /// </para>
+    /// </summary>
+    public static bool NotReady(RopewayLine line, BlockPos lineKey, double travelled)
+    {
+        // Block entity and entity load order is not guaranteed, and a chunk under the line can unload.
+        if (line?.Towers == null || line.TotalLength <= 0) return true;
+
+        // A whole chain is proof of everything below, so nothing else can disqualify it.
+        if (!line.Truncated) return false;
+
+        // A truncated chain's canonical order is decided by the two ends the WALK could reach, not by the
+        // line's real ends (RopewayLine.WalkChain), so a mismatch here is not evidence the chain changed - it
+        // is evidence the chunks are not all in yet, which is the normal state for the first seconds of a
+        // world load. This was the reload teleport: a partial chain that sorts the other way reverses,
+        // Towers[0] stops being the cabin's LineKey, and the re-base branch rewrites LineKey, Travelled and
+        // Pos from a chain nobody can vouch for. MarkLoadedEnds widens the window by itself and
+        // BEPylonBase.Initialize drops the cached line, so a genuine re-base still runs on the tick after
+        // the last tower registers.
+        if (!line.Towers[0].Equals(lineKey)) return true;
+
+        // Same base, but the loaded chain no longer reaches the cabin. Dragging it back to the last loaded
+        // tower is the false-endpoint teleport by another road - and this is the branch that used to Hold,
+        // which cleared `departed` and handed the cabin to the mid-span park the moment the chunk landed.
+        return travelled < line.MinTravel || travelled > line.MaxTravel;
     }
 
     private void ServerTick(float dt)
@@ -288,26 +382,34 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         dt = Math.Min(0.5f, dt);
 
         var line = ResolveLine();
-        if (line == null || line.TotalLength <= 0)
+        if (NotReady(line, LineKey, Travelled))
         {
-            // Block entity and entity load order is not guaranteed, and a chunk under the line can unload.
-            // Holding still is the whole recovery.
+            // THE RULE, and the reason NotReady exists as one predicate rather than three branches: a cabin
+            // whose world is not ready stands still and changes NOTHING ELSE. Not Travelled, not Pos, not
+            // departed, not Destination. All of those are route state and only Hold may clear it - clearing
+            // it here is how a cabin saved in motion used to lose the fact it was moving, after which the
+            // mid-span recovery below read "stopped in mid-air" and parked it at an end tower. Standing
+            // still without forgetting the trip is what lets it carry on where it left off. A fourth way to
+            // be not-ready belongs in NotReady, where it gets this recovery for free.
             IsMoving = false;
-            departed = false;
 
             // Unless the anchor tower is loaded and simply has no spans left: then the line is gone for
             // good, not merely unloaded. Nothing else can ever remove this entity, so without the drop it
             // is immortal litter and the cabin item that paid for it is destroyed.
-            if (LineKey != null && ModSystem?.LoadedTowers.ContainsKey(LineKey) == true) DropAndDie(null);
+            var gone = line == null || line.TotalLength <= 0;
+            if (gone && LineKey != null && ModSystem?.LoadedTowers.ContainsKey(LineKey) == true) DropAndDie(null);
             return;
         }
 
         if (!line.Towers[0].Equals(LineKey))
         {
-            // The chain re-canonicalised under us - it shrank, grew or flipped - so Travelled is measured
-            // from a tower that is no longer index 0 and points somewhere else entirely. Re-basing parks the
-            // cabin at a known tower, which is a teleport: fine for an empty cabin, not for a seated rider,
-            // who waits instead for the chain to rebuild the way it was.
+            // NotReady already absorbed the truncated case, so the chain really did re-canonicalise under us
+            // - it shrank, grew or flipped - and Travelled is measured from a tower that is no longer index 0
+            // and points somewhere else entirely. The trip goes either way: the destination it named is a
+            // distance on a scale that no longer exists, so a rider's cabin drops its call exactly as an
+            // empty one does. What a rider is spared is the RE-BASE, which parks at a known tower and is
+            // therefore a teleport of up to the whole line; their cabin keeps its stale key and stops where
+            // it is, and the re-base runs for real once the seat is empty.
             Hold("ropeway:call-abandoned-line");
             if (!HasPassenger) RebaseTo(line);
             return;
@@ -315,19 +417,11 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         DropGhostPassengers(line);
 
+        // NotReady already returned for every truncated chain the cabin sits outside of, so this only ever
+        // fires on a whole one - where the window IS the line, and anything outside it is stale state to
+        // clamp away rather than a chunk that has not landed yet.
         if (Travelled < line.MinTravel || Travelled > line.MaxTravel)
         {
-            // On a whole line the window is the line, so anything outside it is stale state to park away.
-            // On a truncated one it means the loaded chain no longer reaches the cabin, and dragging it back
-            // to the last loaded tower would be the false-endpoint teleport again. Hold for the chunk.
-            if (line.Truncated)
-            {
-                // Hold rather than a bare stop: a call whose route has just gone out from under it cannot be
-                // honoured, and a destination left pending would restart the trip on every tick.
-                Hold("ropeway:call-abandoned-truncated");
-                return;
-            }
-
             Travelled = GameMath.Clamp(Travelled, 0, line.TotalLength);
         }
 
@@ -342,10 +436,16 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
                 lastSegment = -1;
             }
 
-            // Server restart, chunk reload, or a tower broken under us: never resume from mid-span. Standing
-            // at a tower is not mid-span, at ANY tower - a cabin called to an interior one is parked at a
+            // A tower broken under us, or a trip that gave up: never resume from mid-span. Standing at a
+            // tower is not mid-span, at ANY tower - a cabin called to an interior one is parked at a
             // station, and testing "is it at an end" instead would drag it off again on the next tick.
-            else if (!line.IsAtTower(Travelled, ArrivalTolerance)) ParkAtNearestEnd(line);
+            // Never with anyone aboard, though. Parking is a teleport of up to the whole line, and a seated
+            // rider flung across it is the exact failure this area exists to prevent - the one the re-base
+            // branch above is guarded against, reachable here too because Hold clears `departed` and every
+            // hold lands in this branch on the next tick. Their cabin stops where it stands instead: it is
+            // not moving, so they can step out, and the stop key aims it at a station and sets it going
+            // again, including back the way it came.
+            else if (!HasPassenger && !line.IsAtTower(Travelled, ArrivalTolerance)) ParkAtNearestEnd(line);
 
             if (boarding && HasPassenger)
             {
@@ -380,8 +480,10 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
                 // the gate must not itself be the thing that moves them. Travelled is deliberately NOT
                 // written: the cabin is standing on the tower it was about to leave in every case this fires
                 // for, so there is nowhere to snap it to that is not ACROSS the span just proven blocked.
-                // The one exception - a mid-span resume - is caught by the !departed mid-span recovery on
-                // the very next tick, which parks at a proven end rather than driving through the block.
+                // The one exception - a mid-span resume - is caught for an EMPTY cabin by the !departed
+                // mid-span recovery on the very next tick, which parks at a proven end rather than driving
+                // through the block. A cabin with a rider aboard is deliberately left standing there: see
+                // that branch for why nothing may teleport a passenger, and for the way out they have.
                 Hold("ropeway:call-abandoned-blocked");
                 Place(line);
                 return;
@@ -494,9 +596,33 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// canonical order points it at a completely different place - moving a seated rider tens of blocks
     /// sideways in one tick. Parking is the whole re-base, and it lands inside the loaded window only.
     /// </summary>
+    /// <summary>
+    /// Whether a re-base has to wait for chunks rather than re-key. Same rule as <see cref="NotReady"/>, for
+    /// the link-service callers: <c>TryUnlink</c> and <c>UnlinkAll</c> can hand over a survivor whose far end
+    /// is unloaded, and a truncated chain's <c>Towers[0]</c> is whichever end the walk happened to reach -
+    /// re-keying onto it puts <see cref="Travelled"/> on a scale that means somewhere else.
+    /// <para>
+    /// Only while the old key is still ON that chain, though, and that clause is the whole of this method.
+    /// <c>LineKey</c> is ALWAYS an end tower - <c>TryPlaceCabin</c> sets it to <c>Towers[0]</c> and the tick
+    /// keeps it there - so "the broken tower was the cabin's key" is <c>UnlinkAll</c>'s ordinary case, not an
+    /// exotic one, and <c>PickSurvivor</c> then falls back to the first survivor. Waiting for THAT is waiting
+    /// forever: <c>BEPylonBase.Forget</c> drops the tower from <c>LoadedTowers</c> a moment later,
+    /// <c>ResolveLine</c> returns null for good, and the <c>DropAndDie</c> backstop cannot fire because it
+    /// requires <c>LoadedTowers</c> to contain <c>LineKey</c> - an immortal uncollectable cabin with its item
+    /// destroyed, which is strictly worse than the teleport the guard exists to prevent. Hold only while
+    /// there is something to hold FOR. Pure, and therefore tested.
+    /// </para>
+    /// </summary>
+    public static bool RebaseMustWait(RopewayLine line, BlockPos lineKey)
+    {
+        return line != null && line.Truncated && line.IndexOf(lineKey) >= 0;
+    }
+
     public void RebaseTo(RopewayLine line)
     {
         if (line?.Towers == null || World?.Side != EnumAppSide.Server) return;
+
+        if (RebaseMustWait(line, LineKey)) return;
 
         LineKey = line.Towers[0].Copy();
         ParkAtNearestEnd(line);
@@ -829,6 +955,7 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     {
         Attributes.SetDouble("travelled", Travelled);
         Attributes.SetBool("outbound", Outbound);
+        Attributes.SetBool("departed", departed);
         if (calledBy != null) Attributes.SetString("calledBy", calledBy);
         else Attributes.RemoveAttribute("calledBy");
         base.ToBytes(writer, forClient);
@@ -840,6 +967,14 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         Travelled = Attributes.GetDouble("travelled");
         Outbound = Attributes.GetBool("outbound", defaultValue: true);
         calledBy = Attributes.GetString("calledBy");
+
+        // Persisted for one reason: without it a cabin saved MID-SPAN came back as "stopped somewhere it
+        // cannot legitimately be" and ServerTick's !departed recovery parked it at an end tower - a second
+        // reload teleport, independent of the truncated-chain one, and the one that fires for an ordinary
+        // ride (a called trip survived already, through Destination). With it, a cabin saved in motion
+        // resumes from exactly where it stopped, in the direction it was going. lastSegment stays -1, so
+        // the span it resumes into is re-checked for clearance before it moves.
+        departed = Attributes.GetBool("departed");
 
         // Cabins saved before the key moved to WatchedAttributes still carry it in Attributes. Without the
         // carry-over they resolve no line at all, and a null LineKey also skips the DropAndDie backstop -

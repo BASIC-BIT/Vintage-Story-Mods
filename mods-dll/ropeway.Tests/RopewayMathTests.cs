@@ -220,6 +220,165 @@ public class RopewayMathTests
     }
 
     /// <summary>
+    /// The reload teleport, as the one pure fact underneath it: <b>a truncated chain's Towers[0] is not
+    /// evidence of anything.</b> WalkChain picks canonical orientation by comparing the two ends the WALK
+    /// reached, so a chain that is only a PREFIX of the line - which is every chain at world load, while the
+    /// tower chunks are still registering one column at a time - can sort the opposite way from the whole
+    /// line and reverse. Towers[0] then stops equalling the cabin's LineKey, and ServerTick used to read
+    /// that as "the chain re-canonicalised under us" and rewrite LineKey, Travelled and Pos from it. Both
+    /// guards - ServerTick's re-base branch and RebaseTo - now refuse while Truncated, and this is the input
+    /// they refuse on: the diagnosis's geometry, a line whose first hop goes back on itself.
+    /// <para>
+    /// Pure, and therefore only half the story: it pins the DATA, not the tick ordering that feeds it. That
+    /// the partial chains really do arrive this way during a world load, that the cabin sits still through
+    /// them, and that it is still where it was left afterwards - mid-span included - is the in-game reload
+    /// check in docs/QA-SCRIPT.md.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void APartialChainCanCanonicaliseTheOppositeWayFromTheWholeLine()
+    {
+        var t0 = new BlockPos(0, 64, 0);
+        var t1 = new BlockPos(-10, 64, 0);
+        var t2 = new BlockPos(30, 64, 0);
+
+        var spans = new Dictionary<BlockPos, List<BlockPos>>
+        {
+            [t0] = new() { t1 },
+            [t1] = new() { t0, t2 },
+            [t2] = new() { t1 }
+        };
+
+        IReadOnlyList<BlockPos> Peers(BlockPos p, HashSet<BlockPos> loaded) =>
+            loaded.Contains(p) && spans.TryGetValue(p, out var v) ? v : null!;
+
+        // Whole line: the walk's two ends are T0 and T2, T0 sorts first, so nothing reverses and Towers[0]
+        // is T0 - which is the cabin's LineKey. The tick's re-base branch does not fire.
+        var all = new HashSet<BlockPos> { t0, t1, t2 };
+        var whole = Marked(RopewayLine.WalkChain(t0, p => Peers(p, all)), all);
+        Assert.False(whole.Truncated);
+        Assert.Equal(t0, whole.Towers[0]);
+        Assert.Equal(50, whole.TotalLength, 6);
+
+        // Mid-load: only T0's column is registered, so the walk reaches T1 and stops on it. NOW the two ends
+        // are T0 and T1, T1 sorts first, and the prefix reverses - Towers[0] is a tower the cabin was never
+        // keyed to. Nothing about the line changed; the chunks are simply not all in yet.
+        var partial = new HashSet<BlockPos> { t0 };
+        var prefix = Marked(RopewayLine.WalkChain(t0, p => Peers(p, partial)), partial);
+        Assert.True(prefix.Truncated);
+        Assert.Equal(t1, prefix.Towers[0]);
+        Assert.NotEqual(whole.Towers[0], prefix.Towers[0]);
+
+        // And that mismatch used to be acted on, which is the teleport. The cabin was parked at T2, x 30,
+        // Travelled 50. The prefix is 10 long with a window of 10..10, so ParkAtNearestEnd sends it to 10 -
+        // which on this chain is T0's own anchor, 30 blocks back down the line.
+        Assert.Equal(10, prefix.TotalLength, 6);
+        Assert.Equal(10, prefix.MinTravel, 6);
+        Assert.Equal(10, prefix.MaxTravel, 6);
+        Assert.Equal(30, whole.PositionAt(whole.TotalLength).X - prefix.PositionAt(prefix.MaxTravel).X, 6);
+        Assert.Equal(whole.PositionAt(0).X, prefix.PositionAt(prefix.MaxTravel).X, 6);
+    }
+
+    /// <summary>
+    /// The "the world is not ready" invariant, as the only part of it a pure test can hold: WHICH states
+    /// count. There are three ways to be in one - no line at all, a truncated chain measuring from a
+    /// different tower, and a truncated chain that no longer reaches the cabin - and they used to be three
+    /// separate branches, one of which called <c>Hold</c> and so cleared the <c>departed</c> flag the other
+    /// two were carefully preserving. One tick later the cabin was mid-span with <c>departed == false</c>,
+    /// which is the mid-span park, which is the reload teleport wearing a different hat.
+    /// <para>
+    /// The recovery itself - stand still, write nothing else - is one block at one call site and is checked
+    /// in game by QA 18/18b. What this pins is that the question is asked in one place and in this order.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheWorldIsNotReadyUntilTheChainCanVouchForWhereTheCabinIs()
+    {
+        var a = new BlockPos(0, 64, 0);
+        var b = new BlockPos(10, 64, 0);
+        var c = new BlockPos(20, 64, 0);
+        var d = new BlockPos(30, 64, 0);
+        var chain = new[] { a, b, c, d };
+
+        // No line resolved at all: the tower's own chunk is not in, or the line was cut.
+        Assert.True(EntityRopewayCabin.NotReady(null, a, 0));
+
+        // A whole chain is proof of everything, including for a Travelled that is off the end of it - that
+        // is stale state for the clamp to deal with, not a chunk anyone is waiting for.
+        var whole = Marked(chain, new HashSet<BlockPos> { a, b, c, d });
+        Assert.False(EntityRopewayCabin.NotReady(whole, a, 0));
+        Assert.False(EntityRopewayCabin.NotReady(whole, a, 15));
+        Assert.False(EntityRopewayCabin.NotReady(whole, a, 99));
+
+        // Truncated, and measuring from a tower that is not the cabin's key. THE reload teleport.
+        var farEnd = Marked(chain, new HashSet<BlockPos> { a, b, c });
+        Assert.True(farEnd.Truncated);
+        Assert.True(EntityRopewayCabin.NotReady(farEnd, b, 0));
+        Assert.True(EntityRopewayCabin.NotReady(farEnd, null, 0));
+
+        // Same base, inside the window the loaded towers can vouch for: ready, and this is the mid-span
+        // resume working - the cabin carries on from exactly where the save left it.
+        Assert.False(EntityRopewayCabin.NotReady(farEnd, a, 0));
+        Assert.False(EntityRopewayCabin.NotReady(farEnd, a, 15));
+        Assert.False(EntityRopewayCabin.NotReady(farEnd, a, farEnd.MaxTravel));
+
+        // Same base, PAST that window - the third branch, the one that used to Hold. A cabin saved between
+        // the last two towers of a long line is here on every load, because MaxTravel collapses to the
+        // second-to-last tower the moment the far end is out.
+        Assert.True(EntityRopewayCabin.NotReady(farEnd, a, farEnd.MaxTravel + 0.001));
+        Assert.True(EntityRopewayCabin.NotReady(farEnd, a, 25));
+
+        // And the same at the near end, where the window starts short of zero rather than ending early.
+        var nearEnd = Marked(chain, new HashSet<BlockPos> { b, c, d });
+        Assert.Equal(10, nearEnd.MinTravel);
+        Assert.True(EntityRopewayCabin.NotReady(nearEnd, a, 0));
+        Assert.False(EntityRopewayCabin.NotReady(nearEnd, a, 10));
+    }
+
+    /// <summary>
+    /// The other half of "a truncated chain's Towers[0] is not evidence of anything", and the case that made
+    /// the guard worse than the bug. Refusing to re-key on ANY truncated line strands a cabin forever
+    /// whenever the tower it is keyed to is the one that was just broken - which is <c>UnlinkAll</c>'s
+    /// ordinary case, not an exotic one, because <c>LineKey</c> is always an end tower and
+    /// <c>PickSurvivor</c> falls back to the first survivor. The tower leaves <c>LoadedTowers</c> a moment
+    /// later, <c>ResolveLine</c> returns null for good, and the <c>DropAndDie</c> backstop cannot fire
+    /// because it needs <c>LoadedTowers</c> to contain <c>LineKey</c>: an uncollectable cabin in mid-air
+    /// with its item destroyed, and nothing in the mod ever repairs it.
+    /// </summary>
+    [Fact]
+    public void ARebaseWaitsForChunksOnlyWhileTheOldKeyIsStillOnTheChain()
+    {
+        var a = new BlockPos(0, 64, 0);
+        var b = new BlockPos(10, 64, 0);
+        var c = new BlockPos(20, 64, 0);
+        var d = new BlockPos(30, 64, 0);
+
+        // A whole chain never waits, whatever the key is - re-keying is exactly what it is for.
+        var whole = Marked(new[] { a, b, c, d }, new HashSet<BlockPos> { a, b, c, d });
+        Assert.False(EntityRopewayCabin.RebaseMustWait(whole, a));
+        Assert.False(EntityRopewayCabin.RebaseMustWait(whole, new BlockPos(99, 64, 0)));
+
+        // Truncated, and the cabin's key is still on it: hold. Towers[0] here is whichever end the walk
+        // reached, so re-keying onto it would put Travelled on a scale that means somewhere else, and the
+        // tick re-bases for real once the chunk lands. Nothing is lost by waiting.
+        var truncated = Marked(new[] { a, b, c, d }, new HashSet<BlockPos> { a, b, c });
+        Assert.True(truncated.Truncated);
+        Assert.True(EntityRopewayCabin.RebaseMustWait(truncated, a));
+        Assert.True(EntityRopewayCabin.RebaseMustWait(truncated, c));
+
+        // The key has LEFT the world: break tower A of A-B-C-D and the survivor is B-C-D, still truncated
+        // because D's chunk is out. Waiting for a tower that no longer exists is waiting forever, so this
+        // one must re-key onto the survivor - inside its loaded window, which ParkAtNearestEnd guarantees.
+        var survivor = Marked(new[] { b, c, d }, new HashSet<BlockPos> { b, c });
+        Assert.True(survivor.Truncated);
+        Assert.False(EntityRopewayCabin.RebaseMustWait(survivor, a));
+
+        // A key that was never set at all is in the same position, and re-keying is its repair.
+        Assert.False(EntityRopewayCabin.RebaseMustWait(survivor, null));
+        Assert.False(EntityRopewayCabin.RebaseMustWait(null, a));
+    }
+
+    /// <summary>
     /// The rule that replaced "hold on any truncated line": a cabin may use everything up to the last tower
     /// the walk could actually query, and reversing is only allowed at an end that is loaded. Getting the
     /// window wrong either strands the cabin (too narrow) or reverses it at a false endpoint (too wide).

@@ -322,6 +322,15 @@ public sealed class RopewayLinkService
             return false;
         }
 
+        // Same rule as TryUnlink, and for the same reason: the merge below re-bases the cabin, which parks
+        // it at an end of the new chain - an arbitrary teleport of whoever is sitting in it. Growing a line
+        // is not urgent enough to move a rider for; wait until they get out.
+        if (IsLineOccupied(from) || IsLineOccupied(to))
+        {
+            player.SendIngameError("ropeway-line-in-use", Lang.Get("ropeway:err-line-in-use"));
+            return false;
+        }
+
         var cost = SpanMath.RopeCost(span, beFrom.RopePerBlock);
         var have = CountRope(player);
         if (player.WorldData.CurrentGameMode != EnumGameMode.Creative && have < cost)

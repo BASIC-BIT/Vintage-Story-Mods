@@ -214,7 +214,16 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     highlights a block *behind* the cabin's lower half instead of the cabin. Re-check this **after riding a
     full trip and after a relog** — §3d.1 is precisely about a later attribute sync putting the JSON box
     back, so a box that works on placement and dies later is the same bug returning.
-    **PASS:** you are seated, you can look around freely, and after ~3 s it departs toward the far tower.
+    **PASS:** you are seated, you can look out of either side, and after ~3 s it departs toward the far tower.
+    **PASS — the look limit.** Hold the mouse hard left, then hard right. The view must stop at about a
+    **quarter turn each way** from the seat's facing and refuse to go further: you can look out either side
+    window, you cannot end up looking backwards over your own backrest. It must also **follow the cabin**
+    round a bend rather than staying pinned to a compass bearing. **FAIL:** you can spin a full circle —
+    `ConstrainRiderYaw` is not running, or `bodyYawLimit` went back to `null`. **FAIL the other way:** the
+    centre is 180° out, i.e. you can only look toward the wall behind you — then `mountRotation.y: 180` on
+    both seats is the knob, because the model cannot prove which way the benches face and this check can.
+    Note the limit is on the seated player's **own camera only**; another player watching you already sees
+    you squared to the cabin whichever way you are looking, and always did.
     If nothing happens, retry aiming directly at a seat; a seat-only mount means `mountAnySeat` is not
     reaching its non-controllable fallback loop and `controllable: true` on seat 0 is the fix (at the
     cost of a stutter for the controlling client).
@@ -239,6 +248,11 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     the same.** Two seats behaving differently is the specific signature of a facing problem rather than
     an offset one. A second player standing outside is the cheapest observer for all of it, because that
     forced remote yaw is exactly the case under test.
+    **PASS — the two rows read as evenly placed.** From outside, through the glazing: the same amount of
+    clear floor in front of each rider's feet (12.34 units by construction, so it should read as *equal*,
+    not merely "enough"), and neither rider's toes near a wall. The front bench moved back 10 units for
+    this; **FAIL:** the front rider is jammed against the end wall again, or the interior now looks
+    bunched at one end.
     Also **PASS:** in first person your eye is in the **glazing band** — you can see
     out of the windows — not up inside the roof slab and not down at bench level. Get out again:
     **PASS:** you stand up immediately; **FAIL:** you walk away still stuck in the sit pose, which is the
@@ -418,11 +432,30 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      item by relogging between the break and the pickup.
 
 18. **Persist.** Save, quit to menu, reload the world. **PASS:** towers still read complete with the right
-    span counts, the cabin is still on the line at an end tower, and it is rideable. If the cabin was
-    parked mid-span before the save it must snap to the nearer end tower rather than resume mid-air.
+    span counts, the cabin is still on the line where you left it, and it is rideable.
+    **The cabin does not move on a reload. At all.** That is the whole check, and it replaces the old
+    "it must snap to the nearer end tower" — snapping *was* the bug. Note where it is before you quit
+    (a screenshot of the position readout is enough) and compare.
+
+18b. **Reload it mid-span, twice.** Stand where you can see the cabin, send it across a long span and quit
+     to menu **while it is between two towers** — an ordinary ride with no destination, not a call, because
+     the called trip already survived and the plain one did not. Reload. **PASS:** it is exactly where it
+     was, and then carries on in the same direction. **FAIL (the old bug):** it is at an end tower.
+     Then do the same on a line whose **first hop goes back on itself** (tower 2 west of tower 1, the line
+     then running east) and whose towers span several chunk columns, so that at load only some of them are
+     registered: reload from far enough away that the columns stream in one at a time. **PASS:** the cabin
+     sits still through the load and is where you left it once the last tower is in — it must not park, and
+     it must not end up at the start of the line. Reload twice more: the old failure got *worse* each time,
+     because it re-keyed onto an interior tower.
 
 19. **Relog while riding** (multiplayer, or singleplayer alt-F4 while seated). Reconnect.
-    **PASS:** you are standing at or near an end tower, not falling, and the cabin is parked there empty.
+    **PASS:** you are on solid ground at or near a tower, not falling — or still seated in a cabin that is
+    finishing the trip it was on. Both are correct now and which one you get depends on whether the server
+    kept running: `departed` is persisted, so a cabin saved **in motion** resumes and drives itself to the
+    end of the line while you are away, and the seat holds you until it stops (`CanUnmount` refuses while
+    it is moving). If your player entity despawned while seated, `DropGhostPassengers` unseats you at a
+    tower and puts you on the footing, which is the singleplayer alt-F4 path and the old PASS text.
+    **FAIL:** you are falling, you are inside a block, or you are standing somewhere the cabin never went.
 
 20. **Blocked span.** Wall off the middle of a span with stone while the cabin is parked, then ride.
     **PASS:** the cabin holds at the tower before the obstruction instead of dragging you into the wall.
@@ -435,8 +468,10 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     rider through solid stone.
 
 22. **Link while riding.** With a rider seated on line A–B, have a second player link a new tower C to
-    A. **PASS:** the cabin (and rider) snap to an *end tower* of the new A/B/C line, not to a point
-    tens of blocks away in mid-air.
+    A. **PASS:** the link is **refused** with *"line in use"* — the same rule unlinking already had, because
+    a merge re-bases the cabin and re-basing parks it at an end of the new chain, which is an arbitrary
+    teleport of whoever is sitting in it. **FAIL:** the link succeeds and the rider moves.
+    Get out and link again: **PASS:** it links, and the empty cabin re-bases onto an end tower of A/B/C.
 
 23. **Short spans.** Link two towers only ~6 blocks apart. **PASS:** it links (the clearance check trims
     4 blocks off each end for the towers' own structures, and never trims more than half). Known
