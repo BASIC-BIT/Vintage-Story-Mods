@@ -3,8 +3,8 @@
   "class": "EntityRopewayCabin",
   "attributes": {
     "speed": 2.2,
-    "//hangDrop": "Not a taste knob. The sheave sits 4 cells above the pylon footing and the cabin passes over that footing, so the floor (origin -1.25) must clear the footing's plinth top at +0.5 and the roof (origin +1.25) must clear the crossarm's underside at +4.0 - the crossarm's foot plate reaches the block boundary so it lands flat on the posts, which cost the roof the 1/16 it used to have. That gives 1.75 < hangDrop < 2.75. 2.0 is NOT the midpoint of that window (2.25 is) - it deliberately sits low in it, leaving 0.75 blocks of air under the floor against 0.25 over the roof, because clipping the crossarm reads far worse than a low floor. RopewayAssetContractTests.TheCabinFitsThroughTheTower fails if this or SpanMath.SheaveHeight moves alone.",
-    "hangDrop": 2.0
+    "//hangDrop": "Not a taste knob. The sheave sits 4 cells above the pylon footing and the cabin passes over that footing, so the floor (origin -1.25) must clear the footing's plinth top at +0.5 and the roof (origin +1.25) must clear the crossarm's underside at +4.0 - the crossarm's foot plate reaches the block boundary so it lands flat on the posts, which cost the roof the 1/16 it used to have. That gives 1.75 < hangDrop < 2.75, and 2.25 is its midpoint. It used to sit low in that window at 2.0, on the argument that clipping the crossarm reads worse than a low floor - but that argument only weighed the two ways of running out of room, and there is now something to SPEND the room on. The band between the cabin roof and the crossarm underside is what the station rails and the guide rollers live in; at 2.0 it is 4 units and the rails alone want 4, at 2.25 it is 8 and both fit. The price is the floor clearance, 0.75 -> 0.50 blocks of air over the footing, which is still half a block and still reads as passing over rather than through. RopewayAssetContractTests.TheCabinFitsThroughTheTower fails if this or SpanMath.SheaveHeight moves alone.",
+    "hangDrop": 2.25
   },
   "hitboxSize": { "x": 2.9, "y": 2.5 },
   "behaviorConfigs": {

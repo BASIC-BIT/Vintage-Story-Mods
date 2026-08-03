@@ -32,18 +32,21 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     public const double DefaultSpeed = 2.2;
 
     /// <summary>
-    /// How far the cabin's origin hangs below the rope. Re-derived for the ground-controller tower rather
-    /// than carried over, and it lands on the same 2.0 by arithmetic rather than by luck: with the sheave
+    /// How far the cabin's origin hangs below the rope. Derived, not chosen: with the sheave
     /// <see cref="SpanMath.SheaveHeight"/> = 4 cells above the footing, the roof (origin + 1.25) has to
     /// clear the crossarm's underside and the floor (origin - 1.25) has to clear the footing's top, which
     /// leaves 1.75 &lt; hangDrop &lt; 2.75 (plinth top at +0.5, crossarm underside at +4.0 - the crossarm's
-    /// foot plate reaches the block boundary so it sits flat on the posts). 2.0 is NOT the midpoint of that
-    /// window - 2.25 is - it deliberately sits low in it, giving 0.75 blocks of air under the floor against
-    /// 0.25 over the roof, because clipping the crossarm reads far worse than a low floor. The mast tip
-    /// lands exactly in the sheave throat either way. Changing this or SheaveHeight alone breaks the fit;
-    /// TheCabinFitsThroughTheTower is what catches it.
+    /// foot plate reaches the block boundary so it sits flat on the posts). 2.25 is that window's midpoint.
+    /// <para>
+    /// This sat low in the window at 2.0 while the only question was which way to run out of room, and
+    /// clipping the crossarm reads worse than a low floor. The station rails changed the question: the band
+    /// between the cabin roof and the crossarm underside is now hardware, not air, and at 2.0 that band is
+    /// 4 units against rails that want 4 on their own - no room for the guide rollers at all. The midpoint
+    /// doubles it to 8 and both fit. It is bought with floor clearance, 0.75 -&gt; 0.50 blocks over the
+    /// footing. Changing this or SheaveHeight alone breaks the fit; TheCabinFitsThroughTheTower catches it.
+    /// </para>
     /// </summary>
-    public const double DefaultHangDrop = 2.0;
+    public const double DefaultHangDrop = 2.25;
 
     /// <summary>Close enough to a tower to count as standing at it, in metres along the line.</summary>
     public const double ArrivalTolerance = 0.5;
@@ -190,10 +193,15 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// through: SyncedTreeAttribute.FromBytes invokes every registered modified listener with no path
     /// filter, so any full WatchedAttributes sync re-runs Entity.updateColSelBoxes and would put the JSON
     /// box back.
+    /// <para>
+    /// The top is 2.45, not 2.05: the old mast stopped at shape y 32 = 2.00 blocks, the hanger's jaw now
+    /// reaches y 38.4 = 2.40, and the box has to circumscribe on the VERTICAL axis too or the top of the
+    /// hanger is not ray-hittable. Same 0.05 pad as the other five faces.
+    /// </para>
     /// </summary>
     public override void SetSelectionBox(float length, float height)
     {
-        SelectionBox = new Cuboidf(-2.05f, -1.3f, -2.05f, 2.05f, 2.05f, 2.05f);
+        SelectionBox = new Cuboidf(-2.05f, -1.3f, -2.05f, 2.05f, 2.45f, 2.05f);
         OriginSelectionBox = SelectionBox.Clone();
     }
 
@@ -728,7 +736,7 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             // Not TeleportTo: that defers behind a chunk load the despawning player will not wait for, and
             // its Pos.SetPos is dimension-unaware. Anchors carry a dimension-encoded Y, so strip it.
             // Dropped at the tower's own FOOTING level rather than the cabin's, which is the whole point of
-            // this - they relog standing on the tower they built, not 1.25 blocks above it in the cabin's
+            // this - they relog standing on the tower they built, not a block above it in the cabin's
             // floor. ParkAtNearestEnd ran just above, so Travelled is on a tower and this is that tower.
             // park.Y is the SHEAVE centre = footingY + SheaveHeight + 0.5, so subtracting SheaveHeight
             // alone lands on footingY + 0.5 - the top of the footing's plinth. Subtracting the 0.5 as well

@@ -1,7 +1,64 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 80 ropeway tests passing. Everything in the tables below was found by reading code,
+State: build green, 88 ropeway tests passing. Everything in the tables below was found by reading code,
 not by playing — none of *it* has been observed in game.
+
+## Station rail (2026-08-03) — what shipped, what was reverted, what it costs
+
+`RAIL-DESIGN.md`'s five-step ladder went in and **step 4 came back out.** Steps 1–3 (the split sheave, the
+hanger blade and the jaw, `hangDrop` 2.0 → 2.25, the flared rail drawn on the pylon head's own shape) and
+step 5 (the 5-wide passage) are shipped. Step 4, the angle-station yaw law, is **reverted**.
+
+**The causation in the design was backwards, and an earlier version of this section repeated it.** Read
+this before re-attempting anything here.
+
+**The 5-wide passage is the fix.** Moving the posts from x ±2 to ±3 is what reduces post penetration:
+45° goes **1.000 → 0.033 blocks** and 30° goes **0.450 → 0.000**. That is the whole of the improvement.
+It is not "room and light".
+
+**The angle-station yaw law was a regression and is gone.** Holding each tower's own passage axis across
+the vertex threw the widening's gain away: 45° went **0.033 → 1.000** and 30° **0.000 → 0.331**. The
+mechanism is direct — `RopewayLine.PositionAt` swings the cabin's ORIGIN onto the outgoing leg at the
+vertex, so a cabin still holding the incoming axis crab-walks, and a crabbing 4-block cabin sweeps its tail
+into the post on the outside of the bend. `DirectionAt` is the plain leg bearing again; `RopewayLine.Facings`,
+`SquareHold`, `YawBlend` and the three tests that asserted the law are deleted. The original 0.000-at-every-angle
+number came from a model whose cabin ran dead straight through the vertex, which `PositionAt` never does.
+
+**A right-angle corner can never be clean, under any yaw law.** The posts flank the passage at tower-local
+x = ±3 and a tower facing is one of four cardinals, so at a right angle the outgoing leg *is* the post axis:
+the cabin's **origin** travels through the post column. No rotation fixes a translation. This is a permanent
+geometric limit of "four facings, straight chords", not a bug and not a tuning problem. The handbook says so
+and `QA-SCRIPT.md` step 12b expects it. The only real cures are a diagonal tower facing or refusing sharp
+bends at link time; neither is in v0.1.
+
+**Recommended, not built: `TryLink` should WARN (never refuse) on a sharp bend.** After `AddSpan`, a tower
+that now carries two spans can have the angle between them measured, and a bend under ~150° gets one chat
+line telling the player the cabin will clip a post there. Warn only — refusing would make a legal, buildable
+route unbuildable for a cosmetic reason, and players do build ugly corners on purpose. Not implemented here
+because it is not the two lines it looks like: an angle helper on `SpanMath`, the check on both ends of the
+new span, a lang string, and a test — call it 20 lines across four files. Worth doing next time this file
+is opened; the handbook and QA-SCRIPT carry the warning in the meantime.
+
+**The metal cost per tower DOUBLES — this is the price BASIC is actually paying.** `recipes/grid/brace.json`
+is `stick + metalplate + stick → 4 braces`. A 5-wide crossarm needed 4 braces = **exactly one metal plate**.
+A 7-wide crossarm needs 6, which is not divisible by the recipe's yield of 4, so it is **two crafts = two
+metal plates** (plus 2 spare braces). Marginal metal per tower therefore goes **1 plate → 2**, not "+2
+braces", and across a chained route that is the multiplier `DECISIONS.md` §3's marginal-cheapness rule
+exists to protect. A ten-tower route now costs 20 plates of braces instead of 10. Named here because it was
+chosen knowingly but had never been stated at its true price anywhere.
+
+**Reverting the widening is a JSON-only change** if that price is too high — but it costs back the 45°/30°
+penetration above, which is the honest trade now that the yaw law is not there to be credited for it. In
+`pylonbase.json` drop the two `x: ±3, y: 4` brace offsets and move the eight post offsets from ±3 back to
+±2. Then move the numbers that quote it — `gen_manifests.py`'s `cells()` and its 17.0-unit roof-to-post
+clearance, `SpanMath.TowerClearance`'s note, `MultiblockOffsetsAreTheTowerShellAndNothingElse`, the two
+handbook pages, `ropeway:dlg-guide-body`, `README.md` and `QA-SCRIPT.md` steps 5, 7 and 8. No C# behaviour
+depends on the width.
+
+**Cosmetic, at corners:** the drawn rope leaves the sheave along a bearing that runs *into* the crossarm.
+The rope sits at scene y 35–37 and the brace beams occupy 30–42, so at a right angle the outgoing rope is
+buried inside **three** brace blocks before it clears the tower — it was two before the widening, i.e. the
+widening made this one slightly worse. Only visible at sharp corners, where the cabin already clips.
 
 ## Tower restructure (2026-08-01) — what it costs
 
@@ -47,7 +104,7 @@ Four things BASIC saw once the cable started rendering. All four are closed.
 |---|---|---|
 | **The cable was striped** in unrelated browns, greys and purples along its length. | `CubeMeshUtil.ScaleCubeMesh` multiplies the cube's UVs by the axis scale (CubeMeshUtil.cs:230-251), so a half-span 24 blocks long left them running 0..48. `MeshData.SetTexPos` maps u through `x1 + u * (x2 - x1)`, which puts everything past 1 **outside** this texture's sub-region of the block atlas — the cable was sampling whichever sprites happened to sit next to the rope one. | `BuildHalfCable` flat-samples the sprite: `Array.Fill(mesh.Uv, 0.5f)` before `SetTexPos`, so every vertex lands on the middle of the sprite, far from its edges and therefore safe under mipmapping. A 2-pixel cable has nowhere to show lengthwise detail, and normalising to 0..1 instead would smear one 32×32 sprite over the whole span. The texture also changed to `game:block/cloth/reedrope`, the vanilla banner/crate rope. **That swap was cosmetic, not a fix** — an earlier version of this note claimed `game:item/resource/rope` was transparent at its edges and that this was the cause; it is not, it measures alpha 255 across all 32×32. The UV fix alone closes the bug. Guarded by `TheCableSamplesOnlyItsOwnCornerOfTheAtlas`. Thickness was re-verified and needed nothing: `GetCube` returns a 2×2×2 cube and `ScaleCubeMesh` does `xyz * scale + scale`, so with `translate = -CableRadius` the box spans exactly ±0.06 — 0.12 blocks, two pixels. |
 | **Riders could not control where they got off.** Boarding departed after a grace period and ran to the END of the line, straight through every intermediate tower. Calling was for an empty cabin only. This was C3 below. | Scope: the ride had no rider input at all. | A **hotkey**, `ropewaystop`, default **R** (unbound in vanilla). Pressing it aims the cabin at a tower through the same `Destination` / `PlanCall` / `Reached` machinery a ground call uses — `Aim` is now the one place a trip starts, shared by both — so a rider choosing a stop *is* a call, made from the seat. `NextStop` steps the requested tower one along the chain in the direction of travel and **wraps at the ends**, which is also the direction control: a rider who boarded at an interior station on a cabin pointing the wrong way keeps pressing and the selection comes round the other way. Every candidate goes through `PlanCall`, so the tower the cabin is standing on and anything outside the loaded window are skipped rather than offered and refused. Discoverability was the actual bug, so: a chat hint on boarding naming the player's **own** binding (client side — the server cannot see it), a `"Choose where to get off"` interaction-help line on the cabin, the handbook, the tower guide, and a chat line naming the tower on every press. Guarded by `TheStopKeyStepsAlongTheLineAndWrapsBackTheOtherWay` and `TheStopKeyNeverOffersATowerOutsideTheLoadedWindow`. |
-| **The crossarm did not meet the posts** — a visible step where a narrow metal bracket sat on a full-width log, with the log's whole 16×16 top face on show around it. | The brace's beam was z[5,11] and its flanges z[4,12], bottoming out at y = 1/16 — a 6-wide bracket floating one pixel above a 16-wide post. | One shape, no new block variant. The brace grew a **foot plate**, `[0,0,0]–[16,2,16]`, reaching the block boundary so it lands flat on the log; its flanges start at y = 2 instead of y = 1 so nothing is coplanar with it. The pylon head grew the matching `footwest` / `footeast` stubs at x 0–5 and 11–16, leaving the sheave throat (x 5–11) clear for the mast, so the crossarm reads as one continuous girder across all five cells. Weighed against a separate end-piece block: the plate reads as a girder's bottom flange over the three interior cells and as a bearing plate over the two on posts, which is acceptable in both places, and a new block is a real cost. **It cost the cabin 1/16 of roof clearance** — 0.3125 → 0.25 — because the crossarm underside came down to the block boundary. `gen_manifests.py` now asserts both numbers together (`crossarm foot on the post top = 0`, `cabin roof under the crossarm = 4`), so they cannot drift apart silently. |
+| **The crossarm did not meet the posts** — a visible step where a narrow metal bracket sat on a full-width log, with the log's whole 16×16 top face on show around it. | The brace's beam was z[5,11] and its flanges z[4,12], bottoming out at y = 1/16 — a 6-wide bracket floating one pixel above a 16-wide post. | One shape, no new block variant. The brace grew a **foot plate**, `[0,0,0]–[16,2,16]`, reaching the block boundary so it lands flat on the log; its flanges start at y = 2 instead of y = 1 so nothing is coplanar with it. The pylon head grew the matching `footwest` / `footeast` stubs at x 0–5 and 11–16, leaving the sheave throat (x 5–11) clear for the mast, so the crossarm reads as one continuous girder across all five cells (seven since the widening). Weighed against a separate end-piece block: the plate reads as a girder's bottom flange over the three interior cells and as a bearing plate over the two on posts, which is acceptable in both places, and a new block is a real cost. **It cost the cabin 1/16 of roof clearance** — 0.3125 → 0.25 — because the crossarm underside came down to the block boundary. `gen_manifests.py` now asserts both numbers together (`crossarm foot on the post top = 0`, `cabin roof under the crossarm = 4`), so they cannot drift apart silently. |
 | **Only logs, debarked logs and planks were accepted as posts.** | Scope. | `game:@(log-placed-.*\|debarkedlog-.*\|planks-.*\|rock-.*\|cobblestone-.*\|drystone-.*\|rockpolished-.*\|stonebricks-.*)` — wood or dressed stone, so a tower can match what it stands next to. Deliberately **not** widened to slabs, stairs, chiselled blocks or soil: a post is a structural column, and a tower that accepts anything stops reading as a tower. `WildcardUtil` anchors an `@`-pattern as `^…$` (`RegexCache.IsMatch`), so `rock-.*` does not also swallow `crackedrock-*`. `RopewayModSystem.VerifyStructureWildcards` still passes — but note it only tests the whole key, so a dud **alternative** would hide behind the live ones; QA step 7 places one block of each family by hand for that reason. |
 | **The rider stood up inside the cabin**, in the default standing idle, instead of sitting on a bench. | The `mountAnimations` map on the cabin entity was **dead JSON**. Only `EntityBoat` and `EntityElevator` read that key (`EntityBoat.cs:87`, `EntityElevator.cs:91`); the `seatable` behavior never looks at it, and `EntityRideableSeat.DidMount` starts `"idle"` on the **cabin**, not on the passenger. `SuggestedAnimation` was permanently null too - it casts the mount to `EntityBehaviorRideable`, which the cabin does not have. So no pose was ever started, and mapping the four keys to `"idle"` was never the cause. | `SeatConfig.Animation` per seat (`sitboatidle`, player.json:509 - the same code the sailed boat's non-controllable bench uses), played by an explicit `Passenger.AnimManager.StartAnimation` in `RopewayCabinSeat.DidMount` and stopped in `DidUnmount` **before** `base`, because `EntitySeat.DidUnmount` nulls `Passenger`. `eyeHeight` 1.4 -> 1.0: at 1.4 the eye sat at 1.0875, inside the roof slab that starts at 0.875. Both attachment points dropped 1/16 to the bench top, the sailed boat's convention. Seats stay `controllable: false` - nothing in the animation path reads it. Guarded by `BothCabinSeatsSitTheRiderWithTheEyeInTheGlazing`, which fails on an empty animation code or an eye outside the glazing band. |
 | **You could not see the cabin you were riding in.** | First person is the default and the ride is a view; vanilla's F5 is three stops away and the player has to know to press it. | A second rider hotkey, `ropewayridecam`, default **O** (unbound in vanilla - only I, K, L, O, P, R and U are free, and R is the stop key). Client side only, no packet, no seat change. The camera mode is not a setting: `Camera.CameraMode` and `SetMode` are internal, so it is **read** through `IRenderAPI.CameraType` and **written** by invoking vanilla's own `cyclecamera` hotkey handler - a public field on a public `HotKey` that ignores its argument (`PlayerCamera.cs:132`). Cleaner than the reflection ModDB's `glideview` uses, and needs no extra assembly reference. A 250 ms poll on `MountedOn` catches every dismount path; it restores **only** if the camera is still the mode it set, so pressing F5 mid-ride makes the mod let go rather than fight. Deliberately shipped **without** distance or offset tweaks: each trades a new artefact (lost zoom, desynced crosshair, more first-person snaps at towers) for the one it fixes, and none address the root cause, which is that vanilla's third-person wall check raycasts blocks only and the cabin is an entity. |
@@ -141,6 +198,7 @@ three blockers and the mount race were fixed in the same pass; these five were j
   certifies a straight corridor; a drawn catenary would be a cable that lies about where the cabin goes.
 - **Span ends are not clearance-checked.** `TrimForTowers` skips 4 blocks at each end so a tower's own
   posts don't block its own line, so an obstruction inside those end zones goes undetected.
-- **Metal cost.** Closed by the restructure: one 5-wide crossarm is 4 braces (1 iron plate) plus the
-  sheave, down from two gantries at roughly 2.5 plates. Inside the "don't gate this behind a bunch of
-  metal" target in `DECISIONS.md`.
+- **Metal cost.** The restructure took it from two gantries at roughly 2.5 plates down to one 5-wide
+  crossarm at 4 braces = **1 metal plate** plus the sheave. The station-rail widening then put it back up
+  to a 7-wide crossarm: 6 braces, two crafts, **2 metal plates per tower**. Not closed — see the station-rail
+  section at the top of this file, which states the doubling against `DECISIONS.md` §3.

@@ -15,9 +15,14 @@ public static class SpanMath
     public const int ClearanceRadius = 1;
 
     /// <summary>
-    /// Rows below the rope line that must also be clear. The cabin hangs 2 blocks under the rope and its
-    /// body runs anchor-3.25..anchor (mast tip in the sheave), so certifying only the rope line lets a rise two blocks under
-    /// the rope drag a seated rider through solid stone - riders have no block collision to stop it.
+    /// Rows below the rope line that must also be clear. The cabin hangs 2.25 blocks under the rope and its
+    /// body runs anchor-3.5..anchor (jaw closed on the rope), so certifying only the rope line lets a rise two
+    /// blocks under the rope drag a seated rider through solid stone - riders have no block collision to stop it.
+    /// <para>
+    /// 3 rows still covers it exactly, and only just. The anchor is a block centre, so the j = -3 ray runs down
+    /// the centre of the row spanning anchor-3.5..anchor-2.5 - the cabin's floor lands on that row's bottom
+    /// face. Any further increase in <c>hangDrop</c> needs a fourth row.
+    /// </para>
     /// </summary>
     public const int ClearanceBelow = 3;
 
@@ -26,8 +31,9 @@ public static class SpanMath
     /// checked. The posts are player-chosen logs and planks, so <see cref="RopewayBlockFilter"/> cannot
     /// tell them from terrain; without this the <see cref="ClearanceBelow"/> rays leave the sheave, drop
     /// three blocks and run straight into the tower's own posts, and every span is silently refused.
-    /// The posts stand at x = +/-2, y = 0..3 above the footing; their far corners sit 2.55 blocks
-    /// horizontally from the sheave column, so 4 clears them with margin on any bearing.
+    /// The posts stand at x = +/-3, y = 0..3 above the footing; their far corners sit
+    /// sqrt(3.5^2 + 0.5^2) = 3.54 blocks horizontally from the sheave column, so 4 still clears them on any
+    /// bearing - but the margin is 0.46 now, not 1.45. Widening the passage again needs this raised too.
     /// </summary>
     public const double TowerClearance = 4.0;
 
@@ -37,9 +43,9 @@ public static class SpanMath
     /// canonical position into its geometry, which is why it lives next to <see cref="AnchorOf"/>.
     /// <para>
     /// Forced by the cabin, not chosen: the cabin body runs 1.25 below its origin to 1.25 above it, the
-    /// origin hangs <c>hangDrop</c> = 2 below the sheave, and the footing occupies the ground cell the
-    /// cabin passes over. Floor above the footing needs <c>SheaveHeight + 0.5 - 2 - 1.25 &gt; 0.5</c>
-    /// and roof under the crossarm needs <c>SheaveHeight + 0.5 - 2 + 1.25 &lt; SheaveHeight + 1/16</c>;
+    /// origin hangs <c>hangDrop</c> = 2.25 below the sheave, and the footing occupies the ground cell the
+    /// cabin passes over. Floor above the footing needs <c>SheaveHeight + 0.5 - 2.25 - 1.25 &gt; 0.5</c>
+    /// and roof under the crossarm needs <c>SheaveHeight + 0.5 - 2.25 + 1.25 &lt; SheaveHeight</c>;
     /// together those admit only 4. See <c>RopewayAssetContractTests.TheCabinFitsThroughTheTower</c>.
     /// </para>
     /// </summary>

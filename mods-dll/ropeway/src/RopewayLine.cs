@@ -158,6 +158,19 @@ public sealed class RopewayLine
         return new Vec3d(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t, a.Z + (b.Z - a.Z) * t);
     }
 
+    /// <summary>
+    /// Which way the cabin points at a distance along the line: the bearing of the span it is on, and
+    /// nothing else. Pure; the rendered yaw is its only consumer (<c>EntityRopewayCabin.Place</c>).
+    /// <para>
+    /// An "angle-station" law that held each tower's own passage axis across the vertex was tried and
+    /// REVERTED - it is a regression, measured, not a matter of taste. <see cref="PositionAt"/> swings the
+    /// cabin's ORIGIN onto the outgoing leg at the vertex, so a cabin holding the incoming axis crab-walks
+    /// and its 4-block tail sweeps into the post on the outside of the bend: post penetration went 0.033 -&gt;
+    /// 1.000 blocks at a 45 degree corner and 0.000 -&gt; 0.331 at 30 degrees against this plain bearing. What
+    /// actually reduced penetration was the 5-wide passage. See <c>docs/KNOWN-ISSUES.md</c>; do not
+    /// re-attempt the yaw law without bending the path in whatever model claims it works.
+    /// </para>
+    /// </summary>
     public Vec3d DirectionAt(double travelled)
     {
         if (Anchors == null || Anchors.Length < 2) return new Vec3d(0, 0, 1);

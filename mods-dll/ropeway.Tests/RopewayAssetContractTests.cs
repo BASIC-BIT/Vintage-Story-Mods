@@ -169,8 +169,11 @@ public class RopewayAssetContractTests
                           Z: o.GetProperty("z").GetInt32(), W: o.GetProperty("w").GetInt32()))
             .ToList();
 
-        // One crossarm of five on two posts of four, plus the footing that owns them: 14 cells, 13 offsets.
-        Assert.Equal(13, offsets.Count);
+        // One crossarm of seven on two posts of four, plus the footing that owns them: 16 cells, 15 offsets.
+        // It was five and 14, giving a 3-wide passage. The widening IS the corner fix - it takes post
+        // penetration from 1.000 to 0.033 blocks at a 45-degree corner - and it is priced in metal: 6 braces
+        // is two crafts, so 2 metal plates a tower instead of 1. See pylonbase.json's "//passagewidth".
+        Assert.Equal(15, offsets.Count);
         Assert.Equal(offsets.Count, offsets.Select(o => (o.X, o.Y, o.Z)).Distinct().Count());
 
         // The controller is the footing itself and must not be one of the cells it checks.
@@ -182,8 +185,8 @@ public class RopewayAssetContractTests
         // One block deep. The 4-long cabin passes through a 1-deep frame; a second gantry is a tunnel.
         Assert.All(offsets, o => Assert.Equal(0, o.Z));
 
-        // The 3-wide, 4-tall archway the cabin travels through has to stay empty.
-        Assert.DoesNotContain(offsets, o => o.X is >= -1 and <= 1 && o.Y is >= 0 and <= 3);
+        // The 5-wide, 4-tall archway the cabin travels through has to stay empty.
+        Assert.DoesNotContain(offsets, o => o.X is >= -2 and <= 2 && o.Y is >= 0 and <= 3);
 
         // The sheave is the crossarm's centre cell, directly SheaveHeight above the footing - AnchorOf,
         // BEPylonBase's cable mesh and BlockPylonHead's block-info lookup all assume exactly this cell.
@@ -191,7 +194,7 @@ public class RopewayAssetContractTests
 
         // Posts reach the ground the footing stands on. Starting them a cell higher leaves the legs hanging
         // in the air, which is what "posts three tall" would have produced.
-        foreach (var x in new[] { -2, 2 })
+        foreach (var x in new[] { -3, 3 })
         {
             for (var y = 0; y < SpanMath.SheaveHeight; y++)
             {
@@ -221,7 +224,10 @@ public class RopewayAssetContractTests
         var anchor = SpanMath.SheaveHeight + 0.5;
         var cabinFloor = anchor - hangDrop + Bottom("floor");
         var cabinRoof = anchor - hangDrop + Top("roof");
-        var mastTip = anchor - hangDrop + Top("mast");
+        // The jaw is four plates round the rope, so its clamped centre - not the top of anything - is what
+        // has to land on the anchor. Taking the midpoint of the two clear faces also fails if the jaw is
+        // authored lopsided, which a single-face measurement would let through.
+        var jawCentre = anchor - hangDrop + (Top("jawbottom") + Bottom("jawtop")) / 2;
 
         var footingTop = Load("shapes", "block", "pylonbase.json").GetProperty("elements").EnumerateArray()
             .Max(e => e.GetProperty("to")[1].GetDouble()) / 16;
@@ -240,18 +246,67 @@ public class RopewayAssetContractTests
         Assert.True(cabinRoof < crossarmUnderside,
             $"the cabin roof at {cabinRoof} cuts through the crossarm, whose underside is at {crossarmUnderside}");
 
-        // BASIC's figure, and the reason SheaveHeight is 4 rather than 3: three quarters of a block of air
-        // between the footing and the cabin passing over it.
-        Assert.Equal(0.75, cabinFloor - footingTop, 3);
+        // Half a block of air between the footing and the cabin passing over it. It was 0.75 while hangDrop
+        // sat low in its window; the station rails wanted the room above the roof more than the floor wanted
+        // it below, and this is the quarter block that paid for them.
+        Assert.Equal(0.5, cabinFloor - footingTop, 3);
 
-        // The mast has to reach the sheave throat, or the cabin visibly hangs from nothing. It lands exactly
-        // on the anchor - the centre of the sheave block, and the point the cable is drawn from.
-        Assert.Equal(anchor, mastTip, 3);
+        // The jaw has to close ON the rope, not near it, or the cabin visibly hangs from nothing. Its clamp
+        // line lands exactly on the anchor - the centre of the sheave block, and the point the cable is
+        // drawn from. This is what the split sheave cheeks bought: with a solid housing there was nowhere
+        // at rope height for a jaw to be, and the old "grip" was a boss 0.56 block below its own cable.
+        Assert.Equal(anchor, jawCentre, 3);
+
+        // And it closes to 0.04 unit of the rope's own surface. Wider and it reads as approaching; any
+        // narrower and the two surfaces z-fight.
+        var jawGap = (Bottom("jawtop") - Top("jawbottom")) / 2;
+        Assert.Equal(BEPylonBase.CableRadius + 0.04 / 16, jawGap, 4);
     }
 
     private static JsonElement Find(List<(string Name, JsonElement Element)> elements, string name)
     {
         return elements.First(e => e.Name == name).Element;
+    }
+
+    /// <summary>
+    /// The slot rule. The head's throat is fixed to one of four cardinals (the <c>side</c> variant) and the
+    /// cabin's yaw is not, so every part of the hanger that reaches the rail band or higher has to fit that
+    /// throat at EVERY yaw: its furthest CORNER from the yaw axis, not its half-width, is what must clear.
+    /// A hanger authored as the long flat arm the eye prefers - 8 x 2.5 units - reaches 3.71 off the axis at
+    /// 45 degrees against a 2.6-unit throat and goes straight through the crossarm's foot plate. That is why
+    /// the blade is narrow, and why the guide rollers sit on the yaw axis rather than out at the rails.
+    /// The shoulder is exempt because it stays below the rails, and that is asserted rather than assumed.
+    /// </summary>
+    [Fact]
+    public void EveryPartOfTheHangerClearsTheSheaveThroatAtAnyYaw()
+    {
+        var hangDrop = Load("entities", "cabin.json").GetProperty("attributes").GetProperty("hangDrop").GetDouble();
+        var (_, _, elements) = CabinBounds();
+        var head = Load("shapes", "block", "pylonhead.json").GetProperty("elements").EnumerateArray().ToList();
+
+        double HeadEdge(string element, string corner) =>
+            head.First(e => e.GetProperty("name").GetString() == element).GetProperty(corner)[0].GetDouble();
+
+        // Half the clear gap between the two sheave cheeks, measured from the head cell's own centre line,
+        // and the underside of the rails in the cabin shape's own coordinates.
+        var slot = (HeadEdge("sheavecheekeast", "from") - HeadEdge("sheavecheekwest", "to")) / 2;
+        var railBottom = (hangDrop - 0.5) * 16 + head.Min(e => e.GetProperty("from")[1].GetDouble());
+
+        var reaching = elements.Where(e => e.Element.GetProperty("to")[1].GetDouble() > railBottom).ToList();
+        Assert.NotEmpty(reaching);
+        Assert.DoesNotContain(reaching, e => e.Name == "hangershoulder");
+
+        foreach (var (name, element) in reaching)
+        {
+            double Reach(int axis) => Math.Max(
+                Math.Abs(element.GetProperty("from")[axis].GetDouble()),
+                Math.Abs(element.GetProperty("to")[axis].GetDouble()));
+
+            var corner = Math.Sqrt(Reach(0) * Reach(0) + Reach(2) * Reach(2));
+            Assert.True(corner <= slot,
+                $"{name}: its far corner is {corner:0.###} units off the yaw axis against a {slot:0.###}-unit " +
+                "throat, so it fouls the head at some yaw");
+        }
     }
 
     [Fact]
@@ -336,10 +391,11 @@ public class RopewayAssetContractTests
         Assert.Equal(4.0, (max[0] - min[0]) / 16, 3);
         Assert.Equal(2.875, (max[2] - min[2]) / 16, 3);
 
-        // The tower's posts sit at block x = +/-2, leaving three free cells, and SpanMath.ClearanceRadius
-        // certifies exactly that corridor. Anything wider is a cabin no line can legally carry.
+        // SpanMath.ClearanceRadius certifies a 3-wide corridor along the SPAN, and that is the binding
+        // limit on cabin width - not the tower, whose posts now sit at x = +/-3 and leave five free cells.
+        // Widening the tower did not widen what the line will carry, and must not be read as having done.
         Assert.True((max[2] - min[2]) / 16 <= 2 * SpanMath.ClearanceRadius + 1,
-            "the cabin is wider than the passage it travels through");
+            "the cabin is wider than the corridor its spans are certified over");
     }
 
     /// <summary>
@@ -371,6 +427,10 @@ public class RopewayAssetContractTests
         Assert.True(-box.X1 >= reach && box.X2 >= reach,
             "selection box is smaller than the cabin's longest horizontal half-extent");
         Assert.True(box.Y1 <= min[1] / 16, "selection box does not reach the bottom of the model");
+
+        // And the top. The old mast stopped at 2.00 blocks, inside a box that topped out at 2.05; the jaw
+        // reaches 2.40, and for a while the top 0.35 block of the hanger was not clickable at all.
+        Assert.True(box.Y2 >= max[1] / 16, "selection box does not reach the top of the model");
     }
 
     /// <summary>Both seats must stay on the cabin's centre line, one fore and one aft of the mast.</summary>

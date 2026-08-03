@@ -55,15 +55,15 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    turns to face you.
 
 5. **Read the guidance.** Look at the footing. **PASS:** the block-info panel says
-   *"Tower is not complete, 13 blocks missing or wrong."* followed by *"The cabin will pass through
+   *"Tower is not complete, 15 blocks missing or wrong."* followed by *"The cabin will pass through
    \<direction\> to \<the opposite direction\>"*. **PASS:** those two directions are the axis you were
    standing on when you placed it — the crossarm goes across them. Turn the footing (break and replace
    facing the other way) and check the line changes with it; this is the only orientation cue there is,
    and building the crossarm 90° out is a tower no line can pass through.
-   Right-click the footing. **PASS:** a red toast with the same missing-block message, and **13**
-   translucent ghost cells light up above and around it — a five-wide row four blocks up and two
+   Right-click the footing. **PASS:** a red toast with the same missing-block message, and **15**
+   translucent ghost cells light up above and around it — a seven-wide row four blocks up and two
    four-block columns under its ends — the colour of the block wanted where the cell is empty, red where
-   the wrong block sits. **PASS:** no ghost cell anywhere in the three columns directly above the footing;
+   the wrong block sits. **PASS:** no ghost cell anywhere in the five columns directly above the footing;
    that is the archway the cabin goes through.
 
 6. **Open the guide.** Sneak (hold Shift) and right-click the footing with an empty hand.
@@ -73,10 +73,12 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    **FAIL modes to report:** cabin invisible (renderer/tesselation), cabin clipped out of the inset
    (the size/offset knob in §4.6), a `Ropeway: could not build the guide cabin preview` log line.
 
-7. **Build the tower.** Following the guide: two posts of **four** blocks each, standing on the ground two
+7. **Build the tower.** Following the guide: two posts of **four** blocks each, standing on the ground **three**
    blocks either side of the footing; then the crossarm across their tops,
-   four blocks up: **ropeway braces** at x = ±1 and ±2 and the **pylon head** in the middle, directly
-   above the footing.
+   four blocks up: **ropeway braces** at x = ±1, ±2 and ±3 and the **pylon head** in the middle, directly
+   above the footing. That is **16 cells** in all, two more than before the passage went from three
+   wide to five — the extra pair of braces is the only thing in the station-rail work that costs the
+   player anything, and it is charged on every tower of a chained route.
    **PASS:** each ghost cell disappears within ~0.5 s of you filling it, **without re-right-clicking** —
    this is the live-overlay fix; a stale ghost sitting on top of a placed block means it regressed.
    The count in the block-info panel counts down, and within ~1 s of the last block the panel reads
@@ -85,7 +87,9 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    legs start one block up is the "posts three tall" mistake and means the offsets moved.
    **PASS:** the tower is **one block deep**. There is no second gantry and nothing behind it.
    **PASS:** the pylon head validates whichever of its four facings you place it in. Point its throat down
-   the line anyway; it is the slot the cabin's mast rides in and a crosswise sheave looks wrong.
+   the line anyway; it is the slot the cabin's hanger blade rides in, it carries the station rails, and a
+   crosswise sheave looks wrong. **PASS:** the rails and their flared mouths overhang the head's own cell by
+   a block fore and aft, and no extra block is needed under them — that overhang is the shape, not a bug.
    **PASS — post materials.** Build one post out of **logs** and the other out of **stone bricks**; both
    must satisfy the structure. Then swap a post block for each of the remaining six accepted families in
    turn — debarked log, planks, raw stone (`rock-*`), cobblestone, drystone, polished rock — and check the
@@ -97,7 +101,7 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 7b. **The crossarm meets the posts.** Stand back and look at the joint where an outer crossarm cell lands on
    a post.
    **PASS:** the crossarm's foot plate covers the post's whole top face and sits **flat** on it — a
-   continuous metal band running the full five cells, broken only by the sheave throat in the middle.
+   continuous metal band running the full seven cells, broken only by the sheave throat in the middle.
    **FAIL:** the log's top face is visible around a narrower bracket, or there is a gap you can see through
    between the bracket and the log. That is the pre-fix shape.
    **PASS:** riding through (step 12) still leaves visible air over the cabin roof — the foot plate cost the
@@ -105,11 +109,13 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 
 8. **Check the passage.** Walk through the tower between the posts, along the axis the block-info panel
    named in step 5.
-   **PASS:** a clear 3-wide, 4-tall archway — no post in the way, and you walk over the footing rather
-   than around it (its collision box is half a block).
+   **PASS:** a clear 5-wide, 4-tall archway — no post in the way, and you walk over the footing rather
+   than around it (its collision box is half a block). (It was 3-wide; the posts moved out to x = ±3, which
+   is what step 12b's gentle-corner clearance depends on.)
    **PASS:** stand on the footing and look up: the sheave is four blocks above you, the underside of the
    crossarm three.
-   The cabin's own dimensions are **4 blocks along travel × 2.875 across × 3.25 tall**. The 2.875 is the
+   The cabin's own dimensions are **4 blocks along travel × 2.875 across × 3.65 tall** (floor at shape y
+   −20 to the top of the jaw at 38.4; the body alone is 2.5 and the hanger is the rest). The 2.875 is the
    one that has to fit between the posts; if you ever see the 4-block side facing them, the cabin shape
    has been re-authored along Z again and the previous round's item 1 has regressed.
 
@@ -181,14 +187,14 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 11. **Hang the cabin.** Hold the Ropeway Cabin item and right-click the first tower's footing.
     **PASS:** a cabin appears hanging 2 blocks below the sheave — that is **at the tower it was placed on,
     inside its own archway**, not somewhere near it: its floor a little over a block above the footing, its
-    roof just under the crossarm, its mast up in the sheave throat. **FAIL, and this is the one this round
+    roof just under the station rails, its hanger blade up between the sheave cheeks. **FAIL, and this is the one this round
     is most likely to get wrong:** the cabin appears four blocks lower, at footing height, sitting in the
     ground. That is `SpanMath.AnchorOf` handing back the footing centre instead of the sheave.
     **PASS:** the item leaves your hand (survival), and right-clicking the *middle* of a three-tower line
     with the cabin item instead gives *"The cabin can only be placed at an end tower."*
 
 11b. **The cable meets the cabin.** Stand back and look at a strung span with the cabin parked on it.
-     **PASS:** the drawn cable runs sheave to sheave, and the cabin's mast tip touches it. **FAIL:** the
+     **PASS:** the drawn cable runs sheave to sheave, and the cabin's jaw is closed round it — a hairline of daylight on all four sides, not a gap and not a z-fighting seam. **FAIL:** the
      cable runs at footing level, four blocks under the cabin, or the cabin hangs four blocks under the
      cable — that is the cable mesh and `AnchorOf` disagreeing, which is the whole point of drawing the
      cable from the footing with the same offset `AnchorOf` uses.
@@ -198,8 +204,10 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     untested thing in the mod. Then dismount and repeat aiming at the **floor or a lower wall panel,
     below the seats** — that band is what the §3c.4 selection-box fix added; before it the click hit
     nothing at all. **PASS:** both aims seat you, **from every side** — the override is
-    `x ±2.05, y -1.3..2.05, z ±2.05`, square in x/z because `Entity.SelectionBox` is world-axis-aligned and
+    `x ±2.05, y -1.3..2.45, z ±2.05`, square in x/z because `Entity.SelectionBox` is world-axis-aligned and
     is never rotated by yaw, so it has to circumscribe the cabin at any bearing rather than fit it at one.
+    (The top was 2.05 while the mast stopped at 2.00; the hanger's jaw reaches 2.40, so it went to 2.45 —
+    for a while the top 0.35 block of the hanger was not clickable at all.)
     **Do this on a line running north-south as well as one running east-west** — a box that fits only one
     of the two is the exact defect this round closed. **FAIL:** the lower half is dead to clicks, or the
     two ends of the cabin are dead while the sides work on one bearing but not the other, or the crosshair
@@ -229,17 +237,34 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     its 4-block side to a 3-block gap and clipping both posts on every pass. That is the shape-axis bug and it means the cabin shape has gone back to being
     built along Z.
     **PASS — the vertical fit, and the reason the tower got a block taller:** as the cabin
-    passes through a tower, its **floor clears the footing by three quarters of a block** and its **roof
-    clears the underside of the crossarm by about a quarter**. Both are visible margins, not hairlines.
-    (The roof gap was 0.3125 before the crossarm grew a foot plate that reaches the block boundary; it is
-    0.25 now, and the sway animation eats about 1/16 of it at the ends of the swing.)
-    **FAIL:** the floor cuts through the footing plinth, or the roof eats into the braces. Either one means
+    passes through a tower, its **floor clears the footing by half a block** and its **roof clears the
+    station rails hanging under the crossarm by a quarter**. Both are visible margins, not hairlines.
+    (`hangDrop` moved 2.0 → 2.25, the midpoint of its window, to buy the band above the roof that the
+    rails and the guide rollers live in; the floor clearance went 0.75 → 0.50 to pay for it.)
+    **FAIL:** the floor cuts through the footing plinth, or the roof eats into the rails. Either one means
     `SpanMath.SheaveHeight` and the cabin's `hangDrop` have drifted apart — the unit test
     `TheCabinFitsThroughTheTower` and `gen_manifests.py` both assert exactly these two gaps.
-    The mast **should** pass up into the sheave throat and stop level with its centre; that is the fit, not
-    a clip. The grip passing close under the braces is expected.
+    The hanger blade **should** pass up between the two sheave cheeks and the jaw should close on the rope
+    at the sheave centre with a hairline of daylight; that is the fit, not a clip. The guide rollers
+    running inside the rails is likewise the fit.
     **PASS:** the sway animation rocks the cabin **fore and aft along the line**, like a real hanging
     cabin, not side to side.
+
+12b. **Ride a corner, and expect the sharp one to clip.** Build three towers twice: once with a **gentle**
+     bend at the middle one (30 degrees or less) and once with a **right angle**. Face each middle footing
+     down one of its two legs.
+     **PASS — gentle bend:** the cabin misses both posts. Measured at 0.000 blocks of penetration at 30
+     degrees and 0.033 at 45; the 5-wide passage is what buys that, so a visible hit at 30 degrees means the
+     tower's posts are back at x = ±2.
+     **PASS — right angle, and this is a KNOWN LIMIT, not a bug:** the cabin **passes through a post**. A
+     tower facing is one of four cardinals, so at 90 degrees the outgoing leg IS the post axis: the cabin's
+     *origin* travels down the post column at tower-local x = 3. It is a translation, and no yaw law fixes a
+     translation - one was tried (the "angle-station" law) and made 45- and 60-degree corners worse, so it
+     was reverted. Record it and move on. The handbook tells players the same thing.
+     **Also expected at a right angle, cosmetic:** the outgoing rope leaves the sheave *into* the crossarm
+     and is buried in three brace blocks before it clears the tower. Known; do not report it.
+     **FAIL:** anything at a **gentle** corner - a cabin eating a post at 15-30 degrees is a real regression
+     and means the passage width or `SpanMath.TowerClearance` moved.
 
 13. **Arrive.** **PASS:** it stops at the far tower and holds. Try to dismount while it is still moving —
     you should get *"The cabin is moving. It stops at the next tower."* and stay seated. Once stopped,

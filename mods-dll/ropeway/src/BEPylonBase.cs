@@ -183,8 +183,12 @@ public class BEPylonBase : BlockEntity
         if (Api is ICoreClientAPI && byPlayer != null) highlightedStructure?.ClearHighlights(Api.World, byPlayer);
     }
 
-    /// <summary>Half-thickness of the drawn cable, in blocks.</summary>
-    private const float CableRadius = 0.06f;
+    /// <summary>
+    /// Half-thickness of the drawn cable, in blocks. Public because the cabin's jaw is authored closed on
+    /// this surface with 0.04 unit of clearance, so the two drift apart silently if only one of them moves -
+    /// <c>RopewayAssetContractTests.TheCabinFitsThroughTheTower</c> is what notices.
+    /// </summary>
+    public const float CableRadius = 0.06f;
 
     /// <summary>
     /// Draws this tower's half of every span it carries. Each end draws only to the midpoint rather than one
