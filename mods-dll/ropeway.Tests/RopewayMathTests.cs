@@ -813,6 +813,39 @@ public class RopewayMathTests
         Assert.Equal(expected, SpanMath.CompassKey(dx, dz));
     }
 
+    /// <summary>
+    /// A cabin standing at a tower sits square to that tower's passage, and turns the SHORT way to get there.
+    /// The passage axis has two yaws because the cabin is symmetric front-to-back, so picking the wrong one is
+    /// not wrong to look at - it is a cabin that spins the long way round on arrival, past the axis and back.
+    /// </summary>
+    [Theory]
+    // Facing north, arriving from the south: already nose-on, nothing to do.
+    [InlineData("north", Math.PI, Math.PI)]
+    // Facing north, arriving from the north: the OTHER yaw of the same axis, not a half turn back to it.
+    [InlineData("north", 0, 0)]
+    [InlineData("east", Math.PI / 2, Math.PI / 2)]
+    [InlineData("east", -Math.PI / 2, -Math.PI / 2)]
+    // A leg off the axis snaps onto the nearer of the two, and only ever onto the axis.
+    [InlineData("north", Math.PI * 0.75, Math.PI)]
+    [InlineData("north", Math.PI * 0.25, 0)]
+    public void ACabinStoppedAtATowerSquaresUpTheShortWay(string facing, double leg, double expected)
+    {
+        var yaw = EntityRopewayCabin.SquareTo(BlockFacing.FromCode(facing), (float)leg);
+
+        Assert.Equal(0, GameMath.AngleRadDistance((float)expected, yaw), 4);
+
+        // And whatever the leg was, the turn is never more than a quarter. Anything larger means the two
+        // yaws of the axis were mixed up, which is the long way round.
+        Assert.True(Math.Abs(GameMath.AngleRadDistance((float)leg, yaw)) <= Math.PI / 2 + 1e-4);
+    }
+
+    /// <summary>A tower that cannot be asked leaves the cabin on its plain leg bearing rather than due north.</summary>
+    [Fact]
+    public void WithNoPassageToSquareToTheCabinKeepsTheLegBearing()
+    {
+        Assert.Equal(1.234f, EntityRopewayCabin.SquareTo(null, 1.234f));
+    }
+
     private static RopewayLine Line(params (int X, int Y, int Z)[] towers)
     {
         var positions = new List<BlockPos>();

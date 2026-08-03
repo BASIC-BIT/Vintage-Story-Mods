@@ -170,6 +170,12 @@ public sealed class RopewayLine
     /// actually reduced penetration was the 5-wide passage. See <c>docs/KNOWN-ISSUES.md</c>; do not
     /// re-attempt the yaw law without bending the path in whatever model claims it works.
     /// </para>
+    /// <para>
+    /// The narrow half of it is fine and did ship, but NOT here: <c>EntityRopewayCabin.SquareTo</c> squares
+    /// the cabin to a tower's passage only while it is STOPPED there, where the origin does not move and
+    /// there is nothing to crab away from. This method is the bearing for a cabin in motion and must stay
+    /// the plain leg - a passing cabin's yaw comes from here and from nowhere else.
+    /// </para>
     /// </summary>
     public Vec3d DirectionAt(double travelled)
     {

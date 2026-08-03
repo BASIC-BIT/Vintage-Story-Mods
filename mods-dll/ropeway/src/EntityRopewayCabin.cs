@@ -762,7 +762,60 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         Pos.SetPosWithDimension(new Vec3d(point.X, point.Y - hangDrop, point.Z));
 
         var dir = line.DirectionAt(Travelled);
-        Pos.Yaw = (float)Math.Atan2(dir.X, dir.Z);
+        var leg = (float)Math.Atan2(dir.X, dir.Z);
+        Pos.Yaw = departed ? leg : StationYaw(line, leg);
+    }
+
+    /// <summary>
+    /// The yaw of a cabin STOPPED at a tower: square to that tower's own passage, so it sits flush with the
+    /// platform instead of already pointing at the next station. Falls back to the leg bearing whenever the
+    /// tower cannot be asked.
+    /// <para>
+    /// <c>!departed</c> is the whole safety condition and it is not a proxy for anything - it is the exact
+    /// predicate under which <see cref="Travelled"/> cannot change. Every write to Travelled in
+    /// <see cref="ServerTick"/> is below the <c>!departed</c> early return except the stale-state clamp and
+    /// <see cref="ParkAtNearestEnd"/>, both of which are teleports onto a tower. So the cabin never rotates
+    /// while it is moving: this is the narrow half of the REVERTED angle-station law (see
+    /// <see cref="RopewayLine.DirectionAt"/>), which held the passage axis across a WINDOW around the vertex
+    /// and crab-walked because <see cref="RopewayLine.PositionAt"/> had already swung the origin onto the
+    /// outgoing leg. Stationary, the origin does not move, so there is nothing to crab away from. A cabin
+    /// merely PASSING a tower is byte-identical to the shipped law - it never stops, so it never gets here.
+    /// </para>
+    /// <para>
+    /// Turning in place at the tower centre sweeps the cabin's half-diagonal, sqrt(2.0^2 + 1.4375^2) = 2.463
+    /// blocks, against post inner faces at 2.5 - 0.037 blocks of margin, and only the 5-wide passage buys it.
+    /// <c>TheCabinCanTurnSquareAtATowerWithoutSweepingThroughAPost</c> asserts it off the shipped shape and
+    /// the shipped multiblock; if either moves, that test is the thing that fails.
+    /// </para>
+    /// </summary>
+    private float StationYaw(RopewayLine line, float leg)
+    {
+        var index = line.TowerAt(Travelled, ArrivalTolerance);
+        if (index < 0) return leg;
+
+        var modSystem = ModSystem;
+        return modSystem != null && modSystem.LoadedTowers.TryGetValue(line.Towers[index], out var tower)
+            ? SquareTo(tower.PassageFacing, leg)
+            : leg;
+    }
+
+    /// <summary>
+    /// The passage axis, as the one of its two yaws nearer <paramref name="leg"/>. The cabin is symmetric
+    /// front-to-back so both are equally correct to look at, and taking the nearer one is what makes it turn
+    /// the short way - at most a quarter turn, and never past the axis and back. Pure, and therefore tested.
+    /// <para>
+    /// SNAP, not a hand-rolled blend: the cabin carries <c>interpolateposition</c>, whose
+    /// <c>LerpRotation</c> already eases Pos.Yaw with a ~0.1 s time constant, so one written yaw is rendered
+    /// as a rotation in place. A blend of our own would be a second easing on top of that one, with a phase
+    /// of its own that would have to be proven not to overlap travel.
+    /// </para>
+    /// </summary>
+    public static float SquareTo(BlockFacing passage, float leg)
+    {
+        if (passage == null) return leg;
+
+        var axis = (float)Math.Atan2(passage.Normalf.X, passage.Normalf.Z);
+        return Math.Abs(GameMath.AngleRadDistance(leg, axis)) > Math.PI / 2 ? axis + (float)Math.PI : axis;
     }
 
     private RopewayModSystem ModSystem => Api?.ModLoader?.GetModSystem<RopewayModSystem>();

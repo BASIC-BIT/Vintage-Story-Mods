@@ -265,8 +265,28 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      and is buried in three brace blocks before it clears the tower. Known; do not report it.
      **FAIL:** anything at a **gentle** corner - a cabin eating a post at 15-30 degrees is a real regression
      and means the passage width or `SpanMath.TowerClearance` moved.
+     **This step is about a corner the cabin RIDES THROUGH, and it must stay that way.** A cabin that does
+     not stop is on the plain leg bearing from end to end - step 13's square-up applies only where it stands
+     still. If you see the cabin turn square to a middle tower it is *passing*, that is the reverted law
+     back, and it is a fail here whatever it looks like.
 
-13. **Arrive.** **PASS:** it stops at the far tower and holds. Try to dismount while it is still moving —
+13. **Arrive, and watch it square up.** **PASS — do this at a tower on a line that TURNS, which is where it
+    shows:** as the cabin settles it **turns to sit flush with the station**, square across the crossarm and
+    parallel to the posts, instead of staying angled at the next tower. It is a turn of roughly **half a
+    second** in place (an eased settle, frame-rate dependent), never more than a quarter turn.
+    **FAIL:** it snaps instantly with no rotation (the client's entity interpolation is not running), or it
+    turns the long way round.
+    **NOT a failure, do not report it:** the turn overlapping the start or end of travel by a fraction of a
+    block. The client interpolates position and yaw *independently*, so on departure roughly half the turn
+    happens before visible motion and the rest across the first block or so, and on arrival the last sliver
+    of the turn overlaps the last ~0.15 block. An earlier version of this step called that a FAIL and would
+    have had you report correct behaviour as broken.
+    **What 12b actually catches** is different: the cabin holding the tower's axis *all the way through* a
+    corner while continuing to travel, so it crab-walks and drags its tail through a post. That is the
+    reverted angle-station law, and it looks nothing like a half-second settle.
+    **PASS — leaving:** the cabin turns back onto the span as it departs. A second rotation the same size,
+    and expected — it reads as the cabin swinging out onto the line.
+    **PASS:** it stops at the far tower and holds. Try to dismount while it is still moving —
     you should get *"The cabin is moving. It stops at the next tower."* and stay seated. Once stopped,
     right-click to get out; you should land on or beside the tower, not in the air.
 

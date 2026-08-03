@@ -263,6 +263,70 @@ public class RopewayAssetContractTests
         Assert.Equal(BEPylonBase.CableRadius + 0.04 / 16, jawGap, 4);
     }
 
+    /// <summary>
+    /// THE SAFETY ARGUMENT for <see cref="EntityRopewayCabin.SquareTo"/>, and it is tight. A cabin stopped at
+    /// a tower turns to that tower's passage axis, in place, about its own origin - which is the tower's
+    /// centre line. So it sweeps a CIRCLE of its own half-diagonal, not its half-width: sqrt(2.0^2 +
+    /// 1.4375^2) = 2.463 blocks, against post inner faces at 2.5. Margin 0.037 blocks, and it exists only
+    /// because the passage was widened from 3 to 5; at posts x = +/-2 the cabin would sweep 0.463 blocks
+    /// through them, so this test is what stops that revert being made silently.
+    /// <para>
+    /// Both numbers are derived, not typed: the half-diagonal from the shipped cabin shape and the inner face
+    /// from the shipped multiblock offsets. Widen the cabin, narrow the passage, or lower the crossarm and
+    /// this fails with the number it failed by. Only the parts of the cabin that are actually BESIDE a post
+    /// are measured - the hanger reaches above the post tops into the throat, which
+    /// <see cref="EveryPartOfTheHangerClearsTheSheaveThroatAtAnyYaw"/> owns.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheCabinCanTurnSquareAtATowerWithoutSweepingThroughAPost()
+    {
+        var offsets = Load("blocktypes", "pylonbase.json").GetProperty("attributes")
+            .GetProperty("multiblockStructure").GetProperty("offsets").EnumerateArray()
+            .Select(o => (X: o.GetProperty("x").GetInt32(), Y: o.GetProperty("y").GetInt32()))
+            .ToList();
+
+        // The posts: everything below the crossarm. Their inner faces are half a block in from their centres.
+        var posts = offsets.Where(o => o.Y < SpanMath.SheaveHeight).ToList();
+        Assert.NotEmpty(posts);
+        var passageHalf = posts.Min(o => Math.Abs(o.X)) - 0.5;
+
+        // Heights in blocks above the footing's bottom face, then in the cabin shape's own units about its
+        // origin - the cabin hangs hangDrop below the sheave, which is SheaveHeight + 0.5 up.
+        var hangDrop = Load("entities", "cabin.json").GetProperty("attributes").GetProperty("hangDrop").GetDouble();
+        var origin = SpanMath.SheaveHeight + 0.5 - hangDrop;
+        var postTop = (posts.Max(o => o.Y) + 1 - origin) * 16;
+        var postBottom = (posts.Min(o => o.Y) - origin) * 16;
+
+        var (_, _, elements) = CabinBounds();
+        var beside = elements.Where(e =>
+            e.Element.GetProperty("from")[1].GetDouble() < postTop &&
+            e.Element.GetProperty("to")[1].GetDouble() > postBottom).ToList();
+
+        Assert.NotEmpty(beside);
+
+        var worst = ("", 0.0);
+        foreach (var (name, element) in beside)
+        {
+            double Reach(int axis) => Math.Max(
+                Math.Abs(element.GetProperty("from")[axis].GetDouble()),
+                Math.Abs(element.GetProperty("to")[axis].GetDouble()));
+
+            var corner = Math.Sqrt(Reach(0) * Reach(0) + Reach(2) * Reach(2)) / 16;
+            if (corner > worst.Item2) worst = (name, corner);
+        }
+
+        Assert.True(worst.Item2 < passageHalf,
+            $"{worst.Item1} swings {worst.Item2:0.####} blocks off the yaw axis against a passage whose posts " +
+            $"start at {passageHalf:0.####}. A cabin stopped at a tower turns in place to square up, so it " +
+            "would sweep through the post. Widen the passage, narrow the cabin, or drop the square-up.");
+
+        // The margin, stated. It is 0.037 blocks - a third of the cabin's own wall thickness - so this is a
+        // pass by inspection of one number and not by comfortable clearance.
+        Assert.Equal(2.463, worst.Item2, 3);
+        Assert.Equal(0.037, passageHalf - worst.Item2, 3);
+    }
+
     private static JsonElement Find(List<(string Name, JsonElement Element)> elements, string name)
     {
         return elements.First(e => e.Name == name).Element;

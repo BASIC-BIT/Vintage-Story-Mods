@@ -24,6 +24,20 @@ into the post on the outside of the bend. `DirectionAt` is the plain leg bearing
 `SquareHold`, `YawBlend` and the three tests that asserted the law are deleted. The original 0.000-at-every-angle
 number came from a model whose cabin ran dead straight through the vertex, which `PositionAt` never does.
 
+**The salvageable half DID ship: a cabin STOPPED at a tower squares up to that tower's passage.**
+`EntityRopewayCabin.SquareTo`, gated on `!departed`, which is the exact predicate under which `Travelled`
+cannot change. That is the whole difference from the reverted law: the law held the axis across a *window*
+around the vertex, **while the cabin was moving**, which is what let `PositionAt` swing the origin out from
+under it. Stationary there is no origin motion to crab away from, and a cabin merely *passing* a tower never
+reaches the branch at all — a pass-through is byte-identical to the shipped leg bearing, which is why the
+penetration numbers above are unchanged. Rotating in place at the tower centre sweeps the cabin's
+half-diagonal, √(2.0² + 1.4375²) = **2.463 blocks against post inner faces at 2.5** — 0.037 blocks of margin,
+and the 5-wide passage is the only reason it exists at all (at x ±2 it would sweep 0.463 blocks through a
+post). `TheCabinCanTurnSquareAtATowerWithoutSweepingThroughAPost` asserts both numbers off the shipped shape
+and the shipped multiblock. It is a snap on the server; the cabin's `interpolateposition` behavior eases
+`Pos.Yaw` with a time constant of roughly 0.15 s, so the settle reads as about half a second of eased rotation in place (frame-rate dependent), and it rotates back
+onto the span as it departs. Renders: `docs/agentic/ingest/cablecar/renders/parked/`.
+
 **A right-angle corner can never be clean, under any yaw law.** The posts flank the passage at tower-local
 x = ±3 and a tower facing is one of four cardinals, so at a right angle the outgoing leg *is* the post axis:
 the cabin's **origin** travels through the post column. No rotation fixes a translation. This is a permanent
@@ -165,6 +179,12 @@ three blockers and the mount race were fixed in the same pass; these five were j
 | ~~**C3**~~ | — | **FIXED** by the rider stop key above. BASIC hit this in play before the fix. |
 | **C4** | LOW | **A stale `LineKey` falls through to opening the picker** rather than saying anything (`RopewayLinkService.cs:96-105`). Surprising, not silent, and self-healing: the next tick re-bases and the second click calls the cabin. |
 | **C5** | — | **Interior towers lost the plain-click picker.** Any tower carrying spans now calls the cabin on a plain right-click; the picker is Ctrl-only there. Deliberate — note it in the release notes. |
+
+### A tower facing the wrong way now parks the cabin across its own rope
+
+`SquareTo` squares the parked cabin to the **tower**, not to the line, and nothing requires a footing to face down the line it carries — the picker will link any tower in range whichever way it points. Under the old leg-bearing law a mis-faced tower at least parked the cabin parallel to the rope; now it parks across it, which looks broken even though the tower is working correctly.
+
+Not fixed. The cheap options, in order of preference: warn (do not refuse) at link time when a tower's `PassageFacing` is far off the span bearing; or say it in the block-info panel; or auto-face the footing to its first span. Any of them is small; none is done.
 
 ## Deliberate behaviour worth knowing
 
