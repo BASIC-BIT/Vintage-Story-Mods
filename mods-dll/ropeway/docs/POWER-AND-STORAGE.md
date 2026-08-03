@@ -1,141 +1,175 @@
-# Power and energy storage — design direction
+# Power — design direction
 
-**Status:** built. Spans two mods (`ropeway` and `flywheelpower`), so if `flywheelpower` grows a docs
-home this belongs there as much as here.
+**Status:** built, and rebuilt. The store this file used to describe is **deleted**; what ships is a plain
+mechanical load. The storage taxonomy at the bottom is still live, as a note about a block that does not
+exist yet.
 
 ## The decision
 
-Mechanical power is **required** to run a ropeway. The earlier draft recommendation — power as a speed
-bonus — was argued primarily from vanilla's weather: the `still` wind pattern (strength avg 0, no
-`strengthNoise`, weight 1 of 4.4) means dead calm roughly **23% of play time**, in blocks averaging six
-in-game hours, and no windmill of any size makes torque then. A departure gate would have refused to move
-a quarter of the time.
+**The ropeway is an ordinary machine on the mechanical network.** The drive turns the haul rope, and the
+cabin runs at `k × TrueSpeed` of the drives on its line. There is no store, no charge, no quote, no credit
+and no gate. A network that stops is a cabin that stops, exactly as a network that stops is a quern that
+stops, and it starts again by itself when the wind comes back.
 
-BASIC's answer is better than weakening the requirement: **buffer the calm with storage.** A ropeway then
-becomes a reason to build energy storage rather than just another consumer of it, and the weather
-problem turns into a design opportunity.
+### Why the store went
 
-## The storage taxonomy
+It existed to guarantee that a trip which *started* would *finish*, because a cabin stopped mid-span was a
+trap: the rider could not get out. **That is no longer true.** The phase-1 emergency bail-out (hold sneak
+for two seconds) means a rider can always leave, anywhere on the line, and a stopped cabin lets them step
+straight out because `IsMoving` is false. Once nobody can be trapped, "the cabin stopped because the wind
+stopped" is ordinary machine behaviour — and the entire apparatus built to prevent it (charge arithmetic,
+capacity, `paidTo` and the `Fare` credit rule, `Quote`/`TripCost`/`WorstTripCost`, the link-time steepness
+refusal, and the `NoStore` / `StoreUnreachable` / `NoPower` / `TooDear` refusal states with their strings,
+block-info lines and tests) was dead weight protecting against a problem that had already been solved
+somewhere else.
 
-Three devices that are not interchangeable, and the differences are what make them worth having:
+It also closes `POWER-REVIEW.md` **F1 through F10** outright — every one of them was a property of the
+store, the quote or the weight's persisted binding.
 
-| device | capacity | decay | what it is actually for |
+### Why the tension weight was never the battery it was named after
+
+Arithmetic, not taste. The drawn mass is 0.156 m³ of granite — 422 kg — raised 2 m: **8.3 kJ**. Against it,
+400 blocks of level travel is roughly **45 kJ** and a 40 m climb about **224 kJ**. Short by 5× and 27×. The
+old `capacity: 400` was not a physical quantity at all, it was a game number wearing a physical name, which
+is exactly why `Quote` and `maxLineLength` could not be made to agree (F1).
+
+And a real tension weight does not store energy. It keeps the haul rope taut. Two different machines were
+wearing one name; they have been separated.
+
+## What the tension weight is now
+
+`ropeway:tensionweight` is a **tensioner**: a build requirement for a line, one block, standing within
+eight blocks of any tower on it. It holds no charge, has no gauge and no capacity, is not a mechanical
+power node, and is not bound to anything.
+
+- **It is a build requirement, not a runtime state**, and the check is at **cabin placement**:
+  *a line needs one tension weight to keep the rope taut, and will not take a cabin without it.* One
+  sentence, told once, while the player is building — rather than a refusal state with a message, a toast
+  and a wait attached. Break the weight afterwards and the cabin keeps running; the tower panel says the
+  tensioner is missing.
+- **Proximity at lookup time, never a persisted binding.** `BETensionWeight.OnLine` asks whether any loaded
+  weight stands within its own `towerRadius` of any tower on the line. That deletes `AnchorTower`, `Bind`,
+  the `UnlinkAll` re-bind, the orphan and spare block-info lines, `StoreAt`, and the one-weight-per-line
+  placement refusal — with them go review findings **F4, F6 and F7**, which were all consequences of
+  binding a block to one tower at placement.
+- **The mass moved into the shape.** It used to be chunk mesh drawn by the block entity at a height that
+  *was* the charge gauge. It is now a static element hanging near the bottom of its guide, on a rod up to
+  the head beam, which is where a rope tensioner rests and what makes it read as hanging rather than as a
+  rock sitting on a pad. The block entity draws nothing and exists only to register the block's position.
+
+## The speed ladder, read from vanilla
+
+A rotor settles where its torque meets the load. `BEBehaviorMPRotor.GetTorque` supplies
+`(capableSpeed − speed) × TorqueFactor` against network resistance, so with our resistance `R` the network
+settles at
+
+```
+s* = TargetSpeed − R / T          TargetSpeed = min(0.6, windSpeed)      T = sails/4 × powerMul
+```
+
+`powerMul` is 1 for the wood rotor (max 5 sails) and 1.25 for the metal one (max 10), from
+`survival/blocktypes/mechanics/windmillrotor.json`.
+
+**That expression is nearly flat for small `R`** — which is what the old design got wrong. At the old
+`WindingResistance` of 0.12, three sails gave 0.44 and ten gave 0.56: a 22% spread, invisible in play, and a
+mod where building a bigger mill did nothing you could feel. The lever is `R`, so `R` is now large:
+`HaulResistance = 0.30`, three times a quern's 0.1 and 40% of a maxed wood mill's 0.75 stall budget.
+
+At `k = BlocksPerNetworkSpeed = 6.0`, in good wind, on the level:
+
+| drive | T | s* | cabin |
 |---|---|---|---|
-| **Flywheel** (`flywheelpower`) | modest | yes — friction | smoothing a variable load, riding out a gust or a lull |
-| **Raised mass** (tension weight, or a stone block hoisted up a tower) | large | none | persistent storage across days of calm |
+| 2-sail wood | 0.50 | 0 | **stalls** |
+| 3-sail wood | 0.75 | 0.20 | **1.2 blocks/s** — a walk |
+| 4-sail wood | 1.00 | 0.30 | 1.8 |
+| 5-sail wood (maxed) | 1.25 | 0.36 | **2.2** — the old fixed speed |
+| 5-sail metal | 1.56 | 0.41 | 2.4 |
+| 10-sail metal (maxed) | 3.13 | 0.50 | **3.0** — a run |
+
+A 2.5× spread across the drives a player will actually build, with a stall at the bottom, so "build a bigger
+mill" is a legible answer to a slow line. `RopewayPowerTests.ABiggerDriveIsAVisiblyFasterCabin` asserts both
+the separation and the absolute rungs.
+
+## Resistance reflects load
+
+`RopewayPower.Resistance(hauling, climb, cargo)` is the whole model:
+
+```
+idle                                        when nothing is hauling
+HaulResistance × (1 + 0.5·max(0,climb) + cargo)    when a cabin is trying to move
+```
+
+- **`hauling` is the cabin *trying* to move, not moving.** The load is what slows the network, so keying it
+  on real motion is a feedback loop: a weak mill stalls, the load vanishes, the network speeds up, the cabin
+  starts, and it stalls again a tick later. `EntityRopewayCabin.IsHauling` is `departed`.
+- **`climb`** is the vertical component of the unit direction of travel, so 0.5 is a 30° span. At half
+  weight that is +25% load — a maxed wood mill goes 2.2 → 1.8 blocks/s — and a 45° span +35% → 1.6. Bounded
+  deliberately: a mill that hauls on the level must still climb, slowly. A cabin stuck halfway up a hill is a
+  bug report; a cabin crawling up one is a machine working.
+- **`cargo`** is extra load as a fraction of the empty cabin's, and is passed 0. There is no cargo-weight
+  rule yet and this does not invent one — it gives the one that eventually lands exactly one home, so it
+  cannot be invented separately in the cabin and in the tower.
+- Descending is clamped to level. Gravity assisting a descent is real, but a negative resistance is a
+  ropeway that drives the network.
+
+**Every powered tower declares the same load**, not a share of it. A share would have to be divided by how
+many other towers are powered — a number that changes when somebody walks away and a chunk unloads, which is
+the coupling this design refuses to have. Each drive pulls its own weight and their speeds add.
+
+## Power may be supplied at ANY tower, and pools
+
+Unchanged, and now simpler: `BEPylonBase.DriveSpeedOn` sums `TrueSpeed` over the line's loaded towers, **one
+term per mechanical network** (`RopewayPower.PoolSpeed`, keyed on `MechanicalNetwork.networkId`). That is the
+whole of the pooling — addition does not care about order, and a tower whose chunk unloads simply stops
+contributing.
+
+The per-network key is load-bearing rather than tidiness. `TrueSpeed` is `|Network.Speed × GearedRatio|`, so
+two footings tapped off one axle run are two windows onto the same turning shaft. Summing per tower let a
+player buy speed with axles: each hookup also declares `HaulResistance` on that network, but the load only
+*subtracts* from the settling speed while the sum *multiplies* what is read — three stubs off one maxed metal
+mill read 5.6 blocks/s against a single hookup's 3.0. Adding load made the machine faster, which is the one
+thing a load model must never do. First hookup seen on a network wins; they are all looking at one rope.
+
+Two mills on separate towers are a visibly faster cabin. Historically defensible too: intermediate drive
+stations are real on long ropeways, because driving a continuous haul loop anywhere along its length drives
+all of it.
+
+## The cabin reads live network state — and what makes that safe
+
+The old design forbade this in as many words. It is now the whole point, and the guarantee that replaces the
+store is the **line-length cap**: `maxLineLength` is 320 blocks, inside the server's default
+`MaxChunkRadius` of 384 (`ServerConfig.cs:925`, only ever raised by `ServerMain.cs:789`). Chain length is an
+upper bound on the straight-line distance between any two towers, so **a player anywhere on a line holds
+every tower of it loaded — drives included**. The same argument that closes the truncated-line failure class
+(`KNOWN-ISSUES.md` R1–R4) also keeps a rider's drive loaded.
+
+Raise that cap, or run a server configured below `MaxChunkRadius` 10, and a drive can go dark under a rider.
+Nothing corrupts — the cabin slows or stops — but it stops for a reason the player cannot see. The note lives
+on `pylonbase.json`'s `//maxLineLength`, where the old no-live-read rule used to be written down.
+
+## Gravity storage: shelved, not cancelled
+
+It comes back as **its own standalone block**, usable by anything on the mechanical network rather than
+welded to a ropeway — which is also the only shape in which it can be sized honestly. Rough sizing from the
+arithmetic above: **about one cubic metre of stone per 8.5 m of lift** for a single uphill ropeway trip. A
+device that stores a useful ropeway trip is therefore a structure, not a decoration, and that is the design
+constraint the ropeway-welded version was hiding.
+
+The taxonomy that motivated it still stands:
+
+| device | capacity | decay | what it is for |
+|---|---|---|---|
+| **Flywheel** (`flywheelpower`, sibling mod — not a dependency, and not craftable in vanilla) | modest | yes — friction | smoothing a variable load, riding out a gust |
+| **Raised mass** — a standalone block, unbuilt | large | none | persistent storage across days of calm |
 | **Frictionless flywheel** — imbued, speculative | large | none | a battery |
 
-The third row is the load-bearing observation, in BASIC's words: *"as soon as you have a flywheel that
-can store even more power and doesn't degrade with friction over time, then you just made a battery."*
-That is a strong argument for the imbuement being **expensive and late** — it does not improve a
-flywheel, it collapses two distinct mechanics into one and deletes the reason raised mass exists.
-If frictionless flywheels ever ship cheap, gravity storage is dead content.
-
-## What this means for the ropeway
-
-- The station's **tension weight** is not just ropeway machinery — it is a concrete instance of "raised
-  mass as energy storage". Build it as a concrete thing now. Do **not** generalise it into a shared
-  gravity-battery abstraction until there is a second real caller (a standalone storage block would be
-  that caller; the ropeway alone is not).
-- **A flywheel on the line is the intended answer to dead calm.** Hook a flywheel into the drive
-  network and the ropeway keeps running through a lull. That is a cross-mod interaction worth making
-  legible to the player — the handbook should say it in as many words, since nothing else will teach it.
-- Design so `flywheelpower` is **optional**, not a hard dependency: the ropeway must work with any
-  mechanical power source, with a flywheel being the thing that makes it *pleasant*.
+The third row is why the second must stay expensive: *"as soon as you have a flywheel that can store even
+more power and doesn't degrade with friction over time, then you just made a battery."* If frictionless
+flywheels ever ship cheap, gravity storage is dead content.
 
 ## The cheapness constraint, correctly scoped
 
-An earlier draft of this doc claimed requiring mechanical power conflicts with `DECISIONS.md` §3
-("keep the recipe reachable early, do not gate this behind late-game metal"). **It does not.** BASIC
-clarified: §3 is about the **marginal** cost of a pylon and its rope span, because a chained route
-multiplies that cost by every hop. It was never about the system's one-time cost.
-
-So the budgets are separate and both are satisfiable:
-
-- **Per pylon, per span — must stay cheap.** This is what scales with route length. Wood, minimal metal.
-- **Per line — a drive may be a real investment.** It is paid once no matter how long the route grows.
-
-A windmill plus axles for the whole ropeway is fine. A windmill *per pylon* would not be.
-
-## Power may be supplied at ANY tower on the line
-
-BASIC: *"mechanical power can be supplied to any of the gantries across a chained route. Then it will be
-transferred across the cable accordingly."*
-
-**Decided.** Any tower's `ropeway:pylonbase` can take mechanical power; there is no designated Drive
-Station. Contributions from multiple powered towers **pool** for the line, so adding a second windmill
-somewhere along a long route helps rather than being ignored.
-
-This is also more historically defensible than it might sound: **intermediate drive stations are real**
-on long ropeways, exactly because driving a continuous haul loop anywhere along its length drives the
-whole loop. Worth a handbook line — it is flavour the player will accept immediately once told.
-
-Practical consequences:
-
-1. **Put the drive where the resource is.** Wind on a ridge, water in the valley — you power the tower
-   that suits the terrain, not the one the mod nominates. This is the real win, and it is why the
-   pooling matters more than the realism.
-2. **The store stays physical, and singular.** Recommend ONE tension-weight block placed somewhere on
-   the line, wound by any powered tower on it. Keep the stored energy visible as a raised mass rather
-   than as abstract per-line state — the whole appeal of gravity storage is that you can look at it and
-   see how much you have left.
-3. `AnchorOf` and the line walk already treat towers uniformly, so "any tower" costs no extra machinery
-   here — it is cheaper than a designated drive end would have been.
-
-## Why the store is what makes pooling safe
-
-Pooling power across towers has a trap, and it is the one that already cost this mod three fix rounds:
-**a tower in an unloaded chunk contributes nothing.** If the cabin drew live power from the line, a
-windmill at the far end going out of render would slow or stop a cabin mid-span — the truncated-line
-failure class, wearing a new hat.
-
-The wound store removes it structurally. Drives charge the store *whenever their chunks are loaded*; the
-cabin draws from the **store**, never from live power. An unloaded windmill simply stops contributing
-charge; it cannot strand anyone, because the energy for the trip was already banked — and under the
-option-B design the trip's cost is deducted at departure, so a journey that starts always finishes.
-
-This is the strongest argument for storage over direct drive, and it is worth more than the realism
-argument: **it decouples movement from chunk-load state entirely.** Any future design that has the cabin
-read live network speed re-opens the whole class.
-
-## A trip is paid for once — the credit rule
-
-"Deducted at departure" is only half of the promise. The other half is that the cabin **carries what it
-bought**: `EntityRopewayCabin.paidTo` is the furthest point along the line the store has already funded,
-persisted with the rest of the trip state. `PayFor` is the only thing that writes it and
-`EntityRopewayCabin.Fare` is the whole rule:
-
-- a target **between the cabin and `paidTo`** is free — a rider changing their mind inside a journey the
-  store already funded, and the reach does not shrink to meet it;
-- a target **past `paidTo` the same way** pays only the leg beyond it;
-- a target **the other way** is a new trip, quoted in full. This clause is what stops the credit funding
-  unlimited travel: the covered stretch only ever shrinks as the cabin runs into it.
-
-Anything that stops the cabin short of that reach — a blocked span, an unloaded chunk, a save, the last
-loaded tower of a truncated chain — **keeps** it (`Hold(..., keepPaidTrip: true)`), so the held trip
-finishes out of an empty store. Without that, an interruption stranded a rider mid-span exactly the way a
-flat store was supposed to make impossible.
-
-**Unused credit is forfeited, never refunded.** Reaching the destination spends it; a chain that
-re-canonicalises under the cabin drops it, because `paidTo` is a distance on a scale that no longer exists
-and the store it came from may not be the store the cabin now belongs to. A refund would have to name a
-store, and at the one moment it matters there is no honest answer to which one.
-
-## A line that could never run is refused at link time
-
-The quote is `length + 2 x climb` against a **flat** capacity, so a line can sit inside `maxLineLength`
-and still carry a leg no full weight could ever pay for. `RopewayLinkService.TryLink` weighs
-`EntityRopewayCabin.WorstTripCost` — every tower pair, both ways, on the merged geometry
-(`RopewayLine.Preview`) — against the store's capacity and refuses **before the rope is spent**. The
-worst pair is not always the end-to-end one: a line that climbs and then falls quotes its net climb end
-to end while the uphill half on its own is dearer.
-
-The runtime refusal keeps a matching pair of sentences for lines built before that gate: `NoPower` is
-"not wound far enough **yet**", a wait; `TooDear` is "more than a weight can ever hold", which is not.
-`RopewayAssetContractTests.AFullWeightCanPayForTheLongestLineThatCanBeBuilt` is what keeps `capacity` and
-`maxLineLength` from drifting apart in their separate JSON files.
-
-## Also queued
-
-**Cargo in the cabin**, the way boats carry it. Independent of power, small, and it turns the ropeway
-from a personal lift into freight infrastructure — which is what real material ropeways were for.
+Unchanged and still satisfied. `DECISIONS.md` §3 is about the **marginal** cost of a pylon and its span,
+because a chained route multiplies it by every hop — not about the system's one-time cost. A windmill plus
+axles for the whole ropeway is fine; a windmill per pylon would not be. Nothing here is metal-gated: a
+wooden rotor, wooden axles and angled gears cost no metal at all.

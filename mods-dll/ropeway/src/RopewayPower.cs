@@ -1,102 +1,129 @@
 using System;
+using System.Collections.Generic;
 
 namespace Ropeway;
 
 /// <summary>
-/// The wound-store arithmetic: what a powered tower banks, what a trip costs, and whether the store can
-/// pay for it. No engine state, so this is the tested half of mechanical power - the network itself is
+/// The ropeway as an ordinary mechanical load: what the haul rope costs the network to turn, and how fast
+/// the network turning it moves the cabin. Pure, so this is the tested half - the network itself is
 /// vanilla's and is not ours to test.
 /// <para>
-/// The unit throughout is <em>blocks of travel</em>. That is deliberate: it makes the quote, the store's
-/// capacity and the line's own length the same number, so "the weight holds 118 and this trip needs 180"
-/// is a sentence a player can act on without learning a second currency.
+/// There is no store, no charge and no gate. The cabin is driven at the speed the network is running at,
+/// exactly like a quern is ground at the speed the network is running at, and a network that stops means a
+/// cabin that stops. That is ordinary machine behaviour rather than a failure state because a rider is
+/// never trapped: the sneak-hold bail-out gets them out of a stopped cabin anywhere on the line.
 /// </para>
 /// </summary>
 public static class RopewayPower
 {
     /// <summary>
-    /// Blocks of travel banked per second at <c>TrueSpeed</c> 1.0. Anchored on vanilla, not invented: a
-    /// maxed 5-sail wood windmill winding against <see cref="WindingResistance"/> settles near Speed 0.5
-    /// (s* = 0.6 - 0.12/1.25), so it banks ~1.5 blocks/s and funds a level 100-block trip in about 66
-    /// seconds against the 45 seconds the trip itself takes. That ~60% duty cycle is the intended rhythm.
+    /// Blocks of travel per second at network speed 1.0 - the calibration knob, and the only one. Chosen so
+    /// the vanilla drives land on a ladder a player can FEEL rather than measure; see
+    /// <see cref="HaulResistance"/> for the arithmetic that produces it.
     /// </summary>
-    public const double ChargePerSpeedSecond = 3.0;
+    public const double BlocksPerNetworkSpeed = 6.0;
 
     /// <summary>
-    /// Default store size, in blocks of travel. Deliberately a constant and NOT a function of the line's
-    /// length: <see cref="RopewayLine.TotalLength"/> is derived from which chunks are loaded, and a battery
-    /// that changed size with the chunk view would walk the truncated-line failure class straight into the
-    /// power system. Overridable per blocktype via <c>attributes.capacity</c>.
+    /// What a moving cabin costs the network, level and empty. THE number that makes the drive legible, and
+    /// it is large on purpose.
+    /// <para>
+    /// A rotor settles where its torque meets the load: <c>BEBehaviorMPRotor.GetTorque</c> supplies
+    /// <c>(capableSpeed - speed) * TorqueFactor</c> against our resistance, so in good wind
+    /// (<c>TargetSpeed = min(0.6, windSpeed)</c>) the network settles at <b>s* = 0.6 - R/T</b> with
+    /// <c>T = sails/4 * powerMul</c> (1 wood, 1.25 metal). A SMALL R makes that expression nearly flat -
+    /// at the old 0.12 a 3-sail mill and a 10-sail one were 0.44 and 0.56, and no player can feel 22%.
+    /// At 0.3 the ladder opens out, in blocks per second at <see cref="BlocksPerNetworkSpeed"/>:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>2-sail wood - stalls. 0.6 x 0.5 &lt; 0.3, the mill cannot shift the cabin at all.</item>
+    /// <item>3-sail wood - s* 0.20, <b>1.2 blocks/s</b>, a walk.</item>
+    /// <item>5-sail wood (maxed) - s* 0.36, <b>2.2 blocks/s</b>, the old fixed speed.</item>
+    /// <item>10-sail metal (maxed) - s* 0.50, <b>3.0 blocks/s</b>, a run.</item>
+    /// </list>
+    /// <para>
+    /// Three times a quern's 0.1 and 40% of a maxed wood mill's 0.75 stall budget: a ropeway is a serious
+    /// machine that one good mill drives with room for a quern beside it, and that a small mill does not
+    /// drive at all. Vanilla's own numbers throughout - nothing here is invented.
+    /// </para>
     /// </summary>
-    public const double DefaultCapacity = 400;
-
-    /// <summary>Blocks of store spent per block of net climb, on top of the distance itself.</summary>
-    public const double RiseSurcharge = 2.0;
-
-    /// <summary>Blocks of store credited back per block of net descent. Gravity does some of the work.</summary>
-    public const double DropCredit = 1.0;
+    public const float HaulResistance = 0.3f;
 
     /// <summary>
-    /// A descending trip never costs less than this fraction of its length. Without it a steep enough
-    /// downhill line is free forever, and a machine that costs nothing to run stops being a machine.
-    /// </summary>
-    public const double MinCostFraction = 0.25;
-
-    /// <summary>
-    /// Load a tower puts on its mechanical network while it is winding. Sits between the quern's 0.1 and
-    /// the helve-hammer toggle's 0.125, so a ropeway reads as a serious machine, and a maxed wood windmill
-    /// (stall budget 0.75) still drives several of them.
-    /// </summary>
-    public const float WindingResistance = 0.12f;
-
-    /// <summary>
-    /// Load once the store is full, or when there is no store to wind. The pulverizer's idle/loaded shape
-    /// (0.005 / 0.085): a finished ropeway must not permanently tax the mill it shares a line with.
+    /// Load when there is nothing to haul. The pulverizer's idle/loaded shape (0.005 / 0.085): a parked
+    /// ropeway must not permanently tax the mill it shares a network with.
     /// </summary>
     public const float IdleResistance = 0.005f;
 
     /// <summary>
-    /// One tower's contribution over <paramref name="dt"/> seconds, clamped to capacity. POOLING is this
-    /// function being called once per powered tower against the same store: the rate is linear in speed,
-    /// so two towers at 0.3 bank exactly what one at 0.6 does and neither has to know about the other.
-    /// That is the whole of "contributions pool" - there is no coordination and nothing to keep in sync,
-    /// which is also why a tower in an unloaded chunk simply stops contributing instead of breaking it.
+    /// Extra load per unit of climb, where climb is the vertical component of the unit direction the cabin
+    /// is travelling - so 1.0 would be straight up and 0.5 is a 30 degree span. Half, which puts a 30 degree
+    /// climb at +25% load (a maxed wood mill: 2.2 -&gt; 1.8 blocks/s) and a 45 degree one at +35% (-&gt; 1.6).
+    /// Visible, and never enough on its own to stall a mill that moves the cabin on the level: a cabin that
+    /// crawls up the hill is a machine working, a cabin that stops halfway up is a bug report.
     /// </summary>
-    public static double Wind(double stored, double capacity, double trueSpeed, double dt)
-    {
-        if (double.IsNaN(stored) || stored < 0) stored = 0;
-        if (double.IsNaN(capacity) || capacity <= 0) return 0;
-        if (double.IsNaN(trueSpeed) || double.IsNaN(dt) || trueSpeed <= 0 || dt <= 0) return Math.Min(capacity, stored);
+    public const double ClimbLoad = 0.5;
 
-        return Math.Min(capacity, stored + trueSpeed * ChargePerSpeedSecond * dt);
+    /// <summary>
+    /// How fast a cabin runs on a network turning at <paramref name="networkSpeed"/>. Zero in, zero out -
+    /// the cabin stands still and waits, which is not an error and needs no state of its own.
+    /// </summary>
+    public static double CabinSpeed(double networkSpeed)
+    {
+        if (double.IsNaN(networkSpeed) || networkSpeed <= 0) return 0;
+        return BlocksPerNetworkSpeed * networkSpeed;
     }
 
     /// <summary>
-    /// What a trip of <paramref name="length"/> blocks that ends <paramref name="netClimb"/> blocks higher
-    /// (negative for lower) costs the store. Quoted and paid in full at departure, which is what makes a
-    /// started journey finish no matter what the wind or the chunk loader does thirty seconds later.
+    /// The line's drive speed, pooled from its towers' hookups: one contribution per NETWORK, never one per
+    /// tower. That distinction is the whole function. Two footings tapped off the same axle run are two
+    /// windows onto ONE drive - <c>TrueSpeed</c> is <c>|Network.Speed * GearedRatio|</c>, so they report the
+    /// same turning shaft twice - and adding them would mean a player could buy speed with axles: each extra
+    /// hookup declares another <see cref="HaulResistance"/> on that network, but the load only SUBTRACTS from
+    /// the settling speed while the naive sum MULTIPLIES what gets read, so three stubs off one maxed metal
+    /// mill read 5.6 blocks/s against a single hookup's 3.0. Adding load may never make the machine faster.
     /// <para>
-    /// Siting matters in one line of arithmetic: a 100-block line is 100 level, 180 climbing 40, and 60
-    /// descending 40. A downhill ore line being cheap to run is the historically correct outcome.
+    /// Genuinely separate networks - a mill at each end - still add, which is the pooling the design wants.
+    /// First hookup seen on a network wins: they are all looking at one rope, so a geared stub does not get
+    /// to speak for it, and gearing stays self-correcting because that stub's resistance still lands on the
+    /// network (<c>MechanicalNetwork.updateNetwork</c> weights resistance by <c>|gearedRatio|</c>).
     /// </para>
     /// </summary>
-    public static double Quote(double length, double netClimb)
+    public static double PoolSpeed(IEnumerable<(long NetworkId, double Speed)> drives)
     {
-        if (double.IsNaN(length) || length <= 0) return 0;
-        if (double.IsNaN(netClimb)) netClimb = 0;
+        if (drives == null) return 0;
 
-        var cost = length + (netClimb > 0 ? RiseSurcharge * netClimb : DropCredit * netClimb);
-        return Math.Max(MinCostFraction * length, cost);
+        var counted = new HashSet<long>();
+        var total = 0.0;
+        foreach (var (networkId, speed) in drives)
+        {
+            // A tower with no axle contributes nothing AND must not take a network's slot with its zero.
+            if (double.IsNaN(speed) || speed <= 0) continue;
+            if (counted.Add(networkId)) total += speed;
+        }
+
+        return total;
     }
 
     /// <summary>
-    /// Whether the store can pay a quote outright. Fails closed on NaN - a trip nobody can price is a trip
-    /// that does not leave, which is the only failure mode here that cannot strand anybody.
+    /// What a tower declares to its network. <paramref name="hauling"/> is the line having a cabin that is
+    /// trying to move - NOT one that is actually moving, which would be a feedback loop: the load is what
+    /// slows the network, so dropping it the moment the cabin stalls would speed the network up, start the
+    /// cabin, and stall it again a tick later.
+    /// <para>
+    /// <paramref name="climb"/> is the vertical component of the direction of travel, negative downhill and
+    /// clamped away - gravity assisting a descent is a real effect but a negative load is not, and a haul
+    /// loop carries a cabin each way in any case. <paramref name="cargo"/> is the extra load carried as a
+    /// FRACTION of the empty cabin's, and is 0 until cargo weight is designed; it is a parameter rather than
+    /// an absent term so that the day it lands, it lands here and nowhere else.
+    /// </para>
     /// </summary>
-    public static bool CanAfford(double stored, double cost)
+    public static float Resistance(bool hauling, double climb, double cargo)
     {
-        if (double.IsNaN(cost)) return false;
-        if (cost <= 0) return true;
-        return !double.IsNaN(stored) && stored >= cost;
+        if (!hauling) return IdleResistance;
+
+        if (double.IsNaN(climb) || climb < 0) climb = 0;
+        if (double.IsNaN(cargo) || cargo < 0) cargo = 0;
+
+        return (float)(HaulResistance * (1 + ClimbLoad * climb + cargo));
     }
 }

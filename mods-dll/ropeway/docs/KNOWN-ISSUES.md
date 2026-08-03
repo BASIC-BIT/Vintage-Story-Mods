@@ -134,6 +134,45 @@ Three things BASIC saw riding it. All three are closed.
 | **A seated rider could spin all the way round** on a bench that faces one way. | `bodyYawLimit` was dead JSON, and the key is not decorative — `SeatConfig.BodyYawLimit` is only ever *read* by `EntityBoat.SeatsToMotion` and `EntityBehaviorRideable.SeatsToMotion`, and the cabin is neither, so nothing was going to apply it for us. | `EntityRopewayCabin.ConstrainRiderYaw`, eight lines on the tick, identical to vanilla's: `EntityPlayer.BodyYawLimits` / `HeadYawLimits` centred on `Pos.Yaw + mountRotation.y`, range `bodyYawLimit` (now **1.5707963 = ±90°**, so a rider can look out either side and not sit backwards). It needs **no controllable seat** — it constrains the passenger, not the mount, so `controllable: false` and the smooth-motion tests are untouched. What it clamps, exactly: `HeadYawLimits` is read by `ClientMain.UpdateCameraYawPitch` (:2377-2383), which clamps `mouseYaw`, so this is the seated player's **own camera**, client side; `BodyYawLimits` clamps that same player's rendered body through the `BodyYaw` setter. Neither reaches what other players see — `EntityPlayerShapeRenderer` (:429-431) already forces a remote rider's drawn body yaw to the mount's, so onlookers see him squared to the cabin whichever way he is looking. Running it server side would change nothing: the server assigns `BodyYawServer` from the position packet, not `BodyYaw`, so the clamping setter never sees it. |
 | **The front seat was too far forward** — the rider's toes 2.34 units off the west wall while the rear row had 22.34 units in front of its own. | Forward-facing rows are asymmetric about the mast by construction (the rear row backs onto the east wall, the front row needs a footwell), and the front row was placed by mirroring the pan rather than by the clearance ahead of the rider. | The front bench moved back 10 units: pan −21..−11 → **−11..−1**, and `backrestwest`, `apronwest`, both mullions and both thresholds with it (the AP is `posX`-relative to the pan, so it follows on its own and stays at the pan's depth centre). Both rows face −X, so "evenly placed" is one number — the clear floor ahead of each rider's toes, which reach lip − 4.66 — and 10 is what equalises it at **12.34 each**. It also tiles: footwell 17 + pan 10 = a 27-unit seat bay, twice, in a 56-unit interior, with the rear row's 2-unit reveal off the east wall as the remainder. The threshold plank shortened 24 → 14 and its uv widths with it (size/4, like every face in that shape). `TheSeatedRidersContactPatchLandsOnItsPan` and `TheSeatAttachmentPointsStayOnTheCentreLine` both still pass, and the plan/section renders were re-read rather than the asserts alone. |
 
+## The store, deleted (2026-08-03)
+
+The wound tension weight is **gone**, and with it the whole charge/quote/credit apparatus. What ships is a
+plain mechanical load: the cabin runs at `k × TrueSpeed` of the drives on its line, with no gate. The design
+and the arithmetic are in [POWER-AND-STORAGE.md](POWER-AND-STORAGE.md); this is what it does to the issue
+list.
+
+**Why it could go.** The store existed to guarantee a started trip finished, because a cabin stopped
+mid-span was a trap. The phase-1 bail-out ended that: a rider can always get out, and a stopped cabin lets
+them step straight out (`IsMoving` false). Once nobody is trapped, "it stopped because the wind stopped" is
+ordinary machine behaviour.
+
+**Closed outright by the deletion** — every one of these was a property of the store, the quote or the
+weight's persisted binding, and none of them exists to be fixed any more:
+
+| was | what it was |
+|---|---|
+| **F1** (blocker) | A 288-block line climbing 57 blocks was permanently unrunnable at a full store, told to wait for wind. No quote, no capacity, no dead lines. |
+| **F2** | Pressing the stop key after departure charged twice. Nothing is charged. |
+| **F3** | Recovery from a mid-span hold cost a fresh full quote. Same. |
+| **F4** | Breaking a weight's anchor tower orphaned it with no re-bind. Nothing is bound: `BETensionWeight.OnLine` asks proximity at lookup time. |
+| **F6** | Which of two merged weights was live came from dictionary order. There is no "live" weight; a line has a tensioner or it does not. |
+| **F7** | A weight placed by schematic or worldedit was permanently orphaned. `Bind` is gone; placement does nothing but check it is near a tower. |
+| **F8** | Charge was only persisted on a 1/32 step boundary. There is no charge. |
+| **F9** | `Wind`'s `dt` was unclamped. There is no `Wind`. |
+| **F5** | "This line has no tension weight" could lie under truncation. It still resolves through the walked chain, but it is asked at cabin **placement** and on the block-info panel rather than at every departure, and `maxLineLength` 320 < `MaxChunkRadius` 384 means a player standing on the line holds all of it. |
+| **F10** | The weight is a 3-block shape in a 1-block cell with no headroom check. **Still true**, still cosmetic. |
+| **F11–F14** | Docs. QA step 27 is new, this file and the handbook are rewritten, and handbook 52 no longer recommends a flywheel that vanilla does not have. |
+
+**New, and accepted:** a cabin can now stop mid-span because the drive stopped, and an *empty* one called
+across a line whose mill is too small will sit there until the player builds a bigger one. That is the
+design — a quern does the same — and the tower's block-info panel names it: what the line is turning at, and
+what that comes to in blocks a second. The failure mode the old design had instead was a full gauge beside a
+refusal telling the player to wait for wind that would never be enough.
+
+**Not a regression, worth knowing:** the load is keyed on the cabin *trying* to move
+(`EntityRopewayCabin.IsHauling`), never on whether it is moving. Keying it on real motion oscillates at
+1 Hz — the load is what stalls the network, so dropping it on a stall restarts the cabin, which reapplies it.
+
 ## The truncated-line class (R1–R4)
 
 All four share one root cause: **the cabin's position is a `Travelled` scalar along a line whose
@@ -262,11 +301,12 @@ fixed — it is the guard being put where all the callers actually meet.
   does not route through. So `UnloadCargo` hands out the goods, clears the container, hands out the
   emptied container, and only then clears the slot. Player inventory first, ground under the cabin
   otherwise. Nothing is destroyed, but taking down a loaded line does leave a pile.
-- **Not done on purpose: weight and speed.** A loaded cabin runs exactly as fast as an empty one and
-  costs the same to move. Vanilla has no precedent to copy — `EntityBoat.SpeedMultiplier` is a constant
-  from JSON and `EntityProperties.Weight` is a static type property nothing sums cargo into — so any load
-  effect would be our invention with no calibration to inherit. It is being left for the
-  mechanical-power design to specify rather than half-designed twice.
+- **Not done on purpose: cargo weight.** A loaded cabin still runs exactly as fast as an empty one.
+  Vanilla has no precedent to copy — `EntityBoat.SpeedMultiplier` is a constant from JSON and
+  `EntityProperties.Weight` is a static type property nothing sums cargo into — so any load effect is our
+  invention with no calibration to inherit. What the power redesign gave it is a **home**:
+  `RopewayPower.Resistance(hauling, climb, cargo)` already takes the term and the cabin passes 0, so when
+  weight lands it lands in one function rather than being invented twice.
 - **An empty bench still boards you on a plain right-click**, via `emptyInteractPassThrough`. With
   `interactMountAnySeat` on, so does clicking the cabin body — and that now skips loaded benches, which
   is why boarding a half-loaded cabin always lands you on the free one.
@@ -318,6 +358,32 @@ fixed — it is the guard being put where all the callers actually meet.
   reached any loaded tower in the world was the one worth closing.
 - **A rider unseated mid-span by an explosion now falls.** The pre-fix behaviour put them at a tower,
   but that was a rider teleport (F3). Falling was chosen over teleporting; it is not an accident.
+- **The bail-out clearance rides in the same packet as the unmount, on the rider's own tree.** `CanUnmount`
+  refuses while the cabin moves; a rider who holds sneak for `EntityRopewayCabin.BailHoldSeconds` gets out
+  anyway. Every client answers the `mountedOn` removal by calling `TryUnmount` — and so `CanUnmount` —
+  exactly once, from a listener that never fires again, and a client that says no there keeps the rider
+  drawn inside a cabin they have already left for the rest of the session. So the clearance
+  (`RopewayCabinSeat.BailKey`) is set on the **rider's** `WatchedAttributes` immediately before
+  `TryUnmount`, which ends in `RemoveAttribute("mountedOn")` on that same tree and therefore calls
+  `MarkAllDirty`: one full update carries both, and there is no ordering left to get wrong. *Publishing it
+  a tick early on the cabin does not work.* Attributes flush every 0.2 s rather than per tick
+  (`PhysicsManager.cs:313`), so the two changes land in one flush about five times in six; the cabin's is a
+  *partial* update against the rider's *full* one, and `ClientSystemEntities` applies every full update
+  before any partial — the permission arrived after the removal it authorised. For the same flush reason
+  the clearance cannot be cleared by the tick that spends it (it would never reach the wire): it is retired
+  in `RopewayCabinSeat.DidMount`, and immediately on a jump that did not happen.
+- **The bail-out hold is edge-triggered, not level-triggered.** `EntityAgent.TryMount` copies the boarder's
+  live control flags into the seat before `Passenger` is set, so a player who crouch-walks aboard has the
+  seat's `Sneak` already true, and the false→true handler that is the *only* advertisement of the bail-out
+  has already fired into a null passenger. Counting the held flag would eject them two seconds after
+  departure having pressed nothing and read nothing — easier to hit by accident than on purpose. So
+  `HoldSneak` counts nothing until that rider has been seen *not* sneaking while the cabin moves.
+- **`PositionBeforeFalling` is re-datumed on every cabin dismount**, not only on the bail-out. A mounted
+  player never touches the ground (`EntityBehaviorPlayerPhysics` forces `OnGround = false`), so
+  `PositionBeforeFalling` still names the platform they boarded at and `Entity.OnFallToGround` bills the
+  drop from there. Left alone, riding a line downhill and stepping out at the bottom charged the rider fall
+  damage for the whole descent; the bail-out is only what made it visible. Fixed in
+  `RopewayCabinSeat.DidUnmount`, which is the one funnel every dismount path goes through.
 - **The cable is one mesh per block entity**, so a long span disappears when its own chunk leaves the
   view frustum even while the cable is still on screen. Per-chunk segments are the fix if it reads badly.
 - **Unlinking is not offered on a truncated line.** `SendCandidates` still refuses to open the picker when

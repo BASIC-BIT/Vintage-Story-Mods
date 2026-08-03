@@ -4,13 +4,10 @@ using Vintagestory.API.MathTools;
 namespace Ropeway;
 
 /// <summary>
-/// The store's block. Bound to a tower at placement time, and through that tower to a line: any powered
-/// tower on that line winds it, and the cabin spends from it.
-/// <para>
-/// Binding by PROXIMITY at placement rather than by a link interaction is the lazy half of "one per line":
-/// a weight is a thing you build next to your station, the tower is already the mod's one canonical
-/// position, and a placement that finds no tower refuses with a reason instead of standing there inert.
-/// </para>
+/// The tensioner's block. It keeps the haul rope taut, which is a thing you build beside a station, so the
+/// only rule it carries is that it has to be within reach of a tower - a tensioner standing in a field is
+/// tensioning nothing. Everything after placement is proximity at lookup time
+/// (<see cref="BETensionWeight.OnLine"/>); nothing is bound, so nothing can come unbound.
 /// </summary>
 public class BlockTensionWeight : Block
 {
@@ -20,36 +17,19 @@ public class BlockTensionWeight : Block
     public override bool TryPlaceBlock(IWorldAccessor world, IPlayer byPlayer, ItemStack itemstack, BlockSelection blockSel, ref string failureCode)
     {
         var modSystem = world?.Api?.ModLoader?.GetModSystem<RopewayModSystem>();
-        var tower = NearestTower(modSystem, blockSel?.Position, TowerRadius);
 
-        if (tower == null)
+        if (NearestTower(modSystem, blockSel?.Position, TowerRadius) == null)
         {
             failureCode = "ropewaynotower";
             return false;
         }
 
-        // One store per line, and the check has to run BEFORE the block goes down or the player pays for a
-        // weight that would never be wound. A line that cannot be resolved yet - a tower with no spans -
-        // still gets the check, against that tower alone.
-        var line = RopewayLine.GetOrBuild(modSystem, tower);
-        var existing = line != null ? BETensionWeight.StoreOn(modSystem, line) : BETensionWeight.StoreAt(modSystem, tower);
-        if (existing != null)
-        {
-            failureCode = "ropewayweightexists";
-            return false;
-        }
-
-        if (!base.TryPlaceBlock(world, byPlayer, itemstack, blockSel, ref failureCode)) return false;
-
-        (world.BlockAccessor.GetBlockEntity(blockSel.Position) as BETensionWeight)?.Bind(tower);
-        return true;
+        return base.TryPlaceBlock(world, byPlayer, itemstack, blockSel, ref failureCode);
     }
 
     /// <summary>
-    /// The tower footing this weight should serve: the nearest loaded one in the same dimension, inside
-    /// the radius. Pure apart from the tower table, and therefore unit-tested through
-    /// <see cref="Nearest"/>: picking the wrong tower binds the weight to the wrong LINE, which is a store
-    /// that fills up while the cabin next to it refuses to move.
+    /// The nearest loaded tower footing in the same dimension, inside the radius, or null. Pure apart from
+    /// the tower table, and therefore unit-tested through <see cref="Nearest"/>.
     /// </summary>
     public static BlockPos NearestTower(RopewayModSystem modSystem, BlockPos pos, double radius)
     {

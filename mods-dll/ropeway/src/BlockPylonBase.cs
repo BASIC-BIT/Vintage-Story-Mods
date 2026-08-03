@@ -21,9 +21,10 @@ namespace Ropeway;
 /// </para>
 /// <para>
 /// It is also the line's MECHANICAL POWER hookup, which is why it extends <see cref="BlockMPBase"/> - any
-/// tower can take an axle, and what the powered ones do with it is wind the line's tension weight. The
-/// footing is at axle height by construction, which is the whole reason the hookup lives here and not on
-/// the sheave four blocks up: routing an axle upward is the loudest complaint vanilla mechanical power has.
+/// tower can take an axle, and the powered ones drive the haul rope directly, at the speed their network is
+/// turning. The footing is at axle height by construction, which is the whole reason the hookup lives here
+/// and not on the sheave four blocks up: routing an axle upward is the loudest complaint vanilla mechanical
+/// power has.
 /// </para>
 /// </summary>
 public class BlockPylonBase : BlockMPBase

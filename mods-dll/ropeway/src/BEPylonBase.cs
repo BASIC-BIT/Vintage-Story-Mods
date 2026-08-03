@@ -117,39 +117,71 @@ public class BEPylonBase : BlockEntity
     private void OnServerTick1s(float dt)
     {
         Validate();
-        Wind(dt);
+        DeclareLoad();
     }
 
     /// <summary>
-    /// This tower's contribution to its line's store, and the load it declares for having made it.
+    /// The load this tower puts on its network: the haul rope is a real mechanical load, so a tower whose
+    /// line has a cabin trying to move declares one, and every other tower idles.
     /// <para>
-    /// EVERY tower does this - there is no designated drive station. A tower with no axle reads TrueSpeed 0
-    /// and contributes nothing; a tower with one winds the same weight every other powered tower on the
-    /// line winds, which is the pooling, and it needs no coordination because the rate is linear in speed
-    /// (see <see cref="RopewayPower.Wind"/>). A tower whose chunk is unloaded is not ticking, so it stops
-    /// contributing and cannot strand anybody: the cabin never reads this, it reads the store.
+    /// EVERY tower does this - there is no designated drive station - and every powered tower on the line
+    /// declares the SAME load rather than a share of it, because a share would have to be divided by how
+    /// many other towers are powered, which is a number that changes when somebody walks away and a chunk
+    /// unloads. Each drive pulls its own weight and its speed adds (<see cref="DriveSpeedOn"/>); nothing has
+    /// to be kept in sync, and a tower whose chunk is unloaded simply stops declaring and stops driving.
     /// </para>
     /// <para>
-    /// The resistance schedule is the pulverizer's idle/loaded shape and it depends ONLY on the store, not
-    /// on where the cabin is - so there is no cross-chunk coupling to latch, and a finished ropeway with a
-    /// full weight stops taxing the mill it shares a network with.
+    /// The load is read from <see cref="EntityRopewayCabin.IsHauling"/> - the cabin TRYING to move - and
+    /// never from whether it is actually moving. The load is what slows the network, so keying it on real
+    /// motion would drop it the instant a weak mill stalled, speed the network up, start the cabin and stall
+    /// it again a tick later.
     /// </para>
-    /// ponytail: no clamp on GearedRatio. A 5.5x large gear between the mill and the footing makes this
-    /// tower contribute 0.66 resistance against a maxed wood windmill's 0.75 budget - tight but not a
-    /// stall, and it buys proportionally more charge. Copy the pulverizer's JoinNetwork speed divider if
-    /// in-game QA finds a geared rig killing networks.
+    /// ponytail: no clamp on GearedRatio. Gearing multiplies both this resistance and the speed the footing
+    /// reads, so an over-geared rig stalls its own network exactly as an over-geared quern does. Copy the
+    /// pulverizer's JoinNetwork speed divider if in-game QA finds that surprising rather than instructive.
     /// </summary>
-    private void Wind(float dt)
+    private void DeclareLoad()
     {
-        if (mpc == null) return;
+        // Nothing reads Resistance off a tower that is on no network, and FindOn below is a scan of every
+        // loaded entity - so the towers without an axle, which is most of them, pay nothing for this.
+        if (mpc?.Network == null) return;
 
-        var store = BETensionWeight.StoreOn(ModSystem, RopewayLine.GetOrBuild(ModSystem, Pos));
+        var line = RopewayLine.GetOrBuild(ModSystem, Pos);
+        var cabin = EntityRopewayCabin.FindOn(Api.World, line);
 
-        // Nothing to wind is not the same as nothing to do: a tower still on a network must drop back to
-        // idle load, or a line whose weight was broken taxes the player's mill forever.
-        mpc.Resistance = store != null && !store.Full ? RopewayPower.WindingResistance : RopewayPower.IdleResistance;
+        mpc.Resistance = RopewayPower.Resistance(cabin?.IsHauling == true, cabin?.ClimbOn(line) ?? 0, 0);
+    }
 
-        if (store != null) store.Wind(mpc.TrueSpeed, dt);
+    /// <summary>What this footing's own axle is turning at, or 0 with no behaviour, no axle or no network.</summary>
+    public double DriveSpeed => mpc?.TrueSpeed ?? 0;
+
+    /// <summary>
+    /// The line's drive speed: every loaded tower's, added ONCE PER NETWORK. THAT is the pooling - power may
+    /// be supplied at any tower and separate drives add up - and it needs no coordination because addition
+    /// does not care what order it happens in or whether one of the terms went away. Several footings tapped
+    /// off one axle run are one drive, not several; <see cref="RopewayPower.PoolSpeed"/> is why.
+    /// <para>
+    /// The cabin reads this LIVE, which the store design forbade. What makes it safe is the line-length cap:
+    /// <c>maxLineLength</c> 320 sits inside the default <c>MaxChunkRadius</c> of 384 blocks, so a rider
+    /// anywhere on a line holds every tower of it - drives included - loaded. Raise that cap and a drive can
+    /// go dark under a rider; the cabin then slows or stops rather than corrupting anything, but it stops
+    /// for a reason the player cannot see.
+    /// </para>
+    /// </summary>
+    public static double DriveSpeedOn(RopewayModSystem modSystem, RopewayLine line)
+    {
+        if (modSystem == null || line?.Towers == null) return 0;
+
+        var drives = new List<(long, double)>(line.Towers.Length);
+        foreach (var tower in line.Towers)
+        {
+            if (modSystem.LoadedTowers.TryGetValue(tower, out var be) && be?.mpc?.Network != null)
+            {
+                drives.Add((be.mpc.Network.networkId, be.DriveSpeed));
+            }
+        }
+
+        return RopewayPower.PoolSpeed(drives);
     }
 
     /// <summary>
@@ -561,8 +593,8 @@ public class BEPylonBase : BlockEntity
     /// <summary>
     /// The whole power situation, on the block the player already clicks. Vanilla prints nothing about
     /// mechanical power outside EntityDebugMode, so a machine that does not diagnose itself is a machine
-    /// nobody can learn - and this one refuses to move without a charged store, which is exactly the
-    /// refusal that has to come with a number attached rather than a shrug.
+    /// nobody can learn - and a cabin standing still because the wind dropped looks exactly like a cabin
+    /// standing still because it is broken until this panel says which.
     /// </summary>
     private void AppendPowerLines(RopewayLine line, StringBuilder dsc)
     {
@@ -572,37 +604,17 @@ public class BEPylonBase : BlockEntity
         {
             dsc.AppendLine(mpc.Network == null
                 ? Lang.Get("ropeway:blockinfo-nodrive")
-                : Lang.Get("ropeway:blockinfo-winding", Math.Round(mpc.TrueSpeed, 2)));
+                : Lang.Get("ropeway:blockinfo-drive", Math.Round(mpc.TrueSpeed, 2)));
         }
 
-        var store = BETensionWeight.StoreOn(ModSystem, line);
-        if (store == null)
-        {
-            // "There is no weight" and "the weight is past a tower nobody can see" are different problems
-            // with different fixes - build a block, or walk the line - and the store is resolved through the
-            // CURRENTLY WALKED chain, so a truncated line is exactly where absence cannot be told from
-            // invisibility. Claiming the weight the player built does not exist is the worse of the two lies.
-            dsc.AppendLine(Lang.Get(line.Truncated ? "ropeway:blockinfo-store-unreachable" : "ropeway:blockinfo-nostore"));
-            return;
-        }
+        // The line's, which is what actually moves the cabin: one mill here plus one at the far end is a
+        // faster cabin, and nothing else on this panel would show that.
+        var speed = RopewayPower.CabinSpeed(DriveSpeedOn(ModSystem, line));
+        dsc.AppendLine(speed > 0
+            ? Lang.Get("ropeway:blockinfo-linedrive", Math.Round(speed, 1))
+            : Lang.Get("ropeway:blockinfo-nolinedrive"));
 
-        dsc.AppendLine(Lang.Get("ropeway:blockinfo-store", (int)Math.Round(store.Charge), (int)Math.Round(store.Capacity)));
-
-        // What a ride from HERE costs, taken as the dearer of the two ends - which is the number a player
-        // standing at this tower is actually deciding against, and it is the one the departure gate uses.
-        var index = line.IndexOf(Pos);
-        if (index < 0) return;
-
-        var cost = Math.Max(
-            EntityRopewayCabin.TripCost(line, line.Cumulative[index], line.MinTravel),
-            EntityRopewayCabin.TripCost(line, line.Cumulative[index], line.MaxTravel));
-
-        dsc.AppendLine(Lang.Get("ropeway:blockinfo-tripcost", (int)Math.Ceiling(cost)));
-
-        // Otherwise the panel prints 400 / 400 beside a trip that costs 512 and leaves the player to do the
-        // arithmetic - while the refusal says "not wound far enough YET", which is a wait that never ends.
-        // Lines built before the link gate existed are the only ones that can still read this.
-        if (cost > store.Capacity) dsc.AppendLine(Lang.Get("ropeway:blockinfo-tripcost-toodear"));
+        if (!BETensionWeight.OnLine(ModSystem, line)) dsc.AppendLine(Lang.Get("ropeway:blockinfo-notensioner"));
     }
 
     /// <summary>

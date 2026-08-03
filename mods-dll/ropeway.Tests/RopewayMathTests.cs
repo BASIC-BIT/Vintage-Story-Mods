@@ -540,7 +540,7 @@ public class RopewayMathTests
         var steps = 0;
         while (!EntityRopewayCabin.Reached(travelled, destination, outbound: true) && ++steps < 1000)
         {
-            travelled += EntityRopewayCabin.DefaultSpeed * 0.1;
+            travelled += RopewayPower.CabinSpeed(0.36) * 0.1;
         }
 
         Assert.True(steps < 1000, "the cabin never reached the tower it was called to");
@@ -1003,6 +1003,79 @@ public class RopewayMathTests
     public void WithNoPassageToSquareToTheCabinKeepsTheLegBearing()
     {
         Assert.Equal(1.234f, EntityRopewayCabin.SquareTo(null, 1.234f));
+    }
+
+    /// <summary>
+    /// The bail-out hold has to be UNBROKEN and it only ever runs while there is something to bail out of.
+    /// A hold that survived letting go is a rider ejected by two unrelated taps of sneak; one that survived
+    /// the cabin stopping is a rider who steps out at a tower and finds themselves armed on the next ride.
+    /// </summary>
+    [Fact]
+    public void TheBailOutHoldOnlyCountsWhileSneakIsHeldAndTheCabinMoves()
+    {
+        var held = 0.0;
+
+        // The rider let go once while the cabin moved, so the press that follows is a real one.
+        var released = true;
+
+        // Two ticks of holding while moving accumulate.
+        held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
+        held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
+        Assert.Equal(1.0, held, 6);
+        Assert.True(held < EntityRopewayCabin.BailHoldSeconds, "one second must not be enough to jump");
+
+        // Letting go throws the lot away - the next press starts from zero.
+        Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: false, moving: true, 0.5f, ref released));
+
+        // So does the cabin stopping, even with the key still down.
+        Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: false, 0.5f, ref released));
+
+        // And an unbroken hold does reach the threshold, at the moment it says it does.
+        held = 0;
+        released = true;
+        for (var i = 0; i < (int)(EntityRopewayCabin.BailHoldSeconds / 0.5); i++)
+        {
+            held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
+        }
+
+        Assert.True(held >= EntityRopewayCabin.BailHoldSeconds);
+    }
+
+    /// <summary>
+    /// THE ACCIDENT CASE, and it is the one that has to stay shut. Boarding copies the player's live control
+    /// flags into the seat, so a rider who crouch-walked aboard is "sneaking" from tick one without ever
+    /// pressing anything after they sat down - and no false-&gt;true edge means the refusal that advertises
+    /// the bail-out never fired either. A level-triggered hold ejects them from a moving cabin having pressed
+    /// nothing and read nothing. Nothing may accumulate until they have been seen to let go while moving.
+    /// </summary>
+    [Fact]
+    public void SneakInheritedFromBoardingNeverArmsTheBailOut()
+    {
+        var held = 0.0;
+        var released = false;
+
+        // The cabin sits at the tower through the boarding grace, key already down.
+        for (var i = 0; i < 10; i++) held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: false, 0.5f, ref released);
+
+        // It departs and they keep holding, well past the threshold. Still nothing.
+        for (var i = 0; i < 20; i++) held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
+        Assert.Equal(0, held);
+
+        // One tick off the key while moving is the edge the arm actually wants.
+        held = EntityRopewayCabin.HoldSneak(held, sneaking: false, moving: true, 0.5f, ref released);
+        Assert.True(released);
+        for (var i = 0; i < (int)(EntityRopewayCabin.BailHoldSeconds / 0.5); i++)
+        {
+            held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
+        }
+
+        Assert.True(held >= EntityRopewayCabin.BailHoldSeconds);
+
+        // And the cabin stopping revokes it again: a rider who rides on through a stop still holding the key
+        // has to press it afresh, exactly as if they had just boarded.
+        held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: false, 0.5f, ref released);
+        Assert.False(released);
+        Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released));
     }
 
     private static RopewayLine Line(params (int X, int Y, int Z)[] towers)

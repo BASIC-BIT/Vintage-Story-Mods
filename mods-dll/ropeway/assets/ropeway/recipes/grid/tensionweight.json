@@ -1,5 +1,5 @@
 {
-  "//": "A frame and a heavy mass, and nothing beyond what a tower already costs. This is the one-time per-LINE part of the drive, so it may be a real object - but DECISIONS.md 3 is about the MARGINAL cost of a pylon, and there is no reason for the line's battery to gate anything the towers do not. Stone for the mass, planks for the guide, one metal bit for the winding gear.",
+  "//": "A frame and a heavy mass, and nothing beyond what a tower already costs. One per LINE rather than per pylon, so DECISIONS.md 3 (the MARGINAL cost of a pylon) does not bite - but a rope tensioner is not a machine and has no business gating anything the towers do not. Stone for the mass, planks for the guide, one metal bit for the sheave it hangs over.",
   "ingredientPattern": "MSM,PSP,PSP",
   "ingredients": {
     "S": { "type": "item", "code": "game:stone-*", "name": "rock" },

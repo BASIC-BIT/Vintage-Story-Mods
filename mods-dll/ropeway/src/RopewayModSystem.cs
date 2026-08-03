@@ -29,9 +29,10 @@ public sealed class RopewayModSystem : ModSystem
     public readonly Dictionary<BlockPos, BEPylonBase> LoadedTowers = new();
 
     /// <summary>
-    /// Every loaded tension weight, keyed by its own position. Small by construction - one per line - and
-    /// scanned rather than indexed by line, because a line is rebuilt constantly and an index keyed by one
-    /// would be a second thing to invalidate. BETensionWeight.Initialize adds, OnBlockUnloaded removes.
+    /// Every loaded tension weight, keyed by its own position - the whole reason that block has a block
+    /// entity at all. Scanned rather than indexed by line, because a line is rebuilt constantly and an index
+    /// keyed by one would be a second thing to invalidate. BETensionWeight.Initialize adds, OnBlockUnloaded
+    /// removes.
     /// </summary>
     public readonly Dictionary<BlockPos, BETensionWeight> LoadedWeights = new();
 

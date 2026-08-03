@@ -7,7 +7,7 @@
   },
   "elements": [
     {
-      "//": "Foundation pad. The only part of this block that is inside its own cell - everything above is the guide, and the mass that slides up it is drawn by BETensionWeight.BuildMass rather than authored here, because its height IS the gauge.",
+      "//": "Foundation pad. The only part of this block that is inside its own cell - everything above is the guide and the mass hanging in it.",
       "name": "pad",
       "from": [ 0.0, 0.0, 0.0 ],
       "to": [ 16.0, 2.0, 16.0 ],
@@ -51,7 +51,7 @@
       }
     },
     {
-      "//": "Head beam, three blocks up. Where the winding gear bears - the top of the mass's travel is 0.1 blocks under it at full charge, so a full weight reads as full without needing the number.",
+      "//": "Head beam, three blocks up. The sheave the tensioner's rope passes over.",
       "name": "head",
       "from": [ 1.0, 46.0, 6.0 ],
       "to": [ 15.0, 48.0, 10.0 ],
@@ -63,6 +63,36 @@
         "west": { "texture": "#metal", "uv": [ 6.0, 0.0, 10.0, 2.0 ] },
         "up": { "texture": "#metal", "uv": [ 1.0, 6.0, 15.0, 10.0 ] },
         "down": { "texture": "#metal", "uv": [ 1.0, 6.0, 15.0, 10.0 ] }
+      }
+    },
+    {
+      "//": "The mass, hanging near the bottom of its guide where a rope tensioner rests: it takes up slack, it does not climb, and it means nothing numeric. Half a block wide, so the two rails bracket it exactly. It used to be chunk mesh drawn by the block entity at a height that WAS the charge gauge; there is no charge any more, so it is static geometry and the block entity draws nothing.",
+      "name": "mass",
+      "from": [ 4.0, 3.0, 4.0 ],
+      "to": [ 12.0, 13.0, 12.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#stone", "uv": [ 4.0, 3.0, 12.0, 13.0 ] },
+        "east": { "texture": "#stone", "uv": [ 4.0, 3.0, 12.0, 13.0 ] },
+        "south": { "texture": "#stone", "uv": [ 4.0, 3.0, 12.0, 13.0 ] },
+        "west": { "texture": "#stone", "uv": [ 4.0, 3.0, 12.0, 13.0 ] },
+        "up": { "texture": "#stone", "uv": [ 4.0, 4.0, 12.0, 12.0 ] },
+        "down": { "texture": "#stone", "uv": [ 4.0, 4.0, 12.0, 12.0 ] }
+      }
+    },
+    {
+      "//": "The rope the mass hangs on, from its top up to the head beam. Without it the mass reads as sitting on the pad rather than hanging, which is the whole difference between a tensioner and a rock.",
+      "name": "hanger",
+      "from": [ 7.0, 13.0, 7.0 ],
+      "to": [ 9.0, 46.0, 9.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [ 7.0, 0.0, 9.0, 16.0 ] },
+        "east": { "texture": "#metal", "uv": [ 7.0, 0.0, 9.0, 16.0 ] },
+        "south": { "texture": "#metal", "uv": [ 7.0, 0.0, 9.0, 16.0 ] },
+        "west": { "texture": "#metal", "uv": [ 7.0, 0.0, 9.0, 16.0 ] },
+        "up": { "texture": "#metal", "uv": [ 7.0, 7.0, 9.0, 9.0 ] },
+        "down": { "texture": "#metal", "uv": [ 7.0, 7.0, 9.0, 9.0 ] }
       }
     }
   ]

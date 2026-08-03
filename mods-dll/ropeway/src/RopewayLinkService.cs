@@ -68,9 +68,8 @@ public sealed class RopewayLinkService
         {
             // One message for every refusal there is - a truncated line, a chain that just re-canonicalised,
             // a two-tower line the cabin is standing on the far end of. Silence is what made the controls
-            // look absent in the first place, so an unhelpful answer still beats none. The two power
-            // refusals get their own, because they are the only ones the player can do something about.
-            SendPowerRefusal(fromPlayer, outcome, "ropeway-no-stop", "ropeway:err-no-stop");
+            // look absent in the first place, so an unhelpful answer still beats none.
+            fromPlayer.SendIngameError("ropeway-no-stop", Lang.Get("ropeway:err-no-stop"));
             return;
         }
 
@@ -120,13 +119,6 @@ public sealed class RopewayLinkService
                 case CabinCall.AlreadyHere:
                     player.SendIngameError("ropeway-cabin-here", Lang.Get("ropeway:err-cabin-here"));
                     return;
-
-                case CabinCall.NoStore:
-                case CabinCall.StoreUnreachable:
-                case CabinCall.NoPower:
-                case CabinCall.TooDear:
-                    SendPowerRefusal(player, outcome, null, null);
-                    return;
             }
 
             // Unreachable. On a truncated line that is why, and saying so beats opening a picker that is
@@ -139,21 +131,6 @@ public sealed class RopewayLinkService
         }
 
         SendCandidates(player, pos);
-    }
-
-    /// <summary>
-    /// The one place a power refusal turns into words, shared by the ground call and the rider's stop key
-    /// so the two cannot drift. "No tension weight" and "not wound enough yet" are different problems with
-    /// different fixes - one is a block you have not built, the other is a wait - and reporting either as
-    /// the generic refusal is what makes a required-power design feel broken rather than merely unpowered.
-    /// <paramref name="fallbackCode"/> null means the caller has its own handling for everything else.
-    /// </summary>
-    private static void SendPowerRefusal(IServerPlayer player, CabinCall outcome, string fallbackCode, string fallbackLangKey)
-    {
-        var refusal = EntityRopewayCabin.Refusal(outcome);
-
-        if (refusal.Code != null) player.SendIngameError(refusal.Code, Lang.Get(refusal.Ground));
-        else if (fallbackCode != null) player.SendIngameError(fallbackCode, Lang.Get(fallbackLangKey));
     }
 
     public void SendCandidates(IServerPlayer player, BlockPos from)
@@ -224,10 +201,6 @@ public sealed class RopewayLinkService
         var lineFrom = RopewayLine.GetOrBuild(modSystem, from);
         var lengthFrom = lineFrom?.TotalLength ?? 0;
 
-        // TryLink is the authority and re-checks this against the merged line's own weight; here it only
-        // has to keep a row off the picker that the click would refuse.
-        var capacity = StoreCapacity(lineFrom) ?? RopewayPower.DefaultCapacity;
-
         var near = new List<KeyValuePair<double, BlockPos>>();
         foreach (var entry in modSystem.LoadedTowers)
         {
@@ -256,7 +229,6 @@ public sealed class RopewayLinkService
             var lineTo = RopewayLine.GetOrBuild(modSystem, pos);
             if (lineTo?.Truncated == true) continue;
             if (lengthFrom + (lineTo?.TotalLength ?? 0) + span > be.MaxLineLength) continue;
-            if (EntityRopewayCabin.WorstTripCost(RopewayLine.Preview(lineFrom, from, lineTo, pos)) > capacity) continue;
             if (!SpanMath.IsSpanClear(sapi.World, anchorFrom, SpanMath.AnchorOf(pos), out _)) continue;
 
             result.Add(new TowerCandidate
@@ -346,21 +318,10 @@ public sealed class RopewayLinkService
             return false;
         }
 
-        // The store's capacity is a flat number while a quote is length + 2 x climb, so a line can sit well
-        // inside maxLineLength and still carry a leg no FULL weight could ever pay for - permanently
-        // unrunnable in that direction, with nothing at runtime able to fix it and the refusal telling the
-        // player to wait for wind that will never be enough. Link time is the last moment they can still
-        // act, and this sits above the mutation line, so it costs them nothing but the click.
-        var capacity = StoreCapacity(lineFrom) ?? StoreCapacity(lineTo) ?? RopewayPower.DefaultCapacity;
-        var worst = EntityRopewayCabin.WorstTripCost(RopewayLine.Preview(lineFrom, from, lineTo, to));
-        if (worst > capacity)
-        {
-            player.SendIngameError(
-                "ropeway-line-too-steep",
-                Lang.Get("ropeway:err-line-too-steep", (int)Math.Ceiling(worst), (int)Math.Round(capacity)));
-            return false;
-        }
-
+        // No steepness gate. A climb is load, not a wall: a line too steep for the drive you have runs
+        // slowly, or not until you build a bigger mill, and both of those are answers the player can act on
+        // from inside the game. Refusing the link was only ever needed because a flat store could not pay
+        // for a steep trip at any speed.
         if (!SpanMath.IsSpanClear(sapi.World, anchorFrom, anchorTo, out _))
         {
             player.SendIngameError("ropeway-span-blocked", Lang.Get("ropeway:err-span-blocked"));
@@ -489,7 +450,7 @@ public sealed class RopewayLinkService
     /// What to call a tower in a message. Its player-set name, or the compass bearing to it from wherever
     /// the message is about - never a raw coordinate triple and never an "unnamed" placeholder.
     /// </summary>
-    private static string DisplayName(BEPylonBase be, double dx, double dz)
+    internal static string DisplayName(BEPylonBase be, double dx, double dz)
     {
         return be?.TowerName ?? Lang.Get(SpanMath.CompassKey(dx, dz));
     }
@@ -504,16 +465,6 @@ public sealed class RopewayLinkService
         var peers = be.Spans.ToArray();
         var anchor = SpanMath.AnchorOf(pos);
         var refund = 0;
-
-        // The weight bound to THIS tower is about to lose its anchor, and an orphaned weight is a line with
-        // no store at all - every StoreOn returns null and the only recovery was breaking and replacing the
-        // block. Re-bind it to a surviving peer: that is the same line minus one tower, so it cannot
-        // silently re-home the weight to somebody else's ropeway the way re-deriving by proximity would.
-        // Lowest position when a mid-line break leaves two halves, so which half inherits the store is the
-        // same after a reload as before it. A tower with no spans at all early-returned above: there is
-        // nothing left to bind to, and the block-info panel already says the weight is orphaned. The weight
-        // stands within towerRadius of the footing, so its chunk is loaded whenever the tower's is.
-        BETensionWeight.StoreAt(modSystem, pos)?.Bind(RopewayLine.Lowest(peers));
 
         foreach (var peer in peers)
         {
@@ -569,6 +520,17 @@ public sealed class RopewayLinkService
         if (FindCabin(line) != null)
         {
             player.SendIngameError("ropeway-cabin-exists", Lang.Get("ropeway:err-cabin-exists"));
+            return false;
+        }
+
+        // THE ONE BUILD REQUIREMENT the tensioner carries, and it is enforced here rather than at departure
+        // on purpose: a line with no tensioner is an unfinished line, not a line having a bad day, so it is
+        // told to the player while they are building - once, at the moment they hang the cabin - instead of
+        // becoming a runtime state with a refusal, a toast and a wait attached. Break the weight afterwards
+        // and the cabin keeps running; the tower panel says the tensioner is missing.
+        if (!BETensionWeight.OnLine(modSystem, line))
+        {
+            player.SendIngameError("ropeway-no-tensioner", Lang.Get("ropeway:err-no-tensioner"));
             return false;
         }
 
@@ -724,16 +686,6 @@ public sealed class RopewayLinkService
         }
 
         return true;
-    }
-
-    /// <summary>
-    /// The capacity of the weight already serving a line, or null when it has none. A line usually has no
-    /// weight yet while it is being built, which is why every caller falls back to the blocktype's default:
-    /// a link gate that only bound lines that already had a store would gate nothing at all.
-    /// </summary>
-    private double? StoreCapacity(RopewayLine line)
-    {
-        return BETensionWeight.StoreOn(modSystem, line)?.Capacity;
     }
 
     private BEPylonBase TowerAt(BlockPos pos)

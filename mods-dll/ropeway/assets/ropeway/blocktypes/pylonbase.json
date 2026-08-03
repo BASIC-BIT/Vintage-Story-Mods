@@ -8,7 +8,7 @@
       "name": "HorizontalOrientable"
     }
   ],
-  "//entityBehaviors": "MPConsumer is registered by vanilla (SurvivalCoreSystem), so the mod registers nothing for it. mechPartShape null is MANDATORY, not decoration: BEBehaviorMPBase.Initialize defaults Shape to Block.Shape and then unconditionally calls AddDeviceForRender, so without it the whole footing model joins the instanced spinning renderer and the player's foundation stone rotates. resistance is the schedule's floor - BEPylonBase rewrites it every second to RopewayPower.WindingResistance while there is a store left to wind and back to IdleResistance when there is not.",
+  "//entityBehaviors": "MPConsumer is registered by vanilla (SurvivalCoreSystem), so the mod registers nothing for it. mechPartShape null is MANDATORY, not decoration: BEBehaviorMPBase.Initialize defaults Shape to Block.Shape and then unconditionally calls AddDeviceForRender, so without it the whole footing model joins the instanced spinning renderer and the player's foundation stone rotates. resistance is the schedule's floor - BEPylonBase rewrites it every second to RopewayPower.Resistance, which is this idle figure unless the tower's line has a cabin trying to move, and the haul load plus a climb term while it has.",
   "entityBehaviors": [
     {
       "name": "MPConsumer",
@@ -76,7 +76,7 @@
     },
     "reinforcable": false,
     "maxSpan": 48,
-    "//maxLineLength": "320 = 10 chunks. The server keeps chunks loaded within MaxChunkRadius of a player, default 12 chunks / 384 blocks (ServerConfig.cs:925), and ServerMain.cs:789 only ever raises it. Chain length is an upper bound on the straight-line distance between any two towers, so a line under that radius can never have a tower unload while a rider is anywhere on it - which is the precondition for the whole truncated-line failure class (see docs/KNOWN-ISSUES.md R1-R4). 320 leaves two chunks of margin. Raising this back toward 512 re-opens that class; so does a server configured below MaxChunkRadius 10.",
+    "//maxLineLength": "320 = 10 chunks. The server keeps chunks loaded within MaxChunkRadius of a player, default 12 chunks / 384 blocks (ServerConfig.cs:925), and ServerMain.cs:789 only ever raises it. Chain length is an upper bound on the straight-line distance between any two towers, so a line under that radius can never have a tower unload while a rider is anywhere on it - which is the precondition for the whole truncated-line failure class (see docs/KNOWN-ISSUES.md R1-R4). 320 leaves two chunks of margin. Raising this back toward 512 re-opens that class; so does a server configured below MaxChunkRadius 10. It also now carries the POWER design: the cabin runs at the live speed of the drives on its line (BEPylonBase.DriveSpeedOn), which is only honest while all of them are loaded - the same radius argument, doing a second job. Where the old design wrote 'the cabin must never read live network state', read this instead.",
     "maxLineLength": 320,
     "ropePerBlock": 0.25,
     "maxCandidates": 16,

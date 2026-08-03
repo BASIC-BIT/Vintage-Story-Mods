@@ -45,9 +45,11 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    "Pylon Head", "Pylon Footing", "Ropeway Cabin" — no raw lang keys.
 
 3. **Handbook.** Press `H`, find the **Ropeway** category tab. **PASS:** the tab is labelled "Ropeway"
-   (not `handbook-category-ropeway`), both pages open, the `<itemstack>` renders spin, and the
-   "Building a Line" ↔ "Aerial Ropeways" links work. **PASS:** the overview page describes a footing and
-   one crossarm, not two gantries.
+   (not `handbook-category-ropeway`), all **three** pages open — *Aerial Ropeways*, *Building a Line*,
+   *Power and the Drive* — the `<itemstack>` renders spin, and every link between them works, including
+   50 → 51 → 52 and both pages' way back. **PASS:** the overview page describes a footing and one
+   crossarm, not two gantries. **PASS:** the power page describes a drive that turns the rope and a
+   tension weight that keeps it taut, and says nothing about winding, charge or paying for a trip.
 
 4. **Place the pylon footing.** Stand where you want the tower and place it **on the ground** — this is
    the first block of a tower and nothing has to exist above it.
@@ -317,8 +319,54 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     **PASS — leaving:** the cabin turns back onto the span as it departs. A second rotation the same size,
     and expected — it reads as the cabin swinging out onto the line.
     **PASS:** it stops at the far tower and holds. Try to dismount while it is still moving —
-    you should get *"The cabin is moving. It stops at the next tower."* and stay seated. Once stopped,
+    you should get *"The cabin is moving. Wait until it stops at a tower - or hold [your sneak key] for 2
+    seconds to jump out, and take the fall."* and stay seated. (The wording matters: C2 in KNOWN-ISSUES
+    killed "it stops at the next tower", which is a lie on a line whose middle towers a plain ride runs
+    straight through.) **PASS:** the key it names is **your own
+    current sneak binding** — rebind sneak in Settings > Controls and the message follows it. Once stopped,
     right-click to get out; you should land on or beside the tower, not in the air.
+
+13a. **Bail out of a moving cabin.** The emergency exit, and it is meant to cost you. Ride a span whose
+     middle is well off the ground.
+     **PASS:** a single **tap** of sneak mid-span gets the refusal above and nothing else — you stay seated.
+     Two or three taps in a row, still nothing. That is the accident guard; a rider brushing the key over a
+     ravine must not fall out.
+     **PASS:** now **hold sneak down** and keep holding. About **two seconds** later you are out of the
+     cabin, in mid-air, and you **fall**. One chat line: *"You jumped out of the cabin between X and Y. It
+     carries on without you."*, naming the two towers of the span you were over (their given names if you
+     have named them, otherwise a compass bearing).
+     **PASS:** you take **normal fall damage for the height you actually jumped from** — a bail-out three
+     blocks above a hillside costs nothing, one over a fifty-block drop kills you. **FAIL:** you land
+     unhurt from any height (something is softening it), or you die from a short drop after riding down a
+     long descent — that is the fall being measured from the platform you boarded at, the
+     `PositionBeforeFalling` datum in `RopewayCabinSeat.DidUnmount`. Check the same thing on an ordinary
+     **downhill** ride: board at a high tower, ride to a low one, step out normally. **PASS:** no damage.
+     **PASS:** the cabin **carries on without you** to wherever it was going and stops there. It does not
+     halt, reverse, or park.
+     **PASS:** the tension weight is untouched and unchanged by any of this. It is a tensioner, not a
+     battery — no gauge, no number, nothing that moves. If you find a charge reading anywhere in this mod,
+     that is the deleted store having come back.
+     **PASS — do this one in multiplayer, it is the whole reason the permission is a synced flag.** Have a
+     second player watch from the ground while you bail. **PASS:** they see you leave the cabin and fall.
+     **FAIL — the regression this guards:** the watcher sees you still sitting in the cabin, riding on
+     without a body, for the rest of the session. Every client answers the unmount exactly once, so a
+     client that refuses it never gets a second chance.
+     **PASS:** walk to a tower, board the same cabin again, ride off, and **tap** sneak once. You get the
+     refusal, not an instant ejection — the bail permission is retired when you board. Do it once more
+     after a **relog**, since the permission rides on your player and players are saved.
+     **PASS — the accident case, and the one worth being fussy about.** **Crouch-walk** onto the platform
+     and, *without ever letting go of sneak*, right-click the cabin to board, then keep holding through the
+     departure and for a good ten seconds after. **PASS:** you stay in the cabin. **FAIL:** you are thrown
+     out mid-span having pressed nothing and seen no message — the hold must need a fresh press *after* the
+     cabin is moving, because boarding copies the key you were already holding into the seat. Now let go
+     for a moment and hold again: **PASS:** two seconds later you bail normally.
+     **PASS:** holding sneak while the cabin is **stopped** just gets you out normally, as always. Keep
+     holding as it sets off again: **PASS:** nothing happens until you release and press afresh.
+     **PASS — the trap this exists for.** Bail out mid-span, leaving the cabin empty between two towers,
+     then break a tower on that line (step 17 no longer refuses you: nobody is riding). **PASS:** the empty
+     cabin re-bases and parks at an end tower rather than being stranded. Calling it (step 15) from a tower
+     while it hangs mid-span **PASS:** works — the cabin simply re-aims and carries on to the tower you
+     called it to.
 
 13b. **Choose where you get off.** This one needs a **three-or-more-tower line** — build step 16 first if
      you have not. It is the rider's only control, and the thing whose absence made the ride feel like it
@@ -574,7 +622,7 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     **26d — it rides.** Reload one bench with goods, board the other, and ride a full span.
     **PASS:** the cargo stays on the bench the whole way and does not jitter, and the dialog stays open
     and follows the cabin if you open it mid-ride. **PASS:** the cabin runs at the same speed loaded as
-    empty — weight and speed are deliberately not modelled yet.
+    empty — cargo weight is deliberately not modelled yet (the load model has a term for it, unused).
 
     **26e — PERSISTENCE, the part that had to be right.** With goods on both benches:
     - Save, quit to menu, reload. **PASS:** both containers are still there with the same contents.
@@ -624,3 +672,84 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     **chest** as what fits. Sneak + right-click a footing: **PASS:** the guide's closing paragraph names
     both containers, the Ctrl verb and the "cannot be sat on" rule. **FAIL:** any of these still offers the
     crate, or still claims the basket is the only container that fits.
+
+27. **Power — the drive is a real mechanical load** (this whole step is new: the tension weight used to be
+    a battery you wound up, and that design is deleted. Nothing here stores anything.)
+    You need a **windmill rotor** (`windmillrotor-wood-north`), **sails** (4 per length), **wooden axles**
+    and probably **angled gears**, plus a **tension weight**. Creative and `/giveblock` are fine.
+
+    **27a — the tensioner is a build requirement, and it is the only one.** On a finished two-tower line
+    with no tension weight anywhere near it, hold the **ropeway cabin** and right-click an end footing.
+    **PASS:** it refuses — *"This line has no tension weight to keep the rope taut. Build one within 8
+    blocks of any tower on it first."* — and the cabin item is **not** consumed.
+    Look at a footing: **PASS:** the panel says the line has no tension weight and where to put one.
+    Try to place the weight out in a field, 20 blocks from anything: **PASS:** it refuses,
+    *"A tension weight has to stand within 8 blocks of a pylon footing."*
+    Place it beside **either** tower — it does not matter which — and hang the cabin again. **PASS:** it
+    goes on, and the footing panel stops mentioning the tensioner.
+    **PASS:** the weight looks like a mass **hanging low in its guide** on a rod up to the head beam, and it
+    **never moves**, however long you run the line. **FAIL:** it sits on the pad with nothing above it, or
+    it slides up and down — the first is the hanger element missing, the second is the deleted gauge.
+    **PASS:** place a **second** weight beside the other tower. It is allowed now (one per line was a store
+    rule and is gone), it does nothing extra, and nothing anywhere calls it "spare" or "orphaned".
+    **PASS:** break the weight with the cabin already hanging. The cabin keeps working; the footing panel
+    says the tensioner is missing. That leak is deliberate — it is a build check, not a runtime state.
+
+    **27b — no drive is a cabin that waits, not an error.** With no axle anywhere on the line, board and
+    sit. **PASS:** after the three-second pause nothing happens: no red toast, no chat line, no refusal.
+    The cabin simply does not move. **FAIL:** any message about power, a store, a tension weight not being
+    wound, or a trip being too dear — those states are deleted and any of them means old code is live.
+    **PASS:** the footing panel says *"Nothing on this line is turning, so the cabin will not move."*
+    **PASS:** get out. You can, because it is not moving.
+
+    **27c — build the drive, and the ladder.** Run an axle into **any** footing on the line, from either
+    side of the crossarm (never down the line the cabin travels), and put a **wooden windmill rotor** on
+    it up where the wind blows. Add sails one length at a time, on a clear windy day (check the rotor's own
+    panel reads a decent wind speed — these numbers are for **good wind**, and a becalmed or turbulence-
+    halved mill will read low for reasons that are vanilla's, not ours).
+    **PASS, and this is the point of the whole redesign — you can FEEL the difference:**
+    - **2 sails:** the cabin does not move at all. The mill turns; it cannot carry the load.
+    - **3 sails:** it crawls, about **1.2 blocks a second** — slower than you walk.
+    - **5 sails** (maxed wood): about **2.2 blocks a second**.
+    - a maxed **metal** rotor (10 sails): about **3.0** — you cannot keep up with it on foot.
+    Time a span of known length if you want to be exact; ±20% is fine, the point is that the rungs are
+    obviously different. **FAIL:** every sail count feels the same — that is the old flat design back, and
+    it is what this change exists to kill.
+    **PASS:** the footing panel reads out both numbers — what **this** footing is turning at in rps, and
+    what the **line's** drives come to in blocks a second — and the second one tracks what you just did.
+
+    **27d — climbing costs.** Build (or ride) a line with one clearly uphill span and one level one.
+    **PASS:** the cabin visibly **slows on the way up** and picks up again on the level or the way down.
+    **PASS:** it does **not** stop on the climb with a mill that hauls it on the flat. **FAIL:** it stalls
+    halfway up a hill — the climb term is meant to be visible, never fatal.
+
+    **27e — pooling.** Put a **second** mill on a **different** tower of the same line, on its own axle
+    network. **PASS:** the cabin gets **faster** — the drives add up — and the footing panel's line figure
+    goes up with it. **PASS:** it works whichever towers you pick; there is no drive station.
+    **Then the case that is not pooling:** run **one** axle line along the ropeway and tap **three** footings
+    off that same network. **PASS:** the line figure does **not** climb with the number of footings — one
+    network is one drive however many footings touch it — and the cabin is if anything slower, because every
+    hookup declares the haul load. **FAIL:** each extra footing adds another drive's worth of speed. That is
+    free speed for adding load, and it is the one thing a load model must never do.
+
+    **27f — dead calm, and the thing that used to be impossible.** Wait for still weather (or break the
+    sails) **while the cabin is mid-span with you in it**.
+    **PASS:** the cabin **stops where it is**. No message, no toast, nothing in the log.
+    **PASS:** it starts again **by itself** when the wind comes back, going the same way, and finishes at
+    the tower it was heading for.
+    **PASS:** while it is stopped you can **right-click to get out** normally — you are in mid-air, you
+    fall, and that is correct. You are never trapped; that is why the gate could be deleted.
+    **PASS:** save and reload while it is stopped mid-span. It comes back exactly there, still pointed the
+    same way, and carries on when there is wind. **FAIL:** it teleports to a tower on reload.
+
+    **27g — the ropeway is a citizen of your network.** Put a **quern** on the same axle network as the
+    ropeway's mill and grind something while the cabin runs. **PASS:** both work, and both are slower than
+    they would be alone — a maxed wood mill carries a ropeway plus a quern, and this is what "a real load"
+    means. **PASS:** park the cabin at a tower and the quern speeds back up: a ropeway with nothing to haul
+    drops to a nearly-zero idle load, so a finished line does not tax the mill it shares forever.
+    **FAIL:** the whole network stalls dead with only the ropeway and a quern on a maxed five-sail mill.
+    **PASS, the cabin that never started:** break the sails (or use a line with no drive at all), sit in the
+    cabin through the boarding pause, get out, then put the sails back with the cabin standing there empty.
+    The quern runs at its full unloaded speed the whole time. **FAIL:** the quern stays permanently slow
+    afterwards — that is a cabin that declared itself hauling without ever having moved, and only breaking it
+    would clear it.

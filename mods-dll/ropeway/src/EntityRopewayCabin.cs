@@ -13,33 +13,19 @@ using Vintagestory.GameContent;
 namespace Ropeway;
 
 /// <summary>What a call to a tower would do. Not a bool: "it is already here" and "it cannot get here" are
-/// different things to tell the player, and reporting either as failure is what made calling look broken.</summary>
+/// different things to tell the player, and reporting either as failure is what made calling look broken.
+/// <para>
+/// There is deliberately no power outcome. A line with no drive, or a drive with no wind, accepts the call
+/// and the cabin sets off as soon as it can - the same answer a quern gives. Refusing would be a state to
+/// explain, a message to write and a wait to sit through, for a situation the player can read off the
+/// tower's own panel.
+/// </para>
+/// </summary>
 public enum CabinCall
 {
     Called,
     AlreadyHere,
-    Unreachable,
-
-    /// <summary>The line has no tension weight, so there is nothing for a trip to be paid out of.</summary>
-    NoStore,
-
-    /// <summary>
-    /// Part of the line is unloaded, so a weight past the truncation cannot be seen from here. NOT the same
-    /// as <see cref="NoStore"/> - one is a block the player has to build, the other is a chunk they have to
-    /// walk to - and saying "this line has no tension weight" to somebody standing next to theirs is a lie.
-    /// </summary>
-    StoreUnreachable,
-
-    /// <summary>There is a store and it cannot cover this trip's quote. Waiting for the wind fixes it.</summary>
-    NoPower,
-
-    /// <summary>
-    /// The quote is larger than the store's whole capacity, so no amount of winding will ever start this
-    /// trip. "Not yet" and "never" must not read the same: the first is a wait, the second is a line that
-    /// has to be shortened or eased. <see cref="RopewayLinkService.TryLink"/> refuses to build one of these
-    /// in the first place; this is the runtime backstop for the lines that predate that gate.
-    /// </summary>
-    TooDear
+    Unreachable
 }
 
 /// <summary>
@@ -50,7 +36,18 @@ public enum CabinCall
 public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 {
     public const double BoardingGraceSeconds = 3.0;
-    public const double DefaultSpeed = 2.2;
+
+    /// <summary>
+    /// How long a rider has to hold the SNEAK key, continuously, before a moving cabin lets them jump out.
+    /// <para>
+    /// Sneak because it is already the dismount input - <c>EntitySeat.onControls</c> calls TryUnmount on the
+    /// press, and that press is exactly what raises the refusal that names this hold - so the emergency exit
+    /// is the ordinary verb held down rather than a third hotkey to discover. A HOLD rather than a tap or a
+    /// second tap because a tap is what a rider does by reflex and the drop is what makes waiting for the
+    /// tower the sensible answer: two seconds is longer than any accident and shorter than any emergency.
+    /// </para>
+    /// </summary>
+    public const double BailHoldSeconds = 2.0;
 
     /// <summary>
     /// How far the cabin's origin hangs below the rope. Derived, not chosen: with the sheave
@@ -110,21 +107,8 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// </summary>
     public bool Outbound = true;
 
-    private double speed = DefaultSpeed;
     private double hangDrop = DefaultHangDrop;
     private bool departed;
-
-    /// <summary>
-    /// How far along the line the store has already paid for this cabin to go, as a distance from
-    /// <c>Towers[0]</c> - the same scale as <see cref="Travelled"/> and <see cref="Destination"/> - or
-    /// <see cref="NoDestination"/> when nothing is paid for. THE trip credit: see <see cref="Fare"/> for
-    /// the whole rule and <see cref="PayFor"/> for the only place that writes it.
-    /// <para>
-    /// Persisted with <c>departed</c> and for the same reason: a trip interrupted by a save, a chunk that
-    /// has not landed or a blocked span has already been paid for, and must not be charged again to finish.
-    /// </para>
-    /// </summary>
-    private double paidTo = NoDestination;
 
     private bool boarding;
     private double boardAccum;
@@ -137,6 +121,23 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     private string calledBy;
 
     public double HangDropDefault => hangDrop;
+
+    /// <summary>
+    /// The cabin is trying to move: it has left a station and has not stopped. Read by every powered tower
+    /// on the line to decide what load to declare - see <c>BEPylonBase.DeclareLoad</c> for why this and not
+    /// <see cref="IsMoving"/>, which is false whenever the drive has stalled and would oscillate.
+    /// </summary>
+    public bool IsHauling => departed;
+
+    /// <summary>
+    /// How steeply the cabin is climbing right now, as the vertical component of its unit direction of
+    /// travel: 0 parked or level, negative descending. The load term the towers add to their resistance.
+    /// </summary>
+    public double ClimbOn(RopewayLine line)
+    {
+        if (!departed || line == null) return 0;
+        return (Outbound ? 1 : -1) * line.DirectionAt(Travelled).Y;
+    }
 
     public override double FrustumSphereRadius => base.FrustumSphereRadius * 2.5;
 
@@ -203,7 +204,6 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
     public override void Initialize(EntityProperties properties, ICoreAPI api, long InChunkIndex3d)
     {
-        speed = properties?.Attributes?["speed"].AsDouble(DefaultSpeed) ?? DefaultSpeed;
         hangDrop = properties?.Attributes?["hangDrop"].AsDouble(DefaultHangDrop) ?? DefaultHangDrop;
         base.Initialize(properties, api, InChunkIndex3d);
     }
@@ -481,6 +481,11 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         DropGhostPassengers(line);
 
+        // AFTER the ghost drop, never before: a rider who logged out is unseated and put on a tower there,
+        // and running the bail first would hand the same seat to both. Once DropGhostPassengers has run, a
+        // seat that still has a passenger has a passenger who is really there.
+        BailOut(line, dt);
+
         // NotReady already returned for every truncated chain the cabin sits outside of, so this only ever
         // fires on a whole one - where the window IS the line, and anything outside it is stale state to
         // clamp away rather than a chunk that has not landed yet.
@@ -514,7 +519,19 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             if (boarding && HasPassenger)
             {
                 boardAccum += dt;
-                if (boardAccum >= BoardingGraceSeconds) Depart(line);
+
+                // The grace is up AND the drive is turning. This is NOT the departure gate the store design
+                // had, which refused a trip the cabin could not afford: nothing is being checked against a
+                // budget and nothing is refused - the machine simply does not start while nothing turns, the
+                // same way a quern with no wind does not start. Once it HAS started a stall does not undo it
+                // (see the speed check below), because that is what stops the load oscillating mid-ride.
+                // Without this, boarding a line with no drive at all latches `departed` for good: only Hold
+                // clears it and every Hold needs the cabin to move, so the towers would declare the full haul
+                // load on the player's network forever for a cabin that has never gone anywhere.
+                if (boardAccum >= BoardingGraceSeconds && RopewayPower.CabinSpeed(BEPylonBase.DriveSpeedOn(ModSystem, line)) > 0)
+                {
+                    Depart();
+                }
             }
             else
             {
@@ -522,7 +539,11 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
                 boardAccum = 0;
             }
 
-            IsMoving = false;
+            // `departed`, not false: both the departure above and the resume-after-save at the top of this
+            // branch set it, and leaving IsMoving false until the end of the NEXT tick is a window in which
+            // CanMount lets a second player board a cabin that has already left. Aim closes the same window
+            // by hand for the call path; this is the boarding path's half of it.
+            IsMoving = departed;
             Place(line);
             return;
         }
@@ -543,13 +564,26 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
                 // mid-span recovery on the very next tick, which parks at a proven end rather than driving
                 // through the block. A cabin with a rider aboard is deliberately left standing there: see
                 // that branch for why nothing may teleport a passenger, and for the way out they have.
-                // keepPaidTrip: the trip was paid for in full before it left, and a wall someone built
-                // across the span is not a reason to charge for it again - the way out is the stop key,
-                // which re-aims inside a reach the store has already funded and so costs nothing.
-                Hold("ropeway:call-abandoned-blocked", keepPaidTrip: true);
+                Hold("ropeway:call-abandoned-blocked");
                 Place(line);
                 return;
             }
+        }
+
+        // LIVE network speed, which the store design forbade and this one is built on. The cabin is a load
+        // on the line's drives and runs at whatever they are turning: no wind is no motion, and it picks up
+        // again by itself when the wind does. Nothing here can strand a rider - the sneak-hold bail-out gets
+        // them out of a stopped cabin anywhere - and BEPylonBase.DriveSpeedOn documents why the drives are
+        // always loaded when a rider is on the line.
+        var speed = RopewayPower.CabinSpeed(BEPylonBase.DriveSpeedOn(ModSystem, line));
+        if (speed <= 0)
+        {
+            // Standing still is not stopping: `departed` stays set, so the towers keep declaring the haul
+            // load (or the network would speed up the moment the cabin stalled and cycle) and the trip
+            // resumes on the tick power returns.
+            IsMoving = false;
+            Place(line);
+            return;
         }
 
         Travelled += (Outbound ? 1 : -1) * speed * dt;
@@ -568,13 +602,12 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             Travelled = line.MaxTravel;
 
             // Stopping at a proven end IS the arrival for a call to it. Stopping at the last loaded tower
-            // short of one is a trip that gave up, and the caller is not aboard to be told by NotifyRiders -
-            // so it keeps what it paid and carries on for nothing once the chunk lands.
+            // short of one is a trip that gave up, and the caller is not aboard to be told by NotifyRiders.
             var ended = arrived || line.MaxTravel >= line.TotalLength;
             if (line.MaxTravel >= line.TotalLength) Outbound = false;
             else NotifyRiders("ropeway-line-truncated", "ropeway:cabin-held-truncated");
 
-            Hold(ended ? null : "ropeway:call-abandoned-truncated", keepPaidTrip: !ended);
+            Hold(ended ? null : "ropeway:call-abandoned-truncated");
         }
         else if (Travelled <= line.MinTravel)
         {
@@ -584,7 +617,7 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             if (line.MinTravel <= 0) Outbound = true;
             else NotifyRiders("ropeway-line-truncated", "ropeway:cabin-held-truncated");
 
-            Hold(ended ? null : "ropeway:call-abandoned-truncated", keepPaidTrip: !ended);
+            Hold(ended ? null : "ropeway:call-abandoned-truncated");
         }
 
         if (arrived) Hold();
@@ -594,139 +627,16 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     }
 
     /// <summary>
-    /// A plain ride leaving a station: nobody named a stop, so the trip is to the end of the line the cabin
-    /// is pointing at, and it is quoted and paid for as one. On a refusal the cabin simply does not leave -
-    /// it is standing on solid ground next to a block that can tell the rider the number - and the boarding
-    /// timer re-arms, which is also what rate-limits the toast to one every <see cref="BoardingGraceSeconds"/>.
+    /// A plain ride leaving a station: nobody named a stop, so it runs to the end of the line the cabin is
+    /// pointing at. Nothing is checked HERE - the drive is a load, not a permission, and there is no budget
+    /// to fail - but the caller only starts the cabin while the drive is actually turning, for the reason
+    /// given there.
     /// </summary>
-    private void Depart(RopewayLine line)
+    private void Depart()
     {
-        var payment = PayFor(line, Outbound ? line.MaxTravel : line.MinTravel);
-        if (payment != CabinCall.Called)
-        {
-            boardAccum = 0;
-            var refusal = Refusal(payment);
-            if (refusal.Code != null) NotifyRiders(refusal.Code, refusal.Rider);
-            return;
-        }
-
         departed = true;
         boarding = false;
         lastSegment = -1;
-    }
-
-    /// <summary>
-    /// THE PAYMENT INVARIANT, and the only place that charges for a trip or moves <see cref="paidTo"/>:
-    /// <b>a trip is paid for exactly once.</b> The energy leaves the store before the cabin moves, and the
-    /// cabin then carries the reach it bought, so a drive that stalls, a windmill that loses its wind, a
-    /// chunk that unloads, a blocked span or a server restart changes nothing about a journey in progress -
-    /// it changes when the NEXT one can leave. That is the property the whole store design exists for, and
-    /// it is why the cabin never reads live network speed anywhere.
-    /// <para>
-    /// Anything that stops the cabin short of where it paid to go KEEPS that reach (see <see cref="Hold"/>),
-    /// so the held trip finishes on the money it already spent. What ends the credit is the trip ending:
-    /// reaching the destination spends it, and a line that re-canonicalises under the cabin FORFEITS it -
-    /// no refund, because <see cref="paidTo"/> is a distance on a scale that no longer exists and the store
-    /// it came from may not be the store the cabin now belongs to. Unused credit is never paid back.
-    /// </para>
-    /// </summary>
-    private CabinCall PayFor(RopewayLine line, double target)
-    {
-        var store = BETensionWeight.StoreOn(ModSystem, line);
-        if (store == null) return line?.Truncated == true ? CabinCall.StoreUnreachable : CabinCall.NoStore;
-
-        var (cost, reach) = Fare(line, Travelled, paidTo, target);
-
-        // A quote no full store could ever cover is a different sentence from one it cannot cover yet.
-        if (cost > store.Capacity) return CabinCall.TooDear;
-        if (!store.TrySpend(cost)) return CabinCall.NoPower;
-
-        paidTo = reach;
-        return CabinCall.Called;
-    }
-
-    /// <summary>
-    /// What a new aim costs on top of what the trip in progress already paid, and the reach the cabin holds
-    /// afterwards. Three cases, and they are the whole credit rule:
-    /// <list type="bullet">
-    /// <item>Nothing paid, or a target the other way down the line - a NEW trip, quoted in full from where
-    /// the cabin stands. Turning round is not part of the trip that was bought.</item>
-    /// <item>A target between the cabin and <paramref name="paidTo"/> - free. This is a rider changing their
-    /// mind inside a journey the store has already funded, and the reach does not shrink to meet it, so
-    /// changing it back is free too.</item>
-    /// <item>A target past <paramref name="paidTo"/> the same way - only the leg beyond what was paid.</item>
-    /// </list>
-    /// The covered interval shrinks as the cabin travels into it, so no amount of re-aiming buys more
-    /// travel than was paid for. Pure, and therefore tested - this is the money.
-    /// </summary>
-    public static (double Cost, double PaidTo) Fare(RopewayLine line, double travelled, double paidTo, double target)
-    {
-        var toPaid = paidTo - travelled;
-        var toTarget = target - travelled;
-
-        if (paidTo < 0 || toPaid * toTarget < 0) return (TripCost(line, travelled, target), target);
-        if (Math.Abs(toTarget) <= Math.Abs(toPaid)) return (0, paidTo);
-
-        return (TripCost(line, paidTo, target), target);
-    }
-
-    /// <summary>
-    /// The words for every power refusal, in ONE place: the ground call, the rider's stop key and the
-    /// departure gate all read from here, so a refusal cannot ship with a message on one surface and
-    /// silence on the other two. The rider text differs from the ground text only in what it may assume the
-    /// player can see - somebody in the cabin is not standing at a block-info panel. Empty for everything
-    /// that is not a power refusal.
-    /// </summary>
-    public static (string Code, string Ground, string Rider) Refusal(CabinCall outcome)
-    {
-        return outcome switch
-        {
-            CabinCall.NoStore => ("ropeway-no-store", "ropeway:err-no-store", "ropeway:cabin-held-nostore"),
-            CabinCall.StoreUnreachable => ("ropeway-store-unreachable", "ropeway:err-store-unreachable", "ropeway:cabin-held-store-unreachable"),
-            CabinCall.NoPower => ("ropeway-no-power", "ropeway:err-no-power", "ropeway:cabin-held-nopower"),
-            CabinCall.TooDear => ("ropeway-too-dear", "ropeway:err-too-dear", "ropeway:cabin-held-toodear"),
-            _ => (null, null, null)
-        };
-    }
-
-    /// <summary>
-    /// What a trip between two points on a line costs the store: its length, dearer uphill and cheaper
-    /// down. Pure, and therefore tested - a sign error here is a downhill line that charges double and an
-    /// uphill one that runs free.
-    /// </summary>
-    public static double TripCost(RopewayLine line, double from, double to)
-    {
-        var start = line?.PositionAt(from);
-        var end = line?.PositionAt(to);
-        if (start == null || end == null) return 0;
-
-        return RopewayPower.Quote(Math.Abs(to - from), end.Y - start.Y);
-    }
-
-    /// <summary>
-    /// The dearest quote anybody can ever be handed on a line: every tower pair, both directions. Not the
-    /// two end-to-end trips - a line that climbs and then falls quotes its NET climb end to end while the
-    /// uphill half on its own is dearer - and this is what the link gate weighs against the store's
-    /// capacity, so anything less than the true worst case lets an unrunnable leg through.
-    /// <para>
-    /// O(towers squared), capped by <see cref="RopewayLine.MaxTowersPerLine"/> and only ever run on a click.
-    /// Pure, and therefore tested.
-    /// </para>
-    /// </summary>
-    public static double WorstTripCost(RopewayLine line)
-    {
-        if (line?.Cumulative == null) return 0;
-
-        var worst = 0.0;
-        for (var i = 0; i < line.Cumulative.Length; i++)
-        {
-            for (var j = 0; j < line.Cumulative.Length; j++)
-            {
-                if (i != j) worst = Math.Max(worst, TripCost(line, line.Cumulative[i], line.Cumulative[j]));
-            }
-        }
-
-        return worst;
     }
 
     /// <summary>
@@ -747,19 +657,14 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// hold that is NOT the arrival. Null means the trip ended the way it was meant to.
     /// </para>
     /// <para>
-    /// <paramref name="keepPaidTrip"/> is the other half of <see cref="PayFor"/>'s invariant and the reason
-    /// a stalled trip is not charged twice: a cabin that stopped SHORT of the reach it bought - a blocked
-    /// span, the last loaded tower of a truncated chain - keeps that reach, so going on costs nothing. A
-    /// cabin that arrived has spent it, and a cabin whose chain re-canonicalised forfeits it, because the
-    /// reach is a distance on a scale that no longer means anything. Default false: forfeiting is the safe
-    /// answer, and a new hold that ought to keep the credit has to say so out loud.
+    /// A cabin standing still because its drive stopped is NOT a hold and must never reach here: it has not
+    /// finished, its route is still travellable, and it carries on the moment the wind comes back.
     /// </para>
     /// </summary>
-    private void Hold(string abandonedReason = null, bool keepPaidTrip = false)
+    private void Hold(string abandonedReason = null)
     {
         if (abandonedReason != null) NotifyCaller(abandonedReason);
 
-        if (!keepPaidTrip) paidTo = NoDestination;
         departed = false;
         boarding = false;
         boardAccum = 0;
@@ -858,7 +763,148 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         for (var i = 0; i < seats.Length; i++) (seats[i]?.Passenger as EntityAgent)?.TryUnmount();
     }
 
-    /// <summary>Tells whoever is aboard why the cabin stopped. Server side; the toast de-dupes on its code.</summary>
+    /// <summary>
+    /// One step of a rider's bail-out hold. Zero the moment they let go OR the cabin stops, so the hold has
+    /// to be unbroken and it only ever counts while there is something to bail out of. Pure, and therefore
+    /// tested: an accumulator that failed to reset is a rider who falls out of a cabin they were happily
+    /// riding in.
+    /// <para>
+    /// <paramref name="released"/> is the accident guard, and it is why the arm is EDGE-triggered rather
+    /// than level-triggered on the held flag. <c>EntityAgent.TryMount</c> copies the boarder's live control
+    /// flags into the seat (EntityAgent.cs:273) BEFORE <c>Passenger</c> is set, so a player who crouch-walks
+    /// onto a platform and right-clicks to board arrives with the seat's Sneak already true - and the
+    /// false-&gt;true handler that is the ONLY thing advertising the bail-out already fired into a null
+    /// Passenger, so no toast was shown and no further edge is coming. Counting the flag alone would eject
+    /// them two seconds after departure having pressed nothing and read nothing, which is easier to hit by
+    /// accident than on purpose. So the hold may only start once this rider has been seen NOT sneaking while
+    /// the cabin moves: a flag inherited from boarding can never arm anything, and the refusal toast that
+    /// explains the bail-out always comes first.
+    /// </para>
+    /// </summary>
+    public static double HoldSneak(double held, bool sneaking, bool moving, float dt, ref bool released)
+    {
+        if (!moving) released = false;
+        else if (!sneaking) released = true;
+
+        return sneaking && moving && released ? held + dt : 0;
+    }
+
+    /// <summary>
+    /// THE EMERGENCY EXIT. <see cref="RopewayCabinSeat.CanUnmount"/> refuses while the cabin moves and that
+    /// stays the default answer - an accidental dismount thirty blocks up is worse than riding on to the
+    /// next tower - but a rider who holds sneak for <see cref="BailHoldSeconds"/> gets out anyway, and takes
+    /// the drop for it.
+    /// <para>
+    /// Everything here is PER SEAT and per rider - the hold, the edge trigger and the clearance
+    /// (<see cref="RopewayCabinSeat.BailKey"/>, on the rider's own tree). Two riders can finish their holds
+    /// on the same tick and both get out; nothing on the cabin can be overwritten by the second one.
+    /// </para>
+    /// <para>
+    /// The seat's <c>Controls</c> are the server's copy of the rider's keys: <c>ServerMain</c>
+    /// (:934-947) routes a mounted player's MoveKeyChange packets into <c>MountedOn.Controls</c> rather than
+    /// into the player's own, so <c>Sneak</c> here is the live held state with nothing to sync ourselves.
+    /// </para>
+    /// </summary>
+    private void BailOut(RopewayLine line, float dt)
+    {
+        var seats = GetBehavior<EntityBehaviorSeatable>()?.Seats;
+        if (seats == null) return;
+
+        for (var i = 0; i < seats.Length; i++)
+        {
+            if (seats[i] is not RopewayCabinSeat seat) continue;
+
+            if (seat.Passenger is not EntityPlayer rider)
+            {
+                seat.SneakHeld = 0;
+                seat.SneakReleased = false;
+                continue;
+            }
+
+            seat.SneakHeld = HoldSneak(seat.SneakHeld, seat.Controls?.Sneak == true, IsMoving, dt, ref seat.SneakReleased);
+            if (seat.SneakHeld < BailHoldSeconds) continue;
+
+            seat.SneakHeld = 0;
+            Jump(line, seat, rider);
+        }
+    }
+
+    /// <summary>
+    /// The rider jumps, and the CABIN IS DELIBERATELY LEFT ALONE. It keeps its destination and its direction,
+    /// and it carries on: the drive does not care who is aboard, losing a passenger is not an arrival and
+    /// there is nothing about the trip that was contingent on them - it simply gets there empty.
+    /// Every HasPassenger gate flips open behind them and each one is safe to open, because each is guarded
+    /// for a cabin that is empty and mid-span already: breaking a tower re-bases and parks, a ground call
+    /// re-aims it, and the mid-span park recovery is exactly what rescues a cabin the rider has just
+    /// abandoned between two towers.
+    /// </summary>
+    private void Jump(RopewayLine line, RopewayCabinSeat seat, EntityPlayer rider)
+    {
+        // The clearance and the unmount it authorises, one tree and therefore one packet: TryUnmount ends in
+        // RemoveAttribute("mountedOn") on this same tree, which marks all of it dirty. See BailKey.
+        rider.WatchedAttributes.SetBool(RopewayCabinSeat.BailKey, true);
+
+        // Vanilla's EntityRideableSeat.DidUnmount hunts for a free block beside the mount and teleports the
+        // rider onto it. That is the right answer at a tower and the wrong one here: the reason "wait for
+        // the tower" is the sensible default is that bailing out costs you the fall. Restored in a finally
+        // because TryUnmount runs third-party listeners (Event.TriggerEntityUnmounted, every
+        // IMountableListener): one throw leaves the flag stuck false for the life of the entity, TickEntities
+        // swallows it, and every subsequent ORDINARY dismount at a tower silently drops the rider instead of
+        // placing them. The clearance dies in the same finally when the jump did not happen: a live
+        // permission on a rider who is still seated turns their next single TAP of sneak into an instant
+        // teleporting dismount, the exact inverse of the design.
+        var jumped = false;
+        seat.DoTeleportOnUnmount = false;
+        try
+        {
+            jumped = rider.TryUnmount();
+        }
+        finally
+        {
+            seat.DoTeleportOnUnmount = true;
+            if (!jumped) rider.WatchedAttributes.RemoveAttribute(RopewayCabinSeat.BailKey);
+        }
+
+        if (!jumped) return;
+
+        // Spend the clearance, one flush window later. It cannot be cleared inline: attributes go out every
+        // 0.2 s (PhysicsManager.cs:313), so a set-and-remove inside one window never reaches the wire at all
+        // and every client would refuse the unmount this authorised - the exact failure BailKey documents.
+        // A second later it has been seen, and clearing it stops a spent permission riding on the player's
+        // persisted attributes until their next boarding, across a save and a relog. DidMount clears it too;
+        // whichever gets there first, the other is a no-op.
+        World?.RegisterCallback(_ => rider.WatchedAttributes.RemoveAttribute(RopewayCabinSeat.BailKey), 1000);
+
+        if (World?.PlayerByUid(rider.PlayerUID) is not IServerPlayer player) return;
+
+        var span = line.AnchorIndexAt(Travelled);
+        player.SendMessage(
+            GlobalConstants.InfoLogChatGroup,
+            Lang.Get("ropeway:bailed-out", TowerName(line, span), TowerName(line, span + 1)),
+            EnumChatType.Notification);
+    }
+
+    /// <summary>
+    /// A tower's name for a message, falling back to its compass bearing from the cabin the way every other
+    /// tower message does.
+    /// </summary>
+    private string TowerName(RopewayLine line, int index)
+    {
+        if (line?.Towers == null || index < 0 || index >= line.Towers.Length) return "?";
+
+        var pos = line.Towers[index];
+        var towers = ModSystem?.LoadedTowers;
+        var be = towers != null && towers.TryGetValue(pos, out var found) ? found : null;
+        var anchor = SpanMath.AnchorOf(pos);
+
+        return RopewayLinkService.DisplayName(be, anchor.X - Pos.X, anchor.Z - Pos.Z);
+    }
+
+    /// <summary>
+    /// Tells whoever is aboard why the cabin stopped. Server side. The code is only an identifier the API
+    /// asks for - HudIngameError.Event_InGameError ignores errorCode entirely, so it neither de-dupes nor
+    /// suppresses anything, and repeating a call repeats the toast.
+    /// </summary>
     private void NotifyRiders(string code, string langKey)
     {
         var seats = GetBehavior<EntityBehaviorSeatable>()?.Seats;
@@ -1096,9 +1142,6 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         if (index < 0) return CabinCall.Unreachable;
 
-        var payment = PayFor(line, target);
-        if (payment != CabinCall.Called) return payment;
-
         tower = line.Towers[index];
         Aim(target, riderUid);
         return CabinCall.Called;
@@ -1118,9 +1161,6 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         var outcome = PlanCall(line, tower, Travelled, out var target);
         if (outcome != CabinCall.Called) return outcome;
-
-        var payment = PayFor(line, target);
-        if (payment != CabinCall.Called) return payment;
 
         Aim(target, callerUid);
         return CabinCall.Called;
@@ -1292,7 +1332,6 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         Attributes.SetDouble("travelled", Travelled);
         Attributes.SetBool("outbound", Outbound);
         Attributes.SetBool("departed", departed);
-        Attributes.SetDouble("paidTo", paidTo);
         if (calledBy != null) Attributes.SetString("calledBy", calledBy);
         else Attributes.RemoveAttribute("calledBy");
         base.ToBytes(writer, forClient);
@@ -1312,11 +1351,6 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         // resumes from exactly where it stopped, in the direction it was going. lastSegment stays -1, so
         // the span it resumes into is re-checked for clearance before it moves.
         departed = Attributes.GetBool("departed");
-
-        // Persisted with it and for the same reason: a trip that was paid for and then interrupted by the
-        // save must not be charged a second time to finish. Defaults to "nothing paid" for cabins written
-        // before the credit existed, which quote afresh exactly as they used to.
-        paidTo = Attributes.GetDouble("paidTo", NoDestination);
 
         // Cabins saved before the key moved to WatchedAttributes still carry it in Attributes. Without the
         // carry-over they resolve no line at all, and a null LineKey also skips the DropAndDie backstop -

@@ -82,52 +82,40 @@ public class RopewayAssetContractTests
         Assert.Equal("BlockTensionWeight", block.GetProperty("class").GetString());
         Assert.Equal("TensionWeight", block.GetProperty("entityClass").GetString());
 
-        var attributes = block.GetProperty("attributes");
-        Assert.Equal(RopewayPower.DefaultCapacity, attributes.GetProperty("capacity").GetDouble());
-        Assert.True(attributes.GetProperty("towerRadius").GetDouble() > 0);
-
-        // The drawn mass is the gauge, and it has to stay inside the guide rails authored in the shape
-        // (2/16 to 46/16) at every charge level. Half the mass's own height is 0.3125.
-        var floor = attributes.GetProperty("massFloor").GetDouble();
-        var rise = attributes.GetProperty("massRise").GetDouble();
-        Assert.True(floor - 0.3125 >= 2 / 16.0, $"an empty weight sinks through its own pad: {floor}");
-        Assert.True(floor + rise + 0.3125 <= 46 / 16.0, $"a full weight pokes out the top of its guide: {floor + rise}");
+        // The only rule the tensioner has left. It is read at placement AND at lookup, so a zero here is a
+        // block that can never be built and a line that can never have one.
+        Assert.True(block.GetProperty("attributes").GetProperty("towerRadius").GetDouble() > 0);
     }
 
     /// <summary>
-    /// The two constants that have to be read together, in the one place that can see both: a store that
-    /// cannot pay for the longest line the game will let you BUILD is a ropeway you are invited to
-    /// construct and then permanently refused, while the refusal says "not wound far enough yet" and the
-    /// panel shows a full weight. They live in different files, so nothing but this notices them drifting.
-    /// <para>
-    /// The level line is the floor, not the whole story: the surplus is the climb budget, and a line that
-    /// spends more than that is refused at LINK time by RopewayLinkService.TryLink rather than at the
-    /// departure gate. Shrink the surplus to nothing and every uphill line becomes unbuildable.
-    /// </para>
+    /// The mass is authored in the SHAPE now, not drawn by the block entity at a height that meant a charge,
+    /// and it has to hang inside the guide rails (2/16 to 46/16) rather than through its own pad or out the
+    /// top. Nothing else notices: a mass outside its guide is a render nobody's test suite looks at.
     /// </summary>
     [Fact]
-    public void AFullWeightCanPayForTheLongestLineThatCanBeBuilt()
+    public void TheHangingMassStaysInsideTheGuideItHangsIn()
     {
-        var maxLineLength = Load("blocktypes", "pylonbase.json")
-            .GetProperty("attributes").GetProperty("maxLineLength").GetDouble();
-        var capacity = Load("blocktypes", "tensionweight.json")
-            .GetProperty("attributes").GetProperty("capacity").GetDouble();
+        var elements = Load("shapes", "block", "tensionweight.json").GetProperty("elements").EnumerateArray().ToList();
+        var mass = elements.Single(e => e.GetProperty("name").GetString() == "mass");
 
-        var level = RopewayPower.Quote(maxLineLength, 0);
-        Assert.True(capacity >= level,
-            $"a full weight holds {capacity} and a level line of the maximum {maxLineLength} blocks costs {level}: " +
-            "the longest line the game permits could never be run in either direction.");
+        var from = mass.GetProperty("from").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+        var to = mass.GetProperty("to").EnumerateArray().Select(v => v.GetDouble()).ToArray();
 
-        // What the surplus buys, spelled out so shaving it is a decision rather than an accident.
-        var climbBudget = (capacity - level) / RopewayPower.RiseSurcharge;
-        Assert.True(climbBudget >= 25,
-            $"only {climbBudget} blocks of climb are affordable on a full-length line; anything steeper is refused at link time.");
+        Assert.True(from[1] >= 2, $"the mass sinks into its own pad: {from[1]}");
+        Assert.True(to[1] <= 46, $"the mass pokes out the top of its guide: {to[1]}");
+
+        // Half a block wide, so the two rails at 2..4 and 12..14 bracket it exactly.
+        Assert.Equal(4, from[0]);
+        Assert.Equal(12, to[0]);
+
+        // And it hangs LOW - a tensioner takes up slack, it does not climb. Above the bottom third and it
+        // is reading as a gauge again.
+        Assert.True(to[1] <= 16, $"the mass hangs at {to[1]}, which reads as a raised weight rather than a tensioner");
     }
 
     /// <summary>
-    /// A weight that is not on the mechanical network is a deliberate decision, not an omission: putting it
-    /// on one would drag its chunk into that network's <c>fullyLoaded</c> test, which is exactly the chunk
-    /// coupling the store exists to remove.
+    /// A weight that is not on the mechanical network is a deliberate decision, not an omission: it is a
+    /// rope tensioner, not a machine. The towers are the network's consumers.
     /// </summary>
     [Fact]
     public void TheTensionWeightIsNotAMechanicalPowerNode()

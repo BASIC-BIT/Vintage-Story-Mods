@@ -1,348 +1,183 @@
-using System.Collections.Generic;
-using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
 
 namespace Ropeway.Tests;
 
 /// <summary>
-/// The pure half of mechanical power: what a powered tower banks, what a trip costs, and whether the store
-/// can pay for it. The vanilla network itself is not tested here - it is not ours, and a test of it would
-/// be a test of the decompiler.
+/// The pure half of mechanical power: what the haul rope costs a network to turn, and how fast a network
+/// turning it moves the cabin. The vanilla network itself is not tested here - it is not ours, and a test of
+/// it would be a test of the decompiler.
 /// <para>
-/// Relational rather than absolute wherever the number is balance rather than law, so rebalancing does not
-/// break the suite but breaking the ORDERING does. The absolutes that ARE asserted - a level trip costing
-/// exactly its length, a refused trip changing nothing - are the invariants the design rests on.
+/// The equilibrium the ladder tests use is vanilla's, not ours: <c>BEBehaviorMPRotor.GetTorque</c> supplies
+/// <c>(capableSpeed - speed) * TorqueFactor</c> against the network's resistance, so a rotor with torque
+/// factor T settles at <c>s* = TargetSpeed - R/T</c>. For a windmill <c>TargetSpeed = min(0.6, windSpeed)</c>
+/// and <c>T = sails/4 * powerMul</c> (powerMul 1 wood, 1.25 metal). Reproduced here rather than imported,
+/// because the point of these tests is that the ladder a player feels comes out of vanilla's arithmetic.
 /// </para>
 /// </summary>
 public class RopewayPowerTests
 {
-    // ------------------------------------------------------------------ winding
+    private const double FullWind = 0.6;
 
-    [Fact]
-    public void WindingBanksSpeedTimesRateAndStopsDeadAtCapacity()
+    /// <summary>Blocks per second a windmill of this many sails drives a cabin at, against a given load.</summary>
+    private static double WindmillSpeed(int sails, bool metal, float resistance)
     {
-        Assert.Equal(3.0, RopewayPower.Wind(0, 400, 1.0, 1.0), 6);
-        Assert.Equal(1.5, RopewayPower.Wind(0, 400, 0.5, 1.0), 6);
-        Assert.Equal(3.0, RopewayPower.Wind(0, 400, 0.5, 2.0), 6);
-
-        // A full store takes nothing more, which is also what drops the tower back to idle resistance.
-        Assert.Equal(400, RopewayPower.Wind(399, 400, 1.0, 10.0), 6);
-        Assert.Equal(400, RopewayPower.Wind(400, 400, 1.0, 1.0), 6);
+        var torque = sails / 4.0 * (metal ? 1.25 : 1.0);
+        return RopewayPower.CabinSpeed(FullWind - resistance / torque);
     }
 
+    // ------------------------------------------------------------------ the ladder
+
+    /// <summary>
+    /// THE reason <see cref="RopewayPower.HaulResistance"/> is large. The old design's 0.12 put three sails
+    /// and ten within 22% of each other, which no player can feel; the whole point of the load model is that
+    /// the size of your mill is visible in the speed of your cabin.
+    /// </summary>
     [Fact]
-    public void AnUnpoweredOrStalledTowerBanksNothingAndBreaksNothing()
+    public void ABiggerDriveIsAVisiblyFasterCabin()
     {
-        Assert.Equal(100, RopewayPower.Wind(100, 400, 0, 1.0), 6);
-        Assert.Equal(100, RopewayPower.Wind(100, 400, -1, 1.0), 6);
-        Assert.Equal(100, RopewayPower.Wind(100, 400, 1.0, 0), 6);
-        Assert.Equal(100, RopewayPower.Wind(100, 400, double.NaN, 1.0), 6);
-        Assert.Equal(0, RopewayPower.Wind(100, 0, 1.0, 1.0), 6);
+        var load = RopewayPower.Resistance(hauling: true, climb: 0, cargo: 0);
+
+        var three = WindmillSpeed(3, metal: false, load);
+        var five = WindmillSpeed(5, metal: false, load);
+        var ten = WindmillSpeed(10, metal: true, load);
+
+        // Not merely ordered - separated. Half again from three sails to five, and again to a metal rotor.
+        Assert.True(five > three * 1.5, $"5 sails {five} is not visibly faster than 3 sails {three}");
+        Assert.True(ten > five * 1.3, $"a maxed metal rotor {ten} is not visibly faster than 5 wood sails {five}");
+
+        // And the absolute rungs, because "legible" means these numbers and not just their order: a walk,
+        // the speed the cabin used to be nailed to, and a run.
+        Assert.InRange(three, 1.0, 1.5);
+        Assert.InRange(five, 2.0, 2.5);
+        Assert.InRange(ten, 2.8, 3.4);
     }
 
     /// <summary>
-    /// POOLING, which is the whole of "any tower can take power and contributions add up": the rate is
-    /// linear in speed, so winding twice at 0.3 lands exactly where winding once at 0.6 does. That is why
-    /// no tower has to know about any other one, and why a tower whose chunk unloads just stops
-    /// contributing instead of desynchronising anything.
+    /// The bottom of the ladder is a stall, and that is the design: a two-sail mill cannot haul a cabin, so
+    /// the answer to a cabin that will not move is a bigger mill rather than a longer wait.
     /// </summary>
     [Fact]
-    public void ContributionsFromSeveralTowersPoolIntoOneStore()
+    public void AMillTooSmallToHaulTheCabinSimplyDoesNotMoveIt()
     {
-        var pooled = RopewayPower.Wind(RopewayPower.Wind(0, 400, 0.3, 1.0), 400, 0.3, 1.0);
-        var single = RopewayPower.Wind(0, 400, 0.6, 1.0);
-        Assert.Equal(single, pooled, 6);
+        var load = RopewayPower.Resistance(hauling: true, climb: 0, cargo: 0);
 
-        // Order is irrelevant too - a slow tower first or a fast one first is the same store.
-        var slowFirst = RopewayPower.Wind(RopewayPower.Wind(0, 400, 0.2, 1.0), 400, 0.9, 1.0);
-        var fastFirst = RopewayPower.Wind(RopewayPower.Wind(0, 400, 0.9, 1.0), 400, 0.2, 1.0);
-        Assert.Equal(slowFirst, fastFirst, 6);
+        Assert.Equal(0, WindmillSpeed(2, metal: false, load), 6);
+        Assert.Equal(0, RopewayPower.CabinSpeed(0), 6);
+        Assert.Equal(0, RopewayPower.CabinSpeed(-1), 6);
+        Assert.Equal(0, RopewayPower.CabinSpeed(double.NaN), 6);
     }
 
     /// <summary>
-    /// The one number worth anchoring absolutely, and it is anchored on vanilla rather than invented: a
-    /// maxed five-sail wood windmill winding against WindingResistance settles near Speed 0.5
-    /// (s* = 0.6 - 0.12/1.25), which has to fund a level 100-block trip in roughly the time the trip itself
-    /// takes. Miss this by an order of magnitude and the mod is either a wait or a formality.
+    /// Pooling, which is the whole of "power may be supplied at any tower and contributions add up". It is
+    /// addition, so it needs no coordination and cannot desync when one tower's chunk unloads.
     /// </summary>
     [Fact]
-    public void AMaxedWoodWindmillFundsALevelHundredBlockTripInAboutAMinute()
+    public void TwoDrivesOnALinePoolIntoOneSpeed()
     {
-        const double equilibriumSpeed = 0.6 - RopewayPower.WindingResistance / 1.25;
+        Assert.Equal(RopewayPower.CabinSpeed(0.6), RopewayPower.CabinSpeed(0.2 + 0.4), 6);
+        Assert.True(RopewayPower.CabinSpeed(0.5) > RopewayPower.CabinSpeed(0.3));
 
-        var stored = 0.0;
-        var seconds = 0;
-        var cost = RopewayPower.Quote(100, 0);
-
-        while (!RopewayPower.CanAfford(stored, cost) && seconds < 600)
-        {
-            stored = RopewayPower.Wind(stored, RopewayPower.DefaultCapacity, equilibriumSpeed, 1.0);
-            seconds++;
-        }
-
-        Assert.InRange(seconds, 40, 120);
-    }
-
-    [Fact]
-    public void WindingLoadsTheNetworkAndIdlingBarelyDoes()
-    {
-        // Above the quern's 0.1 so a ropeway reads as a serious machine, under a maxed wood windmill's
-        // 0.75 stall budget so one mill still drives several towers.
-        Assert.InRange(RopewayPower.WindingResistance, 0.1f, 0.2f);
-
-        // And an order of magnitude below it when there is nothing to wind - a finished ropeway must not
-        // permanently tax the mill it shares a network with.
-        Assert.True(RopewayPower.IdleResistance < RopewayPower.WindingResistance / 10);
-    }
-
-    // ------------------------------------------------------------------ the quote
-
-    [Theory]
-    [InlineData(100, 0, 100)]      // level: the trip costs its own length
-    [InlineData(100, 40, 180)]     // climbing 40: length + 2 per block of rise
-    [InlineData(100, -40, 60)]     // descending 40: length - 1 per block of drop
-    [InlineData(100, -90, 25)]     // steep descent, floored at a quarter of the length
-    [InlineData(0, 50, 0)]         // no distance, no charge, whatever the geometry claims
-    public void TheQuoteChargesDistanceDearerUphillAndCheaperDown(double length, double climb, double expected)
-    {
-        Assert.Equal(expected, RopewayPower.Quote(length, climb), 6);
-    }
-
-    [Fact]
-    public void NoTripIsEverFreeNoMatterHowSteeplyItFalls()
-    {
-        for (var drop = 0.0; drop < 400; drop += 7)
-        {
-            var cost = RopewayPower.Quote(100, -drop);
-            Assert.True(cost >= RopewayPower.MinCostFraction * 100, $"drop {drop} priced at {cost}");
-        }
-    }
-
-    [Fact]
-    public void ClimbingIsAlwaysDearerThanLevelAndLevelDearerThanDescending()
-    {
-        var climb = RopewayPower.Quote(120, 30);
-        var level = RopewayPower.Quote(120, 0);
-        var descend = RopewayPower.Quote(120, -30);
-
-        Assert.True(climb > level, $"{climb} !> {level}");
-        Assert.True(level > descend, $"{level} !> {descend}");
-    }
-
-    // ------------------------------------------------------------------ paying
-
-    [Fact]
-    public void AStoreEitherPaysTheWholeQuoteOrRefusesAndChangesNothing()
-    {
-        var store = new BETensionWeight { Charge = 180 };
-
-        Assert.True(store.TrySpend(180));
-        Assert.Equal(0, store.Charge, 6);
-
-        store.Charge = 179.9;
-        Assert.False(store.TrySpend(180));
-
-        // THE invariant: a refused trip leaves the store exactly as it was. A partial payment would be a
-        // cabin leaving with less energy than its journey needs, which is the stranding case the whole
-        // store exists to make impossible.
-        Assert.Equal(179.9, store.Charge, 6);
-    }
-
-    [Fact]
-    public void APricelessTripIsRefusedRatherThanGivenAway()
-    {
-        Assert.False(RopewayPower.CanAfford(400, double.NaN));
-        Assert.False(RopewayPower.CanAfford(double.NaN, 10));
-        Assert.True(RopewayPower.CanAfford(0, 0));
-    }
-
-    [Fact]
-    public void TheStoreClampsToItsCapacityInBothDirections()
-    {
-        var store = new BETensionWeight();
-
-        store.Wind(10, 100);
-        Assert.Equal(RopewayPower.DefaultCapacity, store.Charge, 6);
-        Assert.True(store.Full);
-        Assert.Equal(1, store.Fraction, 6);
-
-        Assert.True(store.TrySpend(RopewayPower.DefaultCapacity));
-        Assert.Equal(0, store.Charge, 6);
-        Assert.False(store.Full);
-    }
-
-    // ------------------------------------------------------------------ quoting a real line
-
-    /// <summary>
-    /// The quote read off actual line geometry, which is where a sign error would land: a downhill ore line
-    /// that charges double and an uphill one that runs free is the same bug twice.
-    /// </summary>
-    [Fact]
-    public void TripCostTakesTheClimbFromTheLineItself()
-    {
-        var low = new BlockPos(0, 64, 0);
-        var high = new BlockPos(0, 104, 0);
-        var line = RopewayLine.FromTowers(new List<BlockPos> { low, high });
-
-        var length = line.TotalLength;
-        var up = EntityRopewayCabin.TripCost(line, 0, length);
-        var down = EntityRopewayCabin.TripCost(line, length, 0);
-
-        Assert.Equal(RopewayPower.Quote(length, 40), up, 6);
-        Assert.Equal(RopewayPower.Quote(length, -40), down, 6);
-        Assert.True(up > down);
-    }
-
-    [Fact]
-    public void ALevelLineCostsTheSameEitherWayAndHalfTripsCostHalf()
-    {
-        var line = RopewayLine.FromTowers(new List<BlockPos>
-        {
-            new BlockPos(0, 64, 0),
-            new BlockPos(100, 64, 0)
-        });
-
-        var whole = EntityRopewayCabin.TripCost(line, 0, line.TotalLength);
-        Assert.Equal(whole, EntityRopewayCabin.TripCost(line, line.TotalLength, 0), 6);
-        Assert.Equal(whole / 2, EntityRopewayCabin.TripCost(line, 0, line.TotalLength / 2), 6);
-        Assert.Equal(0, EntityRopewayCabin.TripCost(null, 0, 10), 6);
-    }
-
-    // ------------------------------------------------------------------ the trip credit
-
-    private static RopewayLine LevelLine()
-    {
-        return RopewayLine.FromTowers(new List<BlockPos> { new(0, 64, 0), new(300, 64, 0) });
+        // Two mills, two networks, one line: that is the pooling.
+        Assert.Equal(0.6, RopewayPower.PoolSpeed(new[] { (1L, 0.2), (2L, 0.4) }), 6);
     }
 
     /// <summary>
-    /// THE INVARIANT the whole store design exists for: a trip is paid for ONCE. A cabin stopped short of
-    /// the reach it bought - a blocked span, a chunk that has not landed, a save - carries on for nothing,
-    /// and it does so out of an EMPTY store, because the energy left the store before it ever moved.
-    /// Charging afresh here is the stranding case reached through the interruption path instead of the
-    /// power path: a rider held mid-span with an empty store could only dismount into open air.
+    /// The one thing a load model may never do is get FASTER when you add load. Every tower on a line
+    /// declares the haul resistance, so tapping three footings off one axle run puts 3x the load on that
+    /// network - and if each of them also reported its network's speed, the reported line speed would go UP,
+    /// because the load only subtracts from the settling speed while the sum multiplies what is read. Three
+    /// stubs off one maxed metal mill bought +86% cabin speed for the price of some axles.
     /// </summary>
     [Fact]
-    public void AnInterruptedTripFinishesOnWhatItAlreadyPaidEvenWithAnEmptyStore()
+    public void HookupsOnOneNetworkAreOneDriveNoMatterHowManyOfThemThereAre()
     {
-        var line = LevelLine();
+        // A maxed metal rotor, three footings tapped off it: one drive, and the extra load it now carries
+        // makes the cabin slower rather than faster.
+        var settled = FullWind - Load(3) / 3.125;
+        var one = RopewayPower.PoolSpeed(new[] { (7L, FullWind - Load(1) / 3.125) });
+        var three = RopewayPower.PoolSpeed(new[] { (7L, settled), (7L, settled), (7L, settled) });
 
-        var (fare, paidTo) = EntityRopewayCabin.Fare(line, 0, EntityRopewayCabin.NoDestination, line.TotalLength);
-        Assert.Equal(line.TotalLength, fare, 6);
-        Assert.Equal(line.TotalLength, paidTo, 6);
+        Assert.Equal(0.504, one, 3);
+        Assert.True(three < one, $"three hookups on one network read {three}, faster than one hookup's {one}");
 
-        // Held halfway, then aimed at the same end again.
-        var (resume, stillPaidTo) = EntityRopewayCabin.Fare(line, 137, paidTo, line.TotalLength);
-        Assert.Equal(0, resume, 6);
-        Assert.Equal(paidTo, stillPaidTo, 6);
-        Assert.True(RopewayPower.CanAfford(0, resume), "a paid trip must finish out of an empty store");
+        // ...while genuinely separate networks still add, which is the behaviour the design wants.
+        Assert.Equal(one * 2, RopewayPower.PoolSpeed(new[] { (7L, one), (8L, one) }), 6);
+
+        // A tower with an axle that is not turning contributes nothing and cannot speak for its network.
+        Assert.Equal(0.5, RopewayPower.PoolSpeed(new[] { (7L, 0.0), (7L, 0.5), (8L, double.NaN) }), 6);
+        Assert.Equal(0, RopewayPower.PoolSpeed(null), 6);
+    }
+
+    /// <summary>Load on a network with n towers of the line hooked to it, at ratio 1.</summary>
+    private static float Load(int towers) => towers * RopewayPower.Resistance(hauling: true, climb: 0, cargo: 0);
+
+    // ------------------------------------------------------------------ the load
+
+    [Fact]
+    public void AParkedCabinBarelyTaxesTheNetworkAndAMovingOneReallyDoes()
+    {
+        var idle = RopewayPower.Resistance(hauling: false, climb: 0, cargo: 0);
+        var hauling = RopewayPower.Resistance(hauling: true, climb: 0, cargo: 0);
+
+        Assert.Equal(RopewayPower.IdleResistance, idle);
+
+        // A finished ropeway must not permanently tax the mill it shares a network with...
+        Assert.True(idle < hauling / 10);
+
+        // ...and a working one must read as a serious machine: above the quern's 0.1, and inside a maxed
+        // wood windmill's 0.75 stall budget with room left for something else on the same network.
+        Assert.InRange(hauling, 0.1f, 0.5f);
+
+        // A parked cabin idles whatever the geometry claims - it is not on a slope, it is not moving.
+        Assert.Equal(idle, RopewayPower.Resistance(hauling: false, climb: 0.9, cargo: 3));
     }
 
     /// <summary>
-    /// The other half of paying once: pressing the stop key after departure is a rider changing their mind
-    /// inside a journey the store has already funded, and it must not be a second full quote. Only the part
-    /// that reaches PAST what was bought costs anything, and it costs exactly the difference.
+    /// Climb is load, which is what makes a mountain line a different machine from a valley one. Bounded on
+    /// purpose: a mill that moves the cabin on the level must still move it up a steep span, or the model
+    /// hands the player a cabin stuck halfway up a hill with no way to read why.
     /// </summary>
     [Fact]
-    public void ReAimingInsideAPaidTripIsFreeAndExtendingItPaysOnlyTheDifference()
+    public void ClimbingCostsMoreAndDescendingIsNeverACredit()
     {
-        var line = LevelLine();
+        var level = RopewayPower.Resistance(hauling: true, climb: 0, cargo: 0);
+        var gentle = RopewayPower.Resistance(hauling: true, climb: 0.5, cargo: 0);
+        var steep = RopewayPower.Resistance(hauling: true, climb: 0.707, cargo: 0);
 
-        // Paid from the start to the 200 mark; the cabin is at 50.
-        Assert.Equal(0, EntityRopewayCabin.Fare(line, 50, 200, 120).Cost, 6);
-        Assert.Equal(0, EntityRopewayCabin.Fare(line, 50, 200, 200).Cost, 6);
+        Assert.True(gentle > level);
+        Assert.True(steep > gentle);
 
-        // The reach does not shrink to meet a nearer stop, so changing back is free too.
-        Assert.Equal(200, EntityRopewayCabin.Fare(line, 50, 200, 120).PaidTo, 6);
+        // Downhill costs the same as level. A negative load would be a network the ropeway DRIVES.
+        Assert.Equal(level, RopewayPower.Resistance(hauling: true, climb: -0.7, cargo: 0));
 
-        var extension = EntityRopewayCabin.Fare(line, 50, 200, 300);
-        Assert.Equal(EntityRopewayCabin.TripCost(line, 200, 300), extension.Cost, 6);
-        Assert.Equal(300, extension.PaidTo, 6);
+        // The three-sail mill that walks the cabin along the flat still climbs, slowly, rather than stalling.
+        Assert.True(WindmillSpeed(3, metal: false, steep) > 0.2, "a 45 degree span stalls the smallest mill that can haul at all");
+        Assert.True(WindmillSpeed(5, metal: false, steep) < WindmillSpeed(5, metal: false, level));
     }
 
     /// <summary>
-    /// Turning round is NOT inside the paid trip - it is a new one, from where the cabin stands - and this
-    /// is the clause that keeps the credit from funding unlimited travel. The covered stretch only ever
-    /// shrinks as the cabin runs into it, so no amount of re-aiming buys more than was paid for.
+    /// Cargo has no rule yet and deliberately no effect, but it has a HOME: the day weight lands it lands in
+    /// this one function, which is what stops it being invented separately in the cabin and the tower.
     /// </summary>
     [Fact]
-    public void TurningRoundIsANewTripAndIsQuotedAfresh()
+    public void CargoIsATermInTheLoadRatherThanASecondRuleWaitingToBeInvented()
     {
-        var line = LevelLine();
+        var empty = RopewayPower.Resistance(hauling: true, climb: 0, cargo: 0);
 
-        var back = EntityRopewayCabin.Fare(line, 100, 300, 0);
-        Assert.Equal(EntityRopewayCabin.TripCost(line, 100, 0), back.Cost, 6);
-        Assert.Equal(0, back.PaidTo, 6);
-
-        // And with nothing paid at all, every aim is the full quote.
-        Assert.Equal(
-            EntityRopewayCabin.TripCost(line, 0, 300),
-            EntityRopewayCabin.Fare(line, 0, EntityRopewayCabin.NoDestination, 300).Cost,
-            6);
+        Assert.True(RopewayPower.Resistance(hauling: true, climb: 0, cargo: 0.5) > empty);
+        Assert.Equal(empty, RopewayPower.Resistance(hauling: true, climb: 0, cargo: -1));
+        Assert.Equal(empty, RopewayPower.Resistance(hauling: true, climb: double.NaN, cargo: double.NaN));
     }
 
-    // ------------------------------------------------------------------ what a line may cost at all
+    // ------------------------------------------------------------------ where the tensioner may stand
 
     /// <summary>
-    /// The number the link gate weighs against the store's capacity has to be the TRUE worst case, or it
-    /// lets an unrunnable leg through: a line that climbs and then falls quotes its net climb end to end
-    /// while the uphill half on its own is far dearer.
+    /// The tensioner is a build requirement and the only geometry it has is "within reach of a tower". The
+    /// dimension term is the one with no visible symptom until somebody builds a ropeway in a pocket
+    /// dimension, at which point a weight answers for a line through the floor of the world.
     /// </summary>
     [Fact]
-    public void TheWorstTripOnALineIsNotAlwaysTheEndToEndOne()
-    {
-        var line = RopewayLine.FromTowers(new List<BlockPos>
-        {
-            new(0, 64, 0),
-            new(20, 164, 0),
-            new(40, 64, 0)
-        });
-
-        var endToEnd = EntityRopewayCabin.TripCost(line, 0, line.TotalLength);
-        var uphillHalf = EntityRopewayCabin.TripCost(line, 0, line.Cumulative[1]);
-        var worst = EntityRopewayCabin.WorstTripCost(line);
-
-        Assert.True(uphillHalf > endToEnd, $"{uphillHalf} !> {endToEnd}");
-        Assert.Equal(uphillHalf, worst, 6);
-        Assert.Equal(0, EntityRopewayCabin.WorstTripCost(null), 6);
-    }
-
-    /// <summary>
-    /// The link gate needs the merged geometry BEFORE the span exists, so the preview has to join the two
-    /// chains at the towers being linked whichever end of its own line each of them happens to sit on.
-    /// </summary>
-    [Fact]
-    public void PreviewJoinsTwoChainsAtTheTowersBeingLinkedFromEitherEnd()
-    {
-        var a = new BlockPos(0, 64, 0);
-        var b = new BlockPos(50, 64, 0);
-        var c = new BlockPos(90, 64, 0);
-        var d = new BlockPos(140, 64, 0);
-
-        var left = RopewayLine.FromTowers(new List<BlockPos> { a, b });
-        var right = RopewayLine.FromTowers(new List<BlockPos> { c, d });
-
-        var merged = RopewayLine.Preview(left, b, right, c);
-        Assert.Equal(new[] { a, b, c, d }, merged.Towers);
-        Assert.Equal(left.TotalLength + 40 + right.TotalLength, merged.TotalLength, 6);
-
-        // Linking the far ends instead reverses both chains rather than building a chain that doubles back.
-        var flipped = RopewayLine.Preview(left, a, right, d);
-        Assert.Equal(new[] { b, a, d, c }, flipped.Towers);
-
-        // A tower with no line of its own is a chain of one.
-        Assert.Equal(new[] { a, c, d }, RopewayLine.Preview(null, a, right, c).Towers);
-    }
-
-    // ------------------------------------------------------------------ where the weight binds
-
-    /// <summary>
-    /// Binding picks the NEAREST tower, and the dimension term is the one with no visible symptom until
-    /// somebody builds a ropeway in a pocket dimension - at which point a weight binds through the floor of
-    /// the world to a line it has nothing to do with.
-    /// </summary>
-    [Fact]
-    public void AWeightBindsOnlyToTowersInRangeAndInItsOwnDimension()
+    public void ATensionerCountsOnlyForTowersInRangeAndInItsOwnDimension()
     {
         var weight = new BlockPos(0, 64, 0);
 
@@ -356,52 +191,9 @@ public class RopewayPowerTests
     }
 
     [Fact]
-    public void HeightCountsTowardTheBindingRadius()
+    public void HeightCountsTowardTheTensionerRadius()
     {
-        // Or a weight at the bottom of a shaft binds to a tower on the cliff directly above it.
+        // Or a weight at the bottom of a shaft serves a tower on the cliff directly above it.
         Assert.Equal(double.MaxValue, BlockTensionWeight.Nearest(new BlockPos(0, 40, 0), new BlockPos(0, 64, 0), 8));
-    }
-
-    // ------------------------------------------------------------------ the gauge
-
-    /// <summary>
-    /// The drawn mass IS the gauge, so its failure mode is a block that renders nothing at all, silently -
-    /// the same pair of CubeMeshUtil traps the cable documents. Face count and colour maps are what the
-    /// chunk tesselator indexes; without them the mesh is either invisible or an IndexOutOfRangeException.
-    /// </summary>
-    [Fact]
-    public void TheDrawnMassCarriesTheFacesAndColourMapsTheTesselatorIndexes()
-    {
-        var mesh = BETensionWeight.BuildMass(1.5f, new TextureAtlasPosition { x1 = 0, y1 = 0, x2 = 1, y2 = 1 });
-
-        Assert.NotNull(mesh);
-        Assert.Equal(6, mesh.XyzFacesCount);
-        Assert.True(mesh.SeasonColorMapIds.Length >= 6);
-        Assert.True(mesh.ClimateColorMapIds.Length >= 6);
-    }
-
-    [Fact]
-    public void TheDrawnMassSitsWhereItsChargePutsIt()
-    {
-        var low = Centre(BETensionWeight.BuildMass(0.5f, Atlas()));
-        var high = Centre(BETensionWeight.BuildMass(2.5f, Atlas()));
-
-        Assert.Equal(0.5, low, 3);
-        Assert.Equal(2.5, high, 3);
-    }
-
-    private static TextureAtlasPosition Atlas() => new() { x1 = 0, y1 = 0, x2 = 1, y2 = 1 };
-
-    private static double Centre(Vintagestory.API.Client.MeshData mesh)
-    {
-        var min = double.MaxValue;
-        var max = double.MinValue;
-        for (var i = 0; i < mesh.VerticesCount; i++)
-        {
-            min = System.Math.Min(min, mesh.xyz[3 * i + 1]);
-            max = System.Math.Max(max, mesh.xyz[3 * i + 1]);
-        }
-
-        return (min + max) / 2;
     }
 }
