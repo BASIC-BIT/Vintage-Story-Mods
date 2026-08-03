@@ -1,5 +1,6 @@
 {
   "code": "pylonbase",
+  "//rope": "Cable texture. BuildHalfCable flat-samples ONE point of it, because CubeMeshUtil scales UVs by the axis scale and anything leaving [0,1] samples the neighbouring atlas sprite - that was the striping. See docs/KNOWN-ISSUES.md. Keep comments OUT of \"textures\": every key there is parsed as a CompositeTexture.",
   "class": "BlockPylonBase",
   "entityClass": "PylonBase",
   "behaviors": [
@@ -43,7 +44,6 @@
     "metal": {
       "base": "game:block/metal/sheet/iron1"
     },
-    "//rope": "A BLOCK texture. The cable flat-samples ONE point of this sprite (BEPylonBase.BuildHalfCable), so what matters is that the sample sits well inside the sprite - CubeMeshUtil scales UVs by the axis scale, and anything leaving [0,1] samples whichever sprite sits next to this one in the atlas. That was the striping, and Array.Fill(mesh.Uv, 0.5f) is what fixes it. NOTE: an earlier comment here claimed game:item/resource/rope was transparent at its edges - it is not, it measures alpha 255 across all 32x32. The swap to block/cloth/reedrope is a taste choice (vanilla banner rope, rope-coloured), not a fix.",
     "rope": {
       "base": "game:block/cloth/reedrope"
     }

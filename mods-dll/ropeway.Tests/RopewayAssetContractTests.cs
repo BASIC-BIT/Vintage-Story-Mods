@@ -47,6 +47,36 @@ public class RopewayAssetContractTests
         Assert.Equal(expectedCode, Load(file.Split('/')).GetProperty("code").GetString());
     }
 
+    /// <summary>
+    /// A "//" comment key is only ignorable where the game parses an untyped bag. Inside "textures" every
+    /// key is deserialised as a CompositeTexture, so a comment there is a hard parse error - and the game
+    /// does not fail loudly, it logs and then "will ignore most of the attributes", which silently strips
+    /// multiblockStructure and leaves towers that can never be completed. That shipped once; this is the
+    /// guard. Same reasoning for any other strongly-typed dictionary a blocktype carries.
+    /// </summary>
+    [Theory]
+    [InlineData("blocktypes/pylonbase.json")]
+    [InlineData("blocktypes/pylonhead.json")]
+    [InlineData("blocktypes/brace.json")]
+    [InlineData("entities/cabin.json")]
+    [InlineData("itemtypes/haulrope.json")]
+    [InlineData("itemtypes/cabin.json")]
+    public void NoCommentKeysInsideStronglyTypedDictionaries(string file)
+    {
+        var root = Load(file.Split('/'));
+
+        foreach (var typed in new[] { "textures", "textesByType", "shapeByType", "sounds" })
+        {
+            if (!root.TryGetProperty(typed, out var dict) || dict.ValueKind != JsonValueKind.Object) continue;
+
+            var comments = dict.EnumerateObject().Where(p => p.Name.StartsWith("//")).Select(p => p.Name).ToList();
+            Assert.True(comments.Count == 0,
+                $"{file}: \"{typed}\" contains comment key(s) {string.Join(", ", comments)}. " +
+                "The game parses every key there into a typed object, so this throws at load and the whole " +
+                "attributes block - multiblockStructure included - is discarded. Put the note at the top level.");
+        }
+    }
+
     [Fact]
     public void RegisteredClassNamesMatchTheJson()
     {
