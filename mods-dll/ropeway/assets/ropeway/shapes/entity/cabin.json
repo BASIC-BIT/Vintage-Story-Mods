@@ -223,7 +223,7 @@
             {
               "code": "SeatAP",
               "posX": "9.0",
-              "posY": "11.0",
+              "posY": "10.0",
               "posZ": "20.0",
               "rotationX": "0.0",
               "rotationY": "0.0",
@@ -248,7 +248,7 @@
             {
               "code": "Seat2AP",
               "posX": "9.0",
-              "posY": "11.0",
+              "posY": "10.0",
               "posZ": "20.0",
               "rotationX": "0.0",
               "rotationY": "0.0",

@@ -4,21 +4,17 @@
   "attributes": {
     "speed": 2.2,
     "//hangDrop": "Not a taste knob. The sheave sits 4 cells above the pylon footing and the cabin passes over that footing, so the floor (origin -1.25) must clear the footing's plinth top at +0.5 and the roof (origin +1.25) must clear the crossarm's underside at +4.0 - the crossarm's foot plate reaches the block boundary so it lands flat on the posts, which cost the roof the 1/16 it used to have. That gives 1.75 < hangDrop < 2.75. 2.0 is NOT the midpoint of that window (2.25 is) - it deliberately sits low in it, leaving 0.75 blocks of air under the floor against 0.25 over the roof, because clipping the crossarm reads far worse than a low floor. RopewayAssetContractTests.TheCabinFitsThroughTheTower fails if this or SpanMath.SheaveHeight moves alone.",
-    "hangDrop": 2.0,
-    "mountAnimations": {
-      "idle": "idle",
-      "ready": "idle",
-      "forwards": "idle",
-      "backwards": "idle"
-    }
+    "hangDrop": 2.0
   },
   "hitboxSize": { "x": 2.9, "y": 2.5 },
   "behaviorConfigs": {
     "seatable": {
       "interactMountAnySeat": true,
+      "//animation": "SeatConfig.Animation, the player meta-anim code EntityBoatSeat honours first. The mountAnimations map that used to sit in attributes was dead JSON - only EntityBoat and EntityElevator read that key, and we are neither, so the rider just stood. sitboatidle is player.json:509 (bench sit, legs forward) and is what the sailed boat's non-controllable bench uses. RopewayCabinSeat.DidMount is what actually plays it.",
+      "//eyeHeight": "1.0, not 1.4. The APs sit on the bench top at -0.375, so 1.4 put the eye at 1.0875 - inside the roof slab, which starts at 0.875. RopewayAssetContractTests.BothCabinSeatsSitTheRiderWithTheEyeInTheGlazing fails if this goes back up.",
       "seats": [
-        { "apName": "SeatAP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.4 },
-        { "apName": "Seat2AP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.4 }
+        { "apName": "SeatAP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.0, "animation": "sitboatidle" },
+        { "apName": "Seat2AP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.0, "animation": "sitboatidle" }
       ]
     },
     "selectionboxes": {

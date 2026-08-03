@@ -226,8 +226,18 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     {
         if (Api is not ICoreClientAPI capi || entityAgent == null || entityAgent != capi.World?.Player?.Entity) return;
 
-        var mapping = capi.Input?.GetHotKeyByCode(RopewayModSystem.StopHotkey)?.CurrentMapping?.ToString();
-        capi.ShowChatMessage(Lang.Get("ropeway:ride-hint", mapping ?? Lang.Get("ropeway:hotkey-stop")));
+        capi.ShowChatMessage(Lang.Get("ropeway:ride-hint", Binding(capi, RopewayModSystem.StopHotkey, "ropeway:hotkey-stop")));
+        capi.ShowChatMessage(Lang.Get("ropeway:ridecam-hint", Binding(capi, RopewayRideCamera.Hotkey, "ropeway:hotkey-ridecam")));
+    }
+
+    /// <summary>
+    /// The player's CURRENT binding for a hotkey, never the default - the whole point of naming a key in a
+    /// hint is that it is the key they would actually press, and they can move ours in Settings > Controls
+    /// like any other. Falls back to the hotkey's own name, which is what they will see in that list.
+    /// </summary>
+    public static string Binding(ICoreClientAPI capi, string hotkey, string nameLangCode)
+    {
+        return capi?.Input?.GetHotKeyByCode(hotkey)?.CurrentMapping?.ToString() ?? Lang.Get(nameLangCode);
     }
 
     public void DidUnmount(EntityAgent entityAgent)
@@ -244,12 +254,19 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// </summary>
     public override WorldInteraction[] GetInteractionHelp(IClientWorldAccessor world, EntitySelection es, IClientPlayer player)
     {
-        return base.GetInteractionHelp(world, es, player).Append(new WorldInteraction
-        {
-            ActionLangCode = "ropeway:entityhelp-stop",
-            MouseButton = EnumMouseButton.None,
-            HotKeyCode = RopewayModSystem.StopHotkey
-        });
+        return base.GetInteractionHelp(world, es, player)
+            .Append(new WorldInteraction
+            {
+                ActionLangCode = "ropeway:entityhelp-stop",
+                MouseButton = EnumMouseButton.None,
+                HotKeyCode = RopewayModSystem.StopHotkey
+            })
+            .Append(new WorldInteraction
+            {
+                ActionLangCode = "ropeway:entityhelp-ridecam",
+                MouseButton = EnumMouseButton.None,
+                HotKeyCode = RopewayRideCamera.Hotkey
+            });
     }
 
     public override void OnGameTick(float dt)

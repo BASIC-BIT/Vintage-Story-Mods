@@ -45,7 +45,10 @@ public sealed class RopewayGuideDialog : GuiDialog
 
     public void Show()
     {
-        if (SingleComposer == null) Compose();
+        // Recomposed every time, not cached: the body names the player's live hotkey bindings, and those can
+        // change in Settings > Controls between two openings.
+        SingleComposer?.Dispose();
+        Compose();
         TryOpen();
     }
 
@@ -58,9 +61,9 @@ public sealed class RopewayGuideDialog : GuiDialog
         // actually does is position the Close button and size the shaded background, both captured from it
         // BEFORE compose - so if it is smaller than the text really needs, the text runs over the button and
         // past the background instead of being cut off. Set it generously; over-tall only adds empty space.
-        // Sized for the riding paragraph the hotkey added (~17 lines at ContentWidth); raise it if a
+        // Sized for the riding paragraph the two hotkeys added (~19 lines at ContentWidth); raise it if a
         // translation runs longer.
-        var textBounds = ElementBounds.Fixed(0, contentTop + ViewportHeight + 12, ContentWidth, 460);
+        var textBounds = ElementBounds.Fixed(0, contentTop + ViewportHeight + 12, ContentWidth, 500);
         var buttonY = textBounds.fixedY + textBounds.fixedHeight + 8;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth - 10, buttonY + 36)
             .WithFixedPadding(GuiStyle.ElementToDialogPadding);
@@ -73,7 +76,13 @@ public sealed class RopewayGuideDialog : GuiDialog
             // The inset takes viewportBounds itself, not a copy: OnRenderGUI needs its renderX/renderY, and
             // only bounds that are actually in the composer tree get CalcWorldBounds called on them.
             .AddInset(viewportBounds, 3)
-            .AddRichtext(Lang.Get("ropeway:dlg-guide-body"), CairoFont.WhiteSmallText(), textBounds)
+            // The two riding keys are substituted from the player's CURRENT bindings, not written into the
+            // string - a guide that names a key the player has rebound is worse than one that names none.
+            .AddRichtext(
+                Lang.Get("ropeway:dlg-guide-body",
+                    EntityRopewayCabin.Binding(capi, RopewayModSystem.StopHotkey, "ropeway:hotkey-stop"),
+                    EntityRopewayCabin.Binding(capi, RopewayRideCamera.Hotkey, "ropeway:hotkey-ridecam")),
+                CairoFont.WhiteSmallText(), textBounds)
             .AddSmallButton(Lang.Get("Close"), OnClose, ElementBounds.Fixed(ContentWidth - 120, buttonY, 110, 30))
             .EndChildElements()
             .Compose(focusFirstElement: false);

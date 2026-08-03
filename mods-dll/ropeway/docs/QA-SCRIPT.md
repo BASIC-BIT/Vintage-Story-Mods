@@ -210,6 +210,15 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     If nothing happens, retry aiming directly at a seat; a seat-only mount means `mountAnySeat` is not
     reaching its non-controllable fallback loop and `controllable: true` on seat 0 is the fix (at the
     cost of a stutter for the controlling client).
+    **PASS — the pose, and check it in third person (F5) because you cannot see yourself otherwise:** the
+    rider is **sitting** on the bench, legs forward, facing **along the line** — not standing. Bring a
+    second player or watch a friend board: a remote rider must be sat too, and both riders face the same
+    way (forward), which is correct, not a bug. **FAIL:** a standing T-ish idle. That is the `sitboatidle`
+    animation not being started — the pose comes from `RopewayCabinSeat.DidMount`, and a mistyped code
+    fails **silently**. Also **PASS:** in first person your eye is in the **glazing band** — you can see
+    out of the windows — not up inside the roof slab and not down at bench level. Get out again:
+    **PASS:** you stand up immediately; **FAIL:** you walk away still stuck in the sit pose, which is the
+    `DidUnmount` stop-before-base ordering having regressed.
     **PASS:** motion is smooth, not a 30 Hz stutter — this is the seat `controllable: false` fix; a
     stutter means the fix regressed.
     **PASS — the axis check, watch for this one:** the cabin's **long side points down the line**, so it
@@ -239,9 +248,11 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 13b. **Choose where you get off.** This one needs a **three-or-more-tower line** — build step 16 first if
      you have not. It is the rider's only control, and the thing whose absence made the ride feel like it
      had none.
-     Board at one end. **PASS:** as you sit down, a chat line tells you which key asks for a stop, naming
-     **your own binding** (**R** unless you rebound it). **FAIL:** no such line — the hint is client-side
-     and local-player-only, so silence here is the bug.
+     Board at one end. **PASS:** as you sit down, **two** chat lines, each naming **your own current
+     binding** — one for asking for a stop, one for the outside view (13c). Now rebind either one in
+     **Settings > Controls**, board again, and **PASS:** the line names the **new** key. **FAIL:** no such
+     line, or a line still naming the old key — the hints are client-side, local-player-only and read the
+     live binding, so both silence and a stale key are bugs.
      Press the key while riding. **PASS:** a chat line *"Stopping at \<name\>."* naming the next tower
      ahead, and the cabin **stops at that tower** instead of running on to the end. Once it is stopped you
      can dismount there.
@@ -263,6 +274,30 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      there works. **PASS:** pressing it while **not** riding does nothing at all and does not eat the key.
      **PASS:** motion is still smooth, not a stutter — the seats are still `controllable: false` and the
      stop key is a hotkey packet, not a seat control. A stutter means someone made a seat controllable.
+
+13c. **The outside view.** The second rider key. It is **client-side only** — no packet, no seat change —
+     so nothing here can affect anyone else on the server.
+     Board, then press the outside-view key (**Ropeway: outside view while riding** in Settings > Controls;
+     it is on **O** unless you rebound it, which is unbound in vanilla). **PASS:** the camera goes to third
+     person and you watch the cabin run. Press it again: **PASS:** back to first person.
+     **PASS:** with it on, dismount — the camera goes back to **first person by itself**. **FAIL:** you walk
+     away in third person; that is the restore not firing, and the poll on `MountedOn` is what should catch
+     every dismount path (normal, death, teleport, chunk unload).
+     **PASS:** turn it on, then press **F5** yourself mid-ride. The mod **lets go**: it stops managing the
+     camera for the rest of that ride and does **not** snap you back. **FAIL:** it fights you, flipping the
+     camera back every quarter second.
+     **PASS:** board while **already** in third person (F5 before you sit) — the mod does nothing, and
+     dismounting leaves you in third person, because it was never ours to restore.
+     **PASS:** turn it on mid-ride, then **relog** while still aboard. You come back in first person and
+     nothing is stuck; the camera mode is never saved.
+     **PASS:** pressing the key while **not** aboard the cabin does nothing at all and does **not** eat the
+     key — like the stop key, it hands the press back.
+     **PASS:** look at the cabin from outside with interaction help on (`Ctrl+N`): a *"Watch the cabin from
+     outside"* line with the key on it, next to the *"Choose where to get off"* line.
+     **Known and accepted, do not file:** in third person the camera can pass **through** the cabin shell —
+     vanilla's third-person wall check raycasts blocks only, and the cabin is an entity — and passing a
+     tower can snap you to first person for a frame where a post crosses the camera ray. Report only if it
+     is constant rather than occasional.
 
 14. **Return trip.** Board again at the far end. **PASS:** it departs back the way it came.
 

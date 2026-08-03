@@ -279,6 +279,48 @@ public class RopewayAssetContractTests
     }
 
     /// <summary>
+    /// A wrong or missing player anim code fails SILENTLY - AnimManager.StartAnimation resolves the string
+    /// against the PLAYER's AnimationsByMetaCode and simply does nothing if it misses, which is exactly how
+    /// the dead mountAnimations map left the rider standing for four rounds. So: both seats must name an
+    /// animation, and the eye it sits behind must land in the glazing band - above the bench top the rider
+    /// is sat on, below the underside of the roof slab. eyeHeight 1.4 put it inside the roof.
+    /// </summary>
+    [Fact]
+    public void BothCabinSeatsSitTheRiderWithTheEyeInTheGlazing()
+    {
+        var (_, _, elements) = CabinBounds();
+        var roofBottom = Find(elements, "roof").GetProperty("from")[1].GetDouble() / 16;
+        var benchTop = Find(elements, "seatfront").GetProperty("to")[1].GetDouble() / 16;
+
+        var apY = new Dictionary<string, double>();
+        foreach (var (_, element) in elements)
+        {
+            if (!element.TryGetProperty("attachmentpoints", out var points)) continue;
+
+            foreach (var point in points.EnumerateArray())
+            {
+                apY[point.GetProperty("code").GetString()!] =
+                    (element.GetProperty("from")[1].GetDouble() + double.Parse(point.GetProperty("posY").GetString()!)) / 16;
+            }
+        }
+
+        var seats = Load("entities", "cabin.json").GetProperty("behaviorConfigs").GetProperty("seatable")
+            .GetProperty("seats").EnumerateArray().ToList();
+
+        Assert.NotEmpty(seats);
+        foreach (var seat in seats)
+        {
+            var apName = seat.GetProperty("apName").GetString()!;
+            Assert.False(string.IsNullOrWhiteSpace(seat.GetProperty("animation").GetString()),
+                $"{apName} names no sit animation, so its rider stands");
+
+            var eye = apY[apName] + seat.GetProperty("eyeHeight").GetDouble();
+            Assert.True(eye > benchTop && eye < roofBottom,
+                $"{apName}: eye at {eye:0.###} is outside the glazing band {benchTop:0.###}..{roofBottom:0.###}");
+        }
+    }
+
+    /// <summary>
     /// Entity shapes are authored along X: EntityShapeRenderer adds +90 degrees to Pos.Yaw before building
     /// the model matrix (EntityShapeRenderer.cs:808), so the model's X axis lands on the entity's heading,
     /// and every vanilla entity whose long axis IS its heading - raft 4.5 x 2.25, arapaima 1.90 x 0.58,

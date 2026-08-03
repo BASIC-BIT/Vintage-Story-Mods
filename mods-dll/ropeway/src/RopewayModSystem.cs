@@ -37,6 +37,9 @@ public sealed class RopewayModSystem : ModSystem
 
     public RopewayGuideDialog GuideDialog { get; private set; }
 
+    /// <summary>Client only. Nothing to dispose - its hotkey and tick listener die with the session.</summary>
+    public RopewayRideCamera RideCamera { get; private set; }
+
     public override void Start(ICoreAPI api)
     {
         base.Start(api);
@@ -101,6 +104,11 @@ public sealed class RopewayModSystem : ModSystem
             api.Network.GetChannel(ChannelName).SendPacket(new RiderStopRequest { CabinEntityId = cabin.EntityId });
             return true;
         });
+
+        // Constructed here, not in Start: the flags it holds must be empty for every session. Camera mode is
+        // never persisted (PlayerCamera is rebuilt per session, Camera's ctor sets FirstPerson), so a relog
+        // while the outside view is on leaks nothing - the fresh instance simply has nothing to restore.
+        RideCamera = new RopewayRideCamera(api);
     }
 
     /// <summary>
