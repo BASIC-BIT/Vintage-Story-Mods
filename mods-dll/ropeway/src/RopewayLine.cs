@@ -89,14 +89,24 @@ public sealed class RopewayLine
     /// </summary>
     public bool IsAtTower(double travelled, double tolerance)
     {
-        if (Cumulative == null) return false;
+        return TowerAt(travelled, tolerance) >= 0;
+    }
+
+    /// <summary>
+    /// Index of the tower standing at a distance along the line, or -1 for a point out in a span. The
+    /// inverse of <see cref="Cumulative"/>, and what lets the rider's stop key carry on from the tower a
+    /// trip is already aimed at rather than from where the cabin happens to be.
+    /// </summary>
+    public int TowerAt(double travelled, double tolerance)
+    {
+        if (Cumulative == null) return -1;
 
         for (var i = 0; i < Cumulative.Length; i++)
         {
-            if (Math.Abs(Cumulative[i] - travelled) <= tolerance) return true;
+            if (Math.Abs(Cumulative[i] - travelled) <= tolerance) return i;
         }
 
-        return false;
+        return -1;
     }
 
     /// <summary>Index of the span the given distance falls inside, clamped to the line.</summary>

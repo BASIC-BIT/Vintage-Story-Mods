@@ -195,9 +195,15 @@ public class RopewayAssetContractTests
 
         var footingTop = Load("shapes", "block", "pylonbase.json").GetProperty("elements").EnumerateArray()
             .Max(e => e.GetProperty("to")[1].GetDouble()) / 16;
+        // The cabin passes under the WHOLE crossarm, and the cell directly over its centre line is the pylon
+        // head, not a brace. Deriving this from brace.json alone was accidentally right only because both
+        // shapes currently reach y=0; lower the head on its own and the test would still pass while the
+        // cabin ate the sheave housing. Take whichever hangs lowest.
         var crossarmUnderside = SpanMath.SheaveHeight
-            + Load("shapes", "block", "brace.json").GetProperty("elements").EnumerateArray()
-                .Min(e => e.GetProperty("from")[1].GetDouble()) / 16;
+            + new[] { "brace.json", "pylonhead.json" }
+                .Select(shape => Load("shapes", "block", shape).GetProperty("elements").EnumerateArray()
+                    .Min(e => e.GetProperty("from")[1].GetDouble()))
+                .Min() / 16;
 
         Assert.True(cabinFloor > footingTop,
             $"the cabin floor at {cabinFloor} cuts through the footing, which tops out at {footingTop}");

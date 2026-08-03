@@ -1,6 +1,6 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 77 ropeway tests passing. Everything in the tables below was found by reading code,
+State: build green, 80 ropeway tests passing. Everything in the tables below was found by reading code,
 not by playing — none of *it* has been observed in game.
 
 ## Tower restructure (2026-08-01) — what it costs
@@ -36,6 +36,17 @@ The scene renders under `docs/agentic/ingest/cablecar/renders/scenes/` were rege
 re-authored cabin, and the numeric clearance asserts in `gen_manifests.py` now check the **Z** axis, which
 is the one the tower's posts are actually on. Both scenes still render with `coplanarOverlapCount: 0` and
 1.0 unit of lateral margin.
+
+## Fixed after the second in-game session
+
+Four things BASIC saw once the cable started rendering. All four are closed.
+
+| what was wrong | root cause | fix |
+|---|---|---|
+| **The cable was striped** in unrelated browns, greys and purples along its length. | `CubeMeshUtil.ScaleCubeMesh` multiplies the cube's UVs by the axis scale (CubeMeshUtil.cs:230-251), so a half-span 24 blocks long left them running 0..48. `MeshData.SetTexPos` maps u through `x1 + u * (x2 - x1)`, which puts everything past 1 **outside** this texture's sub-region of the block atlas — the cable was sampling whichever sprites happened to sit next to the rope one. | `BuildHalfCable` flat-samples the sprite: `Array.Fill(mesh.Uv, 0.5f)` before `SetTexPos`, so every vertex lands on the middle of the sprite, far from its edges and therefore safe under mipmapping. A 2-pixel cable has nowhere to show lengthwise detail, and normalising to 0..1 instead would smear one 32×32 sprite over the whole span. The texture also changed to `game:block/cloth/reedrope`, the vanilla banner/crate rope. **That swap was cosmetic, not a fix** — an earlier version of this note claimed `game:item/resource/rope` was transparent at its edges and that this was the cause; it is not, it measures alpha 255 across all 32×32. The UV fix alone closes the bug. Guarded by `TheCableSamplesOnlyItsOwnCornerOfTheAtlas`. Thickness was re-verified and needed nothing: `GetCube` returns a 2×2×2 cube and `ScaleCubeMesh` does `xyz * scale + scale`, so with `translate = -CableRadius` the box spans exactly ±0.06 — 0.12 blocks, two pixels. |
+| **Riders could not control where they got off.** Boarding departed after a grace period and ran to the END of the line, straight through every intermediate tower. Calling was for an empty cabin only. This was C3 below. | Scope: the ride had no rider input at all. | A **hotkey**, `ropewaystop`, default **R** (unbound in vanilla). Pressing it aims the cabin at a tower through the same `Destination` / `PlanCall` / `Reached` machinery a ground call uses — `Aim` is now the one place a trip starts, shared by both — so a rider choosing a stop *is* a call, made from the seat. `NextStop` steps the requested tower one along the chain in the direction of travel and **wraps at the ends**, which is also the direction control: a rider who boarded at an interior station on a cabin pointing the wrong way keeps pressing and the selection comes round the other way. Every candidate goes through `PlanCall`, so the tower the cabin is standing on and anything outside the loaded window are skipped rather than offered and refused. Discoverability was the actual bug, so: a chat hint on boarding naming the player's **own** binding (client side — the server cannot see it), a `"Choose where to get off"` interaction-help line on the cabin, the handbook, the tower guide, and a chat line naming the tower on every press. Guarded by `TheStopKeyStepsAlongTheLineAndWrapsBackTheOtherWay` and `TheStopKeyNeverOffersATowerOutsideTheLoadedWindow`. |
+| **The crossarm did not meet the posts** — a visible step where a narrow metal bracket sat on a full-width log, with the log's whole 16×16 top face on show around it. | The brace's beam was z[5,11] and its flanges z[4,12], bottoming out at y = 1/16 — a 6-wide bracket floating one pixel above a 16-wide post. | One shape, no new block variant. The brace grew a **foot plate**, `[0,0,0]–[16,2,16]`, reaching the block boundary so it lands flat on the log; its flanges start at y = 2 instead of y = 1 so nothing is coplanar with it. The pylon head grew the matching `footwest` / `footeast` stubs at x 0–5 and 11–16, leaving the sheave throat (x 5–11) clear for the mast, so the crossarm reads as one continuous girder across all five cells. Weighed against a separate end-piece block: the plate reads as a girder's bottom flange over the three interior cells and as a bearing plate over the two on posts, which is acceptable in both places, and a new block is a real cost. **It cost the cabin 1/16 of roof clearance** — 0.3125 → 0.25 — because the crossarm underside came down to the block boundary. `gen_manifests.py` now asserts both numbers together (`crossarm foot on the post top = 0`, `cabin roof under the crossarm = 4`), so they cannot drift apart silently. |
+| **Only logs, debarked logs and planks were accepted as posts.** | Scope. | `game:@(log-placed-.*\|debarkedlog-.*\|planks-.*\|rock-.*\|cobblestone-.*\|drystone-.*\|rockpolished-.*\|stonebricks-.*)` — wood or dressed stone, so a tower can match what it stands next to. Deliberately **not** widened to slabs, stairs, chiselled blocks or soil: a post is a structural column, and a tower that accepts anything stops reading as a tower. `WildcardUtil` anchors an `@`-pattern as `^…$` (`RegexCache.IsMatch`), so `rock-.*` does not also swallow `crackedrock-*`. `RopewayModSystem.VerifyStructureWildcards` still passes — but note it only tests the whole key, so a dud **alternative** would hide behind the live ones; QA step 7 places one block of each family by hand for that reason. |
 
 ## The truncated-line class (R1–R4)
 
@@ -89,13 +100,25 @@ three blockers and the mount race were fixed in the same pass; these five were j
 | id | severity | mechanism |
 |---|---|---|
 | **C1** | LOW | **The resume path validates `Travelled` against the loaded window but not `Destination`.** A line that shrank while the cabin was unloaded can leave a destination that now lands mid-span; the cabin halts in mid-air for one tick before the `!departed && !IsAtTower` recovery parks it at an end. Self-correcting and visibly odd. Validating `Destination` with `IsAtTower` on the resume path is the cheap fix. |
-| **C2** | LOW | **`ropeway:cantride-moving` says "It stops at the next tower."** It stops at its destination, or at an end — never at "the next tower". Pre-existing string, but calling to a chosen tower is what makes it wrong rather than merely vague. |
-| **C3** | LOW/MED | **Boarding direction at an interior station is uncontrollable.** Called backward to tower 2, `Outbound` stays false, so a rider boarding there is carried on to tower 0 with no way to ask for tower 3. Follows from the existing "a ride runs to the end" model rather than from calling, but interior stations make it a question a player will now actually ask. |
+| ~~**C2**~~ | — | **FIXED.** `ropeway:cantride-moving` claimed "It stops at the next tower."; it now reads "Wait until it stops at a tower." |
+| ~~**C3**~~ | — | **FIXED** by the rider stop key above. BASIC hit this in play before the fix. |
 | **C4** | LOW | **A stale `LineKey` falls through to opening the picker** rather than saying anything (`RopewayLinkService.cs:96-105`). Surprising, not silent, and self-healing: the next tick re-bases and the second click calls the cabin. |
 | **C5** | — | **Interior towers lost the plain-click picker.** Any tower carrying spans now calls the cabin on a plain right-click; the picker is Ctrl-only there. Deliberate — note it in the release notes. |
 
 ## Deliberate behaviour worth knowing
 
+- **Reversing from inside costs presses.** The stop key steps one tower at a time and only wraps at the end
+  of the line, so on a five-tower line a rider parked at tower 2 facing tower 0 needs three presses to select
+  tower 3. Deliberate: one key with one meaning beats two keys or a dialog, every press names its tower in
+  chat, and the alternative — a "reverse" key — is a second motion concept for a case that is not the common
+  one. A picker dialog is the upgrade if long lines make this tedious.
+- **The stop key departs immediately.** Pressing it while parked with a rider aboard skips the three-second
+  boarding grace. That is what the rider asked for; the grace only exists for someone who boards and does
+  nothing.
+- **The cabin's roof clearance is 0.25 blocks, not 0.3125.** The crossarm's foot plate reaches the block
+  boundary so it lands flat on the posts, which brought the crossarm underside down by 1/16. The sway
+  animation (±2.5°) eats roughly another 1/16 at the ends of the swing. Still a visible gap, and
+  `gen_manifests.py` asserts the joint and the clearance together so they cannot drift apart.
 - **Ctrl + right-click is the picker.** A plain right-click on an end station calls the cabin home and
   stops there, which made naming and unlinking unreachable on exactly the tower a player most wants to
   name. Sneak + right-click is still the guide; the plain click still calls the cabin.

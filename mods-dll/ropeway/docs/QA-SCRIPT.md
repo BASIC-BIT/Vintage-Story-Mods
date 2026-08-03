@@ -29,8 +29,11 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 1. **Install and load.** Copy `ropeway_0_1_0.zip` into `%APPDATA%\VintagestoryData\Mods\`, start the game,
    open a world. **PASS:** no `Ropeway:` error lines in either log at startup. In particular there must be
    no *"multiblockStructure on ropeway:pylonbase-… lists '…', which matches no loaded block"* — that line
-   means the `@(log-placed-.*|debarkedlog-.*|planks-.*)` wildcard does not resolve at runtime and the
-   fallback is to replace it with plain `game:planks-*`.
+   means the post wildcard does not resolve at runtime and the fallback is to replace it with plain
+   `game:planks-*`. The wildcard now accepts eight families:
+   `log-placed-*`, `debarkedlog-*`, `planks-*`, `rock-*`, `cobblestone-*`, `drystone-*`, `rockpolished-*`
+   and `stonebricks-*`. Note the verifier only tests the whole key, so a dud alternative hides behind the
+   live ones — step 7 is what actually proves each family.
 
 2. **Craft the parts.** Crafting grid:
    - **Ropeway brace ×4** — stick, metal plate (any metal), stick in a 1×3 *row*.
@@ -70,8 +73,8 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    **FAIL modes to report:** cabin invisible (renderer/tesselation), cabin clipped out of the inset
    (the size/offset knob in §4.6), a `Ropeway: could not build the guide cabin preview` log line.
 
-7. **Build the tower.** Following the guide: two posts of **four** log/debarked log/plank blocks each,
-   standing on the ground two blocks either side of the footing; then the crossarm across their tops,
+7. **Build the tower.** Following the guide: two posts of **four** blocks each, standing on the ground two
+   blocks either side of the footing; then the crossarm across their tops,
    four blocks up: **ropeway braces** at x = ±1 and ±2 and the **pylon head** in the middle, directly
    above the footing.
    **PASS:** each ghost cell disappears within ~0.5 s of you filling it, **without re-right-clicking** —
@@ -83,6 +86,22 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    **PASS:** the tower is **one block deep**. There is no second gantry and nothing behind it.
    **PASS:** the pylon head validates whichever of its four facings you place it in. Point its throat down
    the line anyway; it is the slot the cabin's mast rides in and a crosswise sheave looks wrong.
+   **PASS — post materials.** Build one post out of **logs** and the other out of **stone bricks**; both
+   must satisfy the structure. Then swap a post block for each of the remaining six accepted families in
+   turn — debarked log, planks, raw stone (`rock-*`), cobblestone, drystone, polished rock — and check the
+   count does not go up. **PASS:** a **stone brick slab**, a **stairs block**, **soil** or a chiselled block
+   in a post cell counts as *wrong* (red ghost) — the list is structural columns, not "anything".
+   **PASS:** the ghost colour for an empty post cell is still legible against the sky; it is the colour of
+   whichever accepted block the game lists first, not necessarily a log any more.
+
+7b. **The crossarm meets the posts.** Stand back and look at the joint where an outer crossarm cell lands on
+   a post.
+   **PASS:** the crossarm's foot plate covers the post's whole top face and sits **flat** on it — a
+   continuous metal band running the full five cells, broken only by the sheave throat in the middle.
+   **FAIL:** the log's top face is visible around a narrower bracket, or there is a gap you can see through
+   between the bracket and the log. That is the pre-fix shape.
+   **PASS:** riding through (step 12) still leaves visible air over the cabin roof — the foot plate cost the
+   roof 1/16 of a block, so the gap is now about **a quarter of a block**, not a third.
 
 8. **Check the passage.** Walk through the tower between the posts, along the axis the block-info panel
    named in step 5.
@@ -123,6 +142,13 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      no exception and no log line. Nothing in either log will tell you; only looking will.
      Then **quit to menu and reload the world**, and (multiplayer) have a **second player who did not build
      the line** walk up to it. **PASS:** the cable is there for them too, straight away.
+     **PASS — the cable's colour.** It is one flat rope-brown along its whole length, the same at both ends
+     and on every face. **FAIL:** it is striped in unrelated browns, greys or purples, or has transparent
+     patches. That is the atlas bug: `CubeMeshUtil.ScaleCubeMesh` multiplies the cube's UVs by the axis
+     scale, so a long cable runs them far past 1 and `MeshData.SetTexPos` maps them outside the rope
+     texture's own sub-region, sampling whichever sprites sit next to it.
+     **PASS — the cable's thickness.** About two pixels — a thin line, not a beam. Sight along a span from
+     one tower: it should read as rope, not as a pipe.
 
 10c. **Name the towers.** With the picker open on tower 1, type a name into the **"This tower:"** field at
      the top and press **Rename**. **PASS:** the row list refreshes and the block-info panel on that pylon
@@ -193,9 +219,11 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     report a fail for a tight fit; report one only if it clips. **FAIL:** it flies broadside, presenting
     its 4-block side to a 3-block gap and clipping both posts on every pass. That is the shape-axis bug and it means the cabin shape has gone back to being
     built along Z.
-    **PASS — the vertical fit, new this round and the reason the tower got a block taller:** as the cabin
+    **PASS — the vertical fit, and the reason the tower got a block taller:** as the cabin
     passes through a tower, its **floor clears the footing by three quarters of a block** and its **roof
-    clears the underside of the crossarm by about a third**. Both are visible margins, not hairlines.
+    clears the underside of the crossarm by about a quarter**. Both are visible margins, not hairlines.
+    (The roof gap was 0.3125 before the crossarm grew a foot plate that reaches the block boundary; it is
+    0.25 now, and the sway animation eats about 1/16 of it at the ends of the swing.)
     **FAIL:** the floor cuts through the footing plinth, or the roof eats into the braces. Either one means
     `SpanMath.SheaveHeight` and the cabin's `hangDrop` have drifted apart — the unit test
     `TheCabinFitsThroughTheTower` and `gen_manifests.py` both assert exactly these two gaps.
@@ -207,6 +235,34 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 13. **Arrive.** **PASS:** it stops at the far tower and holds. Try to dismount while it is still moving —
     you should get *"The cabin is moving. It stops at the next tower."* and stay seated. Once stopped,
     right-click to get out; you should land on or beside the tower, not in the air.
+
+13b. **Choose where you get off.** This one needs a **three-or-more-tower line** — build step 16 first if
+     you have not. It is the rider's only control, and the thing whose absence made the ride feel like it
+     had none.
+     Board at one end. **PASS:** as you sit down, a chat line tells you which key asks for a stop, naming
+     **your own binding** (**R** unless you rebound it). **FAIL:** no such line — the hint is client-side
+     and local-player-only, so silence here is the bug.
+     Press the key while riding. **PASS:** a chat line *"Stopping at \<name\>."* naming the next tower
+     ahead, and the cabin **stops at that tower** instead of running on to the end. Once it is stopped you
+     can dismount there.
+     Press it **again** before you arrive. **PASS:** the message names the tower **after** that one and the
+     cabin carries on to it. Keep pressing past the far end: **PASS:** the selection wraps and comes back
+     down the line the other way, and the cabin turns around to go there — that wrap is the only way to
+     reverse from inside.
+     **The interior-station case, which is what this step exists for.** Call the cabin *backward* to a
+     middle tower (step 15), board it there, and press the key until it offers a tower on the **far** side.
+     **PASS:** it goes there. **FAIL:** you are carried to the end the cabin was already pointing at with no
+     way to ask for the other — that is the pre-fix behaviour (KNOWN-ISSUES C3).
+     **PASS:** pressing the key while the cabin is **parked** with you aboard departs immediately rather
+     than waiting out the three-second boarding pause.
+     **PASS:** with the cabin still, press it when there is nothing to offer (a two-tower line, standing at
+     one end, having already selected the other) — you get *"No stop to ask for from here."*, never silence.
+     **PASS:** look at the cabin from outside with interaction help on (`Ctrl+N`): a *"Choose where to get
+     off"* line with the key on it, alongside the mount lines.
+     **PASS:** the key is listed in **Settings > Controls** as *"Ropeway: ask for a stop"*, and rebinding it
+     there works. **PASS:** pressing it while **not** riding does nothing at all and does not eat the key.
+     **PASS:** motion is still smooth, not a stutter — the seats are still `controllable: false` and the
+     stop key is a hotkey packet, not a seat control. A stutter means someone made a seat controllable.
 
 14. **Return trip.** Board again at the far end. **PASS:** it departs back the way it came.
 

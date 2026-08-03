@@ -273,6 +273,15 @@ public class BEPylonBase : BlockEntity
         mesh.Rotate(new Vec3f(0, 0, 0), 0, radY, 0);
 
         mesh.Translate((float)(0.5 + dx / 2), (float)(0.5 + SpanMath.SheaveHeight + dy / 2), (float)(0.5 + dz / 2));
+
+        // Flat-sample the texture instead of letting the cube's own UVs through. ScaleCubeMesh multiplies
+        // the UVs by the axis scale (CubeMeshUtil.cs:230-251), so a half-span 24 blocks long leaves them
+        // running 0..48 - and SetTexPos maps u through `x1 + u * (x2 - x1)`, which puts everything past 1
+        // OUTSIDE this texture's sub-region of the block atlas, sampling whatever sprites are next to it.
+        // That is the striping. 0.5 lands on the middle of the sprite, far from its edges and therefore
+        // safe under mipmapping; a 2-pixel-thick cable has nowhere to show lengthwise detail anyway, and
+        // normalising to 0..1 instead would smear one 32x32 sprite over the whole span.
+        Array.Fill(mesh.Uv, 0.5f);
         mesh.SetTexPos(texPos);
         return mesh;
     }

@@ -7,6 +7,7 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 using Vintagestory.GameContent;
 
 namespace Ropeway;
@@ -35,11 +36,12 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// than carried over, and it lands on the same 2.0 by arithmetic rather than by luck: with the sheave
     /// <see cref="SpanMath.SheaveHeight"/> = 4 cells above the footing, the roof (origin + 1.25) has to
     /// clear the crossarm's underside and the floor (origin - 1.25) has to clear the footing's top, which
-    /// leaves 1.6875 &lt; hangDrop &lt; 2.75 (plinth top at +0.5, crossarm underside at +4.0625). 2.0 is NOT
-    /// the midpoint of that window - 2.219 is - it deliberately sits low in it, giving 0.75 blocks of air
-    /// under the floor against 0.3125 over the roof, because clipping the crossarm reads far worse than a
-    /// low floor. The mast tip lands exactly in the sheave throat either way. Changing this or
-    /// SheaveHeight alone breaks the fit; TheCabinFitsThroughTheTower is what catches it.
+    /// leaves 1.75 &lt; hangDrop &lt; 2.75 (plinth top at +0.5, crossarm underside at +4.0 - the crossarm's
+    /// foot plate reaches the block boundary so it sits flat on the posts). 2.0 is NOT the midpoint of that
+    /// window - 2.25 is - it deliberately sits low in it, giving 0.75 blocks of air under the floor against
+    /// 0.25 over the roof, because clipping the crossarm reads far worse than a low floor. The mast tip
+    /// lands exactly in the sheave throat either way. Changing this or SheaveHeight alone breaks the fit;
+    /// TheCabinFitsThroughTheTower is what catches it.
     /// </summary>
     public const double DefaultHangDrop = 2.0;
 
@@ -202,10 +204,30 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
     public void DidMount(EntityAgent entityAgent)
     {
-        if (World?.Side != EnumAppSide.Server || departed) return;
+        if (World?.Side != EnumAppSide.Server)
+        {
+            TellRiderAboutTheStopKey(entityAgent);
+            return;
+        }
+
+        if (departed) return;
 
         boarding = true;
         boardAccum = 0;
+    }
+
+    /// <summary>
+    /// The stop key is the cabin's only rider control, and a rider who does not know it is there rides to the
+    /// end of the line every time - which is exactly how it read in play. Said on boarding, client side and
+    /// to the local player only, because the key it has to name is the player's OWN binding and the server
+    /// cannot see that.
+    /// </summary>
+    private void TellRiderAboutTheStopKey(EntityAgent entityAgent)
+    {
+        if (Api is not ICoreClientAPI capi || entityAgent == null || entityAgent != capi.World?.Player?.Entity) return;
+
+        var mapping = capi.Input?.GetHotKeyByCode(RopewayModSystem.StopHotkey)?.CurrentMapping?.ToString();
+        capi.ShowChatMessage(Lang.Get("ropeway:ride-hint", mapping ?? Lang.Get("ropeway:hotkey-stop")));
     }
 
     public void DidUnmount(EntityAgent entityAgent)
@@ -214,6 +236,20 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         boarding = false;
         boardAccum = 0;
+    }
+
+    /// <summary>
+    /// Shown when a player looks at the cabin. The mount lines come from the seatable behavior; this is the
+    /// one verb that is not a click, and interaction help is where a Vintage Story player looks for verbs.
+    /// </summary>
+    public override WorldInteraction[] GetInteractionHelp(IClientWorldAccessor world, EntitySelection es, IClientPlayer player)
+    {
+        return base.GetInteractionHelp(world, es, player).Append(new WorldInteraction
+        {
+            ActionLangCode = "ropeway:entityhelp-stop",
+            MouseButton = EnumMouseButton.None,
+            HotKeyCode = RopewayModSystem.StopHotkey
+        });
     }
 
     public override void OnGameTick(float dt)
@@ -523,6 +559,68 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     }
 
     /// <summary>
+    /// The index of the tower a rider's next press of the stop key aims at, or -1 when the line has nothing
+    /// to offer. Pure, and therefore tested: this is the whole of the rider's control over the ride.
+    /// <para>
+    /// The cycle steps one tower at a time in the cabin's current direction of travel and wraps at the ends,
+    /// starting from whatever tower is already requested - so the first press picks the stop coming up, a
+    /// second press the one after it, and pressing on past the far end brings the selection back down the
+    /// other side. That wrap is also the only direction control a rider has: it is what lets someone who
+    /// boarded at an interior station, on a cabin pointing the wrong way, ask for a tower behind it.
+    /// <paramref name="acceptable"/> is <see cref="PlanCall"/> in practice, which rejects the tower the cabin
+    /// is already standing on and anything outside the loaded window.
+    /// </para>
+    /// </summary>
+    public static int NextStop(RopewayLine line, double travelled, int requested, bool outbound, System.Func<int, bool> acceptable)
+    {
+        if (line?.Towers == null || line.Towers.Length == 0 || acceptable == null) return -1;
+
+        var count = line.Towers.Length;
+        var step = outbound ? 1 : -1;
+
+        // With nothing requested the cycle starts at the cabin: AnchorIndexAt names the span it is in, whose
+        // two ends are the towers either side of it, so one step from the near end lands on the far one.
+        var from = requested >= 0 ? requested : line.AnchorIndexAt(travelled) + (outbound ? 0 : 1);
+
+        for (var i = 1; i <= count; i++)
+        {
+            var index = ((from + i * step) % count + count) % count;
+            if (acceptable(index)) return index;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// The rider's own call, from inside the cabin: the counterpart to <see cref="CallTo"/>, which refuses
+    /// outright while anyone is aboard. Same destination machinery, same arrival, same abandonment messages -
+    /// a rider choosing a stop IS a call, aimed from the seat instead of from the ground.
+    /// </summary>
+    public CabinCall RequestStop(RopewayLine line, string riderUid, out BlockPos tower)
+    {
+        tower = null;
+        if (line?.Towers == null || World?.Side != EnumAppSide.Server) return CabinCall.Unreachable;
+
+        // Same guard as CallTo: Travelled and every Cumulative are measured from Towers[0], so under a chain
+        // that re-canonicalised they name different places. The tick re-bases and the next press works.
+        if (!line.Towers[0].Equals(LineKey)) return CabinCall.Unreachable;
+
+        var target = NoDestination;
+        var index = NextStop(
+            line,
+            Travelled,
+            HasDestination ? line.TowerAt(Destination, ArrivalTolerance) : -1,
+            Outbound,
+            i => PlanCall(line, line.Towers[i], Travelled, out target) == CabinCall.Called);
+
+        if (index < 0) return CabinCall.Unreachable;
+
+        tower = line.Towers[index];
+        Aim(target, riderUid);
+        return CabinCall.Called;
+    }
+
+    /// <summary>
     /// Sends an empty cabin to any tower on the line, where it stops. Reports why not rather than reporting
     /// success and then not moving.
     /// </summary>
@@ -537,19 +635,28 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         var outcome = PlanCall(line, tower, Travelled, out var target);
         if (outcome != CabinCall.Called) return outcome;
 
+        Aim(target, callerUid);
+        return CabinCall.Called;
+    }
+
+    /// <summary>
+    /// Commit to a destination and leave. The one place a trip starts, shared by the ground call and the
+    /// rider's stop key, so the two cannot drift into setting different halves of the state.
+    /// </summary>
+    private void Aim(double target, string byUid)
+    {
         Destination = target;
         Outbound = target > Travelled;
         departed = true;
         boarding = false;
         lastSegment = -1;
-        calledBy = callerUid;
+        calledBy = byUid;
 
         // Written here rather than left to the end of the next ServerTick: CanMount reads IsMoving, so one
         // tick of "departed but not moving" lets a player board a cabin that has already left - skipping the
         // boarding grace (DidMount early-returns on departed) and producing the passenger-with-a-live-
         // destination combination OnTowerInteract's HasPassenger guard assumes cannot exist.
         IsMoving = true;
-        return CabinCall.Called;
     }
 
     /// <summary>

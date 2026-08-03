@@ -53,6 +53,32 @@ public sealed class RopewayLinkService
         if (be.Rename(packet.Name)) SendCandidateList(fromPlayer, be, packet.Tower);
     }
 
+    /// <summary>
+    /// The rider's stop key. The gate is the mount and nothing else: you can only ever aim the cabin you are
+    /// sitting in, which makes reach and claim checks meaningless here - boarding already passed them.
+    /// </summary>
+    public void OnStopRequest(IServerPlayer fromPlayer, RiderStopRequest packet)
+    {
+        if (packet == null || fromPlayer?.Entity?.MountedOn?.Entity is not EntityRopewayCabin cabin) return;
+        if (cabin.EntityId != packet.CabinEntityId) return;
+
+        var line = RopewayLine.GetOrBuild(modSystem, cabin.LineKey);
+        if (cabin.RequestStop(line, fromPlayer.PlayerUID, out var tower) != CabinCall.Called)
+        {
+            // One message for every refusal there is - a truncated line, a chain that just re-canonicalised,
+            // a two-tower line the cabin is standing on the far end of. Silence is what made the controls
+            // look absent in the first place, so an unhelpful answer still beats none.
+            fromPlayer.SendIngameError("ropeway-no-stop", Lang.Get("ropeway:err-no-stop"));
+            return;
+        }
+
+        var anchor = SpanMath.AnchorOf(tower);
+        fromPlayer.SendMessage(
+            GlobalConstants.InfoLogChatGroup,
+            Lang.Get("ropeway:stop-requested", DisplayName(TowerAt(tower), anchor.X - cabin.Pos.X, anchor.Z - cabin.Pos.Z)),
+            EnumChatType.Notification);
+    }
+
     // -------------------------------------------------------------- interaction
 
     /// <summary>

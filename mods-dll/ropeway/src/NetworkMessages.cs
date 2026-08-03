@@ -53,3 +53,15 @@ public class TowerRenameRequest
     public BlockPos Tower;
     public string Name;
 }
+
+/// <summary>
+/// A seated rider pressing the stop key. Unlike every other request in the mod this carries no position and
+/// needs no reach check: the trust gate is the mount itself - the server takes the cabin from what the
+/// sender is actually sitting in, and the id is only cross-checked against it, so a forged packet can move
+/// nothing the sender is not already riding.
+/// </summary>
+[ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+public class RiderStopRequest
+{
+    public long CabinEntityId;
+}

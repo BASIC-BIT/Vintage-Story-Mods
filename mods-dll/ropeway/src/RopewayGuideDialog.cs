@@ -53,7 +53,14 @@ public sealed class RopewayGuideDialog : GuiDialog
     {
         var contentTop = GuiStyle.TitleBarHeight + 10;
         viewportBounds = ElementBounds.Fixed(0, contentTop, ContentWidth, ViewportHeight);
-        var textBounds = ElementBounds.Fixed(0, contentTop + ViewportHeight + 12, ContentWidth, 285);
+        // ponytail: this is NOT a clip height. GuiElementRichtext.BeforeCalcBounds -> CalcHeightAndPositions
+        // overwrites Bounds.fixedHeight, so the text always renders at its natural size. What this value
+        // actually does is position the Close button and size the shaded background, both captured from it
+        // BEFORE compose - so if it is smaller than the text really needs, the text runs over the button and
+        // past the background instead of being cut off. Set it generously; over-tall only adds empty space.
+        // Sized for the riding paragraph the hotkey added (~17 lines at ContentWidth); raise it if a
+        // translation runs longer.
+        var textBounds = ElementBounds.Fixed(0, contentTop + ViewportHeight + 12, ContentWidth, 460);
         var buttonY = textBounds.fixedY + textBounds.fixedHeight + 8;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth - 10, buttonY + 36)
             .WithFixedPadding(GuiStyle.ElementToDialogPadding);

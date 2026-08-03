@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
@@ -10,6 +11,15 @@ namespace Ropeway;
 public sealed class RopewayModSystem : ModSystem
 {
     public const string ChannelName = "ropeway";
+
+    /// <summary>
+    /// The rider's only control. A hotkey rather than a seat control on purpose: reading Controls.Forward
+    /// the way EntityBehaviorRideable does needs <c>controllable: true</c> on a seat, and a controlling
+    /// client stops interpolating the cabin's position and rides in a 30 Hz stutter. Vanilla's own
+    /// multi-stop rideable, EntityElevator, has no rider controls at all - you call it from the outside -
+    /// so there was nothing to copy.
+    /// </summary>
+    public const string StopHotkey = "ropewaystop";
 
     /// <summary>
     /// Every loaded tower, keyed by its FOOTING position - the one canonical position, the same one
@@ -52,6 +62,7 @@ public sealed class RopewayModSystem : ModSystem
             .RegisterMessageType<TowerLinkRequest>()
             .RegisterMessageType<TowerUnlinkRequest>()
             .RegisterMessageType<TowerRenameRequest>()
+            .RegisterMessageType<RiderStopRequest>()
             .RegisterMessageType<TowerCandidate>();
     }
 
@@ -62,7 +73,8 @@ public sealed class RopewayModSystem : ModSystem
         api.Network.GetChannel(ChannelName)
             .SetMessageHandler<TowerLinkRequest>(LinkService.OnLinkRequest)
             .SetMessageHandler<TowerUnlinkRequest>(LinkService.OnUnlinkRequest)
-            .SetMessageHandler<TowerRenameRequest>(LinkService.OnRenameRequest);
+            .SetMessageHandler<TowerRenameRequest>(LinkService.OnRenameRequest)
+            .SetMessageHandler<RiderStopRequest>(LinkService.OnStopRequest);
 
         // Disconnect while riding is handled by EntityRopewayCabin.DropGhostPassengers on the server tick,
         // which also covers a crashed client and a despawned rider. One mechanism, not two.
@@ -76,6 +88,19 @@ public sealed class RopewayModSystem : ModSystem
 
         api.Network.GetChannel(ChannelName)
             .SetMessageHandler<TowerCandidatesResponse>(Dialog.OnCandidates);
+
+        // R is unbound in vanilla (nothing in ClientMain or any of the three content mods registers it), so
+        // this costs no existing binding, and the player can move it in Settings > Controls like any other.
+        api.Input.RegisterHotKey(StopHotkey, Lang.Get("ropeway:hotkey-stop"), GlKeys.R, HotkeyType.CharacterControls);
+        api.Input.SetHotKeyHandler(StopHotkey, _ =>
+        {
+            // Not riding: hand the key straight back rather than swallowing it, so it stays free for
+            // whatever else the player has bound to it.
+            if (api.World?.Player?.Entity?.MountedOn?.Entity is not EntityRopewayCabin cabin) return false;
+
+            api.Network.GetChannel(ChannelName).SendPacket(new RiderStopRequest { CabinEntityId = cabin.EntityId });
+            return true;
+        });
     }
 
     /// <summary>

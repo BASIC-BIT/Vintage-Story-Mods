@@ -501,6 +501,85 @@ public class RopewayMathTests
         Assert.Equal(0, line.SpanAheadOf(line.Cumulative[1] - 0.001, outbound: false));
     }
 
+    /// <summary>
+    /// The rider's whole control surface. One key, stepping the requested stop along the chain in the
+    /// direction of travel and wrapping at the ends - and the wrap is load bearing, because it is the only
+    /// way a rider who boarded at an interior station on a cabin pointing the wrong way can ask to go the
+    /// other way. Every candidate goes through PlanCall, so the tower the cabin is standing on and anything
+    /// outside the loaded window are skipped rather than offered and then refused.
+    /// </summary>
+    [Fact]
+    public void TheStopKeyStepsAlongTheLineAndWrapsBackTheOtherWay()
+    {
+        var line = FourTowerLine(out _, out _, out _, out _);
+
+        int Press(double travelled, int requested, bool outbound) =>
+            EntityRopewayCabin.NextStop(line, travelled, requested, outbound,
+                i => EntityRopewayCabin.PlanCall(line, line.Towers[i], travelled, out _) == CabinCall.Called);
+
+        // Parked at tower 0 and pointing outward: one press per tower, out to the far end.
+        Assert.Equal(1, Press(0, -1, outbound: true));
+        Assert.Equal(2, Press(0, 1, outbound: true));
+        Assert.Equal(3, Press(0, 2, outbound: true));
+
+        // Past the far end it wraps - skipping tower 0, which is where the cabin is standing.
+        Assert.Equal(1, Press(0, 3, outbound: true));
+
+        // Mid-span and running inbound, the first press is the tower behind, not the one it just left.
+        Assert.Equal(2, Press(25, -1, outbound: false));
+
+        // The direction escape: parked at interior tower 2 with the cabin pointing back down the line, a
+        // rider who wants tower 3 keeps pressing and the selection comes round the other way.
+        Assert.Equal(1, Press(20, -1, outbound: false));
+        Assert.Equal(0, Press(20, 1, outbound: false));
+        Assert.Equal(3, Press(20, 0, outbound: false));
+
+        Assert.Equal(-1, EntityRopewayCabin.NextStop(null, 0, -1, true, _ => true));
+    }
+
+    /// <summary>A tower past the loaded end is never offered, the same rule a call from the ground obeys.</summary>
+    [Fact]
+    public void TheStopKeyNeverOffersATowerOutsideTheLoadedWindow()
+    {
+        var a = new BlockPos(0, 64, 0);
+        var b = new BlockPos(10, 64, 0);
+        var c = new BlockPos(20, 64, 0);
+        var d = new BlockPos(30, 64, 0);
+        var line = Marked(new[] { a, b, c, d }, new HashSet<BlockPos> { a, b, c });
+
+        int Press(int requested) =>
+            EntityRopewayCabin.NextStop(line, 0, requested, outbound: true,
+                i => EntityRopewayCabin.PlanCall(line, line.Towers[i], 0, out _) == CabinCall.Called);
+
+        Assert.Equal(1, Press(-1));
+        Assert.Equal(2, Press(1));
+
+        // Tower 3 is unproven and tower 0 is where the cabin stands, so the cycle is just 1 and 2.
+        Assert.Equal(1, Press(2));
+    }
+
+    /// <summary>
+    /// The striping BASIC saw. ScaleCubeMesh multiplies the cube's UVs by the axis scale
+    /// (CubeMeshUtil.cs:230-251), so a long cable leaves them running well past 1 - and MeshData.SetTexPos
+    /// maps u through <c>x1 + u * (x2 - x1)</c>, which lands everything past 1 OUTSIDE this texture's
+    /// sub-region of the block atlas, sampling whatever sprites happen to sit next to it.
+    /// </summary>
+    [Fact]
+    public void TheCableSamplesOnlyItsOwnCornerOfTheAtlas()
+    {
+        // A deliberately small sub-region in the middle of the atlas, so an out-of-range UV cannot land
+        // inside it by luck. Half of a 48-block span, which is the longest the mod allows.
+        var texPos = new TextureAtlasPosition { x1 = 0.25f, y1 = 0.5f, x2 = 0.3f, y2 = 0.55f };
+        var mesh = BEPylonBase.BuildHalfCable(24, 0, 0, texPos);
+
+        Assert.NotNull(mesh);
+        for (var i = 0; i < mesh.Uv.Length; i += 2)
+        {
+            Assert.InRange(mesh.Uv[i], texPos.x1, texPos.x2);
+            Assert.InRange(mesh.Uv[i + 1], texPos.y1, texPos.y2);
+        }
+    }
+
     private static RopewayLine FourTowerLine(out BlockPos a, out BlockPos b, out BlockPos c, out BlockPos d)
     {
         a = new BlockPos(0, 64, 0);

@@ -3,28 +3,66 @@
   "class": "BlockPylonBase",
   "entityClass": "PylonBase",
   "behaviors": [
-    { "name": "HorizontalOrientable" }
+    {
+      "name": "HorizontalOrientable"
+    }
   ],
   "variantgroups": [
-    { "code": "side", "states": [ "north", "east", "south", "west" ] }
+    {
+      "code": "side",
+      "states": [
+        "north",
+        "east",
+        "south",
+        "west"
+      ]
+    }
   ],
   "shapeByType": {
-    "*-north": { "base": "ropeway:block/pylonbase", "rotateY": 0 },
-    "*-east": { "base": "ropeway:block/pylonbase", "rotateY": 270 },
-    "*-south": { "base": "ropeway:block/pylonbase", "rotateY": 180 },
-    "*-west": { "base": "ropeway:block/pylonbase", "rotateY": 90 }
+    "*-north": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 0
+    },
+    "*-east": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 270
+    },
+    "*-south": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 180
+    },
+    "*-west": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 90
+    }
   },
   "textures": {
-    "stone": { "base": "game:block/stone/rock/granite1" },
-    "metal": { "base": "game:block/metal/sheet/iron1" },
-    "rope": { "base": "game:item/resource/rope" }
+    "stone": {
+      "base": "game:block/stone/rock/granite1"
+    },
+    "metal": {
+      "base": "game:block/metal/sheet/iron1"
+    },
+    "//rope": "A BLOCK texture. The cable flat-samples ONE point of this sprite (BEPylonBase.BuildHalfCable), so what matters is that the sample sits well inside the sprite - CubeMeshUtil scales UVs by the axis scale, and anything leaving [0,1] samples whichever sprite sits next to this one in the atlas. That was the striping, and Array.Fill(mesh.Uv, 0.5f) is what fixes it. NOTE: an earlier comment here claimed game:item/resource/rope was transparent at its edges - it is not, it measures alpha 255 across all 32x32. The swap to block/cloth/reedrope is a taste choice (vanilla banner rope, rope-coloured), not a fix.",
+    "rope": {
+      "base": "game:block/cloth/reedrope"
+    }
   },
   "drawtype": "json",
   "blockmaterial": "Stone",
-  "creativeinventory": { "general": [ "*-north" ], "construction": [ "*-north" ] },
+  "creativeinventory": {
+    "general": [
+      "*-north"
+    ],
+    "construction": [
+      "*-north"
+    ]
+  },
   "attributes": {
     "handbook": {
-      "groupBy": [ "pylonbase-*" ]
+      "groupBy": [
+        "pylonbase-*"
+      ]
     },
     "reinforcable": false,
     "maxSpan": 48,
@@ -32,50 +70,139 @@
     "maxLineLength": 320,
     "ropePerBlock": 0.25,
     "maxCandidates": 16,
+    "//posts": "Block number 3 is the two posts: wood or dressed stone, so a tower can match what it stands next to. Every alternative must resolve to at least one loaded block or MultiblockStructure.HighlightIncompleteParts throws on SearchBlocks(wildcard)[0]; RopewayModSystem.VerifyStructureWildcards logs that at startup, but it only tests the whole key, so a dud alternative hides behind the live ones. These are the vanilla 1.22.1 codes: log-placed-{wood}-{rotation}, debarkedlog-*, planks-*, rock-*, cobblestone-*, drystone-*, rockpolished-*, stonebricks-*. WildcardUtil anchors an @-pattern as ^...$ (RegexCache.IsMatch), so rock-.* does not also swallow crackedrock-*. Deliberately NOT widened to slabs, stairs, chiselled blocks or soil: a post is a structural column, and a tower that accepts anything stops reading as a tower.",
     "//multiblockStructure": "One crossarm on two posts, all offsets from the footing you place on the ground. The crossarm is at y +4 and not lower: the cabin is 2.5 blocks tall, hangs 2 below the rope, and passes over this very block, so the sheave has to sit 4.5 above the footing's bottom for the floor to clear the footing and the roof to clear the braces. The posts run the whole way down to ground level, y 0..3, or they hang in the air beside the footing. The passage cells (x -1..1, y 0..3) are deliberately absent.",
     "multiblockStructure": {
       "blockNumbers": {
         "ropeway:pylonhead-*": 1,
         "ropeway:brace-*": 2,
-        "game:@(log-placed-.*|debarkedlog-.*|planks-.*)": 3
+        "game:@(log-placed-.*|debarkedlog-.*|planks-.*|rock-.*|cobblestone-.*|drystone-.*|rockpolished-.*|stonebricks-.*)": 3
       },
       "offsets": [
-        { "x": 0, "y": 4, "z": 0, "w": 1 },
-
-        { "x": -2, "y": 4, "z": 0, "w": 2 },
-        { "x": -1, "y": 4, "z": 0, "w": 2 },
-        { "x": 1, "y": 4, "z": 0, "w": 2 },
-        { "x": 2, "y": 4, "z": 0, "w": 2 },
-
-        { "x": -2, "y": 0, "z": 0, "w": 3 },
-        { "x": -2, "y": 1, "z": 0, "w": 3 },
-        { "x": -2, "y": 2, "z": 0, "w": 3 },
-        { "x": -2, "y": 3, "z": 0, "w": 3 },
-        { "x": 2, "y": 0, "z": 0, "w": 3 },
-        { "x": 2, "y": 1, "z": 0, "w": 3 },
-        { "x": 2, "y": 2, "z": 0, "w": 3 },
-        { "x": 2, "y": 3, "z": 0, "w": 3 }
+        {
+          "x": 0,
+          "y": 4,
+          "z": 0,
+          "w": 1
+        },
+        {
+          "x": -2,
+          "y": 4,
+          "z": 0,
+          "w": 2
+        },
+        {
+          "x": -1,
+          "y": 4,
+          "z": 0,
+          "w": 2
+        },
+        {
+          "x": 1,
+          "y": 4,
+          "z": 0,
+          "w": 2
+        },
+        {
+          "x": 2,
+          "y": 4,
+          "z": 0,
+          "w": 2
+        },
+        {
+          "x": -2,
+          "y": 0,
+          "z": 0,
+          "w": 3
+        },
+        {
+          "x": -2,
+          "y": 1,
+          "z": 0,
+          "w": 3
+        },
+        {
+          "x": -2,
+          "y": 2,
+          "z": 0,
+          "w": 3
+        },
+        {
+          "x": -2,
+          "y": 3,
+          "z": 0,
+          "w": 3
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "z": 0,
+          "w": 3
+        },
+        {
+          "x": 2,
+          "y": 1,
+          "z": 0,
+          "w": 3
+        },
+        {
+          "x": 2,
+          "y": 2,
+          "z": 0,
+          "w": 3
+        },
+        {
+          "x": 2,
+          "y": 3,
+          "z": 0,
+          "w": 3
+        }
       ]
     }
   },
   "replaceable": 500,
   "resistance": 4.5,
   "lightAbsorption": 0,
-  "sidesolid": { "all": false },
-  "sideopaque": { "all": false },
-  "collisionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.5, "z2": 1 },
-  "selectionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.5, "z2": 1 },
+  "sidesolid": {
+    "all": false
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "collisionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 0.5,
+    "z2": 1
+  },
+  "selectionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 0.5,
+    "z2": 1
+  },
   "sounds": {
     "walk": "game:walk/stone*",
     "place": "game:block/anvil",
     "break": "game:block/rock-break-pickaxe",
     "hit": "game:block/rock-hit-pickaxe",
     "byTool": {
-      "Pickaxe": { "hit": "game:block/rock-hit-pickaxe", "break": "game:block/rock-break-pickaxe" }
+      "Pickaxe": {
+        "hit": "game:block/rock-hit-pickaxe",
+        "break": "game:block/rock-break-pickaxe"
+      }
     }
   },
   "guiTransform": {
-    "rotation": { "x": -22.6, "y": 45, "z": 0 },
+    "rotation": {
+      "x": -22.6,
+      "y": 45,
+      "z": 0
+    },
     "scale": 1.6,
     "rotate": true
   }
