@@ -5,6 +5,7 @@ using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using Vintagestory.GameContent.Mechanics;
 
 namespace Ropeway;
 
@@ -18,8 +19,14 @@ namespace Ropeway;
 /// The footing is at the player's feet, it is the block the ghost overlay radiates from, and it is the
 /// only one of the tower's cells that is a single well-known block rather than "whatever log you used".
 /// </para>
+/// <para>
+/// It is also the line's MECHANICAL POWER hookup, which is why it extends <see cref="BlockMPBase"/> - any
+/// tower can take an axle, and what the powered ones do with it is wind the line's tension weight. The
+/// footing is at axle height by construction, which is the whole reason the hookup lives here and not on
+/// the sheave four blocks up: routing an axle upward is the loudest complaint vanilla mechanical power has.
+/// </para>
 /// </summary>
-public class BlockPylonBase : Block
+public class BlockPylonBase : BlockMPBase
 {
     // Reserved highlight slots. Vanilla's multiblock overlay owns slot 23, so these stay clear of it.
     // Unused in v0.1 - the pre-placement ghost and the live span preview are not in this lane's scope.
@@ -27,6 +34,38 @@ public class BlockPylonBase : Block
     public const int PreviewHighlightSlot = 1201;
 
     public const string CabinItemCode = "ropeway:cabin";
+
+    /// <summary>
+    /// The axle enters across the crossarm, never down the line. That is where the shape's drive boss
+    /// already points, and it is the only pair of horizontal faces that is not inside the archway the cabin
+    /// threads through - an axle in the passage would be a tower you cannot run a cabin through.
+    /// <para>
+    /// A face and its opposite, deliberately: <see cref="BlockMPBase.WasPlaced"/> probes facing F and then
+    /// connects toward F.Opposite, so a one-sided rule would only ever join from the side it was not
+    /// looking at. Two opposite faces make that quirk harmless. Same shape as BlockGrindingWheel.
+    /// </para>
+    /// </summary>
+    public override bool HasMechPowerConnectorAt(IWorldAccessor world, BlockPos pos, BlockFacing face, BlockMPBase forBlock)
+    {
+        var passage = BlockFacing.FromCode(Variant["side"]) ?? BlockFacing.NORTH;
+        return face != null && (face == passage.GetCW() || face == passage.GetCCW());
+    }
+
+    public override void DidConnectAt(IWorldAccessor world, BlockPos pos, BlockFacing face)
+    {
+    }
+
+    /// <summary>
+    /// Nothing in the engine calls <see cref="BlockMPBase.WasPlaced"/> for you - every vanilla mechanical
+    /// block makes this call itself, and omitting it ships a footing that accepts an axle and silently does
+    /// nothing until the player breaks and replaces the axle. Copied from BlockGrindingWheel, which places
+    /// it on OnBlockPlaced rather than TryPlaceBlock so that it also covers a schematic or a /blockplace.
+    /// </summary>
+    public override void OnBlockPlaced(IWorldAccessor world, BlockPos blockPos, ItemStack byItemStack = null)
+    {
+        base.OnBlockPlaced(world, blockPos, byItemStack);
+        WasPlaced(world, blockPos, null);
+    }
 
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel)
     {

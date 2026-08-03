@@ -6,6 +6,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.GameContent.Mechanics;
 
 namespace Ropeway;
 
@@ -40,6 +41,12 @@ public class BEPylonBase : BlockEntity
     private IPlayer highlightFor;
     private string side;
 
+    /// <summary>
+    /// This tower's mechanical power hookup, or null on a variant that never declared the behaviour.
+    /// Vanilla registers <c>MPConsumer</c> itself, so the mod registers nothing for it.
+    /// </summary>
+    private BEBehaviorMPConsumer mpc;
+
     public double MaxSpan => Block?.Attributes?["maxSpan"].AsDouble(48) ?? 48;
 
     public double MaxLineLength => Block?.Attributes?["maxLineLength"].AsDouble(512) ?? 512;
@@ -68,6 +75,7 @@ public class BEPylonBase : BlockEntity
         // AsObject<T> on a missing key yields null - a variant that forgot the attribute must not NRE.
         structure = Block?.Attributes?["multiblockStructure"]?.AsObject<MultiblockStructure>();
         side ??= Block?.Variant["side"];
+        mpc = GetBehavior<BEBehaviorMPConsumer>();
 
         if (structure != null && side != null) Init();
 
@@ -109,6 +117,39 @@ public class BEPylonBase : BlockEntity
     private void OnServerTick1s(float dt)
     {
         Validate();
+        Wind(dt);
+    }
+
+    /// <summary>
+    /// This tower's contribution to its line's store, and the load it declares for having made it.
+    /// <para>
+    /// EVERY tower does this - there is no designated drive station. A tower with no axle reads TrueSpeed 0
+    /// and contributes nothing; a tower with one winds the same weight every other powered tower on the
+    /// line winds, which is the pooling, and it needs no coordination because the rate is linear in speed
+    /// (see <see cref="RopewayPower.Wind"/>). A tower whose chunk is unloaded is not ticking, so it stops
+    /// contributing and cannot strand anybody: the cabin never reads this, it reads the store.
+    /// </para>
+    /// <para>
+    /// The resistance schedule is the pulverizer's idle/loaded shape and it depends ONLY on the store, not
+    /// on where the cabin is - so there is no cross-chunk coupling to latch, and a finished ropeway with a
+    /// full weight stops taxing the mill it shares a network with.
+    /// </para>
+    /// ponytail: no clamp on GearedRatio. A 5.5x large gear between the mill and the footing makes this
+    /// tower contribute 0.66 resistance against a maxed wood windmill's 0.75 budget - tight but not a
+    /// stall, and it buys proportionally more charge. Copy the pulverizer's JoinNetwork speed divider if
+    /// in-game QA finds a geared rig killing networks.
+    /// </summary>
+    private void Wind(float dt)
+    {
+        if (mpc == null) return;
+
+        var store = BETensionWeight.StoreOn(ModSystem, RopewayLine.GetOrBuild(ModSystem, Pos));
+
+        // Nothing to wind is not the same as nothing to do: a tower still on a network must drop back to
+        // idle load, or a line whose weight was broken taxes the player's mill forever.
+        mpc.Resistance = store != null && !store.Full ? RopewayPower.WindingResistance : RopewayPower.IdleResistance;
+
+        if (store != null) store.Wind(mpc.TrueSpeed, dt);
     }
 
     /// <summary>
@@ -207,7 +248,15 @@ public class BEPylonBase : BlockEntity
     /// </summary>
     public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tessThreadTesselator)
     {
-        var replacedDefault = base.OnTesselation(mesher, tessThreadTesselator);
+        // Deliberately discarding what base returns, and this is load bearing rather than sloppy:
+        // BlockEntity.OnTesselation ORs its behaviours' results, and BEBehaviorMPConsumer.OnTesselation
+        // returns TRUE for any non-null block - because a vanilla consumer expects the instanced
+        // MechNetworkRenderer to draw it instead. With mechPartShape null nothing draws it, so honouring
+        // that true would make the footing model vanish the moment the MP behaviour was added. Ours is a
+        // static structure that the chunk tesselator must keep drawing; nothing on this block entity has
+        // any business replacing the default.
+        base.OnTesselation(mesher, tessThreadTesselator);
+        const bool replacedDefault = false;
         if (Spans.Count == 0 || Block == null) return replacedDefault;
 
         TextureAtlasPosition texPos;
@@ -504,8 +553,56 @@ public class BEPylonBase : BlockEntity
             // only the end of the loaded part of it, and a cabin holding there looks broken rather than held.
             if (line.Truncated) dsc.AppendLine(Lang.Get("ropeway:blockinfo-line-truncated"));
 
+            AppendPowerLines(line, dsc);
             AppendCabinLine(line, dsc);
         }
+    }
+
+    /// <summary>
+    /// The whole power situation, on the block the player already clicks. Vanilla prints nothing about
+    /// mechanical power outside EntityDebugMode, so a machine that does not diagnose itself is a machine
+    /// nobody can learn - and this one refuses to move without a charged store, which is exactly the
+    /// refusal that has to come with a number attached rather than a shrug.
+    /// </summary>
+    private void AppendPowerLines(RopewayLine line, StringBuilder dsc)
+    {
+        // This tower's own drive, whether or not it is the one that has an axle. Any tower may take power,
+        // so "no axle here" is information about THIS tower, never about the line.
+        if (mpc != null)
+        {
+            dsc.AppendLine(mpc.Network == null
+                ? Lang.Get("ropeway:blockinfo-nodrive")
+                : Lang.Get("ropeway:blockinfo-winding", Math.Round(mpc.TrueSpeed, 2)));
+        }
+
+        var store = BETensionWeight.StoreOn(ModSystem, line);
+        if (store == null)
+        {
+            // "There is no weight" and "the weight is past a tower nobody can see" are different problems
+            // with different fixes - build a block, or walk the line - and the store is resolved through the
+            // CURRENTLY WALKED chain, so a truncated line is exactly where absence cannot be told from
+            // invisibility. Claiming the weight the player built does not exist is the worse of the two lies.
+            dsc.AppendLine(Lang.Get(line.Truncated ? "ropeway:blockinfo-store-unreachable" : "ropeway:blockinfo-nostore"));
+            return;
+        }
+
+        dsc.AppendLine(Lang.Get("ropeway:blockinfo-store", (int)Math.Round(store.Charge), (int)Math.Round(store.Capacity)));
+
+        // What a ride from HERE costs, taken as the dearer of the two ends - which is the number a player
+        // standing at this tower is actually deciding against, and it is the one the departure gate uses.
+        var index = line.IndexOf(Pos);
+        if (index < 0) return;
+
+        var cost = Math.Max(
+            EntityRopewayCabin.TripCost(line, line.Cumulative[index], line.MinTravel),
+            EntityRopewayCabin.TripCost(line, line.Cumulative[index], line.MaxTravel));
+
+        dsc.AppendLine(Lang.Get("ropeway:blockinfo-tripcost", (int)Math.Ceiling(cost)));
+
+        // Otherwise the panel prints 400 / 400 beside a trip that costs 512 and leaves the player to do the
+        // arithmetic - while the refusal says "not wound far enough YET", which is a wait that never ends.
+        // Lines built before the link gate existed are the only ones that can still read this.
+        if (cost > store.Capacity) dsc.AppendLine(Lang.Get("ropeway:blockinfo-tripcost-toodear"));
     }
 
     /// <summary>

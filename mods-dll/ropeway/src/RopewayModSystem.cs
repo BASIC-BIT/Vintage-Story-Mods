@@ -28,6 +28,13 @@ public sealed class RopewayModSystem : ModSystem
     /// </summary>
     public readonly Dictionary<BlockPos, BEPylonBase> LoadedTowers = new();
 
+    /// <summary>
+    /// Every loaded tension weight, keyed by its own position. Small by construction - one per line - and
+    /// scanned rather than indexed by line, because a line is rebuilt constantly and an index keyed by one
+    /// would be a second thing to invalidate. BETensionWeight.Initialize adds, OnBlockUnloaded removes.
+    /// </summary>
+    public readonly Dictionary<BlockPos, BETensionWeight> LoadedWeights = new();
+
     /// <summary>Derived line geometry, keyed by every member tower. Never persisted; InvalidateLine drops it.</summary>
     public readonly Dictionary<BlockPos, RopewayLine> LineCache = new();
 
@@ -46,6 +53,7 @@ public sealed class RopewayModSystem : ModSystem
 
         api.RegisterBlockClass("BlockPylonBase", typeof(BlockPylonBase));
         api.RegisterBlockClass("BlockPylonHead", typeof(BlockPylonHead));
+        api.RegisterBlockClass("BlockTensionWeight", typeof(BlockTensionWeight));
 
         // MIGRATION, deliberate: the block entity class name changed from "PylonHead" with the controller.
         // A pre-footing world has its towers' block entities saved under the old name, and ServerChunk.cs:531
@@ -54,6 +62,7 @@ public sealed class RopewayModSystem : ModSystem
         // whole migration: it fails safe by construction, no upgrader, no half-converted towers. Reusing the
         // old name would instead resurrect those towers four blocks below their own geometry.
         api.RegisterBlockEntityClass("PylonBase", typeof(BEPylonBase));
+        api.RegisterBlockEntityClass("TensionWeight", typeof(BETensionWeight));
         api.RegisterEntity("EntityRopewayCabin", typeof(EntityRopewayCabin));
 
         // Both sides, or EntityAgent.Initialize cannot re-resolve WatchedAttributes["mountedOn"] after a relog

@@ -233,7 +233,13 @@ public sealed class RopewayLine
         MaxTravel = endLoaded ? TotalLength : Cumulative[Cumulative.Length - 2];
     }
 
-    private static int ComparePos(BlockPos a, BlockPos b)
+    /// <summary>
+    /// Total order on positions. Public because it is also what makes every OTHER choice between blocks
+    /// deterministic - which of two merged tension weights is the live one, which peer an orphaned weight
+    /// re-binds to - rather than dictionary enumeration order, which is chunk-load order and can differ
+    /// across restarts.
+    /// </summary>
+    public static int ComparePos(BlockPos a, BlockPos b)
     {
         if (a.X != b.X) return a.X.CompareTo(b.X);
         if (a.Z != b.Z) return a.Z.CompareTo(b.Z);
@@ -272,6 +278,44 @@ public sealed class RopewayLine
             previous = current;
             current = next;
         }
+    }
+
+    /// <summary>Lowest of a set of positions in <see cref="ComparePos"/> order, or null when there are none.</summary>
+    public static BlockPos Lowest(IReadOnlyList<BlockPos> positions)
+    {
+        BlockPos best = null;
+        for (var i = 0; positions != null && i < positions.Count; i++)
+        {
+            if (positions[i] != null && (best == null || ComparePos(positions[i], best) < 0)) best = positions[i];
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// The chain two towers WOULD form if they were linked, without linking them. Rules that have to refuse
+    /// a link before the rope is spent - the store's capacity against the dearest trip on the result - need
+    /// the merged geometry, and this is the only place it can be ordered: the two towers each carry at most
+    /// one span (<see cref="RopewayLinkService.TryLink"/> refuses a full one), so each is an END of its own
+    /// chain and the merge is simply chain-from followed by chain-to. A tower with no line of its own is a
+    /// chain of one. Pure, and therefore tested.
+    /// </summary>
+    public static RopewayLine Preview(RopewayLine lineFrom, BlockPos from, RopewayLine lineTo, BlockPos to)
+    {
+        var towers = new List<BlockPos>();
+        towers.AddRange(JoiningAt(lineFrom, from, last: true));
+        towers.AddRange(JoiningAt(lineTo, to, last: false));
+        return FromTowers(towers);
+    }
+
+    /// <summary>One side of a <see cref="Preview"/>, oriented so the joining tower is the end that joins.</summary>
+    private static IReadOnlyList<BlockPos> JoiningAt(RopewayLine line, BlockPos tower, bool last)
+    {
+        if (line?.Towers == null || line.IndexOf(tower) < 0) return new[] { tower };
+
+        var chain = new List<BlockPos>(line.Towers);
+        if (chain[chain.Count - 1].Equals(tower) != last) chain.Reverse();
+        return chain;
     }
 
     /// <summary>

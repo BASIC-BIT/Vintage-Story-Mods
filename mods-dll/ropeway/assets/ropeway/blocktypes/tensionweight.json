@@ -1,0 +1,86 @@
+{
+  "code": "tensionweight",
+  "//mass": "Texture the drawn mass samples. BETensionWeight.BuildMass flat-samples ONE point of it, for the same reason the cable does - CubeMeshUtil scales UVs by the axis scale and anything leaving [0,1] samples the neighbouring atlas sprite. Keep comments OUT of \"textures\".",
+  "class": "BlockTensionWeight",
+  "entityClass": "TensionWeight",
+  "//nomechpower": "Deliberately NOT a mechanical power node. The towers are the consumers; this is what they wind. Putting it on the network would make its chunk part of the network's fullyLoaded test, which is exactly the chunk coupling the store exists to remove.",
+  "shape": {
+    "base": "ropeway:block/tensionweight"
+  },
+  "textures": {
+    "stone": {
+      "base": "game:block/stone/rock/granite1"
+    },
+    "metal": {
+      "base": "game:block/metal/sheet/iron1"
+    },
+    "mass": {
+      "base": "game:block/stone/rock/granite1"
+    }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Stone",
+  "creativeinventory": {
+    "general": [ "*" ],
+    "construction": [ "*" ]
+  },
+  "attributes": {
+    "handbook": {
+      "groupBy": [ "tensionweight" ]
+    },
+    "reinforcable": false,
+    "//capacity": "Blocks of travel the wound mass can hold. A CONSTANT and deliberately not a function of the line's length: RopewayLine.TotalLength is derived from which chunks are loaded, so a battery sized off it would walk the truncated-line failure class (docs/KNOWN-ISSUES.md R1-R4) straight into the power system. 400 funds a level 100-block round trip twice over, and a maxed 5-sail wood windmill fills it from empty in about four and a half minutes.",
+    "capacity": 400,
+    "//towerRadius": "How far from a tower footing this may be built. It binds to the nearest one at placement and serves that tower's whole line. 8 is close enough to read as part of the station and far enough to dodge the tower's own posts and archway.",
+    "towerRadius": 8,
+    "//massFloor": "Centre height of the drawn mass at empty charge, in blocks above this block's bottom face. massRise is how far it climbs to full. Both must stay inside the guide rails authored in shapes/block/tensionweight.json (2/16 to 46/16); the mass is 0.625 blocks tall, so the usable band for its centre is 0.44 to 2.56.",
+    "massFloor": 0.5,
+    "massRise": 2.0
+  },
+  "replaceable": 500,
+  "resistance": 4.5,
+  "lightAbsorption": 0,
+  "sidesolid": {
+    "all": false
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "collisionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 0.125,
+    "z2": 1
+  },
+  "selectionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 1,
+    "z2": 1
+  },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/rock-break-pickaxe",
+    "hit": "game:block/rock-hit-pickaxe",
+    "byTool": {
+      "Pickaxe": {
+        "hit": "game:block/rock-hit-pickaxe",
+        "break": "game:block/rock-break-pickaxe"
+      }
+    }
+  },
+  "guiTransform": {
+    "rotation": {
+      "x": -22.6,
+      "y": 45,
+      "z": 0
+    },
+    "scale": 0.6,
+    "rotate": true
+  }
+}

@@ -1,7 +1,7 @@
 # Power and energy storage — design direction
 
-**Status:** direction agreed, not built. Spans two mods (`ropeway` and `flywheelpower`), so if
-`flywheelpower` grows a docs home this belongs there as much as here.
+**Status:** built. Spans two mods (`ropeway` and `flywheelpower`), so if `flywheelpower` grows a docs
+home this belongs there as much as here.
 
 ## The decision
 
@@ -97,6 +97,43 @@ option-B design the trip's cost is deducted at departure, so a journey that star
 This is the strongest argument for storage over direct drive, and it is worth more than the realism
 argument: **it decouples movement from chunk-load state entirely.** Any future design that has the cabin
 read live network speed re-opens the whole class.
+
+## A trip is paid for once — the credit rule
+
+"Deducted at departure" is only half of the promise. The other half is that the cabin **carries what it
+bought**: `EntityRopewayCabin.paidTo` is the furthest point along the line the store has already funded,
+persisted with the rest of the trip state. `PayFor` is the only thing that writes it and
+`EntityRopewayCabin.Fare` is the whole rule:
+
+- a target **between the cabin and `paidTo`** is free — a rider changing their mind inside a journey the
+  store already funded, and the reach does not shrink to meet it;
+- a target **past `paidTo` the same way** pays only the leg beyond it;
+- a target **the other way** is a new trip, quoted in full. This clause is what stops the credit funding
+  unlimited travel: the covered stretch only ever shrinks as the cabin runs into it.
+
+Anything that stops the cabin short of that reach — a blocked span, an unloaded chunk, a save, the last
+loaded tower of a truncated chain — **keeps** it (`Hold(..., keepPaidTrip: true)`), so the held trip
+finishes out of an empty store. Without that, an interruption stranded a rider mid-span exactly the way a
+flat store was supposed to make impossible.
+
+**Unused credit is forfeited, never refunded.** Reaching the destination spends it; a chain that
+re-canonicalises under the cabin drops it, because `paidTo` is a distance on a scale that no longer exists
+and the store it came from may not be the store the cabin now belongs to. A refund would have to name a
+store, and at the one moment it matters there is no honest answer to which one.
+
+## A line that could never run is refused at link time
+
+The quote is `length + 2 x climb` against a **flat** capacity, so a line can sit inside `maxLineLength`
+and still carry a leg no full weight could ever pay for. `RopewayLinkService.TryLink` weighs
+`EntityRopewayCabin.WorstTripCost` — every tower pair, both ways, on the merged geometry
+(`RopewayLine.Preview`) — against the store's capacity and refuses **before the rope is spent**. The
+worst pair is not always the end-to-end one: a line that climbs and then falls quotes its net climb end
+to end while the uphill half on its own is dearer.
+
+The runtime refusal keeps a matching pair of sentences for lines built before that gate: `NoPower` is
+"not wound far enough **yet**", a wait; `TooDear` is "more than a weight can ever hold", which is not.
+`RopewayAssetContractTests.AFullWeightCanPayForTheLongestLineThatCanBeBuilt` is what keeps `capacity` and
+`maxLineLength` from drifting apart in their separate JSON files.
 
 ## Also queued
 

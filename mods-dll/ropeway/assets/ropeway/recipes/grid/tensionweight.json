@@ -1,0 +1,12 @@
+{
+  "//": "A frame and a heavy mass, and nothing beyond what a tower already costs. This is the one-time per-LINE part of the drive, so it may be a real object - but DECISIONS.md 3 is about the MARGINAL cost of a pylon, and there is no reason for the line's battery to gate anything the towers do not. Stone for the mass, planks for the guide, one metal bit for the winding gear.",
+  "ingredientPattern": "MSM,PSP,PSP",
+  "ingredients": {
+    "S": { "type": "item", "code": "game:stone-*", "name": "rock" },
+    "P": { "type": "item", "code": "game:plank-*", "name": "wood" },
+    "M": { "type": "item", "code": "game:metalbit-*", "name": "metal" }
+  },
+  "width": 3,
+  "height": 3,
+  "output": { "type": "block", "code": "tensionweight", "quantity": 1 }
+}

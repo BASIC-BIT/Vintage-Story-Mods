@@ -42,9 +42,97 @@ public class RopewayAssetContractTests
     [InlineData("blocktypes/pylonbase.json", "pylonbase")]
     [InlineData("blocktypes/pylonhead.json", "pylonhead")]
     [InlineData("blocktypes/brace.json", "brace")]
+    [InlineData("blocktypes/tensionweight.json", "tensionweight")]
     public void CodesTheGameplayCodeHardcodesExist(string file, string expectedCode)
     {
         Assert.Equal(expectedCode, Load(file.Split('/')).GetProperty("code").GetString());
+    }
+
+    /// <summary>
+    /// The mechanical power hookup, all of which is JSON that C# cannot check for itself.
+    /// <para>
+    /// <c>mechPartShape: null</c> is the one that has to be asserted rather than trusted:
+    /// <c>BEBehaviorMPBase.Initialize</c> defaults <c>Shape</c> to <c>Block.Shape</c> and then
+    /// UNCONDITIONALLY calls <c>AddDeviceForRender</c>, so dropping this key does not fail, it puts the
+    /// whole footing model into the instanced spinning renderer and the player's foundation stone starts
+    /// rotating. An explicit JSON null is what makes <c>AsObject</c> return null - a missing key returns
+    /// the default instead - so the key must be present AND null.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ThePylonFootingDeclaresTheVanillaMPConsumerBehaviour()
+    {
+        var behaviors = Load("blocktypes", "pylonbase.json").GetProperty("entityBehaviors").EnumerateArray().ToList();
+        var consumer = behaviors.Single(b => b.GetProperty("name").GetString() == "MPConsumer");
+
+        var properties = consumer.GetProperty("properties");
+        Assert.True(properties.TryGetProperty("mechPartShape", out var shape), "mechPartShape must be present");
+        Assert.Equal(JsonValueKind.Null, shape.ValueKind);
+
+        // The behaviour's own default is 0.1. BEPylonBase rewrites this every second, so what the JSON
+        // pins is the state a footing is in before its first tick - which must be the idle one, or a fresh
+        // chunk load taxes the network for a second on every tower of a long line.
+        Assert.Equal(RopewayPower.IdleResistance, properties.GetProperty("resistance").GetSingle(), 4);
+    }
+
+    [Fact]
+    public void TheTensionWeightCarriesTheAttributesItsBlockEntityReads()
+    {
+        var block = Load("blocktypes", "tensionweight.json");
+        Assert.Equal("BlockTensionWeight", block.GetProperty("class").GetString());
+        Assert.Equal("TensionWeight", block.GetProperty("entityClass").GetString());
+
+        var attributes = block.GetProperty("attributes");
+        Assert.Equal(RopewayPower.DefaultCapacity, attributes.GetProperty("capacity").GetDouble());
+        Assert.True(attributes.GetProperty("towerRadius").GetDouble() > 0);
+
+        // The drawn mass is the gauge, and it has to stay inside the guide rails authored in the shape
+        // (2/16 to 46/16) at every charge level. Half the mass's own height is 0.3125.
+        var floor = attributes.GetProperty("massFloor").GetDouble();
+        var rise = attributes.GetProperty("massRise").GetDouble();
+        Assert.True(floor - 0.3125 >= 2 / 16.0, $"an empty weight sinks through its own pad: {floor}");
+        Assert.True(floor + rise + 0.3125 <= 46 / 16.0, $"a full weight pokes out the top of its guide: {floor + rise}");
+    }
+
+    /// <summary>
+    /// The two constants that have to be read together, in the one place that can see both: a store that
+    /// cannot pay for the longest line the game will let you BUILD is a ropeway you are invited to
+    /// construct and then permanently refused, while the refusal says "not wound far enough yet" and the
+    /// panel shows a full weight. They live in different files, so nothing but this notices them drifting.
+    /// <para>
+    /// The level line is the floor, not the whole story: the surplus is the climb budget, and a line that
+    /// spends more than that is refused at LINK time by RopewayLinkService.TryLink rather than at the
+    /// departure gate. Shrink the surplus to nothing and every uphill line becomes unbuildable.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void AFullWeightCanPayForTheLongestLineThatCanBeBuilt()
+    {
+        var maxLineLength = Load("blocktypes", "pylonbase.json")
+            .GetProperty("attributes").GetProperty("maxLineLength").GetDouble();
+        var capacity = Load("blocktypes", "tensionweight.json")
+            .GetProperty("attributes").GetProperty("capacity").GetDouble();
+
+        var level = RopewayPower.Quote(maxLineLength, 0);
+        Assert.True(capacity >= level,
+            $"a full weight holds {capacity} and a level line of the maximum {maxLineLength} blocks costs {level}: " +
+            "the longest line the game permits could never be run in either direction.");
+
+        // What the surplus buys, spelled out so shaving it is a decision rather than an accident.
+        var climbBudget = (capacity - level) / RopewayPower.RiseSurcharge;
+        Assert.True(climbBudget >= 25,
+            $"only {climbBudget} blocks of climb are affordable on a full-length line; anything steeper is refused at link time.");
+    }
+
+    /// <summary>
+    /// A weight that is not on the mechanical network is a deliberate decision, not an omission: putting it
+    /// on one would drag its chunk into that network's <c>fullyLoaded</c> test, which is exactly the chunk
+    /// coupling the store exists to remove.
+    /// </summary>
+    [Fact]
+    public void TheTensionWeightIsNotAMechanicalPowerNode()
+    {
+        Assert.False(Load("blocktypes", "tensionweight.json").TryGetProperty("entityBehaviors", out _));
     }
 
     /// <summary>
@@ -58,6 +146,7 @@ public class RopewayAssetContractTests
     [InlineData("blocktypes/pylonbase.json")]
     [InlineData("blocktypes/pylonhead.json")]
     [InlineData("blocktypes/brace.json")]
+    [InlineData("blocktypes/tensionweight.json")]
     [InlineData("entities/cabin.json")]
     [InlineData("itemtypes/haulrope.json")]
     [InlineData("itemtypes/cabin.json")]
@@ -626,12 +715,14 @@ public class RopewayAssetContractTests
             Assert.True(slot.GetProperty("emptyInteractPassThrough").GetBoolean(),
                 $"{slot.GetProperty("attachmentPointCode").GetString()} would swallow the click that boards the cabin");
 
-            // Basket only. Not the chest (16 mixed slots against a basket's 8 - a gondola is not a
-            // warehouse), and not the crate: BlockCrate carries CollectibleBehaviorBoatableCrate, which
+            // Vanilla's own cargo list minus the crate. boat-sailed.json:143 and :178 read
+            // ["seat", "chest", "basket", "crate"] and these benches are those squares; basket and chest
+            // both carry BoatableGenericTypedContainer, a HeldBag subclass that overrides only
+            // GetQuantitySlots, so both answer the same verb and the interaction help stays true of both.
+            // The crate is the one exclusion: BlockCrate carries CollectibleBehaviorBoatableCrate, which
             // overrides OnInteract without calling base, so a crate has no dialog at all - a plain click
-            // takes one item out and Ctrl empties it AND detaches it in the same click. One container, one
-            // verb, one true line of interaction help.
-            Assert.Equal(new[] { "basket" },
+            // takes one item out and Ctrl empties it AND detaches it in the same click.
+            Assert.Equal(new[] { "basket", "chest" },
                 slot.GetProperty("forCategoryCodes").EnumerateArray().Select(c => c.GetString()).ToArray());
         }
 

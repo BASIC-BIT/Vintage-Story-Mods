@@ -8,6 +8,16 @@
       "name": "HorizontalOrientable"
     }
   ],
+  "//entityBehaviors": "MPConsumer is registered by vanilla (SurvivalCoreSystem), so the mod registers nothing for it. mechPartShape null is MANDATORY, not decoration: BEBehaviorMPBase.Initialize defaults Shape to Block.Shape and then unconditionally calls AddDeviceForRender, so without it the whole footing model joins the instanced spinning renderer and the player's foundation stone rotates. resistance is the schedule's floor - BEPylonBase rewrites it every second to RopewayPower.WindingResistance while there is a store left to wind and back to IdleResistance when there is not.",
+  "entityBehaviors": [
+    {
+      "name": "MPConsumer",
+      "properties": {
+        "resistance": 0.005,
+        "mechPartShape": null
+      }
+    }
+  ],
   "variantgroups": [
     {
       "code": "side",

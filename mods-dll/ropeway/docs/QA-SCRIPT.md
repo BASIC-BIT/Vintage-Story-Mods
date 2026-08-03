@@ -532,8 +532,8 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     Craft or `/giveblock` two **reed baskets** — the block code is `stationarybasket-north`, *not*
     `stationarybasket-reed-north`: the basket's only variantgroup is `side`, and reed/papyrus/vine is a
     stack **attribute** with `defaultType: "reed"`. Park a cabin at a tower.
-    You will also want a **crate** (code `crate` — it has no variantgroups at all) and a **chest** for the
-    two refusal checks in 26a.
+    You will also want a **chest** (code `chest-north`, `normal-generic`) for the second half of 26a and a
+    **crate** (code `crate` — it has no variantgroups at all) for the one refusal check.
 
     **26a — attach.** Hold the basket, **Ctrl** and right-click one of the two benches.
     **PASS:** the basket appears sitting on that bench, centred on it, and the place sound plays. The
@@ -544,12 +544,21 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     **FAIL:** a crash or a red error line while merely *looking* at the cabin — that is the
     `wearableSlots` / `selectionBoxes` index alignment (`RopewayAssetContractTests`
     `TheCargoSlotsAreTheBenchesAndIndexAlignWithTheSelectionBoxes`) having drifted.
-    Try a **chest**: **PASS:** it refuses — deliberately, a gondola is not a warehouse.
-    Try a **crate**: **PASS:** it refuses too. This one is not about capacity — a crate carries
+    Now the same with a **chest**, on the other bench. **PASS:** it attaches, exactly as the basket did,
+    and a plain right-click opens the same floaty slot grid — a chest carries the same
+    `BoatableGenericTypedContainer` behaviour a basket does. **FAIL:** it refuses — `forCategoryCodes` has
+    been narrowed back to `["basket"]` and the cabin is again deviating from vanilla's own cargo list.
+    **PASS (geometry):** on the **rear** bench the chest sits flush to the inner face of the east end wall
+    and clears the roof by 7 units; its two rope handles poke a unit past that face into the open window
+    band, which is expected and documented on `//cargorear`. **FAIL:** the chest's body passes through the
+    end wall or the roof.
+    Try a **crate**: **PASS:** it refuses. This is not about capacity — a crate carries
     `CollectibleBehaviorBoatableCrate`, which overrides `OnInteract` without calling `base`, so it has no
     dialog on a mount at all and Ctrl + right-click would empty it *and* detach it in the same click.
-    **FAIL:** the crate attaches — `forCategoryCodes` has been widened back to `["basket", "crate"]` and
+    **FAIL:** the crate attaches — `forCategoryCodes` has been widened back to include `"crate"` and
     every freight string in the mod now lies about the verb.
+    A **trunk chest** (`chest-trunk-north`) will also attach and then open nothing. Known, inherited from
+    vanilla — see `docs/KNOWN-ISSUES.md` — not a failure of this step.
 
     **26b — the bench is now freight, not a seat.** Right-click the loaded bench with an empty hand.
     **PASS:** the cargo dialog opens (a floaty slot grid on the cabin, not the chest GUI); you do **not**
@@ -611,6 +620,7 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     so these two commands are covered.
 
     **26i — handbook and guide.** `H` → Ropeway → *Building a Line*: **PASS:** the **Carrying freight**
-    section is there and says two loads, or one load and one passenger, and it names the **basket** as the
-    only container that fits. Sneak + right-click a footing: **PASS:** the guide's closing paragraph names
-    the Ctrl verb and the "cannot be sat on" rule. **FAIL:** any of these still offers the crate.
+    section is there and says two loads, or one load and one passenger, and it names the **basket** and the
+    **chest** as what fits. Sneak + right-click a footing: **PASS:** the guide's closing paragraph names
+    both containers, the Ctrl verb and the "cannot be sat on" rule. **FAIL:** any of these still offers the
+    crate, or still claims the basket is the only container that fits.

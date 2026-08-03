@@ -1,0 +1,69 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "stone": "game:block/stone/rock/granite1",
+    "metal": "game:block/metal/sheet/iron1"
+  },
+  "elements": [
+    {
+      "//": "Foundation pad. The only part of this block that is inside its own cell - everything above is the guide, and the mass that slides up it is drawn by BETensionWeight.BuildMass rather than authored here, because its height IS the gauge.",
+      "name": "pad",
+      "from": [ 0.0, 0.0, 0.0 ],
+      "to": [ 16.0, 2.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 2.0 ] },
+        "east": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 2.0 ] },
+        "south": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 2.0 ] },
+        "west": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 2.0 ] },
+        "up": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 16.0 ] },
+        "down": { "texture": "#stone", "uv": [ 0.0, 0.0, 16.0, 16.0 ] }
+      }
+    },
+    {
+      "//": "West guide rail. The mass is half a block wide, so it runs 4..12 and the two rails bracket it exactly.",
+      "name": "railwest",
+      "from": [ 2.0, 2.0, 7.0 ],
+      "to": [ 4.0, 46.0, 9.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [ 2.0, 0.0, 4.0, 16.0 ] },
+        "east": { "texture": "#metal", "uv": [ 7.0, 0.0, 9.0, 16.0 ] },
+        "south": { "texture": "#metal", "uv": [ 2.0, 0.0, 4.0, 16.0 ] },
+        "west": { "texture": "#metal", "uv": [ 7.0, 0.0, 9.0, 16.0 ] },
+        "up": { "texture": "#metal", "uv": [ 2.0, 7.0, 4.0, 9.0 ] },
+        "down": { "texture": "#metal", "uv": [ 2.0, 7.0, 4.0, 9.0 ] }
+      }
+    },
+    {
+      "name": "raileast",
+      "from": [ 12.0, 2.0, 7.0 ],
+      "to": [ 14.0, 46.0, 9.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [ 12.0, 0.0, 14.0, 16.0 ] },
+        "east": { "texture": "#metal", "uv": [ 7.0, 0.0, 9.0, 16.0 ] },
+        "south": { "texture": "#metal", "uv": [ 12.0, 0.0, 14.0, 16.0 ] },
+        "west": { "texture": "#metal", "uv": [ 7.0, 0.0, 9.0, 16.0 ] },
+        "up": { "texture": "#metal", "uv": [ 12.0, 7.0, 14.0, 9.0 ] },
+        "down": { "texture": "#metal", "uv": [ 12.0, 7.0, 14.0, 9.0 ] }
+      }
+    },
+    {
+      "//": "Head beam, three blocks up. Where the winding gear bears - the top of the mass's travel is 0.1 blocks under it at full charge, so a full weight reads as full without needing the number.",
+      "name": "head",
+      "from": [ 1.0, 46.0, 6.0 ],
+      "to": [ 15.0, 48.0, 10.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [ 1.0, 0.0, 15.0, 2.0 ] },
+        "east": { "texture": "#metal", "uv": [ 6.0, 0.0, 10.0, 2.0 ] },
+        "south": { "texture": "#metal", "uv": [ 1.0, 0.0, 15.0, 2.0 ] },
+        "west": { "texture": "#metal", "uv": [ 6.0, 0.0, 10.0, 2.0 ] },
+        "up": { "texture": "#metal", "uv": [ 1.0, 6.0, 15.0, 10.0 ] },
+        "down": { "texture": "#metal", "uv": [ 1.0, 6.0, 15.0, 10.0 ] }
+      }
+    }
+  ]
+}

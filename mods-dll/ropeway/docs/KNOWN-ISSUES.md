@@ -222,20 +222,31 @@ fixed — it is the guard being put where all the callers actually meet.
   `AttachableInteractionHelp` subscripts `wearableSlots` with the *selection box* index, so a divergent
   pair of lists throws while you merely look at the cabin. boat-raft.json:84 warns modders about this in
   as many words.
-- **Baskets only — not crates, and not chests.** The crate was on the list until 2026-08-03 and came off
-  on a *verb* argument, not a capacity one. `BlockCrate` does not carry `CollectibleBehaviorHeldBag`; it
-  carries `CollectibleBehaviorBoatableCrate`, which overrides `OnInteract` outright and never calls `base`,
-  so **a crate on a mount has no dialog at all**. Plain right-click takes one item out; shift puts one in;
-  Ctrl + right-click empties the first stack **and detaches the emptied crate in the same click**; sprint
-  does nothing. A basket carries `BoatableGenericTypedContainer`, which subclasses `HeldBag` and overrides
-  only `GetQuantitySlots`, so it inherits the base `OnInteract` and opens the floaty slot grid. Supporting
-  both would mean four user-facing strings and two QA steps that have to name two different verbs, and one
-  of those verbs is a no-confirmation footgun. One container, one verb.
-  The old capacity argument here was also **backwards** and is gone: a crate is 16 slots aged, 20 for most
-  woods, 25 for ebony and purpleheart (`crate.json` `attributes.properties`), so two crates was 40 slots
-  against a chest's 16. Against a basket's 8 the chest exclusion is honest, and that is the only form of
-  the argument that survives. Slot counts come from the container, so the category list is still the only
-  capacity knob we own.
+- **Baskets and chests — not crates.** `["basket", "chest"]` is vanilla's own cargo list minus the crate:
+  boat-sailed.json:143 and :178, the two deck squares that carry no `ropetiepost`, read
+  `["seat", "chest", "basket", "crate"]`, and this cabin's benches are those squares. The **crate** came off
+  on 2026-08-03 on a *verb* argument, and that one stands: `BlockCrate` does not carry
+  `CollectibleBehaviorHeldBag`; it carries `CollectibleBehaviorBoatableCrate`, which overrides `OnInteract`
+  outright and never calls `base`, so **a crate on a mount has no dialog at all**. Plain right-click takes
+  one item out; shift puts one in; Ctrl + right-click empties the first stack **and detaches the emptied
+  crate in the same click**; sprint does nothing. One container verb, one true line of interaction help.
+  The **chest** was off the list too until 2026-08-03, on the capacity argument "16 mixed slots against a
+  basket's 8, and a gondola is not a warehouse". That was taste written up as a rule and an unrequested
+  deviation from vanilla, so it is gone. A chest carries the same `BoatableGenericTypedContainer` a basket
+  does — both subclass `HeldBag`, both override only `GetQuantitySlots` — so both answer the same verb and
+  open the same floaty slot grid. Slot counts are the container's business.
+  Category codes, read off the blocktypes rather than assumed: `"crate"` is hardcoded in
+  `BlockCrate.GetCategoryCode`; `"basket"` is `reedchest.json`'s `attachableCategoryCode` for reed, papyrus
+  and vine (`aged`/`aged2` are `null` there and do not attach at all); `"chest"` is declared **nowhere** —
+  `chest.json` has no `attachableCategoryCode` key, so `BlockGenericTypedContainer.GetCategoryCode` falls
+  through to its `AsString("chest")` default.
+- **A trunk chest attaches and then does nothing, and that is vanilla's behaviour, not ours.**
+  `chest-trunk` is a `BlockGenericTypedContainer` subclass with no `attachableCategoryCode`, so it reports
+  `"chest"` and passes the category filter — but its `behaviors` list has no
+  `BoatableGenericTypedContainer`, so it has no `IHeldBag` and a plain right-click on it opens nothing. It
+  attaches, blocks the bench, and comes straight back off with Ctrl. Vanilla's sailed boat accepts it on
+  exactly the same terms; filtering it out here would mean inventing a rule vanilla does not have, so it is
+  recorded rather than fixed.
 - **`dropContentsOnDeath` is deliberately absent**, and its assertion is now that it stays absent. It was
   the one real dupe vector: on `Die(Death)` vanilla runs `EntityBehaviorContainer.OnEntityDeath` (drops the
   container itemstack **with its `backpack` tree intact**) *and* `CollectibleBehaviorHeldBag.OnEntityDespawn`
@@ -246,7 +257,7 @@ fixed — it is the guard being put where all the callers actually meet.
 - **Cargo spills on teardown; it does not ride inside the cabin item.** Handing back a *loaded* container
   would be a silent destroyer: `BlockEntityGenericTypedContainer.OnBlockPlaced` reads only `type` and
   `isPerPlayer` off the placed stack and then calls `base.OnBlockPlaced(null)`, so the `backpack` tree
-  goes in the bin the moment the player puts the basket down. Vanilla never meets this because
+  goes in the bin the moment the player puts the container down. Vanilla never meets this because
   `OnTryDetach` refuses to let a player pull a loaded container off a mount at all — a guard the unload path
   does not route through. So `UnloadCargo` hands out the goods, clears the container, hands out the
   emptied container, and only then clears the slot. Player inventory first, ground under the cabin
@@ -274,7 +285,7 @@ fixed — it is the guard being put where all the callers actually meet.
   player at all. **Not a dupe either way:** a stale dialog cannot move items, because
   `OnReceivedClientPacket:435-451` only dispatches on a non-null `Itemstack`.
 - **Nothing gates cargo on the cabin moving, and that is recorded rather than fixed.**
-  `RopewayCabinSeat.CanUnmount` refuses while the cabin moves; attach, detach and opening a basket have no
+  `RopewayCabinSeat.CanUnmount` refuses while the cabin moves; attach, detach and opening a container have no
   equivalent, so a player at a tower can strip a bench off a cabin passing through, or load one, from the
   ground. Riding-and-opening is intended (QA 26d) and is the case a naive `IsMoving` guard would also break,
   so the gate would have to tell a rider from an outsider — more code and a second rule to explain than a

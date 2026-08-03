@@ -63,12 +63,14 @@ public sealed class RopewayLinkService
         if (cabin.EntityId != packet.CabinEntityId) return;
 
         var line = RopewayLine.GetOrBuild(modSystem, cabin.LineKey);
-        if (cabin.RequestStop(line, fromPlayer.PlayerUID, out var tower) != CabinCall.Called)
+        var outcome = cabin.RequestStop(line, fromPlayer.PlayerUID, out var tower);
+        if (outcome != CabinCall.Called)
         {
             // One message for every refusal there is - a truncated line, a chain that just re-canonicalised,
             // a two-tower line the cabin is standing on the far end of. Silence is what made the controls
-            // look absent in the first place, so an unhelpful answer still beats none.
-            fromPlayer.SendIngameError("ropeway-no-stop", Lang.Get("ropeway:err-no-stop"));
+            // look absent in the first place, so an unhelpful answer still beats none. The two power
+            // refusals get their own, because they are the only ones the player can do something about.
+            SendPowerRefusal(fromPlayer, outcome, "ropeway-no-stop", "ropeway:err-no-stop");
             return;
         }
 
@@ -102,7 +104,8 @@ public sealed class RopewayLinkService
                 return;
             }
 
-            switch (cabin.CallTo(line, pos, player.PlayerUID))
+            var outcome = cabin.CallTo(line, pos, player.PlayerUID);
+            switch (outcome)
             {
                 case CabinCall.Called:
                     // Bearing from the cabin to the tower, for an unnamed one: it says which way the thing
@@ -117,6 +120,13 @@ public sealed class RopewayLinkService
                 case CabinCall.AlreadyHere:
                     player.SendIngameError("ropeway-cabin-here", Lang.Get("ropeway:err-cabin-here"));
                     return;
+
+                case CabinCall.NoStore:
+                case CabinCall.StoreUnreachable:
+                case CabinCall.NoPower:
+                case CabinCall.TooDear:
+                    SendPowerRefusal(player, outcome, null, null);
+                    return;
             }
 
             // Unreachable. On a truncated line that is why, and saying so beats opening a picker that is
@@ -129,6 +139,21 @@ public sealed class RopewayLinkService
         }
 
         SendCandidates(player, pos);
+    }
+
+    /// <summary>
+    /// The one place a power refusal turns into words, shared by the ground call and the rider's stop key
+    /// so the two cannot drift. "No tension weight" and "not wound enough yet" are different problems with
+    /// different fixes - one is a block you have not built, the other is a wait - and reporting either as
+    /// the generic refusal is what makes a required-power design feel broken rather than merely unpowered.
+    /// <paramref name="fallbackCode"/> null means the caller has its own handling for everything else.
+    /// </summary>
+    private static void SendPowerRefusal(IServerPlayer player, CabinCall outcome, string fallbackCode, string fallbackLangKey)
+    {
+        var refusal = EntityRopewayCabin.Refusal(outcome);
+
+        if (refusal.Code != null) player.SendIngameError(refusal.Code, Lang.Get(refusal.Ground));
+        else if (fallbackCode != null) player.SendIngameError(fallbackCode, Lang.Get(fallbackLangKey));
     }
 
     public void SendCandidates(IServerPlayer player, BlockPos from)
@@ -199,6 +224,10 @@ public sealed class RopewayLinkService
         var lineFrom = RopewayLine.GetOrBuild(modSystem, from);
         var lengthFrom = lineFrom?.TotalLength ?? 0;
 
+        // TryLink is the authority and re-checks this against the merged line's own weight; here it only
+        // has to keep a row off the picker that the click would refuse.
+        var capacity = StoreCapacity(lineFrom) ?? RopewayPower.DefaultCapacity;
+
         var near = new List<KeyValuePair<double, BlockPos>>();
         foreach (var entry in modSystem.LoadedTowers)
         {
@@ -227,6 +256,7 @@ public sealed class RopewayLinkService
             var lineTo = RopewayLine.GetOrBuild(modSystem, pos);
             if (lineTo?.Truncated == true) continue;
             if (lengthFrom + (lineTo?.TotalLength ?? 0) + span > be.MaxLineLength) continue;
+            if (EntityRopewayCabin.WorstTripCost(RopewayLine.Preview(lineFrom, from, lineTo, pos)) > capacity) continue;
             if (!SpanMath.IsSpanClear(sapi.World, anchorFrom, SpanMath.AnchorOf(pos), out _)) continue;
 
             result.Add(new TowerCandidate
@@ -313,6 +343,21 @@ public sealed class RopewayLinkService
         if ((lineFrom?.TotalLength ?? 0) + (lineTo?.TotalLength ?? 0) + span > beFrom.MaxLineLength)
         {
             player.SendIngameError("ropeway-line-too-long", Lang.Get("ropeway:err-line-too-long", (int)beFrom.MaxLineLength));
+            return false;
+        }
+
+        // The store's capacity is a flat number while a quote is length + 2 x climb, so a line can sit well
+        // inside maxLineLength and still carry a leg no FULL weight could ever pay for - permanently
+        // unrunnable in that direction, with nothing at runtime able to fix it and the refusal telling the
+        // player to wait for wind that will never be enough. Link time is the last moment they can still
+        // act, and this sits above the mutation line, so it costs them nothing but the click.
+        var capacity = StoreCapacity(lineFrom) ?? StoreCapacity(lineTo) ?? RopewayPower.DefaultCapacity;
+        var worst = EntityRopewayCabin.WorstTripCost(RopewayLine.Preview(lineFrom, from, lineTo, to));
+        if (worst > capacity)
+        {
+            player.SendIngameError(
+                "ropeway-line-too-steep",
+                Lang.Get("ropeway:err-line-too-steep", (int)Math.Ceiling(worst), (int)Math.Round(capacity)));
             return false;
         }
 
@@ -459,6 +504,16 @@ public sealed class RopewayLinkService
         var peers = be.Spans.ToArray();
         var anchor = SpanMath.AnchorOf(pos);
         var refund = 0;
+
+        // The weight bound to THIS tower is about to lose its anchor, and an orphaned weight is a line with
+        // no store at all - every StoreOn returns null and the only recovery was breaking and replacing the
+        // block. Re-bind it to a surviving peer: that is the same line minus one tower, so it cannot
+        // silently re-home the weight to somebody else's ropeway the way re-deriving by proximity would.
+        // Lowest position when a mid-line break leaves two halves, so which half inherits the store is the
+        // same after a reload as before it. A tower with no spans at all early-returned above: there is
+        // nothing left to bind to, and the block-info panel already says the weight is orphaned. The weight
+        // stands within towerRadius of the footing, so its chunk is loaded whenever the tower's is.
+        BETensionWeight.StoreAt(modSystem, pos)?.Bind(RopewayLine.Lowest(peers));
 
         foreach (var peer in peers)
         {
@@ -669,6 +724,16 @@ public sealed class RopewayLinkService
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// The capacity of the weight already serving a line, or null when it has none. A line usually has no
+    /// weight yet while it is being built, which is why every caller falls back to the blocktype's default:
+    /// a link gate that only bound lines that already had a store would gate nothing at all.
+    /// </summary>
+    private double? StoreCapacity(RopewayLine line)
+    {
+        return BETensionWeight.StoreOn(modSystem, line)?.Capacity;
     }
 
     private BEPylonBase TowerAt(BlockPos pos)
