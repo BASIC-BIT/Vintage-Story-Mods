@@ -19,6 +19,17 @@
         { "apName": "Seat2AP", "controllable": false, "bodyYawLimit": 1.5707963, "eyeHeight": 1.0, "animation": "sitboatidle", "riderOffset": { "x": -0.5 } }
       ]
     },
+    "//attachable": "FREIGHT. Vanilla's own mechanism, wholesale: EntityBehaviorAttachable holds the container as an ITEM in its own inventory, CollectibleBehaviorHeldBag (already on every vanilla basket and crate) owns the goods inside that itemstack's `backpack` tree, and AttachedContainerWorkspace opens GuiDialogCreatureContents. No inventory of our own, no dialog of our own, no new persistence surface - the whole lot rides in Entity.WatchedAttributes under the key \"wearablesInv\", which Entity.ToBytes writes unconditionally and Entity.FromBytes reads before the behavior loop. The base key, not \"rideableaccessories\": that subclass only gates EntityBehaviorRideable's CanRide/CanTurn on a saddle, and this cabin has no such behavior, so it would be a literal no-op.",
+    "//attachable-slots": "TWO, one per bench, and the slot IS the bench - each wearable slot hangs off a seat's own attachment point, which is boat-raft.json's pattern (:53-85) rather than the sailed boat's eight deck squares. Three things fall out of that and all three are wanted. (1) Freight COMPETES with passengers: EntityBehaviorSeatable.CanSitOn (:258-282) refuses a seat whose attachable slot holds something that is not a saddle and declares no seatConfig, so a loaded bench cannot be sat on and a loaded cabin is a goods cabin. That is the whole historical point - material ropeways hauled ore, not people. (2) The click target and the thing you see coincide: the selection box comes from the AP's own element, so you Ctrl-click the bench you are loading. (3) selectionBoxes and wearableSlots stay index-aligned, which boat-raft.json:84 warns about by name - AttachableInteractionHelp indexes wearableSlots with the SELECTION BOX index, so a list that diverges throws while you merely LOOK at the cabin. emptyInteractPassThrough is what keeps an empty bench boardable: EntityBehaviorAttachable.OnInteract (:180-184) hands the click straight back to seatable.",
+    "//attachable-capacity": "BASKET ONLY. Not chest, and - since 2026-08-03 - not crate either, and the crate is the interesting half. It is NOT a slot-count argument: a crate is 16 slots aged, 20 for most woods and 25 for ebony and purpleheart (crate.json attributes.properties), so two crates is 40 against a chest's 16 and excluding the chest on capacity was measurably backwards. It is a VERB argument. BlockCrate does not carry CollectibleBehaviorHeldBag, it carries CollectibleBehaviorBoatableCrate, which overrides OnInteract outright and never calls base - there is no dialog on a crate at all. On a boat, and so on this cabin, a crate answers a plain right-click by taking ONE item out, shift by putting one in, and Ctrl by emptying the whole first stack AND detaching the emptied crate in the same click, which is a footgun with no confirmation and no undo. A basket carries BoatableGenericTypedContainer, which subclasses HeldBag and overrides only GetQuantitySlots, so it inherits the base OnInteract and opens the floaty slot grid. One container, one verb, one line of interaction help that is true. The chest stays out on capacity, and against a basket that argument now holds: 8 slots against 16 mixed. \"basket\" is what BlockGenericTypedContainer.GetCategoryCode returns for reed, papyrus and vine (reedchest.json:45-51). Put \"crate\" back and lang entityhelp-cargo, dlg-guide-body, handbook 51 and QA 26b/26c all become lies about the verb.",
+    "//attachable-death": "dropContentsOnDeath is deliberately ABSENT. It was the one real dupe vector here: on Die(Death) vanilla runs both EntityBehaviorContainer.OnEntityDeath - which drops the container itemstack with its `backpack` tree intact - and CollectibleBehaviorHeldBag.OnEntityDespawn, which spawns every content stack loose. Vanilla escapes because placing a container discards the tree (BlockEntityGenericTypedContainer.OnBlockPlaced), but re-attaching that same container to another cabin or a boat keeps it, and the goods then exist twice. EntityRopewayCabin.Die unloads on every reason including Death, so the flag bought nothing the unload path does not already do.",
+    "attachable": {
+      "wearableSlots": [
+        { "code": "Fore Bench", "forCategoryCodes": [ "basket" ], "attachmentPointCode": "SeatAP", "stepParentTo": { "": { "elementName": "cargofront" } }, "emptyInteractPassThrough": true },
+        { "code": "Aft Bench", "forCategoryCodes": [ "basket" ], "attachmentPointCode": "Seat2AP", "stepParentTo": { "": { "elementName": "cargorear" } }, "emptyInteractPassThrough": true }
+      ]
+    },
+    "//attachable-order": "attachable sits between selectionboxes and seatable in BOTH the client and the server behavior list, exactly where boat-sailed.json:397-398 and :407-408 put it. Entity.OnInteract walks SidedProperties.Behaviors in list order and breaks on PreventSubsequent, so behind seatable the cargo click never arrives; and off the SERVER list entirely, ToBytes/FromBytes never run for it (Entity.cs:2346, :2307) and the cargo vanishes on reload with no error. The selectionBoxes list below is the other half of that contract: AttachableInteractionHelp.GetOrCreateInteractionHelp is handed the SELECTION BOX index and uses it to subscript wearableSlots, so the two lists must name the same APs in the same order. They do, because the cargo slots ARE the seats.",
     "selectionboxes": {
       "selectionBoxes": [ "SeatAP", "Seat2AP" ]
     }
@@ -30,6 +41,7 @@
     "behaviors": [
       { "code": "selectionboxes" },
       { "code": "interpolateposition" },
+      { "code": "attachable" },
       { "code": "seatable" },
       { "code": "repulseagents", "movable": false }
     ],
@@ -46,6 +58,7 @@
   "server": {
     "behaviors": [
       { "code": "selectionboxes" },
+      { "code": "attachable" },
       { "code": "seatable" },
       { "code": "repulseagents", "movable": false }
     ]

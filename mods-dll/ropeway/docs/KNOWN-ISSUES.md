@@ -197,6 +197,93 @@ three blockers and the mount race were fixed in the same pass; these five were j
 
 Not fixed. The cheap options, in order of preference: warn (do not refuse) at link time when a tower's `PassageFacing` is far off the span bearing; or say it in the block-info panel; or auto-face the footing to its first span. Any of them is small; none is done.
 
+## Freight (2026-08-03) — what it is, and what it deliberately does not do
+
+Cargo is vanilla's `attachable` + `CollectibleBehaviorHeldBag` + `AttachedContainerWorkspace`, wholesale.
+There is no inventory, no dialog and no persistence surface of our own; the only C# is
+`EntityRopewayCabin.UnloadCargo`, and it exists solely because vanilla's only unprompted drop is gated on
+`EnumDespawnReason.Death` while every way this cabin goes away despawns with `Removed`.
+
+It hangs off **`Entity.Die`, not `DropAndDie`**. An earlier note here claimed all three removal paths funnel
+through `DropAndDie` "so this is fixed once and no call site is patched" — true of the *mod's* paths
+(`RopewayLinkService.TryUnlink`, `UnlinkAll`, `ServerTick`'s `gone` backstop) and false of the *game's*:
+`/entity remove` (`CmdEntity.cs:213`, `:230`, `:727`) and WorldEdit entity removal
+(`BlockAccessorRevertable.cs:401`, `:490`) call `Die(Removed)` straight, and `/entity kill` calls
+`Die(Death)`. Overriding `Die` is the same number of lines and covers every caller. Admin commands deleting
+entities is normal and the cabin item was already lost on those paths, so this is not a regression being
+fixed — it is the guard being put where all the callers actually meet.
+
+- **The cargo slots ARE the seats**, hung off `SeatAP` / `Seat2AP` (boat-raft.json's pattern, not the
+  sailed boat's separate deck squares). So a loaded bench cannot be sat on — `EntityBehaviorSeatable
+  .CanSitOn` refuses any seat whose attachable slot holds something that is neither a saddle nor a thing
+  declaring a `seatConfig`. **Two loads, or one load and one passenger, never two of each.** That is the
+  design, not a limit waiting to be raised: freight competing with people is what the real machines did.
+  It is also what keeps `selectionBoxes` and `wearableSlots` index-aligned, which is a hard requirement —
+  `AttachableInteractionHelp` subscripts `wearableSlots` with the *selection box* index, so a divergent
+  pair of lists throws while you merely look at the cabin. boat-raft.json:84 warns modders about this in
+  as many words.
+- **Baskets only — not crates, and not chests.** The crate was on the list until 2026-08-03 and came off
+  on a *verb* argument, not a capacity one. `BlockCrate` does not carry `CollectibleBehaviorHeldBag`; it
+  carries `CollectibleBehaviorBoatableCrate`, which overrides `OnInteract` outright and never calls `base`,
+  so **a crate on a mount has no dialog at all**. Plain right-click takes one item out; shift puts one in;
+  Ctrl + right-click empties the first stack **and detaches the emptied crate in the same click**; sprint
+  does nothing. A basket carries `BoatableGenericTypedContainer`, which subclasses `HeldBag` and overrides
+  only `GetQuantitySlots`, so it inherits the base `OnInteract` and opens the floaty slot grid. Supporting
+  both would mean four user-facing strings and two QA steps that have to name two different verbs, and one
+  of those verbs is a no-confirmation footgun. One container, one verb.
+  The old capacity argument here was also **backwards** and is gone: a crate is 16 slots aged, 20 for most
+  woods, 25 for ebony and purpleheart (`crate.json` `attributes.properties`), so two crates was 40 slots
+  against a chest's 16. Against a basket's 8 the chest exclusion is honest, and that is the only form of
+  the argument that survives. Slot counts come from the container, so the category list is still the only
+  capacity knob we own.
+- **`dropContentsOnDeath` is deliberately absent**, and its assertion is now that it stays absent. It was
+  the one real dupe vector: on `Die(Death)` vanilla runs `EntityBehaviorContainer.OnEntityDeath` (drops the
+  container itemstack **with its `backpack` tree intact**) *and* `CollectibleBehaviorHeldBag.OnEntityDespawn`
+  (spawns every content stack loose). Vanilla escapes because placing a container discards the tree
+  (`BlockEntityGenericTypedContainer.OnBlockPlaced`) — but re-attaching that container to another cabin or a
+  boat keeps it, and the goods then exist twice. `EntityRopewayCabin.Die` unloads on **every** reason,
+  `Death` included, so the flag bought nothing the unload path did not already do.
+- **Cargo spills on teardown; it does not ride inside the cabin item.** Handing back a *loaded* container
+  would be a silent destroyer: `BlockEntityGenericTypedContainer.OnBlockPlaced` reads only `type` and
+  `isPerPlayer` off the placed stack and then calls `base.OnBlockPlaced(null)`, so the `backpack` tree
+  goes in the bin the moment the player puts the basket down. Vanilla never meets this because
+  `OnTryDetach` refuses to let a player pull a loaded container off a mount at all — a guard the unload path
+  does not route through. So `UnloadCargo` hands out the goods, clears the container, hands out the
+  emptied container, and only then clears the slot. Player inventory first, ground under the cabin
+  otherwise. Nothing is destroyed, but taking down a loaded line does leave a pile.
+- **Not done on purpose: weight and speed.** A loaded cabin runs exactly as fast as an empty one and
+  costs the same to move. Vanilla has no precedent to copy — `EntityBoat.SpeedMultiplier` is a constant
+  from JSON and `EntityProperties.Weight` is a static type property nothing sums cargo into — so any load
+  effect would be our invention with no calibration to inherit. It is being left for the
+  mechanical-power design to specify rather than half-designed twice.
+- **An empty bench still boards you on a plain right-click**, via `emptyInteractPassThrough`. With
+  `interactMountAnySeat` on, so does clicking the cabin body — and that now skips loaded benches, which
+  is why boarding a half-loaded cabin always lands you on the free one.
+- **First asset-side user of the plain `attachable` key.** It is registered at `SurvivalCoreSystem.cs:903`
+  but every vanilla entity JSON takes the `rideableaccessories` subclass instead. The subclass provably
+  adds only `EntityBehaviorRideable` gating this cabin does not have, so the risk is low — but it is a
+  smoke-test line (QA step 26a), not an assumption.
+- **Teardown closes the dialog before it empties the slots**, and the order is not cosmetic. Vanilla's
+  despawn fan-out (`EntityBehaviorAttachable.OnEntityDespawn:411-428`) dereferences `slot.Itemstack`, so a
+  slot we have already nulled is skipped entirely — `CollectibleBehaviorHeldBag.OnEntityDespawn` never runs,
+  `AttachedContainerWorkspace.OnDespawn` never runs, the server's `wrapperInv` is never
+  `CloseInventoryAndSync`'d and leaks in `player.InventoryManager.OpenedInventories` for the rest of the
+  session, and the client's dialog sits open over a removed entity until the player walks out of range. So
+  `UnloadCargo` calls the per-slot `IAttachedInteractions.OnEntityDespawn` first. Not `OnDetached`, which is
+  what vanilla's own detach path uses — it does `(byEntity as EntityPlayer).Player` and this path has no
+  player at all. **Not a dupe either way:** a stale dialog cannot move items, because
+  `OnReceivedClientPacket:435-451` only dispatches on a non-null `Itemstack`.
+- **Nothing gates cargo on the cabin moving, and that is recorded rather than fixed.**
+  `RopewayCabinSeat.CanUnmount` refuses while the cabin moves; attach, detach and opening a basket have no
+  equivalent, so a player at a tower can strip a bench off a cabin passing through, or load one, from the
+  ground. Riding-and-opening is intended (QA 26d) and is the case a naive `IsMoving` guard would also break,
+  so the gate would have to tell a rider from an outsider — more code and a second rule to explain than a
+  case where nothing is lost and the dialog self-closes on range. Revisit if a moving cabin ever becomes
+  reachable for longer than it is now.
+- **Perishables do not tick in transit**, exactly as in a vanilla boat's storage. `InWorldContainer.OnTick`
+  is never invoked from `EntityBehaviorContainer`, and the behavior's own inventory holds the container
+  *item*, not the food. Do not "fix" it.
+
 ## Deliberate behaviour worth knowing
 
 - **Reversing from inside costs presses.** The stop key steps one tower at a time and only wraps at the end

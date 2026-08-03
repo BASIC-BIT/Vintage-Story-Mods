@@ -262,7 +262,7 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// </summary>
     public override WorldInteraction[] GetInteractionHelp(IClientWorldAccessor world, EntitySelection es, IClientPlayer player)
     {
-        return base.GetInteractionHelp(world, es, player)
+        var help = base.GetInteractionHelp(world, es, player)
             .Append(new WorldInteraction
             {
                 ActionLangCode = "ropeway:entityhelp-stop",
@@ -275,6 +275,35 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
                 MouseButton = EnumMouseButton.None,
                 HotKeyCode = RopewayRideCamera.Hotkey
             });
+
+        // The attach/detach line is generated for us by EntityBehaviorAttachable.GetInteractionHelp, which
+        // is already in the walk above. What it does NOT advertise is the verb that actually moves goods:
+        // a plain right-click on a LOADED bench opens the container (CollectibleBehaviorHeldBag.OnInteract
+        // fires whenever Ctrl is not held). Unadvertised, the only discoverable thing about a loaded cabin
+        // is how to take the basket off again. The line can promise ONE verb because only baskets attach -
+        // see entities/cabin.json //attachable-capacity for why the crate is not on the list.
+        return LoadedBench(es) == null
+            ? help
+            : help.Append(new WorldInteraction
+            {
+                ActionLangCode = "ropeway:entityhelp-cargo",
+                MouseButton = EnumMouseButton.Right
+            });
+    }
+
+    /// <summary>
+    /// The cargo slot behind the selection box the player is looking at, if it has anything in it.
+    /// Bounds-checked on our side because the box list is rebuilt on every tesselation
+    /// (<c>EntityBehaviorSelectionBoxes.OnTesselated</c>) and a stale index would otherwise index past it.
+    /// </summary>
+    private ItemSlot LoadedBench(EntitySelection es)
+    {
+        var boxes = GetBehavior<EntityBehaviorSelectionBoxes>()?.selectionBoxes;
+        var index = (es?.SelectionBoxIndex ?? 0) - 1;
+        if (boxes == null || index < 0 || index >= boxes.Length) return null;
+
+        var slot = GetBehavior<EntityBehaviorAttachable>()?.GetSlotFromSelectionBoxIndex(index);
+        return slot?.Empty == false ? slot : null;
     }
 
     public override void OnGameTick(float dt)
@@ -669,18 +698,135 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         if (World?.Side != EnumAppSide.Server) return;
 
         UnseatAll();
+        UnloadCargo(giveTo);
 
         var item = World.GetItem(new AssetLocation(BlockPylonBase.CabinItemCode));
-        if (item != null)
-        {
-            var stack = new ItemStack(item);
-            if (giveTo?.InventoryManager?.TryGiveItemstack(stack, slotNotifyEffect: true) != true)
-            {
-                World.SpawnItemEntity(stack, Pos.XYZ);
-            }
-        }
+        if (item != null) HandBack(new ItemStack(item), giveTo);
 
         Die(EnumDespawnReason.Removed);
+    }
+
+    /// <summary>
+    /// The cargo guard lives here rather than in <see cref="DropAndDie"/> because <c>DropAndDie</c> is not
+    /// the only door. <c>/entity remove</c> (<c>CmdEntity.cs:213</c>, <c>:230</c>, <c>:727</c>) and WorldEdit's
+    /// entity removal (<c>BlockAccessorRevertable.cs:401</c>, <c>:490</c>) call <c>Die(Removed)</c> straight,
+    /// and <c>/entity kill</c> calls <c>Die(Death)</c>; vanilla covers neither, because its only unprompted
+    /// drop is gated on <c>Death</c> and even that spills the goods loose while binning the emptied container
+    /// itself. One guard here covers every caller, present and future, and it deliberately has no reason
+    /// check: unloading first leaves the despawn fan-out empty slots, so nothing can drop twice - which is
+    /// also why <c>dropContentsOnDeath</c> came off <c>cabin.json</c>, it was the one real dupe vector.
+    /// <para>
+    /// The mod's own three paths have already run <see cref="UnloadCargo(IPlayer)"/> with a player to hand to;
+    /// this second pass finds the slots empty and does nothing.
+    /// </para>
+    /// </summary>
+    public override void Die(EnumDespawnReason reason = EnumDespawnReason.Death, DamageSource damageSourceForDeath = null)
+    {
+        if (World?.Side == EnumAppSide.Server) UnloadCargo(null);
+
+        base.Die(reason, damageSourceForDeath);
+    }
+
+    /// <summary>
+    /// Into <paramref name="giveTo"/>'s inventory if it fits, on the ground under the cabin if it does not.
+    /// The second half is not a fallback nobody hits - <see cref="DropAndDie"/> runs for the tower-vanished
+    /// backstop with no player at all.
+    /// </summary>
+    private void HandBack(ItemStack stack, IPlayer giveTo)
+    {
+        if (giveTo?.InventoryManager?.TryGiveItemstack(stack, slotNotifyEffect: true) != true)
+        {
+            World.SpawnItemEntity(stack, Pos.XYZ);
+        }
+    }
+
+    /// <summary>
+    /// Empties the benches before the cabin dies. THE thing this feature had to get right: vanilla's only
+    /// unprompted drop is <c>CollectibleBehaviorHeldBag.OnEntityDespawn</c> gated on <c>Reason == Death</c>,
+    /// and even that spills the goods loose while binning the emptied container itself - while every way this
+    /// cabin actually goes away despawns with <c>Removed</c>, where the fan-out reaches the held bag, fails
+    /// its own reason check and does nothing but close the dialog. Stop there and every basket on the cabin,
+    /// and everything in it, is deleted in silence.
+    /// <para>
+    /// Called from <see cref="DropAndDie"/> with the player who took the line down, and again from
+    /// <see cref="Die"/> with nobody - see there for why the second call site is what makes this complete.
+    /// </para>
+    /// </summary>
+    private void UnloadCargo(IPlayer giveTo)
+    {
+        var attachable = GetBehavior<EntityBehaviorAttachable>();
+        var inv = attachable?.Inventory;
+        if (inv == null) return;
+
+        // Close any open cargo dialog BEFORE the slots are emptied. Vanilla's despawn fan-out
+        // (EntityBehaviorAttachable.OnEntityDespawn:411-428) dereferences slot.Itemstack, so once we null it
+        // the hook is skipped: CollectibleBehaviorHeldBag.OnEntityDespawn never reaches
+        // AttachedContainerWorkspace.OnDespawn, the server's wrapperInv is never CloseInventoryAndSync'd and
+        // leaks in player.InventoryManager.OpenedInventories for the rest of the session, and the dialog sits
+        // open over a cabin that is gone. Not OnDetached, which is what vanilla's own detach calls - it does
+        // (byEntity as EntityPlayer).Player and this path has no player at all. The index is the workspace's
+        // cache key: HeldBag keys it by SELECTION BOX index, which here is the inventory index, because the
+        // cargo slots ARE the selection boxes and the two lists are pinned in the same order.
+        var despawn = new EntityDespawnData { Reason = EnumDespawnReason.Removed };
+        for (var i = 0; i < inv.Count; i++)
+        {
+            inv[i]?.Itemstack?.Collectible?.GetCollectibleInterface<IAttachedInteractions>()
+                ?.OnEntityDespawn(inv[i], i, this, despawn);
+        }
+
+        // storeInv, not MarkDirty: this mutates the behavior's inventory outside the attach/detach flow that
+        // normally writes it back, and the tree in WatchedAttributes is the only copy (EntityBehaviorContainer
+        // :395). Vanilla does the same after its own detach (EntityBehaviorAttachable.cs:270).
+        if (UnloadCargo(inv, World, stack => HandBack(stack, giveTo)) > 0) attachable.storeInv();
+    }
+
+    /// <summary>
+    /// Hands back the goods first and the emptied container second, and only then clears the slot. Returns
+    /// how many containers it emptied.
+    /// <para>
+    /// The goods come out rather than riding along inside the container item because a container itemstack
+    /// carrying a <c>backpack</c> tree loses it the moment the block is placed:
+    /// <c>BlockEntityGenericTypedContainer.OnBlockPlaced</c> reads only <c>type</c> and <c>isPerPlayer</c>
+    /// off the stack and then calls <c>base.OnBlockPlaced(null)</c>. Vanilla never has to care because
+    /// <c>CollectibleBehaviorHeldBag.OnTryDetach</c> refuses to let a player pull a loaded container off a
+    /// mount at all - a guard this path does not go through. So: cargo SPILLS. It does not ride inside the
+    /// cabin item, and it is not left inside a container item we hand someone. Both halves land in the
+    /// player's inventory when there is room and on the ground when there is not, so nothing is destroyed
+    /// either way.
+    /// </para>
+    /// </summary>
+    public static int UnloadCargo(IEnumerable<ItemSlot> slots, IWorldAccessor world, Action<ItemStack> handBack)
+    {
+        if (slots == null) return 0;
+
+        var emptied = 0;
+        foreach (var slot in slots)
+        {
+            var container = slot?.Itemstack;
+            if (container == null) continue;
+
+            var bag = container.Collectible?.GetCollectibleInterface<IHeldBag>();
+
+            // Null contents means the container was never opened, so it has no `backpack` tree at all -
+            // and Clear would dereference that missing tree (CollectibleBehaviorHeldBag.cs:37-40). Guarding
+            // on the read is what keeps a pristine basket from throwing on the way out.
+            var contents = bag?.GetContents(container, world);
+            if (contents != null)
+            {
+                foreach (var goods in contents)
+                {
+                    if (goods?.StackSize > 0) handBack(goods);
+                }
+
+                bag.Clear(container);
+            }
+
+            handBack(container);
+            slot.Itemstack = null;
+            emptied++;
+        }
+
+        return emptied;
     }
 
     /// <summary>

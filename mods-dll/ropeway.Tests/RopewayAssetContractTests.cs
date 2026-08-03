@@ -592,6 +592,108 @@ public class RopewayAssetContractTests
         Assert.True(seats["SeatAP"][0] * seats["Seat2AP"][0] < 0, "both seats are on the same side of the mast");
     }
 
+    /// <summary>
+    /// The cargo contract, and the reason it is asserted rather than left to the JSON: vanilla indexes
+    /// <c>wearableSlots</c> with the SELECTION BOX index, not the inventory index
+    /// (<c>EntityBehaviorAttachable.GetInteractionHelp</c> hands <c>es.SelectionBoxIndex - 1</c> straight to
+    /// <c>AttachableInteractionHelp</c>, which subscripts the slot array with it). The two lists therefore
+    /// have to name the same attachment points in the same order or merely LOOKING at the cabin throws -
+    /// which is what boat-raft.json:84 warns modders about in as many words. Free here because the cargo
+    /// slots ARE the seats; one line of drift and it is not.
+    /// </summary>
+    [Fact]
+    public void TheCargoSlotsAreTheBenchesAndIndexAlignWithTheSelectionBoxes()
+    {
+        var configs = Load("entities", "cabin.json").GetProperty("behaviorConfigs");
+        var attachable = configs.GetProperty("attachable");
+        var slots = attachable.GetProperty("wearableSlots").EnumerateArray().ToList();
+
+        var boxes = configs.GetProperty("selectionboxes").GetProperty("selectionBoxes")
+            .EnumerateArray().Select(b => b.GetString()).ToList();
+
+        Assert.Equal(boxes, slots.Select(s => s.GetProperty("attachmentPointCode").GetString()).ToList());
+
+        // Two, because there are two benches and a loaded bench cannot be sat on
+        // (EntityBehaviorSeatable.CanSitOn). Freight competing with passengers is the design, not a limit
+        // that wants raising - and it is the only cap on capacity we own, since slot counts come from the
+        // container itself.
+        Assert.Equal(2, slots.Count);
+
+        foreach (var slot in slots)
+        {
+            // Without this an empty bench stops being boardable: EntityBehaviorAttachable.OnInteract only
+            // hands the click back to seatable at :180-184 when the flag is set.
+            Assert.True(slot.GetProperty("emptyInteractPassThrough").GetBoolean(),
+                $"{slot.GetProperty("attachmentPointCode").GetString()} would swallow the click that boards the cabin");
+
+            // Basket only. Not the chest (16 mixed slots against a basket's 8 - a gondola is not a
+            // warehouse), and not the crate: BlockCrate carries CollectibleBehaviorBoatableCrate, which
+            // overrides OnInteract without calling base, so a crate has no dialog at all - a plain click
+            // takes one item out and Ctrl empties it AND detaches it in the same click. One container, one
+            // verb, one true line of interaction help.
+            Assert.Equal(new[] { "basket" },
+                slot.GetProperty("forCategoryCodes").EnumerateArray().Select(c => c.GetString()).ToArray());
+        }
+
+        // dropContentsOnDeath must stay OFF: on Die(Death) it drops the container with its `backpack` tree
+        // intact while the held-bag despawn hook spills the same goods loose, and re-attaching that container
+        // elsewhere keeps the tree. EntityRopewayCabin.Die unloads on every reason, Death included.
+        Assert.False(attachable.TryGetProperty("dropContentsOnDeath", out _),
+            "dropContentsOnDeath double-drops on the Death path and the unload guard already covers it");
+    }
+
+    /// <summary>
+    /// Order in both behavior lists. Behind <c>seatable</c> the cargo click is eaten by the mount
+    /// (<c>Entity.OnInteract</c> breaks on <c>PreventSubsequent</c>); missing from the SERVER list, the
+    /// behavior's <c>ToBytes</c>/<c>FromBytes</c> never run and the cargo is gone on reload with no error.
+    /// </summary>
+    [Theory]
+    [InlineData("client")]
+    [InlineData("server")]
+    public void TheAttachableBehaviorSitsBetweenSelectionBoxesAndSeatable(string side)
+    {
+        var codes = Load("entities", "cabin.json").GetProperty(side).GetProperty("behaviors")
+            .EnumerateArray().Select(b => b.GetProperty("code").GetString()).ToList();
+
+        Assert.Contains("attachable", codes);
+        Assert.InRange(codes.IndexOf("attachable"), codes.IndexOf("selectionboxes") + 1, codes.IndexOf("seatable") - 1);
+    }
+
+    /// <summary>
+    /// <c>stepParentTo</c> needs a real element to hang the container's shape on - a missing one is
+    /// attached-but-invisible cargo, which looks exactly like the attach having failed. And the element has
+    /// to start at the bench pan's top, because a container's own shape sits on its parent's floor.
+    /// </summary>
+    [Fact]
+    public void EveryCargoSlotStepParentsToAnElementSittingOnItsBench()
+    {
+        var (_, _, elements) = CabinBounds();
+        var benchTop = Find(elements, "seatfront").GetProperty("to")[1].GetDouble();
+
+        var slots = Load("entities", "cabin.json").GetProperty("behaviorConfigs").GetProperty("attachable")
+            .GetProperty("wearableSlots").EnumerateArray();
+
+        foreach (var slot in slots)
+        {
+            var name = slot.GetProperty("stepParentTo").GetProperty("").GetProperty("elementName").GetString()!;
+            Assert.Contains(elements, e => e.Name == name);
+
+            var pad = Find(elements, name);
+            Assert.Equal(benchTop, pad.GetProperty("from")[1].GetDouble(), 3);
+
+            // A container is a block: the pad has to be a 16-unit cube or the shape it parents lands at the
+            // wrong scale against the cabin instead of sitting in it.
+            for (var axis = 0; axis < 3; axis++)
+            {
+                Assert.Equal(16, pad.GetProperty("to")[axis].GetDouble() - pad.GetProperty("from")[axis].GetDouble(), 3);
+            }
+
+            // Invisible: the cargo you see is the container, never the mount point.
+            Assert.All(pad.GetProperty("faces").EnumerateObject(),
+                f => Assert.False(f.Value.GetProperty("enabled").GetBoolean(), $"{name}.{f.Name} would render a grey box"));
+        }
+    }
+
     private static (double[] Min, double[] Max, List<(string Name, JsonElement Element)> Elements) CabinBounds()
     {
         var min = new[] { double.MaxValue, double.MaxValue, double.MaxValue };

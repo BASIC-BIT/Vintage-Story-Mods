@@ -526,3 +526,91 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     Finally, **try to link a new tower onto a line whose far end is unloaded.** **PASS:** *"Part of that
     line is in unloaded chunks, so it cannot be measured. Get closer to the rest of it first."* — the
     picker must not open. This is the cycle guard; a link that succeeds here can produce a looped line.
+
+26. **Freight** (new this round — the whole feature, and the first asset-side user of the plain
+    `attachable` behavior rather than the `rideableaccessories` subclass every vanilla entity takes).
+    Craft or `/giveblock` two **reed baskets** — the block code is `stationarybasket-north`, *not*
+    `stationarybasket-reed-north`: the basket's only variantgroup is `side`, and reed/papyrus/vine is a
+    stack **attribute** with `defaultType: "reed"`. Park a cabin at a tower.
+    You will also want a **crate** (code `crate` — it has no variantgroups at all) and a **chest** for the
+    two refusal checks in 26a.
+
+    **26a — attach.** Hold the basket, **Ctrl** and right-click one of the two benches.
+    **PASS:** the basket appears sitting on that bench, centred on it, and the place sound plays. The
+    basket must be *visible*: an attach that succeeds but renders nothing means `stepParentTo` lost its
+    element (`cargofront` / `cargorear` in `shapes/entity/cabin.json`) and looks exactly like a failure.
+    **PASS:** look at the bench — the interaction help lists *"Ctrl + right-click: Detach"* and
+    *"Right-click: Load or unload the freight"*.
+    **FAIL:** a crash or a red error line while merely *looking* at the cabin — that is the
+    `wearableSlots` / `selectionBoxes` index alignment (`RopewayAssetContractTests`
+    `TheCargoSlotsAreTheBenchesAndIndexAlignWithTheSelectionBoxes`) having drifted.
+    Try a **chest**: **PASS:** it refuses — deliberately, a gondola is not a warehouse.
+    Try a **crate**: **PASS:** it refuses too. This one is not about capacity — a crate carries
+    `CollectibleBehaviorBoatableCrate`, which overrides `OnInteract` without calling `base`, so it has no
+    dialog on a mount at all and Ctrl + right-click would empty it *and* detach it in the same click.
+    **FAIL:** the crate attaches — `forCategoryCodes` has been widened back to `["basket", "crate"]` and
+    every freight string in the mod now lies about the verb.
+
+    **26b — the bench is now freight, not a seat.** Right-click the loaded bench with an empty hand.
+    **PASS:** the cargo dialog opens (a floaty slot grid on the cabin, not the chest GUI); you do **not**
+    sit down. Put a few items in and close it. Now right-click the cabin **body** (roof or upper wall).
+    **PASS:** you board the *other* bench, and only that one. Load the second bench too.
+    **PASS:** the cabin can no longer be boarded at all — two loads or two riders or one of each.
+    **PASS:** the empty bench, before you load it, still boards you on a plain right-click.
+
+    **26c — detach is guarded.** With goods still inside, Ctrl + right-click the loaded bench with an
+    empty hand. **PASS:** nothing comes off (vanilla's `OnTryDetach` refuses a non-empty container).
+    Empty it through the dialog, then Ctrl + right-click again. **PASS:** the basket comes back to hand.
+
+    **26d — it rides.** Reload one bench with goods, board the other, and ride a full span.
+    **PASS:** the cargo stays on the bench the whole way and does not jitter, and the dialog stays open
+    and follows the cabin if you open it mid-ride. **PASS:** the cabin runs at the same speed loaded as
+    empty — weight and speed are deliberately not modelled yet.
+
+    **26e — PERSISTENCE, the part that had to be right.** With goods on both benches:
+    - Save, quit to menu, reload. **PASS:** both containers are still there with the same contents.
+    - Walk away until the cabin's chunk unloads — leave it **mid-span** by riding, stopping at an interior
+      tower and walking off — then come back. **PASS:** unchanged.
+    - Stop and restart the **server** (or the singleplayer world) with the cabin mid-line. **PASS:**
+      unchanged.
+    **FAIL:** the containers come back empty, or come back at all but with the goods gone. Empty
+    containers mean the `attachable` behavior fell off the **server** behavior list; missing goods mean
+    something wrote the inventory without calling `storeInv`.
+
+    **26f — TEARDOWN, and nothing may be destroyed.** Three separate runs, each with a loaded basket on
+    **both** benches, and count the items before and after each:
+    - **Cut the span the cabin hangs on** (Ctrl + right-click a footing, click the connected row).
+    - **Break the last tower of a two-tower line** so the line has no spans left.
+    - **Blow up / break every tower of the line** so the cabin's `gone` backstop fires with no player.
+    **PASS**, all three: the goods come out **loose** as item stacks, the two **emptied** containers come
+    back as items, and the **cabin item** comes back — into your inventory where there is room, on the
+    ground under the cabin where there is not (and always on the ground for the third case, which has no
+    player). Nothing is missing. **FAIL — this is THE regression:** the containers or their contents
+    simply vanish. Vanilla's only unprompted drop is gated on `EnumDespawnReason.Death` and the cabin
+    despawns with `Removed`, so `EntityRopewayCabin.UnloadCargo` is the only thing standing between a
+    loaded cabin and a silent delete (`RopewayCargoTests` pins the pure half).
+    **PASS:** pick the returned basket up, place it as a block. It is empty — as it should be; the goods
+    were handed to you separately, precisely because a placed container drops any `backpack` tree the
+    itemstack was carrying.
+
+    **26g — teardown with the dialog OPEN.** Load a bench, **open it and leave it open**, then cut the span
+    from where you stand. **PASS:** the dialog closes by itself the instant the cabin goes, and the goods and
+    the emptied basket land as in 26f. **FAIL:** the dialog stays on screen showing the contents of a cabin
+    that is no longer there, and only disappears when you walk away. That is the despawn hook being skipped
+    because the slot was nulled first — the server side of the same fault leaks one `InventoryGeneric` into
+    `player.InventoryManager.OpenedInventories` per teardown, invisibly, for the rest of the session.
+
+    **26h — admin removal is not a shredder.** Load both benches, then `/entity remove` the cabin (or delete
+    it with WorldEdit). **PASS:** the goods and both emptied baskets are on the ground where the cabin was.
+    The cabin item itself is **not** returned on this path and is not expected to be — `/entity remove` is a
+    delete, and it destroyed the cabin item before this change too. Repeat with `/entity kill`.
+    **PASS:** same, and — the point of this one — **exactly one** copy of each stack. Two copies of the goods
+    means `dropContentsOnDeath` has been put back on `cabin.json`, which drops the container with its
+    `backpack` tree intact *and* spills the same goods loose.
+    **FAIL:** everything vanishes. The guard is on `EntityRopewayCabin.Die`, not on `DropAndDie`, precisely
+    so these two commands are covered.
+
+    **26i — handbook and guide.** `H` → Ropeway → *Building a Line*: **PASS:** the **Carrying freight**
+    section is there and says two loads, or one load and one passenger, and it names the **basket** as the
+    only container that fits. Sneak + right-click a footing: **PASS:** the guide's closing paragraph names
+    the Ctrl verb and the "cannot be sat on" rule. **FAIL:** any of these still offers the crate.

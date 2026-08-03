@@ -504,6 +504,37 @@
               "rotationZ": "0.0"
             }
           ]
+        },
+        {
+          "//cargofront": "Invisible 16x16x16 mount point for a basket loaded onto the FRONT bench, and nothing else - every face is disabled, exactly as boat/sailed.json's LeftStorage1..4 are. It carries no attachment point on purpose: the cargo slot hangs off SeatAP (entities/cabin.json, behaviorConfigs.attachable) so the click target IS the bench, and stepParentTo only needs a NAMED ELEMENT to hang the container's own shape on - EntityBehaviorContainer.applyStepParentOverrides rewrites StepParentName, it never reads an AP. Keeping the slot on the bench's own selection box is what keeps selectionBoxes and wearableSlots index-aligned, which boat-raft.json:84 warns modders about in as many words.",
+          "//cargofront-placement": "Sized and placed so the container it parents (its own shape runs 1..15 of this cube) sits ON the pan top and centred on it: pan x -11..-1 gives centre -6, so the cube is -14..2; from y -6 is the pan top, so the container's base lands there. It is 16 wide against a 10-deep pan and there is no way round that - a container is a block. Overhanging FORWARD into the footwell and back over backrestwest is the version that reads: the basket is opaque, so it hides the backrest rather than clipping through open air, and its 1 unit past the backrest into the aisle is nothing. Top at 10 leaves 4 units under the roof slab. Every extent here is inside the roof's, so it costs the parked-rotation swept circle nothing.",
+          "name": "cargofront",
+          "from": [ -14.0, -6.0, -8.0 ],
+          "to": [ 2.0, 10.0, 8.0 ],
+          "rotationOrigin": [ -14.0, -6.0, -8.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false }
+          }
+        },
+        {
+          "//cargorear": "The same mount point for the REAR bench, hung off Seat2AP. Pan x 16..26 gives centre 21, so the cube is 13..29 and the container lands at 14..28 - flush to the inner face of paneleast at 28, which is where a basket against the back wall belongs.",
+          "name": "cargorear",
+          "from": [ 13.0, -6.0, -8.0 ],
+          "to": [ 29.0, 10.0, 8.0 ],
+          "rotationOrigin": [ 13.0, -6.0, -8.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 16.0, 16.0 ], "enabled": false }
+          }
         }
       ]
     }
