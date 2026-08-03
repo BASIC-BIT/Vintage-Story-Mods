@@ -440,6 +440,69 @@ public class RopewayAssetContractTests
     }
 
     /// <summary>
+    /// The rider does not land on his attachment point. sitboatidle's frame-0 keyframe carries
+    /// <c>LowerTorso offsetX 6.2</c> (game/shapes/entity/humanoid/seraph.json), which Animation.cs:211 turns
+    /// into a pose translation, and with that element's own rest roll the seated backside ends up
+    /// <c>+4.59 .. +9.85</c> model units toward shape +X of wherever the rider's ORIGIN is - the constants
+    /// below, and the only part of the pose that has to land on wood. The knob that moves that origin is the
+    /// seat's <c>riderOffset</c>, in BLOCKS, applied in the mount's own shape space
+    /// (EntityRideableSeat.SeatPosition: RotateY(yaw+90), then Translate(RiderOffset), then the AP).
+    ///
+    /// Three numbers therefore have to agree - the AP's x, the pan's x extent, and riderOffset - and nothing
+    /// pinned them together. An interior rebuild narrowed the pans 18 -> 14 and moved the APs +/-15 -> +/-18
+    /// with all 96 tests green, which put the contact patch 2.85 units off the pan on BOTH benches while the
+    /// extent, swept-circle and eye-in-glazing tests carried on passing. Move any one of the three alone and
+    /// this is what fails. Calibration: boat-sailed.json:53-54, vanilla's only sitboatidle bench, is a
+    /// 10-deep plank with its AP dead centre and riderOffset -0.5 - and without that offset vanilla's own
+    /// rider misses its own plank by 2.7 units, which is what fixes the sign.
+    /// </summary>
+    [Fact]
+    public void TheSeatedRidersContactPatchLandsOnItsPan()
+    {
+        const double buttNear = 4.59;
+        const double buttFar = 9.85;
+
+        var (_, _, elements) = CabinBounds();
+
+        // The AP's owning element IS the pan the rider sits on, so the pairing is read, not assumed.
+        var pans = new Dictionary<string, (string Name, double From, double To, double ApX)>();
+        foreach (var (name, element) in elements)
+        {
+            if (!element.TryGetProperty("attachmentpoints", out var points)) continue;
+
+            foreach (var point in points.EnumerateArray())
+            {
+                var from = element.GetProperty("from")[0].GetDouble();
+                pans[point.GetProperty("code").GetString()!] =
+                    (name, from, element.GetProperty("to")[0].GetDouble(),
+                        from + double.Parse(point.GetProperty("posX").GetString()!));
+            }
+        }
+
+        var seats = Load("entities", "cabin.json").GetProperty("behaviorConfigs").GetProperty("seatable")
+            .GetProperty("seats").EnumerateArray().ToList();
+
+        Assert.Equal(2, seats.Count);
+        foreach (var seat in seats)
+        {
+            var apName = seat.GetProperty("apName").GetString()!;
+            var (pan, panFrom, panTo, apX) = pans[apName];
+
+            var offset = seat.TryGetProperty("riderOffset", out var riderOffset) &&
+                         riderOffset.TryGetProperty("x", out var offsetX)
+                ? offsetX.GetDouble() * 16
+                : 0;
+
+            var near = apX + offset + buttNear;
+            var far = apX + offset + buttFar;
+
+            Assert.True(near >= panFrom && far <= panTo,
+                $"{apName}: seated at x {near:0.##}..{far:0.##} (AP {apX:0.##}, riderOffset {offset:0.##} units), " +
+                $"which is off {pan} at {panFrom:0.##}..{panTo:0.##}");
+        }
+    }
+
+    /// <summary>
     /// Entity shapes are authored along X: EntityShapeRenderer adds +90 degrees to Pos.Yaw before building
     /// the model matrix (EntityShapeRenderer.cs:808), so the model's X axis lands on the entity's heading,
     /// and every vanilla entity whose long axis IS its heading - raft 4.5 x 2.25, arapaima 1.90 x 0.58,

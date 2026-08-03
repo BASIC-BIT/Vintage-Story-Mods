@@ -221,9 +221,25 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     **PASS — the pose, and check it in third person (F5) because you cannot see yourself otherwise:** the
     rider is **sitting** on the bench, legs forward, facing **along the line** — not standing. Bring a
     second player or watch a friend board: a remote rider must be sat too, and both riders face the same
-    way (forward), which is correct, not a bug. **FAIL:** a standing T-ish idle. That is the `sitboatidle`
+    way (forward), which is correct, not a bug — the engine forces a remote rider's body yaw to the
+    cabin's (`EntityPlayerShapeRenderer.cs:429-431`) and there is no per-seat facing to be had, which is
+    why **both benches face forward with their backrest behind them, like tram seating**, rather than
+    facing each other. **FAIL:** a standing T-ish idle. That is the `sitboatidle`
     animation not being started — the pose comes from `RopewayCabinSeat.DidMount`, and a mistyped code
-    fails **silently**. Also **PASS:** in first person your eye is in the **glazing band** — you can see
+    fails **silently**.
+    **PASS — where the rider lands on the bench, and this is the one to actually look at.** Board the
+    **front** seat (the bench toward the outbound end), F5, and orbit until you see the seated body from
+    the side. **PASS:** rear on the pan, back against the backrest behind you, knees just proud of the
+    front lip with the shins hanging down in front of it, feet clear of the floor. **FAIL, and each
+    failure names its own cause:** rear hanging off the back of the pan and over the aisle = the seat's
+    `riderOffset` is missing or has the wrong sign (`entities/cabin.json`, `x: -0.5`, vanilla's own
+    number from `boat-sailed.json:53-54`); shins disappearing *into* the pan rather than in front of it =
+    the pan is deeper than 10 units again; facing your own backrest with your back to the aisle = a
+    backrest has gone back onto an end wall. **Then board the rear seat and repeat — the two must look
+    the same.** Two seats behaving differently is the specific signature of a facing problem rather than
+    an offset one. A second player standing outside is the cheapest observer for all of it, because that
+    forced remote yaw is exactly the case under test.
+    Also **PASS:** in first person your eye is in the **glazing band** — you can see
     out of the windows — not up inside the roof slab and not down at bench level. Get out again:
     **PASS:** you stand up immediately; **FAIL:** you walk away still stuck in the sit pose, which is the
     `DidUnmount` stop-before-base ordering having regressed.

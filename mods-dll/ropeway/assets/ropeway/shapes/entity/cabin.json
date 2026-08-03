@@ -137,31 +137,32 @@
           }
         },
         {
+          "//mullion": "Window pillar, x -14..-11, which is the seat-back line: it lands exactly on backrestwest and dies into its end, the way a tram's pillar lines up with the seat it is beside. It used to sit at x -2..2, dead centre of the wall and therefore dead centre of the threshold below it - a post through the middle of the thing that announces itself as the way in. There is one per side, not one per opening; the asymmetry is the seating's, and it is the honest one.",
           "name": "mullionnorth",
-          "from": [ -2.0, -2.0, -23.0 ],
-          "to": [ 2.0, 14.0, -20.0 ],
-          "rotationOrigin": [ -2.0, -2.0, -23.0 ],
+          "from": [ -14.0, -2.0, -23.0 ],
+          "to": [ -11.0, 14.0, -20.0 ],
+          "rotationOrigin": [ -14.0, -2.0, -23.0 ],
           "faces": {
-            "north": { "texture": "#metal", "uv": [ 0.0, 0.0, 1.0, 4.0 ] },
+            "north": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 4.0 ] },
             "east": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 4.0 ] },
-            "south": { "texture": "#metal", "uv": [ 0.0, 0.0, 1.0, 4.0 ] },
+            "south": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 4.0 ] },
             "west": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 4.0 ] },
-            "up": { "texture": "#metal", "uv": [ 0.0, 0.0, 1.0, 0.75 ] },
-            "down": { "texture": "#metal", "uv": [ 0.0, 0.0, 1.0, 0.75 ] }
+            "up": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 0.75 ] },
+            "down": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 0.75 ] }
           }
         },
         {
           "name": "mullionsouth",
-          "from": [ -2.0, -2.0, 20.0 ],
-          "to": [ 2.0, 14.0, 23.0 ],
-          "rotationOrigin": [ -2.0, -2.0, 20.0 ],
+          "from": [ -14.0, -2.0, 20.0 ],
+          "to": [ -11.0, 14.0, 23.0 ],
+          "rotationOrigin": [ -14.0, -2.0, 20.0 ],
           "faces": {
-            "north": { "texture": "#metal", "uv": [ 0.0, 0.0, 1.0, 4.0 ] },
+            "north": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 4.0 ] },
             "east": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 4.0 ] },
-            "south": { "texture": "#metal", "uv": [ 0.0, 0.0, 1.0, 4.0 ] },
+            "south": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 4.0 ] },
             "west": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 4.0 ] },
-            "up": { "texture": "#metal", "uv": [ 0.0, 0.0, 1.0, 0.75 ] },
-            "down": { "texture": "#metal", "uv": [ 0.0, 0.0, 1.0, 0.75 ] }
+            "up": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 0.75 ] },
+            "down": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.75, 0.75 ] }
           }
         },
         {
@@ -305,23 +306,171 @@
           }
         },
         {
-          "name": "seatfront",
-          "from": [ -24.0, -16.0, -20.0 ],
-          "to": [ -6.0, -6.0, 20.0 ],
-          "rotationOrigin": [ -24.0, -16.0, -20.0 ],
+          "//sill": "The two long walls stop at y -2 and the roof starts at 14, so a whole block of the cabin is open air. Unframed that band reads as a missing wall rather than a window; a 2-unit ledge on the panel top gives the opening an edge to end on and something to rest an elbow on. It runs the full -31..31 so it dies into the wall corners instead of stopping short of them. The end walls get no sill - the bench backrests are already the detail there, and a sill would drive straight through them.",
+          "name": "sillnorth",
+          "from": [ -31.0, -2.0, -20.0 ],
+          "to": [ 31.0, 0.0, -18.0 ],
+          "rotationOrigin": [ -31.0, -2.0, -20.0 ],
           "faces": {
-            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 4.5, 2.5 ] },
-            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 2.5 ] },
-            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 4.5, 2.5 ] },
-            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 2.5 ] },
-            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 4.5, 10.0 ] },
-            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 4.5, 10.0 ] }
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 15.5, 0.5 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 15.5, 0.5 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 15.5, 0.5 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 15.5, 0.5 ] }
+          }
+        },
+        {
+          "name": "sillsouth",
+          "from": [ -31.0, -2.0, 18.0 ],
+          "to": [ 31.0, 0.0, 20.0 ],
+          "rotationOrigin": [ -31.0, -2.0, 18.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 15.5, 0.5 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 15.5, 0.5 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 15.5, 0.5 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 15.5, 0.5 ] }
+          }
+        },
+        {
+          "//rail": "Metal, post to post, y 6..8 - 22 units over the floor, which is a standing seraph's waist and the one detail that says you are meant to stand up in here. It has to stay BELOW the seated eye (y 10, from eyeHeight 1.0 over an AP at -6) or every rider looks out through a bar, and it stops at x +/-28 so it lands on the post inner faces rather than floating past them.",
+          "name": "railnorth",
+          "from": [ -28.0, 6.0, -20.0 ],
+          "to": [ 28.0, 8.0, -18.0 ],
+          "rotationOrigin": [ -28.0, 6.0, -20.0 ],
+          "faces": {
+            "north": { "texture": "#metal", "uv": [ 0.0, 0.0, 14.0, 0.5 ] },
+            "east": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+            "south": { "texture": "#metal", "uv": [ 0.0, 0.0, 14.0, 0.5 ] },
+            "west": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+            "up": { "texture": "#metal", "uv": [ 0.0, 0.0, 14.0, 0.5 ] },
+            "down": { "texture": "#metal", "uv": [ 0.0, 0.0, 14.0, 0.5 ] }
+          }
+        },
+        {
+          "name": "railsouth",
+          "from": [ -28.0, 6.0, 18.0 ],
+          "to": [ 28.0, 8.0, 20.0 ],
+          "rotationOrigin": [ -28.0, 6.0, 18.0 ],
+          "faces": {
+            "north": { "texture": "#metal", "uv": [ 0.0, 0.0, 14.0, 0.5 ] },
+            "east": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+            "south": { "texture": "#metal", "uv": [ 0.0, 0.0, 14.0, 0.5 ] },
+            "west": { "texture": "#metal", "uv": [ 0.0, 0.0, 0.5, 0.5 ] },
+            "up": { "texture": "#metal", "uv": [ 0.0, 0.0, 14.0, 0.5 ] },
+            "down": { "texture": "#metal", "uv": [ 0.0, 0.0, 14.0, 0.5 ] }
+          }
+        },
+        {
+          "//threshold": "One 62 x 46 slab reads as a crate bottom. A proud plank across each long side is where you actually step in, and it costs one element per side to stop the floor being a single untextured plane. It spans x -11..13, which is exactly the clear floor: -11 is the back face of backrestwest and 13 clears the rear rider's toes at 11.34. The mullion no longer crosses it - both moved to the seat-back line at -14..-11, so the plank runs from the pillar to the far bench with nothing standing in it.",
+          "name": "thresholdnorth",
+          "from": [ -11.0, -16.0, -20.0 ],
+          "to": [ 13.0, -15.0, -17.0 ],
+          "rotationOrigin": [ -11.0, -16.0, -20.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 6.0, 0.25 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 0.25 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 6.0, 0.25 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 0.25 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 6.0, 0.75 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 6.0, 0.75 ] }
+          }
+        },
+        {
+          "name": "thresholdsouth",
+          "from": [ -11.0, -16.0, 17.0 ],
+          "to": [ 13.0, -15.0, 20.0 ],
+          "rotationOrigin": [ -11.0, -16.0, 17.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 6.0, 0.25 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 0.25 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 6.0, 0.25 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 0.25 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 6.0, 0.75 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 6.0, 0.75 ] }
+          }
+        },
+        {
+          "//backrest": "y -6..4: starts at the pan top and stops 10 units up - below the seated eye at 10 and below the grab rail at 6..8, both of which it would otherwise stand in front of. It sits ON the rear 3 units of its own pan, at +X of it, NOT on the end wall. That is forced, not styled: EntityPlayerShapeRenderer.cs:429-431 pins a remote rider's body yaw to the MOUNT's yaw, so both riders always face cabin -X and there is no per-seat facing to be had (an AP's rotationY only reaches seatPos.Yaw, which that renderer ignores). Backs on the two end walls therefore seated one rider correctly and the other facing into his own backrest. Both backs behind both riders = tram seating, the only layout the engine will actually honour. Its front face lands at AP+2, 0.15 units clear of the seated LowerTorso box (worst case, frame 0; the only other keyed channel in sitboatidle is a 1-degree UpperTorso rock TOWARD upright, away from the back). z stays +/-18, not +/-20 like the pan: the sills run y -2..0 at z 18..20 and the backrest would drive straight through them. Ending on the sill's inner face reads as the back being framed by them.",
+          "name": "backrestwest",
+          "from": [ -14.0, -6.0, -18.0 ],
+          "to": [ -11.0, 4.0, 18.0 ],
+          "rotationOrigin": [ -14.0, -6.0, -18.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 2.5 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 9.0, 2.5 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 2.5 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 9.0, 2.5 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 9.0 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 9.0 ] }
+          }
+        },
+        {
+          "//backresteast": "Held 2 units off paneleast's inner face at x 28 rather than flush against it. Flush put its outer face in the end-wall glazing plane, where from outside the cabin it read as a solid lower window pane appearing on two of the four faces. 2 units of reveal is enough to read as furniture standing inside the glass.",
+          "name": "backresteast",
+          "from": [ 23.0, -6.0, -18.0 ],
+          "to": [ 26.0, 4.0, 18.0 ],
+          "rotationOrigin": [ 23.0, -6.0, -18.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 2.5 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 9.0, 2.5 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 2.5 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 9.0, 2.5 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 9.0 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.75, 9.0 ] }
+          }
+        },
+        {
+          "//apron": "Skirt board under the pan's front lip, stopped 2 units short of the floor so there is a toe recess to put your feet under. Two of these replace four legs and are the reason the bench does not read as a box with a plank on it. Held 2 units back from the lip rather than flush with it: the seated shin box runs to AP-4.19 and a flush apron at AP-5 would be inside it. Runs wall to wall at z +/-20, same as the pan, which is what closes the under-bench void the open ends used to show.",
+          "name": "apronwest",
+          "from": [ -19.0, -14.0, -20.0 ],
+          "to": [ -17.0, -8.0, 20.0 ],
+          "rotationOrigin": [ -19.0, -14.0, -20.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 1.5 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 1.5 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 1.5 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 1.5 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 10.0 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 10.0 ] }
+          }
+        },
+        {
+          "name": "aproneast",
+          "from": [ 18.0, -14.0, -20.0 ],
+          "to": [ 20.0, -8.0, 20.0 ],
+          "rotationOrigin": [ 18.0, -14.0, -20.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 1.5 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 1.5 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 1.5 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 1.5 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 10.0 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 0.5, 10.0 ] }
+          }
+        },
+        {
+          "//seatfront": "The seat PAN, and the only part of the bench the rider touches. Its top stays at y -6 - the number the whole seated rider is hung off. 10 units over the floor is a bench (0.625 blocks, ~40cm); the sailed boat's plank sits at 12 over its own floor, but that bench has open sky above it and this one has a roof at 14. eyeHeight 1.0 puts the eye 16 units over the AP and the seraph's head tops out 1.5 above that, so a pan at -6 leaves 2.5 units of head clearance and a pan at -4 leaves 0.5 - the sway animation eats that. 10 DEEP, CENTRED ON ITS AP, which is vanilla's number copied exactly and not a taste call: SeatPlankN1 on boat-sailed is 10 deep and LeftSeatAP + riderOffset -0.5 lands the seated body dead centre of it, with the knee 2.44 proud of the front lip and the shins hanging off it. The 14-deep pan this replaces was deep enough that the shins came down INSIDE the pan's own footprint instead of in front of it. Front lip at -21, so the west end is footwell: the front rider's toes reach -25.66 against a wall at -28.",
+          "name": "seatfront",
+          "from": [ -21.0, -8.0, -20.0 ],
+          "to": [ -11.0, -6.0, 20.0 ],
+          "rotationOrigin": [ -21.0, -8.0, -20.0 ],
+          "faces": {
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 2.5, 0.5 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 0.5 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 2.5, 0.5 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 0.5 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 2.5, 10.0 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 2.5, 10.0 ] }
           },
           "attachmentpoints": [
             {
+              "//": "On the pan TOP (y -6) and at its DEPTH CENTRE (x -16), which is the sailed boat's convention - SeatPlankN1 tops out at 12.1 and LeftSeatAP sits at exactly 12.1, dead centre of the plank. The AP is NOT where the rider lands: sitboatidle carries LowerTorso offsetX 6.2 plus its own rest roll, which puts the butt centre 7.22 units toward cabin +X of wherever the rider's origin is, so the seat's riderOffset -0.5 (= -8 units, entities/cabin.json) is what pulls that back onto the pan. Pan centre +/- 5, offset -8, butt at AP-3.41..AP+1.85: the identical relationship vanilla ships. Move this AP, the pan's from/to, or that riderOffset without the other two and TheSeatedRidersContactPatchLandsOnItsPan fails.",
               "code": "SeatAP",
-              "posX": "9.0",
-              "posY": "10.0",
+              "posX": "5.0",
+              "posY": "2.0",
               "posZ": "20.0",
               "rotationX": "0.0",
               "rotationY": "0.0",
@@ -330,23 +479,24 @@
           ]
         },
         {
+          "//seatrear": "Same bench, one row back, same way round - both rows face -X because the engine gives us no choice (see backrestwest). Its AP is at +21, not the +16 that would mirror the front row: the front row has to keep a footwell in front of it at the west end and this one backs onto the east wall instead, so forward-facing rows are inherently asymmetric about the mast. They still straddle it, which TheSeatAttachmentPointsStayOnTheCentreLine checks.",
           "name": "seatrear",
-          "from": [ 6.0, -16.0, -20.0 ],
-          "to": [ 24.0, -6.0, 20.0 ],
-          "rotationOrigin": [ 6.0, -16.0, -20.0 ],
+          "from": [ 16.0, -8.0, -20.0 ],
+          "to": [ 26.0, -6.0, 20.0 ],
+          "rotationOrigin": [ 16.0, -8.0, -20.0 ],
           "faces": {
-            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 4.5, 2.5 ] },
-            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 2.5 ] },
-            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 4.5, 2.5 ] },
-            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 2.5 ] },
-            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 4.5, 10.0 ] },
-            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 4.5, 10.0 ] }
+            "north": { "texture": "#wood", "uv": [ 0.0, 0.0, 2.5, 0.5 ] },
+            "east": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 0.5 ] },
+            "south": { "texture": "#wood", "uv": [ 0.0, 0.0, 2.5, 0.5 ] },
+            "west": { "texture": "#wood", "uv": [ 0.0, 0.0, 10.0, 0.5 ] },
+            "up": { "texture": "#wood", "uv": [ 0.0, 0.0, 2.5, 10.0 ] },
+            "down": { "texture": "#wood", "uv": [ 0.0, 0.0, 2.5, 10.0 ] }
           },
           "attachmentpoints": [
             {
               "code": "Seat2AP",
-              "posX": "9.0",
-              "posY": "10.0",
+              "posX": "5.0",
+              "posY": "2.0",
               "posZ": "20.0",
               "rotationX": "0.0",
               "rotationY": "0.0",

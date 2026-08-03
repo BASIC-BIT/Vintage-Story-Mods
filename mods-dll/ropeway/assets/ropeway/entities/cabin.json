@@ -12,9 +12,10 @@
       "interactMountAnySeat": true,
       "//animation": "SeatConfig.Animation, the player meta-anim code EntityBoatSeat honours first. The mountAnimations map that used to sit in attributes was dead JSON - only EntityBoat and EntityElevator read that key, and we are neither, so the rider just stood. sitboatidle is player.json:509 (bench sit, legs forward) and is what the sailed boat's non-controllable bench uses. RopewayCabinSeat.DidMount is what actually plays it.",
       "//eyeHeight": "1.0, not 1.4. The APs sit on the bench top at -0.375, so 1.4 put the eye at 1.0875 - inside the roof slab, which starts at 0.875. RopewayAssetContractTests.BothCabinSeatsSitTheRiderWithTheEyeInTheGlazing fails if this goes back up.",
+      "//riderOffset": "-0.5 BLOCKS = -8 units along the cabin's own X, applied before the AP transform (EntityRideableSeat.SeatPosition, .cs:53-58 - RotateY(yaw+90) then Translate(RiderOffset), so it is shape-local, not world). Not decoration and not copied blind: sitboatidle does not sit the rider ON the AP. Its LowerTorso keyframe carries offsetX 6.2, and with that element's rest roll the butt centre lands 7.22 units toward cabin +X of the rider's origin, box reaching 9.85. Without this the contact patch sits off the back of the pan and over the aisle. boat-sailed.json:53-54 is the calibration - it is the one vanilla sitboatidle bench, it carries exactly this value, and without it vanilla's own rider would miss its own plank by 2.7 units. Same sign as vanilla because the pose it is correcting is the same pose. RopewayAssetContractTests.TheSeatedRidersContactPatchLandsOnItsPan pins it to the pan geometry.",
       "seats": [
-        { "apName": "SeatAP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.0, "animation": "sitboatidle" },
-        { "apName": "Seat2AP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.0, "animation": "sitboatidle" }
+        { "apName": "SeatAP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.0, "animation": "sitboatidle", "riderOffset": { "x": -0.5 } },
+        { "apName": "Seat2AP", "controllable": false, "bodyYawLimit": null, "eyeHeight": 1.0, "animation": "sitboatidle", "riderOffset": { "x": -0.5 } }
       ]
     },
     "selectionboxes": {
