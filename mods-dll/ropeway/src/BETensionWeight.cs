@@ -39,10 +39,14 @@ public class BETensionWeight : BlockEntity
     /// what deletes the whole orphan/re-bind/spare family - break the tower a weight was built beside and it
     /// simply serves whichever tower is still in range, with nothing to repair.
     /// <para>
-    /// A weight in an unloaded chunk cannot be seen and would read as missing. It cannot happen while anyone
-    /// is on the line: <c>maxLineLength</c> 320 sits inside the default <c>MaxChunkRadius</c> of 384 blocks,
-    /// so a player standing anywhere on a line holds the whole of it loaded. That cap is doing real work
-    /// here, and it is the same cap that keeps a drive loaded around a rider.
+    /// A weight in an unloaded chunk cannot be seen and reads as missing, and the line-length cap does not
+    /// rule that out the way this used to claim: <c>MaxChunkRadius</c> 384 is a cap and not the loaded
+    /// radius, which is <c>min(MaxChunkRadius, ceil(Viewdistance/32))</c> for a network client - singleplayer
+    /// skips the cap - and comes to 256 blocks at the shipped view distance either way (see
+    /// <see cref="BEPylonBase.DriveSpeedOn"/> for the whole of it). A tensioner
+    /// beyond that window on a 320-block line refuses a cabin placement at the other end. Unlike the drive
+    /// there is no exemption for it, and it wants none - hanging a cabin is a one-off act the player can
+    /// simply do from the end the tensioner is at, not a control taken away mid-ride.
     /// </para>
     /// ponytail: O(weights x towers), both small, and only asked on a cabin placement or a block-info
     /// refresh. Index by line if a profile ever shows it.
@@ -56,10 +60,7 @@ public class BETensionWeight : BlockEntity
             if (weight?.Pos == null) continue;
             var radius = (weight.Block as BlockTensionWeight)?.TowerRadius ?? 0;
 
-            foreach (var tower in line.Towers)
-            {
-                if (BlockTensionWeight.Nearest(weight.Pos, tower, radius) < double.MaxValue) return true;
-            }
+            if (BlockTensionWeight.NearAnyTower(weight.Pos, line, radius)) return true;
         }
 
         return false;

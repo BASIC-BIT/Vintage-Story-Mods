@@ -1,0 +1,11 @@
+{
+  "//": "A pylon head with a drive housing built round it. One per LINE at most, and optional even then, so DECISIONS.md 3 - the MARGINAL cost of a pylon - does not bite: two plates on top of the head's own cost.",
+  "ingredientPattern": "PHP",
+  "ingredients": {
+    "P": { "type": "item", "code": "game:metalplate-*", "name": "metal" },
+    "H": { "type": "block", "code": "ropeway:pylonhead-*", "name": "side" }
+  },
+  "width": 3,
+  "height": 1,
+  "output": { "type": "block", "code": "bullwheel-north", "quantity": 1 }
+}

@@ -1,0 +1,545 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "metal": "game:block/metal/sheet/iron1"
+  },
+  "elements": [
+    {
+      "name": "footwest",
+      "from": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "to": [
+        3.2,
+        2.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "footeast",
+      "from": [
+        12.8,
+        0.0,
+        0.0
+      ],
+      "to": [
+        16.0,
+        2.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "beamwest",
+      "from": [
+        0.0,
+        2.0,
+        5.0
+      ],
+      "to": [
+        3.2,
+        14.0,
+        11.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "beameast",
+      "from": [
+        12.8,
+        2.0,
+        5.0
+      ],
+      "to": [
+        16.0,
+        14.0,
+        11.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "sheavecheekwest",
+      "from": [
+        3.2,
+        0.0,
+        2.0
+      ],
+      "to": [
+        5.4,
+        15.0,
+        14.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "sheavecheekeast",
+      "from": [
+        10.6,
+        0.0,
+        2.0
+      ],
+      "to": [
+        12.8,
+        15.0,
+        14.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "railwest",
+      "from": [
+        3.2,
+        -4.0,
+        0.0
+      ],
+      "to": [
+        5.4,
+        0.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "raileast",
+      "from": [
+        10.6,
+        -4.0,
+        0.0
+      ],
+      "to": [
+        12.8,
+        0.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "railwestflarein",
+      "from": [
+        3.2,
+        -3.98,
+        -16.0
+      ],
+      "to": [
+        5.4,
+        -0.02,
+        0.0
+      ],
+      "rotationOrigin": [
+        4.3,
+        -2.0,
+        0.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      },
+      "rotationY": 8
+    },
+    {
+      "name": "railwestflareout",
+      "from": [
+        3.2,
+        -3.98,
+        16.0
+      ],
+      "to": [
+        5.4,
+        -0.02,
+        32.0
+      ],
+      "rotationOrigin": [
+        4.3,
+        -2.0,
+        16.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      },
+      "rotationY": -8
+    },
+    {
+      "name": "raileastflarein",
+      "from": [
+        10.6,
+        -3.98,
+        -16.0
+      ],
+      "to": [
+        12.8,
+        -0.02,
+        0.0
+      ],
+      "rotationOrigin": [
+        11.7,
+        -2.0,
+        0.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      },
+      "rotationY": -8
+    },
+    {
+      "name": "raileastflareout",
+      "from": [
+        10.6,
+        -3.98,
+        16.0
+      ],
+      "to": [
+        12.8,
+        -0.02,
+        32.0
+      ],
+      "rotationOrigin": [
+        11.7,
+        -2.0,
+        16.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      },
+      "rotationY": 8
+    },
+    {
+      "name": "drivehousing",
+      "from": [
+        5.4,
+        12.2,
+        4.0
+      ],
+      "to": [
+        10.6,
+        15.0,
+        12.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "driveboss",
+      "from": [
+        6.5,
+        15.0,
+        6.5
+      ],
+      "to": [
+        9.5,
+        16.0,
+        9.5
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    }
+  ]
+}

@@ -38,9 +38,10 @@ public static class SpanMath
     public const double TowerClearance = 4.0;
 
     /// <summary>
-    /// Cells from the ground-placed controller (<c>ropeway:pylonbase</c>) up to the sheave block
-    /// (<c>ropeway:pylonhead</c>) at the top of its crossarm. The one number that turns a tower's
-    /// canonical position into its geometry, which is why it lives next to <see cref="AnchorOf"/>.
+    /// Cells from the ground-placed controller (<c>ropeway:pylonbase</c>) up to the sheave block at the top
+    /// of its crossarm - <c>ropeway:pylonhead</c>, or the decorative <c>ropeway:bullwheel</c> that stands in
+    /// for it. The one number that turns a tower's canonical position into its geometry, which is why it
+    /// lives next to <see cref="AnchorOf"/>.
     /// <para>
     /// Forced by the cabin, not chosen: the cabin body runs 1.25 below its origin to 1.25 above it, the
     /// origin hangs <c>hangDrop</c> = 2.25 below the sheave, and the footing occupies the ground cell the

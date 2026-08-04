@@ -14,18 +14,35 @@ namespace Ropeway;
 
 /// <summary>What a call to a tower would do. Not a bool: "it is already here" and "it cannot get here" are
 /// different things to tell the player, and reporting either as failure is what made calling look broken.
-/// <para>
-/// There is deliberately no power outcome. A line with no drive, or a drive with no wind, accepts the call
-/// and the cabin sets off as soon as it can - the same answer a quern gives. Refusing would be a state to
-/// explain, a message to write and a wait to sit through, for a situation the player can read off the
-/// tower's own panel.
-/// </para>
 /// </summary>
 public enum CabinCall
 {
     Called,
     AlreadyHere,
-    Unreachable
+    Unreachable,
+
+    /// <summary>
+    /// Nothing on the line is turning, the whole of the line is loaded, and the cabin has not left a station.
+    /// This is the outcome the design spent a paragraph refusing to have - a quern with no wind accepts the
+    /// grain and waits - and the reason it exists anyway is that aiming is not free. <c>Aim</c> latches
+    /// <c>departed</c>, only <c>Hold</c> clears it and every <c>Hold</c> needs the cabin to have got
+    /// somewhere, so a call on a dead line pins the full haul load on every drive of that line forever, for a
+    /// cabin that has never moved. The boarding path already had this guard; the call and the stop key were
+    /// the two doors left open.
+    /// <para>
+    /// The loaded clause is <see cref="MayStart"/>'s, and it is an EXEMPTION rather than an equivalence.
+    /// Truncation and drivelessness are independent: a truncated chain's zero MAY be a housing in a chunk
+    /// that has not landed, and it may equally be a line nobody ever built a drive for. So the exemption does
+    /// re-open the latch above - a three-second sit-down on a driveless truncated line latches
+    /// <c>departed</c>, and it stays latched after the chunk lands. It is taken anyway, because the two
+    /// mistakes are not the same size. The false refusal tells a player to go and build the drive they are
+    /// standing beside, which is a message they cannot act on. What the exemption costs is one cabin
+    /// declaring the haul load on a line where nothing turns - the same pin any departure that stalls
+    /// mid-span already carries, and it clears the first time something does turn and the cabin reaches a
+    /// tower.
+    /// </para>
+    /// </summary>
+    NoDrive
 }
 
 /// <summary>
@@ -124,7 +141,7 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
     /// <summary>
     /// The cabin is trying to move: it has left a station and has not stopped. Read by every powered tower
-    /// on the line to decide what load to declare - see <c>BEPylonBase.DeclareLoad</c> for why this and not
+    /// on the line to decide what load to declare - see <c>BEDriveHousing.DeclareLoad</c> for why this and not
     /// <see cref="IsMoving"/>, which is false whenever the drive has stalled and would oscillate.
     /// </summary>
     public bool IsHauling => departed;
@@ -511,9 +528,13 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
             // Never with anyone aboard, though. Parking is a teleport of up to the whole line, and a seated
             // rider flung across it is the exact failure this area exists to prevent - the one the re-base
             // branch above is guarded against, reachable here too because Hold clears `departed` and every
-            // hold lands in this branch on the next tick. Their cabin stops where it stands instead: it is
-            // not moving, so they can step out, and the stop key aims it at a station and sets it going
-            // again, including back the way it came.
+            // hold lands in this branch on the next tick. Their cabin stops where it stands instead, and the
+            // way out is the dismount: it is not moving, so they can simply step out. The stop key is the
+            // lesser half of it - a hold cleared `departed`, so aiming again is a first latch and MayStart
+            // asks for a drive, which means a rider held on a line that is whole and has nothing turning
+            // gets a refusal rather than a new heading. That is the one control this state costs them, and
+            // it is the price of not letting a parked cabin latch IsMoving on a driveless line and take the
+            // ordinary sneak-exit away.
             else if (!HasPassenger && !line.IsAtTower(Travelled, ArrivalTolerance)) ParkAtNearestEnd(line);
 
             if (boarding && HasPassenger)
@@ -522,16 +543,15 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
                 // The grace is up AND the drive is turning. This is NOT the departure gate the store design
                 // had, which refused a trip the cabin could not afford: nothing is being checked against a
-                // budget and nothing is refused - the machine simply does not start while nothing turns, the
-                // same way a quern with no wind does not start. Once it HAS started a stall does not undo it
-                // (see the speed check below), because that is what stops the load oscillating mid-ride.
-                // Without this, boarding a line with no drive at all latches `departed` for good: only Hold
-                // clears it and every Hold needs the cabin to move, so the towers would declare the full haul
-                // load on the player's network forever for a cabin that has never gone anywhere.
-                if (boardAccum >= BoardingGraceSeconds && RopewayPower.CabinSpeed(BEPylonBase.DriveSpeedOn(ModSystem, line)) > 0)
-                {
-                    Depart();
-                }
+                // budget and nobody is told no here - the machine simply does not start while nothing turns,
+                // the same way a quern with no wind does not start, and the rider is sitting in it and can
+                // see that. The two doors with nobody watching - the ground call and the stop key - answer
+                // the same question through MayStart and say so out loud. Once it HAS started a stall does
+                // not undo it (see the speed check below), because that is what stops the load oscillating
+                // mid-ride. Without this, boarding a line with no drive at all latches `departed` for good:
+                // only Hold clears it and every Hold needs the cabin to move, so the drives would declare the
+                // full haul load on the player's network forever for a cabin that has never gone anywhere.
+                if (boardAccum >= BoardingGraceSeconds && MayStart(line)) Depart();
             }
             else
             {
@@ -624,6 +644,43 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         IsMoving = departed;
         Place(line);
+    }
+
+    /// <summary>
+    /// May the cabin be set going right now: is anything on the line actually turning, and has it not left a
+    /// station already. Every latch of <c>departed</c> asks this - the boarding grace, the ground call and
+    /// the rider's stop key - and it is one method rather than three copies of the expression because the
+    /// three of them drifting apart is exactly how the call and the stop key ended up without the guard the
+    /// boarding path has always had. Pure, and therefore tested.
+    /// <para>
+    /// <paramref name="departed"/> is in the question, and that clause is the whole subtlety. A cabin that
+    /// has left and then stalled mid-span must still accept a re-aim: it is already latched, so aiming it
+    /// somewhere else costs the network nothing it is not already paying, and refusing there would take the
+    /// stop key off a rider at the exact moment the wind drops - which is the moment they most want to choose
+    /// where they end up. Only the first latch is worth a refusal.
+    /// </para>
+    /// <para>
+    /// <paramref name="truncated"/> is an EXEMPTION and not evidence. A truncated chain says part of the
+    /// line is dark; it does not say the dark part holds a drive, and a line with no drive anywhere can be
+    /// truncated just as easily. The window a rider holds open is 256 blocks at the shipped view distance
+    /// against a 320-block line cap, so a housing beside the far end of a long line really does read as
+    /// absent (<see cref="BEPylonBase.DriveSpeedOn"/>). Refusing there tells the player to build the drive
+    /// they are standing next to, on a click that used to bank and complete once the chunk landed; accepting
+    /// there latches <c>departed</c> on a line that may have no drive at all. The second is the cheaper
+    /// mistake and <see cref="CabinCall.NoDrive"/> weighs the two. It lives here rather than at the two
+    /// refusal sites so the boarding grace gets it too: the rider who presses the stop key and the rider who
+    /// simply sits down have the same drive, and answering them differently is how these three drifted apart
+    /// the first time.
+    /// </para>
+    /// </summary>
+    public static bool MayStart(bool departed, double lineSpeed, bool truncated)
+    {
+        return departed || truncated || lineSpeed > 0;
+    }
+
+    private bool MayStart(RopewayLine line)
+    {
+        return MayStart(departed, RopewayPower.CabinSpeed(BEPylonBase.DriveSpeedOn(ModSystem, line)), line?.Truncated == true);
     }
 
     /// <summary>
@@ -1142,6 +1199,11 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         if (index < 0) return CabinCall.Unreachable;
 
+        // A rider on a cabin that is already hauling passes this whatever the wind is doing - see MayStart.
+        // The one refused here is the rider sitting in a parked cabin on a line with nothing turning, who
+        // would otherwise pin the haul load on the line for as long as the world lives.
+        if (!MayStart(line)) return CabinCall.NoDrive;
+
         tower = line.Towers[index];
         Aim(target, riderUid);
         return CabinCall.Called;
@@ -1161,6 +1223,10 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         var outcome = PlanCall(line, tower, Travelled, out var target);
         if (outcome != CabinCall.Called) return outcome;
+
+        // Last, not first: "the cabin is already at this tower" is the more useful answer to a click at a
+        // tower the cabin is standing at, whether or not the wind is blowing.
+        if (!MayStart(line)) return CabinCall.NoDrive;
 
         Aim(target, callerUid);
         return CabinCall.Called;

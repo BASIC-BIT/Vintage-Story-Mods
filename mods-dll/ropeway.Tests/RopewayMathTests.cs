@@ -1078,6 +1078,84 @@ public class RopewayMathTests
         Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released));
     }
 
+    /// <summary>
+    /// The one new decision in the cabin's state machine, and the only control the mod can take away from a
+    /// rider. Every row, because each of the three terms is there for a different failure and dropping any of
+    /// them looks harmless from the code.
+    /// </summary>
+    [Theory]
+    // Nothing turning, whole line loaded, never left a station: the one refusal there is.
+    [InlineData(false, 0.0, false, false)]
+    // A drive is turning, so of course it may go.
+    [InlineData(false, 1.2, false, true)]
+    // Already left and stalled mid-span. Refusing here takes the stop key off a rider at the exact moment
+    // the wind drops, and the load it would save is pinned by the departure already.
+    [InlineData(true, 0.0, false, true)]
+    [InlineData(true, 1.2, false, true)]
+    // Truncated: the zero is a chunk that has not landed rather than a drive nobody built. Refusing here
+    // told a player whose only housing stands beside the far end of a 320-block line to go and build the
+    // drive they were standing next to.
+    [InlineData(false, 0.0, true, true)]
+    [InlineData(false, 1.2, true, true)]
+    [InlineData(true, 0.0, true, true)]
+    [InlineData(true, 1.2, true, true)]
+    public void ACabinOnlyRefusesToStartWhenTheWholeLineIsLoadedAndNothingIsTurning(
+        bool departed, double lineSpeed, bool truncated, bool expected)
+    {
+        Assert.Equal(expected, EntityRopewayCabin.MayStart(departed, lineSpeed, truncated));
+    }
+
+    /// <summary>
+    /// The rim has to TURN rather than orbit, and the guard for that cannot be the constant the chain is
+    /// built from: asserting <c>RimPivotY</c> against the shape pins two INPUTS and leaves the matrix free,
+    /// so putting the return translate back to -0.5 on its own restores the orbit with every other test
+    /// still green. The axle is the chain's fixed point or the wheel is swinging round something else, and
+    /// that has to hold at every angle on every facing.
+    /// <para>
+    /// The axle probe ALONE is very nearly worthless, which is what an earlier version of this test was: the
+    /// pivot is the fixed point of <c>T(c) * A * B * T(-c)</c> for any pair of rotations about <c>c</c>, in
+    /// any order and about any axes, so both ways <c>BullwheelRenderer.RimMatrix</c> can be wrong - the two
+    /// rotations swapped, or RotateZ where RotateX belongs - leave all three of its numbers untouched. Both
+    /// edits were applied and the whole suite stayed green. The felloe probe below is what sees them.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheRimTurnsOnItsOwnAxleAtEveryAngleAndEveryFacing()
+    {
+        foreach (var side in new[] { "north", "east", "south", "west", null })
+        foreach (var turns in new[] { 0.0, 0.25, 0.5, 0.75 })
+        {
+            var yaw = BullwheelRenderer.YawFor(side);
+            var theta = (float)(turns * GameMath.TWOPI);
+            var matrix = BullwheelRenderer.RimMatrix(new Matrixf().Identity(), yaw, theta).Values;
+
+            var axle = Mat4f.MulWithVec4(matrix, 0.5f, BullwheelRenderer.RimPivotY, 0.5f, 1f);
+
+            // Tolerances rather than decimal places: these are single-precision sines and cosines, and the
+            // pivot itself sits on a 4-dp midpoint that rounds two ways. A wheel that orbits misses by a
+            // whole block, four orders above this.
+            Assert.Equal(0.5, axle[0], 1e-4);
+            Assert.Equal(BullwheelRenderer.RimPivotY, axle[1], 1e-4);
+            Assert.Equal(0.5, axle[2], 1e-4);
+
+            // One point on the felloe, 0.6 up the axle's own vertical, against the closed form of the chain
+            // the renderer is meant to be: Ry(yaw) applied to Rx(theta) applied to (0, 0.6, 0), written out
+            // from the rotation definitions rather than composed from Matrixf - composing it would agree
+            // with whatever the renderer does and prove nothing. All three components, because every wrong
+            // chain puts the same 0.6 on a DIFFERENT axis and changes nothing else.
+            //
+            // Which row catches what, because it is not one row: west (yaw 90) at a quarter turn separates
+            // the shipped chain, +0.6 on x, from both wrong ones, +0.6 on z. It cannot separate those two
+            // from EACH OTHER - at yaw 90 they are literally the same matrix, since Ry(90) carries z to x and
+            // so Ry(90)*Rz(t) == Rx(t)*Ry(90). North (yaw 0) at a quarter turn is the row that does: the
+            // swapped chain agrees with the shipped one there, and RotateZ puts the 0.6 on -x.
+            var felloe = Mat4f.MulWithVec4(matrix, 0.5f, BullwheelRenderer.RimPivotY + 0.6f, 0.5f, 1f);
+            Assert.Equal(0.5 + 0.6 * Math.Sin(theta) * Math.Sin(yaw), felloe[0], 1e-4);
+            Assert.Equal(BullwheelRenderer.RimPivotY + 0.6 * Math.Cos(theta), felloe[1], 1e-4);
+            Assert.Equal(0.5 + 0.6 * Math.Sin(theta) * Math.Cos(yaw), felloe[2], 1e-4);
+        }
+    }
+
     private static RopewayLine Line(params (int X, int Y, int Z)[] towers)
     {
         var positions = new List<BlockPos>();

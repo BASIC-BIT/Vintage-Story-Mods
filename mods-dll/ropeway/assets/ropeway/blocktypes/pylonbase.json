@@ -8,16 +8,7 @@
       "name": "HorizontalOrientable"
     }
   ],
-  "//entityBehaviors": "MPConsumer is registered by vanilla (SurvivalCoreSystem), so the mod registers nothing for it. mechPartShape null is MANDATORY, not decoration: BEBehaviorMPBase.Initialize defaults Shape to Block.Shape and then unconditionally calls AddDeviceForRender, so without it the whole footing model joins the instanced spinning renderer and the player's foundation stone rotates. resistance is the schedule's floor - BEPylonBase rewrites it every second to RopewayPower.Resistance, which is this idle figure unless the tower's line has a cabin trying to move, and the haul load plus a climb term while it has.",
-  "entityBehaviors": [
-    {
-      "name": "MPConsumer",
-      "properties": {
-        "resistance": 0.005,
-        "mechPartShape": null
-      }
-    }
-  ],
+  "//nopower": "The footing is NOT a mechanical power node. It carried the MPConsumer while the drive was invisible - two identical towers, one driving the line and one not. The hookup is now ropeway:drivehousing, a separate block standing within 8 blocks of any tower on the line; the bullwheel on the crossarm is decoration that turns and is on no network at all. A trial build DID put the hookup on the bullwheel up here, and it was abandoned: getting an axle four blocks into the air cost about sixteen vanilla blocks, and the run had to cross the cells the cabin hanger flies through. Do not move the intake back onto a tower cell. See docs/POWER-AND-STORAGE.md.",
   "variantgroups": [
     {
       "code": "side",
@@ -76,16 +67,17 @@
     },
     "reinforcable": false,
     "maxSpan": 48,
-    "//maxLineLength": "320 = 10 chunks. The server keeps chunks loaded within MaxChunkRadius of a player, default 12 chunks / 384 blocks (ServerConfig.cs:925), and ServerMain.cs:789 only ever raises it. Chain length is an upper bound on the straight-line distance between any two towers, so a line under that radius can never have a tower unload while a rider is anywhere on it - which is the precondition for the whole truncated-line failure class (see docs/KNOWN-ISSUES.md R1-R4). 320 leaves two chunks of margin. Raising this back toward 512 re-opens that class; so does a server configured below MaxChunkRadius 10. It also now carries the POWER design: the cabin runs at the live speed of the drives on its line (BEPylonBase.DriveSpeedOn), which is only honest while all of them are loaded - the same radius argument, doing a second job. Where the old design wrote 'the cabin must never read live network state', read this instead.",
+    "//maxLineLength": "320 = 10 chunks, and it MITIGATES the truncated-line failure class rather than closing it (docs/KNOWN-ISSUES.md R1-R4). This used to say a line shorter than the server's MaxChunkRadius can never have a tower unload while a rider is anywhere on it. MaxChunkRadius 12, i.e. 384 blocks (ServerConfig.cs:925), is a CAP on the loaded radius and not the radius: ServerMain.GetAllowedChunkRadius is min(MaxChunkRadius, ceil(Viewdistance/32)), and the shipped client default of 256 makes that 8 chunks = 256 blocks - so a full-length line outruns the window by 64 and a player at one END of one has the far end dark. What 320 does buy is that the MIDDLE of a full-length line holds all of it, and that most lines are well under 256 end to end. Raising this back toward 512 makes both worse. It also carries the POWER design: the cabin runs at the live speed of the drives on its line (BEPylonBase.DriveSpeedOn), which is only honest while all of them are loaded - the same radius argument doing a second job, with the same caveat, which is why EntityRopewayCabin.MayStart refuses only on a chain that is not truncated. Where the old design wrote 'the cabin must never read live network state', read this instead.",
     "maxLineLength": 320,
     "ropePerBlock": 0.25,
     "maxCandidates": 16,
     "//posts": "Block number 3 is the two posts: wood or dressed stone, so a tower can match what it stands next to. Every alternative must resolve to at least one loaded block or MultiblockStructure.HighlightIncompleteParts throws on SearchBlocks(wildcard)[0]; RopewayModSystem.VerifyStructureWildcards logs that at startup, but it only tests the whole key, so a dud alternative hides behind the live ones. These are the vanilla 1.22.1 codes: log-placed-{wood}-{rotation}, debarkedlog-*, planks-*, rock-*, cobblestone-*, drystone-*, rockpolished-*, stonebricks-*. WildcardUtil anchors an @-pattern as ^...$ (RegexCache.IsMatch), so rock-.* does not also swallow crackedrock-*. Deliberately NOT widened to slabs, stairs, chiselled blocks or soil: a post is a structural column, and a tower that accepts anything stops reading as a tower.",
+    "//blockNumber1": "The crossarm's centre cell takes EITHER the plain sheave or the bullwheel: a drive tower is the same sixteen cells as every other tower and the wheel is a swap, not an extra cell. That is what keeps the drive off DECISIONS.md 3's per-tower marginal cost - no tower needs one, and a line with none simply does not move.",
     "//multiblockStructure": "One crossarm on two posts, all offsets from the footing you place on the ground. The crossarm is at y +4 and not lower: the cabin is 2.5 blocks tall, hangs 2.25 below the rope, and passes over this very block, so the sheave has to sit 4.5 above the footing's bottom for the floor to clear the footing and the roof to clear the station rails. The posts run the whole way down to ground level, y 0..3, or they hang in the air beside the footing. The passage cells (x -2..2, y 0..3) are deliberately absent.",
     "//passagewidth": "The posts sit at x +/-3 and the crossarm is SEVEN cells, leaving a 5-wide passage. It was 5 cells and a 3-wide passage. THIS IS THE FIX, not decoration: moving the posts out is what takes post penetration from 1.000 to 0.033 blocks at a 45-degree corner and from 0.450 to 0.000 at 30 degrees. An earlier note here said the opposite - that the widening was 'room and light' and that the angle-station yaw law was the fix. Backwards on both counts: the yaw law measured WORSE (45deg 0.033 -> 1.000, 30deg 0.000 -> 0.331), because the cabin crab-walks once PositionAt has swung its origin onto the outgoing leg, and it was reverted. Do not re-attempt it. A right-angle corner still clips whatever the yaw does - a facing is one of four cardinals, so at 90 degrees the outgoing leg IS the post axis and the cabin's origin travels through the post column, which is a translation no rotation fixes. The price of the widening is metal, and it DOUBLES rather than rising by two braces: brace.json is stick+metalplate+stick -> 4 braces, so a 5-wide crossarm was 4 braces = exactly 1 metal plate and a 7-wide is 6 braces = 2 crafts = 2 metal plates, on EVERY tower of a chained route. That marginal per-tower cost is exactly what DECISIONS.md section 3 protects; it was taken knowingly (docs/KNOWN-ISSUES.md records it). Reverting is JSON-only - posts +/-3 -> +/-2, drop the two outer brace offsets, and move the matching numbers in gen_manifests.py, the two handbook pages, dlg-guide-body, README and QA-SCRIPT - but it hands the 45/30-degree penetration straight back.",
     "multiblockStructure": {
       "blockNumbers": {
-        "ropeway:pylonhead-*": 1,
+        "ropeway:@(pylonhead-.*|bullwheel-.*)": 1,
         "ropeway:brace-*": 2,
         "game:@(log-placed-.*|debarkedlog-.*|planks-.*|rock-.*|cobblestone-.*|drystone-.*|rockpolished-.*|stonebricks-.*)": 3
       },

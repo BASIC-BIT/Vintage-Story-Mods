@@ -1,6 +1,8 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 88 ropeway tests passing. Everything in the tables below was found by reading code,
+State: build green, 147 ropeway tests passing — 78 `[Fact]` plus 69 `[InlineData]` across the four files in
+`mods-dll/ropeway.Tests`, which is where to re-derive this number rather than trusting the line. (It read
+136 for two rounds after the count moved.) Everything in the tables below was found by reading code,
 not by playing — none of *it* has been observed in game.
 
 ## Station rail (2026-08-03) — what shipped, what was reverted, what it costs
@@ -134,6 +136,156 @@ Three things BASIC saw riding it. All three are closed.
 | **A seated rider could spin all the way round** on a bench that faces one way. | `bodyYawLimit` was dead JSON, and the key is not decorative — `SeatConfig.BodyYawLimit` is only ever *read* by `EntityBoat.SeatsToMotion` and `EntityBehaviorRideable.SeatsToMotion`, and the cabin is neither, so nothing was going to apply it for us. | `EntityRopewayCabin.ConstrainRiderYaw`, eight lines on the tick, identical to vanilla's: `EntityPlayer.BodyYawLimits` / `HeadYawLimits` centred on `Pos.Yaw + mountRotation.y`, range `bodyYawLimit` (now **1.5707963 = ±90°**, so a rider can look out either side and not sit backwards). It needs **no controllable seat** — it constrains the passenger, not the mount, so `controllable: false` and the smooth-motion tests are untouched. What it clamps, exactly: `HeadYawLimits` is read by `ClientMain.UpdateCameraYawPitch` (:2377-2383), which clamps `mouseYaw`, so this is the seated player's **own camera**, client side; `BodyYawLimits` clamps that same player's rendered body through the `BodyYaw` setter. Neither reaches what other players see — `EntityPlayerShapeRenderer` (:429-431) already forces a remote rider's drawn body yaw to the mount's, so onlookers see him squared to the cabin whichever way he is looking. Running it server side would change nothing: the server assigns `BodyYawServer` from the position packet, not `BodyYaw`, so the clamping setter never sees it. |
 | **The front seat was too far forward** — the rider's toes 2.34 units off the west wall while the rear row had 22.34 units in front of its own. | Forward-facing rows are asymmetric about the mast by construction (the rear row backs onto the east wall, the front row needs a footwell), and the front row was placed by mirroring the pan rather than by the clearance ahead of the rider. | The front bench moved back 10 units: pan −21..−11 → **−11..−1**, and `backrestwest`, `apronwest`, both mullions and both thresholds with it (the AP is `posX`-relative to the pan, so it follows on its own and stays at the pan's depth centre). Both rows face −X, so "evenly placed" is one number — the clear floor ahead of each rider's toes, which reach lip − 4.66 — and 10 is what equalises it at **12.34 each**. It also tiles: footwell 17 + pan 10 = a 27-unit seat bay, twice, in a 56-unit interior, with the rear row's 2-unit reveal off the east wall as the remainder. The threshold plank shortened 24 → 14 and its uv widths with it (size/4, like every face in that shape). `TheSeatedRidersContactPatchLandsOnItsPan` and `TheSeatAttachmentPointsStayOnTheCentreLine` both still pass, and the plan/section renders were re-read rather than the asserts alone. |
 
+## The drive came down off the crossarm (2026-08-03)
+
+The bullwheel trial is **resolved, and split**. The mechanical consumer is now `ropeway:drivehousing`, a
+block you build within eight blocks of any tower on the line — usually on the ground, and up beside a
+windmill's hub when the mill needs the height; the bullwheel stays on the crossarm as **decoration that
+turns**. Design and reasoning: [POWER-AND-STORAGE.md](POWER-AND-STORAGE.md).
+
+**Why the trial failed.** Two findings, both from the hostile review
+(`docs/agentic/ingest/cablecar/BULLWHEEL-REVIEW.md`):
+
+1. **Getting power four blocks up cost about sixteen vanilla blocks** — a five-log support column, four
+   vertical axles, a four-block run back across the crossarm and three angled gears — and the column was
+   *mandatory*: vanilla refuses an angled gear beside an unsupported axle, and every block of the tower
+   ships `sidesolid: all false`, so the run cannot lean on the tower it serves. In the render the column
+   stood as tall as the tower's own posts and right beside them, so the tower read as two piers with a
+   lean-to rather than one archway.
+2. **The wheel failed at its own job.** Its silhouette measured near-identical to the pylon head's at any
+   real distance, and it did not move. What actually marked a drive tower was the scaffolding.
+
+**What each half is now.**
+
+| | before | now |
+|---|---|---|
+| the consumer | `ropeway:bullwheel`, 4 blocks up, on a tower cell | `ropeway:drivehousing`, its own block within 8 |
+| mill → line | ~16 blocks, whatever the mill | **3** (housing + 2 axles, no gears) for a water wheel or a wooden rotor whose housing rides up to hub height; **5** (2 gears + 3 vertical axles) for a maxed metal rotor |
+| binding | none — the wheel was a tower cell | proximity within 8 blocks, the tension weight's pattern |
+| axle faces | up, down, and both cells **along the line** | horizontal only |
+| the bullwheel | the intake | decoration, on no network, and it **turns** |
+
+**B1 (build-order dead end) is gone for the gearless layouts and back for the metal one.** It was
+`BlockAngledGears.TryPlaceBlock` refusing to sit beside an axle that fails `IsAttachedToBlock`. There is no
+angled gear in the water-wheel build or in a wooden-rotor build whose housing sits at hub height, and
+`BEBehaviorMPAxle.IsAttachedToBlock` passes a ground-level `we` axle on the block below it — the ground. A
+maxed metal rotor needs eleven clear blocks under its hub whatever the intake does, so that drive still descends through
+two gears and a `woodenaxle-ud` column, and the column still needs a wall beside it because every block of
+the tower is `sidesolid: all false`. An earlier version of this line said the dead end was gone outright.
+
+**The docs described a windmill that cannot exist (2026-08-03, docs only).** `QA-SCRIPT.md` 27c, handbook
+52 step 2, `50-ropeway.json` and the tower guide all told the player to stand a rotor on the ground two
+blocks out from a ground-level housing. `BEBehaviorWindmillRotor.OnInteract` refuses a sail when
+`obstructed(sailLength + 2)`, and `obstructed(len)` is a flat `(2len+1)²` square standing in the plane the
+sails turn in — up and sideways count exactly as much as down, only the centre cell and the four extreme
+corners are exempt, and nothing along the axle axis is ever scanned. **A rotor whose hub is one block off
+the ground refuses its first sail.** Every one of those pages is rewritten; no code changed, because the
+code was right. Two things the fact-finding turned up that the review raising it had also got wrong: the
+**water wheel is not the easy ground-level alternative** (it only turns in worldgen-only `rapidwater` — plain
+`water` declares no `flowSpeed` at all — and it is a six-stage build in 32 support beams and 96 planks), and
+**`obstructed` never scans along the axle axis**, which is exactly why the drive train behind a mill is free
+and why the housing can ride up beside the hub without blocking it. Working:
+`docs/agentic/ingest/cablecar/HOUSING-FIX-FACTS.md`.
+
+**A bare scouting footing can no longer take a housing off its line.** `BEPylonBase.Initialize` registers a
+footing in `LoadedTowers` unconditionally — before any completeness check, and whether or not it carries
+spans — so a bare one dropped while marking the next tower position used to be a candidate for
+`ServingTower`. Put it within 8 blocks of a working housing and nearer to it than the line's own footing and
+the housing fell to `IdleResistance` with `Serves(realLine)` false: the line stopped, with the mill visibly
+turning three blocks away and the footing panel telling the player to build a drive housing they had already
+built. `ServingTower` now filters to footings that **resolve to a line** — `RopewayLine.GetOrBuild` is null
+below two towers, which is exactly the test — and `ABareFootingCannotTakeAHousingOffTheLineItDrives` pins it.
+The exact tie went the same way: `NearestTower` breaks equal distances on `RopewayLine.ComparePos` rather
+than on whichever entry the `Dictionary` yields first, so two equidistant footings resolve identically on the
+server, on every client and across a restart. `EquidistantFootingsAreDecidedOnPositionAndNotOnChunkLoadOrder`
+is the guard.
+
+**B2 (an axle on the haul rope) is gone.** The housing connects on horizontal faces only, four blocks below
+the rope line.
+
+**L2 (no drive in the tower guide) is closed.** `RopewayGuideDialog` turns five blocks now — footing, head,
+brace, bullwheel, drive housing — and the body names the drive.
+
+**L6 (the five-vs-four vertical axle count) died with the scaffold.** Nothing counts vertical axles any
+more, here or in QA-SCRIPT.
+
+**M4 is ACCEPTED, not fixed.** The bullwheel is still `HorizontalOrientable`, so one placed while facing the
+wrong way validates the tower with its throat and station rails running across the line. The pylon head has
+carried exactly the same looseness since the pattern was written; the fix is to orient the crossarm's centre
+cell from the footing below it for **both** blocks in one place, and a private rule on the decorative half
+would leave the bug and add a rule. Marked `ponytail:` in `BEBullwheel`.
+
+**Every placed bullwheel costs a server-side block entity that does nothing, and that is accepted.**
+`entityClass: "Bullwheel"` is declared for both sides and `BEBullwheel.Initialize` returns at
+`api is not ICoreClientAPI` before it registers anything, so on a server each wheel is a block entity that
+is saved, loaded and never useful. Unavoidable while the client needs one to hang the renderer on, and
+cheap — recorded because the handbook says a bullwheel *"costs the tower nothing"*, which is true of the
+sixteen build cells and not quite true of the server.
+
+**Migration, and it is not silent this time either.** A world saved on the trial build has its `MPConsumer`
+on the bullwheel. That behaviour is no longer declared, so it is dropped on load (orphan tree attributes are
+ignored — no crash), the wheel stops driving and the axle stub beside it will self-break on the next
+neighbour change. The line then reports *"Nothing on this line is turning"* and names the drive housing.
+Acceptable for a pre-1.0 mod; the rebuild is one block and two axles beside whatever the mill turned out
+to be — on the ground for a water wheel, up at the hub for a windmill.
+
+## From the housing-fix review — recorded, not fixed (2026-08-03)
+
+Round-2 adversarial review of the drive housing, the `NoDrive` refusal and the bullwheel renderer
+(`docs/agentic/ingest/cablecar/HOUSING-FIX-REVIEW-truth.md`, `-refusal.md`, `-renderer.md`). Its blocker and
+its doc concerns were fixed in the same pass; these four were judged not worth the diff. The bare-footing
+half of the stray-footing entry **was** fixed in round 2 and has moved up into the section above; the
+truncated-boarding entry is round 3's, and is a consequence of a fix rather than a leftover.
+
+**A rider held mid-span cannot re-aim until something turns.** `Hold` clears `departed`, and
+`EntityRopewayCabin.MayStart` is `departed || truncated || lineSpeed > 0`, so a mid-span rider on a line that
+is whole keeps the stop key only while `departed` or a turning drive holds. An ordinary stall keeps `departed` latched on purpose — that is the
+anti-oscillation rule — so a cabin merely becalmed mid-span still takes the stop key with the wind at zero.
+What is not covered is a `Hold` firing mid-span *while* the drive is also dead: a blocked span ahead, or a
+call abandoned under them, on a line whose mill has stopped too. `RequestStop` then answers `NoDrive` and
+the rider cannot point the cabin anywhere until the drive turns again. It is not a strand and it heals
+itself: `departed` false means `IsMoving` false means `CanUnmount` true, so the ordinary dismount is open
+the whole time — in mid-air with the fall, which is the deal every mid-span exit has — and the key works
+again the instant anything turns. The two ways to close it, dropping the `departed` clause for
+`RequestStop` alone or refusing `NoDrive` on a held cabin, both add a rule to a state machine that has just
+had one deleted, for a state you reach by being unlucky twice.
+
+**A real scrap line nearer a housing than the line it was built for takes it, and correctly.** Two
+abandoned footings still linked to each other, standing nearer the housing than the line it was meant to
+drive, win `ServingTower`: that is a line, and "the nearest footing that is on a line" is doing exactly what
+it was written to do. The bare-footing version of this — a single unlinked footing — is **fixed** and is
+recorded above. What is left is the case where the rule is right and the world is wrong, and the fix is to
+break the scrap line. Recorded because the symptom is identical to the fixed one: a stopped line beside a
+turning mill. Check for a linked pair before filing.
+
+**On a truncated line the boarding grace latches `departed` with nothing turning, and that is the price of
+the `truncated` term.** `MayStart` is `departed || truncated || lineSpeed > 0`, and its third caller is the
+boarding grace in `EntityRopewayCabin.ServerTick`. The comment at that call site says what the gate exists to
+prevent — boarding a line with no drive at all would otherwise latch `departed` for good, since only `Hold`
+clears it and every `Hold` needs the cabin to move — and a truncated line now exempts it. A rider who sits
+for the three-second pause on a line with a dark end departs with `lineSpeed` 0: nothing moves (the
+`speed <= 0` branch writes `IsMoving = false`, so nobody is trapped and the dismount stays open) but
+`IsHauling` is true, and every loaded housing on that line writes the full `HaulResistance` onto its network
+until something turns. **Deliberate.** The `truncated` clause is there because a zero speed on a truncated
+chain is not evidence that there is no drive, and it lives in `MayStart` rather than at the two refusal sites
+precisely so the rider who sits down and the rider who presses the stop key get the same answer — splitting
+them is how these three drifted apart the first time. **It self-heals**: the moment anything on the line
+turns, the cabin departs for real and the next `Hold` clears `departed`. QA 27g's closing check is therefore
+scoped to a line that is whole, and says so.
+
+**North- and south-facing bullwheels on one line turn opposite ways, and that is accepted.**
+`BullwheelRenderer.YawFor` is a full 360° yaw — north 0, east 270, south 180, west 90 — matching
+`bullwheel.json`'s own `rotateY` table so the rim's plane tracks the sheave throat on every variant. The
+spin axis is not 360°: a 180° yaw maps the mesh axle from +X to −X, so one always-positive `angleRad` reads
+clockwise on a north-facing wheel and anticlockwise on a south-facing one.
+`ThePylonHeadShapeIsSymmetricAlongTheRopeAxis` already establishes that the two are identical standing
+still, so both are ordinary placements on a north-south line and nothing tells a player to prefer either —
+which is precisely how two drive towers on one rope end up disagreeing. Purely cosmetic: the rope's own
+direction of travel is not modelled anywhere, so both directions are equally arbitrary and only the
+disagreement is visible. The one-line collapse is `"east" or "west" => 90f, _ => 0f`, safe because the rim
+mesh is itself symmetric under a 180° yaw; not taken, because it trades a real correspondence with the
+static shape's yaw table for a tidy-up nobody can falsify. QA 27c-wheel says not to file it.
+
 ## The store, deleted (2026-08-03)
 
 The wound tension weight is **gone**, and with it the whole charge/quote/credit apparatus. What ships is a
@@ -159,7 +311,7 @@ weight's persisted binding, and none of them exists to be fixed any more:
 | **F7** | A weight placed by schematic or worldedit was permanently orphaned. `Bind` is gone; placement does nothing but check it is near a tower. |
 | **F8** | Charge was only persisted on a 1/32 step boundary. There is no charge. |
 | **F9** | `Wind`'s `dt` was unclamped. There is no `Wind`. |
-| **F5** | "This line has no tension weight" could lie under truncation. It still resolves through the walked chain, but it is asked at cabin **placement** and on the block-info panel rather than at every departure, and `maxLineLength` 320 < `MaxChunkRadius` 384 means a player standing on the line holds all of it. |
+| **F5** | "This line has no tension weight" could lie under truncation. It still resolves through the walked chain, but it is asked at cabin **placement** and on the block-info panel rather than at every departure — one question at build time rather than a gate on every trip. The line that used to close this row outright (`maxLineLength` 320 < `MaxChunkRadius` 384, so a player standing on the line holds all of it) is **arithmetically wrong**: the stock loaded window is 256 blocks, not 384. See the truncated-line section below. It is narrowed to placement, not eliminated. |
 | **F10** | The weight is a 3-block shape in a 1-block cell with no headroom check. **Still true**, still cosmetic. |
 | **F11–F14** | Docs. QA step 27 is new, this file and the handbook are rewritten, and handbook 52 no longer recommends a flywheel that vanilla does not have. |
 
@@ -180,12 +332,18 @@ identity, length and canonical direction are derived from which chunks happen to
 rounds of patching this produced a new defect each time. See [CABIN-MOTION-REDESIGN.md](CABIN-MOTION-REDESIGN.md)
 for the fix that removes the class rather than compensating for it.
 
-**Mitigated, not fixed.** `maxLineLength` was reduced 512 → 320 (`blocktypes/pylonhead.json`). The
-server keeps chunks loaded within `MaxChunkRadius` of a player — default 12 chunks / 384 blocks
-(`ServerConfig.cs:925`), and `ServerMain.cs:789` only ever raises it. Chain length upper-bounds the
-straight-line distance between any two towers, so on a line under that radius no tower can unload while
-a rider is anywhere on it. **This makes R1–R4 unreachable under default server config.** They return if
-`maxLineLength` is raised, or if a server sets `MaxChunkRadius` below 10.
+**Mitigated, and less than the arithmetic here used to claim.** `maxLineLength` was reduced 512 → 320
+(`blocktypes/pylonbase.json`). This section said that put a whole line inside the server's default
+`MaxChunkRadius` of 384 and made R1–R4 unreachable on a stock server. **It does not.** `MaxChunkRadius` 12
+(`ServerConfig.cs:925`) is a *cap*: `ServerMain.GetAllowedChunkRadius` (`:2527`) returns
+`min(MaxChunkRadius, ceil(viewDistance / 32))`, the shipped `viewDistance` is 256 (`ClientSettings.cs:1958`),
+and `ServerSystemUnloadChunks` (`:597`, `:734`) unloads everything outside exactly that radius. So the stock
+window is **8 chunks = 256 blocks** against a line that may be **320**, and a rider standing at one end of a
+full-length line has the far end unloaded. R1–R4 are **reachable at stock settings on a line built near the
+cap**; what makes them rare is that most lines are nowhere near 320 blocks long, and anything under about
+256 end to end really is inside one player's window wherever they stand on it. A singleplayer client skips
+the cap entirely and gets its own view-distance slider, so raising that above 320 closes them there.
+Working: [POWER-AND-STORAGE.md](POWER-AND-STORAGE.md), "The cabin reads live network state".
 
 | id | severity | what happens |
 |---|---|---|

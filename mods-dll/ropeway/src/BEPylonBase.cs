@@ -41,12 +41,6 @@ public class BEPylonBase : BlockEntity
     private IPlayer highlightFor;
     private string side;
 
-    /// <summary>
-    /// This tower's mechanical power hookup, or null on a variant that never declared the behaviour.
-    /// Vanilla registers <c>MPConsumer</c> itself, so the mod registers nothing for it.
-    /// </summary>
-    private BEBehaviorMPConsumer mpc;
-
     public double MaxSpan => Block?.Attributes?["maxSpan"].AsDouble(48) ?? 48;
 
     public double MaxLineLength => Block?.Attributes?["maxLineLength"].AsDouble(512) ?? 512;
@@ -75,7 +69,6 @@ public class BEPylonBase : BlockEntity
         // AsObject<T> on a missing key yields null - a variant that forgot the attribute must not NRE.
         structure = Block?.Attributes?["multiblockStructure"]?.AsObject<MultiblockStructure>();
         side ??= Block?.Variant["side"];
-        mpc = GetBehavior<BEBehaviorMPConsumer>();
 
         if (structure != null && side != null) Init();
 
@@ -117,68 +110,55 @@ public class BEPylonBase : BlockEntity
     private void OnServerTick1s(float dt)
     {
         Validate();
-        DeclareLoad();
     }
 
     /// <summary>
-    /// The load this tower puts on its network: the haul rope is a real mechanical load, so a tower whose
-    /// line has a cabin trying to move declares one, and every other tower idles.
+    /// The line's drive speed: every loaded HOUSING standing beside it, added ONCE PER NETWORK. THAT is the
+    /// pooling - a drive may be built beside any tower and separate drives add up - and it needs no
+    /// coordination because addition does not care what order it happens in or whether one of the terms went
+    /// away. Several housings tapped off one axle run are one drive, not several;
+    /// <see cref="RopewayPower.PoolSpeed"/> is why, and that dedupe is unchanged from when the pool was over
+    /// towers - only the source of the pairs moved.
     /// <para>
-    /// EVERY tower does this - there is no designated drive station - and every powered tower on the line
-    /// declares the SAME load rather than a share of it, because a share would have to be divided by how
-    /// many other towers are powered, which is a number that changes when somebody walks away and a chunk
-    /// unloads. Each drive pulls its own weight and its speed adds (<see cref="DriveSpeedOn"/>); nothing has
-    /// to be kept in sync, and a tower whose chunk is unloaded simply stops declaring and stops driving.
+    /// Scanned over the housing table rather than walked from the towers, because a housing is bound to a
+    /// line by proximity at lookup time and so has no tower to be indexed under - the tension weight's shape
+    /// exactly. Both tables are small and this is asked on a block-info refresh or a cabin tick.
     /// </para>
     /// <para>
-    /// The load is read from <see cref="EntityRopewayCabin.IsHauling"/> - the cabin TRYING to move - and
-    /// never from whether it is actually moving. The load is what slows the network, so keying it on real
-    /// motion would drop it the instant a weak mill stalled, speed the network up, start the cabin and stall
-    /// it again a tick later.
+    /// The cabin reads this LIVE, which the store design forbade, and the line-length cap does NOT make that
+    /// safe the way this used to claim. <c>MaxChunkRadius</c> 384 is a cap on the loaded radius rather than
+    /// the radius: <c>ServerMain.GetAllowedChunkRadius</c> is <c>min(MaxChunkRadius, ceil(Viewdistance/32))</c>
+    /// for a network client - singleplayer skips the cap and returns the raw <c>ceil(Viewdistance/32)</c>,
+    /// which only diverges above a 384-block view distance - and the shipped client default of 256 makes both
+    /// 8 chunks = <b>256 blocks</b>. A 320-block line is buildable at that view distance and outruns the
+    /// window by 64 blocks, so a housing beside the far end really can be dark while a rider is aboard, and
+    /// it reads as 0 here.
     /// </para>
-    /// ponytail: no clamp on GearedRatio. Gearing multiplies both this resistance and the speed the footing
-    /// reads, so an over-geared rig stalls its own network exactly as an over-geared quern does. Copy the
-    /// pulverizer's JoinNetwork speed divider if in-game QA finds that surprising rather than instructive.
-    /// </summary>
-    private void DeclareLoad()
-    {
-        // Nothing reads Resistance off a tower that is on no network, and FindOn below is a scan of every
-        // loaded entity - so the towers without an axle, which is most of them, pay nothing for this.
-        if (mpc?.Network == null) return;
-
-        var line = RopewayLine.GetOrBuild(ModSystem, Pos);
-        var cabin = EntityRopewayCabin.FindOn(Api.World, line);
-
-        mpc.Resistance = RopewayPower.Resistance(cabin?.IsHauling == true, cabin?.ClimbOn(line) ?? 0, 0);
-    }
-
-    /// <summary>What this footing's own axle is turning at, or 0 with no behaviour, no axle or no network.</summary>
-    public double DriveSpeed => mpc?.TrueSpeed ?? 0;
-
-    /// <summary>
-    /// The line's drive speed: every loaded tower's, added ONCE PER NETWORK. THAT is the pooling - power may
-    /// be supplied at any tower and separate drives add up - and it needs no coordination because addition
-    /// does not care what order it happens in or whether one of the terms went away. Several footings tapped
-    /// off one axle run are one drive, not several; <see cref="RopewayPower.PoolSpeed"/> is why.
     /// <para>
-    /// The cabin reads this LIVE, which the store design forbade. What makes it safe is the line-length cap:
-    /// <c>maxLineLength</c> 320 sits inside the default <c>MaxChunkRadius</c> of 384 blocks, so a rider
-    /// anywhere on a line holds every tower of it - drives included - loaded. Raise that cap and a drive can
-    /// go dark under a rider; the cabin then slows or stops rather than corrupting anything, but it stops
-    /// for a reason the player cannot see.
+    /// Nothing is corrupted by that - the cabin slows or stops and picks up again when the chunk lands - but
+    /// 0 must not be reported to the player as "you have no drive". A dark TOWER is necessarily an end of the
+    /// walked chain (<see cref="RopewayLine.WalkChain"/>) and so sets <c>Truncated</c>, which is the state
+    /// <see cref="EntityRopewayCabin.MayStart"/> exempts. That does not carry over to housings on its own: a
+    /// housing stands up to eight blocks from its footing, chunk columns unload at a sharp boundary, and a
+    /// footing at 250 blocks out can be lit with its housing at 258 dark on a chain that is not truncated.
+    /// What actually makes the refusal safe is smaller and true - a player standing at a tower to interact
+    /// with it holds that tower's own eight-block neighbourhood loaded, so every housing THAT tower can
+    /// answer to is loaded and counted, and the refusal the player is looking at is honest. The residual band
+    /// is a call made at one end of a long line against a housing that sits across the window's edge from its
+    /// own footing: it prints <c>ropeway:err-no-drive</c> to a player who has a drive. Accepted rather than
+    /// closed - closing it means either a second walk over unloaded chunks or refusing on distance, and both
+    /// cost more than the message does.
     /// </para>
     /// </summary>
     public static double DriveSpeedOn(RopewayModSystem modSystem, RopewayLine line)
     {
         if (modSystem == null || line?.Towers == null) return 0;
 
-        var drives = new List<(long, double)>(line.Towers.Length);
-        foreach (var tower in line.Towers)
+        var drives = new List<(long, double)>(modSystem.LoadedHousings.Count);
+        foreach (var housing in modSystem.LoadedHousings.Values)
         {
-            if (modSystem.LoadedTowers.TryGetValue(tower, out var be) && be?.mpc?.Network != null)
-            {
-                drives.Add((be.mpc.Network.networkId, be.DriveSpeed));
-            }
+            if (housing?.Network == null || !housing.Serves(line)) continue;
+            drives.Add((housing.Network.networkId, housing.DriveSpeed));
         }
 
         return RopewayPower.PoolSpeed(drives);
@@ -280,13 +260,9 @@ public class BEPylonBase : BlockEntity
     /// </summary>
     public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tessThreadTesselator)
     {
-        // Deliberately discarding what base returns, and this is load bearing rather than sloppy:
-        // BlockEntity.OnTesselation ORs its behaviours' results, and BEBehaviorMPConsumer.OnTesselation
-        // returns TRUE for any non-null block - because a vanilla consumer expects the instanced
-        // MechNetworkRenderer to draw it instead. With mechPartShape null nothing draws it, so honouring
-        // that true would make the footing model vanish the moment the MP behaviour was added. Ours is a
-        // static structure that the chunk tesselator must keep drawing; nothing on this block entity has
-        // any business replacing the default.
+        // Deliberately discarding what base returns: the footing is a static structure the chunk tesselator
+        // must keep drawing, and nothing on this block entity has any business replacing the default. The
+        // trap that made this explicit lives on BEDriveHousing.OnTesselation now, with the MP behaviour.
         base.OnTesselation(mesher, tessThreadTesselator);
         const bool replacedDefault = false;
         if (Spans.Count == 0 || Block == null) return replacedDefault;
@@ -598,17 +574,10 @@ public class BEPylonBase : BlockEntity
     /// </summary>
     private void AppendPowerLines(RopewayLine line, StringBuilder dsc)
     {
-        // This tower's own drive, whether or not it is the one that has an axle. Any tower may take power,
-        // so "no axle here" is information about THIS tower, never about the line.
-        if (mpc != null)
-        {
-            dsc.AppendLine(mpc.Network == null
-                ? Lang.Get("ropeway:blockinfo-nodrive")
-                : Lang.Get("ropeway:blockinfo-drive", Math.Round(mpc.TrueSpeed, 2)));
-        }
-
-        // The line's, which is what actually moves the cabin: one mill here plus one at the far end is a
-        // faster cabin, and nothing else on this panel would show that.
+        // The line's drive, which is what actually moves the cabin: one mill here plus one at the far end is
+        // a faster cabin, and nothing else on this panel would show that. There is no per-tower drive line
+        // any more - a housing serves a LINE, not a tower, so "this tower has no drive" was a question with
+        // no answer once the intake came down off the crossarm.
         var speed = RopewayPower.CabinSpeed(DriveSpeedOn(ModSystem, line));
         dsc.AppendLine(speed > 0
             ? Lang.Get("ropeway:blockinfo-linedrive", Math.Round(speed, 1))

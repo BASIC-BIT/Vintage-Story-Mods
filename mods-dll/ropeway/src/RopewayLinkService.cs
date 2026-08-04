@@ -64,6 +64,16 @@ public sealed class RopewayLinkService
 
         var line = RopewayLine.GetOrBuild(modSystem, cabin.LineKey);
         var outcome = cabin.RequestStop(line, fromPlayer.PlayerUID, out var tower);
+
+        // Split out of the catch-all below because it is the one refusal with a cause the rider can do
+        // something about, and the one they will otherwise blame on the key: a parked cabin on a line where
+        // nothing is turning. A rider whose cabin is merely stalled mid-span never reaches this.
+        if (outcome == CabinCall.NoDrive)
+        {
+            fromPlayer.SendIngameError("ropeway-no-drive", Lang.Get("ropeway:err-no-drive"));
+            return;
+        }
+
         if (outcome != CabinCall.Called)
         {
             // One message for every refusal there is - a truncated line, a chain that just re-canonicalised,
@@ -118,6 +128,13 @@ public sealed class RopewayLinkService
 
                 case CabinCall.AlreadyHere:
                     player.SendIngameError("ropeway-cabin-here", Lang.Get("ropeway:err-cabin-here"));
+                    return;
+
+                case CabinCall.NoDrive:
+                    // The call is refused rather than banked, so this message is the whole of what the player
+                    // gets - it has to name the cause, because "nothing happened" is indistinguishable from a
+                    // broken tower. The footing's own panel says the same thing in more words.
+                    player.SendIngameError("ropeway-no-drive", Lang.Get("ropeway:err-no-drive"));
                     return;
             }
 

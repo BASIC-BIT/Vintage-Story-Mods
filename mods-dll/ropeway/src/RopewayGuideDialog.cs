@@ -23,9 +23,18 @@ public sealed class RopewayGuideDialog : GuiDialog
     private const double ViewportHeight = 190;
 
     private ElementBounds viewportBounds;
-    private ItemSlot baseSlot;
-    private ItemSlot headSlot;
-    private ItemSlot braceSlot;
+
+    /// <summary>
+    /// The blocks the strip turns, left to right, then the cabin. The drive pair is here because the guide
+    /// is the mod's primary build-teaching surface and a drive tower had no representation on it at all -
+    /// a player following the guide could build every tower on a line and never learn what makes one move.
+    /// </summary>
+    private static readonly string[] StripBlocks =
+    {
+        "pylonbase-north", "pylonhead-north", "brace-north", "bullwheel-north", "drivehousing"
+    };
+
+    private readonly ItemSlot[] slots = new ItemSlot[StripBlocks.Length];
 
     private Entity cabin;
     private EntityShapeRenderer cabinRenderer;
@@ -52,18 +61,33 @@ public sealed class RopewayGuideDialog : GuiDialog
         TryOpen();
     }
 
+    /// <summary>
+    /// Two passes, and the first one exists only to measure. <c>GuiComposer.Compose</c> calls
+    /// <c>BeforeCalcBounds</c> on every element before it sizes anything, and
+    /// <c>GuiElementRichtext.BeforeCalcBounds</c> -&gt; <c>CalcHeightAndPositions</c> overwrites its
+    /// <c>Bounds.fixedHeight</c> with the height the body actually laid out to - so after one compose the
+    /// text has told us how tall it is. Everything else on this dialog is read off that number BEFORE
+    /// compose: the Close button's Y, the shaded background, the dialog's own size. That is why the height
+    /// used to be a hardcoded 500 with a comment asking the next person to raise it, and why it went stale
+    /// the first time a paragraph was added. Asking costs one throwaway compose on a right-click, and the
+    /// throwaway frees itself: <c>IGuiAPI.CreateCompo</c> disposes whatever is already cached under the same
+    /// dialog name.
+    /// </summary>
     private void Compose()
+    {
+        var measured = Compose(0);
+        Compose(measured);
+    }
+
+    /// <summary>
+    /// Builds the dialog with <paramref name="textHeight"/> allotted to the body, and returns the height the
+    /// body really needed.
+    /// </summary>
+    private double Compose(double textHeight)
     {
         var contentTop = GuiStyle.TitleBarHeight + 10;
         viewportBounds = ElementBounds.Fixed(0, contentTop, ContentWidth, ViewportHeight);
-        // ponytail: this is NOT a clip height. GuiElementRichtext.BeforeCalcBounds -> CalcHeightAndPositions
-        // overwrites Bounds.fixedHeight, so the text always renders at its natural size. What this value
-        // actually does is position the Close button and size the shaded background, both captured from it
-        // BEFORE compose - so if it is smaller than the text really needs, the text runs over the button and
-        // past the background instead of being cut off. Set it generously; over-tall only adds empty space.
-        // Sized for the riding paragraph the two hotkeys added (~19 lines at ContentWidth); raise it if a
-        // translation runs longer.
-        var textBounds = ElementBounds.Fixed(0, contentTop + ViewportHeight + 12, ContentWidth, 500);
+        var textBounds = ElementBounds.Fixed(0, contentTop + ViewportHeight + 12, ContentWidth, textHeight);
         var buttonY = textBounds.fixedY + textBounds.fixedHeight + 8;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth - 10, buttonY + 36)
             .WithFixedPadding(GuiStyle.ElementToDialogPadding);
@@ -86,15 +110,15 @@ public sealed class RopewayGuideDialog : GuiDialog
             .AddSmallButton(Lang.Get("Close"), OnClose, ElementBounds.Fixed(ContentWidth - 120, buttonY, 110, 30))
             .EndChildElements()
             .Compose(focusFirstElement: false);
+
+        return textBounds.fixedHeight;
     }
 
     public override void OnGuiOpened()
     {
         base.OnGuiOpened();
 
-        baseSlot ??= SlotFor("pylonbase-north");
-        headSlot ??= SlotFor("pylonhead-north");
-        braceSlot ??= SlotFor("brace-north");
+        for (var i = 0; i < StripBlocks.Length; i++) slots[i] ??= SlotFor(StripBlocks[i]);
         EnsureCabin();
     }
 
@@ -151,19 +175,24 @@ public sealed class RopewayGuideDialog : GuiDialog
 
         yaw += dt * 0.6f;
 
-        // Four cells: the three blocks a tower is made of, then the cabin. The posts are player-chosen wood
-        // and have no one block to show.
-        var cell = viewportBounds.InnerWidth / 4;
+        // The blocks a tower is made of, then the drive pair, then the cabin. The posts are player-chosen
+        // wood and have no one block to show.
+        var cells = StripBlocks.Length + 1;
+        var cell = viewportBounds.InnerWidth / cells;
         var y = viewportBounds.renderY + viewportBounds.InnerHeight / 2;
-        var size = (float)GuiElement.scaled(60);
+
+        // Shrinks as the strip grows, so adding a block narrows the row rather than overflowing it.
+        var size = (float)GuiElement.scaled(360.0 / cells);
 
         capi.Render.GlPushMatrix();
         capi.Render.GlRotate(-14f, 1f, 0f, 0f);
 
-        RenderStack(dt, baseSlot, viewportBounds.renderX + cell * 0.5, y, size);
-        RenderStack(dt, headSlot, viewportBounds.renderX + cell * 1.5, y, size);
-        RenderStack(dt, braceSlot, viewportBounds.renderX + cell * 2.5, y, size);
-        RenderCabin(dt, viewportBounds.renderX + cell * 3.5, y);
+        for (var i = 0; i < slots.Length; i++)
+        {
+            RenderStack(dt, slots[i], viewportBounds.renderX + cell * (i + 0.5), y, size);
+        }
+
+        RenderCabin(dt, viewportBounds.renderX + cell * (cells - 0.5), y);
 
         capi.Render.GlPopMatrix();
     }

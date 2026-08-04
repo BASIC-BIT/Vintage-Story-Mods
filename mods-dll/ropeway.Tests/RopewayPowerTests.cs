@@ -196,4 +196,109 @@ public class RopewayPowerTests
         // Or a weight at the bottom of a shaft serves a tower on the cliff directly above it.
         Assert.Equal(double.MaxValue, BlockTensionWeight.Nearest(new BlockPos(0, 40, 0), new BlockPos(0, 64, 0), 8));
     }
+
+    // ------------------------------------------------------------------ which line a housing drives
+
+    /// <summary>
+    /// A housing drives ONE line - the one its single nearest in-range footing belongs to - and that is a
+    /// load-model rule rather than a tidiness one. It used to answer two different questions: "is any tower
+    /// of this line in range" for the speed, and "which footing is nearest" for the load. Two lines whose
+    /// towers passed within eight blocks of one housing therefore both read its full speed while only one of
+    /// them was ever charged the haul resistance - one mill hauling two cabins for the price of one, which is
+    /// the same free speed <see cref="RopewayPower.PoolSpeed"/> exists to refuse.
+    /// <para>
+    /// <c>BEDriveHousing.Serves</c> itself is a block entity method and cannot run without a world, but it is
+    /// exactly these two calls made on the housing's own position, and these two are what disagreed.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void AHousingDrivesTheOneLineItsNearestFootingIsOn()
+    {
+        var modSystem = new RopewayModSystem();
+        var mine = new BlockPos(0, 64, 0);
+        var neighbours = new BlockPos(6, 64, 0);
+        modSystem.LoadedTowers[mine] = null!;
+        modSystem.LoadedTowers[neighbours] = null!;
+
+        // Two blocks from one footing, six from the other: in range of both, nearest to one.
+        var housing = new BlockPos(2, 64, 0);
+        var driven = RopewayLine.FromTowers(new List<BlockPos> { mine, new(0, 64, 40) });
+        var other = RopewayLine.FromTowers(new List<BlockPos> { neighbours, new(6, 64, 40) });
+
+        var nearest = BlockTensionWeight.NearestTower(modSystem, housing, 8);
+        Assert.Equal(mine, nearest);
+        Assert.True(driven.IndexOf(nearest) >= 0);
+        Assert.Equal(-1, other.IndexOf(nearest));
+
+        // And the predicate that used to answer the speed question says yes to both, which is the bug.
+        Assert.True(BlockTensionWeight.NearAnyTower(housing, driven, 8));
+        Assert.True(BlockTensionWeight.NearAnyTower(housing, other, 8));
+    }
+
+    /// <summary>
+    /// A footing goes into <c>LoadedTowers</c> the moment it is placed, spans or none, so a bare one dropped
+    /// while scouting the next tower position is a candidate. Land it nearer to the housing than the line's
+    /// own footing and, on nearest-overall, the housing silently stops driving anything: the mill keeps
+    /// turning, the cabin stops, and every panel on screen still reports a working drive. Nearest footing
+    /// that resolves to a LINE keeps the one-line rule and refuses the veto.
+    /// </summary>
+    [Fact]
+    public void ABareFootingCannotTakeAHousingOffTheLineItDrives()
+    {
+        var modSystem = new RopewayModSystem();
+        var near = new BlockPos(0, 64, 0);
+        var far = new BlockPos(0, 64, 40);
+        var stray = new BlockPos(3, 64, 0);
+
+        Tower(modSystem, near, far);
+        Tower(modSystem, far, near);
+        Tower(modSystem, stray);
+
+        // One block from the stray, four from the line's own footing: it wins on distance and loses on being
+        // a line at all - RopewayLine.FromTowers is null below two towers.
+        var housing = new BlockPos(4, 64, 0);
+        Assert.Equal(stray, BlockTensionWeight.NearestTower(modSystem, housing, 8));
+
+        Assert.Equal(near, BlockTensionWeight.NearestTower(modSystem, housing, 8,
+            tower => RopewayLine.GetOrBuild(modSystem, tower) != null));
+    }
+
+    /// <summary>
+    /// Equidistant footings on two lines. Which one the housing serves decides which line MOVES now rather
+    /// than only which one pays the haul load, and <c>DriveSpeedOn</c> is evaluated on the client too - so
+    /// answering it out of dictionary enumeration order lets two machines that loaded their chunks in
+    /// different orders disagree about the same rope. <c>RopewayLine.ComparePos</c> exists to forbid exactly
+    /// this and says so in its own doc comment.
+    /// </summary>
+    [Fact]
+    public void EquidistantFootingsAreDecidedOnPositionAndNotOnChunkLoadOrder()
+    {
+        var housing = new BlockPos(0, 64, 0);
+        var east = new BlockPos(5, 64, 0);
+        var south = new BlockPos(0, 64, 5);
+
+        // Same two footings, opposite insertion orders. That is the whole of what chunk-load order is.
+        var loadedEastFirst = new RopewayModSystem();
+        loadedEastFirst.LoadedTowers[east] = null!;
+        loadedEastFirst.LoadedTowers[south] = null!;
+
+        var loadedSouthFirst = new RopewayModSystem();
+        loadedSouthFirst.LoadedTowers[south] = null!;
+        loadedSouthFirst.LoadedTowers[east] = null!;
+
+        Assert.Equal(
+            BlockTensionWeight.NearestTower(loadedEastFirst, housing, 8),
+            BlockTensionWeight.NearestTower(loadedSouthFirst, housing, 8));
+
+        // Not merely stable - the one ComparePos names, so the answer survives a restart as well as a peer.
+        Assert.Equal(south, BlockTensionWeight.NearestTower(loadedEastFirst, housing, 8));
+    }
+
+    /// <summary>A loaded footing carrying the spans it is linked by. Enough for GetOrBuild to walk it.</summary>
+    private static void Tower(RopewayModSystem modSystem, BlockPos pos, params BlockPos[] spans)
+    {
+        var tower = new BEPylonBase();
+        foreach (var span in spans) tower.Spans.Add(span);
+        modSystem.LoadedTowers[pos] = tower;
+    }
 }

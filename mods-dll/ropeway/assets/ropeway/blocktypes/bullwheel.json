@@ -1,0 +1,50 @@
+{
+  "//": "DECORATION, and the tell-tale. It is an accepted alternative to the pylon head on the crossarm's centre cell - pylonbase.json's multiblockStructure matches either for block number 1 - so a drive tower is the same sixteen cells as any other tower. It is NOT on the mechanical network: no entityBehaviors, no MPConsumer, no resistance. The intake is ropeway:drivehousing, off the tower entirely. What this block does is TURN when the line runs, which is the only thing that ever told a drive tower apart from a plain one; BEBullwheel + BullwheelRenderer draw shapes/block/bullwheelrim.json over the static shape below.",
+  "code": "bullwheel",
+  "entityClass": "Bullwheel",
+  "behaviors": [
+    { "name": "HorizontalOrientable" }
+  ],
+  "variantgroups": [
+    { "code": "side", "states": [ "north", "east", "south", "west" ] }
+  ],
+  "shapeByType": {
+    "*-north": { "base": "ropeway:block/bullwheel", "rotateY": 0 },
+    "*-east": { "base": "ropeway:block/bullwheel", "rotateY": 270 },
+    "*-south": { "base": "ropeway:block/bullwheel", "rotateY": 180 },
+    "*-west": { "base": "ropeway:block/bullwheel", "rotateY": 90 }
+  },
+  "textures": {
+    "metal": { "base": "game:block/metal/sheet/iron1" }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Metal",
+  "creativeinventory": { "general": [ "*-north" ], "construction": [ "*-north" ] },
+  "attributes": {
+    "handbook": {
+      "groupBy": [ "bullwheel-*" ]
+    },
+    "reinforcable": false
+  },
+  "replaceable": 500,
+  "resistance": 4.5,
+  "lightAbsorption": 0,
+  "sidesolid": { "all": false },
+  "sideopaque": { "all": false },
+  "collisionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 1, "z2": 1 },
+  "selectionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 1, "z2": 1 },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/anvil",
+    "hit": "game:block/anvil",
+    "byTool": {
+      "Pickaxe": { "hit": "game:block/rock-hit-pickaxe", "break": "game:block/rock-break-pickaxe" }
+    }
+  },
+  "guiTransform": {
+    "rotation": { "x": -22.6, "y": 45, "z": 0 },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

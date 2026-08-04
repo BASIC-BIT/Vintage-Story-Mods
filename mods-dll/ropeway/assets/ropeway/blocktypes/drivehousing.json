@@ -1,0 +1,56 @@
+{
+  "//": "The line's mechanical intake, standing within towerRadius of any tower rather than on one. It carries the MPConsumer the bullwheel used to; the wheel stayed on the crossarm as decoration that spins. Getting an axle four blocks up cost sixteen vanilla blocks of scaffold and made the tower read as two structures - a mill now connects with an ordinary short axle run. Not necessarily at ground level, and this comment said it was: a windmill rotor cannot stand low enough to meet a housing on the ground, so the housing goes up level with the hub and the radius is a sphere that permits it. See docs/POWER-AND-STORAGE.md.",
+  "code": "drivehousing",
+  "class": "BlockDriveHousing",
+  "entityClass": "DriveHousing",
+  "//novariant": "No side variant, deliberately: BlockDriveHousing.HasMechPowerConnectorAt takes an axle on ANY horizontal face, so orientation decides nothing - and a block with no orientation cannot be placed 90 degrees out. The shape is 4-fold symmetric to match.",
+  "//entityBehaviors": "MPConsumer is registered by vanilla (SurvivalCoreSystem), so the mod registers nothing for it. mechPartShape null is MANDATORY, not decoration: BEBehaviorMPBase.Initialize defaults Shape to Block.Shape and then unconditionally calls AddDeviceForRender, so without it the whole housing model joins the instanced spinning renderer and turns about an axis nothing derived. resistance is the schedule's floor - BEDriveHousing rewrites it every second to RopewayPower.Resistance, which is this idle figure unless the line has a cabin trying to move.",
+  "entityBehaviors": [
+    {
+      "name": "MPConsumer",
+      "properties": {
+        "resistance": 0.005,
+        "mechPartShape": null
+      }
+    }
+  ],
+  "shape": {
+    "base": "ropeway:block/drivehousing"
+  },
+  "textures": {
+    "metal": { "base": "game:block/metal/sheet/iron1" },
+    "stone": { "base": "game:block/stone/rock/granite1" }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Metal",
+  "creativeinventory": { "general": [ "*" ], "construction": [ "*" ] },
+  "attributes": {
+    "handbook": {
+      "groupBy": [ "drivehousing" ]
+    },
+    "reinforcable": false,
+    "//towerRadius": "How far from a tower footing this may be built, and the same radius BEPylonBase.DriveSpeedOn asks at lookup time - nothing is bound at placement, so nothing can come unbound when that tower is broken. 8 is the tension weight's number and for the same reason: close enough to read as part of the station, far enough to dodge the tower's own posts and archway.",
+    "towerRadius": 8
+  },
+  "replaceable": 500,
+  "resistance": 4.5,
+  "lightAbsorption": 0,
+  "sidesolid": { "all": false },
+  "sideopaque": { "all": false },
+  "collisionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.9375, "z2": 1 },
+  "selectionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.9375, "z2": 1 },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/anvil",
+    "hit": "game:block/anvil",
+    "byTool": {
+      "Pickaxe": { "hit": "game:block/rock-hit-pickaxe", "break": "game:block/rock-break-pickaxe" }
+    }
+  },
+  "guiTransform": {
+    "rotation": { "x": -22.6, "y": 45, "z": 0 },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

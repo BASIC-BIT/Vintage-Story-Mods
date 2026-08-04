@@ -36,6 +36,13 @@ public sealed class RopewayModSystem : ModSystem
     /// </summary>
     public readonly Dictionary<BlockPos, BETensionWeight> LoadedWeights = new();
 
+    /// <summary>
+    /// Every loaded drive housing, keyed by its own position - same table shape and same reason as
+    /// <see cref="LoadedWeights"/>: a housing serves whichever line is in range at lookup time, so there is
+    /// no tower to index it under. BEDriveHousing.Initialize adds, OnBlockUnloaded removes.
+    /// </summary>
+    public readonly Dictionary<BlockPos, BEDriveHousing> LoadedHousings = new();
+
     /// <summary>Derived line geometry, keyed by every member tower. Never persisted; InvalidateLine drops it.</summary>
     public readonly Dictionary<BlockPos, RopewayLine> LineCache = new();
 
@@ -55,6 +62,7 @@ public sealed class RopewayModSystem : ModSystem
         api.RegisterBlockClass("BlockPylonBase", typeof(BlockPylonBase));
         api.RegisterBlockClass("BlockPylonHead", typeof(BlockPylonHead));
         api.RegisterBlockClass("BlockTensionWeight", typeof(BlockTensionWeight));
+        api.RegisterBlockClass("BlockDriveHousing", typeof(BlockDriveHousing));
 
         // MIGRATION, deliberate: the block entity class name changed from "PylonHead" with the controller.
         // A pre-footing world has its towers' block entities saved under the old name, and ServerChunk.cs:531
@@ -64,6 +72,8 @@ public sealed class RopewayModSystem : ModSystem
         // old name would instead resurrect those towers four blocks below their own geometry.
         api.RegisterBlockEntityClass("PylonBase", typeof(BEPylonBase));
         api.RegisterBlockEntityClass("TensionWeight", typeof(BETensionWeight));
+        api.RegisterBlockEntityClass("Bullwheel", typeof(BEBullwheel));
+        api.RegisterBlockEntityClass("DriveHousing", typeof(BEDriveHousing));
         api.RegisterEntity("EntityRopewayCabin", typeof(EntityRopewayCabin));
 
         // Both sides, or EntityAgent.Initialize cannot re-resolve WatchedAttributes["mountedOn"] after a relog

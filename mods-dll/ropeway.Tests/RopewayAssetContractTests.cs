@@ -41,38 +41,139 @@ public class RopewayAssetContractTests
     [InlineData("entities/cabin.json", "cabin")]
     [InlineData("blocktypes/pylonbase.json", "pylonbase")]
     [InlineData("blocktypes/pylonhead.json", "pylonhead")]
+    [InlineData("blocktypes/bullwheel.json", "bullwheel")]
     [InlineData("blocktypes/brace.json", "brace")]
     [InlineData("blocktypes/tensionweight.json", "tensionweight")]
+    [InlineData("blocktypes/drivehousing.json", "drivehousing")]
     public void CodesTheGameplayCodeHardcodesExist(string file, string expectedCode)
     {
         Assert.Equal(expectedCode, Load(file.Split('/')).GetProperty("code").GetString());
     }
 
     /// <summary>
-    /// The mechanical power hookup, all of which is JSON that C# cannot check for itself.
+    /// The mechanical power hookup, all of which is JSON that C# cannot check for itself. It lives on the
+    /// ground-level DRIVE HOUSING, and on nothing else - the footing and the bullwheel are both asserted
+    /// clean, because a second consumer anywhere on a tower would let <c>PoolSpeed</c> see one network twice
+    /// through two different blocks.
     /// <para>
     /// <c>mechPartShape: null</c> is the one that has to be asserted rather than trusted:
     /// <c>BEBehaviorMPBase.Initialize</c> defaults <c>Shape</c> to <c>Block.Shape</c> and then
     /// UNCONDITIONALLY calls <c>AddDeviceForRender</c>, so dropping this key does not fail, it puts the
-    /// whole footing model into the instanced spinning renderer and the player's foundation stone starts
-    /// rotating. An explicit JSON null is what makes <c>AsObject</c> return null - a missing key returns
-    /// the default instead - so the key must be present AND null.
+    /// whole housing model into the instanced spinning renderer. An explicit JSON null is what makes
+    /// <c>AsObject</c> return null - a missing key returns the default instead - so the key must be present
+    /// AND null.
     /// </para>
     /// </summary>
     [Fact]
-    public void ThePylonFootingDeclaresTheVanillaMPConsumerBehaviour()
+    public void OnlyTheDriveHousingDeclaresTheVanillaMPConsumerBehaviour()
     {
-        var behaviors = Load("blocktypes", "pylonbase.json").GetProperty("entityBehaviors").EnumerateArray().ToList();
+        var behaviors = Load("blocktypes", "drivehousing.json").GetProperty("entityBehaviors").EnumerateArray().ToList();
         var consumer = behaviors.Single(b => b.GetProperty("name").GetString() == "MPConsumer");
 
         var properties = consumer.GetProperty("properties");
         Assert.True(properties.TryGetProperty("mechPartShape", out var shape), "mechPartShape must be present");
         Assert.Equal(JsonValueKind.Null, shape.ValueKind);
 
-        // The behaviour's own default is 0.1. BEPylonBase rewrites this every second, so what the JSON
-        // pins is the state a footing is in before its first tick - which must be the idle one, or a fresh
-        // chunk load taxes the network for a second on every tower of a long line.
+        // The behaviour's own default is 0.1. BEDriveHousing rewrites this every second, so what the JSON
+        // pins is the state a housing is in before its first tick - which must be the idle one, or a fresh
+        // chunk load taxes the network for a second on every drive of a long line.
         Assert.Equal(RopewayPower.IdleResistance, properties.GetProperty("resistance").GetSingle(), 4);
+
+        Assert.False(Load("blocktypes", "pylonbase.json").TryGetProperty("entityBehaviors", out _));
+
+        // The bullwheel is DECORATION. It carried this behaviour for one trial; leaving it on would put the
+        // drive back four blocks up, where reaching it cost sixteen vanilla blocks of scaffold.
+        Assert.False(Load("blocktypes", "bullwheel.json").TryGetProperty("entityBehaviors", out _));
+    }
+
+    /// <summary>
+    /// The housing is bound to a line by proximity at lookup time, so a zero radius is a block that can
+    /// never be built and a line that can never have a drive - the same rule and the same failure the
+    /// tensioner has.
+    /// </summary>
+    [Fact]
+    public void TheDriveHousingCarriesTheAttributesItsBlockEntityReads()
+    {
+        var block = Load("blocktypes", "drivehousing.json");
+        Assert.Equal("BlockDriveHousing", block.GetProperty("class").GetString());
+        Assert.Equal("DriveHousing", block.GetProperty("entityClass").GetString());
+        Assert.True(block.GetProperty("attributes").GetProperty("towerRadius").GetDouble() > 0);
+
+        // No side variant: the housing connects on every horizontal face, so orientation decides nothing -
+        // and a block with no orientation cannot be placed 90 degrees out, which is the failure the
+        // crossarm's oriented blocks still carry.
+        Assert.False(block.TryGetProperty("variantgroups", out _));
+    }
+
+    /// <summary>
+    /// The turning half of the bullwheel is a SEPARATE shape, drawn by <c>BullwheelRenderer</c> over the
+    /// static one, and it has to stay clear of the block cell the cabin passes through. The sheave throat is
+    /// where the cabin's hanger blade rides at every tower; a wheel authored down into it is a cabin that
+    /// catches, and nothing in the game would say so - it would just stop.
+    /// </summary>
+    [Fact]
+    public void TheTurningWheelStaysAboveTheCellTheCabinPassesThrough()
+    {
+        var rim = Load("shapes", "block", "bullwheelrim.json").GetProperty("elements").EnumerateArray().ToList();
+        Assert.NotEmpty(rim);
+
+        var centre = rim[0].GetProperty("rotationOrigin")[1].GetDouble();
+
+        // The RENDERER spins the rim about this same axis, and it is the one number the two lanes share.
+        // Re-author the wheel about a different centre with the renderer left alone and it stops turning and
+        // starts orbiting. This pins the number; TheRimTurnsOnItsOwnAxleAtEveryAngleAndEveryFacing pins the
+        // chain that consumes it, because either one alone leaves the other free to drift.
+        // A tolerance rather than decimal places: the float constant is 1.6062500476837158 against the
+        // double's 1.60625, which lands exactly on a 4-dp midpoint and rounds the two opposite ways. Any
+        // drift worth catching is a tenth of a unit, 0.00625 blocks, sixty times the bar.
+        Assert.Equal(BullwheelRenderer.RimPivotY, centre / 16, 1e-4);
+
+        // Every element is a box turned about the wheel's own axis, and turning a corner about that axis does
+        // not change its distance from it - so the angles the boxes are authored at say nothing about how low
+        // the wheel gets, and what may dip into the cell is the furthest CORNER of any element swept all the
+        // way round. Reading each box at its own authored angle was what hid the 0.45 unit this used to miss:
+        // the octagon rests on a flat and brings a corner to the bottom a twentieth of a turn later.
+        var reach = 0.0;
+        var cull = 0.0;
+        foreach (var element in rim)
+        {
+            // X and Z as well as Y, because the renderer hardcodes the block's own centre line for both and
+            // a rim re-authored about a different one would turn crabwise with nothing to say so.
+            var origin = element.GetProperty("rotationOrigin").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+            Assert.Equal(8, origin[0], 3);
+            Assert.Equal(centre, origin[1], 3);
+            Assert.Equal(8, origin[2], 3);
+
+            var from = element.GetProperty("from").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+            var to = element.GetProperty("to").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+
+            var swept = 0.0;
+            foreach (var y in new[] { from[1], to[1] })
+            foreach (var z in new[] { from[2], to[2] })
+            {
+                swept = Math.Max(swept, Math.Sqrt((y - centre) * (y - centre) + (z - 8) * (z - 8)));
+            }
+
+            reach = Math.Max(reach, swept);
+
+            // The same corners, measured from the BLOCK CENTRE instead of the axle, which is the question the
+            // frustum sphere asks. Turning about the axle moves a corner round a circle centred on
+            // (centre, 8) in the y-z plane, so the furthest it ever gets from (8, 8) is that offset plus its
+            // own radius; x rides along unchanged and a yaw about the block's own vertical - which contains
+            // both the axle and the block centre - cannot change the distance either. Per element, because
+            // the hub is the widest in x and the felloe the furthest out, and neither wins on both.
+            var spanX = Math.Max(Math.Abs(from[0] - 8), Math.Abs(to[0] - 8));
+            cull = Math.Max(cull, Math.Sqrt(spanX * spanX + (centre - 8 + swept) * (centre - 8 + swept)));
+        }
+
+        Assert.True(centre - reach >= 16,
+            $"the turning wheel sweeps down to {centre - reach}, inside the crossarm cell the cabin passes through");
+
+        // The other end of the same measurement. Nothing in the game complains when a frustum sphere is too
+        // small - the wheel simply vanishes at the edge of the screen on a tower the player is looking at -
+        // so the number the renderer culls against is tied to the shape here rather than trusted.
+        Assert.True(BullwheelRenderer.CullRadius >= cull / 16,
+            $"the turning wheel reaches {cull / 16} blocks from the block centre, outside the {BullwheelRenderer.CullRadius}-block frustum sphere it is culled against");
     }
 
     [Fact]
@@ -133,8 +234,10 @@ public class RopewayAssetContractTests
     [Theory]
     [InlineData("blocktypes/pylonbase.json")]
     [InlineData("blocktypes/pylonhead.json")]
+    [InlineData("blocktypes/bullwheel.json")]
     [InlineData("blocktypes/brace.json")]
     [InlineData("blocktypes/tensionweight.json")]
+    [InlineData("blocktypes/drivehousing.json")]
     [InlineData("entities/cabin.json")]
     [InlineData("itemtypes/haulrope.json")]
     [InlineData("itemtypes/cabin.json")]
@@ -173,6 +276,14 @@ public class RopewayAssetContractTests
         Assert.False(head.TryGetProperty("entityClass", out _));
         Assert.False(head.GetProperty("attributes").TryGetProperty("multiblockStructure", out _));
 
+        // The bullwheel is the same cell with a block entity on it - not because it is a machine, but
+        // because something has to turn its rim. Its BLOCK is a plain one: it was a BlockMPBase, and with
+        // the intake gone there was nothing left in the subclass, so there is deliberately no "class" key.
+        var wheel = Load("blocktypes", "bullwheel.json");
+        Assert.False(wheel.TryGetProperty("class", out _));
+        Assert.Equal("Bullwheel", wheel.GetProperty("entityClass").GetString());
+        Assert.False(wheel.GetProperty("attributes").TryGetProperty("multiblockStructure", out _));
+
         Assert.Equal("EntityRopewayCabin", Load("entities", "cabin.json").GetProperty("class").GetString());
     }
 
@@ -194,15 +305,17 @@ public class RopewayAssetContractTests
         Assert.Equal(16, attributes.GetProperty("maxCandidates").GetInt32());
 
         // maxLineLength is a CORRECTNESS bound, not a taste knob, which is why it is asserted rather than
-        // ranged. The server keeps chunks loaded within MaxChunkRadius of a player - default 12 chunks /
-        // 384 blocks (ServerConfig.cs:925), only ever raised (ServerMain.cs:789). Chain length upper-bounds
-        // the straight-line distance between any two towers, so a line shorter than that radius can never
-        // have a tower unload while a rider is on it - and that unload is the precondition for the entire
-        // truncated-line failure class (docs/KNOWN-ISSUES.md R1-R4). 320 = 10 chunks, two chunks of margin.
-        // Raising this toward 384 removes the margin; past 384 the bugs come back.
+        // ranged: past it lies the entire truncated-line failure class (docs/KNOWN-ISSUES.md R1-R4). What it
+        // does NOT do is make truncation impossible, which is what this used to claim. MaxChunkRadius 12 -
+        // 384 blocks, ServerConfig.cs:925 - is a CAP on the loaded radius rather than the radius:
+        // ServerMain.cs:2527 takes min(MaxChunkRadius, ceil(Viewdistance / 32)), and the shipped client
+        // default of 256 (ClientSettings.cs:1958) makes that min(12, 8) = 8 chunks = 256 blocks. A 320-block
+        // line outruns that by 64. What 320 does buy is that a player standing at the MIDDLE of a full-length
+        // line is 160 from each end and holds the whole of it - so the truncation is a thing that happens
+        // while somebody walks the line, not a thing they cannot get out of.
         var maxLineLength = attributes.GetProperty("maxLineLength").GetDouble();
         Assert.Equal(320, maxLineLength);
-        Assert.True(maxLineLength <= 320, "maxLineLength must stay inside the default server chunk radius");
+        Assert.True(maxLineLength / 2 <= 256, "half a line must fit the loaded window a player at its middle holds");
         Assert.True(attributes.TryGetProperty("multiblockStructure", out _));
 
         // BEPylonBase.RopePerBlock. At 1.0 a 48-block span is 96 vanilla rope = 576 cattail tops, which is
@@ -217,12 +330,14 @@ public class RopewayAssetContractTests
     /// both directions and nothing about the tower is asymmetric any more. The old shape carried a spur
     /// pointing at the rear gantry; with one gantry that spur is a hint at something that does not exist.
     /// </summary>
-    [Fact]
-    public void ThePylonHeadShapeIsSymmetricAlongTheRopeAxis()
+    [Theory]
+    [InlineData("pylonhead.json")]
+    [InlineData("bullwheel.json")]
+    public void ThePylonHeadShapeIsSymmetricAlongTheRopeAxis(string shape)
     {
         // Symmetric as a SET, not element by element: the two sheave cheek plates sit at z 3-5 and 11-13
         // and are each other's mirror. So the whole box list has to map onto itself under z -> 16 - z.
-        var boxes = Load("shapes", "block", "pylonhead.json").GetProperty("elements").EnumerateArray()
+        var boxes = Load("shapes", "block", shape).GetProperty("elements").EnumerateArray()
             .Select(e => (e.GetProperty("from"), e.GetProperty("to")))
             .Select(e => (
                 X0: e.Item1[0].GetDouble(), Y0: e.Item1[1].GetDouble(), Z0: e.Item1[2].GetDouble(),
@@ -313,7 +428,7 @@ public class RopewayAssetContractTests
         // shapes currently reach y=0; lower the head on its own and the test would still pass while the
         // cabin ate the sheave housing. Take whichever hangs lowest.
         var crossarmUnderside = SpanMath.SheaveHeight
-            + new[] { "brace.json", "pylonhead.json" }
+            + new[] { "brace.json", "pylonhead.json", "bullwheel.json" }
                 .Select(shape => Load("shapes", "block", shape).GetProperty("elements").EnumerateArray()
                     .Min(e => e.GetProperty("from")[1].GetDouble()))
                 .Min() / 16;
@@ -418,12 +533,14 @@ public class RopewayAssetContractTests
     /// the blade is narrow, and why the guide rollers sit on the yaw axis rather than out at the rails.
     /// The shoulder is exempt because it stays below the rails, and that is asserted rather than assumed.
     /// </summary>
-    [Fact]
-    public void EveryPartOfTheHangerClearsTheSheaveThroatAtAnyYaw()
+    [Theory]
+    [InlineData("pylonhead.json")]
+    [InlineData("bullwheel.json")]
+    public void EveryPartOfTheHangerClearsTheSheaveThroatAtAnyYaw(string shape)
     {
         var hangDrop = Load("entities", "cabin.json").GetProperty("attributes").GetProperty("hangDrop").GetDouble();
         var (_, _, elements) = CabinBounds();
-        var head = Load("shapes", "block", "pylonhead.json").GetProperty("elements").EnumerateArray().ToList();
+        var head = Load("shapes", "block", shape).GetProperty("elements").EnumerateArray().ToList();
 
         double HeadEdge(string element, string corner) =>
             head.First(e => e.GetProperty("name").GetString() == element).GetProperty(corner)[0].GetDouble();
@@ -800,6 +917,63 @@ public class RopewayAssetContractTests
 
         Visit(Load("shapes", "entity", "cabin.json").GetProperty("elements"), true);
         return (min, max, elements);
+    }
+
+    /// <summary>
+    /// The bullwheel is a SWAP for the sheave, not an extra cell: the crossarm's centre cell accepts either,
+    /// so a drive tower is the same sixteen cells as every other tower and the drive costs no per-tower
+    /// marginal anything (DECISIONS.md 3). Narrow this wildcard back and every existing drive tower reads as
+    /// incomplete, silently, with the highlight overlay pointing at a cell that already has a block in it.
+    /// </summary>
+    [Fact]
+    public void TheCrossarmCentreCellTakesEitherASheaveOrABullwheel()
+    {
+        var structure = Load("blocktypes", "pylonbase.json").GetProperty("attributes").GetProperty("multiblockStructure");
+
+        var centre = structure.GetProperty("offsets").EnumerateArray()
+            .Single(o => o.GetProperty("x").GetInt32() == 0 && o.GetProperty("z").GetInt32() == 0
+                         && o.GetProperty("y").GetInt32() == SpanMath.SheaveHeight)
+            .GetProperty("w").GetInt32();
+
+        var wildcard = structure.GetProperty("blockNumbers").EnumerateObject()
+            .Single(p => p.Value.GetInt32() == centre).Name;
+
+        // WildcardUtil anchors an @-pattern as ^...$ (RegexCache.IsMatch), and * means "anything".
+        var pattern = new Regex("^" + wildcard.Replace("@", "").Replace("*", ".*") + "$");
+
+        Assert.Matches(pattern, "ropeway:pylonhead-north");
+        Assert.Matches(pattern, "ropeway:bullwheel-west");
+        Assert.DoesNotMatch(pattern, "ropeway:brace-north");
+    }
+
+    /// <summary>
+    /// ...and because it is a swap, the cabin has to fit it exactly as it fits the sheave. The throat the
+    /// hanger blade rides up and the station rails the guide rollers run inside are the two surfaces the
+    /// cabin actually touches, so they are asserted IDENTICAL rather than merely compatible - a bullwheel
+    /// authored a quarter unit narrower is a cabin that catches on one tower out of a line of twelve.
+    /// </summary>
+    [Fact]
+    public void TheBullwheelKeepsTheSheavesThroatAndStationRails()
+    {
+        (double[] From, double[] To) Box(string shape, string element) =>
+            Load("shapes", "block", shape).GetProperty("elements").EnumerateArray()
+                .Where(e => e.GetProperty("name").GetString() == element)
+                .Select(e => (e.GetProperty("from").EnumerateArray().Select(v => v.GetDouble()).ToArray(),
+                              e.GetProperty("to").EnumerateArray().Select(v => v.GetDouble()).ToArray()))
+                .Single();
+
+        // The throat: the two cheeks' facing x planes. Their height and depth may grow - a bullwheel is a
+        // bigger wheel, and drawing one is the whole point - but the gap between them may not move.
+        Assert.Equal(Box("pylonhead.json", "sheavecheekwest").To[0], Box("bullwheel.json", "sheavecheekwest").To[0], 3);
+        Assert.Equal(Box("pylonhead.json", "sheavecheekeast").From[0], Box("bullwheel.json", "sheavecheekeast").From[0], 3);
+
+        // The rails, whole: the rollers ride inside them and the crossarm-underside clearance is measured
+        // off them, so nothing about them may differ at all.
+        foreach (var rail in new[] { "railwest", "raileast" })
+        {
+            Assert.Equal(Box("pylonhead.json", rail).From, Box("bullwheel.json", rail).From);
+            Assert.Equal(Box("pylonhead.json", rail).To, Box("bullwheel.json", rail).To);
+        }
     }
 
     [Fact]

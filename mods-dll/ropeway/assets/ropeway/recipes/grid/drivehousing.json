@@ -1,0 +1,11 @@
+{
+  "//": "A drum on a bed: three plates and three planks. One per LINE at most, and optional even then, so DECISIONS.md 3 - the MARGINAL cost of a pylon - does not bite. It costs no more than the bullwheel it took the drive from, which matters: this replaces sixteen blocks of vanilla scaffold, so it must not quietly cost sixteen blocks of anything else.",
+  "ingredientPattern": "MMM,PPP",
+  "ingredients": {
+    "M": { "type": "item", "code": "game:metalplate-*", "name": "metal" },
+    "P": { "type": "item", "code": "game:plank-*", "name": "wood" }
+  },
+  "width": 3,
+  "height": 2,
+  "output": { "type": "block", "code": "drivehousing", "quantity": 1 }
+}
