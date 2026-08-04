@@ -57,39 +57,96 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    `log-placed-*`, `debarkedlog-*`, `planks-*`, `rock-*`, `cobblestone-*`, `drystone-*`, `rockpolished-*`
    and `stonebricks-*`. Note the verifier only tests the whole key, so a dud alternative hides behind the
    live ones — step 7 is what actually proves each family.
+   **PASS — the recipes resolve clean.** **No** `failed to resolve` line anywhere in the startup log.
+   The 15 files in `assets/ropeway/recipes/grid/` used to expand to about **19,000** registered recipes,
+   because every wildcard carried a `name` and a named wildcard makes the loader expand the file once per
+   metal, wood and rock — all held in RAM and serialised to every joining client, for outputs that never
+   used the name. Three of those expansions asked for `metalplate-blistersteel` and two siblings, which do
+   not exist, so `drivehead` logged three resolve errors at **every** start. The names are gone and so are
+   the errors, and that is the whole of what this step checks.
+   **FAIL:** any `Grid Recipe with output 'ropeway:…' contains an ingredient that cannot be resolved`, or
+   any `failed to resolve N recipes`.
+   **Do not go looking for a recipe count, and do not fail anything on one.** `RecipeLoader` logs the
+   number of JSON **files** it parsed, never the expanded total — the 19,000 never appeared in any log line
+   and neither does the 15, because the mod logged 15 files before the fix as well. That line is also
+   global across vanilla and every other mod, so the ropeway's own recipes cannot be read out of it.
+   **PASS — no missing textures.** Grep the client log for `Missing mapping for texture code`. There must be
+   none. This is the one class of defect the suite genuinely cannot see: the asset tests check that every
+   `#key` a face uses is *declared*, and that the blocktype and its shape shadow copy agree, but a declared
+   key pointing at a path that does not exist on disk resolves to the unknown-texture checker at tesselation
+   time and logs on that thread. A green build and a magenta block are compatible.
 
-2. **Craft the parts.** Crafting grid:
-   - **Ropeway brace ×4** — stick, metal plate (any metal), stick in a 1×3 *row*.
-   - **Haul rope ×1** — rope / metal bit / rope in a 1×3 *column*.
+1b. **Look at all fifteen blocks.** In creative, place one of each — footing, drive station footing, tension
+   station footing, pylon head, brace, bullwheel, drive housing, drive shaft, drive head, lay shaft, tension
+   weight, tension guide, tension head — plus the cabin. **PASS:** nothing draws the magenta-and-black
+   checker, and the palette reads as a ladder: riveted iron on the crossarm and lattice, dark tarnished
+   castings on the drum, gearbox, sheave cheeks and wheel, bright steel on the shafts and bearing caps, cool
+   grey andesite on the plinths and the counterweight. **PASS at range:** from about 30 blocks the drive
+   station's dark gearbox and the tension station's pale mass are both still readable against a plain tower.
+   That distinction is the whole reason the bullwheel exists, and it is the one thing no test can assert.
+
+2. **Craft the parts.** **Chisel your bits first.** Every station recipe pays its fastenings in **metal
+   bits, eight to a slot**, and a whole station wants about a hundred of them. Chisel + ingot = 20 bits,
+   chisel + metal plate = 40, so budget about **six ingots of bits per station** before you sit down at the
+   grid. Drop a stack into each slot and it takes 8 out of it; you need one stack per bit slot, so split
+   them rather than carrying one pile of 200. Then, in the crafting grid — **the quantity after the ×
+   is one craft's output**:
+   - **Ropeway brace ×8** — stick, metal plate (any metal), stick in a 1×3 *row*.
+   - **Haul rope ×4** — rope / metal bit / rope in a 1×3 *column*.
    - **Pylon head ×1** — rope / brace / metal bit, top to bottom in a 1×3 *column*.
-   - **Bullwheel ×2** — metal plate, **pylon head**, metal plate in a 1×3 *row*, so each one eats a pylon
-     head of its own. **Craft two.** It is the centre crossarm cell of a drive station *and* of a tension
-     station, so a two-station line wants one each and neither structure completes without it — this list
-     used to omit it entirely and sent testers out to step 11 two bullwheels short.
+   - **Bullwheel ×1** — **8 metal bits**, **pylon head**, **8 metal bits** in a 1×3 *row*, so each one eats
+     a pylon head of its own. **Craft two.** It is the centre crossarm cell of a drive station *and* of a
+     tension station, so a two-station line wants one each and neither structure completes without it —
+     this list used to omit it entirely and sent testers out to step 11 two bullwheels short.
+     **The two pylon heads it eats are the same two the finished line has**, so if you follow this script's
+     walk — plain towers at steps 7 and 9, converted at step 11 — you want **two more pylon heads** than
+     the bill funds, for the plain crossarms you build first and break again. Steps 5+ are creative, so
+     `/giveblock` them; the bill is right and prices the **finished** line, not the walk. The same is true
+     of posts: the walk peaks at 16 placed against a bill of 8, because step 11 hands a column back at each
+     end.
    - **Pylon footing ×1** — plank, metal bit, plank on the top row; three loose stones under them.
+     **Craft two**, and the bill below buys exactly two: one for tower 1 at step 4 and one for tower 2 at
+     step 9. At step 11 you break both back out of the ground and they become the two station footings.
    - **Ropeway cabin ×1** — haul rope, empty, haul rope / brace, plank, brace / plank, plank, plank.
-   - **Tension weight ×1** — metal bit, loose stone, metal bit on the top row, then plank, loose stone,
+   - **Tension weight ×1** — **8 bits**, loose stone, **8 bits** on the top row, then plank, loose stone,
      plank twice under it. Cell [3,0,0] of a tension station (step 11).
-   - **Drive housing ×1** — three metal plates across the top row, three planks under them. Cell [3,0,0] of
-     a drive station (step 11).
-   **The station footings and their legs**, all new this round:
-   - **Drive station footing ×1** — metal plate, **pylon footing**, metal plate in a 1×3 *row*.
-   - **Tension station footing ×1** — metal bit, **pylon footing**, metal bit in a 1×3 *row*.
-   - **Lay shaft ×2** — metal bit, metal plate, metal bit in a 1×3 *row*. Both stations want two.
-   - **Drive head ×1** — plate/bit/plate on the top row, bit/plate/bit under it.
-   - **Drive shaft ×2** — stick, plate, stick, twice, in a 3×2 block.
-   - **Tension head ×1** — bit/plate/bit on the top row, plate/stick/plate under it.
-   - **Tension guide ×2** — stick, plate, stick on the top row, then plate, **rope**, plate under it.
-   **PASS:** all fifteen appear in the crafting output under real names rather than raw lang keys.
-   **Quantities are one craft's output, and one craft is not a tower.** A tower is a footing, a head and
-   **six** braces — plus the brace that goes inside each head — so budget two brace crafts per tower, and
-   enough haul rope for `ceil(span / 4)` on every span you string; a 30-block span is 8 rope on its own.
-   **And the two above that do not divide: a station's leg is THREE cells.** A drive station wants **three**
-   drive shafts and a tension station **three** tension guides, against recipes that yield two — so that is
-   **two crafts each per station**, with one spare. Craft one of each and you walk out to step 11 one block
-   short of a finished leg, which is the same shape of defect as the bullwheel this list used to omit.
-   `layshaft` is the counter-example that proves the rule is about the count and not about the recipe: two
-   cells, yield two, one craft, exact.
+   - **Drive housing ×1** — **8 bits**, metal plate, **8 bits** across the top row, three planks under them.
+     Cell [3,0,0] of a drive station (step 11).
+   **The station legs. The two station FOOTINGS are not crafted here — they are crafted at step 11**, out
+   of the two plain pylon footings you break back out of towers 1 and 2. Both station-footing recipes eat a
+   whole `pylonbase`, and the bill below funds exactly two `pylonbase` crafts, so crafting them at this
+   step spends both and leaves you nothing to place at step 4. Their grids are written out at step 11 where
+   you need them; you still pay for them out of this bill (a metal plate and 16 bits), just later.
+   - **Lay shaft ×2** — **8 bits**, metal plate, **8 bits** in a 1×3 *row*. Both stations want two, so that
+     is one craft per station, exact.
+   - **Drive head ×1** — **8 bits**/plate/**8 bits** on the top row, **8 bits** in all three cells under it.
+     Forty bits and one plate; it is the most expensive block in the mod and it is meant to be.
+   - **Drive shaft ×3** — stick, plate, stick on the top row, then stick, **8 bits**, stick. A leg is three
+     cells, so that is one craft, exact.
+   - **Tension head ×1** — **8 bits**/plate/**8 bits** on the top row, **8 bits**/stick/**8 bits** under it.
+   - **Tension guide ×3** — stick, plate, stick on the top row, then **8 bits**, **rope**, **8 bits**. One
+     craft per leg, exact.
+   **PASS:** all thirteen appear in the crafting output under real names rather than raw lang keys — the
+   two station footings at step 11 make fifteen.
+   **PASS:** every one of them takes **any** metal — try a bit or plate of a metal you have spare rather
+   than iron, and try a plate of one metal beside bits of another in the same grid. The wildcards carry no
+   `name` any more, so nothing couples the two.
+   **The quantities divide now, and that is the thing to check.** A tower is a footing, a head and **six**
+   braces — plus the one that goes inside the head — so **seven**, against a brace craft of eight: one
+   craft, one spare. A station's leg is **three** cells against drive-shaft and tension-guide crafts of
+   three: one craft, none spare. A station's crossarm wants **two** lay shafts against a craft of two.
+   Haul rope is still `ceil(span / 4)` per span — a 30-block span is **8** — against a craft of four, so
+   that span is two crafts. Nothing on this list needs a second craft for a spare part any more; if
+   something does, the yield regressed.
+   **What a whole first line costs**, two stations plus **one 30-block span** plus the cabin: **10 metal
+   plates and 215 metal bits — call it 31 ingots** (10×2 + 215×0.05 = 30.75) — with 15 planks, 11 sticks,
+   9 loose stones, 9 ordinary rope and 8 post blocks. Every extra **plain** tower after that is **one plate
+   and two bits**, and every extra 30-block span is **four rope and two bits**.
+   **Say the span or the figure means nothing.** 30 blocks is the canonical one, here and in the handbook
+   and in `RECIPE-LADDER.md`. A **20**-block span instead prices out at **214 bits and 7 rope** — one
+   haul-rope craft less — and that is a different line, not an error in either number. The reason the
+   30-block line needs the third craft: `ceil(30/4)` = **8** haul rope is two crafts exactly with nothing
+   over, so the cabin's own two have to come out of a third.
    **The tower count is much more than three.** Steps 9 and 16 want three; 12b wants two separate
    three-tower lines, 18b a line whose first hop doubles back, 27a a fresh pair, 27d an uphill line, and 25
    wants five (singleplayer, slider at 128) or seven on a stock server. **Each of those lines wants one
@@ -101,7 +158,24 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    (not `handbook-category-ropeway`), all **three** pages open — *Aerial Ropeways*, *Building a Line*,
    *Power and the Drive* — the `<itemstack>` renders spin, and every link between them works, including
    50 → 51 → 52 and both pages' way back. **PASS:** the overview page describes a footing and one
-   crossarm, not two gantries. **PASS:** the power page describes a drive that turns the rope and a
+   crossarm, not two gantries.
+   **PASS:** the overview page carries a *"What it costs"* section and **every number in it matches what
+   you actually spent in step 2** — a plain tower about two ingots, a drive station about 16 and a tension
+   station about 13, a whole short line about 31 for **ten plates and 215 bits**. It is the
+   only page that quotes prices, so it is the one that lies if a recipe is ever retuned without it.
+   **FAIL:** it still says a tower costs two metal plates because six braces is two crafts — true at a
+   brace yield of 4, false at 8.
+   **PASS — the short line's sentence names its span, and it is 30 blocks.** The same figure priced at a
+   20-block span is 214 bits and 7 rope; both are right and an unlabelled one is neither.
+   **FAIL:** any cost sentence on the page that quotes a bit count or a rope count without saying which
+   span it is pricing.
+   **PASS — the span is priced in whole crafts, not at a rope-per-block rate.** Haul rope comes four to a
+   craft, so a 20- and a 30-block span cost the same four rope and two bits, and 48 blocks costs six and
+   three. **FAIL:** *"one rope for every eight blocks"* or any other per-block rate stated as a price — it
+   rounds the wrong way on about a third of legal span lengths and sends a tester out one craft short.
+   **PASS:** page 51's rope paragraph says one craft makes **four** haul rope and that a stack of 16 covers
+   any single span. **FAIL:** it says a long span is paid out of several stacks; the longest span in the
+   game is 12 haul rope. **PASS:** the power page describes a drive that turns the rope and a
    tension weight that keeps it taut, and says nothing about winding, charge or paying for a trip.
    **PASS:** the power page carries a *"A windmill needs room"* section, and it states the room as
    **clear blocks under the hub** — four for three sails, six for a maxed five, eleven for a maxed metal
@@ -121,10 +195,14 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 
 4. **Place the pylon footing.** Stand where you want the tower and place it **on the ground** — this is
    the first block of a tower and nothing has to exist above it.
-   **Read step 11 first if you are building a line you intend to ride.** Two of its towers want to be
-   **stations**, and a station is a different footing rather than an extra block — so placing the plain
-   footing at both ends and rebuilding them later costs you the span and a re-link. Steps 4–9 are written
-   for the plain tower because that is what every intermediate tower is.
+   **This script deliberately builds both end towers plain first and converts them at step 11**, because a
+   station footing is crafted *from* a plain one and the two you break back out of towers 1 and 2 are what
+   pays for them. The cost of doing it that way is one re-link per end, at step 11, and the span's rope
+   comes back when you break the footing. If you are building a line for real and already know which two
+   towers are the stations, craft their footings up front and skip the rebuild — but then buy two more
+   `pylonbase` crafts (+4 planks, +6 stone, +2 bits) than the step 2 bill lists, because the bill funds
+   exactly two and both are standing in the ground by step 9. Steps 4–9 are written for the plain tower
+   because that is what every intermediate tower is.
    **PASS:** it lands flat, it is a half-height plinth you can walk over rather than a full cube, and it
    turns to face you.
 
@@ -156,8 +234,9 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    blocks either side of the footing; then the crossarm across their tops,
    four blocks up: **ropeway braces** at x = ±1, ±2 and ±3 and the **pylon head** in the middle, directly
    above the footing. That is **16 cells** in all, two more than before the passage went from three
-   wide to five — the extra pair of braces is the only thing in the station-rail work that costs the
-   player anything, and it is charged on every tower of a chained route.
+   wide to five. That extra pair of braces used to be the one thing in the station-rail work that cost the
+   player anything, because six braces did not divide by a yield of four; the yield is eight now, so a
+   whole tower's seven braces are one craft with one over and the widening is free.
    **PASS:** each ghost cell disappears within ~0.5 s of you filling it, **without re-right-clicking** —
    this is the live-overlay fix; a stale ghost sitting on top of a placed block means it regressed.
    The count in the block-info panel counts down, and within ~1 s of the last block the panel reads
@@ -201,7 +280,10 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    one that has to fit between the posts; if you ever see the 4-block side facing them, the cabin shape
    has been re-authored along Z again and the previous round's item 1 has regressed.
 
-9. **Build a second tower** 20-40 blocks away with clear line of sight, same procedure. Keep both towers
+9. **Build a second tower** 20-40 blocks away with clear line of sight, same procedure. **Make it 30 or 32
+   blocks**, not an arbitrary distance: haul rope comes four to a craft, so a span whose length is not a
+   multiple of four loses a rope every time you re-link it, and step 11 re-links twice. At 33-35 or 37-39
+   you run out mid-step and the failure looks like a bug in the refund. Keep both towers
    at similar height for the first test. **Deliberately orient this one so its passage axis is 90° from
    the line between the two towers** — its crossarm then lies along the line instead of across it. That is
    the case the tower's own posts used to block silently, and it must still *link*: the clearance check
@@ -285,13 +367,25 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     with one leg of machinery instead of posts. Both are explained in full at **27a** and **27c**.
     **You built two plain towers in steps 7 and 9. Rebuild them as stations now**, or build the stations
     from the start next time:
-    - break tower 1's **footing** (that cuts the span and refunds its rope), place a **drive station
-      footing** in the same spot facing the same way, and re-link;
+    - break tower 1's **footing** (that cuts the span and refunds its rope). **The plain pylon footing you
+      just picked up is the ingredient for the station footing** — that is why step 2 did not craft these
+      two and why its bill buys exactly two `pylonbase`. Craft, from what you are now holding:
+      - **Drive station footing ×1** — metal plate, **pylon footing**: **two cells side by side, a 2×1
+        pair**, not a three-wide row. It is the one recipe in the mod that is not 1×3, 3×1, 3×2 or 3×3, and
+        it is that shape because one plate cannot sit in the middle of a symmetric row and
+        `bit/footing/bit` is the tension station's own grid.
+      - **Tension station footing ×1** — **8 bits**, **pylon footing**, **8 bits** in a 1×3 *row*. Craft
+        this one when you break tower 2's footing, below.
+      **PASS:** both appear under real names, and between them and step 2's thirteen you have now seen all
+      fifteen recipes. **FAIL:** either grid does not craft, or a station footing turns out to want
+      something step 2's bill did not buy.
+      Place the **drive station footing** in tower 1's spot facing the same way, and re-link;
     - build its crossarm: three braces on the plain side, a **bullwheel** in the middle instead of the pylon
       head, two **lay shafts** running out to the machine leg, a **drive head** on the crossarm end, three
       **drive shafts** below it and a **drive housing** on the ground;
-    - do the same at tower 2 with a **tension station footing**, a **tension head**, three **tension
-      guides** and a **tension weight** on the ground;
+    - do the same at tower 2: break its footing, craft the **tension station footing** out of the pylon
+      footing that comes back, place it, re-link, then a **tension head**, three **tension guides** and a
+      **tension weight** on the ground;
     - right-click each footing as you go — the overlay lights every cell that is still missing, in the
       wanted block's own colour, and that is faster than counting;
     - then run a mill into the drive housing, **following 27c**.

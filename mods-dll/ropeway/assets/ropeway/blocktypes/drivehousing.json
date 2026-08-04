@@ -18,8 +18,9 @@
     "base": "ropeway:block/drivehousing"
   },
   "textures": {
-    "metal": { "base": "game:block/metal/sheet/iron1" },
-    "stone": { "base": "game:block/stone/rock/granite1" }
+    "stone": { "base": "game:block/stone/rock/andesite1" },
+    "machine": { "base": "game:block/metal/tarnished/iron" },
+    "girder": { "base": "game:block/metal/riveted/iron1" }
   },
   "drawtype": "json",
   "blockmaterial": "Metal",

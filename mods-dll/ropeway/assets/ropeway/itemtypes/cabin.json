@@ -1,9 +1,11 @@
 {
   "code": "cabin",
   "shape": { "base": "ropeway:item/cabin" },
+  "//textures": "`hull` is a smooth plate/ sprite on purpose, and the reason belongs to the ENTITY the icon stands for: shapes/entity/cabin.json authors its body UVs at exactly size/4 and leaves the running gear unauthored at 1:1, so one texture appears at two scales on one cabin. A patterned sheet shows a 4x version of itself on the roof beside a 1x version on the jaw two units away, which is what made the old sheet/iron1 roof read as blotched.",
   "textures": {
     "wood": { "base": "game:block/wood/planks/oak1" },
-    "metal": { "base": "game:block/metal/sheet/iron1" }
+    "hull": { "base": "game:block/metal/plate/iron" },
+    "shaft": { "base": "game:block/metal/plate/steel" }
   },
   "creativeinventory": { "general": [ "*" ], "items": [ "*" ] },
   "maxstacksize": 1,

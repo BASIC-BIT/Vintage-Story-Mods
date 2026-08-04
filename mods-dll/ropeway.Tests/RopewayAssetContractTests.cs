@@ -347,6 +347,306 @@ public class RopewayAssetContractTests
         }
     }
 
+    /// <summary>
+    /// Every <c>#key</c> a shape's faces name has to be declared somewhere the game will look, or that face
+    /// draws the unknown-texture checker and the only warning is a line on the tesselation thread nobody
+    /// reads: <i>"Missing mapping for texture code #machine during shape tesselation of block
+    /// ropeway:bullwheel"</i> (TextureSource.cs:53-65).
+    /// <para>
+    /// This is the palette's only automated gate, because nothing else covers it. The model renderer cannot:
+    /// a manifest carries its own scene-global texture map and never reads a blocktype at all. The build
+    /// cannot: no C# names a texture key except the two on <c>BEPylonBase</c> below.
+    /// </para>
+    /// <para>
+    /// "Somewhere the game will look" is the blocktype's own map OR the declared shape's, because
+    /// <c>BlockTextureAtlasManager.CollectAndBakeTexturesFromShape</c> folds a shape's map into the block's
+    /// for any key the block did not already declare. <c>bullwheelrim.json</c> is the exception and is
+    /// checked against the BLOCK alone: <c>BEBullwheel</c> tesselates it with
+    /// <c>Tesselator.TesselateShape(Block, ...)</c>, and that collector only ever walks a block's DECLARED
+    /// shapes - a shape a block entity draws at runtime is never one of them.
+    /// </para>
+    /// The reverse is deliberately NOT asserted. A declared key no face uses still bakes into the atlas
+    /// (Block.cs:2514), which is the only reason the drawn cable's <c>rope</c> and the drawn rail's
+    /// <c>metal</c> can live on the three footings at all.
+    /// <para>
+    /// Names are only half of it, and the missing half was a silent no-op. The palette is written TWICE for
+    /// every block - once in <c>blocktypes/*.json</c> and once in the shape's own <c>textures</c> map - and
+    /// where both declare a key <c>ResolveTextureCodes</c> only <c>Add</c>s the shape's entry for a key the
+    /// block did NOT already declare (:306-328), so the BLOCKTYPE wins and the shape's copy is dead weight.
+    /// Re-pointing a shape's key at another sprite therefore changes nothing in game and used to change
+    /// nothing here either: the reviewer set <c>shapes/block/brace.json</c>'s <c>girder</c> to basalt, left
+    /// the blocktype alone, and got 174 green. <see cref="AssertShadowCopyAgrees"/> is the other half.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void EveryTextureKeyAShapeUsesIsDeclaredWhereTheGameWillLookForIt()
+    {
+        foreach (var folder in new[] { "blocktypes", "itemtypes" })
+        {
+            foreach (var path in Directory.GetFiles(Path.Combine(Assets, folder), "*.json"))
+            {
+                var file = folder + "/" + Path.GetFileName(path);
+                var root = Load(folder, Path.GetFileName(path));
+
+                foreach (var shapeBase in ShapeBases(root))
+                {
+                    // A vanilla shape (haulrope borrows game:item/resource/rope) is not ours to check.
+                    if (!shapeBase.StartsWith("ropeway:")) continue;
+
+                    var shape = Load(("shapes/" + shapeBase["ropeway:".Length..] + ".json").Split('/'));
+                    AssertDeclares(file + " -> " + shapeBase, FaceKeys(shape), Declared(root), TextureKeys(shape));
+                    AssertShadowCopyAgrees(file, shapeBase, root, shape);
+                }
+            }
+        }
+
+        // The rim, against the bullwheel BLOCK only - see the remarks.
+        AssertDeclares("bullwheelrim.json -> blocktypes/bullwheel.json",
+            FaceKeys(Load("shapes", "block", "bullwheelrim.json")),
+            Declared(Load("blocktypes", "bullwheel.json")));
+        AssertShadowCopyAgrees("blocktypes/bullwheel.json", "ropeway:block/bullwheelrim",
+            Load("blocktypes", "bullwheel.json"), Load("shapes", "block", "bullwheelrim.json"));
+
+        // The cabin entity declares no textures of its own, so its shape's map is the whole mapping -
+        // EntityTextureAtlasManager.LoadShapeTextures is what puts it on Client.Textures.
+        var cabin = Load("shapes", "entity", "cabin.json");
+        AssertDeclares("shapes/entity/cabin.json", FaceKeys(cabin), TextureKeys(cabin));
+    }
+
+    /// <summary>
+    /// The cable, the wrap ring, both station rails and both outriggers are drawn in C# rather than by any
+    /// shape: <c>BEPylonBase.OnTesselation</c> reads <c>textures["rope"]</c> and <c>textures["metal"]</c> off
+    /// the FOOTING block (BEPylonBase.cs:602-603). So <c>metal</c> on a footing is not that block's own
+    /// decoration - it is every rail on every line - and the footing's own plate and boss sit on
+    /// <c>shaft</c> so a cosmetic edit cannot reach the rail by accident.
+    /// <para>
+    /// The plate/ family requirement is the flat-sample rule and it is a proxy, not the measurement:
+    /// <c>BuildBox</c> does <c>Array.Fill(mesh.Uv, 0.5f)</c> (BEPylonBase.cs:989), so a drawn box shows one
+    /// sprite's CENTRE texel and nothing else. What that needs is |centre - mean| under about 2 L, and in
+    /// this library only plate/ and reedrope pass; riveted/iron1 misses by 6.5 L and would draw a rail
+    /// visibly darker than the riveted crossarm it hangs under, with no rivets to show for it. Measured in
+    /// docs/agentic/ingest/cablecar/PALETTE-SPEC.md 4d.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheRunTimeDrawnRopeAndRailAreOneSpriteEachAcrossEveryFooting()
+    {
+        var footings = new[] { "pylonbase.json", "drivestation.json", "tensionstation.json" };
+        var rails = new SortedSet<string>();
+
+        foreach (var footing in footings)
+        {
+            var textures = Load("blocktypes", footing).GetProperty("textures");
+            foreach (var key in new[] { "rope", "metal" })
+            {
+                Assert.True(textures.TryGetProperty(key, out _),
+                    $"blocktypes/{footing} dropped \"{key}\", which BEPylonBase.OnTesselation reads by name off " +
+                    "this block. There is no shape face to notice it is gone - the cable or the rail simply " +
+                    "stops being drawn on every line keyed to this footing.");
+            }
+
+            var rail = textures.GetProperty("metal").GetProperty("base").GetString()!;
+            Assert.StartsWith("game:block/metal/plate/", rail);
+            rails.Add(rail);
+        }
+
+        Assert.True(rails.Count == 1, $"the three footings draw the station rail in {rails.Count} different " +
+                                      $"sprites ({string.Join(", ", rails)}); one line's rail would change " +
+                                      "colour at a station.");
+
+        // The rope has to agree across six files, three of which authored it as a shape face rather than a
+        // runtime draw: a tie hanging off a tension leg and the cable it takes up slack in are the same rope.
+        var ropes = new SortedSet<string>();
+        foreach (var file in footings.Concat(new[] { "tensionhead.json", "tensionguide.json", "tensionweight.json" }))
+        {
+            ropes.Add(Load("blocktypes", file).GetProperty("textures").GetProperty("rope").GetProperty("base").GetString()!);
+        }
+
+        foreach (var shape in new[] { "tensionhead.json", "tensionguide.json", "tensionweight.json" })
+        {
+            ropes.Add(Load("shapes", "block", shape).GetProperty("textures").GetProperty("rope").GetString()!);
+        }
+
+        Assert.True(ropes.Count == 1, $"the mod's rope resolves to {ropes.Count} sprites " +
+                                      $"({string.Join(", ", ropes)}). Every rope in the mod is 2 units across, " +
+                                      "so it reads as one flat colour and a mismatch shows as a tie that is a " +
+                                      "different rope from the cable it hangs beside.");
+    }
+
+    /// <summary>
+    /// One key, one sprite, across the whole mod. The shadow-copy check next door only proves a blocktype and
+    /// its own shape agree with EACH OTHER, so moving a key on both copies of one block passes it while the
+    /// block changes material in game - a pylon head in steel against six brace cells in riveted iron is the
+    /// exact "the ladder collapses" failure the palette sweep rejected, and it was green until this ran.
+    /// <para>
+    /// Itemtypes are out of scope on purpose rather than by omission: an inventory icon is drawn from the item
+    /// atlas, and haulrope deliberately borrows vanilla's own rope ITEM sprite for the coil in your hand while
+    /// every rope in the world is the block sprite. Those are two different pictures of one material and
+    /// forcing them equal would be wrong.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void EveryPaletteKeyResolvesToExactlyOneSpriteAcrossTheWholeMod()
+    {
+        var values = new SortedDictionary<string, SortedSet<string>>();
+        var sources = new SortedDictionary<string, SortedSet<string>>();
+
+        void Claim(string file, JsonElement root)
+        {
+            if (!root.TryGetProperty("textures", out var textures)) return;
+
+            foreach (var texture in textures.EnumerateObject())
+            {
+                if (texture.Name.StartsWith("//")) continue;
+
+                var sprite = texture.Value.ValueKind == JsonValueKind.Object
+                    ? texture.Value.GetProperty("base").GetString()
+                    : texture.Value.GetString();
+                if (sprite == null) continue;
+
+                values.TryAdd(texture.Name, new SortedSet<string>());
+                sources.TryAdd(texture.Name, new SortedSet<string>());
+                values[texture.Name].Add(sprite);
+                sources[texture.Name].Add(file + " -> " + sprite);
+            }
+        }
+
+        foreach (var path in Directory.GetFiles(Path.Combine(Assets, "blocktypes"), "*.json"))
+        {
+            Claim("blocktypes/" + Path.GetFileName(path), Load("blocktypes", Path.GetFileName(path)));
+        }
+
+        // The cabin is an entity rather than a block, and it is the one thing that has to read as part of the
+        // machine while never being made of it, so its keys belong in the same ledger.
+        Claim("shapes/entity/cabin.json", Load("shapes", "entity", "cabin.json"));
+
+        Assert.NotEmpty(values);
+
+        var split = values.Where(v => v.Value.Count > 1).ToList();
+        Assert.True(split.Count == 0,
+            "these palette keys resolve to more than one sprite, so two blocks that are supposed to be the " +
+            "same material are not: " +
+            string.Join("; ", split.Select(v => "#" + v.Key + " [" + string.Join(", ", sources[v.Key]) + "]")));
+    }
+
+    private static void AssertDeclares(string what, SortedSet<string> used, params SortedSet<string>[] declared)
+    {
+        var known = declared.SelectMany(d => d).ToHashSet();
+        var missing = used.Where(k => !known.Contains(k)).ToList();
+        Assert.True(missing.Count == 0,
+            $"{what}: face key(s) {string.Join(", ", missing.Select(k => "#" + k))} are declared nowhere. " +
+            $"Declared: {string.Join(", ", known.OrderBy(k => k))}. In game those faces draw the " +
+            "unknown-texture checker and the only sign is an error line on the tesselation thread.");
+    }
+
+    /// <summary>
+    /// Where a texture key is declared on BOTH a blocktype/itemtype and the shape it draws, the two values
+    /// have to be the same string - because only one of them is ever used and it is not the shape's.
+    /// <c>BlockTextureAtlasManager.ResolveTextureCodes</c> folds a shape's map into the block's with an
+    /// <c>Add</c> that skips keys the block already carries (:306-328), so the shape's copy of a shared key
+    /// is a shadow: editing it repaints nothing, and the mismatch is invisible in game AND in the model
+    /// renderer, whose manifests carry a scene-global map and read neither file.
+    /// <para>
+    /// Two copies of the palette is the shipped design - the shape's map is what makes a shape renderable on
+    /// its own, and <c>shapes/entity/cabin.json</c>'s map is load-bearing because the cabin entity declares
+    /// no textures at all - so the fix is to pin them together rather than to delete one.
+    /// </para>
+    /// </summary>
+    private static void AssertShadowCopyAgrees(string definition, string shapeBase, JsonElement root, JsonElement shape)
+    {
+        var declared = TextureValues(root);
+
+        foreach (var (key, shapeValue) in TextureValues(shape))
+        {
+            if (!declared.TryGetValue(key, out var definitionValue) || definitionValue == shapeValue) continue;
+
+            Assert.Fail($"{definition} and {shapeBase} both declare \"{key}\" and they disagree: the " +
+                        $"definition says {definitionValue}, the shape says {shapeValue}. THE GAME DRAWS " +
+                        $"{definitionValue} - ResolveTextureCodes only adds a shape's entry for a key the " +
+                        "block did not already declare, so the shape's copy is a shadow and editing it " +
+                        "alone is a silent no-op. Change the definition, or change both.");
+        }
+    }
+
+    /// <summary>
+    /// A <c>textures</c> map as key -> texture path. A blocktype writes <c>{ "base": "..." }</c>, a shape
+    /// writes the string directly, and a CompositeTexture accepts either, so both forms are read.
+    /// </summary>
+    private static Dictionary<string, string> TextureValues(JsonElement root)
+    {
+        var values = new Dictionary<string, string>();
+        if (!root.TryGetProperty("textures", out var textures) || textures.ValueKind != JsonValueKind.Object)
+        {
+            return values;
+        }
+
+        foreach (var entry in textures.EnumerateObject())
+        {
+            var value = entry.Value.ValueKind == JsonValueKind.String
+                ? entry.Value.GetString()
+                : entry.Value.TryGetProperty("base", out var basePath) ? basePath.GetString() : null;
+
+            if (value != null) values[entry.Name] = value;
+        }
+
+        return values;
+    }
+
+    private static SortedSet<string> Declared(JsonElement root) => TextureKeys(root, "textures");
+
+    private static SortedSet<string> TextureKeys(JsonElement root, string property = "textures")
+    {
+        var keys = new SortedSet<string>();
+        if (root.TryGetProperty(property, out var textures) && textures.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var entry in textures.EnumerateObject()) keys.Add(entry.Name);
+        }
+
+        return keys;
+    }
+
+    private static IEnumerable<string> ShapeBases(JsonElement root)
+    {
+        if (root.TryGetProperty("shape", out var single) && single.TryGetProperty("base", out var one))
+        {
+            yield return one.GetString()!;
+        }
+
+        if (!root.TryGetProperty("shapeByType", out var byType)) yield break;
+
+        foreach (var entry in byType.EnumerateObject())
+        {
+            if (entry.Value.TryGetProperty("base", out var many)) yield return many.GetString()!;
+        }
+    }
+
+    private static SortedSet<string> FaceKeys(JsonElement shape)
+    {
+        var keys = new SortedSet<string>();
+
+        void Visit(JsonElement elements)
+        {
+            foreach (var element in elements.EnumerateArray())
+            {
+                if (element.TryGetProperty("faces", out var faces))
+                {
+                    foreach (var face in faces.EnumerateObject())
+                    {
+                        if (!face.Value.TryGetProperty("texture", out var code)) continue;
+
+                        var name = code.GetString();
+                        if (name != null && name.StartsWith('#')) keys.Add(name[1..]);
+                    }
+                }
+
+                if (element.TryGetProperty("children", out var children)) Visit(children);
+            }
+        }
+
+        Visit(shape.GetProperty("elements"));
+        return keys;
+    }
+
     [Fact]
     public void RegisteredClassNamesMatchTheJson()
     {

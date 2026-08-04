@@ -1,8 +1,8 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 172 ropeway tests passing — 82 `[Fact]` plus 90 `[InlineData]` across the four files in
+State: build green, 174 ropeway tests passing — 84 `[Fact]` plus 90 `[InlineData]` across the four files in
 `mods-dll/ropeway.Tests`, which is where to re-derive this number rather than trusting the line. (It read
-136 for two rounds after the count moved, 147 for two more, and 168 for two more again.) Everything in the tables below was found by
+136 for two rounds after the count moved, 147 for two more, 168 for two more again, and 172 for one.) Everything in the tables below was found by
 reading code, not by playing — none of *it* has been observed in game.
 
 ## Station rail (2026-08-03) — what shipped, what was reverted, what it costs
@@ -123,21 +123,21 @@ degree and errs toward warning. There is no closed form to find — the cabin fi
 (2.463 against 2.5), so what a facing error costs is where the origin is twenty blocks out, which no local
 geometry knows. Pinned by `ACornerTellsAPlayerWhichWayItsTowerWantsToFace`.
 
-**The metal cost per tower DOUBLES — this is the price BASIC is actually paying.** `recipes/grid/brace.json`
-is `stick + metalplate + stick → 4 braces`. A 5-wide crossarm needed 4 braces = **exactly one metal plate**.
-A 7-wide crossarm needs 6, which is not divisible by the recipe's yield of 4, so it is **two crafts = two
-metal plates** (plus 2 spare braces). Marginal metal per tower therefore goes **1 plate → 2**, not "+2
-braces", and across a chained route that is the multiplier `DECISIONS.md` §3's marginal-cheapness rule
-exists to protect. A ten-tower route now costs 20 plates of braces instead of 10. Named here because it was
-chosen knowingly but had never been stated at its true price anywhere.
+**The doubled metal cost per tower is PAID OFF, and the debt was booked against the wrong thing
+(2026-08-04).** What this section used to say was true and is kept because it was a real trade: a 5-wide
+crossarm needed 4 braces = exactly one metal plate, a 7-wide needs 6, and 6 is not divisible by
+`brace.json`'s yield of **4**, so a tower was **two crafts = two plates** and a ten-tower route 20 plates of
+braces instead of 10 — the multiplier `DECISIONS.md` §3's marginal-cheapness rule exists to protect.
 
-**Reverting the widening is a JSON-only change** if that price is too high — but it costs back the 45°/30°
-penetration above, which is the honest trade now that the yaw law is not there to be credited for it. In
-`pylonbase.json` drop the two `x: ±3, y: 4` brace offsets and move the eight post offsets from ±3 back to
-±2. Then move the numbers that quote it — `gen_manifests.py`'s `cells()` and its 17.0-unit roof-to-post
-clearance, `SpanMath.TowerClearance`'s note, `MultiblockOffsetsAreTheTowerShellAndNothingElse`, the two
-handbook pages, `ropeway:dlg-guide-body`, `README.md` and `QA-SCRIPT.md` steps 5, 7 and 8. No C# behaviour
-depends on the width.
+**It was framed as a forced trade against reverting the 5-wide passage, and that was a false dilemma.** The
+whole penalty came out of the *yield*, not the *width*: nobody had looked at the 4. The recipe pass raised
+it to **8**, so a tower's seven braces — six on the crossarm plus the one the pylon head eats — are **one
+craft with one over**, the marginal metal per tower is **1.85 ingots**, and the widening keeps its
+45°/30° post-penetration gain for nothing. There is no longer any price to weigh the passage against, so
+the paragraph that used to stand here telling you how to revert it is deleted rather than corrected: the
+reason to revert is gone. (If the geometry ever needs undoing for some *other* reason, it is still
+JSON-only — the offsets in `pylonbase.json` and the numbers quoting them — but that is a different
+argument and it should be made on its own.)
 
 **Cosmetic, at corners, and the bend halved it (2026-08-04).** The rope sits at scene y 35–37 and the brace
 beams occupy 30–42, so any drawn cable inside the tower's own plane and beyond half a block along the
@@ -378,25 +378,84 @@ picker or the call), so it stops answering right-clicks entirely until a pylon h
 of the crossarm. It is surfaced rather than silent — the panel counts the missing cell and the overlay
 reddens it — and the repair is one block. QA step 0 now carries it.
 
-## Deferred on purpose: textures and recipes (2026-08-04)
+## Textures and recipes: both halves are CLOSED (2026-08-04)
 
-**Both stations wear borrowed vanilla textures and both stations' recipes are placeholders, and neither is an
-oversight.** Every shape shipped this round — `drivestation`, `tensionstation`, `layshaft`, `drivehead`,
-`driveshaft`, `tensionhead`, `tensionguide`, and the bullwheel's new fixture — samples exactly three vanilla
-sprites: `game:block/metal/sheet/iron1`, `game:block/stone/rock/granite1` and the `game:block/cloth/reedrope`
-the cable already uses. Nothing in the mod has a texture of its own. That is because the geometry was the
-question this round, and a texture that reads correctly at 16 pixels is a different skill from a shape that
-does. The recipes are the same shape of placeholder: they are *balanced* against the tower's existing
-cost and they resolve against real vanilla items, but they were written to make the blocks craftable for QA
-rather than to say anything about what a drive station ought to be worth.
+**The textures were deferred; they are not any more, and nothing was drawn.** Every block used to put all of
+its metal on one key, `#metal` — a crossarm flange, a gearbox, a bearing cap, a wheel rim and a counterweight
+guide were the same pixels, over `game:block/metal/sheet/iron1` and `game:block/stone/rock/granite1`, neither
+of which the mod references any more. They are now eight keys carrying seven sprites, all vanilla, chosen by
+measuring the install's 9,587 PNGs rather than by taste. `docs/agentic/ingest/cablecar/PALETTE-SPEC.md` in the
+parent repo has the survey, the per-element table and the renders that rejected each alternative.
 
-**Scoped, so it is a decision rather than a shrug.** The author's ask is *"we'll want to texture this at some
-point and come up with good recipes"*, and it is its own round: a texture pass wants a palette decision
-across all fifteen blocks at once, and a recipe pass wants the whole ladder priced together (a station
-footing against a plain one, a drive head against a lay shaft, both against what a windmill costs) rather
-than block by block. Doing either piecemeal now would mean doing it twice. **Nothing else in this file is
-waiting on it** — no clearance, no test and no behaviour reads a texture or a recipe — so it can land whole,
-later, without unpicking anything.
+| key | sprite | what it is |
+|---|---|---|
+| `girder` | `game:block/metal/riveted/iron1` | the crossarm and every lattice leg. A 6-texel rivet grid, which is exactly one rivet line on the mod's commonest 3-unit face, and no vanilla post family has a regular grid |
+| `machine` | `game:block/metal/tarnished/iron` | drums, gearboxes, sheave housings, the wheel rim. The dark step, and the cue that names a drive station at silhouette distance |
+| `shaft` | `game:block/metal/plate/steel` | anything that turns, bears or is ridden on. The bright step, deliberately confined to small parts so it reads as a highlight |
+| `stone` | `game:block/stone/rock/andesite1` | pads, machine beds and the counterweight mass. The one cool grey in an otherwise warm palette |
+| `hull` | `game:block/metal/plate/iron` | the cabin's frame and roof. Smooth on purpose: `cabin.json` authors its body UVs at size/4 and its running gear at 1:1, so one sprite appears at two scales on one entity |
+| `metal` | `game:block/metal/plate/iron` | **not any block's decoration.** The station rail and the outriggers, drawn in C# off the *footing* block (`BEPylonBase.cs:603`) and flat-sampled, so only the sprite's centre texel is ever seen. Two 2.2×4-unit bars the length of every span at every tower — the mod's longest continuous geometry, and one step darker than `shaft` because it is a mass, not a highlight |
+| `rope` | `game:block/cloth/reedrope` | every rope, drawn or authored, in all six files that declare one. Unchanged |
+| `wood` | `game:block/wood/planks/oak1` | the cabin body. Unchanged, and the cabin's warmth is what makes it read as a different kind of object |
+
+**No PNG was authored and both `assets/ropeway/textures/` folders are still empty.** That is the outcome, not
+a shortcut: every role resolved inside the vanilla library, including the two hard ones (a structural metal
+that survives a 2-unit flange, and a sprite that flat-samples to its own mean). The one thing an authored file
+would buy is a grooved sheave face, on a 2-unit-wide element that would show four texels of the groove.
+
+**Which copy the game reads.** Every key is declared twice — on the blocktype and again in the shape's own
+`textures` map. **The blocktype is the source of truth**: `BlockTextureAtlasManager.ResolveTextureCodes` only
+adds a shape's entry for a key the block did not already declare, so the shape's map is a *shadow copy* and
+re-pointing it alone repaints nothing in game. `EveryTextureKeyAShapeUsesIsDeclaredWhereTheGameWillLookForIt`
+now pins both halves: every `#key` a face names is declared somewhere the game will look, and where both
+places declare a key the two values must match. Two shapes are exceptions and the test knows it —
+`shapes/entity/cabin.json`'s map *is* the mapping (the entity declares no textures), and `bullwheelrim.json`
+is tesselated by `BEBullwheel` against the `ropeway:bullwheel` **block**, so its own map is never consulted.
+
+**Genuinely still deferred, and the reasoning is the valuable part** (PALETTE-SPEC §2 and §4b):
+
+- **Glazing.** The cabin's windows are voids between mullions; there is no pane element. Adding glass is a
+  geometry change plus `renderPass` handling the entity shape does not do — probably permanent, and the void
+  reads as an opening in every render anyway.
+- **Per-metal variants.** Every ropeway block is iron and steel whatever it was crafted from, and the recipes
+  stay `metalplate-*`. The blocker is the **multiblock**, not the blocktype count: `pylonbase.json` matches
+  `ropeway:brace-*`, so a `metal` variantgroup lets `brace-north-copper` and `brace-north-iron` both satisfy
+  it and a crossarm built from two crafts comes out a patchwork. The count is the second reason — six
+  four-sided blocks × 23 metals is **552** blocktypes, plus handbook, creative inventory and three sets of
+  wildcards. If metal should ever show, the cheap honest version is **one part**: a runtime texture swap on
+  `bullwheelrim` keyed off a metal stored on `BEBullwheel`, exactly `BlockPulverizer`'s cap pattern. One block
+  entity, one key, one visible wheel — not variantgroups.
+
+**The recipes were placeholders and are not any more.** All fifteen were audited against the 1.22.1 loader
+and priced as one ladder — `docs/agentic/ingest/cablecar/RECIPE-LADDER.md` in the parent repo has the full
+working. Three things came out of it:
+
+- **Two real defects.** `drivehead.json` gave `metalplate-*` and `metalbit-*` the same `name`, and
+  `RecipeBase.GetNameToCodeMappingForBasicWildcard` ends in a plain `mappings[ingredient.Name] = val`, so
+  the last ingredient iterated wins outright — metalbit did, and it carries three variants metalplate does
+  not, so three generated recipes asked for `metalplate-blistersteel` and friends and **logged three
+  resolve errors at every server start**. `layshaft` and `tensionhead` were the same latent bug, fine only
+  by Dictionary enumeration order. And the fifteen files registered **~19,137** grid recipes rather than
+  15, held in RAM and serialised to every joining client, because a named wildcard triggers cartesian
+  expansion and **not one output used a `{name}` placeholder**. `pylonbase` and `tensionweight` were 9,100
+  each. Both are fixed by the same deletion: every `name` is gone from every wildcard in the folder.
+- **The price was wrong by about a factor of two.** A minimum line — two stations, **one 30-block span** and
+  a cabin, which is the span every figure in this mod is quoted against — was **61 ingots**: four suits of
+  plate armour, six anvils, ten water wheels, against a vanilla mechanical tree that is *entirely wooden*
+  except the water wheel's two hubs, and a vanilla ceiling of **one** metalplate per machine recipe. It is
+  now **30.75** (10 plates + 215 bits): at most one plate per craft, fastenings paid in metal bits at 8 per
+  station-machinery slot and 1 on anything a plain tower or a haul rope needs. Marginal tower 4.1 → **1.85 ingots**, 30-block span 16
+  vanilla rope → **4**, drive station 32.4 → **15.9**, tension station 26.5 → **12.7**.
+- **Two output quantities that did not divide their consumer.** `driveshaft` and `tensionguide` yielded 2
+  against legs of **three** cells, so both really cost two crafts; both yield 3 now. `layshaft`'s yield of
+  2 against a station's 2 already divided and was left alone.
+
+The shipped ladder is quoted for players in handbook page 50 (*What it costs*) and for testers in
+`QA-SCRIPT.md` step 2. **What was NOT done, deliberately:** `itemtypes/haulrope.json`'s `maxstacksize`
+16 → 8 (which is what would make `DECISIONS.md` §5's multi-stack-per-span requirement reachable — the
+longest legal span is 12 haul rope against a stack of 16, so it never has been), and a tool-durability
+`isTool` ingredient on the station machinery, which every vanilla mechanical block spends and none of ours
+does. Both are one-token edits, both are outside the recipe files, and neither changes a price.
 
 ## The drive came down off the crossarm (2026-08-03, superseded above)
 
@@ -835,7 +894,9 @@ fixed — it is the guard being put where all the callers actually meet.
   to `s(1−s)²`; a curve without it is a curve that does not pass through the tower.
 - **Span ends are not clearance-checked.** `TrimForTowers` skips 4 blocks at each end so a tower's own
   posts don't block its own line, so an obstruction inside those end zones goes undetected.
-- **Metal cost.** The restructure took it from two gantries at roughly 2.5 plates down to one 5-wide
-  crossarm at 4 braces = **1 metal plate** plus the sheave. The station-rail widening then put it back up
-  to a 7-wide crossarm: 6 braces, two crafts, **2 metal plates per tower**. Not closed — see the station-rail
-  section at the top of this file, which states the doubling against `DECISIONS.md` §3.
+- **Metal cost — CLOSED (2026-08-04).** The restructure took it from two gantries at roughly 2.5 plates
+  down to one 5-wide crossarm at 4 braces = **1 metal plate** plus the sheave. The station-rail widening
+  then put it back up to a 7-wide crossarm: 6 braces, two crafts, **2 metal plates per tower**. The recipe
+  pass raised `brace.json`'s yield 4 → 8, so a tower's seven braces (six on the crossarm, one inside the
+  head) are **one craft with one over** and the marginal tower is back to **1.85 ingots**. See the
+  station-rail section at the top of this file.

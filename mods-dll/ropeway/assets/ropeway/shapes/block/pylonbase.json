@@ -2,8 +2,8 @@
   "textureWidth": 16,
   "textureHeight": 16,
   "textures": {
-    "stone": "game:block/stone/rock/granite1",
-    "metal": "game:block/metal/sheet/iron1"
+    "stone": "game:block/stone/rock/andesite1",
+    "shaft": "game:block/metal/plate/steel"
   },
   "elements": [
     {
@@ -26,12 +26,12 @@
       "to": [ 14.0, 5.0, 14.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
-        "north": { "texture": "#metal", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
-        "east": { "texture": "#metal", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
-        "south": { "texture": "#metal", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
-        "west": { "texture": "#metal", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
-        "up": { "texture": "#metal", "uv": [ 2.0, 2.0, 14.0, 14.0 ] },
-        "down": { "texture": "#metal", "uv": [ 2.0, 2.0, 14.0, 14.0 ] }
+        "north": { "texture": "#shaft", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
+        "east": { "texture": "#shaft", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
+        "south": { "texture": "#shaft", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
+        "west": { "texture": "#shaft", "uv": [ 2.0, 0.0, 14.0, 2.0 ] },
+        "up": { "texture": "#shaft", "uv": [ 2.0, 2.0, 14.0, 14.0 ] },
+        "down": { "texture": "#shaft", "uv": [ 2.0, 2.0, 14.0, 14.0 ] }
       }
     },
     {
@@ -41,12 +41,12 @@
       "to": [ 11.0, 8.0, 10.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
-        "north": { "texture": "#metal", "uv": [ 5.0, 5.0, 11.0, 8.0 ] },
-        "east": { "texture": "#metal", "uv": [ 6.0, 5.0, 10.0, 8.0 ] },
-        "south": { "texture": "#metal", "uv": [ 5.0, 5.0, 11.0, 8.0 ] },
-        "west": { "texture": "#metal", "uv": [ 6.0, 5.0, 10.0, 8.0 ] },
-        "up": { "texture": "#metal", "uv": [ 5.0, 6.0, 11.0, 10.0 ] },
-        "down": { "texture": "#metal", "uv": [ 5.0, 6.0, 11.0, 10.0 ] }
+        "north": { "texture": "#shaft", "uv": [ 5.0, 5.0, 11.0, 8.0 ] },
+        "east": { "texture": "#shaft", "uv": [ 6.0, 5.0, 10.0, 8.0 ] },
+        "south": { "texture": "#shaft", "uv": [ 5.0, 5.0, 11.0, 8.0 ] },
+        "west": { "texture": "#shaft", "uv": [ 6.0, 5.0, 10.0, 8.0 ] },
+        "up": { "texture": "#shaft", "uv": [ 5.0, 6.0, 11.0, 10.0 ] },
+        "down": { "texture": "#shaft", "uv": [ 5.0, 6.0, 11.0, 10.0 ] }
       }
     }
   ]

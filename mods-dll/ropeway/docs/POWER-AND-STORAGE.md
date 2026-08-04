@@ -504,9 +504,30 @@ The third row is why the second must stay expensive: *"as soon as you have a fly
 more power and doesn't degrade with friction over time, then you just made a battery."* If frictionless
 flywheels ever ship cheap, gravity storage is dead content.
 
-## The cheapness constraint, correctly scoped
+## The cheapness constraint, correctly scoped — and now checked against arithmetic
 
-Unchanged and still satisfied. `DECISIONS.md` §3 is about the **marginal** cost of a pylon and its span,
-because a chained route multiplies it by every hop — not about the system's one-time cost. A windmill plus
-axles for the whole ropeway is fine; a windmill per pylon would not be. Nothing here is metal-gated: a
-wooden rotor, wooden axles and angled gears cost no metal at all.
+`DECISIONS.md` §3 is about the **marginal** cost of a pylon and its span, because a chained route
+multiplies it by every hop — not about the system's one-time cost. A windmill plus axles for the whole
+ropeway is fine; a windmill per pylon would not be. The drive train itself is not metal-gated at all: a
+wooden rotor, wooden axles and angled gears cost no metal.
+
+This section used to say "unchanged and still satisfied" and give no number, and the argument had never
+been run past the recipes. It has now (`docs/agentic/ingest/cablecar/RECIPE-LADDER.md`), and it was **not**
+satisfied — a minimum line came to 61 ingots and a ten-tower route to 93, against an anvil at 10. After the
+recipe pass, pricing a `metalplate` at the 2 ingots it is smithed from and a `metalbit` at 1/20:
+
+| | marginal | once per line |
+|---|---|---|
+| **plain tower** | **1.85 ingots**, 1 rope, 2 planks, 3 stone, 8 posts | — |
+| **span, 30 blocks** | **4 vanilla rope** + 0.1 ingot | — |
+| **span, 48 blocks (max)** | 6 rope + 0.15 ingot | — |
+| **drive station** | — | **15.9 ingots** |
+| **tension station** | — | **12.7 ingots** |
+| **cabin** | — | 0.53 ingot |
+
+So a whole short line at a 30-block span is **≈31 ingots** — about three anvils, or one and a half water
+wheels once the water wheel's own six construction stages are counted — and each hop after it is under two
+ingots, plus rope by the span: 2 up to 16 blocks, 4 from 17 to 32, 6 from 33 to 48. Haul rope only comes four
+to a craft, so that is a step function and not a rate; quoting "four rope a hop" undercharges the 33-to-48
+band that QA's own 20-to-40-block spans reach. The once-per-line cost sits beside the drive that runs it, and
+the per-pylon cost is small enough that a ten-tower route at the same span is only **≈46**.

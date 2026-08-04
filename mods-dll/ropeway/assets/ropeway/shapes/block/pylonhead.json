@@ -2,7 +2,8 @@
   "textureWidth": 16,
   "textureHeight": 16,
   "textures": {
-    "metal": "game:block/metal/sheet/iron1"
+    "girder": "game:block/metal/riveted/iron1",
+    "machine": "game:block/metal/tarnished/iron"
   },
   "elements": [
     {
@@ -11,12 +12,12 @@
       "to": [ 3.2, 2.0, 16.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
       }
     },
     {
@@ -25,12 +26,12 @@
       "to": [ 16.0, 2.0, 16.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
       }
     },
     {
@@ -39,12 +40,12 @@
       "to": [ 3.2, 14.0, 11.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
       }
     },
     {
@@ -53,12 +54,12 @@
       "to": [ 16.0, 14.0, 11.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
       }
     },
     {
@@ -67,12 +68,12 @@
       "to": [ 11.0, 14.0, 13.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
       }
     },
     {
@@ -81,12 +82,12 @@
       "to": [ 5.4, 12.2, 12.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
       }
     },
     {
@@ -95,12 +96,12 @@
       "to": [ 12.8, 12.2, 12.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
       }
     }
   ]

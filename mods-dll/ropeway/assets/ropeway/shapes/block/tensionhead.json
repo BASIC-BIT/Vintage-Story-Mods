@@ -2,7 +2,9 @@
   "textureWidth": 16,
   "textureHeight": 16,
   "textures": {
-    "metal": "game:block/metal/sheet/iron1",
+    "girder": "game:block/metal/riveted/iron1",
+    "machine": "game:block/metal/tarnished/iron",
+    "shaft": "game:block/metal/plate/steel",
     "rope": "game:block/cloth/reedrope"
   },
   "elements": [
@@ -26,22 +28,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       }
     },
@@ -64,22 +66,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       }
     },
@@ -102,22 +104,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       }
     },
@@ -140,22 +142,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       }
     },
@@ -179,22 +181,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#machine"
         }
       }
     },
@@ -217,22 +219,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#shaft"
         }
       }
     },
@@ -255,22 +257,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#shaft"
         }
       }
     },
@@ -293,22 +295,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#machine"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#machine"
         }
       }
     },
@@ -332,22 +334,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#shaft"
         }
       }
     },

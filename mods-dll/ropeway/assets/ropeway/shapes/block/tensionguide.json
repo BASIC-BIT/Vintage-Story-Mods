@@ -2,7 +2,8 @@
   "textureWidth": 16,
   "textureHeight": 16,
   "textures": {
-    "metal": "game:block/metal/sheet/iron1",
+    "girder": "game:block/metal/riveted/iron1",
+    "shaft": "game:block/metal/plate/steel",
     "rope": "game:block/cloth/reedrope"
   },
   "elements": [
@@ -25,22 +26,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       },
       "//": "Four corner angles running the full height of the cell. This leg REPLACES a post column, so it carries the tower as well as the machinery and cannot be open at the corners."
@@ -64,22 +65,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       }
     },
@@ -102,22 +103,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       }
     },
@@ -140,22 +141,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       }
     },
@@ -179,22 +180,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       }
     },
@@ -217,22 +218,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#girder"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#girder"
         }
       }
     },
@@ -256,22 +257,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#shaft"
         }
       }
     },
@@ -294,22 +295,22 @@
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "south": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#shaft"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#shaft"
         }
       }
     },

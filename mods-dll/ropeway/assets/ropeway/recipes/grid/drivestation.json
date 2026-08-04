@@ -1,23 +1,12 @@
 {
-  "//": "A pylon footing with the drive plate on it. One or two per LINE rather than one per pylon, so DECISIONS.md 3 - the MARGINAL cost of a pylon - does not bite: two plates on top of a footing's own cost, for the tower that names the drive end of the line.",
-  "ingredientPattern": "PFP",
+  "//": "A pylon footing with the drive plate bolted beside it. It was TWO plates - 4 ingots for a fitting - against the tension footing's two bits at 0.1, a 40x gap for the same act on the same block. Both stations put their machinery on the LEG; the footings differ only in what they are rigged for. One plate here and eight bits a side there leaves 2.05 against 0.85, a gap the fiction can carry.",
+  "//pattern": "2x1, not 3x1. One plate cannot sit in a symmetric 3-wide row, and the two ways to spend the spare cell both fail: a second plate is what we are removing, and B-F-B is tensionstation.json's grid exactly, which would make one of the two uncraftable. 'A footing with its drive plate next to it' reads fine as a pair.",
+  "ingredientPattern": "PF",
   "ingredients": {
-    "P": {
-      "type": "item",
-      "code": "game:metalplate-*",
-      "name": "metal"
-    },
-    "F": {
-      "type": "block",
-      "code": "ropeway:pylonbase-*",
-      "name": "side"
-    }
+    "P": { "type": "item", "code": "game:metalplate-*" },
+    "F": { "type": "block", "code": "ropeway:pylonbase-*" }
   },
-  "width": 3,
+  "width": 2,
   "height": 1,
-  "output": {
-    "type": "block",
-    "code": "drivestation-north",
-    "quantity": 1
-  }
+  "output": { "type": "block", "code": "drivestation-north", "quantity": 1 }
 }

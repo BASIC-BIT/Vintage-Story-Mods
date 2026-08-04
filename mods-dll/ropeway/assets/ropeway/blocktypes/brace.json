@@ -13,7 +13,7 @@
     "*-west": { "base": "ropeway:block/brace", "rotateY": 90 }
   },
   "textures": {
-    "metal": { "base": "game:block/metal/sheet/iron1" }
+    "girder": { "base": "game:block/metal/riveted/iron1" }
   },
   "drawtype": "json",
   "blockmaterial": "Metal",

@@ -14,8 +14,11 @@
     "*-south": { "base": "ropeway:block/bullwheel", "rotateY": 180 },
     "*-west": { "base": "ropeway:block/bullwheel", "rotateY": 90 }
   },
+  "//textures": "`machine` has to be declared HERE and not only on the rim shape: BEBullwheel draws bullwheelrim.json with Tesselator.TesselateShape(Block, ...), which builds a BLOCK texture source (ShapeTesselator.cs:179-190) and never consults the shape's own map. Rename or drop it and the rim renders as the unknown-texture checker with a 'Missing mapping for texture code #machine' line. Loud, at least.",
   "textures": {
-    "metal": { "base": "game:block/metal/sheet/iron1" }
+    "girder": { "base": "game:block/metal/riveted/iron1" },
+    "machine": { "base": "game:block/metal/tarnished/iron" },
+    "shaft": { "base": "game:block/metal/plate/steel" }
   },
   "drawtype": "json",
   "blockmaterial": "Metal",

@@ -1,10 +1,12 @@
 {
+  "//": "Two vanilla ropes spliced round a handful of bits. Yield was 1, which put a 30-block span at 16 vanilla rope - more than the stone anchor, vanilla's rope-heaviest craft - and a ten-tower route at 160, i.e. 960 cattail tops picked by hand. At 4 the MARGINAL rate is one vanilla rope per eight blocks of span, but a span is bought in whole crafts of four haul rope, so the price is 2*ceil(ceil(L/4)/4) vanilla rope: 2 for a span of 1-16 blocks, 4 for 17-32, 6 for 33-48. Quote craft counts, not the rate - the rate undercharges at L in 1-8, 17-24 and 33-40, which is roughly a third of legal spans.",
+  "//whyyield": "Tried and rejected: halving pylonbase.json's ropePerBlock, which is the same arithmetic. ropePerBlock is quoted by the picker rows, both handbook pages and QA-SCRIPT, so moving it falsifies every span number on every page; moving the recipe's yield leaves all of them true.",
   "ingredientPattern": "R,M,R",
   "ingredients": {
     "R": { "type": "item", "code": "game:rope" },
-    "M": { "type": "item", "code": "game:metalbit-*", "name": "metal" }
+    "M": { "type": "item", "code": "game:metalbit-*" }
   },
   "width": 1,
   "height": 3,
-  "output": { "type": "item", "code": "haulrope", "quantity": 1 }
+  "output": { "type": "item", "code": "haulrope", "quantity": 4 }
 }

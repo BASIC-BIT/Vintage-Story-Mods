@@ -36,8 +36,11 @@
     }
   },
   "textures": {
-    "metal": {
-      "base": "game:block/metal/sheet/iron1"
+    "girder": {
+      "base": "game:block/metal/riveted/iron1"
+    },
+    "shaft": {
+      "base": "game:block/metal/plate/steel"
     }
   },
   "drawtype": "json",

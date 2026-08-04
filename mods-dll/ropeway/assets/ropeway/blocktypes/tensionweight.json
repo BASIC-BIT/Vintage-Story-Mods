@@ -7,13 +7,16 @@
   },
   "textures": {
     "stone": {
-      "base": "game:block/stone/rock/granite1"
+      "base": "game:block/stone/rock/andesite1"
     },
-    "metal": {
-      "base": "game:block/metal/sheet/iron1"
+    "shaft": {
+      "base": "game:block/metal/plate/steel"
     },
     "rope": {
       "base": "game:block/cloth/reedrope"
+    },
+    "girder": {
+      "base": "game:block/metal/riveted/iron1"
     }
   },
   "drawtype": "json",

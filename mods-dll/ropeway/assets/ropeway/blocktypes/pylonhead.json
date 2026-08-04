@@ -15,7 +15,8 @@
     "*-west": { "base": "ropeway:block/pylonhead", "rotateY": 90 }
   },
   "textures": {
-    "metal": { "base": "game:block/metal/sheet/iron1" }
+    "girder": { "base": "game:block/metal/riveted/iron1" },
+    "machine": { "base": "game:block/metal/tarnished/iron" }
   },
   "drawtype": "json",
   "blockmaterial": "Metal",

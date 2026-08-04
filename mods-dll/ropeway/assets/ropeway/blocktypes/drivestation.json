@@ -39,12 +39,16 @@
     }
   },
   "//shape": "The footing reuses the plain one's model. A distinct model was considered and dropped: the block-info panel, the build overlay and the item name all already say which footing you are holding, and the footing is buried in the archway floor where nobody looks. What names a station from across the valley is its machine leg.",
+  "//metal": "NOT this footing's own decoration. `metal` is the STATION RAIL and the outrigger plates, which BEPylonBase.OnTesselation draws in C# off textures[\"metal\"] (BEPylonBase.cs:603) and flat-samples like the cable - Array.Fill(mesh.Uv, 0.5f) at :989 - so only this sprite's CENTRE texel is ever seen and it must stay in the plate/ family, whose centre is within 1 L of its own mean. riveted/iron1 fails that by 6.5 L. It is plate/IRON and not the plate/steel `shaft` wears, which is a SECOND rule and a rendered one: SpanMath.TrimForTowers draws eight blocks of 2.2x4-unit bar at every tower on every line, so this is the longest continuous geometry the mod has, and steel's flat sample of 126.5 L made it the brightest object on a tower - 37% brighter than the crossarm it hangs under, with the haul cable a thread beside it (renders/palette/zoom-rail.png). plate/iron flat-samples 95.0: one step UNDER `shaft`, 2.5 L off the riveted crossarm's own mean, still 21 L clear of the rope, and it reads as a bar rather than a highlight. The footing's own plate and boss are on `shaft` instead, so a cosmetic edit to the footing cannot silently repaint every rail on every line. A key no shape face uses still bakes into the atlas (Block.cs:2514); `rope` here has always worked that way.",
   "textures": {
     "stone": {
-      "base": "game:block/stone/rock/granite1"
+      "base": "game:block/stone/rock/andesite1"
+    },
+    "shaft": {
+      "base": "game:block/metal/plate/steel"
     },
     "metal": {
-      "base": "game:block/metal/sheet/iron1"
+      "base": "game:block/metal/plate/iron"
     },
     "rope": {
       "base": "game:block/cloth/reedrope"
