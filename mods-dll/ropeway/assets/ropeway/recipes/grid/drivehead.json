@@ -1,0 +1,23 @@
+{
+  "//": "The bevel gearbox. The most metal of the machine blocks, which is right - it is the one cell where the drive turns a corner.",
+  "ingredientPattern": "PBP,BPB",
+  "ingredients": {
+    "P": {
+      "type": "item",
+      "code": "game:metalplate-*",
+      "name": "metal"
+    },
+    "B": {
+      "type": "item",
+      "code": "game:metalbit-*",
+      "name": "metal"
+    }
+  },
+  "width": 3,
+  "height": 2,
+  "output": {
+    "type": "block",
+    "code": "drivehead-north",
+    "quantity": 1
+  }
+}

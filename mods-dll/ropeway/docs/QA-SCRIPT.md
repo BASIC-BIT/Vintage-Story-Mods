@@ -4,10 +4,15 @@ Manual operator checklist. One in-game session has happened: the mod loaded clea
 four findings the previous round fixed — cabin built across the travel axis, cable rendering nothing, the
 picker showing only link candidates, and no way to name a tower.
 
-**This round restructured the tower** (`DECISIONS.md`, "2026-07-31 — tower restructure"): the rear gantry
-is gone, and the controller moved from the pylon head at head height to a **pylon footing on the ground**.
-Steps 0, 2, 4–8 and 11 are rewritten for it, and everywhere the old script said "right-click the pylon
-head" it now says "right-click the footing" — every verb moved. Every measurement in this script was
+**This round made the drive and the tensioner STRUCTURE** (`STATION-DESIGN.md`): they are cells of two
+new tower kinds, `drivestation` and `tensionstation`, rather than blocks you stand near the line. Steps 0,
+1, 2, 3, 6, 11 and the whole of 27 are rewritten for it, and every "within eight blocks" in the old script
+is gone — if you are holding a copy that still has one, it is stale.
+
+**The round before restructured the tower** (`DECISIONS.md`, "2026-07-31 — tower restructure"): the rear
+gantry is gone, and the controller moved from the pylon head at head height to a **pylon footing on the
+ground**. Everywhere the old script said "right-click the pylon head" it now says "right-click the
+footing" — every verb moved. Every measurement in this script was
 re-derived from `blocktypes/pylonbase.json` and the shipped shapes on 2026-08-01, and the same numbers are
 asserted by `renders/scenes/gen_manifests.py` and `RopewayAssetContractTests.TheCabinFitsThroughTheTower`.
 See [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for what source review already found and did not fix.
@@ -16,21 +21,39 @@ See [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for what source review already found and 
 Creative mode is fine for steps 5+; do steps 1-4 in survival at least once to check the recipes.
 Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` throughout.
 
-0. **Migration, if and only if you have a world with towers built before this round.** Load it.
-   **PASS:** the world loads, and `server-main.log` carries one *"Failed loading blockentity PylonHead …
-   Will discard it"* line per old tower — that is the intended migration, not a bug. The old towers are
-   now inert decoration: their blocks are all still there, their spans and names are gone, and nothing
-   crashes. Look at an old pylon head: **PASS:** *"Not part of a tower. A tower starts with a pylon
-   footing on the ground…"*. **FAIL:** a crash on load, an old tower that still reports spans, or a
-   cable still drawn between two of them.
-   **Known and accepted:** a cabin that was on an old line stays hanging where it was, holding, with no
-   line to resolve. Break it out with `/entity remove` or leave it; it is inert. Pre-release, no upgrader.
+0. **Migration, if and only if you have a world with a line built before this round.** Load it.
+   **PASS:** the line itself survives completely — towers still read complete, spans still drawn, names
+   still there, the cabin still hanging where it was. Nothing about the chain changed.
+   **PASS:** `server-main.log` carries one *"Failed loading blockentity TensionWeight … Will discard it"*
+   line per old tension weight. That is the intended migration, not a bug: the weight has no block entity
+   any more, so every one of them fails at once and the blocks stay as decoration.
+   **PASS:** the footing panel now says *"Nothing on this line is turning"* and *"This line has no tension
+   station"*. Both are true — a free-standing drive housing is not a cell of a station, so it drives
+   nothing however close it stands, and the old weight is not a tension station. The old housing keeps its
+   axle and its own panel still reads what it is turning at; it simply turns nothing.
+   **PASS:** a cabin already on the line stops and **is not stranded** — `IsMoving` is false, so right-click
+   steps you out. A cabin cannot be *placed* on that line until a tension station exists.
+   **EXPECTED, and it is the one migration case the list used to miss:** a **plain tower wearing a decorative
+   bullwheel** now loads **incomplete**, and while it is incomplete it takes no clicks at all — no picker, no
+   call, no rename. A plain footing's centre cell used to accept a pylon head *or* a bullwheel and the old
+   guide text said the swap was "optional and changes nothing mechanical"; the wheel is a station cell now,
+   so `ropeway:pylonbase` wants the head and nothing else. **The repair is one block:** put a pylon head
+   back in the middle of the crossarm and the tower goes green and answers clicks again. **FAIL:** the tower
+   reads complete with a bullwheel on it, or reads incomplete and its overlay does not name the centre cell.
+   **The repair, and it is two towers per line.** Break each end tower's footing (that refunds the span's
+   rope and unlinks it), re-place it as a **drive station footing** at the mill end and a **tension station
+   footing** at the other, build the two legs, and re-link. The old housing and the old weight are picked
+   back up and go straight into the new legs, so nothing is wasted.
+   **FAIL:** a crash on load, a tower that lost its spans, or a cable that stopped being drawn.
+   **Also still true from the round before:** a world with towers older than the ground footing carries one
+   *"Failed loading blockentity PylonHead …"* line per old tower and those towers are inert decoration.
 
 1. **Install and load.** Copy `ropeway_0_1_0.zip` into `%APPDATA%\VintagestoryData\Mods\`, start the game,
    open a world. **PASS:** no `Ropeway:` error lines in either log at startup. In particular there must be
-   no *"multiblockStructure on ropeway:pylonbase-… lists '…', which matches no loaded block"* — that line
-   means the post wildcard does not resolve at runtime and the fallback is to replace it with plain
-   `game:planks-*`. The wildcard now accepts eight families:
+   no *"multiblockStructure on ropeway:… lists '…', which matches no loaded block"* — that line
+   means a structure wildcard does not resolve at runtime. **Three footings carry a structure now** —
+   `pylonbase`, `drivestation` and `tensionstation` — so read the block code in the message before you
+   assume it is the post wildcard. The post wildcard accepts eight families:
    `log-placed-*`, `debarkedlog-*`, `planks-*`, `rock-*`, `cobblestone-*`, `drystone-*`, `rockpolished-*`
    and `stonebricks-*`. Note the verifier only tests the whole key, so a dud alternative hides behind the
    live ones — step 7 is what actually proves each family.
@@ -39,20 +62,39 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    - **Ropeway brace ×4** — stick, metal plate (any metal), stick in a 1×3 *row*.
    - **Haul rope ×1** — rope / metal bit / rope in a 1×3 *column*.
    - **Pylon head ×1** — rope / brace / metal bit, top to bottom in a 1×3 *column*.
+   - **Bullwheel ×2** — metal plate, **pylon head**, metal plate in a 1×3 *row*, so each one eats a pylon
+     head of its own. **Craft two.** It is the centre crossarm cell of a drive station *and* of a tension
+     station, so a two-station line wants one each and neither structure completes without it — this list
+     used to omit it entirely and sent testers out to step 11 two bullwheels short.
    - **Pylon footing ×1** — plank, metal bit, plank on the top row; three loose stones under them.
    - **Ropeway cabin ×1** — haul rope, empty, haul rope / brace, plank, brace / plank, plank, plank.
    - **Tension weight ×1** — metal bit, loose stone, metal bit on the top row, then plank, loose stone,
-     plank twice under it. A line will not take a cabin without one (step 11).
-   - **Drive housing ×1** — three metal plates across the top row, three planks under them. Nothing on a
-     line moves without one (step 11).
-   **PASS:** all seven appear in the crafting output under real names rather than raw lang keys.
+     plank twice under it. Cell [3,0,0] of a tension station (step 11).
+   - **Drive housing ×1** — three metal plates across the top row, three planks under them. Cell [3,0,0] of
+     a drive station (step 11).
+   **The station footings and their legs**, all new this round:
+   - **Drive station footing ×1** — metal plate, **pylon footing**, metal plate in a 1×3 *row*.
+   - **Tension station footing ×1** — metal bit, **pylon footing**, metal bit in a 1×3 *row*.
+   - **Lay shaft ×2** — metal bit, metal plate, metal bit in a 1×3 *row*. Both stations want two.
+   - **Drive head ×1** — plate/bit/plate on the top row, bit/plate/bit under it.
+   - **Drive shaft ×2** — stick, plate, stick, twice, in a 3×2 block.
+   - **Tension head ×1** — bit/plate/bit on the top row, plate/stick/plate under it.
+   - **Tension guide ×2** — stick, plate, stick on the top row, then plate, **rope**, plate under it.
+   **PASS:** all fifteen appear in the crafting output under real names rather than raw lang keys.
    **Quantities are one craft's output, and one craft is not a tower.** A tower is a footing, a head and
    **six** braces — plus the brace that goes inside each head — so budget two brace crafts per tower, and
    enough haul rope for `ceil(span / 4)` on every span you string; a 30-block span is 8 rope on its own.
+   **And the two above that do not divide: a station's leg is THREE cells.** A drive station wants **three**
+   drive shafts and a tension station **three** tension guides, against recipes that yield two — so that is
+   **two crafts each per station**, with one spare. Craft one of each and you walk out to step 11 one block
+   short of a finished leg, which is the same shape of defect as the bullwheel this list used to omit.
+   `layshaft` is the counter-example that proves the rule is about the count and not about the recipe: two
+   cells, yield two, one craft, exact.
    **The tower count is much more than three.** Steps 9 and 16 want three; 12b wants two separate
    three-tower lines, 18b a line whose first hop doubles back, 27a a fresh pair, 27d an uphill line, and 25
-   wants five (singleplayer, slider at 128) or seven on a stock server. Each of those lines also wants its
-   own tension weight and drive housing — see step 11. Do steps 1-4 in survival once for the recipes and
+   wants five (singleplayer, slider at 128) or seven on a stock server. **Each of those lines wants one
+   drive station and one tension station of its own**, which is two of its towers built as stations rather
+   than two extra blocks beside it — see step 11. Do steps 1-4 in survival once for the recipes and
    then take the rest in creative; nobody is meant to hand-craft that in survival.
 
 3. **Handbook.** Press `H`, find the **Ropeway** category tab. **PASS:** the tab is labelled "Ropeway"
@@ -63,16 +105,26 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    tension weight that keeps it taut, and says nothing about winding, charge or paying for a trip.
    **PASS:** the power page carries a *"A windmill needs room"* section, and it states the room as
    **clear blocks under the hub** — four for three sails, six for a maxed five, eleven for a maxed metal
-   rotor — not as a height above anything. It also says the eight blocks are measured through the air so
-   height counts. **FAIL:** it gives those numbers as *"the hub four blocks up"* with nothing saying what
-   "up" is counted from. That reading is one short from the ground you stand on, and it fails the last sail
-   on the tester who trusts it. **FAIL:** it still tells you a mill standing
-   beside the tower reaches the housing with two or three axles and nothing to climb. That is the stale
-   copy, it describes a windmill vanilla will not let you build, and step 27c is where the player finds
-   out.
+   rotor — not as a height above anything. **FAIL:** it gives those numbers as *"the hub four blocks up"*
+   with nothing saying what "up" is counted from. That reading is one short from the ground you stand on,
+   and it fails the last sail on the tester who trusts it.
+   **PASS:** the power page describes the drive as a **station** — one of the line's own towers, with a
+   machine leg — and tells you to run the mill down the outside of that leg on a vertical axle column.
+   **FAIL:** it describes the drive as a block bound to the line **by distance** — a sphere, a radius, a
+   housing standing beside the tower rather than being a cell of it, or a housing riding up to hub height.
+   Every one of those is the deleted rule, and a tester who follows it builds a drive that turns nothing.
+   **Read the sentence, not the number.** An earlier version of this criterion failed on the string *"eight
+   blocks"*, which the page then legitimately carried for a while as a station **spacing** rule — so a tester
+   walking front to back filed a FAIL against the one paragraph that existed to prevent it. That rule is
+   retired (the shared machine leg is closed in code), so the page should say nothing about spacing at all
+   now; but if a distance ever comes back, judge it by whether it is telling you where to STAND the drive.
 
 4. **Place the pylon footing.** Stand where you want the tower and place it **on the ground** — this is
    the first block of a tower and nothing has to exist above it.
+   **Read step 11 first if you are building a line you intend to ride.** Two of its towers want to be
+   **stations**, and a station is a different footing rather than an extra block — so placing the plain
+   footing at both ends and rebuilding them later costs you the span and a re-link. Steps 4–9 are written
+   for the plain tower because that is what every intermediate tower is.
    **PASS:** it lands flat, it is a half-height plinth you can walk over rather than a full cube, and it
    turns to face you.
 
@@ -89,12 +141,14 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    that is the archway the cabin goes through.
 
 6. **Open the guide.** Sneak (hold Shift) and right-click the footing with an empty hand.
-   **PASS:** the "Ropeway Tower" dialog opens; **six** cells turn in 3D — pylon footing, pylon head, brace,
-   **bullwheel**, **drive housing**, then the cabin — and the build steps are readable underneath.
-   **PASS:** all six fit inside the inset; the cells got narrower again when the drive pair was added.
-   **PASS:** the text has a *"Making it move"* paragraph naming the drive housing and the 8-block rule.
-   **FAIL:** that paragraph says the mill stands **on the ground** beside the tower. A windmill cannot —
-   see 27c — and the guide is the last place still saying so if it does.
+   **PASS:** the "Ropeway Tower" dialog opens; **seven** cells turn in 3D — pylon footing, **drive station
+   footing**, **tension station footing**, pylon head, brace, **bullwheel**, then the cabin — and the build
+   steps are readable underneath.
+   **PASS:** all seven fit inside the inset; the cells got narrower again when the two station footings
+   were added.
+   **PASS:** the text has a *"Making it move"* paragraph, and it names the two **stations** and the seven
+   machine-leg blocks. **FAIL:** it mentions **eight blocks** or a housing standing beside the tower; that
+   is the deleted rule, and the guide is the last place still saying so if it does.
    **FAIL modes to report:** cabin invisible (renderer/tesselation), cabin clipped out of the inset
    (the size/offset knob in §4.6), a `Ropeway: could not build the guide cabin preview` log line.
 
@@ -112,9 +166,12 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    legs start one block up is the "posts three tall" mistake and means the offsets moved.
    **PASS:** the tower is **one block deep**. There is no second gantry and nothing behind it.
    **PASS:** the pylon head validates whichever of its four facings you place it in. Point its throat down
-   the line anyway; it is the slot the cabin's hanger blade rides in, it carries the station rails, and a
-   crosswise sheave looks wrong. **PASS:** the rails and their flared mouths overhang the head's own cell by
-   a block fore and aft, and no extra block is needed under them — that overhang is the shape, not a bug.
+   the line anyway; it is the slot the cabin's hanger blade rides in and a crosswise sheave looks wrong.
+   **PASS:** an unlinked tower has **no station rail at all**. Every authored rail element is gone from the
+   head shape this round — the ±8° flared mouths *and* the one straight plate per side that outlived them —
+   because all of it is now drawn on the rope by the footing, so the rail only exists once the tower is
+   linked. Check it at **10b**.
+   **FAIL:** flares, a plate under the sheave, or any rail on an unlinked tower.
    **PASS — post materials.** Build one post out of **logs** and the other out of **stone bricks**; both
    must satisfy the structure. Then swap a post block for each of the remaining six accepted families in
    turn — debarked log, planks, raw stone (`rock-*`), cobblestone, drystone, polished rock — and check the
@@ -184,6 +241,14 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      texture's own sub-region, sampling whichever sprites sit next to it.
      **PASS — the cable's thickness.** About two pixels — a thin line, not a beam. Sight along a span from
      one tower: it should read as rope, not as a pipe.
+     **PASS — the station rail came with it, new this round.** A pair of thin metal bars now runs out of each
+     tower **under and either side of the cable**, about four blocks along the span before stopping — the same
+     curve, from the same call, so on a straight span they are two straight bars parallel to the rope. They
+     start at the tower centre, under the sheave, so the two runs meet there with no gap and no step. On a
+     **short** span (step 23) they are shorter or absent, which is correct: the run is the same window the
+     bend uses, and a span under about two blocks has none. **FAIL:** the bars run straight across the
+     crossarm on a cardinal instead of out along the rope, or a straight plate sits under the sheave that
+     does not turn with them — that is the authored fixture back.
 
 10c. **Name the towers.** With the picker open on tower 1, type a name into the **"This tower:"** field at
      the top and press **Rename**. **PASS:** the row list refreshes and the block-info panel on that pylon
@@ -213,14 +278,23 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      unlinkable full tower is the whole point of the row list. It offers **no link rows**, because every
      one of them would fail on click.
 
-11. **Hang the cabin — but build the line's two power blocks first, or nothing after this step works.**
-    A line refuses a cabin outright until a **tension weight** stands within 8 blocks of one of its towers,
-    and a cabin will not depart until a **drive housing** on that line is being turned. Both are in step 2's
-    craft list; both are explained in full at **27a** and **27c**. Build them now:
-    - the **tension weight** anywhere within 8 blocks of either tower — it does not matter which, and it
-      takes no axle;
-    - the **drive housing** with a mill running into it, **following 27c** — read 27c before you place
-      anything, because the mill's hub cannot sit at ground level and the housing has to climb with it.
+11. **Hang the cabin — but build the line's two STATIONS first, or nothing after this step works.**
+    A line refuses a cabin outright until one of its towers is a **finished tension station**, and a cabin
+    will not depart until a **drive station** on that line is being turned. A station is not an extra block
+    beside the line: it is one of the line's own towers, built on a station footing instead of a plain one,
+    with one leg of machinery instead of posts. Both are explained in full at **27a** and **27c**.
+    **You built two plain towers in steps 7 and 9. Rebuild them as stations now**, or build the stations
+    from the start next time:
+    - break tower 1's **footing** (that cuts the span and refunds its rope), place a **drive station
+      footing** in the same spot facing the same way, and re-link;
+    - build its crossarm: three braces on the plain side, a **bullwheel** in the middle instead of the pylon
+      head, two **lay shafts** running out to the machine leg, a **drive head** on the crossarm end, three
+      **drive shafts** below it and a **drive housing** on the ground;
+    - do the same at tower 2 with a **tension station footing**, a **tension head**, three **tension
+      guides** and a **tension weight** on the ground;
+    - right-click each footing as you go — the overlay lights every cell that is still missing, in the
+      wanted block's own colour, and that is faster than counting;
+    - then run a mill into the drive housing, **following 27c**.
       Give it **five** sails, not three, and **pin the weather now** — `/weather acp false`, *then*
       `/weather setw strongbreeze`.
       **`acp false` first.** Vanilla re-rolls the wind pattern by itself every few game hours, uniformly over
@@ -232,12 +306,12 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
       **`acp` is not persisted** — it is a field on the weather mod system, so it is back to `true` after
       every reload — re-run both commands after every one. Steps 18, 18b, 19, 26e and 27f all reload, and
       27f is the one that bites: 27g needs the mill turning and nothing between them tells you to re-pin.
-    **Every line you build from here on wants its own pair**, because a housing drives the one line whose
-    footing is nearest it — counting only footings that are themselves on a line. That includes the corner
-    lines in 12b, the doubling-back line in 18b, the three-tower line in 16, the long one in 25 and the
-    uphill one in 27d.
-    **27a and 27b are the deliberate runs *without* them**, so do those two on a fresh pair of towers rather
-    than tearing these out.
+    **Every line you build from here on wants one of each**, because a drive station drives the line it is
+    a tower OF and no other. That includes the corner lines in 12b, the doubling-back line in 18b, the
+    three-tower line in 16, the long one in 25 and the uphill one in 27d. Build those lines' end towers as
+    stations from the start; rebuilding a footing costs a re-link.
+    **27a and 27b are the deliberate runs *without* them**, so do those two on a fresh pair of plain towers
+    rather than tearing these out.
     Now hold the Ropeway Cabin item and right-click the first tower's footing.
     **PASS:** a cabin appears hanging 2 blocks below the sheave — that is **at the tower it was placed on,
     inside its own archway**, not somewhere near it: its floor a little over a block above the footing, its
@@ -339,21 +413,47 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      bend at the middle one (30 degrees or less) and once with a **right angle**. Face each middle footing
      down one of its two legs.
      **PASS — gentle bend:** the cabin misses both posts. Measured at 0.000 blocks of penetration at 30
-     degrees and 0.033 at 45; the 5-wide passage is what buys that, so a visible hit at 30 degrees means the
-     tower's posts are back at x = ±2.
-     **PASS — right angle, and this is a KNOWN LIMIT, not a bug:** the cabin **passes through a post**. A
-     tower facing is one of four cardinals, so at 90 degrees the outgoing leg IS the post axis: the cabin's
-     *origin* travels down the post column at tower-local x = 3. It is a translation, and no yaw law fixes a
+     degrees and **0.004** at 45 with the footing down a leg — it was 0.033 before the path was bent through
+     the tower this round. The 5-wide passage is what buys the bulk of that, so a visible hit at 30 degrees
+     means the tower's posts are back at x = ±2.
+     **PASS — right angle between two CARDINAL legs, and this is a KNOWN LIMIT, not a bug:** the cabin
+     **passes through a post**. A tower facing is one of four cardinals and this corner's halfway line is a
+     diagonal, so whichever way the footing points the outgoing leg IS the post axis: the cabin's *origin*
+     travels down the post column at tower-local x = 3. It is a translation, and no yaw law fixes a
      translation - one was tried (the "angle-station" law) and made 45- and 60-degree corners worse, so it
      was reverted. Record it and move on. The handbook tells players the same thing.
-     **Also expected at a right angle, cosmetic:** the outgoing rope leaves the sheave *into* the crossarm
-     and is buried in three brace blocks before it clears the tower. Known; do not report it.
+     **PASS — the chat warning, new this round, and it fires on the SECOND span of the corner.** Linking the
+     span that makes a middle tower a corner prints one line naming the turn in degrees. On the gentle bend
+     with the footing turned off the halfway line it names the facing to use instead; on the right angle it
+     says no facing carries a corner that sharp. **It is a warning and never a refusal** - the link is paid
+     for and made either way. **FAIL:** the link is refused, or nothing is printed on a right-angle corner.
+     **PASS — the right angle that IS clean, and it is worth building once.** Make the same 90 degrees out of
+     two **diagonal** legs — in from the **south-west**, out to the **south-east** — and face the middle
+     footing **east**. Those two headings are 45 and 135 degrees, so the turn really is 90 and the halfway
+     line is due east, a cardinal the tower can actually face. No warning is printed, and the cabin comes
+     through without touching a post. `KNOWN-ISSUES.md` recorded this case as impossible for two rounds; it
+     is not.
+     **Check the turn the chat line names before you record anything.** An earlier version of this step said
+     *"in from the south-west, out to the north-east"*, which is the **same heading twice** — a straight line,
+     turn 0 degrees. Every PASS above is then satisfied vacuously (no warning, because there is no corner;
+     no post touched, because a 4.861-block yawed footprint fits a 5.000 passage at any yaw), and the tester
+     records a PASS for a case that was never built.
+     **Also expected at a right angle with the footing down a leg, cosmetic:** the rope on the *incoming*
+     side runs along the crossarm axis and is buried in brace blocks before it clears the tower. Known; do
+     not report it. The bend fixed the outgoing side and cannot fix this one — the rope arrives from twenty
+     blocks out and a curve confined to the last four cannot change where it comes from. At the clean corner
+     above (both legs diagonal, tower facing the halfway line) the rope barely leaves the sheave's own cell.
      **FAIL:** anything at a **gentle** corner - a cabin eating a post at 15-30 degrees is a real regression
      and means the passage width or `SpanMath.TowerClearance` moved.
-     **This step is about a corner the cabin RIDES THROUGH, and it must stay that way.** A cabin that does
-     not stop is on the plain leg bearing from end to end - step 13's square-up applies only where it stands
-     still. If you see the cabin turn square to a middle tower it is *passing*, that is the reverted law
-     back, and it is a fail here whatever it looks like.
+     **This step is about a corner the cabin RIDES THROUGH, and what to watch is HOW it turns, not whether.**
+     Since the path itself bends this round, a passing cabin is on the curve's own tangent: it sweeps
+     continuously from the incoming leg, through the corner's halfway line *at* the tower, and on to the
+     outgoing leg, over the four blocks either side. So at a tower facing that halfway line it does come
+     through square, and that is the curve rather than step 13's square-up, which applies only where the
+     cabin stands still.
+     **FAIL:** the cabin **holds one fixed heading** across the tower and then steps to the next in one tick -
+     a crab-walk that drags its tail through the post on the outside of the bend. That is the reverted
+     angle-station law, and it looks nothing like a continuous sweep.
 
 13. **Arrive, and watch it square up.** **PASS — do this at a tower on a line that TURNS, which is where it
     shows:** as the cabin settles it **turns to sit flush with the station**, square across the crossarm and
@@ -749,57 +849,81 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 27. **Power — the drive is a real mechanical load** (this whole step is new: the tension weight used to be
     a battery you wound up, and that design is deleted. Nothing here stores anything.)
     You need a **windmill rotor** (`windmillrotor-wood-north`), **sails** (4 per length), **wooden axles**,
-    a **tension weight**, a **drive housing** (`ropeway:drivehousing`) and, if you want to check the
-    decoration, a **bullwheel** (`ropeway:bullwheel-north`). No angled gears for the wooden mill — that is
-    the point; the maxed metal rotor in 27c-metal is the exception and needs two of them plus blocks to
-    stand a wall out of. Creative and `/giveblock` are fine.
+    **two angled gears**, and both station kits from step 2's craft list. **Every windmill now needs the two
+    gears and a vertical axle column** — that is the price of fixing the intake to a cell, and the column
+    leans on the drive leg rather than on a wall you build. Creative and `/giveblock` are fine.
     **The two rotors take different sails**, and this is the one that wastes an afternoon: `sail` for the
     wooden rotor, **`sail-large-oak`** for the metal one, 4 per length either way
     (`windmillrotor.json`'s `sailStack`). Offer the wrong sail and vanilla's `OnInteract` returns without a
     message — no toast, no chat line, nothing — which reads exactly like a broken block.
 
-    **27a — the tensioner is a build requirement, and it is the only one.** This wants a line that has
-    never had a weight near it, so build a **fresh two-tower pair** well away from the one you have been
-    riding rather than breaking that line's weight — a weight broken after the cabin is hung deliberately
-    changes nothing (last check of this step), so it cannot get you back to the state under test.
-    On that finished two-tower line with no tension weight anywhere near it, hold the **ropeway cabin** and
-    right-click an end footing.
-    **PASS:** it refuses — *"This line has no tension weight to keep the rope taut. Build one within 8
-    blocks of any tower on it first."* — and the cabin item is **not** consumed.
-    Look at a footing: **PASS:** the panel says the line has no tension weight and where to put one.
-    Try to place the weight out in a field, 20 blocks from anything: **PASS:** it refuses,
-    *"A tension weight has to stand within 8 blocks of a pylon footing."*
-    Place it beside **either** tower — it does not matter which — and hang the cabin again. **PASS:** it
-    goes on, and the footing panel stops mentioning the tensioner.
-    **PASS:** the weight looks like a mass **hanging low in its guide** on a rod up to the head beam, and it
-    **never moves**, however long you run the line. **FAIL:** it sits on the pad with nothing above it, or
-    it slides up and down — the first is the hanger element missing, the second is the deleted gauge.
-    **PASS:** place a **second** weight beside the other tower. It is allowed now (one per line was a store
-    rule and is gone), it does nothing extra, and nothing anywhere calls it "spare" or "orphaned".
-    **PASS:** break the weight with the cabin already hanging. The cabin keeps working; the footing panel
-    says the tensioner is missing. That leak is deliberate — it is a build check, not a runtime state.
+    **27a — the tensioner is a build requirement, and it is STRUCTURAL.** This wants a line with no
+    tension station on it, so build a **fresh two-tower pair of plain towers** well away from the one you
+    have been riding.
+    On that finished plain two-tower line, hold the **ropeway cabin** and right-click an end footing.
+    **PASS:** it refuses — *"This line has no tension station to keep the rope taut. Build one of its towers
+    as a tension station and finish it first."* — and the cabin item is **not** consumed.
+    Look at a footing: **PASS:** the panel says the line has no tension station.
+    **PASS — proximity is dead, and this is the check that proves it.** Place a bare **tension weight** on
+    the ground beside the tower, and then another one twenty blocks out in a field. Both place without
+    complaint (there is no placement rule left) and **neither changes anything**: the panel still says the
+    line has no tension station and the cabin still refuses. **FAIL:** the cabin goes on — that is the old
+    eight-block rule still live.
+    Now rebuild one of the two towers as a tension station: break its **footing**, place a **tension station
+    footing** facing the same way, re-link, and build the leg — tension weight on the ground, three tension
+    guides, tension head on the crossarm end, two lay shafts, and the bullwheel in the middle.
+    **PASS — build it HALF way first and read the panel.** With the leg part built the footing says the
+    tower is not complete and lights the missing cells, and the cabin still refuses. **That is new**: a
+    half-built tensioner used to be indistinguishable from a finished one, because a block was either in
+    range or not.
+    Finish it. **PASS:** the panel goes green, stops mentioning the tensioner, and the cabin goes on.
+    **PASS:** the weight is a mass **hanging low in its guide**, and the rails and rope carry on above it
+    through the three guide cells to the head sheave, with the rope leaving the sheave westward as the tie
+    rod to the bullwheel. It **never moves**, however long you run the line. **FAIL:** the mass slides up
+    and down — that is the deleted gauge; or the rails stop at the top of the weight's own block — that is
+    the guide cells missing.
+    **PASS:** break any cell of the finished station with the cabin already hanging. The cabin keeps
+    working; the footing panel says the tensioner is missing. That leak is deliberate — it is a build check,
+    not a runtime state.
 
-    **27b — no drive is a cabin that waits, not an error.** Use 27a's fresh pair, once its weight is in and
-    it has taken the cabin — it is the line that has never had a housing near it. With no axle and no drive
-    housing anywhere on that line, board and
+    **27b — no drive is a cabin that waits, not an error.** Use 27a's fresh pair, once its tension station
+    is finished and it has taken the cabin — it is the line whose other tower is still plain. With no drive
+    station anywhere on that line, board and
     sit. **PASS:** after the three-second pause nothing happens: no red toast, no chat line, no refusal.
     The cabin simply does not move. **FAIL:** any message about power, a store, a tension weight not being
     wound, or a trip being too dear — those states are deleted and any of them means old code is live.
     **PASS:** the footing panel says *"Nothing on this line is turning, so the cabin will not move"* and
-    tells you to build a **drive housing** within 8 blocks of a tower. **FAIL:** it says anything about
-    putting a bullwheel on a tower — the wheel does not drive anything any more.
+    tells you one of its towers has to be a finished **drive station**. **FAIL:** it mentions eight blocks,
+    or tells you to read a nearby housing's own panel to find out which line it decided to drive — both are
+    the deleted rule.
     **PASS:** get out. You can, because it is not moving.
     **PASS — calling refuses out loud.** Still with no drive on the line, stand at a tower with an empty
     hand and **call the cabin** (plain right-click). You get one **red error toast** — the same channel as
     step 5's, not a chat line — telling you nothing on this
-    line is turning and to build a drive housing, and the cabin does not take the call. **FAIL:** the
+    line is turning and to build a drive station, and the cabin does not take the call. **FAIL:** the
     click is silent and the cabin latches onto a trip it can never make — that was the old behaviour, and
     it looks exactly like a broken call rather than an unpowered line. Build the drive (27c) and call it
     again: **PASS:** it comes.
 
-    **27c — build the drive, and the ladder.** Try to place a **drive housing** out in a field, 20 blocks
-    from anything. **PASS:** it refuses — *"A drive housing has to stand within 8 blocks of a pylon
-    footing."* — and the block is not consumed.
+    **27c — build the drive station, and the ladder.**
+    **PASS — membership, not proximity, and this is the check that proves it.** Place a bare **drive
+    housing** on the ground beside a plain tower and run a mill into it. It places (there is no rule left),
+    the housing's own panel reads out what it is turning at, and **the line does not move**: the footing
+    panel still says nothing on this line is turning. **FAIL:** the cabin moves — that is the old
+    eight-block rule still live.
+    Now build the drive station properly. Break the tower's **footing**, place a **drive station footing**
+    facing the same way, re-link, and build the fifteen cells over it: four posts of your own material on the
+    plain side, three braces, the **bullwheel** in the middle, then the machine leg — **drive housing** on the
+    ground, three **drive shafts** above it, the **drive head** on the crossarm end, two **lay shafts**
+    running in to the wheel. Right-click the footing as you go and follow the overlay.
+    **PASS:** the panel counts **fifteen** and goes green when the last one lands — the footing you are
+    clicking is the sixteenth block of the tower and is never in that count, so do not wait for a sixteen
+    that never comes. The tower still reads as an ordinary tower in every other way — same footprint, same
+    archway, same spans.
+    **PASS — look along the crossarm from the side.** The shaft runs **unbroken at one height** from the
+    gearbox on the leg, through both lay shafts, into the bullwheel's hub between its two bearings. **FAIL:**
+    the shaft is three segments that stop short of each other, or the wheel sits over the crossarm joined to
+    nothing.
     **First, prove where the mill's hub has to be, because it is not on the ground.** Stand a **wooden
     windmill rotor** (`windmillrotor-wood-north`) at about head height beside the tower and try to add one
     sail. **PASS:** vanilla refuses it — *"Cannot add more sails. Make sure there's space for the sails to
@@ -816,25 +940,19 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     the footing beside you.
     Point the rotor's axle along the tower's **passage** axis (the direction the cabin travels), so the
     sail disc stands across the line and can never contain a tower cell.
-    **Put the drive housing up beside the hub, at the same height** — set back from the rotor along the
-    axle axis with two clear cells between them, not down on the ground — and fill those two cells with
-    **wooden axles** running into **any of the housing's four sides**.
-    **PASS:** the housing places there. The eight blocks are measured straight through the air, so a
-    housing six blocks **above the footing block** and two across is well inside them. **FAIL:** *"A drive
-    housing has to stand within 8 blocks of a pylon footing."* at that position — the radius has become a
-    ground circle.
-    **PASS — the edges of that sphere, worth two minutes** (every height here counted from the footing
-    block itself)**:** the housing places **eight** blocks straight
-    above the footing and refuses at nine; it refuses at eight up **and one across**; six up allows about
-    five across. Do not build the tower's own cells over with it.
-    **PASS:** that is the whole **drive train** — **three blocks between the mill and the line** (housing +
-    2 axles), no support column, no vertical axles, **no angled gears**. Each of those three is placed
-    against the block before it, so none of them needs scaffolding. **The rotor itself still has to be
-    mounted against something at hub height**, and at +4 or +6 that is a mast you build; the three blocks
-    are the run, not the total. What the drive housing deleted is the scaffold *on the tower*: nothing is
-    built on the crossarm and nothing climbs the tower. The mill still stands as high as vanilla makes it
-    stand, and the housing goes up beside it. **FAIL:** an axle or the housing refuses to place for want of
-    support, or you find yourself building a column up the tower.
+    **The intake does not climb any more, so the mill comes down to it.** From the hub: an **angled gear**,
+    then a column of **`woodenaxle-ud`** down the outside of the drive leg, a second **angled gear** at the
+    bottom, and one horizontal **wooden axle** into any of the housing's four sides. For three sails that is
+    about seven vanilla blocks; for a maxed five, nine.
+    **PASS — and this is the one line worth the whole step: the column leans on the drive leg.** Run the
+    `woodenaxle-ud` column hard against the three **drive shaft** cells and place the bottom angled gear.
+    It places. **FAIL:** *"axlemusthavesupport"* — that means `driveshaft` has lost its `sidesolid: all
+    true`, which is the one attribute that makes a windmill drive buildable without standing a wall up
+    beside the tower first.
+    **PASS:** the drive leg is still **see-through** — you can see daylight through the lattice — and casts
+    no shadow. Solid sides are for the axle rule only; `sideopaque` and `lightAbsorption` stay off.
+    **PASS:** nothing is built **on the crossarm** and nothing climbs past the crossarm. The descent runs
+    down the outside of a leg that is already there.
     Now add sails one length at a time in good wind. **Do not wait for weather — set it, and pin it:**
 
     ```
@@ -870,34 +988,33 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     it is what this change exists to kill.
     **PASS:** the **housing's** panel reads what it is turning at in rps; **any footing's** reads what the
     **line's** drives come to in blocks a second, and tracks what you just did.
-    **PASS:** build a second drive beside the **far** tower instead and it works exactly the same. There
-    is no drive station, and no tower is special.
-    **PASS:** break the tower the housing was built beside, on a line long enough to have another within 8
-    blocks. The drive keeps working — nothing was bound at placement, so nothing came unbound.
+    **PASS:** build the drive station at the **far** end of the line instead and it works exactly the same.
+    Which tower carries the drive does not matter; being a tower of the line is the whole of the rule.
+    **PASS:** break any cell of the drive station — a post, a brace, a drive shaft. The drive **stops** if
+    you broke the leg (the intake is no longer reachable) and keeps running if you broke a post, and the
+    footing's overlay says which cell is missing either way. **FAIL:** the drive keeps running with the
+    housing removed, or a cell you replaced correctly leaves the tower reading incomplete.
 
     **27c-metal — the maxed metal rotor still needs a column, and that is a REDUCTION, not a regression.**
     Only worth running once, and only if you want the 3.0 rung.
     Ten sails need **eleven** clear blocks every way in the disc, which on flat ground stands the hub
-    eleven blocks above the footing block. **PASS:** at that height the housing cannot reach it — eleven
-    blocks of height alone is outside
-    the eight, wherever you stand the housing, so there is no horizontal run to be had. The drive has to
-    come down: an **angled gear** at the hub, three **`woodenaxle-ud`** below it, a second **angled gear**
-    beside a housing standing about **seven blocks above the footing and two across**.
-    **PASS:** the vertical column needs a **wall beside it**. Try the **bottom** gear first with nothing
-    next to the axles **and the housing not yet placed**: vanilla refuses it (*"axlemusthavesupport"*). The
-    tower's own blocks are all `sidesolid: false`, so the column cannot lean on the tower it serves — build
-    the wall, then the gear.
-    **Build order decides whether that refusal fires at all, so do not report its absence as a bug.**
+    eleven blocks above the footing block. It is the same build as the wooden rotor's in 27c, only taller:
+    an **angled gear** at the hub, **eleven** `woodenaxle-ud` down the outside of the drive leg, a second
+    **angled gear** at the bottom, and one horizontal axle into the housing. About fourteen vanilla blocks.
+    **PASS:** the column leans on the three **drive shaft** cells for its bottom three, and wants a wall for
+    the rest — the leg is four cells tall and the hub is eleven up, so the top of the column stands beside
+    open air. **That part has not changed and is vanilla's rule, not ours.**
+    **Build order decides whether the support refusal fires at all, so do not report its absence as a bug.**
     `BlockAngledGears.TryPlaceBlock` walks `BlockFacing.ALLFACES` — horizontals before up and down — and
     applies the support check only to the **first** connectable neighbour it finds. A bottom gear placed
     beside an already-built housing finds the housing on a horizontal face and never looks up at the axle,
     so the check is skipped. That is a build-order accident, not a licence: `BlockAxle.OnNeighbourBlockChange`
-    breaks an unattached axle that loses its support. Build the wall either way.
-    **PASS:** with all five blocks in, the cabin runs at about **3.0 blocks a second**.
-    **Do not report the gears here as a regression.** The old crossarm hookup made this same drive descend
-    to the crossarm four blocks above the footing; it now stops seven above it, which is one or two fewer vertical axles
-    and the same two gears. The handbook says so in as many words; **FAIL** is the handbook claiming this
-    rung needs no gears.
+    breaks an unattached axle that loses its support.
+    **PASS:** with the column in, the cabin runs at about **3.0 blocks a second**.
+    **Do not report the gears here as a regression.** Every windmill needs the two gears now, this one
+    included. What this rung buys back is that there is **no placement envelope at all**: the old
+    eight-block sphere could not be met from any position at eleven blocks up, so this drive always
+    descended, and it was the one build the sphere never helped.
 
     **27c-water — the water wheel.** A water wheel only turns in `rapidwater`, which generates rarely in
     mountain-side streams and **cannot be placed or made by a player in survival** — ordinary water will not
@@ -911,21 +1028,29 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     in six right-click stages** (32 support beams, 96 planks, 12 resin, 8 nails-and-strips), and it makes
     no torque at all until the last stage is done. Its axle comes out of **both** ends, at most one block
     above the water surface, and the eight cells ringing it must be clear.
-    **PASS:** stand the drive housing on the bank **at hub height** and two or three level wooden axles
-    reach it. Nothing climbs, no gears, no column — this is the one drive that genuinely hooks up at ground
-    level, when the bank happens to sit level with the hub.
+    **PASS:** two or three level wooden axles reach from the wheel's hub to the drive housing at the foot
+    of the station's leg. Nothing climbs, no gears, no column — this is the one drive the fixed intake
+    costs nothing at all, because a water wheel's hub sits at most one block above the water anyway.
     **PASS:** the cabin tops out around **1.8 blocks a second** however fast the water runs, and it holds
     that speed through weather that stops every windmill on the map. That is the trade.
 
-    **27c-wheel — the bullwheel is decoration, and it TURNS.** Break the **pylon head** on any tower's
-    crossarm and put a **bullwheel** in its place.
-    **PASS:** the tower still reads *"Tower complete"* — the wheel is a swap for the sheave, not a
-    sixteenth-plus-one cell.
-    **PASS:** the cabin still passes through that tower without catching: the throat and the station rails
+    **27c-wheel — the bullwheel belongs to a STATION, and it TURNS.** It is the centre cell of both
+    stations' crossarms, and a plain tower no longer accepts one.
+    **PASS:** put a **bullwheel** on a plain `pylonbase` tower's crossarm in place of the pylon head. The
+    tower now reads **incomplete** and the overlay marks that cell red. **FAIL:** it still reads complete —
+    the centre-cell wildcard has not been narrowed, and a wheel joined to nothing can turn on a tower that
+    drives nothing. Put the pylon head back.
+    **PASS:** the reverse, on a station: put a **pylon head** in a station's centre cell and it reads
+    incomplete too. Put the bullwheel back.
+    **PASS:** the cabin still passes through a station without catching: the throat and the station rails
     are the sheave's, unchanged.
     **PASS:** its **spoked wheel stands above the crossarm** and is obviously a wheel from thirty blocks
-    away — you can tell a drive tower from a plain one at a glance, which the previous wheel could not
-    manage at ten.
+    away — you can tell a station from a plain tower at a glance.
+    **PASS — the wheel is JOINED to something, and this is the fixture check.** Stand off to one side and
+    look along the wheel's axle line. Two **bearing standards** rise out of the sheave cheeks either side of
+    the rim, and the **hub axle** runs out through them along the crossarm into the lay shaft next door.
+    **FAIL:** the wheel balances on the small square boss with a visible gap under it and nothing running
+    out of its hub — that is the fixture missing.
     **PASS, and this is the whole reason the block survived:** with the mill running, the wheel **turns**,
     faster with more sails. Stop the mill (break a sail, or wait for calm) and it **stops**. **FAIL:** it
     is still. A still wheel is what made the first attempt worthless.
@@ -943,33 +1068,52 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     crossarm.
     **PASS:** the wheel takes **no axle** and its panel says nothing about power. Try to run an axle into
     it: **PASS:** nothing connects, because it is on no network. **FAIL:** it accepts one — the consumer
-    has been left on it and the drive is back four blocks up.
-    **PASS:** a line with **no bullwheel anywhere** still runs perfectly. It is a marker, not a part.
+    has been left on it and the drive is back four blocks up. The hub axle is geometry, not a connector.
 
     **27d — climbing costs.** Build (or ride) a line with one clearly uphill span and one level one.
     **PASS:** the cabin visibly **slows on the way up** and picks up again on the level or the way down.
     **PASS:** it does **not** stop on the climb with a mill that hauls it on the flat. **FAIL:** it stalls
     halfway up a hill — the climb term is meant to be visible, never fatal.
 
-    **27e — pooling.** Put a **second** mill beside a **different** tower of the same line, on its own axle
-    network and its own drive housing. **PASS:** the cabin gets **faster** — the drives add up — and the footing panel's line figure
-    goes up with it. **PASS:** it works whichever towers you pick; there is no drive station.
-    **Then the case that is not pooling:** run **one** axle line along the ropeway and drive **three**
-    drive housings off that same network. **PASS:** the line figure does **not** climb with the number of
-    housings — one network is one drive however many housings touch it — and the cabin is if anything
-    slower, because every hookup declares the full haul load. **FAIL:** each extra housing adds another
+    **27e — pooling.** Build a **second drive station** as another tower of the same line, on its own axle
+    network and its own mill. **PASS:** the cabin gets **faster** — the drives add up — and the footing
+    panel's line figure goes up with it. **PASS:** it works whichever towers you pick; a line may carry more
+    than one drive station and no tower is special.
+    **Then the case that is not pooling:** run **one** axle line along the ropeway and drive **three** drive
+    stations' housings off that same network. **PASS:** the line figure does **not** climb with the number
+    of stations — one network is one drive however many housings touch it — and the cabin is if anything
+    slower, because every hookup declares the full haul load. **FAIL:** each extra station adds another
     drive's worth of speed. That is free speed for adding load, and it is the one thing a load model must
     never do.
-    **And the other way a housing could give speed away.** Build a **second, separate line** whose nearest
-    tower sits about six blocks from a tower of the first — two short lines side by side, one drive housing
-    between them, in range of both. Hang a cabin on each. Put the housing **clearly nearer one of the two
-    footings**, two blocks or more of daylight between the distances, so that which line it ought to drive
-    is not in doubt while you read the result. An exact tie is not undefined — it resolves on block
-    position, the same way on the server and on every client — it is just not a thing you can settle by
-    looking. **PASS:** only **one** of the two lines runs — the
-    one whose footing is *nearest* the housing — and the other reads *"Nothing on this line is turning"*.
-    **FAIL:** both cabins move. One mill would then be hauling two cabins while only one line's load was
-    ever charged to it, which is the same free speed as the case above wearing a different hat.
+    **And the case that used to give speed away for free.** Build a **second, separate line** whose nearest
+    tower sits a few blocks from a tower of the first — two short lines side by side, close enough that a
+    free-standing housing would have been in range of both. Hang a cabin on each, and build the drive station
+    on **one** of them.
+    **PASS:** only that line runs, and the other reads *"Nothing on this line is turning"* — whichever
+    line's tower happens to be nearer the mill, because the mill is not what decides.
+    **FAIL:** both cabins move; that is one mill hauling two cabins while only one line's load was ever
+    charged for it.
+    **Now do it deliberately, because until this round it worked.** Build the second line's **drive station**
+    at the tightest sharing geometry there is: put its footing **three blocks along the first station's
+    crossarm and three along its passage** — 4.243 blocks away, facing **east** or **west** where the first
+    faces north — so the two want the *same* machine-leg column. Two perpendicular lines meeting at a
+    junction, which is a thing you would build on purpose.
+    **PASS:** you cannot finish both. Build the leg once and **one** of the two stations goes green while the
+    other's panel still counts a missing cell and reddens the head at the top of that leg — the two want a
+    `drivehead` facing different ways, and one block cannot be both.
+    **FAIL:** both footings read complete off one leg, and both cabins run at full speed off one mill. That
+    is the bug this step exists for, and it is *free speed plus unpaid load* — the one thing a load model
+    must never do. Try the same at **six blocks on the opposite facing**, and try both with two **tension**
+    stations.
+    **There is no longer a spacing rule to observe.** An earlier version of this step told you to leave eight
+    blocks; that rule stood in for the fix above and is retired. Towers closer than seven blocks can still
+    want the same cell — a station's leg landing in a plain neighbour's post cells leaves one of them
+    incomplete and therefore un-clickable — but that is visible on the panel and in the overlay, and it costs
+    a rebuild rather than silently stealing power. See "One machine leg, one station" in
+    `docs/KNOWN-ISSUES.md`.
+    **What you no longer have to measure is which mill is nearest.** The old rule turned on that and needed
+    two blocks of daylight between the distances before the result could be read at all. Stand the mill
+    wherever you like.
 
     **27f — dead calm, and the thing that used to be impossible.** `/weather setw still` **while the cabin
     is mid-span with you in it**, and `/weather setw strongbreeze` to bring it back. Breaking a sail does
@@ -998,5 +1142,5 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     **A truncated line exempts this, deliberately, for the same reason the call refusal is exempt.**
     `MayStart` is `departed || truncated || lineSpeed > 0`, and the boarding grace is its third caller — so
     on a line with a dark end (step 25) a rider who sits through the pause latches `departed` with nothing
-    turning, and the housings write `HaulResistance` until something does. Do not run this check on such a
+    turning, and the line's drive stations write `HaulResistance` until something does. Do not run this check on such a
     line and do not file it; `KNOWN-ISSUES.md` records the trade. It clears itself the moment anything turns.

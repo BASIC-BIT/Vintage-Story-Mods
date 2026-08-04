@@ -1,5 +1,5 @@
 {
-  "//": "The line's mechanical intake, standing within towerRadius of any tower rather than on one. It carries the MPConsumer the bullwheel used to; the wheel stayed on the crossarm as decoration that spins. Getting an axle four blocks up cost sixteen vanilla blocks of scaffold and made the tower read as two structures - a mill now connects with an ordinary short axle run. Not necessarily at ground level, and this comment said it was: a windmill rotor cannot stand low enough to meet a housing on the ground, so the housing goes up level with the hub and the radius is a sphere that permits it. See docs/POWER-AND-STORAGE.md.",
+  "//": "The line's mechanical intake, and cell [3,0,0] of a ropeway:drivestation - the foot of the machine leg, on the ground. It carries the MPConsumer the bullwheel used to; getting an axle four blocks up cost sixteen vanilla blocks of scaffold and made the tower read as two structures. It stood FREE for one round, bound to whichever line had the nearest footing within eight blocks, and that is what this change deletes: a housing that is not a cell of a station drives nothing at all, whatever it is standing beside. The cost of that is honest and is written down - a mill's hub is four to eleven blocks up and the intake no longer climbs to meet it, so a windmill drive now runs an axle column down the drive leg, which ropeway:driveshaft's sidesolid is what makes possible. See docs/POWER-AND-STORAGE.md.",
   "code": "drivehousing",
   "class": "BlockDriveHousing",
   "entityClass": "DriveHousing",
@@ -28,9 +28,7 @@
     "handbook": {
       "groupBy": [ "drivehousing" ]
     },
-    "reinforcable": false,
-    "//towerRadius": "How far from a tower footing this may be built, and the same radius BEPylonBase.DriveSpeedOn asks at lookup time - nothing is bound at placement, so nothing can come unbound when that tower is broken. 8 is the tension weight's number and for the same reason: close enough to read as part of the station, far enough to dodge the tower's own posts and archway.",
-    "towerRadius": 8
+    "reinforcable": false
   },
   "replaceable": 500,
   "resistance": 4.5,

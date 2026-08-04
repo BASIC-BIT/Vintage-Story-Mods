@@ -3,13 +3,12 @@
   "textureHeight": 16,
   "textures": {
     "metal": "game:block/metal/sheet/iron1",
-    "stone": "game:block/stone/rock/granite1",
     "rope": "game:block/cloth/reedrope"
   },
   "elements": [
     {
-      "//": "ONE cell now, where this used to be a six-element shape reaching three cells up out of a one-cell hole with nothing checking the headroom. The rails and the rope carry on in ropeway:tensionguide above it, which is structure the station's multiblock check requires - so the headroom is checked by construction.",
-      "name": "pad",
+      "//": "brace.json's girder profile, copied box for box. A machine cell is a brace cell with gear on top of it, so the crossarm has to read continuous across the join or the tower looks like two structures bolted together.",
+      "name": "foot",
       "from": [
         0.0,
         0.0,
@@ -27,44 +26,6 @@
       ],
       "faces": {
         "north": {
-          "texture": "#stone"
-        },
-        "east": {
-          "texture": "#stone"
-        },
-        "south": {
-          "texture": "#stone"
-        },
-        "west": {
-          "texture": "#stone"
-        },
-        "up": {
-          "texture": "#stone"
-        },
-        "down": {
-          "texture": "#stone"
-        }
-      }
-    },
-    {
-      "name": "railwest",
-      "from": [
-        2.0,
-        2.0,
-        7.0
-      ],
-      "to": [
-        4.0,
-        16.0,
-        9.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
           "texture": "#metal"
         },
         "east": {
@@ -85,16 +46,16 @@
       }
     },
     {
-      "name": "raileast",
+      "name": "beam",
       "from": [
-        12.0,
         2.0,
-        7.0
+        2.0,
+        5.0
       ],
       "to": [
         14.0,
-        16.0,
-        9.0
+        14.0,
+        11.0
       ],
       "rotationOrigin": [
         8.0,
@@ -123,16 +84,15 @@
       }
     },
     {
-      "//": "The mass hangs LOW in its guide, where a rope tensioner rests: it takes up slack, it does not climb, and its height means nothing numeric. Half a block wide, so the two rails bracket it exactly.",
-      "name": "mass",
+      "name": "flangewest",
       "from": [
-        4.0,
-        3.0,
+        0.0,
+        2.0,
         4.0
       ],
       "to": [
-        12.0,
-        13.0,
+        2.0,
+        15.0,
         12.0
       ],
       "rotationOrigin": [
@@ -142,35 +102,266 @@
       ],
       "faces": {
         "north": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "east": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "south": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "west": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "up": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "down": {
-          "texture": "#stone"
+          "texture": "#metal"
         }
       }
     },
     {
-      "name": "hanger",
+      "name": "flangeeast",
+      "from": [
+        14.0,
+        2.0,
+        4.0
+      ],
+      "to": [
+        16.0,
+        15.0,
+        12.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "//": "The sheave's centre is chosen rather than drawn. At (12, 25.7-4) with radius 4 its TOP tangent is 25.7, the lay shaft's own height, and its WEST tangent is x 8, the guide's own hanger column - so both ends of the wrap terminate on members that already exist. Centred in the cell, the rope left both of them and the counterweight read as a separate object parked beside a tower.",
+      "name": "pedestal",
+      "from": [
+        9.5,
+        14.0,
+        6.4
+      ],
+      "to": [
+        14.5,
+        19.7,
+        9.6
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "bearingnorth",
+      "from": [
+        10.0,
+        19.2,
+        5.1
+      ],
+      "to": [
+        14.0,
+        24.2,
+        6.4
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "bearingsouth",
+      "from": [
+        10.0,
+        19.2,
+        9.6
+      ],
+      "to": [
+        14.0,
+        24.2,
+        10.9
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "sheave",
+      "from": [
+        8.0,
+        17.7,
+        6.6
+      ],
+      "to": [
+        16.0,
+        25.7,
+        9.4
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "//": "Metal, not rope, and collinear with the lay shaft it runs into. Drawn in rope texture first, which made the two halves of one member look like two different things.",
+      "name": "tierod",
+      "from": [
+        0.0,
+        24.7,
+        7.0
+      ],
+      "to": [
+        12.0,
+        26.7,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "//": "The rope leaving the sheave's west tangent straight down the guide's hanger column, into the counterweight three cells below.",
+      "name": "hangdown",
       "from": [
         7.0,
-        13.0,
+        0.6,
         7.0
       ],
       "to": [
         9.0,
-        16.0,
+        21.7,
         9.0
       ],
       "rotationOrigin": [
@@ -196,159 +387,6 @@
         },
         "down": {
           "texture": "#rope"
-        }
-      }
-    },
-    {
-      "//": "The guide column's four corner posts stopped at this cell's top face, so the machine leg stood on nothing and the whole frame read as hovering over its own base course. They carry on down here and land ON the pad, which is the foot plate - a post run to the cell floor instead would have its foot buried in the plate rather than bearing on it. Not done by reaching tensionguide.json downward out of its own cell: two of those stack in this column and would double up.",
-      "name": "anglewn",
-      "from": [
-        0.0,
-        2.0,
-        0.0
-      ],
-      "to": [
-        2.0,
-        16.0,
-        2.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "name": "anglews",
-      "from": [
-        0.0,
-        2.0,
-        14.0
-      ],
-      "to": [
-        2.0,
-        16.0,
-        16.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "name": "angleen",
-      "from": [
-        14.0,
-        2.0,
-        0.0
-      ],
-      "to": [
-        16.0,
-        16.0,
-        2.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "name": "anglees",
-      "from": [
-        14.0,
-        2.0,
-        14.0
-      ],
-      "to": [
-        16.0,
-        16.0,
-        16.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
         }
       }
     }

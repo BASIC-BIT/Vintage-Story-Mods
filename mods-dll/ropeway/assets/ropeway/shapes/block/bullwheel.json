@@ -234,242 +234,10 @@
       }
     },
     {
-      "name": "railwest",
-      "from": [
-        3.2,
-        -4.0,
-        0.0
-      ],
-      "to": [
-        5.4,
-        0.0,
-        16.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "name": "raileast",
-      "from": [
-        10.6,
-        -4.0,
-        0.0
-      ],
-      "to": [
-        12.8,
-        0.0,
-        16.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "name": "railwestflarein",
-      "from": [
-        3.2,
-        -3.98,
-        -16.0
-      ],
-      "to": [
-        5.4,
-        -0.02,
-        0.0
-      ],
-      "rotationOrigin": [
-        4.3,
-        -2.0,
-        0.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      },
-      "rotationY": 8
-    },
-    {
-      "name": "railwestflareout",
-      "from": [
-        3.2,
-        -3.98,
-        16.0
-      ],
-      "to": [
-        5.4,
-        -0.02,
-        32.0
-      ],
-      "rotationOrigin": [
-        4.3,
-        -2.0,
-        16.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      },
-      "rotationY": -8
-    },
-    {
-      "name": "raileastflarein",
-      "from": [
-        10.6,
-        -3.98,
-        -16.0
-      ],
-      "to": [
-        12.8,
-        -0.02,
-        0.0
-      ],
-      "rotationOrigin": [
-        11.7,
-        -2.0,
-        0.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      },
-      "rotationY": -8
-    },
-    {
-      "name": "raileastflareout",
-      "from": [
-        10.6,
-        -3.98,
-        16.0
-      ],
-      "to": [
-        12.8,
-        -0.02,
-        32.0
-      ],
-      "rotationOrigin": [
-        11.7,
-        -2.0,
-        16.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      },
-      "rotationY": 8
-    },
-    {
       "name": "drivehousing",
       "from": [
         5.4,
-        12.2,
+        10.6,
         4.0
       ],
       "to": [
@@ -514,6 +282,197 @@
         9.5,
         16.0,
         9.5
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "bearingstandwest",
+      "from": [
+        3.2,
+        15.0,
+        6.0
+      ],
+      "to": [
+        5.4,
+        23.0,
+        10.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "bearingstandeast",
+      "from": [
+        10.6,
+        15.0,
+        6.0
+      ],
+      "to": [
+        12.8,
+        23.0,
+        10.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "bearingcapwest",
+      "from": [
+        3.2,
+        23.0,
+        5.25
+      ],
+      "to": [
+        6.3,
+        28.5,
+        10.75
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "bearingcapeast",
+      "from": [
+        9.7,
+        23.0,
+        5.25
+      ],
+      "to": [
+        12.8,
+        28.5,
+        10.75
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "//": "The wheel's axle line, and the one element that makes the wheel read as driven rather than decorative. Its height is the rim's own rotation centre, so it IS the axle the rim turns about, and it runs out to the cell's east face to meet the lay shaft next door with no seam. Thinner than the rim's hub bore (y 23.5..27.9, z 5.8..10.2) and buried inside both bearing caps, so no face of it is ever coplanar with the turning mesh.",
+      "name": "hubaxle",
+      "from": [
+        2.0,
+        24.7,
+        7.0
+      ],
+      "to": [
+        16.0,
+        26.7,
+        9.0
       ],
       "rotationOrigin": [
         8.0,

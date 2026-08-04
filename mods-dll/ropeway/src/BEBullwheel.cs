@@ -3,13 +3,38 @@ using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
 
 namespace Ropeway;
 
 /// <summary>
-/// The bullwheel: the big sheave the haul rope wraps, on the crossarm's centre cell in place of the pylon
-/// head. It is PURELY DECORATION - no <c>MPConsumer</c>, no network membership, no resistance, nothing on
-/// the mechanical network at all. The intake is <see cref="BlockDriveHousing"/>, off the tower entirely.
+/// The bullwheel: the big wheel on a STATION's crossarm centre cell, in place of the pylon head. It is on no
+/// mechanical network - no <c>MPConsumer</c>, no membership, no resistance - and the intake is
+/// <see cref="BlockDriveHousing"/> at the foot of the same station's machine leg. What joins the two is
+/// GEOMETRY rather than a network: the shape's <c>hubaxle</c> runs at the rim's own rotation centre out to
+/// the cell's east face, where the <c>layshaft</c> next door picks it up, so the wheel reads as driven by the
+/// thing that is actually driving the line.
+/// <para>
+/// AT A TERMINAL IT DOES WRAP THE ROPE, and everywhere else it does not. This comment has said both, wrongly
+/// and then honestly, so here is the arithmetic. <c>bullwheelrim.json</c> sweeps a radius of 9.6504 units
+/// about its axle, so a wheel standing over the tower has its lowest swept point 0.443 blocks above the
+/// rope's own surface - it turns BESIDE the rope and reads its speed. It cannot simply be lowered: a parked
+/// cabin's jaw is a clamp closed ON the rope and its top plate stands 0.15 blocks above the rope's
+/// centreline, and a wheel tangent to that rope from above cannot share a point with the clamp closed round
+/// it. What buys the room is the axis nobody looked at - ALONG the line, past the tower. At a tower carrying
+/// exactly one span the far side is DEAD: nothing ever passes there, the parked cabin's grip stops 0.13
+/// blocks short of the tower centre and its roof is a full block below. So there the wheel stands one cell
+/// out along that dead side and <see cref="BullwheelRenderer.WrapDrop"/> down, its groove lands on the
+/// rope's centreline, and <see cref="BEPylonBase.WrapPath"/> closes the rope round it in a ring - 0.146
+/// blocks clear of the parked grip in plan, 0.06 clear of the station's own soffit.
+/// </para>
+/// <para>
+/// At a station the line runs THROUGH, the wheel stays where it was and no wrap is drawn: there is no dead
+/// side, and a ring dropped to the rope on either side of such a tower would have a passing cabin's grip
+/// inside it for a block of travel, every trip, in both directions. That is not a wart, it is the machine -
+/// a terminal has a bullwheel with a wrap; a tower in the middle of a line has a deflection sheave, which is
+/// what the raised wheel already was.
+/// </para>
 /// <para>
 /// It exists for one job: to TURN. A drive tower with a still wheel is what the trial failed on - the
 /// wheel's silhouette is close enough to the pylon head's that only motion tells them apart at any real
@@ -31,10 +56,26 @@ namespace Ropeway;
 /// </para>
 /// <para>
 /// ponytail: still <c>HorizontalOrientable</c>, so a wheel placed while facing the wrong way validates the
-/// tower with its throat and station rails running across the line rather than along it. ACCEPTED, not
-/// fixed: the pylon head has had exactly the same looseness since the pattern was written, so the real fix
-/// is to orient the crossarm's centre cell from the footing below it for BOTH blocks, in one place - and
-/// bolting a private rule onto the decorative half of the pair would leave the bug and add a rule.
+/// tower with its throat and station rails running across the line rather than along it - and now with its
+/// hub axle pointing at the braces rather than at the lay shaft. ACCEPTED, not fixed, and COSMETIC: the
+/// count went 2 to 5 when the stations landed and back to 3 when the two heads were narrowed, so what is
+/// left loose is <c>pylonhead</c>, this block and <c>layshaft</c>. The real fix is unchanged and is still
+/// ONE fix in one place - orient the crossarm cells from the footing below them, for all of them at once.
+/// Bolting a private rule onto this one block would leave the bug and add a rule.
+/// </para>
+/// <para>
+/// ponytail: it was briefly the only fix for a second, STRUCTURAL bug, and that half is closed without it.
+/// <c>MultiblockStructure</c> has no notion of ownership - <c>InCompleteBlockCount</c> asks only whether the
+/// block at each offset matches a wildcard - so a second station 4.243 blocks away on a perpendicular facing,
+/// or six on the opposite one, shared the whole machine leg, both structures validated, both
+/// <c>DeclareLoad</c> calls wrote <c>Resistance</c> onto the SAME consumer so the last tick won, and both
+/// lines read that one drive at full speed. <see cref="BEPylonBase.OwnTheHeadCell"/> ends it by narrowing
+/// the leg's one facing-carrying cell to the footing's own side: a shared <c>drivehead</c> can face one way,
+/// so it can satisfy one station. That refusal is safe on <c>drivehead</c> and <c>tensionhead</c> precisely
+/// because they are new and asymmetric, and it is NOT safe here - a pylon head or a bullwheel is symmetric
+/// along the rope axis, so a saved world's tower placed from the other side would go incomplete and
+/// un-clickable over a block that looks perfectly right. The refusal on these three is only safe once
+/// placement can no longer produce a wrong facing, which is M4's other half.
 /// </para>
 /// </summary>
 public class BEBullwheel : BlockEntity
@@ -73,8 +114,33 @@ public class BEBullwheel : BlockEntity
         capi.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "ropewaybullwheel");
 
         // Polled rather than read per frame: LineSpeed walks the tower chain and the housing table, and a
-        // wheel that picks up half a second late is a wheel nobody can tell picked up late.
-        RegisterGameTickListener(_ => renderer.Speed = LineSpeed(), 500, 0);
+        // wheel that picks up half a second late is a wheel nobody can tell picked up late. The pose rides
+        // the same tick for the same reason and needs no listener of its own - the footing re-tesselates its
+        // own chunk when a span is linked or cut, so the drawn wrap and the wheel can disagree for at most
+        // half a second on the one tick a terminal stops being one.
+        RegisterGameTickListener(
+            _ =>
+            {
+                renderer.Speed = LineSpeed();
+                renderer.Offset = WrapOffset(Tower?.DeadSide);
+            },
+            500, 0);
+    }
+
+    /// <summary>
+    /// Where the wheel stands, given the tower's dead side: out along it by
+    /// <see cref="BullwheelRenderer.WrapOut"/> and down by <see cref="BullwheelRenderer.WrapDrop"/>, or the
+    /// zero vector when there is no dead side to stand on. Pure, and therefore the one part of the pose the
+    /// suite can look at.
+    /// </summary>
+    public static Vec3f WrapOffset(Vec3d deadSide)
+    {
+        return deadSide == null
+            ? new Vec3f()
+            : new Vec3f(
+                (float)(deadSide.X * BullwheelRenderer.WrapOut),
+                -BullwheelRenderer.WrapDrop,
+                (float)(deadSide.Z * BullwheelRenderer.WrapOut));
     }
 
     private MeshData RimMesh(ICoreClientAPI capi)

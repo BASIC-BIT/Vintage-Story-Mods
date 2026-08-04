@@ -1,15 +1,17 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 147 ropeway tests passing — 78 `[Fact]` plus 69 `[InlineData]` across the four files in
+State: build green, 172 ropeway tests passing — 82 `[Fact]` plus 90 `[InlineData]` across the four files in
 `mods-dll/ropeway.Tests`, which is where to re-derive this number rather than trusting the line. (It read
-136 for two rounds after the count moved.) Everything in the tables below was found by reading code,
-not by playing — none of *it* has been observed in game.
+136 for two rounds after the count moved, 147 for two more, and 168 for two more again.) Everything in the tables below was found by
+reading code, not by playing — none of *it* has been observed in game.
 
 ## Station rail (2026-08-03) — what shipped, what was reverted, what it costs
 
 `RAIL-DESIGN.md`'s five-step ladder went in and **step 4 came back out.** Steps 1–3 (the split sheave, the
 hanger blade and the jaw, `hangDrop` 2.0 → 2.25, the flared rail drawn on the pylon head's own shape) and
-step 5 (the 5-wide passage) are shipped. Step 4, the angle-station yaw law, is **reverted**.
+step 5 (the 5-wide passage) are shipped. Step 4, the angle-station yaw law, is **reverted**. (Step 3's
+authored rail is gone entirely since 2026-08-04 — flares and plates both — and the whole rail is drawn on
+the path. See "Closed: the drawn rope and the station rail follow the bend" below.)
 
 **The causation in the design was backwards, and an earlier version of this section repeated it.** Read
 this before re-attempting anything here.
@@ -22,38 +24,104 @@ It is not "room and light".
 the vertex threw the widening's gain away: 45° went **0.033 → 1.000** and 30° **0.000 → 0.331**. The
 mechanism is direct — `RopewayLine.PositionAt` swings the cabin's ORIGIN onto the outgoing leg at the
 vertex, so a cabin still holding the incoming axis crab-walks, and a crabbing 4-block cabin sweeps its tail
-into the post on the outside of the bend. `DirectionAt` is the plain leg bearing again; `RopewayLine.Facings`,
-`SquareHold`, `YawBlend` and the three tests that asserted the law are deleted. The original 0.000-at-every-angle
-number came from a model whose cabin ran dead straight through the vertex, which `PositionAt` never does.
+into the post on the outside of the bend. `RopewayLine.Facings`, `SquareHold`, `YawBlend` and the three tests
+that asserted the law are deleted. The original 0.000-at-every-angle number came from a model whose cabin ran
+dead straight through the vertex, which `PositionAt` never does.
+
+**Superseded on one point only: `DirectionAt` is no longer the plain leg bearing.** `PositionAt` now bends
+the path through each tower — a cubic Hermite tangent to the corner's bisector, confined to the
+`TrimForTowers` stretch no clearance ray ever visits — and `DirectionAt` returns that path's own tangent,
+which AT a tower is the bisector. The reverted law was re-run on the bent path before this was built, which
+is the condition the old tombstone set, and **it is still a regression**: held as a hard cardinal across the
+window it measures 1.000 blocks of penetration at 90° with the tower on the bisector against 0.034 for the
+plain bearing, 1.000 against 0.033 at 45°, and 0.740 against 0.000 at 30° — worse in three of nine cells and
+better in none. What the bend changes is that the *bearing* no longer steps by the whole turn angle in one
+tick, and measured across the same nine cells it is never worse than the straight path and better twice
+(90°/ψ=0 0.034 → 0.000, 45°/ψ=22.5 0.033 → 0.004). Asserted by
+`TheBentPathNeverDrivesTheCabinDeeperIntoAPostThanTheStraightOneDid`; full derivation in
+`docs/agentic/ingest/cablecar/TURNING-SPEC.md`.
+
+**"Never worse" is scoped to those nine cells and NOT to every corner (2026-08-04).** `DirectionAt`'s own
+tombstone used to claim the tangent law is never worse than the plain bearing *anywhere*; measured over a
+turn × ψ grid it is worse from about **125° of turn**, and worst at a **164.6° hairpin with the tower 45° off
+the bisector — 0.529 blocks of post straight against a full 1.000 bent**. The mechanism is direct: a hairpin's
+bisector is nearly perpendicular to both legs, so arriving on it points a 4-block cabin broadside across its
+own passage where the straight path at least kept it along a leg. Nothing in `RopewayLinkService` constrains
+the angle between two spans, so those corners are buildable — the closure is the link-time warning below, not
+a curve. There is **no cell anywhere on that grid where the straight path was essentially clean (< 0.05
+blocks) and the bend is not**; every regression is a corner already 0.17–1.0 blocks into a post. The hairpin
+is now a pinned row of `TheBentPathNeverDrivesTheCabinDeeperIntoAPostThanTheStraightOneDid`, in the direction
+it actually goes, so the word "anywhere" cannot come back without the test noticing.
+
+**Closed: the drawn rope and the station rail follow the bend.** `BEPylonBase.OnTesselation` samples both off
+`RopewayLine.PositionAt` — the same function the cabin's own position comes from — through the
+`TrimForTowers` window at each end of a span, then one straight box for the middle the bend does not touch.
+Rope, rail and cabin are one curve because they are one call. Before this the cabin's origin left the drawn
+cable by up to 0.419 blocks at 90° (0.227 at 45°, 0.153 at 30°) against 0.0025 blocks of jaw play, and the
+authored rail was a cardinal fixture the rollers rode 0.3–0.6 blocks clear of through every corner.
+
+**Every authored rail element is now gone from both head shapes, and the two straight plates went last
+(2026-08-04).** `TURNING-SPEC.md` §4 asked for all twelve out of `pylonhead.json` and `bullwheel.json`; the
+eight **flares** went first and `railwest` / `raileast` survived one round on the *parked* cabin's argument —
+a parked cabin squares to the tower's own cardinal, so a cardinal fixture under the sheave is right at any
+yaw. What killed them is the **moving** cabin: at a 90° corner the drawn run leaves the plate's axis by 1.33
+units and the guide roller ends up 1.37 units inside the plate's own metal, so the fixture that was right
+parked is the one piece of geometry a passing cabin goes through. The run now starts at the tower centre and
+the rail is **entirely** a runtime cross-section, pinned to the rollers it carries rather than to a shape —
+`TheDrawnRailIsTheBarTheGuideRollersRideIn`, which replaced
+`TheBullwheelKeepsTheSheavesThroatAndStationRails`. `BEPylonBase.RailStart` went with the plate.
 
 **The salvageable half DID ship: a cabin STOPPED at a tower squares up to that tower's passage.**
 `EntityRopewayCabin.SquareTo`, gated on `!departed`, which is the exact predicate under which `Travelled`
 cannot change. That is the whole difference from the reverted law: the law held the axis across a *window*
 around the vertex, **while the cabin was moving**, which is what let `PositionAt` swing the origin out from
 under it. Stationary there is no origin motion to crab away from, and a cabin merely *passing* a tower never
-reaches the branch at all — a pass-through is byte-identical to the shipped leg bearing, which is why the
-penetration numbers above are unchanged. Rotating in place at the tower centre sweeps the cabin's
+reaches the branch at all — a pass-through takes `DirectionAt` and nothing else, which since the bend is the
+path's own tangent rather than the leg bearing. The two now differ by ψ, the tower facing's error from the
+bisector: a parked cabin sits on the tower's cardinal and a passing one on the bisector, so a badly-faced
+corner tower still shows a swing as the cabin settles. That gap is the facing, not the curve.
+Rotating in place at the tower centre sweeps the cabin's
 half-diagonal, √(2.0² + 1.4375²) = **2.463 blocks against post inner faces at 2.5** — 0.037 blocks of margin,
 and the 5-wide passage is the only reason it exists at all (at x ±2 it would sweep 0.463 blocks through a
 post). `TheCabinCanTurnSquareAtATowerWithoutSweepingThroughAPost` asserts both numbers off the shipped shape
 and the shipped multiblock. It is a snap on the server; the cabin's `interpolateposition` behavior eases
-`Pos.Yaw` with a time constant of roughly 0.15 s, so the settle reads as about half a second of eased rotation in place (frame-rate dependent), and it rotates back
-onto the span as it departs. Renders: `docs/agentic/ingest/cablecar/renders/parked/`.
+`Pos.Yaw` with a time constant of exactly **1/6 s** (`LerpRotation` resolves to `d(yaw)/dt = 6·(target−yaw)`
+for any `dt` under 0.1 s — the 0.1 is a literal inside its clamp, not the constant, and two comments used to
+quote it as though it were), so the settle reads as about half a second of eased rotation in place
+(frame-rate dependent), and it rotates back onto the span as it departs. Renders:
+`docs/agentic/ingest/cablecar/renders/parked/`.
 
-**A right-angle corner can never be clean, under any yaw law.** The posts flank the passage at tower-local
-x = ±3 and a tower facing is one of four cardinals, so at a right angle the outgoing leg *is* the post axis:
-the cabin's **origin** travels through the post column. No rotation fixes a translation. This is a permanent
-geometric limit of "four facings, straight chords", not a bug and not a tuning problem. The handbook says so
-and `QA-SCRIPT.md` step 12b expects it. The only real cures are a diagonal tower facing or refusing sharp
-bends at link time; neither is in v0.1.
+**A right-angle corner is clean if and only if its bisector is a cardinal.** An earlier version of this line
+said "can never be clean, under any yaw law", and that is true only when the tower faces one of the two
+**legs**: then the other leg *is* the post axis, the cabin's **origin** travels through the post column, and
+no rotation fixes a translation. But a 90° corner between two **diagonal** legs has a cardinal bisector, the
+tower can face it, and the posts then sit across the passage rather than along a leg — measured, that corner
+penetrates 0.034 blocks on the straight path and **0.000 with the bend**. The rig that produced the old
+1.000 rounded its "nearest cardinal" onto the incoming leg, so the case had never been measured.
 
-**Recommended, not built: `TryLink` should WARN (never refuse) on a sharp bend.** After `AddSpan`, a tower
-that now carries two spans can have the angle between them measured, and a bend under ~150° gets one chat
-line telling the player the cabin will clip a post there. Warn only — refusing would make a legal, buildable
-route unbuildable for a cosmetic reason, and players do build ugly corners on purpose. Not implemented here
-because it is not the two lines it looks like: an angle helper on `SpanMath`, the check on both ends of the
-new span, a lang string, and a test — call it 20 lines across four files. Worth doing next time this file
-is opened; the handbook and QA-SCRIPT carry the warning in the meantime.
+What is permanent is the tolerance, and it is ψ that owns it: the widest tower-facing error that keeps
+penetration under the cabin's own 0.0625-block wall thickness is **±1.0° at 90°, ±23° at 45°, ±30° at 30°**.
+Since `HorizontalOrientable` offers four cardinals, the achievable ψ is uniform on [0°, 45°], so roughly 2%
+of arbitrary right-angle corners, 52% of 45° ones and 68% of 30° ones come out clean, and no yaw law in the
+table changes that materially. The handbook says so and `QA-SCRIPT.md` step 12b expects it. The cures are a
+tower turned onto the bisector — free, and nothing tells the player to do it — or refusing sharp bends at
+link time; the link-time **warning** below is the cheap one and the tolerances above are the numbers it was
+missing.
+
+**BUILT (2026-08-04): `TryLink` WARNS, and never refuses, on a corner the cabin cannot pass cleanly.** After
+both `AddSpan` calls, each end of the new span that now carries two spans gets its bisector read straight out
+of `RopewayLine.DirectionAt` at the vertex — so the message talks about the direction the cabin actually
+takes, by construction — and its crossarm's error from that bisector compared against
+`SpanMath.CornerTolerance`. Two messages, because there are two answers: under a right angle a cardinal
+usually exists that carries the corner and `ropeway:corner-facing` names it, and at or past one the best of
+four cardinals is still outside the tolerance so `ropeway:corner-too-sharp` says that instead rather than
+handing out advice that does not work. Warn only — refusing would make a legal, buildable route unbuildable
+for a cosmetic reason, and players do build ugly corners on purpose.
+`CornerTolerance` is **a fit to three measured points, not a derivation**, and says so in its own comment:
+half the shortfall from a right angle reproduces the ±1.0° / ±23.2° / ±30.8° of the table above to within a
+degree and errs toward warning. There is no closed form to find — the cabin fits the passage at *any* yaw
+(2.463 against 2.5), so what a facing error costs is where the origin is twenty blocks out, which no local
+geometry knows. Pinned by `ACornerTellsAPlayerWhichWayItsTowerWantsToFace`.
 
 **The metal cost per tower DOUBLES — this is the price BASIC is actually paying.** `recipes/grid/brace.json`
 is `stick + metalplate + stick → 4 braces`. A 5-wide crossarm needed 4 braces = **exactly one metal plate**.
@@ -71,10 +139,15 @@ clearance, `SpanMath.TowerClearance`'s note, `MultiblockOffsetsAreTheTowerShellA
 handbook pages, `ropeway:dlg-guide-body`, `README.md` and `QA-SCRIPT.md` steps 5, 7 and 8. No C# behaviour
 depends on the width.
 
-**Cosmetic, at corners:** the drawn rope leaves the sheave along a bearing that runs *into* the crossarm.
-The rope sits at scene y 35–37 and the brace beams occupy 30–42, so at a right angle the outgoing rope is
-buried inside **three** brace blocks before it clears the tower — it was two before the widening, i.e. the
-widening made this one slightly worse. Only visible at sharp corners, where the cabin already clips.
+**Cosmetic, at corners, and the bend halved it (2026-08-04).** The rope sits at scene y 35–37 and the brace
+beams occupy 30–42, so any drawn cable inside the tower's own plane and beyond half a block along the
+crossarm is inside a brace block. The rope now leaves the sheave on the corner's **bisector** rather than on
+the leg bearing, which cuts the burial from half a block to a tenth at a tower facing that bisector — the
+cable never leaves the sheave's own cell. **What it cannot fix is the incoming leg at a badly faced tower.**
+At a right angle with the crossarm pointed down one of the two legs, that leg *is* the crossarm axis twenty
+blocks out, and a curve confined to the last four cannot change where the rope arrives from: it lies along
+the whole 3.5-block crossarm, as it always did. So this is now a symptom of ψ like everything else at a
+corner, and the cure is the tower facing the link-time warning names.
 
 ## Tower restructure (2026-08-01) — what it costs
 
@@ -136,12 +209,203 @@ Three things BASIC saw riding it. All three are closed.
 | **A seated rider could spin all the way round** on a bench that faces one way. | `bodyYawLimit` was dead JSON, and the key is not decorative — `SeatConfig.BodyYawLimit` is only ever *read* by `EntityBoat.SeatsToMotion` and `EntityBehaviorRideable.SeatsToMotion`, and the cabin is neither, so nothing was going to apply it for us. | `EntityRopewayCabin.ConstrainRiderYaw`, eight lines on the tick, identical to vanilla's: `EntityPlayer.BodyYawLimits` / `HeadYawLimits` centred on `Pos.Yaw + mountRotation.y`, range `bodyYawLimit` (now **1.5707963 = ±90°**, so a rider can look out either side and not sit backwards). It needs **no controllable seat** — it constrains the passenger, not the mount, so `controllable: false` and the smooth-motion tests are untouched. What it clamps, exactly: `HeadYawLimits` is read by `ClientMain.UpdateCameraYawPitch` (:2377-2383), which clamps `mouseYaw`, so this is the seated player's **own camera**, client side; `BodyYawLimits` clamps that same player's rendered body through the `BodyYaw` setter. Neither reaches what other players see — `EntityPlayerShapeRenderer` (:429-431) already forces a remote rider's drawn body yaw to the mount's, so onlookers see him squared to the cabin whichever way he is looking. Running it server side would change nothing: the server assigns `BodyYawServer` from the position packet, not `BodyYaw`, so the clamping setter never sees it. |
 | **The front seat was too far forward** — the rider's toes 2.34 units off the west wall while the rear row had 22.34 units in front of its own. | Forward-facing rows are asymmetric about the mast by construction (the rear row backs onto the east wall, the front row needs a footwell), and the front row was placed by mirroring the pan rather than by the clearance ahead of the rider. | The front bench moved back 10 units: pan −21..−11 → **−11..−1**, and `backrestwest`, `apronwest`, both mullions and both thresholds with it (the AP is `posX`-relative to the pan, so it follows on its own and stays at the pan's depth centre). Both rows face −X, so "evenly placed" is one number — the clear floor ahead of each rider's toes, which reach lip − 4.66 — and 10 is what equalises it at **12.34 each**. It also tiles: footwell 17 + pan 10 = a 27-unit seat bay, twice, in a 56-unit interior, with the rear row's 2-unit reveal off the east wall as the remainder. The threshold plank shortened 24 → 14 and its uv widths with it (size/4, like every face in that shape). `TheSeatedRidersContactPatchLandsOnItsPan` and `TheSeatAttachmentPointsStayOnTheCentreLine` both still pass, and the plan/section renders were re-read rather than the asserts alone. |
 
-## The drive came down off the crossarm (2026-08-03)
+## Membership replaced proximity (2026-08-04)
 
-The bullwheel trial is **resolved, and split**. The mechanical consumer is now `ropeway:drivehousing`, a
-block you build within eight blocks of any tower on the line — usually on the ground, and up beside a
-windmill's hub when the mill needs the height; the bullwheel stays on the crossarm as **decoration that
-turns**. Design and reasoning: [POWER-AND-STORAGE.md](POWER-AND-STORAGE.md).
+The drive housing and the tension weight are **cells of a station**, not free-standing blocks bound to a
+line by distance. Two new footings — `ropeway:drivestation` and `ropeway:tensionstation` — carry exactly the
+fifteen offsets `pylonbase.json` already had; only which block each cell wants differs, and a station
+REPLACES a tower in the chain rather than extending one. Design and the full deletion list:
+`docs/agentic/ingest/cablecar/STATION-DESIGN.md`; build costs are in
+[POWER-AND-STORAGE.md](POWER-AND-STORAGE.md).
+
+**What that deleted.** `BETensionWeight.cs` and `BlockTensionWeight.cs` outright; `LoadedWeights` and
+`LoadedHousings`; `ServingTower`, `Serves`, `Nearest`, `NearestTower`, `NearAnyTower`, both `towerRadius`
+attributes, both placement refusals, the tie-break's **only caller**, and `BEDriveHousing`'s own tick
+listener. **Nothing calls `Nearest` any more, because there is no `Nearest`** — that was the check that this
+landed. `BEPylonBase.Intake` is one block-accessor call at an offset the station's own JSON names, and
+`BEPylonBase.HasTensioner` is a walk over `line.Towers`.
+`RopewayLine.ComparePos` itself **stays and must stay** — an earlier version of this line read as though it
+went with the tie-break. `WalkChain` still calls it to canonicalise the chain's direction so `Travelled` is
+measured from a stable `Towers[0]`, which is a different question from "which of two equidistant footings
+owns this housing", and deleting it resurrects the reload teleport.
+
+### One machine leg, one station — CLOSED, and the spacing rule is retired with it
+
+**The bug, and it was real for two rounds.** `MultiblockStructure` has no notion of ownership:
+`InCompleteBlockCount` asks only whether the block at each offset matches a wildcard, and nothing anywhere
+asks whether some **other** footing is already claiming that cell. Derived off the shipped offsets by
+`docs/agentic/ingest/cablecar/onetrack/sharedleg.py`, a `drivestation-north` at the origin shared its entire
+machine leg — `drivehousing` at `(3,0,0)`, three `driveshaft` above it and `drivehead` at `(3,4,0)` — with
+**three** other placements, and `tensionstation` with the same three:
+
+| second station | footing separation |
+|---|---|
+| facing **east** at `(3, 0, −3)` | **4.243 blocks** |
+| facing **west** at `(3, 0, +3)` | **4.243 blocks** |
+| facing **south** at `(6, 0, 0)` | 6.000 blocks |
+
+An earlier version of this section named only the third and reasoned from "a station's machine leg stands
+three blocks out from its footing", which would lead a careful player to think a station four blocks away
+*across the passage* was fine. It was not: the two 4.243 cases are two perpendicular lines meeting at a
+junction, which is a thing a player builds on purpose. Both structures validated, so `DriveSpeedOn` resolved
+the **same** `MPConsumer` from both lines and ran both at full speed, while `DeclareLoad` wrote `Resistance`
+onto it from both footings on a 1 s tick and the last writer won — free speed **and** unpaid load, which is
+verbatim what `RopewayPower.PoolSpeed`'s own comment calls the one thing a load model must never do and what
+QA 27e exists to forbid.
+
+**The fix is five lines and it is `BEPylonBase.OwnTheHeadCell` (2026-08-04).** Before `Init` hands the
+structure to `InitForUse`, the footing's own copy of `blockNumbers` has `ropeway:drivehead-*` rewritten to
+`ropeway:drivehead-<its own side>` and `ropeway:tensionhead-*` to `ropeway:tensionhead-<side>`.
+`MultiblockStructure.BlockNumbers` is a public dictionary on a per-block-entity `AsObject` copy and
+`BlockCodes` is built out of it inside `InitForUse`, so the rewrite is local to the tower and the build
+overlay follows it. A shared head can face one way, so it can satisfy one station: **re-derived afterwards,
+all three placements are gone, for both station kinds, at every separation the offsets can reach.**
+`ASharedMachineLegSatisfiesAtMostOneStation` enumerates them and is what stops the tie coming back.
+
+**Why only those two, when M4's looseness covers five blocks.** The refusal M4 defers is the one that would
+bite `pylonhead` and `bullwheel`, and that argument is correct about them and irrelevant here. Those two are
+symmetric along the rope axis, so a player who placed one from the other side of the tower has a
+geometrically identical block that would stop validating — and an incomplete tower is un-clickable, so a
+saved world would lose its picker, its call and its rename over a block that looks perfectly right. Neither
+applies to the heads: **both blocktypes are new this round and untracked in git**, so no saved world can hold
+a wrongly-faced one and the migration surface is empty; and both are visibly asymmetric —
+`drivehead.shaftwest` is `x 0..4`, `tensionhead`'s tie rod is `x 0..12` against a sheave at `x 8..16` — so a
+wrong facing is self-evident to the player rather than invisible. `pylonhead`, `bullwheel` and `layshaft`
+keep the wildcard until M4's placement half lands.
+
+**And the facing it now demands is the one that was already right.** Rendered both ways at
+`docs/agentic/ingest/cablecar/renders/headfacing/{drive,tension}/material/right.png` (crops:
+`zoom-right.png` / `zoom-wrong.png`, `zoom-tension-*.png`). At the head's own side the lay shaft, the
+`drivehead`'s stub and the gearbox are one unbroken bar from the hub to the gearbox column; a half turn out,
+the bar stops in open air short of the gearbox and the stub reappears on the far side of it pointing at
+nothing. On the tension station the wrong facing throws the sheave inboard, runs the tie rod off the end of
+the crossarm and hangs the counterweight rope outside the guide leg it is supposed to drop down. Nobody
+builds that and thinks it looks finished.
+
+**The eight-block spacing rule is retired.** It existed for this bug and nothing else, and the docs, the
+handbook and QA 27e all carried it. What is left after the fix, re-derived over every facing and every
+separation: two stations can still both validate while overlapping — but only on **post**, **brace** and
+**lay shaft** cells. The first two are vanilla logs and `ropeway:brace-*`; the third is ours, and it is worth
+naming rather than leaving under "post and brace", because ten overlapping placements per station kind
+survive and eight of them share a `ropeway:layshaft-*` cell, the closest at **1.414 blocks** — two crossarms
+crossing at one cell, both structures validating off it. It costs nothing mechanically and that is a property
+of the block rather than of the geometry: `layshaft.json` declares no `class`, no `entityClass` and no
+`entityBehaviors`, so there is no block entity to share and no consumer, speed or resistance can pass through
+it. No placement shares a drive housing, a drive shaft, a tension weight, a tension guide or a head — those
+are the cells that carry the machine, and those are closed.
+
+**What is left is a build nuisance, not a rule.** A station's machine leg landing in a **plain** neighbour's
+post cells wants two different blocks in one cell, so one of the two towers reads incomplete — and an
+incomplete tower is un-clickable. It is self-diagnosing rather than silent: the panel counts the missing cell
+and the overlay reddens it, and the repair is to move one tower. Seven blocks is the first separation at
+which no two towers can want the same cell at all (the largest horizontal `|o₁ − o₂|` over the shipped
+offsets across any two facings is exactly **6.000**), so if you want a number that ends the question, that is
+the number — but you no longer *need* one, and nothing quietly steals power any more if you ignore it.
+
+**No offset moved, and that is what made it affordable.** Every geometric number the tower was tuned
+against — the 5-wide passage, `SpanMath.TowerClearance`, the cabin's 2.463-block turning sweep against post
+inner faces at 2.5, the roof-to-crossarm clearance — is a property of the offset list, and all three
+footings share one. `AllThreeFootingsShareOneCellList` is what keeps that true, and it is why
+`TheCabinFitsThroughTheTower` and `TheCabinCanTurnSquareAtATowerWithoutSweepingThroughAPost` still read
+`pylonbase.json` alone and are nonetheless true of a station.
+
+**The offset list was not the whole of it, and the second half was asserted nowhere (2026-08-04).** "Post
+inner faces at 2.5" is a fact about the offsets *and* about the blocks standing in them. On a plain tower
+the second half is free — the post cells hold vanilla logs, planks and stone, which fill a cell and stop
+there. A station fills the `x = +3` column with four shapes of **ours**, and a shape of ours may reach
+outside its own cell: `bullwheelrim.json`'s felloe sweeps a whole unit past the cell face in each direction
+along the passage, and `drivehead.json`'s gearbox hangs 1.5 units below its own. (This used to cite
+`bullwheel.json`'s flared rail mouths, which were the same point until the rail moved onto the path; every
+authored rail element is now deleted from both head shapes.) Re-derived rather than assumed:
+`drivehousing`, `driveshaft`, `tensionweight` and `tensionguide` are all exactly `x, z ∈ [0, 16]`, including
+the drive housing's 45°-turned drum chamfer, whose swept corner stops 0.93 units inside the cell. So a
+station's leg presents the same 2.500-block face as a log post, the cabin's 2.463-block sweep keeps its
+0.037 of margin, and the bent path's 0.034 / 0.033 / 0.000 penetration numbers hold unchanged for a station.
+**`AStationsMachineLegStaysInsideThePostColumn` is the assert that was missing**; it fails with the number
+it failed by, and it refuses a tilted box outright rather than mismeasuring one. Rendered with the cabin
+parked at 45° in each station's own archway — the deepest pose either column ever sees — at
+`docs/agentic/ingest/cablecar/renders/station/corner/{drive45,tension45}/`.
+
+**The bullwheel is joined to something now.** It floated: `driveboss` is a 3×3 stub topping out at y 16
+under a rim whose resting bottom is 16.685. It stands in two bearing standards rising out of its own sheave
+cheeks, and a `hubaxle` at y 24.7–26.7 — the rim's own rotation centre, so it IS the axle the rim turns
+about — runs out to the cell's east face and meets the `layshaft` next door with no seam. One piece of
+geometry closes both complaints: the wheel is visibly bolted to the crossarm, and the thing that drives it
+is visibly connected to it. Renders: `docs/agentic/ingest/cablecar/renders/station/{drive,tension}/`, 19 and
+18 parts, `coplanarOverlapCount: 0`.
+
+**At a TERMINAL the wheel now wraps the rope; everywhere else it still turns beside it (2026-08-04).**
+`bullwheelrim.json` sweeps a radius of 9.6504 units about an axle at y 25.7, so a wheel standing over the
+tower has its lowest swept point at y 16.05 — the top face of the head block — against a haul rope at y 8,
+which is **0.443 blocks of daylight** over the rope's own surface. It cannot simply be lowered there: a
+parked cabin's jaw is a clamp closed ON the rope with its top plate 0.15 blocks above the rope's centreline,
+and a wheel tangent to that rope from above cannot share a point with the clamp closed round it. What buys
+the room is the axis along the line, past the tower. At a tower carrying exactly one span the far side is
+**dead** — nothing ever passes there — so `BullwheelRenderer.Offset` carries the wheel one cell out along it
+and `WrapDrop` = 0.443 blocks down, its groove lands on the rope's centreline, and `BEPylonBase.WrapPath`
+closes the rope round it as a sixteen-chord ring. 0.146 blocks clear of the parked grip **in plan**, so no
+vertical margin is load-bearing. At a station the line runs *through* there is no dead side and no wrap is
+drawn: a ring dropped to the rope on either side of such a tower would have a passing cabin's grip inside it
+for a block of travel, every trip. `TheWrappedWheelClearsACabinAtEveryPositionTheCabinCanReach` sweeps the
+cabin against both poses and is what replaced `TheTurningWheelStaysAboveTheCellTheCabinPassesThrough`, whose
+premise the wrapped pose no longer has. Full derivation:
+`docs/agentic/ingest/cablecar/BULLWHEEL-WRAP-SPEC.md`.
+
+**What breaks on a world built on the old scheme.** Towers, spans, the drawn cable, names, the cabin,
+calling, riding, the stop key and freight all survive untouched — every one of them is keyed on
+`ropeway:pylonbase` footings and their `Spans`. What every existing line loses on load is its **drive** and
+its **tensioner**. `ropeway:drivehousing` keeps its code, its class, its block entity and its `MPConsumer`,
+so the block and its axle survive intact and simply drive nothing, because no station structure contains
+it; the footing panel says *"Nothing on this line is turning"*. `ropeway:tensionweight` keeps its code but
+has lost its `entityClass`, and `TensionWeight` is no longer registered, so `ServerChunk` logs *"Failed
+loading blockentity TensionWeight … Will discard it"* and drops every one of them — the same benign,
+self-completing migration the `PylonHead` → `PylonBase` rename used, with the same property that they all
+fail at once and nothing is left holding a reference. The block stays as decoration. A cabin already hanging
+on the line stops where it is and is **not** stranded (`IsMoving` false, so the rider steps out), but a
+cabin cannot be *placed* on that line until a tension station exists. The repair is two towers of rework per
+line: break each end tower's footing, re-place it as the station footing, build the leg. Breaking a footing
+refunds its span's rope, so each end costs one re-link, and the old housing and weight are picked up and
+reused as station cells. An upgrader was considered and rejected — converting "footing with a housing within
+8 blocks" into a drive station means writing the proximity code one more time, in a migration path that runs
+once, to save two towers of rework in a pre-release mod.
+
+**One more case, and this list was a case short: a PLAIN tower wearing a decorative bullwheel now loads
+INCOMPLETE.** `pylonbase.json`'s centre cell narrowed from `ropeway:@(pylonhead-.*|bullwheel-.*)` to
+`ropeway:pylonhead-*`, and the old guide text told players a bullwheel on a plain tower was *"optional and
+changes nothing mechanical"* — so this is real saved-world state, not a hypothetical. An incomplete tower is
+also an **un-clickable** one (`BlockPylonBase.OnBlockInteractStart` returns on `!be.Validate()` before the
+picker or the call), so it stops answering right-clicks entirely until a pylon head goes back in the middle
+of the crossarm. It is surfaced rather than silent — the panel counts the missing cell and the overlay
+reddens it — and the repair is one block. QA step 0 now carries it.
+
+## Deferred on purpose: textures and recipes (2026-08-04)
+
+**Both stations wear borrowed vanilla textures and both stations' recipes are placeholders, and neither is an
+oversight.** Every shape shipped this round — `drivestation`, `tensionstation`, `layshaft`, `drivehead`,
+`driveshaft`, `tensionhead`, `tensionguide`, and the bullwheel's new fixture — samples exactly three vanilla
+sprites: `game:block/metal/sheet/iron1`, `game:block/stone/rock/granite1` and the `game:block/cloth/reedrope`
+the cable already uses. Nothing in the mod has a texture of its own. That is because the geometry was the
+question this round, and a texture that reads correctly at 16 pixels is a different skill from a shape that
+does. The recipes are the same shape of placeholder: they are *balanced* against the tower's existing
+cost and they resolve against real vanilla items, but they were written to make the blocks craftable for QA
+rather than to say anything about what a drive station ought to be worth.
+
+**Scoped, so it is a decision rather than a shrug.** The author's ask is *"we'll want to texture this at some
+point and come up with good recipes"*, and it is its own round: a texture pass wants a palette decision
+across all fifteen blocks at once, and a recipe pass wants the whole ladder priced together (a station
+footing against a plain one, a drive head against a lay shaft, both against what a windmill costs) rather
+than block by block. Doing either piecemeal now would mean doing it twice. **Nothing else in this file is
+waiting on it** — no clearance, no test and no behaviour reads a texture or a recipe — so it can land whole,
+later, without unpicking anything.
+
+## The drive came down off the crossarm (2026-08-03, superseded above)
+
+The bullwheel trial was **resolved, and split**. The mechanical consumer became `ropeway:drivehousing`, a
+block you built within eight blocks of any tower on the line — usually on the ground, and up beside a
+windmill's hub when the mill needed the height; the bullwheel stayed on the crossarm as **decoration that
+turns**. The eight blocks are gone and the housing is a station cell; the split is not, and the reasoning
+below is why the intake is still not on the crossarm. Design:
+[POWER-AND-STORAGE.md](POWER-AND-STORAGE.md).
 
 **Why the trial failed.** Two findings, both from the hostile review
 (`docs/agentic/ingest/cablecar/BULLWHEEL-REVIEW.md`):
@@ -157,21 +421,31 @@ turns**. Design and reasoning: [POWER-AND-STORAGE.md](POWER-AND-STORAGE.md).
 
 **What each half is now.**
 
-| | before | now |
-|---|---|---|
-| the consumer | `ropeway:bullwheel`, 4 blocks up, on a tower cell | `ropeway:drivehousing`, its own block within 8 |
-| mill → line | ~16 blocks, whatever the mill | **3** (housing + 2 axles, no gears) for a water wheel or a wooden rotor whose housing rides up to hub height; **5** (2 gears + 3 vertical axles) for a maxed metal rotor |
-| binding | none — the wheel was a tower cell | proximity within 8 blocks, the tension weight's pattern |
-| axle faces | up, down, and both cells **along the line** | horizontal only |
-| the bullwheel | the intake | decoration, on no network, and it **turns** |
+| | the trial | free-standing housing | station cell (now) |
+|---|---|---|---|
+| the consumer | `ropeway:bullwheel`, 4 blocks up, on a tower cell | `ropeway:drivehousing`, its own block within 8 | `ropeway:drivehousing`, cell [3,0,0] of a drive station |
+| mill → line | ~16 blocks, whatever the mill | **3** (housing + 2 axles) for a water wheel or a wooden rotor whose housing rides up to hub height; **5** for a maxed metal rotor | **3** for a water wheel; **~7** for a 3-sail rotor, **~9** for a maxed wooden one, **~14** for a maxed metal one — an axle column down the outside of the drive leg |
+| binding | none — the wheel was a tower cell | proximity within 8 blocks, the tension weight's pattern | **membership**: a cell of exactly one station, found at a known offset |
+| axle faces | up, down, and both cells **along the line** | horizontal only | horizontal only |
+| the bullwheel | the intake | decoration, on no network, and it **turns** | on no network, **turns**, and visibly geared to the intake through the crossarm |
 
-**B1 (build-order dead end) is gone for the gearless layouts and back for the metal one.** It was
-`BlockAngledGears.TryPlaceBlock` refusing to sit beside an axle that fails `IsAttachedToBlock`. There is no
-angled gear in the water-wheel build or in a wooden-rotor build whose housing sits at hub height, and
-`BEBehaviorMPAxle.IsAttachedToBlock` passes a ground-level `we` axle on the block below it — the ground. A
-maxed metal rotor needs eleven clear blocks under its hub whatever the intake does, so that drive still descends through
-two gears and a `woodenaxle-ud` column, and the column still needs a wall beside it because every block of
-the tower is `sidesolid: all false`. An earlier version of this line said the dead end was gone outright.
+**The middle column bought a cheap drive by paying in binding, and this change reverses the trade
+knowingly.** A fixed intake means a descent: a windmill's hub sits 4 blocks up for three sails, 6 for a
+maxed wooden five and 11 for a maxed metal ten — vanilla decides that, not us — and the station's tallest
+cell is +4, so there is no fixed cell that matches an arbitrary hub. Two things are bought back for it. The
+**eight-block ceiling is gone**: a maxed metal rotor could not meet the sphere at all (121 > 64) and needed
+a descent regardless, and now no mill has a placement constraint. And the **scaffold is gone** —
+`ropeway:driveshaft` is the one block of the tower with `sidesolid: all true`, so a `woodenaxle-ud` column
+leans on the drive leg it feeds.
+
+**B1 (build-order dead end) is closed for every drive rather than only the gearless ones.** It was
+`BlockAngledGears.TryPlaceBlock` refusing to sit beside an axle that fails `IsAttachedToBlock`, and the wall
+a vertical axle column needed was unbuildable against a tower whose every block ships `sidesolid: all
+false`. The drive leg is now solid on all six sides (with `sideopaque` still false and `lightAbsorption`
+still 0, so it neither hides the frame nor casts shade), which is exactly the wall those columns wanted, at
+exactly the column where power is supposed to touch the tower. Two earlier versions of this line were both
+wrong in different directions: one said the dead end was gone outright, the next that it was back for the
+metal rotor.
 
 **The docs described a windmill that cannot exist (2026-08-03, docs only).** `QA-SCRIPT.md` 27c, handbook
 52 step 2, `50-ropeway.json` and the tower guide all told the player to stand a rotor on the ground two
@@ -187,33 +461,36 @@ code was right. Two things the fact-finding turned up that the review raising it
 and why the housing can ride up beside the hub without blocking it. Working:
 `docs/agentic/ingest/cablecar/HOUSING-FIX-FACTS.md`.
 
-**A bare scouting footing can no longer take a housing off its line.** `BEPylonBase.Initialize` registers a
-footing in `LoadedTowers` unconditionally — before any completeness check, and whether or not it carries
-spans — so a bare one dropped while marking the next tower position used to be a candidate for
-`ServingTower`. Put it within 8 blocks of a working housing and nearer to it than the line's own footing and
-the housing fell to `IdleResistance` with `Serves(realLine)` false: the line stopped, with the mill visibly
-turning three blocks away and the footing panel telling the player to build a drive housing they had already
-built. `ServingTower` now filters to footings that **resolve to a line** — `RopewayLine.GetOrBuild` is null
-below two towers, which is exactly the test — and `ABareFootingCannotTakeAHousingOffTheLineItDrives` pins it.
-The exact tie went the same way: `NearestTower` breaks equal distances on `RopewayLine.ComparePos` rather
-than on whichever entry the `Dictionary` yields first, so two equidistant footings resolve identically on the
-server, on every client and across a restart. `EquidistantFootingsAreDecidedOnPositionAndNotOnChunkLoadOrder`
-is the guard.
+**The stray-footing family has no subject any more.** Two entries lived here: a bare scouting footing
+dropped nearer a housing than the line's own footing silently taking the housing off its line, and two
+equidistant footings needing `RopewayLine.ComparePos` as a tie-break so the server, every client and a
+restart could not disagree about which line a mill was driving. Both were properties of "the nearest footing
+within eight blocks". A housing is now a cell of exactly one station and there is nothing to be nearest to,
+so `ServingTower`, its line-resolving predicate, the tie-break's only caller and the three tests that pinned
+them are all deleted rather than kept passing.
 
 **B2 (an axle on the haul rope) is gone.** The housing connects on horizontal faces only, four blocks below
-the rope line.
+the rope line, and it is now on the ground at the foot of the leg rather than anywhere within a sphere.
 
-**L2 (no drive in the tower guide) is closed.** `RopewayGuideDialog` turns five blocks now — footing, head,
-brace, bullwheel, drive housing — and the body names the drive.
+**L2 (no drive in the tower guide) is closed.** `RopewayGuideDialog` turns six blocks — all three footings,
+head, brace and bullwheel — and the body walks the whole station build. The machine legs' seven blocks are
+named in the text rather than shown: seven more portraits would shrink the row to nothing.
 
 **L6 (the five-vs-four vertical axle count) died with the scaffold.** Nothing counts vertical axles any
 more, here or in QA-SCRIPT.
 
-**M4 is ACCEPTED, not fixed.** The bullwheel is still `HorizontalOrientable`, so one placed while facing the
-wrong way validates the tower with its throat and station rails running across the line. The pylon head has
-carried exactly the same looseness since the pattern was written; the fix is to orient the crossarm's centre
-cell from the footing below it for **both** blocks in one place, and a private rule on the decorative half
-would leave the bug and add a rule. Marked `ponytail:` in `BEBullwheel`.
+**M4 is ACCEPTED, not fixed, and it is COSMETIC again (2026-08-04).** The bullwheel is still
+`HorizontalOrientable`, so one placed while facing the wrong way validates the tower with its throat and
+station rails running across the line — and now with its hub axle pointing at the braces instead of at the
+lay shaft. `layshaft` inherits the same looseness, so the count is **3**: `pylonhead`, `bullwheel`,
+`layshaft`. The fix is unchanged and is still one fix in one place: orient the crossarm cells from the
+footing below them, for all of them at once. Marked `ponytail:` in `BEBullwheel`.
+**It briefly was not cosmetic, and that half is now closed.** For one round M4 was also the only thing
+stopping two stations sharing one machine leg, which is a structural bug and not a wrong-looking wheel.
+`drivehead` and `tensionhead` — the only facing-carrying cells of a shared leg — are now narrowed to the
+footing's own side in `BEPylonBase.OwnTheHeadCell`, which closes that outright without needing M4's placement
+half; see "One machine leg, one station" above. So the count went 2 → 5 → 3, and what is left of M4 is a
+wheel that looks wrong and drives correctly.
 
 **Every placed bullwheel costs a server-side block entity that does nothing, and that is accepted.**
 `entityClass: "Bullwheel"` is declared for both sides and `BEBullwheel.Initialize` returns at
@@ -250,13 +527,12 @@ again the instant anything turns. The two ways to close it, dropping the `depart
 `RequestStop` alone or refusing `NoDrive` on a held cabin, both add a rule to a state machine that has just
 had one deleted, for a state you reach by being unlucky twice.
 
-**A real scrap line nearer a housing than the line it was built for takes it, and correctly.** Two
-abandoned footings still linked to each other, standing nearer the housing than the line it was meant to
-drive, win `ServingTower`: that is a line, and "the nearest footing that is on a line" is doing exactly what
-it was written to do. The bare-footing version of this — a single unlinked footing — is **fixed** and is
-recorded above. What is left is the case where the rule is right and the world is wrong, and the fix is to
-break the scrap line. Recorded because the symptom is identical to the fixed one: a stopped line beside a
-turning mill. Check for a linked pair before filing.
+**A real scrap line nearer a housing than the line it was built for takes it — DEAD, 2026-08-04.** Two
+abandoned footings still linked to each other used to win `ServingTower` from the line the housing was built
+for, correctly, because "the nearest footing that is on a line" was doing exactly what it was written to do.
+There is no `ServingTower`: a housing is a cell of one station and cannot be taken off it by anything
+standing nearby. Kept as a row because the symptom it produced — a stopped line beside a turning mill — is
+still reachable, but only by an unfinished station now, and the tower's own overlay says which cell.
 
 **On a truncated line the boarding grace latches `departed` with nothing turning, and that is the price of
 the `truncated` term.** `MayStart` is `departed || truncated || lineSpeed > 0`, and its third caller is the
@@ -265,7 +541,7 @@ prevent — boarding a line with no drive at all would otherwise latch `departed
 clears it and every `Hold` needs the cabin to move — and a truncated line now exempts it. A rider who sits
 for the three-second pause on a line with a dark end departs with `lineSpeed` 0: nothing moves (the
 `speed <= 0` branch writes `IsMoving = false`, so nobody is trapped and the dismount stays open) but
-`IsHauling` is true, and every loaded housing on that line writes the full `HaulResistance` onto its network
+`IsHauling` is true, and every loaded drive station on that line writes the full `HaulResistance` onto its network
 until something turns. **Deliberate.** The `truncated` clause is there because a zero speed on a truncated
 chain is not evidence that there is no drive, and it lives in `MayStart` rather than at the two refusal sites
 precisely so the rider who sits down and the rider who presses the stop key get the same answer — splitting
@@ -306,13 +582,13 @@ weight's persisted binding, and none of them exists to be fixed any more:
 | **F1** (blocker) | A 288-block line climbing 57 blocks was permanently unrunnable at a full store, told to wait for wind. No quote, no capacity, no dead lines. |
 | **F2** | Pressing the stop key after departure charged twice. Nothing is charged. |
 | **F3** | Recovery from a mid-span hold cost a fresh full quote. Same. |
-| **F4** | Breaking a weight's anchor tower orphaned it with no re-bind. Nothing is bound: `BETensionWeight.OnLine` asks proximity at lookup time. |
-| **F6** | Which of two merged weights was live came from dictionary order. There is no "live" weight; a line has a tensioner or it does not. |
-| **F7** | A weight placed by schematic or worldedit was permanently orphaned. `Bind` is gone; placement does nothing but check it is near a tower. |
+| **F4** | Breaking a weight's anchor tower orphaned it with no re-bind. Nothing is bound, and the reason is now stronger than "proximity at lookup time": the weight is a **cell of a station**, so breaking the tower breaks the structure that contained it and the answer changes with the world rather than needing repair. |
+| **F6** | Which of two merged weights was live came from dictionary order. There is no "live" weight and no dictionary; a line has a completed tension station on its own chain or it does not. |
+| **F7** | A weight placed by schematic or worldedit was permanently orphaned. `Bind` is gone and so is the placement rule that replaced it — a schematic that lays down a whole station simply works, and one that lays down a lone weight produces a lone weight. |
 | **F8** | Charge was only persisted on a 1/32 step boundary. There is no charge. |
 | **F9** | `Wind`'s `dt` was unclamped. There is no `Wind`. |
-| **F5** | "This line has no tension weight" could lie under truncation. It still resolves through the walked chain, but it is asked at cabin **placement** and on the block-info panel rather than at every departure — one question at build time rather than a gate on every trip. The line that used to close this row outright (`maxLineLength` 320 < `MaxChunkRadius` 384, so a player standing on the line holds all of it) is **arithmetically wrong**: the stock loaded window is 256 blocks, not 384. See the truncated-line section below. It is narrowed to placement, not eliminated. |
-| **F10** | The weight is a 3-block shape in a 1-block cell with no headroom check. **Still true**, still cosmetic. |
+| **F5** | "This line has no tensioner" could lie under truncation. **Narrowed twice and still open, 2026-08-04.** The question is now `IsTensioner && StructureComplete` over `line.Towers`, so it is asked out of the *same table* `WalkChain` walks — but a version of this row claimed that made "no tensioner" and `line.Truncated` **coincide exactly**, and it does not. `StructureComplete` is fifteen `GetBlockRaw` reads and `BlockAccessorRelaxed.GetBlockId` returns 0 — air — for an unloaded chunk, so a *loaded* footing whose own leg is three blocks away across an unloaded chunk boundary reads incomplete while `MarkLoadedEnds`, which only inspects the two ends of the walked chain, sees nothing wrong. Same residual band `DriveSpeedOn`'s comment has always been honest about, narrowed from eight blocks to three. **What is closed is the LIE on a long line**: `TryPlaceCabin` now branches on `line.Truncated` **before** the tensioner refusal and sends `err-line-truncated-link`, so the player standing at the drive end of a 320-block line with a perfectly good tension station at the far end is no longer told to go and build one. What is left underneath is the three-block residue, where the player is standing at the tower and its own overlay names the missing cell. Still asked at cabin **placement** and on the block-info panel rather than at every departure. The line that used to close this row outright (`maxLineLength` 320 < `MaxChunkRadius` 384) is **arithmetically wrong**: the stock loaded window is 256 blocks, not 384. |
+| **F10** | The weight was a 3-block shape in a 1-block cell with no headroom check. **CLOSED, 2026-08-04.** The shape collapsed to five elements inside its own cell, and the three cells of `ropeway:tensionguide` above it are structure the station's multiblock check requires — so the headroom is checked by construction rather than not at all. `TheHangingMassStaysInsideTheGuideItHangsIn` now asserts every element stays under y 16. |
 | **F11–F14** | Docs. QA step 27 is new, this file and the handbook are rewritten, and handbook 52 no longer recommends a flywheel that vanilla does not have. |
 
 **New, and accepted:** a cabin can now stop mid-span because the drive stopped, and an *empty* one called
@@ -547,8 +823,16 @@ fixed — it is the guard being put where all the callers actually meet.
 - **Unlinking is not offered on a truncated line.** `SendCandidates` still refuses to open the picker when
   part of the line is unloaded, because the link rows would be unprovable. That also takes the unlink rows
   with it. Breaking the footing still works, so this is an inconvenience rather than a trap.
-- **The cable is straight, not sagging.** The cabin travels the straight chord and `IsSpanClear`
-  certifies a straight corridor; a drawn catenary would be a cable that lies about where the cabin goes.
+- **The cable is straight between towers, not sagging.** The cabin travels the chord — bent at the towers,
+  and the rope is bent with it — and `IsSpanClear` certifies that corridor; a drawn catenary would be a
+  cable that lies about where the cabin goes. Sag needs the cabin to sag too.
+- **The cabin's ground speed varies by roughly ±12% through a 90° corner, and its nose wags.** Both fall out
+  of the bend and neither is a defect. `Travelled` is arclength of the **chord**, not of the bent path, so a
+  cabin covering equal `Travelled` per tick covers slightly more ground where the curve is longest; forward
+  progress is `cos(turn/2)` at worst and never negative. And `BendSlope` reaches −1/3 two thirds of the way
+  through the window, so the heading **overshoots the leg bearing by 12.1°** at a 90° corner (7.1° at 45°)
+  before turning into it — the nose swings out and comes back, on both sides of every corner. It is inherent
+  to `s(1−s)²`; a curve without it is a curve that does not pass through the tower.
 - **Span ends are not clearance-checked.** `TrimForTowers` skips 4 blocks at each end so a tower's own
   posts don't block its own line, so an obstruction inside those end zones goes undetected.
 - **Metal cost.** The restructure took it from two gantries at roughly 2.5 plates down to one 5-wide

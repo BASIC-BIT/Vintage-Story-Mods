@@ -83,6 +83,35 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// </summary>
     public const double DefaultHangDrop = 2.25;
 
+    /// <summary>
+    /// How far AHEAD of itself a moving cabin reads its heading, in blocks. It exists only to cancel the
+    /// client's own rotation easing and is not a choice about where the cabin points.
+    /// <para>
+    /// Derived: <c>EntityBehaviorInterpolatePosition.LerpRotation</c> resolves to
+    /// <c>d(yaw)/dt = 6 * (target - yaw)</c> for any <c>dt</c> under 0.1 s - the clamp binds there and
+    /// <c>0.6 * dt / 0.1</c> IS <c>6 * dt</c> - so the client's time constant is exactly <b>1/6 = 0.1667 s</b>.
+    /// Reading <see cref="RopewayLine.DirectionAt"/> one lag ahead cancels it to first order: measured on the
+    /// bent path at a right-angle corner the yaw error at the tower goes from -13.2 degrees to +0.7, and post
+    /// penetration from 0.033 blocks to 0.000.
+    /// </para>
+    /// <para>
+    /// A CALIBRATION KNOB, not a constant of nature, and it is 4% LOW knowingly rather than by accident. At
+    /// the nominal 2.2 blocks/s the exact lag is 2.2/6 = <b>0.367</b> blocks; 0.352 is what "about 0.16 s"
+    /// gave before the time constant was read off the decompiled source properly. Chasing the 4% buys nothing:
+    /// <c>RopewayPower.CabinSpeed</c> is 6x the network speed and spans 1.2 to 6.0 blocks a second across the
+    /// drive ladder, so the lead is exact at ONE speed whatever number goes here. That the mistune costs
+    /// nothing is measured rather than assumed -
+    /// <c>RopewayAssetContractTests.TheBentPathNeverDrivesTheCabinDeeperIntoAPostThanTheStraightOneDid</c>
+    /// sweeps the real lag (<c>speed / 6</c>) over that whole range against this fixed lead and the worst cell
+    /// comes out at 0.022 blocks of post, against 0.033 to 0.126 for the straight path.
+    /// </para>
+    /// <para>
+    /// Without it the bend still works and still beats the straight path everywhere it was measured; the lead
+    /// is the difference between arriving 13 degrees off the rail and arriving on it.
+    /// </para>
+    /// </summary>
+    public const double YawLead = 0.352;
+
     /// <summary>Close enough to a tower to count as standing at it, in metres along the line.</summary>
     public const double ArrivalTolerance = 0.5;
 
@@ -1329,7 +1358,9 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         // Never TeleportTo - it sets IsTeleport and resets the client interpolation queue into a visible snap.
         Pos.SetPosWithDimension(new Vec3d(point.X, point.Y - hangDrop, point.Z));
 
-        var dir = line.DirectionAt(Travelled);
+        // Read ahead only while the cabin is actually going somewhere: the lead cancels a lag that a parked
+        // cabin does not have, and applying it to a stopped one would aim it down a span it is not on.
+        var dir = line.DirectionAt(departed ? Travelled + (Outbound ? 1 : -1) * YawLead : Travelled);
         var leg = (float)Math.Atan2(dir.X, dir.Z);
         Pos.Yaw = departed ? leg : StationYaw(line, leg);
     }
@@ -1339,15 +1370,25 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// platform instead of already pointing at the next station. Falls back to the leg bearing whenever the
     /// tower cannot be asked.
     /// <para>
+    /// A SEPARATE RULE FROM THE BEND, and not the bend's limit. <see cref="RopewayLine.DirectionAt"/> now
+    /// hands a passing cabin the corner's bisector at a tower, which is where the path goes; this hands a
+    /// PARKED one the tower's own cardinal, which is where the platform and the authored station rails are.
+    /// The two agree exactly when the tower faces the bisector and differ by however far it does not - up to
+    /// 45 degrees at a right-angle corner, because the facing comes from <c>HorizontalOrientable</c> and
+    /// nothing in the mod ever tells a player which way a corner tower wants to point. So a cabin arriving
+    /// at a badly-faced corner tower still swings as it settles. That gap is the tower's facing, not the
+    /// curve: no radius, no yaw law and no cabin length closes it, and the cure is to warn at link time
+    /// rather than to bend harder. See <c>docs/KNOWN-ISSUES.md</c>.
+    /// </para>
+    /// <para>
     /// <c>!departed</c> is the whole safety condition and it is not a proxy for anything - it is the exact
     /// predicate under which <see cref="Travelled"/> cannot change. Every write to Travelled in
     /// <see cref="ServerTick"/> is below the <c>!departed</c> early return except the stale-state clamp and
     /// <see cref="ParkAtNearestEnd"/>, both of which are teleports onto a tower. So the cabin never rotates
     /// while it is moving: this is the narrow half of the REVERTED angle-station law (see
-    /// <see cref="RopewayLine.DirectionAt"/>), which held the passage axis across a WINDOW around the vertex
-    /// and crab-walked because <see cref="RopewayLine.PositionAt"/> had already swung the origin onto the
-    /// outgoing leg. Stationary, the origin does not move, so there is nothing to crab away from. A cabin
-    /// merely PASSING a tower is byte-identical to the shipped law - it never stops, so it never gets here.
+    /// <see cref="RopewayLine.DirectionAt"/> for why the wide half stayed dead even once the path was bent).
+    /// Stationary, the origin does not move, so there is nothing to crab away from. A cabin merely PASSING a
+    /// tower never stops, so it never gets here.
     /// </para>
     /// <para>
     /// Turning in place at the tower centre sweeps the cabin's half-diagonal, sqrt(2.0^2 + 1.4375^2) = 2.463
@@ -1373,9 +1414,11 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// the short way - at most a quarter turn, and never past the axis and back. Pure, and therefore tested.
     /// <para>
     /// SNAP, not a hand-rolled blend: the cabin carries <c>interpolateposition</c>, whose
-    /// <c>LerpRotation</c> already eases Pos.Yaw with a ~0.1 s time constant, so one written yaw is rendered
-    /// as a rotation in place. A blend of our own would be a second easing on top of that one, with a phase
-    /// of its own that would have to be proven not to overlap travel.
+    /// <c>LerpRotation</c> already eases Pos.Yaw with a time constant of 1/6 s, so one written yaw is
+    /// rendered as a rotation in place. (The 0.1 in that method is a literal inside its clamp, not the time
+    /// constant; an earlier version of this line quoted it as though it were - see
+    /// <see cref="YawLead"/> for the derivation.) A blend of our own would be a second easing on top of that
+    /// one, with a phase of its own that would have to be proven not to overlap travel.
     /// </para>
     /// </summary>
     public static float SquareTo(BlockFacing passage, float leg)

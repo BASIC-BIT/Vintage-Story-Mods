@@ -1,0 +1,77 @@
+{
+  "//": "One cell of a drive station's machine leg: a lattice column carrying the tower, with the vertical shaft running its whole height. It REPLACES a post cell, so it is structure as well as machinery. No side variant - the lattice is 4-fold symmetric, so orientation decides nothing and it cannot be placed 90 degrees out.",
+  "code": "driveshaft",
+  "//sidesolid": "The ONE block of the tower that is solid, and it deletes the mandatory scaffold. Vanilla refuses an angled gear beside an unsupported axle, and every other block of a tower ships sidesolid all false - so before this a wooden axle run coming down to the intake could not lean on the tower it served. Now it can, at exactly the one column where power is supposed to touch the tower. sideopaque stays false and lightAbsorption stays 0, so the leg is still see-through and casts no shade. It has no effect on spans: SpanMath.RopewayBlockFilter returns false for Code.Domain == \"ropeway\" before it ever looks at SideSolid.",
+  "shape": {
+    "base": "ropeway:block/driveshaft"
+  },
+  "textures": {
+    "metal": {
+      "base": "game:block/metal/sheet/iron1"
+    }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Metal",
+  "creativeinventory": {
+    "general": [
+      "*"
+    ],
+    "construction": [
+      "*"
+    ]
+  },
+  "attributes": {
+    "handbook": {
+      "groupBy": [
+        "driveshaft"
+      ]
+    },
+    "reinforcable": false
+  },
+  "replaceable": 500,
+  "resistance": 3.5,
+  "lightAbsorption": 0,
+  "sidesolid": {
+    "all": true
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "collisionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 1,
+    "z2": 1
+  },
+  "selectionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 1,
+    "z2": 1
+  },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/anvil",
+    "hit": "game:block/anvil",
+    "byTool": {
+      "Pickaxe": {
+        "hit": "game:block/rock-hit-pickaxe",
+        "break": "game:block/rock-break-pickaxe"
+      }
+    }
+  },
+  "guiTransform": {
+    "rotation": {
+      "x": -22.6,
+      "y": 45,
+      "z": 0
+    },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

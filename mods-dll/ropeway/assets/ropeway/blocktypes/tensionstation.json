@@ -1,0 +1,153 @@
+{
+  "code": "tensionstation",
+  "//": "The tower whose bullwheel is held out by a counterweight. Same sixteen cells as ropeway:pylonbase and the same fifteen offsets as ropeway:drivestation - only the block numbers on the machine leg differ. A line will not carry a cabin until one of its towers is a COMPLETED tension station, which is a structural fact about the chain rather than a distance query, so it is asked by walking line.Towers.",
+  "//whytwo": "Two station blocks rather than one that is both. On a real aerial ropeway the drive bullwheel is at one end and the return bullwheel rides a tensioned carriage at the other; a combined block would let a player tension the haul rope against the very thing driving it, and there is one leg to spend.",
+  "class": "BlockPylonBase",
+  "entityClass": "PylonBase",
+  "//rope": "Cable texture. BuildHalfCable flat-samples ONE point of it - see pylonbase.json. Keep comments OUT of \"textures\".",
+  "behaviors": [
+    {
+      "name": "HorizontalOrientable"
+    }
+  ],
+  "variantgroups": [
+    {
+      "code": "side",
+      "states": [
+        "north",
+        "east",
+        "south",
+        "west"
+      ]
+    }
+  ],
+  "shapeByType": {
+    "*-north": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 0
+    },
+    "*-east": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 270
+    },
+    "*-south": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 180
+    },
+    "*-west": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 90
+    }
+  },
+  "textures": {
+    "stone": {
+      "base": "game:block/stone/rock/granite1"
+    },
+    "metal": {
+      "base": "game:block/metal/sheet/iron1"
+    },
+    "rope": {
+      "base": "game:block/cloth/reedrope"
+    }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Stone",
+  "creativeinventory": {
+    "general": [
+      "*-north"
+    ],
+    "construction": [
+      "*-north"
+    ]
+  },
+  "attributes": {
+    "handbook": {
+      "groupBy": [
+        "tensionstation-*"
+      ]
+    },
+    "reinforcable": false,
+    "maxSpan": 48,
+    "maxLineLength": 320,
+    "ropePerBlock": 0.25,
+    "maxCandidates": 16,
+    "//tensioner": "Read once by BEPylonBase.IsTensioner. This one flag is the entire tensioner rule now: a line has its tensioner iff one of its own towers carries it and is complete. There is no matching flag on drivestation.json - a drive station is named by the intake cell it owns, and a second attribute saying the same thing would be a second thing to keep in step.",
+    "tensioner": true,
+    "//multiblockStructure": "The same fifteen offsets as pylonbase.json and drivestation.json, byte for byte. See drivestation.json for why that identity is the point rather than a coincidence. ropeway:layshaft is deliberately the SAME block on both stations: on the drive it is a turning line shaft and here it is a static tie rod, and at 16 pixels those are the same forged bar on the same standards.",
+    "//tensionhead": "The -* stays a WILDCARD here and is narrowed at runtime, per tower, by BEPylonBase.OwnTheHeadCell: a north-facing station wants tensionhead-north and an east-facing one tensionhead-east. Writing an exact code here instead would make all four variants demand the same facing. The narrowing is what stops two stations sharing one machine leg - RopewayAssetContractTests.ASharedMachineLegSatisfiesAtMostOneStation fails either way round.",
+    "multiblockStructure": {
+      "blockNumbers": {
+        "ropeway:bullwheel-*": 1,
+        "ropeway:brace-*": 2,
+        "game:@(log-placed-.*|debarkedlog-.*|planks-.*|rock-.*|cobblestone-.*|drystone-.*|rockpolished-.*|stonebricks-.*)": 3,
+        "ropeway:layshaft-*": 4,
+        "ropeway:tensionhead-*": 5,
+        "ropeway:tensionguide": 6,
+        "ropeway:tensionweight": 7
+      },
+      "offsets": [
+        { "x": 0, "y": 4, "z": 0, "w": 1 },
+        { "x": -3, "y": 4, "z": 0, "w": 2 },
+        { "x": -2, "y": 4, "z": 0, "w": 2 },
+        { "x": -1, "y": 4, "z": 0, "w": 2 },
+        { "x": 1, "y": 4, "z": 0, "w": 4 },
+        { "x": 2, "y": 4, "z": 0, "w": 4 },
+        { "x": 3, "y": 4, "z": 0, "w": 5 },
+        { "x": -3, "y": 0, "z": 0, "w": 3 },
+        { "x": -3, "y": 1, "z": 0, "w": 3 },
+        { "x": -3, "y": 2, "z": 0, "w": 3 },
+        { "x": -3, "y": 3, "z": 0, "w": 3 },
+        { "x": 3, "y": 0, "z": 0, "w": 7 },
+        { "x": 3, "y": 1, "z": 0, "w": 6 },
+        { "x": 3, "y": 2, "z": 0, "w": 6 },
+        { "x": 3, "y": 3, "z": 0, "w": 6 }
+      ]
+    }
+  },
+  "replaceable": 500,
+  "resistance": 4.5,
+  "lightAbsorption": 0,
+  "sidesolid": {
+    "all": false
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "collisionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 0.5,
+    "z2": 1
+  },
+  "selectionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 0.5,
+    "z2": 1
+  },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/rock-break-pickaxe",
+    "hit": "game:block/rock-hit-pickaxe",
+    "byTool": {
+      "Pickaxe": {
+        "hit": "game:block/rock-hit-pickaxe",
+        "break": "game:block/rock-break-pickaxe"
+      }
+    }
+  },
+  "guiTransform": {
+    "rotation": {
+      "x": -22.6,
+      "y": 45,
+      "z": 0
+    },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

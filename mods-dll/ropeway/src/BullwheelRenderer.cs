@@ -38,14 +38,43 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
     public const float RimPivotY = 25.7f / 16f;
 
     /// <summary>
+    /// Blocks from the axle to the haul rope's own centreline once the rope is IN the groove: the rim's swept
+    /// reach (9.6504 units - felloe5's corner, not its flat) plus the cable's own 0.96-unit half-thickness
+    /// bedded on it. FORCED, not chosen: bed the rope on the felloe's flats instead and the corners stand
+    /// 0.635 units proud through the rope's own cross-section on every quarter turn. Re-derived off the
+    /// shipped rim by <c>TheWrappedWheelClearsACabinAtEveryPositionTheCabinCanReach</c>.
+    /// </summary>
+    public const float WrapRadius = 10.6104f / 16f;
+
+    /// <summary>
+    /// Blocks the wrapped wheel drops so its groove lands on the rope. DERIVED rather than typed: the axle
+    /// stands <see cref="RimPivotY"/> above the block's own bottom face, the rope runs through the block's
+    /// centre half a block up, and the groove has to be <see cref="WrapRadius"/> above the rope. 0.4431
+    /// blocks. Re-author the rim about a different axle and this follows it instead of drifting off it.
+    /// </summary>
+    public const float WrapDrop = RimPivotY - 0.5f - WrapRadius;
+
+    /// <summary>
+    /// Blocks the wrapped wheel stands out along the DEAD side of a terminal - the side of the tower past
+    /// which nothing ever runs. ONE CELL, and the two thresholds under it are measured: at 0.641 blocks the
+    /// wrap stops cutting a parked cabin's grip, and at 0.854 its near edge stops overhanging that grip at
+    /// all, so above 0.854 no vertical margin is load-bearing. One cell is 17% past the second and is the
+    /// unit everything else in this mod is measured in; it leaves 0.146 blocks of clearance in plan. Not a
+    /// knife edge and not a number that wants tuning.
+    /// </summary>
+    public const float WrapOut = 1f;
+
+    /// <summary>
     /// Radius of the frustum sphere the wheel is culled against, in blocks from the block's own centre. The
-    /// swept rim reaches 1.712 blocks from there - a felloe corner 0.603 blocks out from an axle that is
-    /// itself 1.106 blocks up - and 2 is the next round number past it. Erring large costs at worst a draw
-    /// call that was going to happen anyway; erring small pops the wheel off a tower the player is looking at.
+    /// axle stands 1.200 blocks off that centre once the wheel moves out to wrap (one cell along the line and
+    /// 0.443 down) and a felloe corner reaches 0.610 further, so the swept rim reaches 1.810 - it was 1.717
+    /// with the wheel over the tower - and 2 is the next round number past it. Erring large costs at worst a
+    /// draw call that was going to happen anyway; erring small pops the wheel off a tower the player is
+    /// looking at.
     /// <para>
     /// Public only so the asset contract test can measure the shape and check this covers it. The value 2 is
     /// arrived at by hand from a shape the generator can re-author, and vanilla's own sign renderer passes a
-    /// literal 1 here - copy that number across and 0.712 blocks of wheel hang outside the sphere, with
+    /// literal 1 here - copy that number across and 0.810 blocks of wheel hang outside the sphere, with
     /// nothing in the game or the suite to say so.
     /// </para>
     /// </summary>
@@ -64,6 +93,19 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
     /// where it is, which is the whole tell: a line with no drive has a still wheel.
     /// </summary>
     public double Speed;
+
+    /// <summary>
+    /// Where the wheel stands relative to the cell it belongs to, in blocks: the zero vector at a station
+    /// the line runs THROUGH, and one cell along the dead side plus <see cref="WrapDrop"/> down at a
+    /// terminal, where the groove lands on the rope and the drawn wrap closes round it.
+    /// <para>
+    /// Replaced wholesale rather than written component by component, and that is the reason it is a Vec3f
+    /// and not three floats: <see cref="BEBullwheel"/> writes it on a 500 ms tick and
+    /// <see cref="OnRenderFrame"/> reads it every frame, so three separate float writes could be read as a
+    /// vector the wheel is never actually at. A reference assignment cannot tear.
+    /// </para>
+    /// </summary>
+    public Vec3f Offset = new();
 
     public BullwheelRenderer(ICoreClientAPI capi, BlockPos pos, MeshData rim, float yawRad)
     {
@@ -107,11 +149,20 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
     /// failures this paragraph names. What sees those is a point off the axle, checked on all three
     /// components at a non-zero yaw - <c>TheRimTurnsOnItsOwnAxleAtEveryAngleAndEveryFacing</c>.
     /// </para>
+    /// <para>
+    /// <paramref name="offset"/> goes in the FIRST translate and nowhere else. That is what carries the
+    /// wheel out to the rope without changing what it turns about: the return translate is still the axle,
+    /// so the pair still cancels and the rotations still happen at the origin the shape is authored around.
+    /// Add it to both and the wheel is where it should be and spinning about the cell it left; add it to the
+    /// second only and it orbits. The offset is applied OUTSIDE the yaw on purpose - it is a direction the
+    /// LINE decides, not the block's own facing, which is what makes a badly-placed wheel wrap correctly
+    /// anyway.
+    /// </para>
     /// </summary>
-    public static Matrixf RimMatrix(Matrixf m, float yawRad, float angleRad)
+    public static Matrixf RimMatrix(Matrixf m, float yawRad, float angleRad, Vec3f offset)
     {
         return m
-            .Translate(0.5f, RimPivotY, 0.5f)
+            .Translate(0.5f + offset.X, RimPivotY + offset.Y, 0.5f + offset.Z)
             .RotateY(yawRad)
             .RotateX(angleRad)
             .Translate(-0.5f, -RimPivotY, -0.5f);
@@ -134,6 +185,8 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
         // Without it every loaded bullwheel pays a light lookup, a shader bind, a dozen uniform uploads and a
         // draw call every frame, behind the camera included. NOT gated on Speed: a still wheel on a driveless
         // line is the whole tell, so it has to keep being drawn.
+        // Still the BLOCK's own centre rather than the wheel's: CullRadius covers the offset pose, so a
+        // sphere that moved with the wheel would only be a second thing to keep in step.
         if (!render.DefaultFrustumCuller.SphereInFrustum(pos.X + 0.5, pos.InternalY + 0.5, pos.Z + 0.5, CullRadius)) return;
 
         var cameraPos = capi.World.Player.Entity.CameraPos;
@@ -147,7 +200,8 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
         prog.ModelMatrix = RimMatrix(
             modelMat.Identity().Translate(pos.X - cameraPos.X, pos.InternalY - cameraPos.Y, pos.Z - cameraPos.Z),
             yawRad,
-            angleRad).Values;
+            angleRad,
+            Offset).Values;
 
         prog.ViewMatrix = render.CameraMatrixOriginf;
         prog.ProjectionMatrix = render.CurrentProjectionMatrix;

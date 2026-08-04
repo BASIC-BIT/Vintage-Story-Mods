@@ -1,0 +1,110 @@
+{
+  "//": "The head sheave at the outboard end of a tension station's crossarm: the counterweight's rope comes up the guide leg, over this sheave, and away west as the tie rod to the return wheel. The sheave's centre is chosen rather than drawn - at (12, 21.7) with radius 4 its top tangent lands on the lay shaft and its west tangent lands on the guide's own hanger column, so both ends of the wrap terminate on members that already exist. That is what makes the counterweight read as pulling the wheel rather than as a rock parked beside a tower.",
+  "code": "tensionhead",
+  "behaviors": [
+    {
+      "name": "HorizontalOrientable"
+    }
+  ],
+  "variantgroups": [
+    {
+      "code": "side",
+      "states": [
+        "north",
+        "east",
+        "south",
+        "west"
+      ]
+    }
+  ],
+  "shapeByType": {
+    "*-north": {
+      "base": "ropeway:block/tensionhead",
+      "rotateY": 0
+    },
+    "*-east": {
+      "base": "ropeway:block/tensionhead",
+      "rotateY": 270
+    },
+    "*-south": {
+      "base": "ropeway:block/tensionhead",
+      "rotateY": 180
+    },
+    "*-west": {
+      "base": "ropeway:block/tensionhead",
+      "rotateY": 90
+    }
+  },
+  "textures": {
+    "metal": {
+      "base": "game:block/metal/sheet/iron1"
+    },
+    "rope": {
+      "base": "game:block/cloth/reedrope"
+    }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Metal",
+  "creativeinventory": {
+    "general": [
+      "*-north"
+    ],
+    "construction": [
+      "*-north"
+    ]
+  },
+  "attributes": {
+    "handbook": {
+      "groupBy": [
+        "tensionhead-*"
+      ]
+    },
+    "reinforcable": false
+  },
+  "replaceable": 500,
+  "resistance": 3.5,
+  "lightAbsorption": 0,
+  "sidesolid": {
+    "all": false
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "collisionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 1,
+    "z2": 1
+  },
+  "selectionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 1,
+    "z2": 1
+  },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/anvil",
+    "hit": "game:block/anvil",
+    "byTool": {
+      "Pickaxe": {
+        "hit": "game:block/rock-hit-pickaxe",
+        "break": "game:block/rock-break-pickaxe"
+      }
+    }
+  },
+  "guiTransform": {
+    "rotation": {
+      "x": -22.6,
+      "y": 45,
+      "z": 0
+    },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

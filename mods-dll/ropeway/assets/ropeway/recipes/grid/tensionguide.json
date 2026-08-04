@@ -1,0 +1,26 @@
+{
+  "//": "One cell of lattice leg with the counterweight's rails and its rope. Two per craft, same as the drive leg's.",
+  "ingredientPattern": "SPS,PRP",
+  "ingredients": {
+    "S": {
+      "type": "item",
+      "code": "game:stick"
+    },
+    "P": {
+      "type": "item",
+      "code": "game:metalplate-*",
+      "name": "metal"
+    },
+    "R": {
+      "type": "item",
+      "code": "game:rope"
+    }
+  },
+  "width": 3,
+  "height": 2,
+  "output": {
+    "type": "block",
+    "code": "tensionguide",
+    "quantity": 2
+  }
+}

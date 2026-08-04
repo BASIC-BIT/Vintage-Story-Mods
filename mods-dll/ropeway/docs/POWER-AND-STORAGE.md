@@ -38,24 +38,41 @@ wearing one name; they have been separated.
 
 ## What the tension weight is now
 
-`ropeway:tensionweight` is a **tensioner**: a build requirement for a line, one block, standing within
-eight blocks of any tower on it. It holds no charge, has no gauge and no capacity, is not a mechanical
-power node, and is not bound to anything.
+`ropeway:tensionweight` is a **tensioner**: cell `[3,0,0]` of a `ropeway:tensionstation`, at the foot of that
+tower's machine leg. It holds no charge, has no gauge and no capacity, is not a mechanical power node, has
+no block class and no block entity, and is not bound to anything.
 
 - **It is a build requirement, not a runtime state**, and the check is at **cabin placement**:
-  *a line needs one tension weight to keep the rope taut, and will not take a cabin without it.* One
-  sentence, told once, while the player is building — rather than a refusal state with a message, a toast
-  and a wait attached. Break the weight afterwards and the cabin keeps running; the tower panel says the
-  tensioner is missing.
-- **Proximity at lookup time, never a persisted binding.** `BETensionWeight.OnLine` asks whether any loaded
-  weight stands within its own `towerRadius` of any tower on the line. That deletes `AnchorTower`, `Bind`,
-  the `UnlinkAll` re-bind, the orphan and spare block-info lines, `StoreAt`, and the one-weight-per-line
-  placement refusal — with them go review findings **F4, F6 and F7**, which were all consequences of
-  binding a block to one tower at placement.
-- **The mass moved into the shape.** It used to be chunk mesh drawn by the block entity at a height that
-  *was* the charge gauge. It is now a static element hanging near the bottom of its guide, on a rod up to
-  the head beam, which is where a rope tensioner rests and what makes it read as hanging rather than as a
-  rock sitting on a pad. The block entity draws nothing and exists only to register the block's position.
+  *a line will not carry a cabin until one of its towers is a completed tension station.* One sentence, told
+  once, while the player is building — rather than a refusal state with a message, a toast and a wait
+  attached. Break the station afterwards and the cabin keeps running; the tower panel says the tensioner is
+  missing.
+- **Membership, not proximity (2026-08-04).** The rule was *any loaded weight standing within its own
+  `towerRadius` of any tower on the line*, which needed `LoadedWeights`, `Nearest`, `NearAnyTower`, a block
+  entity on the weight whose only job was to register itself in that table, and a placement refusal to keep
+  the block off a random hillside. `BEPylonBase.HasTensioner` is now `IsTensioner && StructureComplete` over
+  `line.Towers` — a walk over a list the caller already holds — and all of that is deleted, along with
+  `BETensionWeight.cs` and `BlockTensionWeight.cs` entirely. Three things improve for free.
+  **`StructureComplete` gates it**, which proximity could not express at all, so a half-built tension
+  station is not a tensioner and the tower's own overlay says which cells are missing. **It is visible**:
+  "which tower tensions this line" was previously unanswerable by looking at the world. And **tensioning the
+  wrong line by accident is CLOSED** — two lines passing within eight blocks of one weight both used to
+  count it. Membership narrowed that to one residue (two tension stations sharing a machine leg, because
+  `MultiblockStructure` has no notion of ownership), and `BEPylonBase.OwnTheHeadCell` closed the residue by
+  narrowing `ropeway:tensionhead-*` to the footing's own side before `InitForUse`. Exactly the drive's
+  residue below and exactly the same fix; both are derived in
+  [KNOWN-ISSUES.md](KNOWN-ISSUES.md) under "One machine leg, one station". Review findings **F4, F6 and
+  F7** stay closed and their reason gets stronger — "it is a cell of a structure" rather than "it is asked
+  at lookup time".
+- **The mass moved into the shape, and then into one cell.** It used to be chunk mesh drawn by the block
+  entity at a height that *was* the charge gauge. It is a static element hanging near the bottom of its
+  guide, which is where a rope tensioner rests. The guide rails and the rod above it reached three cells up
+  out of a one-cell block with nothing checking the headroom (**F10**); they are now
+  `ropeway:tensionguide`, three real cells the station's multiblock check requires, and the head beam is
+  `ropeway:tensionhead` on the crossarm end. So the headroom is checked by construction, and the rope leaves
+  the head sheave on tangents that land on the lay shaft at one end and the guide's own hanger column at the
+  other — which is what makes the counterweight read as pulling the return wheel rather than as a rock
+  parked beside a tower.
 
 ## The speed ladder, read from vanilla
 
@@ -124,52 +141,60 @@ HaulResistance × (1 + 0.5·max(0,climb) + cargo)    when a cabin is trying to m
 - Descending is clamped to level. Gravity assisting a descent is real, but a negative resistance is a
   ropeway that drives the network.
 
-**Every drive housing declares the same load**, not a share of it. A share would have to be divided by how
+**Every drive station declares the same load**, not a share of it. A share would have to be divided by how
 many other drives are powered — a number that changes when somebody walks away and a chunk unloads, which is
 the coupling this design refuses to have. Each drive pulls its own weight and their speeds add.
 
-## The drive housing — where power enters (2026-08-03)
+## The drive station — where power enters (2026-08-04)
 
-**The consumer is `ropeway:drivehousing`, a separate block standing within eight blocks of any tower on the
-line — and nearer to that line's towers than to any other's.** Placement asks only for *a* tower in range;
-which line it then drives is decided by the **single nearest footing that is on a line** — a bare unlinked
-footing is skipped, however close it stands. The two are not the same rule and the player-facing text has to
-say both. It carries the `MPConsumer`, declares the haul load, and the line's speed pools over housings. The
-footing stays what it was: the controller, the multiblock owner, the span owner, the name holder. It is
-usually on the ground and it does not have to be — see the sphere, below, which is what makes a windmill
-hookup possible at all.
+**The consumer is `ropeway:drivehousing`, cell `[3,0,0]` of a `ropeway:drivestation`**: the foot of that
+tower's machine leg, on the ground, inside the tower's own footprint. It carries the `MPConsumer`, and the
+line's speed pools over drive stations. The footing stays what it was — the controller, the multiblock
+owner, the span owner, the name holder — and it now also owns the intake, at an offset its own JSON names.
 
-**How it binds to a line: proximity at lookup time**, within its own `towerRadius` (8, the tension weight's
-number). Nothing is persisted at placement, so nothing can come unbound — break the tower a housing was
-built beside and it drives the line of whichever footing **that is on a line** is nearest it next.
-`BlockTensionWeight.NearestTower` is the shared helper and `Nearest` is the shared metric, so the tensioner
-and the drive agree about how far "beside the line" reaches.
+**Which line it drives is a STRUCTURAL fact.** `BEPylonBase.Intake` scans the footing's own
+`TransformedOffsets` for the block number `driveIntakeCell` names and takes the block entity at that offset.
+One block-accessor call, already rotated for the tower's facing, with no radius, no candidate scan, no
+acceptance predicate and no tie-break. `DriveSpeedOn` then walks `line.Towers` and reads each station's
+intake, where it used to scan a table of every loaded housing asking each one which footing was nearest it.
 
-**They do not ask the same question, and an earlier version of this section said they did.** The tensioner
-asks `NearAnyTower` — is any tower of this line in range — and the housing asked it too, which is true of
-*every* line with a tower nearby. Its load declaration meanwhile asked for the single nearest footing
-overall, so two lines whose towers passed within eight blocks of one housing both read its full pooled speed
-while only one of them was ever charged `HaulResistance`: one mill hauling two cabins for the price of one,
-which is precisely the free speed `PoolSpeed` exists to refuse. `BEDriveHousing.Serves` now routes through
-one `ServingTower` accessor on `NearestTower`, so the speed and the load answer the same question by
-construction. The asymmetry is the point rather than an oversight — a tensioner only has to *certify* that a
-line has one, which any weight in reach can do, while a drive has to be the drive of exactly one line.
-`RopewayPowerTests.AHousingDrivesTheOneLineItsNearestFootingIsOn` pins both halves.
+**What that replaced, stated once so nobody rebuilds it.** The housing stood free within an eight-block
+sphere and answered "which line am I on" at lookup time. That needed: `LoadedHousings` kept in step with
+chunk loads; `ServingTower` walking every loaded footing; a predicate demanding the footing resolve to a
+real line, because a bare footing dropped while scouting could otherwise steal the housing; a `ComparePos`
+tie-break so two equidistant footings could not make the server and a client disagree about which rope was
+turning; `Serves`; a placement refusal; and a `towerRadius` attribute. Two lines passing within eight blocks
+of one housing was a real configuration with a real wrong answer. **None of those questions exists once the
+housing is a cell of exactly one station**, and every one of those members is deleted.
 
-**The eight blocks are a SPHERE, and that is now load-bearing rather than incidental.**
-`BlockTensionWeight.Nearest` squares `dy` alongside `dx` and `dz` and compares against `radius * radius`
-with the boundary inclusive, so height counts exactly as much as distance across the ground and a housing
-may sit *above* a footing as readily as beside it. That was inherited from the tensioner, where it never
-mattered; it matters here, because a windmill rotor cannot stand at ground level (below) and the only way
-the axle run into the housing stays horizontal is for the housing to climb with the hub. `LoadedTowers` is
-keyed by the ground-placed footing, so on flat ground the `dy` in that expression is exactly the height
-above the tower's own first block. The envelope, since the handbook now quotes parts of it: **+6 with up to
-5 blocks of horizontal offset**, +7 with up to 3, +8 only directly above the footing (`64 <= 64`, exactly on
-the boundary), nothing at all at +9 or higher. A raised housing must also miss the tower's own fifteen
-multiblock cells, which in practice means offsetting along the passage axis rather than along the crossarm.
+**"A cell of exactly one station" is now the code as well as the design (2026-08-04).**
+`MultiblockStructure` has no notion of ownership — `InCompleteBlockCount` asks only whether the block at each
+offset matches a wildcard, and nothing anywhere asks whether some other footing is already claiming that
+cell. For one round that put the two-lines-off-one-mill answer back at three geometries: a second station
+**4.243 blocks away on a perpendicular facing** (either side) or **six on the opposite one** shared the whole
+machine leg and both validated off it. `BEPylonBase.OwnTheHeadCell` narrows the leg's one facing-carrying
+cell — `ropeway:drivehead-*` / `ropeway:tensionhead-*` — to the footing's own side before `InitForUse`, and a
+shared head can face one way, so it satisfies one station. All three geometries are gone, re-derived, and
+`ASharedMachineLegSatisfiesAtMostOneStation` enumerates them. The **spacing rule that stood in for the fix is
+retired** — the derivation, and what remains (two towers may still share a leg of logs, as two plain towers
+always could), are in [KNOWN-ISSUES.md](KNOWN-ISSUES.md) under "One machine leg, one station".
 
-**Placement refuses rather than sitting inert.** No tower inside 8 blocks →
-`placefailure-ropewaynodrivetower`.
+**The eight-block sphere is gone, and with it the raised housing.** `Nearest` squared `dy` alongside `dx`
+and `dz`, which was what let a housing climb to a windmill's hub and keep the axle run horizontal. The
+intake is now at a fixed cell, so it cannot climb — see the honest cost below. What the sphere's removal
+buys back is that there is **no placement envelope at all**: a maxed metal rotor could not meet the sphere
+from any position (`121 > 64`) and needed a descent regardless, and now no mill has a placement constraint.
+
+**`ropeway:driveshaft` is the one block of the tower with `sidesolid: all true`**, and that is the line that
+deletes the mandatory scaffold. Vanilla refuses an angled gear beside an unsupported axle, and every other
+block of a tower ships `sidesolid: all false`, so a vertical axle column could not lean on the tower it
+served and the player had to build a wall first. The drive leg is that wall, at exactly the column where
+power is supposed to touch the tower. `sideopaque` stays false and `lightAbsorption` stays 0, so the leg is
+still see-through and casts no shade, and it has no effect on spans — `SpanMath.RopewayBlockFilter` returns
+false for `Code.Domain == "ropeway"` before it ever looks at `SideSolid`.
+
+**There is no placement refusal any more.** A housing built anywhere else simply drives nothing, which needs
+no rule, cannot be got wrong halfway through a build, and is said by the block's own panel.
 
 **It takes an axle on any HORIZONTAL face**, and that is the fix rather than a simplification. The trial's
 bullwheel accepted power from either end *along the line*, which at sheave height is the haul rope's own
@@ -180,10 +205,10 @@ faces are where vanilla axle runs already live. `BlockMPBase.WasPlaced(world, po
 which is now exactly and only the set this block connects on — so the "documented entry the auto-connect
 cannot see" failure the crossarm hookup carried does not exist here either.
 
-**What horizontal-only costs, stated once: one angled gear, and only where the housing sits below the
-rotor.** A `woodenaxle-ud` column cannot terminate on the housing's roof, so a descent is two gears and
-N−1 axles rather than one gear and N. The water wheel and the raised-housing windmill pay nothing, because
-their runs never leave the horizontal. Worth it, on the same argument the rule exists for.
+**What horizontal-only costs, stated once: one angled gear, and now on every windmill.** A `woodenaxle-ud`
+column cannot terminate on the housing's roof, so a descent is two gears and N−1 axles rather than one gear
+and N. The water wheel still pays nothing, because its run never leaves the horizontal. The raised-housing
+windmill used to pay nothing either, and that layout is gone with the sphere.
 
 **No `side` variant.** Every horizontal face connects, so orientation decides nothing — and a block with no
 orientation cannot be placed ninety degrees out.
@@ -216,16 +241,17 @@ dropped. Clearance is counted in blocks, not altitude — a trench does as well 
 cannot be read two ways; a height is only meaningful against a stated datum, and every off-by-one in this
 area is somebody reading one datum where another was meant. The second column exists for the arithmetic
 below and not for the handbook: its datum is the **footing block**, because that is what `LoadedTowers` is
-keyed by and therefore exactly the `dy` the eight-block sphere squares. Against the ground *surface* the
-same hub is one cell higher again — the footing itself is a block, and it stands on the ground rather than
-in it.
+keyed by. Against the ground *surface* the same hub is one cell higher again — the footing itself is a
+block, and it stands on the ground rather than in it. **The height column is now a descent, not a
+placement.** With the intake at a fixed cell there is no hub height the housing can rise to meet, so what
+this table gives is how far the axle run has to come down the outside of the drive leg.
 
-Three real hookups follow from that.
+Two real hookups follow from that.
 
 **Water wheel — three blocks, on the ground, nothing to climb, and it is the expensive one.** The wheel
 drives an axle out of *either* end of its own axis and its hub sits at most one block above the water
-surface, so a housing on the bank at hub height takes a straight `woodenaxle-we` run of two or three and
-nothing else. **It is not the easy example the review nominated.** `BEBehaviorMPWaterWheel.CheckWater`
+surface, so a straight `woodenaxle-we` run of two or three from the bank into the intake is the whole
+hookup. It is the one drive the fixed intake costs nothing at all. **It is not the easy example the review nominated.** `BEBehaviorMPWaterWheel.CheckWater`
 counts a ring cell only when `flowSpeed > requiresMinFlowSpeed` (1.5), and only `rapidwater` declares one
 (2) — plain `water` has no `flowSpeed` key at all, so **ordinary water never turns a wheel in 1.22.1**.
 Rapid water is worldgen-only, ~5% in mountain-side rivulets, and vanilla's own handbook says players cannot
@@ -233,71 +259,88 @@ place it. The block is a six-stage `RightClickConstructable` costing 32 support 
 and 8 nails-and-strips, on top of a craft needing two iron 4-way hubs. One size, 3m, one cell, with 8 ring
 cells that must be non-solid.
 
-**Wooden windmill — three blocks, and the housing climbs with the mill.** Four clear blocks under the hub
-for three sails, six for a maxed five, which is +4 and +6 above the footing. Put the rotor's axle along the
-tower's passage axis so the sail disc can never contain a
-tower cell, and stand the housing at hub height:
+**Windmill — the mill comes down the leg, and this is the price of the change.** Four clear blocks under the
+hub for three sails, six for a maxed five, eleven for a maxed metal ten, and the intake is at +0. Put the
+rotor's axle along the tower's passage axis so the sail disc can never contain a tower cell, then run down
+the outside of the drive leg:
 
-| what | where, footing-relative | count |
-|---|---|---|
-| `windmillrotor-wood-*` | hub at +6, disc in the plane square to its axle | — |
-| `woodenaxle-{ns,we}` | 2 cells at hub height, on the axle axis | 2 |
-| `ropeway:drivehousing` | dy 6, dz 2 → `36 + 4 = 40 ≤ 64` | 1 |
-| | | **3 between the mill and the line** |
+| what | where, footing-relative | 3 sails | 5 sails | 10 sails |
+|---|---|---|---|---|
+| `windmillrotor-*` | hub at +4 / +6 / +11, disc square to its axle | — | — | — |
+| `angledgears` | at the hub, turning the run vertical | 1 | 1 | 1 |
+| `woodenaxle-ud` | down the outside of the drive leg, leaning on it | 4 | 6 | 11 |
+| `angledgears` | at the bottom, turning it back horizontal | 1 | 1 | 1 |
+| `woodenaxle-{ns,we}` | into any of the housing's four sides | 1 | 1 | 1 |
+| | | **~7** | **~9** | **~14** |
 
-The housing, whatever holds it up and every axle between it and the hub sit **on the axle axis**, which
-`obstructed` never scans. Nothing in the drive train can obstruct the mill it drives — that is why this
-layout closes rather than fighting itself.
+The column leans on `ropeway:driveshaft`, which is the only reason those builds close at all — every other
+block of a tower is `sidesolid: all false`, and an unsupported `ud` column refuses its angled gear. Nothing
+in the drive train can obstruct the mill it drives: the rotor's axle axis is the one direction `obstructed`
+never scans, and the whole descent is behind the rotor on that axis.
 
-**Maxed metal rotor — the column is back, and shorter.** Eleven clear blocks every way puts the hub at +11
-above the footing, which gives `121 > 64` before any
-horizontal term, so no housing can meet it at its own height and power has to come down: `angledgears` at
-the hub, 3 × `woodenaxle-ud`, a second `angledgears` beside a housing at dy 7 / dz 2 (`53 ≤ 64`). **Five
-vanilla blocks**, plus a wall beside the `ud` column. A four-block version exists — housing at dy 8
-straight above the footing, exactly on the radius boundary, hanging over the crossarm — and it is legal and
-should not be what the handbook draws.
+**It was sixteen, then it was three with a floating housing, and it is now a plain shaft down the outside
+of the drive leg.** All three numbers are true of different builds and the middle one is the one that no
+longer exists. The trial put the intake on the bullwheel four blocks up, so every drive paid a five-log
+support column, four vertical axles, a run back across the crossarm and three angled gears — and the support
+column was mandatory because nothing on the tower was solid. The free-standing housing bought that down to
+three blocks for a water wheel or a wooden rotor, by letting the intake climb to meet the hub, and paid for
+it in binding: a table, a nearest-footing scan, a line-resolving predicate and a positional tie-break, with
+a real wrong answer where two lines passed close together. **Fixing the intake to a cell hands the descent
+back and takes the binding away**, and it buys two things: no mill has a placement constraint any more (the
+maxed metal rotor could never meet the sphere at all), and the scaffold is gone for *every* drive rather
+than only the gearless ones, because the leg is the wall. Rendered at
+`docs/agentic/ingest/cablecar/renders/station/drive/` — `textured/right.png` is the elevation that shows the
+shaft running unbroken from the gearbox to the wheel hub. The older `renders/drive/` scene is the
+free-standing housing and is kept only as the record of what it looked like.
 
-**It was sixteen, and it is three for the drives that can meet the housing at their own height.** The trial
-put the intake on the bullwheel, four blocks above the footing, so *every* drive paid a five-log support column, four
-vertical axles, a four-block run back across the crossarm and three angled gears. A water wheel or a wooden
-rotor now pays none of that. **The maxed metal rotor still pays some of it, and this is the claim to keep
-honest:** it needs eleven clear blocks under its hub whatever the intake does, so it descends through two gears and three
-vertical axles either way — the drop is 11 → 7 instead of the old 11 → 4, which is one or two fewer
-`woodenaxle-ud` and the same two gears. What the ground housing **deleted** is the scaffold the *tower* had
-to carry: nothing is built on the crossarm and nothing climbs the tower. What it **reduced** is the descent
-from a mill that has to stand high to turn at all. Rendered at
-`docs/agentic/ingest/cablecar/renders/drive/` — compare `textured/isometric.png` against the sixteen-block
-version the review looked at. **That render is stale in one respect and is kept anyway:** its scene
-(`renders/scenes/drive/manifest.json`) stands the rotor, both axles and the housing at footing height,
-which is the ground-level windmill the clearance rule below rules out. It is right about what the *drive
-train* costs — the count this section is making — and wrong about how high the whole assembly sits. Read it
-for the three blocks, not for the altitude.
-
-**The build-order dead end went with it for the gearless layouts only.**
+**The build-order dead end is closed for every drive.**
 `BlockAngledGears.TryPlaceBlock` refuses to sit beside an axle that fails `IsAttachedToBlock`, which is what
-forced one legal build order and dead-ended the documented one. There is no angled gear in the water-wheel
-build or in a wooden-rotor build whose housing rides up to hub height, and
-`BEBehaviorMPAxle.IsAttachedToBlock` passes a ground-level `we` axle on the block *below* it — the ground.
-The metal descent
-has the rule back: a `woodenaxle-ud` column needs a horizontally adjacent solid side, and the tower's own
-blocks are all `sidesolid: all false`, so it cannot lean on the tower it serves. Build the wall first. (A
+forced one legal build order and dead-ended the documented one. A `woodenaxle-ud` column needs a
+horizontally adjacent solid side, and it now has one: `ropeway:driveshaft` ships `sidesolid: all true` and
+runs the full height of the leg the column comes down. That is the wall, already built, in the one place a
+column wants it. (A
 bottom gear placed beside an already-built housing happens to skip the check, because `ALLFACES` walks
 horizontals first and finds the housing before it looks up at the axle. That is a build-order accident, not
 a licence — `BlockAxle.OnNeighbourBlockChange` breaks an unattached axle that loses its support.)
 
-## The bullwheel — decoration that turns
+## The bullwheel — the wheel a station turns
 
-The bullwheel survives as an **accepted alternative to the pylon head** on the crossarm's centre cell
-(`pylonbase.json`'s `multiblockStructure` matches either for block number 1), so a drive tower is still the
-same sixteen cells. It is **purely cosmetic**: no `entityBehaviors`, no `MPConsumer`, no network membership,
-no resistance. Its block has no `class` at all — it was a `BlockMPBase`, and with the intake gone the
-subclass was empty.
+The bullwheel is the **centre cell of a station's crossarm**, on both `drivestation.json` and
+`tensionstation.json`, and a plain `pylonbase` now wants the plain sheave and nothing else. It was an
+accepted alternative on any tower while it was decoration that happened to spin; accepting one on a plain
+tower would now put a wheel joined to nothing on a tower that drives nothing. It is still not a mechanical
+power node: no `entityBehaviors`, no `MPConsumer`, no network membership, no resistance, and no `class` at
+all — it was a `BlockMPBase`, and with the intake gone the subclass was empty.
 
-**It turns.** That is the whole reason it survived. The review measured the wheel's silhouette against the
-pylon head's and found them near-identical at any real distance, so a *still* wheel marked nothing; what
-actually marked a drive tower was the scaffold. `BEBullwheel` polls the line's pooled drive speed every 500
-ms and `BullwheelRenderer` integrates it into an angle — revolutions per second, so a stopped line is a
-stopped wheel.
+**It turns.** That is the whole reason it survived the trial. The review measured the wheel's silhouette
+against the pylon head's and found them near-identical at any real distance, so a *still* wheel marked
+nothing; what actually marked a drive tower was the scaffold. `BEBullwheel` polls the line's pooled drive
+speed every 500 ms and `BullwheelRenderer` integrates it into an angle — revolutions per second, so a
+stopped line is a stopped wheel.
+
+**And it is now visibly driven rather than visibly spinning.** The complaint was that it *"floats with
+nothing joining it"*: `driveboss` is a 3×3 stub topping out at y 16 under a rim whose resting bottom is
+16.685, so the wheel balanced on a pinhead and was joined to nothing. Three elements fix it and they are the
+same three that receive the drive. Two **bearing standards** rise out of the existing `sheavecheek` plates
+at y 15 and flank the rim, and a **`hubaxle`** at y 24.7–26.7 — the rim's own rotation centre, so it *is*
+the axle the rim turns about — runs the full width of the cell to meet the `layshaft` in the next cell east
+with no seam. It is thinner than the rim's own hub bore (y 23.5–27.9, z 5.8–10.2) and buried inside both
+bearing caps, so no face of it is ever coplanar with the turning mesh. `driveboss` stays: it is under the
+rim, between the standards, and removing it would be a change with no visible effect.
+
+**The visible train, drive station, bottom to top.** `drivehousing` (the intake, on the ground) → three
+`driveshaft` lattice cells with the vertical shaft inside them → `drivehead`, the bevel gearbox on the
+crossarm end → two `layshaft` cells → the bullwheel's hub. Every one of those is a block a player can point
+at, and the shaft is one unbroken line at one height — 25.7 in the crossarm cell's own units — from the
+gearbox to the wheel. The tension station mirrors it: `tensionweight` → three `tensionguide` cells →
+`tensionhead`, a sheave whose top tangent is that same 25.7 and whose west tangent is the guide's own hanger
+column → two `layshaft` cells as a tie rod → the return wheel's carriage. `ropeway:layshaft` is deliberately
+one block used by both: on the drive it turns and on the tensioner it pulls, and at 16 pixels those are the
+same forged bar on the same standards.
+
+**Nothing in the drive train is within 8 units of the rope or the cabin.** The shaft runs along local X at
+25.7 and the haul rope runs along local Z at 8 — `SpanMath.AnchorOf`, the cell centre — so they cross only
+at the wheel and are 17.7 units apart vertically.
 
 **Why a plain `IRenderer` and not `MechBlockRenderer`.** `mods-dll/flywheelpower`'s
 `FlywheelMechBlockRenderer` is an *instanced* renderer registered with `MechanicalPowerMod` and driven
@@ -313,41 +356,56 @@ crossarm, just clear of the sheave's drive boss — 18 units across, a full bloc
 rim's resting bottom to 16.685 against a `driveboss` topping out at y 16, so it now floats 0.685 unit —
 0.043 blocks — above it. Sub-pixel at any distance a player will see it from, and not worth code. It is a separate shape
 from `bullwheel.json` so the chunk tesselator keeps drawing the static half with normal chunk lighting.
-It is authored **above** the block cell, never in it: the sheave throat is where the cabin's hanger blade
-rides at every tower, and a wheel authored down into it is a cabin that catches with nothing to say so.
-`TheTurningWheelStaysAboveTheCellTheCabinPassesThrough` is the assert.
+It is authored **above** the block cell: the sheave throat is where the cabin's hanger blade rides at every
+tower, and a wheel authored down into it is a cabin that catches with nothing to say so. At a **terminal**
+the renderer carries it one cell out along the dead side and `BullwheelRenderer.WrapDrop` down so the rope
+wraps it, and there it does enter that cell's airspace — on the side of the tower nothing ever passes.
+`TheWrappedWheelClearsACabinAtEveryPositionTheCabinCanReach` is the assert, in both poses.
 
-**Not fixed, and named:** the wheel is still `HorizontalOrientable`, so one placed while facing the wrong
-way validates the tower with its throat and station rails running across the line. The pylon head has had
-exactly the same looseness since the pattern was written; the fix is to orient the crossarm's centre cell
-from the footing below it for **both** blocks in one place, and a private rule on the decorative half would
-leave the bug and add a rule.
+**Not fixed, and named — and it got worse before it gets better.** The wheel is still `HorizontalOrientable`,
+so one placed while facing the wrong way validates the tower with its throat and station rails running
+across the line, and now with its hub axle pointing at the braces rather than at the lay shaft. `layshaft`,
+`drivehead` and `tensionhead` inherit it, so the count goes 2 → 5. The fix is unchanged and is still one fix
+in one place: orient the crossarm cells from the footing below them, for all of them at once. It is worth
+doing at five where it was not at two.
 
-## Power may be supplied ANYWHERE beside the line, and pools
+## Power may be supplied at ANY drive station on the line, and pools
 
-Unchanged where it counts: `BEPylonBase.DriveSpeedOn` sums `TrueSpeed` over the loaded **drive housings**
-standing beside the line, **one term per mechanical network** (`RopewayPower.PoolSpeed`, keyed on
-`MechanicalNetwork.networkId`). That is the whole of the pooling — addition does not care about order, and a
-housing whose chunk unloads simply stops contributing. `PoolSpeed` itself did not change; only the source of
-the `(networkId, speed)` pairs moved, for the second time.
+Unchanged where it counts: `BEPylonBase.DriveSpeedOn` sums `TrueSpeed` over the line's **drive stations**,
+**one term per mechanical network** (`RopewayPower.PoolSpeed`, keyed on `MechanicalNetwork.networkId`). That
+is the whole of the pooling — addition does not care about order, and a station whose chunk unloads simply
+stops contributing. `PoolSpeed` itself did not change; only the source of the `(networkId, speed)` pairs
+moved, for the third time.
 
-It is scanned over the housing table rather than walked from the towers, because a housing has no tower to
-be indexed under — the one it answers to is resolved from its own position at lookup time. Same shape as
-`BETensionWeight.OnLine`, same reason. Not the same predicate: the tensioner takes any tower of the line in
-range and the housing takes the single nearest footing **that is on a line**, per "The drive housing — where
-power enters" above, which states the same rule.
+**It is now a WALK of `line.Towers` rather than a scan of a table**, which is the whole of the 2026-08-04
+change here. A housing bound by proximity had no tower to be indexed under, so the pool had to be gathered
+from a table of every loaded housing and each one asked which line it was on; a housing that is a cell of a
+station is reached from the footing at a known offset. The tensioner's own question went the same way and
+now asks the *same* table, which narrows the band it can lie in — but **"no tensioner" and `line.Truncated`
+do NOT coincide exactly**, and an earlier version of this paragraph said they did. `HasTensioner` gates on
+`StructureComplete`, which is fifteen `GetBlockRaw` reads, and `BlockAccessorRelaxed` hands back air for an
+unloaded chunk, so a loaded footing whose own leg is three blocks away across an unloaded chunk boundary
+reads incomplete while `MarkLoadedEnds` — which only inspects the two ends of the walked chain — sees nothing
+wrong. Same three-block residue `DriveSpeedOn` carries. `TryPlaceCabin` therefore asks `line.Truncated`
+**first** and answers with the honest "part of that line is not loaded" whenever it applies.
 
 The per-network key is load-bearing rather than tidiness. `TrueSpeed` is `|Network.Speed × GearedRatio|`, so
-two housings tapped off one axle run are two windows onto the same turning shaft. Summing per hookup let a
+two stations tapped off one axle run are two windows onto the same turning shaft. Summing per hookup let a
 player buy speed with axles: each hookup also declares `HaulResistance` on that network, but the load only
 *subtracts* from the settling speed while the sum *multiplies* what is read — three stubs off one maxed metal
 mill read 5.6 blocks/s against a single hookup's 3.0. Adding load made the machine faster, which is the one
 thing a load model must never do. First hookup seen on a network wins; they are all looking at one rope.
 
-Two housings on **one** network are therefore not merely redundant, they are a **penalty**: each writes the
-full `HaulResistance` onto that shared network every second and `MechanicalNetwork.updateNetwork` sums
+Two drive stations on **one** network are therefore not merely redundant, they are a **penalty**: each writes
+the full `HaulResistance` onto that shared network every second and `MechanicalNetwork.updateNetwork` sums
 resistances, so the settling speed drops while the pool counts the speed once. The second one makes the line
 slower. The handbook says so now.
+
+**The load is declared by the station, not by the housing.** `BEDriveHousing` used to carry a
+`RegisterGameTickListener` purely because it had to re-answer "which line am I on" every second;
+`BEPylonBase.OnServerTick1s` already ticks at 1 s and already knows, so the listener is a deletion rather
+than a move. It early-returns on a footing with no intake cell, which is every tower but one or two per
+line, so the scan of loaded entities `FindOn` does never runs on a plain tower.
 
 Two mills on separate networks are a visibly faster cabin. Historically defensible too: intermediate drive
 stations are real on long ropeways, because driving a continuous haul loop anywhere along its length drives
@@ -374,9 +432,13 @@ radius, not the loaded radius:
 So the stock window is `min(12, ceil(256/32))` = **8 chunks = 256 blocks**, against a line that may be 320.
 **A line can be longer than the window it is loaded in, and a drive at the far end of one can be dark.**
 From the *middle* of a full-length line each end is 160 away and everything holds; from one **end** of one,
-the far end is 320 away and outside the window. A housing beside that far end is not in `LoadedHousings`,
+the far end is 320 away and outside the window. A drive station at that far end is not in `LoadedTowers`,
 so it contributes nothing to `DriveSpeedOn`, and the line reads as having no drive at all — a cabin that
-will not start, beside a message telling the player to build the thing they have already built. Every view
+will not start, beside a message telling the player to build the thing they have already built. The band
+this used to describe was wider: a free-standing housing could be up to eight blocks from its own footing
+and a chunk boundary between them made the footing lit and the housing dark on a chain that was not
+truncated. The intake is a cell of the tower now, so that gap is three blocks instead of eight — narrower,
+and still not closed, because a chunk boundary can fall anywhere. Every view
 distance below 256 makes the window smaller; a singleplayer slider above 320 makes the problem vanish.
 
 What the cap does buy is a **shorter** line: at stock settings anything under about 256 blocks end to end
@@ -385,8 +447,7 @@ likelihood, not a guarantee, and the docs used to state it as a guarantee. The s
 the truncated-line class (`KNOWN-ISSUES.md` R1–R4), which is mitigated by the cap and not closed by it.
 
 The 384 figure was repeated in code and asset comments as well as here — `pylonbase.json`'s
-`//maxLineLength`, `BEPylonBase.DriveSpeedOn`, `BETensionWeight` — and those are the places a future reader
-will trust. Anything that says a line fits inside the loaded window wants the same correction.
+`//maxLineLength` and `BEPylonBase.DriveSpeedOn` — and those are the places a future reader will trust. Anything that says a line fits inside the loaded window wants the same correction.
 
 ## Transmitting power along the cable: RECORDED, NOT BUILT
 

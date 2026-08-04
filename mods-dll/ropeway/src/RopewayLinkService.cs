@@ -389,7 +389,64 @@ public sealed class RopewayLinkService
             Lang.Get("ropeway:span-linked", DisplayName(beTo, to.X - from.X, to.Z - from.Z), (int)Math.Round(span), cost),
             EnumChatType.Notification);
 
+        // Either end of the new span may have just become a corner, so both are asked.
+        WarnOnCorner(player, beFrom, from, to);
+        WarnOnCorner(player, beTo, to, from);
+
         return true;
+    }
+
+    /// <summary>
+    /// One chat line when a tower has just become a corner the cabin cannot pass cleanly. WARN, NEVER REFUSE:
+    /// the route is legal, buildable and works, players build ugly corners on purpose, and refusing one for a
+    /// cosmetic reason turns a shrug into a wall. It runs AFTER the mutation because a corner only exists
+    /// once the second span does.
+    /// <para>
+    /// The bisector is read out of <see cref="RopewayLine.DirectionAt"/> at the vertex rather than derived
+    /// here, so the direction the message talks about is by construction the direction the cabin actually
+    /// takes through the tower. A three-tower mini-line is enough for that and needs no world access.
+    /// </para>
+    /// <para>
+    /// TWO messages because there are two different answers. Under 90 degrees of turn a cardinal facing
+    /// usually exists that carries the corner, and naming it is something the player can act on in one block
+    /// break. At and past 90 the best of four cardinals is still outside
+    /// <see cref="SpanMath.CornerTolerance"/>, so there is nothing to turn the footing to and saying "face it
+    /// east" would be advice that does not work. This is the closure `KNOWN-ISSUES` and `TURNING-SPEC` §7 both
+    /// name as the cheap one: psi is what owns the tolerance, nothing else in the mod ever mentions psi, and
+    /// no curve, radius or cabin length changes it.
+    /// </para>
+    /// </summary>
+    private void WarnOnCorner(IServerPlayer player, BEPylonBase tower, BlockPos pos, BlockPos peer)
+    {
+        if (tower == null || tower.Spans.Count != 2) return;
+
+        var line = RopewayLine.FromTowers(new List<BlockPos> { tower.Spans[0], pos, tower.Spans[1] });
+        if (line == null) return;
+
+        var into = line.Anchors[1].Clone().Sub(line.Anchors[0]);
+        var outOf = line.Anchors[2].Clone().Sub(line.Anchors[1]);
+        var turn = Math.Abs(GameMath.AngleRadDistance(
+            (float)Math.Atan2(into.X, into.Z), (float)Math.Atan2(outOf.X, outOf.Z))) * GameMath.RAD2DEG;
+
+        var dir = line.DirectionAt(line.Cumulative[1]);
+        var bisector = Math.Atan2(dir.X, dir.Z);
+        var tolerance = SpanMath.CornerTolerance(turn);
+        if (SpanMath.AxisError(bisector, tower.PassageFacing) <= tolerance) return;
+
+        var best = BlockFacing.HORIZONTALS[0];
+        foreach (var facing in BlockFacing.HORIZONTALS)
+        {
+            if (SpanMath.AxisError(bisector, facing) < SpanMath.AxisError(bisector, best)) best = facing;
+        }
+
+        var name = DisplayName(tower, pos.X - peer.X, pos.Z - peer.Z);
+        var degrees = (int)Math.Round(turn);
+        player.SendMessage(
+            GlobalConstants.InfoLogChatGroup,
+            SpanMath.AxisError(bisector, best) <= tolerance
+                ? Lang.Get("ropeway:corner-facing", name, degrees, Lang.Get("game:facing-" + best.Code))
+                : Lang.Get("ropeway:corner-too-sharp", name, degrees),
+            EnumChatType.Notification);
     }
 
     /// <summary>
@@ -540,12 +597,25 @@ public sealed class RopewayLinkService
             return false;
         }
 
+        // TRUNCATION IS ASKED FIRST, and it has to be, because the tensioner answer underneath it is not
+        // trustworthy while part of the line is dark. HasTensioner needs StructureComplete, which is fifteen
+        // GetBlockRaw reads, and BlockAccessorRelaxed hands back AIR for an unloaded chunk - so the far
+        // station of a 320-block line reads "not a tensioner" from the near end at the shipped 256-block view
+        // distance. Answering that with "build a tension station" tells a player who has one to go and build
+        // a second. The honest message already existed for the link path; this is the same sentence at the
+        // one other place the truncation can lie.
+        if (line.Truncated)
+        {
+            player.SendIngameError("ropeway-line-truncated", Lang.Get("ropeway:err-line-truncated-link"));
+            return false;
+        }
+
         // THE ONE BUILD REQUIREMENT the tensioner carries, and it is enforced here rather than at departure
         // on purpose: a line with no tensioner is an unfinished line, not a line having a bad day, so it is
         // told to the player while they are building - once, at the moment they hang the cabin - instead of
-        // becoming a runtime state with a refusal, a toast and a wait attached. Break the weight afterwards
+        // becoming a runtime state with a refusal, a toast and a wait attached. Break the station afterwards
         // and the cabin keeps running; the tower panel says the tensioner is missing.
-        if (!BETensionWeight.OnLine(modSystem, line))
+        if (!BEPylonBase.HasTensioner(modSystem, line))
         {
             player.SendIngameError("ropeway-no-tensioner", Lang.Get("ropeway:err-no-tensioner"));
             return false;

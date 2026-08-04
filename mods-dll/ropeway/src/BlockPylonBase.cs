@@ -20,10 +20,18 @@ namespace Ropeway;
 /// only one of the tower's cells that is a single well-known block rather than "whatever log you used".
 /// </para>
 /// <para>
-/// It is NOT the mechanical power hookup. That is <see cref="BlockDriveHousing"/>, built on the GROUND
-/// within eight blocks of any tower on the line and bound to it by proximity at lookup time - the tension
-/// weight's pattern. The hookup spent one trial up on the crossarm's bullwheel, which cost sixteen vanilla
-/// blocks of scaffold to reach and made the tower read as two structures; see docs/POWER-AND-STORAGE.md.
+/// It is NOT the mechanical power hookup. That is <see cref="BlockDriveHousing"/>, which is a CELL of a
+/// drive station - the foot of its machine leg, on the ground - and is reached from the footing through
+/// <c>BEPylonBase.Intake</c>. The hookup spent one trial up on the crossarm's bullwheel, which cost sixteen
+/// vanilla blocks of scaffold to reach and made the tower read as two structures; see
+/// docs/POWER-AND-STORAGE.md.
+/// </para>
+/// <para>
+/// This ONE class serves all three footings - <c>ropeway:pylonbase</c>, <c>ropeway:drivestation</c> and
+/// <c>ropeway:tensionstation</c>. Nothing here branches on which: a station differs only in the
+/// <c>multiblockStructure</c> its own block carries, which <see cref="BEPylonBase"/> reads off
+/// <c>Block.Attributes</c>. That is what let stations ship with no new C# block class and no new block
+/// entity class, and it is the reason nothing in this file names a block code.
 /// </para>
 /// </summary>
 public class BlockPylonBase : Block

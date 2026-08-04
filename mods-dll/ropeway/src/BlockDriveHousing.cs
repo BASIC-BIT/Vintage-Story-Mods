@@ -5,27 +5,15 @@ using Vintagestory.GameContent.Mechanics;
 namespace Ropeway;
 
 /// <summary>
-/// The line's mechanical power intake, standing within eight blocks of any tower rather than on one. It is
-/// the machine an axle run reaches without a scaffold: two or three blocks from the mill, rather than the
-/// sixteen it took to get power up to the crossarm.
+/// The line's mechanical intake, and cell [3,0,0] of a <c>ropeway:drivestation</c> - the foot of the
+/// station's machine leg, on the ground, where axle runs already live.
 /// <para>
-/// It is NOT necessarily on the ground, which is what this comment claimed first and is wrong for every
-/// windmill. A rotor refuses its first sail unless the disc it turns in is clear every way, so even a
-/// three-sail hub stands four blocks up and a maxed wooden one six; the housing climbs to meet it and the
-/// run stays level. That layout is legal only because the eight blocks are a SPHERE -
-/// <see cref="BlockTensionWeight.Nearest"/> squares dy alongside dx and dz - and the water wheel is the one
-/// drive that really does hook up at bank level. Worked through in docs/POWER-AND-STORAGE.md.
-/// </para>
-/// <para>
-/// It replaces the bullwheel as the consumer. The wheel stayed on the crossarm as the thing you can SEE
-/// turning; this is the thing you can REACH. That split is the whole design: the intake lives where axles
-/// live, and the tell-tale lives where the rope is.
-/// </para>
-/// <para>
-/// Bound to a line by PROXIMITY at lookup time, exactly as the tension weight is - same radius attribute,
-/// same <see cref="BlockTensionWeight.NearestTower"/> helper, no second pattern. Nothing is persisted at
-/// placement, so nothing can come unbound: break the tower a housing was built beside and it simply drives
-/// whichever line is still in range.
+/// It stood FREE for one round, within an eight-block sphere of any tower, and this class carried the
+/// placement refusal that kept it there. Both are gone: a housing that is not a cell of a station simply
+/// drives nothing, which needs no rule and cannot be got wrong halfway through a build. The honest cost is
+/// that the intake no longer climbs to meet a windmill's hub - a mill four to eleven blocks up now runs an
+/// axle column down the drive leg, which <c>driveshaft</c>'s <c>sidesolid</c> is what makes possible.
+/// See docs/POWER-AND-STORAGE.md.
 /// </para>
 /// <para>
 /// No <c>side</c> variant, deliberately. The housing takes an axle on ANY horizontal face, so there is
@@ -34,15 +22,12 @@ namespace Ropeway;
 /// </summary>
 public class BlockDriveHousing : BlockMPBase
 {
-    /// <summary>How far from a tower footing this may be built, and the radius it serves a line at.</summary>
-    public double TowerRadius => Attributes?["towerRadius"].AsDouble(8) ?? 8;
-
     /// <summary>
     /// Horizontal faces only, and that is the fix rather than a simplification: the bullwheel accepted an
     /// axle from either end ALONG THE LINE, which at sheave height is the haul rope's own path and the cells
     /// the cabin's hanger travels through - the handbook was telling players to build an axle where the
-    /// cabin flies. Anywhere off the crossarm there is no rope to build across - on the ground, or up beside
-    /// a mill's hub - and horizontal faces are where vanilla axle runs already live.
+    /// cabin flies. Down at the foot of the leg there is no rope to build across, and horizontal faces are
+    /// where vanilla axle runs already live.
     /// </summary>
     public override bool HasMechPowerConnectorAt(IWorldAccessor world, BlockPos pos, BlockFacing face, BlockMPBase forBlock)
     {
@@ -51,31 +36,6 @@ public class BlockDriveHousing : BlockMPBase
 
     public override void DidConnectAt(IWorldAccessor world, BlockPos pos, BlockFacing face)
     {
-    }
-
-    /// <summary>
-    /// Refuses rather than sitting inert. A housing out in a field drives nothing, and a block that accepts
-    /// an axle and silently does nothing is the worst thing this could ship as.
-    /// <para>
-    /// ANY footing in range, deliberately - not <see cref="BEDriveHousing"/>'s stricter "nearest footing that
-    /// resolves to a line". Adding that predicate here was considered and rejected: it refuses the housing
-    /// while the line is still being built, which is the order half of the world builds in, and a lone
-    /// footing becomes a line the moment the next span is strung. The housing's own block-info panel says
-    /// <c>ropeway:housing-orphan</c> until then, which is the honest report rather than a refusal. The two
-    /// rules are allowed to differ because the placement rule only has to keep the block off a random hillside.
-    /// </para>
-    /// </summary>
-    public override bool TryPlaceBlock(IWorldAccessor world, IPlayer byPlayer, ItemStack itemstack, BlockSelection blockSel, ref string failureCode)
-    {
-        var modSystem = world?.Api?.ModLoader?.GetModSystem<RopewayModSystem>();
-
-        if (BlockTensionWeight.NearestTower(modSystem, blockSel?.Position, TowerRadius) == null)
-        {
-            failureCode = "ropewaynodrivetower";
-            return false;
-        }
-
-        return base.TryPlaceBlock(world, byPlayer, itemstack, blockSel, ref failureCode);
     }
 
     /// <summary>

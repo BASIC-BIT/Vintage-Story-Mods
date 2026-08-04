@@ -118,6 +118,63 @@
         "up": { "texture": "#metal" },
         "down": { "texture": "#metal" }
       }
+    },
+    {
+      "//": "The drive shaft column's four corner posts stopped at this cell's top face, so the machine leg stood on nothing and the whole frame read as hovering over its own base course. They carry on down here and land ON the bed, which is the foot plate - a post run to the cell floor instead would have its foot buried in the plate rather than bearing on it. Not done by reaching driveshaft.json downward out of its own cell: two of those stack in this column and would double up.",
+      "name": "anglewn",
+      "from": [ 0.0, 2.0, 0.0 ],
+      "to": [ 2.0, 16.0, 2.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal" },
+        "east": { "texture": "#metal" },
+        "south": { "texture": "#metal" },
+        "west": { "texture": "#metal" },
+        "up": { "texture": "#metal" },
+        "down": { "texture": "#metal" }
+      }
+    },
+    {
+      "name": "anglews",
+      "from": [ 0.0, 2.0, 14.0 ],
+      "to": [ 2.0, 16.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal" },
+        "east": { "texture": "#metal" },
+        "south": { "texture": "#metal" },
+        "west": { "texture": "#metal" },
+        "up": { "texture": "#metal" },
+        "down": { "texture": "#metal" }
+      }
+    },
+    {
+      "name": "angleen",
+      "from": [ 14.0, 2.0, 0.0 ],
+      "to": [ 16.0, 16.0, 2.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal" },
+        "east": { "texture": "#metal" },
+        "south": { "texture": "#metal" },
+        "west": { "texture": "#metal" },
+        "up": { "texture": "#metal" },
+        "down": { "texture": "#metal" }
+      }
+    },
+    {
+      "name": "anglees",
+      "from": [ 14.0, 2.0, 14.0 ],
+      "to": [ 16.0, 16.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#metal" },
+        "east": { "texture": "#metal" },
+        "south": { "texture": "#metal" },
+        "west": { "texture": "#metal" },
+        "up": { "texture": "#metal" },
+        "down": { "texture": "#metal" }
+      }
     }
   ]
 }

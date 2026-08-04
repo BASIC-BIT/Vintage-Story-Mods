@@ -3,208 +3,14 @@
   "textureHeight": 16,
   "textures": {
     "metal": "game:block/metal/sheet/iron1",
-    "stone": "game:block/stone/rock/granite1",
     "rope": "game:block/cloth/reedrope"
   },
   "elements": [
     {
-      "//": "ONE cell now, where this used to be a six-element shape reaching three cells up out of a one-cell hole with nothing checking the headroom. The rails and the rope carry on in ropeway:tensionguide above it, which is structure the station's multiblock check requires - so the headroom is checked by construction.",
-      "name": "pad",
-      "from": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "to": [
-        16.0,
-        2.0,
-        16.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#stone"
-        },
-        "east": {
-          "texture": "#stone"
-        },
-        "south": {
-          "texture": "#stone"
-        },
-        "west": {
-          "texture": "#stone"
-        },
-        "up": {
-          "texture": "#stone"
-        },
-        "down": {
-          "texture": "#stone"
-        }
-      }
-    },
-    {
-      "name": "railwest",
-      "from": [
-        2.0,
-        2.0,
-        7.0
-      ],
-      "to": [
-        4.0,
-        16.0,
-        9.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "name": "raileast",
-      "from": [
-        12.0,
-        2.0,
-        7.0
-      ],
-      "to": [
-        14.0,
-        16.0,
-        9.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "//": "The mass hangs LOW in its guide, where a rope tensioner rests: it takes up slack, it does not climb, and its height means nothing numeric. Half a block wide, so the two rails bracket it exactly.",
-      "name": "mass",
-      "from": [
-        4.0,
-        3.0,
-        4.0
-      ],
-      "to": [
-        12.0,
-        13.0,
-        12.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#stone"
-        },
-        "east": {
-          "texture": "#stone"
-        },
-        "south": {
-          "texture": "#stone"
-        },
-        "west": {
-          "texture": "#stone"
-        },
-        "up": {
-          "texture": "#stone"
-        },
-        "down": {
-          "texture": "#stone"
-        }
-      }
-    },
-    {
-      "name": "hanger",
-      "from": [
-        7.0,
-        13.0,
-        7.0
-      ],
-      "to": [
-        9.0,
-        16.0,
-        9.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#rope"
-        },
-        "east": {
-          "texture": "#rope"
-        },
-        "south": {
-          "texture": "#rope"
-        },
-        "west": {
-          "texture": "#rope"
-        },
-        "up": {
-          "texture": "#rope"
-        },
-        "down": {
-          "texture": "#rope"
-        }
-      }
-    },
-    {
-      "//": "The guide column's four corner posts stopped at this cell's top face, so the machine leg stood on nothing and the whole frame read as hovering over its own base course. They carry on down here and land ON the pad, which is the foot plate - a post run to the cell floor instead would have its foot buried in the plate rather than bearing on it. Not done by reaching tensionguide.json downward out of its own cell: two of those stack in this column and would double up.",
       "name": "anglewn",
       "from": [
         0.0,
-        2.0,
+        0.0,
         0.0
       ],
       "to": [
@@ -236,13 +42,14 @@
         "down": {
           "texture": "#metal"
         }
-      }
+      },
+      "//": "Four corner angles running the full height of the cell. This leg REPLACES a post column, so it carries the tower as well as the machinery and cannot be open at the corners."
     },
     {
       "name": "anglews",
       "from": [
         0.0,
-        2.0,
+        0.0,
         14.0
       ],
       "to": [
@@ -280,7 +87,7 @@
       "name": "angleen",
       "from": [
         14.0,
-        2.0,
+        0.0,
         0.0
       ],
       "to": [
@@ -318,7 +125,7 @@
       "name": "anglees",
       "from": [
         14.0,
-        2.0,
+        0.0,
         14.0
       ],
       "to": [
@@ -349,6 +156,198 @@
         },
         "down": {
           "texture": "#metal"
+        }
+      }
+    },
+    {
+      "//": "Waist band, so the leg reads as a lattice rather than four loose sticks. INSET by 0.4 rather than flush or proud, and both halves of that matter. Flush shares four planes with the angles' outer faces, which is a z-fight. Proud was tried and reverted: this leg stands at tower-local x +3 exactly where a post does, and a cabin turning square at a tower sweeps to within 0.037 blocks of the post inner face, so 0.4 unit proud eats two thirds of that margin. Inset spends nothing.",
+      "name": "bandlow",
+      "from": [
+        0.4,
+        3.0,
+        0.4
+      ],
+      "to": [
+        15.6,
+        4.4,
+        15.6
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "bandhigh",
+      "from": [
+        0.4,
+        12.0,
+        0.4
+      ],
+      "to": [
+        15.6,
+        13.4,
+        15.6
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "//": "The counterweight's guide rails and the rope between them, continuing the run that starts at the weight's own cell.",
+      "name": "railwest",
+      "from": [
+        2.0,
+        0.0,
+        7.0
+      ],
+      "to": [
+        4.0,
+        16.0,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "raileast",
+      "from": [
+        12.0,
+        0.0,
+        7.0
+      ],
+      "to": [
+        14.0,
+        16.0,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "hanger",
+      "from": [
+        7.0,
+        0.0,
+        7.0
+      ],
+      "to": [
+        9.0,
+        16.0,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rope"
+        },
+        "east": {
+          "texture": "#rope"
+        },
+        "south": {
+          "texture": "#rope"
+        },
+        "west": {
+          "texture": "#rope"
+        },
+        "up": {
+          "texture": "#rope"
+        },
+        "down": {
+          "texture": "#rope"
         }
       }
     }

@@ -28,20 +28,10 @@ public sealed class RopewayModSystem : ModSystem
     /// </summary>
     public readonly Dictionary<BlockPos, BEPylonBase> LoadedTowers = new();
 
-    /// <summary>
-    /// Every loaded tension weight, keyed by its own position - the whole reason that block has a block
-    /// entity at all. Scanned rather than indexed by line, because a line is rebuilt constantly and an index
-    /// keyed by one would be a second thing to invalidate. BETensionWeight.Initialize adds, OnBlockUnloaded
-    /// removes.
-    /// </summary>
-    public readonly Dictionary<BlockPos, BETensionWeight> LoadedWeights = new();
-
-    /// <summary>
-    /// Every loaded drive housing, keyed by its own position - same table shape and same reason as
-    /// <see cref="LoadedWeights"/>: a housing serves whichever line is in range at lookup time, so there is
-    /// no tower to index it under. BEDriveHousing.Initialize adds, OnBlockUnloaded removes.
-    /// </summary>
-    public readonly Dictionary<BlockPos, BEDriveHousing> LoadedHousings = new();
+    // There were two more tables here, one of every loaded tension weight and one of every loaded drive
+    // housing, keyed by their own positions because a block bound to a line by PROXIMITY has no tower to be
+    // indexed under. Both are cells of a station now, so the footing above finds them at a known offset and
+    // there is nothing to keep in step with chunk loads.
 
     /// <summary>Derived line geometry, keyed by every member tower. Never persisted; InvalidateLine drops it.</summary>
     public readonly Dictionary<BlockPos, RopewayLine> LineCache = new();
@@ -59,9 +49,10 @@ public sealed class RopewayModSystem : ModSystem
     {
         base.Start(api);
 
+        // One block class for all three footings - pylonbase, drivestation and tensionstation. They differ
+        // only in the multiblockStructure their own Attributes carry, which BEPylonBase reads off its block.
         api.RegisterBlockClass("BlockPylonBase", typeof(BlockPylonBase));
         api.RegisterBlockClass("BlockPylonHead", typeof(BlockPylonHead));
-        api.RegisterBlockClass("BlockTensionWeight", typeof(BlockTensionWeight));
         api.RegisterBlockClass("BlockDriveHousing", typeof(BlockDriveHousing));
 
         // MIGRATION, deliberate: the block entity class name changed from "PylonHead" with the controller.
@@ -70,8 +61,11 @@ public sealed class RopewayModSystem : ModSystem
         // inert decoration with no spans, no route state and nothing to walk a line through. That is the
         // whole migration: it fails safe by construction, no upgrader, no half-converted towers. Reusing the
         // old name would instead resurrect those towers four blocks below their own geometry.
+        // "TensionWeight" is deliberately NOT registered any more, and the same migration applies to it: a
+        // world built on the old scheme has weights saved under that name, ServerChunk discards every one of
+        // them on load, and the blocks stay as decoration. Nothing is left holding a reference, because the
+        // only thing that ever held one was the position table this deleted.
         api.RegisterBlockEntityClass("PylonBase", typeof(BEPylonBase));
-        api.RegisterBlockEntityClass("TensionWeight", typeof(BETensionWeight));
         api.RegisterBlockEntityClass("Bullwheel", typeof(BEBullwheel));
         api.RegisterBlockEntityClass("DriveHousing", typeof(BEDriveHousing));
         api.RegisterEntity("EntityRopewayCabin", typeof(EntityRopewayCabin));

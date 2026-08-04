@@ -1,8 +1,7 @@
 {
   "code": "tensionweight",
-  "class": "BlockTensionWeight",
-  "entityClass": "TensionWeight",
-  "//nomechpower": "Deliberately NOT a mechanical power node. It is a rope tensioner, not a machine: it stores nothing, is wound by nothing and takes no axle. The towers are the network's consumers.",
+  "//": "Cell [3,0,0] of a ropeway:tensionstation: the mass, hanging in the guide that runs three cells up its machine leg. It has no class and no block entity, and that is the change - it used to carry both, purely to put itself in a position table so a line could ask whether any weight stood within eight blocks of any of its towers. Membership of a station answers that exactly, so there is nothing left for either to do.",
+  "//nomechpower": "Deliberately NOT a mechanical power node. It is a rope tensioner, not a machine: it stores nothing, is wound by nothing and takes no axle. The drive station's intake is the network's consumer.",
   "shape": {
     "base": "ropeway:block/tensionweight"
   },
@@ -12,6 +11,9 @@
     },
     "metal": {
       "base": "game:block/metal/sheet/iron1"
+    },
+    "rope": {
+      "base": "game:block/cloth/reedrope"
     }
   },
   "drawtype": "json",
@@ -24,9 +26,7 @@
     "handbook": {
       "groupBy": [ "tensionweight" ]
     },
-    "reinforcable": false,
-    "//towerRadius": "How far from a tower footing this may be built, and the same radius BETensionWeight.OnLine asks at lookup time - nothing is bound at placement, so nothing can come unbound when that tower is broken. 8 is close enough to read as part of the station and far enough to dodge the tower's own posts and archway.",
-    "towerRadius": 8
+    "reinforcable": false
   },
   "replaceable": 500,
   "resistance": 4.5,

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
 namespace Ropeway.Tests;
@@ -134,22 +135,290 @@ public class RopewayMathTests
         }
     }
 
+    /// <summary>
+    /// The cabin never goes backwards, and stops at the ends. Asserted as the PROJECTION ONTO EACH SPAN'S OWN
+    /// CHORD, strictly increasing, which is the property that actually holds and has teeth.
+    /// <para>
+    /// Two weaker versions were here first and both are worth naming. Distance from <c>Anchors[0]</c> is what
+    /// the straight path used and is a false negative on a curve - a step round the outside of a corner
+    /// really can shorten the straight-line distance to a tower twenty blocks behind without the cabin having
+    /// reversed. Its replacement, <c>step . DirectionAt</c>, is close to a tautology: the step is a finite
+    /// difference of <c>PositionAt</c> and the heading is the analytic tangent of that same function, so it
+    /// reduces to "the tangent is not zero" and cannot see a loop or a backward excursion. The chord
+    /// projection can: its derivative is <c>1 - BendSlope * (1 - cos(turn/2))</c>, worst at the anchor where
+    /// <c>BendSlope</c> is 1, so it is bounded below by <c>cos(turn/2)</c> and a bend that overshot its own
+    /// window or reversed its sign would drive it negative.
+    /// </para>
+    /// </summary>
     [Fact]
-    public void PositionAtIsMonotonicAndClampsOutsideTheLine()
+    public void PositionAtOnlyEverMovesForwardAndClampsOutsideTheLine()
     {
-        var line = Line((0, 64, 0), (10, 64, 0), (10, 64, 24));
+        // Two right angles, the second doubling the line back across itself, so the assert is exercised where
+        // distance-from-the-start is not a usable proxy. The 6-block span also trims to 2.5, i.e. a window
+        // below the full TowerClearance.
+        var line = Line((0, 64, 0), (10, 64, 0), (10, 64, 24), (4, 64, 24));
 
-        var previous = -1.0;
-        for (var i = 0; i <= 100; i++)
+        for (var i = 0; i < line.Anchors.Length - 1; i++)
         {
-            var p = line.PositionAt(line.TotalLength * i / 100.0);
-            var d = line.Anchors[0].DistanceTo(p);
-            Assert.True(d >= previous - 1e-6, $"sample {i} moved backwards");
-            previous = d;
+            var chord = line.Anchors[i + 1].Clone().Sub(line.Anchors[i]).Normalize();
+            var span = line.Cumulative[i + 1] - line.Cumulative[i];
+            var previous = double.NegativeInfinity;
+
+            for (var k = 0; k <= 2000; k++)
+            {
+                var t = line.Cumulative[i] + span * k / 2000.0;
+                var along = line.PositionAt(t).Sub(line.Anchors[i]).Dot(chord);
+
+                Assert.True(along > previous, $"span {i} sample {k} at {t:0.###} went backwards along its chord");
+                previous = along;
+            }
         }
 
         Assert.Equal(line.Anchors[0].X, line.PositionAt(-5).X, 6);
         Assert.Equal(line.Anchors[^1].X, line.PositionAt(line.TotalLength + 5).X, 6);
+    }
+
+    /// <summary>
+    /// The bend's first requirement: it passes through every tower EXACTLY, on that corner's bisector. The
+    /// first half is what keeps Cumulative, TowerAt, SpanAheadOf, every call target and the ghost-drop's
+    /// footing arithmetic meaning what they meant before there was a curve at all; the second is the whole
+    /// point of the curve, because a cabin arriving on the bisector is a cabin square to the passage.
+    /// </summary>
+    [Fact]
+    public void TheBendPassesThroughEveryTowerOnTheBisector()
+    {
+        var line = Line((0, 64, 0), (0, 64, 40), (40, 64, 40), (40, 64, 0));
+
+        for (var i = 0; i < line.Anchors.Length; i++)
+        {
+            var p = line.PositionAt(line.Cumulative[i]);
+            Assert.Equal(line.Anchors[i].X, p.X, 9);
+            Assert.Equal(line.Anchors[i].Y, p.Y, 9);
+            Assert.Equal(line.Anchors[i].Z, p.Z, 9);
+        }
+
+        // Both corners are 90 degrees between cardinals, so the bisectors are the two diagonals; the ends
+        // keep their single leg. Read off the anchors rather than typed, and compared as a BEARING - the
+        // vertical is still the chord's, by design.
+        for (var i = 0; i < line.Anchors.Length; i++)
+        {
+            var into = i > 0 ? Bearing(line.Anchors[i - 1], line.Anchors[i]) : (double?)null;
+            var outOf = i < line.Anchors.Length - 1 ? Bearing(line.Anchors[i], line.Anchors[i + 1]) : (double?)null;
+            var expected = into == null ? outOf!.Value
+                : outOf == null ? into.Value
+                : into.Value + GameMath.AngleRadDistance((float)into.Value, (float)outOf.Value) / 2;
+
+            var dir = line.DirectionAt(line.Cumulative[i]);
+            Assert.Equal(0, GameMath.AngleRadDistance((float)expected, (float)Math.Atan2(dir.X, dir.Z)), 6);
+        }
+
+        // And the heading does not step at a tower the way the plain leg bearing used to: sampled either
+        // side of the middle corner it turns by a hair, not by the whole 90 degrees.
+        var before = line.DirectionAt(line.Cumulative[2] - 0.01);
+        var after = line.DirectionAt(line.Cumulative[2] + 0.01);
+        var turned = Math.Abs(GameMath.AngleRadDistance(
+            (float)Math.Atan2(before.X, before.Z), (float)Math.Atan2(after.X, after.Z)));
+        Assert.True(turned < 0.05, $"the heading stepped by {turned * GameMath.RAD2DEG:0.##} degrees at the tower");
+    }
+
+    /// <summary>
+    /// The bend's second requirement, and the whole clearance argument in one assert: it lives entirely
+    /// inside the stretch at each end of a span that <see cref="SpanMath.IsSpanClear"/> already trims away
+    /// before it casts a single ray. So the curve cannot wander into ground nobody certified, and
+    /// <c>IsSpanClear</c>, <c>ClearanceRadius</c>, <c>ClearanceBelow</c> and <c>TrimForTowers</c> all stay
+    /// exactly as they were. Widen the window past the trim and this is what fails.
+    /// </summary>
+    [Fact]
+    public void TheBendStaysInsideTheStretchNoClearanceRayVisits()
+    {
+        // A 90 degree corner on a long span (trims to the full 4) and a 6-block one (trims to 2.5).
+        var line = Line((0, 64, 0), (40, 64, 0), (40, 64, 6), (46, 64, 6));
+        var peak = 0.0;
+
+        for (var i = 0; i < line.Anchors.Length - 1; i++)
+        {
+            var segment = line.Cumulative[i + 1] - line.Cumulative[i];
+            var trim = SpanMath.TrimForTowers(segment);
+            Assert.True(trim > 0);
+
+            for (var k = 0; k <= 4000; k++)
+            {
+                var along = segment * k / 4000.0;
+                var offset = Perpendicular(line.Anchors[i], line.Anchors[i + 1], line.PositionAt(line.Cumulative[i] + along));
+
+                if (along < trim || along > segment - trim)
+                {
+                    if (i == 0) peak = Math.Max(peak, offset);
+                    continue;
+                }
+
+                Assert.Equal(0, offset, 12);
+            }
+        }
+
+        // And it bows by as much as it is meant to, which is what stops a right window hiding a wrong curve.
+        // The first span is 40 blocks, so its window is the full TowerClearance of 4 and its far anchor is a
+        // right angle: the furthest the path leaves that chord is 4/27 * 4 * sin(45 deg) = 0.419 blocks.
+        Assert.Equal(4.0 / 27 * SpanMath.TowerClearance * Math.Sin(Math.PI / 4), peak, 4);
+        Assert.Equal(0.419, peak, 3);
+    }
+
+    /// <summary>
+    /// The three shapes of line that have no corner to bend, each of which is a way to produce a NaN or a
+    /// jump if the bend is written as though every anchor had two legs.
+    /// </summary>
+    [Fact]
+    public void ALineWithNoCornerToTurnIsLeftDeadStraight()
+    {
+        // 1. Two towers: no interior anchor at all, so the path is the chord and the heading is constant.
+        var pair = Line((0, 64, 0), (30, 64, 40));
+        for (var i = 0; i <= 100; i++)
+        {
+            var t = pair.TotalLength * i / 100.0;
+            var p = pair.PositionAt(t);
+            Assert.Equal(0, Perpendicular(pair.Anchors[0], pair.Anchors[1], p), 12);
+            Assert.Equal(0.6, pair.DirectionAt(t).X, 9);
+        }
+
+        // 2. Straight through an interior tower: a bisector that IS the leg must bend nothing, and that has
+        // to hold on a CLIMBING line too - the tangent carries the legs' horizontal rate for this reason.
+        //
+        // Compared in ALL THREE COMPONENTS against the chord point, and that is the whole strength of this
+        // case. It used to measure only the PERPENDICULAR distance off the line, which is blind to both of
+        // the properties it is here to pin: dropping the mean-horizontal-rate scaling from Bisect puts a
+        // phantom bend into a straight sloped span, but the wobble is LONGITUDINAL and slides the cabin
+        // along the line rather than off it, so the perpendicular reads 0.00e+00 either way; and a vertical
+        // term in BendOffset - the bend is horizontal by construction - is invisible to a horizontal
+        // measurement for the same reason. Both mutations left this test green. Three asserts kill both.
+        var straight = Line((0, 64, 0), (20, 70, 0), (40, 76, 0));
+        var from = straight.Anchors[0];
+        var to = straight.Anchors[2];
+        for (var i = 0; i <= 200; i++)
+        {
+            var t = straight.TotalLength * i / 200.0;
+            var u = t / straight.TotalLength;
+            var p = straight.PositionAt(t);
+
+            Assert.Equal(from.X + (to.X - from.X) * u, p.X, 9);
+            Assert.Equal(from.Y + (to.Y - from.Y) * u, p.Y, 9);
+            Assert.Equal(from.Z + (to.Z - from.Z) * u, p.Z, 9);
+        }
+
+        // 3. Doubling back: the two legs are opposite, no direction is between them, and the cusp is left as
+        // a cusp. Finite everywhere is the whole assert - a normalised zero here is a cabin at NaN.
+        var hairpin = Line((0, 64, 0), (40, 64, 0), (10, 64, 0));
+        for (var i = 0; i <= 400; i++)
+        {
+            var t = hairpin.TotalLength * i / 400.0;
+            var p = hairpin.PositionAt(t);
+            var d = hairpin.DirectionAt(t);
+
+            Assert.True(double.IsFinite(p.X) && double.IsFinite(p.Y) && double.IsFinite(p.Z));
+            Assert.True(double.IsFinite(d.X) && double.IsFinite(d.Y) && double.IsFinite(d.Z));
+            Assert.Equal(0, p.Z - hairpin.Anchors[0].Z, 9);
+            Assert.Equal(1, d.Length(), 9);
+        }
+
+        Assert.Null(hairpin.Tangents[1]);
+    }
+
+    /// <summary>
+    /// The two pure halves of the link-time corner warning, and the case it exists for. Psi - the angle
+    /// between a corner's bisector and the tower's own crossarm - is what decides whether a cabin clears the
+    /// posts, nothing in the mod ever constrains it, and before this nothing told the player it mattered.
+    /// </summary>
+    [Fact]
+    public void ACornerTellsAPlayerWhichWayItsTowerWantsToFace()
+    {
+        // The fit against the three measured points: +/-1.0 degree at a 90 degree turn, +/-23.2 at 45,
+        // +/-30.8 at 30. Half the shortfall from a right angle, and never negative.
+        Assert.Equal(0, SpanMath.CornerTolerance(90), 9);
+        Assert.Equal(22.5, SpanMath.CornerTolerance(45), 9);
+        Assert.Equal(30, SpanMath.CornerTolerance(30), 9);
+        Assert.Equal(45, SpanMath.CornerTolerance(0), 9);
+        Assert.Equal(0, SpanMath.CornerTolerance(165), 9);
+
+        // An AXIS, not a facing: the passage runs through the tower both ways and the cabin is symmetric
+        // front to back, so a south-facing crossarm carries a due-north bisector exactly. Measuring against
+        // the facing would call that tower 180 degrees wrong.
+        Assert.Equal(0, SpanMath.AxisError(0, BlockFacing.NORTH), 6);
+        Assert.Equal(0, SpanMath.AxisError(0, BlockFacing.SOUTH), 6);
+        Assert.Equal(90, SpanMath.AxisError(0, BlockFacing.EAST), 6);
+        Assert.Equal(45, SpanMath.AxisError(Math.PI / 4, BlockFacing.NORTH), 6);
+        Assert.Equal(90, SpanMath.AxisError(0, null), 6);
+
+        // THE PHOTOGRAPH, in two lines. A right angle between two CARDINAL legs has a diagonal bisector, so
+        // the best of four cardinals is 45 degrees off against a tolerance of 0 - no facing carries it, and
+        // the warning has to say so rather than name one.
+        var cardinal = Line((0, 64, -60), (0, 64, 0), (60, 64, 0));
+        var bisector = Bearing(new Vec3d(), cardinal.DirectionAt(cardinal.Cumulative[1]));
+        Assert.Equal(45, SpanMath.AxisError(bisector, BlockFacing.NORTH), 6);
+        Assert.True(SpanMath.AxisError(bisector, BlockFacing.EAST) > SpanMath.CornerTolerance(90));
+
+        // ...and the same right angle between two DIAGONAL legs has a CARDINAL bisector - here due east,
+        // since the two legs come in from the south-west and leave to the north-east - which a tower can face
+        // exactly. That is the corner KNOWN-ISSUES had recorded as impossible under any yaw law.
+        var diagonal = Line((-60, 64, -60), (0, 64, 0), (60, 64, -60));
+        var clean = Bearing(new Vec3d(), diagonal.DirectionAt(diagonal.Cumulative[1]));
+        Assert.Equal(0, SpanMath.AxisError(clean, BlockFacing.EAST), 6);
+        Assert.True(SpanMath.AxisError(clean, BlockFacing.EAST) <= SpanMath.CornerTolerance(90));
+    }
+
+    /// <summary>
+    /// A tower whose next-door chunk has not landed yet is the end of a TRUNCATED chain, so it has one leg
+    /// and no bend - and when the chunk does land it grows a second leg and a bend appears under a cabin
+    /// that never moved. That is only safe because the two are the same everywhere the cabin is allowed to
+    /// be: <c>MarkLoadedEnds</c> fences it at the last PROVEN tower, the bend is zero at every anchor, and
+    /// the stretch beyond that fence is the only ground the new curve touches. This is that, measured.
+    /// </summary>
+    [Fact]
+    public void AChunkLandingBehindTheLastProvenTowerMovesNothingTheCabinCanReach()
+    {
+        var towers = new List<BlockPos>
+        {
+            new(0, 64, 0), new(0, 64, 20), new(0, 64, 40), new(30, 64, 40)
+        };
+
+        var whole = RopewayLine.FromTowers(towers)!;
+        var partial = RopewayLine.FromTowers(towers.GetRange(0, 3))!;
+        partial.MarkLoadedEnds(pos => !pos.Equals(towers[2]));
+
+        // The unproven end really is fenced off, and the fence lands on a tower.
+        Assert.True(partial.Truncated);
+        Assert.Equal(partial.Cumulative[1], partial.MaxTravel, 9);
+
+        // Everything the cabin may occupy is byte-for-byte the same line before and after the chunk lands.
+        for (var i = 0; i <= 1000; i++)
+        {
+            var t = partial.MaxTravel * i / 1000.0;
+            var a = partial.PositionAt(t);
+            var b = whole.PositionAt(t);
+
+            Assert.Equal(a.X, b.X, 12);
+            Assert.Equal(a.Y, b.Y, 12);
+            Assert.Equal(a.Z, b.Z, 12);
+        }
+
+        // And the corner the partial chain could not see IS genuinely bent once it can, or the agreement
+        // above would only be saying that neither line bends anywhere.
+        var inside = whole.Cumulative[2] - 2;
+        Assert.True(partial.PositionAt(inside).DistanceTo(whole.PositionAt(inside)) > 0.1,
+            "the chunk landing changed nothing at all, so this proves nothing");
+    }
+
+    private static double Bearing(Vec3d from, Vec3d to)
+    {
+        return Math.Atan2(to.X - from.X, to.Z - from.Z);
+    }
+
+    /// <summary>How far a point sits off the straight line through two anchors, horizontally.</summary>
+    private static double Perpendicular(Vec3d from, Vec3d to, Vec3d point)
+    {
+        var dx = to.X - from.X;
+        var dz = to.Z - from.Z;
+        var length = Math.Sqrt(dx * dx + dz * dz);
+
+        return Math.Abs((point.X - from.X) * dz - (point.Z - from.Z) * dx) / length;
     }
 
     [Fact]
@@ -1122,21 +1391,34 @@ public class RopewayMathTests
     [Fact]
     public void TheRimTurnsOnItsOwnAxleAtEveryAngleAndEveryFacing()
     {
+        // The four poses a wheel is ever in: over the tower at a station the line runs through, and carried
+        // out along each of the two horizontal axes at a terminal. The offset rows are what stop it going in
+        // the wrong translate - put it in BOTH and the pair no longer cancels, so the wheel lands right and
+        // spins about the cell it left; put it in the SECOND only and it orbits; put it inside the yaw and
+        // the horizontal half swings round with the facing, which is the one a north-facing test never sees.
+        var poses = new[]
+        {
+            new Vec3f(),
+            new Vec3f(0, -BullwheelRenderer.WrapDrop, BullwheelRenderer.WrapOut),
+            new Vec3f(-BullwheelRenderer.WrapOut, -BullwheelRenderer.WrapDrop, 0)
+        };
+
         foreach (var side in new[] { "north", "east", "south", "west", null })
         foreach (var turns in new[] { 0.0, 0.25, 0.5, 0.75 })
+        foreach (var offset in poses)
         {
             var yaw = BullwheelRenderer.YawFor(side);
             var theta = (float)(turns * GameMath.TWOPI);
-            var matrix = BullwheelRenderer.RimMatrix(new Matrixf().Identity(), yaw, theta).Values;
+            var matrix = BullwheelRenderer.RimMatrix(new Matrixf().Identity(), yaw, theta, offset).Values;
 
             var axle = Mat4f.MulWithVec4(matrix, 0.5f, BullwheelRenderer.RimPivotY, 0.5f, 1f);
 
             // Tolerances rather than decimal places: these are single-precision sines and cosines, and the
             // pivot itself sits on a 4-dp midpoint that rounds two ways. A wheel that orbits misses by a
             // whole block, four orders above this.
-            Assert.Equal(0.5, axle[0], 1e-4);
-            Assert.Equal(BullwheelRenderer.RimPivotY, axle[1], 1e-4);
-            Assert.Equal(0.5, axle[2], 1e-4);
+            Assert.Equal(0.5 + offset.X, axle[0], 1e-4);
+            Assert.Equal(BullwheelRenderer.RimPivotY + offset.Y, axle[1], 1e-4);
+            Assert.Equal(0.5 + offset.Z, axle[2], 1e-4);
 
             // One point on the felloe, 0.6 up the axle's own vertical, against the closed form of the chain
             // the renderer is meant to be: Ry(yaw) applied to Rx(theta) applied to (0, 0.6, 0), written out
@@ -1150,10 +1432,110 @@ public class RopewayMathTests
             // so Ry(90)*Rz(t) == Rx(t)*Ry(90). North (yaw 0) at a quarter turn is the row that does: the
             // swapped chain agrees with the shipped one there, and RotateZ puts the 0.6 on -x.
             var felloe = Mat4f.MulWithVec4(matrix, 0.5f, BullwheelRenderer.RimPivotY + 0.6f, 0.5f, 1f);
-            Assert.Equal(0.5 + 0.6 * Math.Sin(theta) * Math.Sin(yaw), felloe[0], 1e-4);
-            Assert.Equal(BullwheelRenderer.RimPivotY + 0.6 * Math.Cos(theta), felloe[1], 1e-4);
-            Assert.Equal(0.5 + 0.6 * Math.Sin(theta) * Math.Cos(yaw), felloe[2], 1e-4);
+            Assert.Equal(0.5 + offset.X + 0.6 * Math.Sin(theta) * Math.Sin(yaw), felloe[0], 1e-4);
+            Assert.Equal(BullwheelRenderer.RimPivotY + offset.Y + 0.6 * Math.Cos(theta), felloe[1], 1e-4);
+            Assert.Equal(0.5 + offset.Z + 0.6 * Math.Sin(theta) * Math.Cos(yaw), felloe[2], 1e-4);
         }
+    }
+
+    /// <summary>
+    /// The wrap is drawn at a tower carrying exactly ONE span and nowhere else, and that conditional is not
+    /// a wart. <c>STATION-DESIGN</c> §1 allows a station that is not an end tower, and at such a tower there
+    /// is no dead side: a ring dropped to the rope on either side has its underside below a passing cabin's
+    /// grip for a block of travel, every trip, in both directions.
+    /// <para>
+    /// <c>Spans.Count</c> and deliberately not <c>IsEndpoint</c> - gating on <c>StructureComplete</c> would
+    /// make the wheel jump a block sideways the moment somebody broke a brace, and jump back when they put
+    /// it in. And the wheel's own facing is not in it anywhere, which is why a bullwheel placed a quarter
+    /// turn out still wraps correctly: the wrap is keyed on the footing's spans.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheWrapIsOnlyDrawnWhereNoCabinPasses()
+    {
+        var tower = new BEPylonBase { Pos = new BlockPos(0, 64, 0) };
+        Assert.Null(tower.DeadSide);
+
+        // One span, in from the north: the dead side points the other way, along the line and away from it.
+        tower.Spans.Add(new BlockPos(0, 64, -20));
+        Assert.Equal(0, tower.DeadSide!.X, 9);
+        Assert.Equal(0, tower.DeadSide.Y, 9);
+        Assert.Equal(1, tower.DeadSide.Z, 9);
+
+        // Two spans: a cabin passes, and there is no side of this tower nothing runs over.
+        tower.Spans.Add(new BlockPos(20, 64, 0));
+        Assert.Null(tower.DeadSide);
+
+        // A pitched span is still a horizontal dead side - the wheel drops to the rope's own centreline at
+        // the tower, and the arriving rope's climb is a kink at the sheave throat, which is where a sheave
+        // puts one.
+        tower.Spans.Clear();
+        tower.Spans.Add(new BlockPos(-30, 20, -40));
+        Assert.Equal(0.6, tower.DeadSide!.X, 9);
+        Assert.Equal(0, tower.DeadSide.Y, 9);
+        Assert.Equal(0.8, tower.DeadSide.Z, 9);
+    }
+
+    /// <summary>
+    /// The wrap's own geometry, which is three claims and all of them are about one number. The chord
+    /// MIDPOINTS sit on rho, not the corners, so the bottom of the ring lands exactly on the rope's own
+    /// centreline where the wheel is tangent to it; the ring closes on itself, so there is no free end
+    /// anywhere; and the straight stub out of the sheave is collinear with the bottom chord, which is why
+    /// <c>BuildRun</c> hands back sixteen boxes rather than seventeen and the joint phase alternates all the
+    /// way round instead of putting two full-depth boxes in one plane where it meets itself.
+    /// </summary>
+    [Fact]
+    public void TheWrapIsAClosedRingBeddedOnTheRopesOwnCentreline()
+    {
+        var dead = new Vec3d(0, 0, 1);
+        var points = BEPylonBase.WrapPath(dead);
+
+        Assert.Null(BEPylonBase.WrapPath(null));
+        Assert.Equal(18, points.Count);
+
+        // It starts at the sheave, exactly, the same way the half-cable does.
+        Assert.Equal(0, points[0].Length(), 9);
+
+        // Closed: last vertex is first vertex.
+        Assert.Equal(points[1].X, points[17].X, 9);
+        Assert.Equal(points[1].Y, points[17].Y, 9);
+        Assert.Equal(points[1].Z, points[17].Z, 9);
+
+        var axleZ = (double)BullwheelRenderer.WrapOut;
+        var axleY = (double)BullwheelRenderer.WrapRadius;
+
+        for (var k = 1; k < points.Count - 1; k++)
+        {
+            // Every chord's MIDPOINT is exactly rho from the axle, which is the tangency. The vertices are
+            // 0.208 units outside it, a tenth of the cable's own thickness.
+            var midY = (points[k].Y + points[k + 1].Y) / 2 - axleY;
+            var midZ = (points[k].Z + points[k + 1].Z) / 2 - axleZ;
+            Assert.Equal(axleY, Math.Sqrt(midY * midY + midZ * midZ), 6);
+
+            // Flat in the cross-axis: the ring turns in the plane that contains the line, so a wheel that
+            // wrapped sideways would show up here rather than in a render.
+            Assert.Equal(0, points[k].X, 9);
+        }
+
+        // The bottom of the ring is ON the rope, which is what the whole drop is for, and the stub that
+        // reaches it is dead straight out of the sheave.
+        Assert.Equal(0, points[1].Y, 6);
+        Assert.Equal(0, points[2].Y, 6);
+        Assert.True(points[1].Z < axleZ && points[2].Z > axleZ,
+            "the ring's bottom chord does not straddle the axle, so it is not tangent under the wheel");
+
+        // THE HANDSHAKE, and it is the only thing tying the two lanes together. The ring is chunk mesh from
+        // BEPylonBase and the wheel is a matrix in BullwheelRenderer, computed in different files from
+        // different constants, and the whole build is a rope drawn round a wheel that is somewhere else if
+        // they disagree by a sign. The wheel rests RimPivotY - 0.5 above the anchor; add the offset and it
+        // has to land on the centre this ring was drawn about.
+        var offset = BEBullwheel.WrapOffset(dead);
+        Assert.Equal(dead.X * axleZ, offset.X, 5);
+        Assert.Equal(dead.Z * axleZ, offset.Z, 5);
+        Assert.Equal(axleY, BullwheelRenderer.RimPivotY - 0.5 + offset.Y, 5);
+
+        // ...and no dead side is no offset, which is the wheel a cabin passes under.
+        Assert.Equal(0, BEBullwheel.WrapOffset(null).Length(), 9);
     }
 
     private static RopewayLine Line(params (int X, int Y, int Z)[] towers)

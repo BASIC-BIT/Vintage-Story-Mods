@@ -25,13 +25,16 @@ public sealed class RopewayGuideDialog : GuiDialog
     private ElementBounds viewportBounds;
 
     /// <summary>
-    /// The blocks the strip turns, left to right, then the cabin. The drive pair is here because the guide
-    /// is the mod's primary build-teaching surface and a drive tower had no representation on it at all -
-    /// a player following the guide could build every tower on a line and never learn what makes one move.
+    /// The blocks the strip turns, left to right, then the cabin. All three FOOTINGS are here because the
+    /// guide is the mod's primary build-teaching surface and which footing you place is now the whole of
+    /// what makes a tower a drive or a tensioner - a player who never sees the station footings can build
+    /// every tower on a line and never learn what makes one move. The machine legs' seven blocks are named
+    /// in the guide text instead: seven more portraits would shrink the row to nothing.
     /// </summary>
     private static readonly string[] StripBlocks =
     {
-        "pylonbase-north", "pylonhead-north", "brace-north", "bullwheel-north", "drivehousing"
+        "pylonbase-north", "drivestation-north", "tensionstation-north", "pylonhead-north", "brace-north",
+        "bullwheel-north"
     };
 
     private readonly ItemSlot[] slots = new ItemSlot[StripBlocks.Length];
@@ -175,8 +178,10 @@ public sealed class RopewayGuideDialog : GuiDialog
 
         yaw += dt * 0.6f;
 
-        // The blocks a tower is made of, then the drive pair, then the cabin. The posts are player-chosen
-        // wood and have no one block to show.
+        // The three footings and the three crossarm blocks, then the cabin. The posts are player-chosen wood
+        // and have no one block to show, and the machine legs are named in the text rather than turned here.
+        // It used to say "the drive pair", from when the strip ended with the housing and the weight; both
+        // are cells of a station now and neither is in StripBlocks.
         var cells = StripBlocks.Length + 1;
         var cell = viewportBounds.InnerWidth / cells;
         var y = viewportBounds.renderY + viewportBounds.InnerHeight / 2;

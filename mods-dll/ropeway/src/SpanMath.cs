@@ -38,10 +38,11 @@ public static class SpanMath
     public const double TowerClearance = 4.0;
 
     /// <summary>
-    /// Cells from the ground-placed controller (<c>ropeway:pylonbase</c>) up to the sheave block at the top
-    /// of its crossarm - <c>ropeway:pylonhead</c>, or the decorative <c>ropeway:bullwheel</c> that stands in
-    /// for it. The one number that turns a tower's canonical position into its geometry, which is why it
-    /// lives next to <see cref="AnchorOf"/>.
+    /// Cells from the ground-placed controller up to the sheave block at the top of its crossarm -
+    /// <c>ropeway:pylonhead</c> on a plain tower, <c>ropeway:bullwheel</c> on a station. The one number that
+    /// turns a tower's canonical position into its geometry, which is why it lives next to
+    /// <see cref="AnchorOf"/>. It is the same for all three footings because all three carry one offset
+    /// list; <c>RopewayAssetContractTests.AllThreeFootingsShareOneCellList</c> is what pins that.
     /// <para>
     /// Forced by the cabin, not chosen: the cabin body runs 1.25 below its origin to 1.25 above it, the
     /// origin hangs <c>hangDrop</c> = 2.25 below the sheave, and the footing occupies the ground cell the
@@ -133,6 +134,50 @@ public static class SpanMath
             6 => "ropeway:dir-w",
             _ => "ropeway:dir-nw"
         };
+    }
+
+    /// <summary>
+    /// The widest error between a corner tower's crossarm and the corner's own bisector that still lets the
+    /// cabin through without clipping a post, in degrees, for a corner that deflects the line by
+    /// <paramref name="turnDeg"/>. Pure.
+    /// <para>
+    /// A FIT TO THREE MEASURED POINTS, not a derivation, and it is stated that way on purpose. The rig in
+    /// <c>docs/agentic/ingest/cablecar/TURNING-SPEC.md</c> §2.5 swept the tower facing at each corner angle
+    /// and found the widest error keeping penetration under the cabin's own 0.0625-block wall thickness:
+    /// <b>+/-1.0 degree at a 90 degree turn, +/-23.2 at 45, +/-30.8 at 30</b>. Half the shortfall from a right
+    /// angle reproduces all three to within a degree (0 / 22.5 / 30) and errs on the warning side, which is
+    /// the right side for something that only ever prints a chat line. Past 90 degrees it is zero: a corner
+    /// that sharp is dirty at every facing, which the acceptance test's hairpin row measures.
+    /// </para>
+    /// <para>
+    /// This is NOT a closed form waiting to be found. The cabin fits the passage at any yaw - its 2.463-block
+    /// half-diagonal against post inner faces at 2.5 - so what a facing error costs is not the rotation but
+    /// where the cabin's ORIGIN is, twenty blocks out, which no local geometry knows.
+    /// </para>
+    /// </summary>
+    public static double CornerTolerance(double turnDeg)
+    {
+        return Math.Max(0, (90 - turnDeg) / 2);
+    }
+
+    /// <summary>
+    /// How far a bearing is off a facing's AXIS rather than off the facing itself, in degrees, folded into
+    /// [0, 90]. The passage runs through the tower both ways and the cabin is symmetric front to back, so a
+    /// north-facing crossarm and a south-facing one are the same crossarm - measuring against the facing
+    /// would report 180 degrees of error for a tower that is exactly right. Pure.
+    /// </summary>
+    public static double AxisError(double bearingRad, BlockFacing axis)
+    {
+        if (axis == null) return 90;
+
+        // Folded modulo PI rather than through GameMath.AngleRadDistance, which is float: a due-north axis is
+        // atan2(0, -1) = PI exactly in double and 1.4e-5 degrees off it in float, and this is compared against
+        // a tolerance that is legitimately zero at a right angle.
+        var off = (bearingRad - Math.Atan2(axis.Normalf.X, axis.Normalf.Z)) % Math.PI;
+        if (off < 0) off += Math.PI;
+
+        // 180 / PI in double, not GameMath.RAD2DEG, which is a float and puts a perpendicular tower at 89.99995.
+        return Math.Min(off, Math.PI - off) * (180 / Math.PI);
     }
 
     /// <summary>

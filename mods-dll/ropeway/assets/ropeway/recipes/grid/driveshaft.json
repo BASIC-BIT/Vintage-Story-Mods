@@ -1,0 +1,22 @@
+{
+  "//": "One cell of lattice leg with the shaft inside it. Two per craft: a leg is three cells, so two crafts build one and leave a spare.",
+  "ingredientPattern": "SPS,SPS",
+  "ingredients": {
+    "S": {
+      "type": "item",
+      "code": "game:stick"
+    },
+    "P": {
+      "type": "item",
+      "code": "game:metalplate-*",
+      "name": "metal"
+    }
+  },
+  "width": 3,
+  "height": 2,
+  "output": {
+    "type": "block",
+    "code": "driveshaft",
+    "quantity": 2
+  }
+}

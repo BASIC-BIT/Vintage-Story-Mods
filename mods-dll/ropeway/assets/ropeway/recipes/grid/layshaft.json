@@ -1,0 +1,23 @@
+{
+  "//": "A forged bar on two standards. Two per craft because both stations want two of them, so one craft dresses one crossarm.",
+  "ingredientPattern": "BPB",
+  "ingredients": {
+    "B": {
+      "type": "item",
+      "code": "game:metalbit-*",
+      "name": "metal"
+    },
+    "P": {
+      "type": "item",
+      "code": "game:metalplate-*",
+      "name": "metal"
+    }
+  },
+  "width": 3,
+  "height": 1,
+  "output": {
+    "type": "block",
+    "code": "layshaft-north",
+    "quantity": 2
+  }
+}

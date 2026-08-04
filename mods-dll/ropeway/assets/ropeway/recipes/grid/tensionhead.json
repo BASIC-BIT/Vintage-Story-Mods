@@ -1,0 +1,27 @@
+{
+  "//": "The head sheave on its pedestal.",
+  "ingredientPattern": "BPB,PSP",
+  "ingredients": {
+    "B": {
+      "type": "item",
+      "code": "game:metalbit-*",
+      "name": "metal"
+    },
+    "P": {
+      "type": "item",
+      "code": "game:metalplate-*",
+      "name": "metal"
+    },
+    "S": {
+      "type": "item",
+      "code": "game:stick"
+    }
+  },
+  "width": 3,
+  "height": 2,
+  "output": {
+    "type": "block",
+    "code": "tensionhead-north",
+    "quantity": 1
+  }
+}

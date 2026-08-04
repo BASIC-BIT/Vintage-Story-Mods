@@ -1,0 +1,23 @@
+{
+  "//": "A pylon footing rigged for a counterweight. Cheaper in metal than the drive station and for the same reason the tensioner has always been cheap: nothing about it is a machine.",
+  "ingredientPattern": "BFB",
+  "ingredients": {
+    "B": {
+      "type": "item",
+      "code": "game:metalbit-*",
+      "name": "metal"
+    },
+    "F": {
+      "type": "block",
+      "code": "ropeway:pylonbase-*",
+      "name": "side"
+    }
+  },
+  "width": 3,
+  "height": 1,
+  "output": {
+    "type": "block",
+    "code": "tensionstation-north",
+    "quantity": 1
+  }
+}

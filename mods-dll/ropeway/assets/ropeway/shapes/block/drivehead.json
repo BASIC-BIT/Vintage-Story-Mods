@@ -2,14 +2,12 @@
   "textureWidth": 16,
   "textureHeight": 16,
   "textures": {
-    "metal": "game:block/metal/sheet/iron1",
-    "stone": "game:block/stone/rock/granite1",
-    "rope": "game:block/cloth/reedrope"
+    "metal": "game:block/metal/sheet/iron1"
   },
   "elements": [
     {
-      "//": "ONE cell now, where this used to be a six-element shape reaching three cells up out of a one-cell hole with nothing checking the headroom. The rails and the rope carry on in ropeway:tensionguide above it, which is structure the station's multiblock check requires - so the headroom is checked by construction.",
-      "name": "pad",
+      "//": "brace.json's girder profile, copied box for box. A machine cell is a brace cell with gear on top of it, so the crossarm has to read continuous across the join or the tower looks like two structures bolted together.",
+      "name": "foot",
       "from": [
         0.0,
         0.0,
@@ -27,44 +25,6 @@
       ],
       "faces": {
         "north": {
-          "texture": "#stone"
-        },
-        "east": {
-          "texture": "#stone"
-        },
-        "south": {
-          "texture": "#stone"
-        },
-        "west": {
-          "texture": "#stone"
-        },
-        "up": {
-          "texture": "#stone"
-        },
-        "down": {
-          "texture": "#stone"
-        }
-      }
-    },
-    {
-      "name": "railwest",
-      "from": [
-        2.0,
-        2.0,
-        7.0
-      ],
-      "to": [
-        4.0,
-        16.0,
-        9.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
           "texture": "#metal"
         },
         "east": {
@@ -85,16 +45,16 @@
       }
     },
     {
-      "name": "raileast",
+      "name": "beam",
       "from": [
-        12.0,
         2.0,
-        7.0
+        2.0,
+        5.0
       ],
       "to": [
         14.0,
-        16.0,
-        9.0
+        14.0,
+        11.0
       ],
       "rotationOrigin": [
         8.0,
@@ -123,16 +83,15 @@
       }
     },
     {
-      "//": "The mass hangs LOW in its guide, where a rope tensioner rests: it takes up slack, it does not climb, and its height means nothing numeric. Half a block wide, so the two rails bracket it exactly.",
-      "name": "mass",
+      "name": "flangewest",
       "from": [
-        4.0,
-        3.0,
+        0.0,
+        2.0,
         4.0
       ],
       "to": [
-        12.0,
-        13.0,
+        2.0,
+        15.0,
         12.0
       ],
       "rotationOrigin": [
@@ -142,189 +101,152 @@
       ],
       "faces": {
         "north": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "east": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "south": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "west": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "up": {
-          "texture": "#stone"
+          "texture": "#metal"
         },
         "down": {
-          "texture": "#stone"
+          "texture": "#metal"
         }
       }
     },
     {
-      "name": "hanger",
+      "name": "flangeeast",
       "from": [
-        7.0,
-        13.0,
+        14.0,
+        2.0,
+        4.0
+      ],
+      "to": [
+        16.0,
+        15.0,
+        12.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "//": "The knee: vertical shaft in from the cell below, horizontal shaft out to the west. It reaches 1.5 units below its own cell so the drive shaft's top visibly enters it instead of stopping at a seam.",
+      "name": "gearbox",
+      "from": [
+        3.5,
+        -1.5,
+        3.5
+      ],
+      "to": [
+        12.5,
+        28.2,
+        12.5
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "name": "gearcap",
+      "from": [
+        2.5,
+        28.2,
+        2.5
+      ],
+      "to": [
+        13.5,
+        29.7,
+        13.5
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal"
+        },
+        "east": {
+          "texture": "#metal"
+        },
+        "south": {
+          "texture": "#metal"
+        },
+        "west": {
+          "texture": "#metal"
+        },
+        "up": {
+          "texture": "#metal"
+        },
+        "down": {
+          "texture": "#metal"
+        }
+      }
+    },
+    {
+      "//": "Leaves west at the lay shaft's height, so gearbox to bullwheel hub is one unbroken line at one height.",
+      "name": "shaftwest",
+      "from": [
+        0.0,
+        24.7,
         7.0
       ],
       "to": [
-        9.0,
-        16.0,
+        4.0,
+        26.7,
         9.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#rope"
-        },
-        "east": {
-          "texture": "#rope"
-        },
-        "south": {
-          "texture": "#rope"
-        },
-        "west": {
-          "texture": "#rope"
-        },
-        "up": {
-          "texture": "#rope"
-        },
-        "down": {
-          "texture": "#rope"
-        }
-      }
-    },
-    {
-      "//": "The guide column's four corner posts stopped at this cell's top face, so the machine leg stood on nothing and the whole frame read as hovering over its own base course. They carry on down here and land ON the pad, which is the foot plate - a post run to the cell floor instead would have its foot buried in the plate rather than bearing on it. Not done by reaching tensionguide.json downward out of its own cell: two of those stack in this column and would double up.",
-      "name": "anglewn",
-      "from": [
-        0.0,
-        2.0,
-        0.0
-      ],
-      "to": [
-        2.0,
-        16.0,
-        2.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "name": "anglews",
-      "from": [
-        0.0,
-        2.0,
-        14.0
-      ],
-      "to": [
-        2.0,
-        16.0,
-        16.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "name": "angleen",
-      "from": [
-        14.0,
-        2.0,
-        0.0
-      ],
-      "to": [
-        16.0,
-        16.0,
-        2.0
-      ],
-      "rotationOrigin": [
-        8.0,
-        8.0,
-        8.0
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
-        }
-      }
-    },
-    {
-      "name": "anglees",
-      "from": [
-        14.0,
-        2.0,
-        14.0
-      ],
-      "to": [
-        16.0,
-        16.0,
-        16.0
       ],
       "rotationOrigin": [
         8.0,

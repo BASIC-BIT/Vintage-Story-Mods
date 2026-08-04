@@ -63,7 +63,7 @@
     },
     {
       "name": "housing",
-      "from": [ 5.0, 12.0, 3.0 ],
+      "from": [ 5.0, 10.6, 3.0 ],
       "to": [ 11.0, 14.0, 13.0 ],
       "rotationOrigin": [ 8.0, 8.0, 8.0 ],
       "faces": {
@@ -102,94 +102,6 @@
         "up": { "texture": "#metal" },
         "down": { "texture": "#metal" }
       }
-    },
-    {
-      "name": "railwest",
-      "from": [ 3.2, -4.0, 0.0 ],
-      "to": [ 5.4, 0.0, 16.0 ],
-      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
-      "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
-      }
-    },
-    {
-      "name": "raileast",
-      "from": [ 10.6, -4.0, 0.0 ],
-      "to": [ 12.8, 0.0, 16.0 ],
-      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
-      "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
-      }
-    },
-    {
-      "name": "railwestflarein",
-      "from": [ 3.2, -3.98, -16.0 ],
-      "to": [ 5.4, -0.02, 0.0 ],
-      "rotationOrigin": [ 4.3, -2.0, 0.0 ],
-      "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
-      },
-      "rotationY": 8
-    },
-    {
-      "name": "railwestflareout",
-      "from": [ 3.2, -3.98, 16.0 ],
-      "to": [ 5.4, -0.02, 32.0 ],
-      "rotationOrigin": [ 4.3, -2.0, 16.0 ],
-      "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
-      },
-      "rotationY": -8
-    },
-    {
-      "name": "raileastflarein",
-      "from": [ 10.6, -3.98, -16.0 ],
-      "to": [ 12.8, -0.02, 0.0 ],
-      "rotationOrigin": [ 11.7, -2.0, 0.0 ],
-      "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
-      },
-      "rotationY": -8
-    },
-    {
-      "name": "raileastflareout",
-      "from": [ 10.6, -3.98, 16.0 ],
-      "to": [ 12.8, -0.02, 32.0 ],
-      "rotationOrigin": [ 11.7, -2.0, 16.0 ],
-      "faces": {
-        "north": { "texture": "#metal" },
-        "east": { "texture": "#metal" },
-        "south": { "texture": "#metal" },
-        "west": { "texture": "#metal" },
-        "up": { "texture": "#metal" },
-        "down": { "texture": "#metal" }
-      },
-      "rotationY": 8
     }
   ]
 }
