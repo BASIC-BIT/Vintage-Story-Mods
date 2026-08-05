@@ -134,8 +134,8 @@ def check_textures(install: Path) -> int:
     return len(refs)
 
 
-def check_shapes(install: Path) -> int:
-    """Same failure mode one level up: a shape that does not resolve draws nothing at all."""
+def shape_refs() -> set[tuple[str, str]]:
+    """(file, shape path) for every blocktype/itemtype that names its own geometry."""
     seen = set()
     for path in sorted(ASSETS.rglob("*.json")):
         data = load(path)
@@ -145,10 +145,43 @@ def check_shapes(install: Path) -> int:
         for spec in [data.get("shape")] + list((data.get("shapeByType") or {}).values()):
             if isinstance(spec, dict) and "base" in spec:
                 seen.add((file, spec["base"]))
+    return seen
+
+
+def check_shapes(install: Path) -> int:
+    """Same failure mode one level up: a shape that does not resolve draws nothing at all."""
+    seen = shape_refs()
     for file, base in sorted(seen):
         if not resolve_asset(base, "shapes", ".json", install):
             fail(f"shape {file} -> {base} resolves to no JSON")
     return len(seen)
+
+
+def check_palette() -> int:
+    """One key, one sprite, mod-wide.
+
+    A texture key is a PALETTE entry, not a local name: `girder` means riveted iron on all
+    twenty faces that ask for it, or it means nothing. Two spellings of the same material is
+    how a mod ends up with a crossarm and a post in subtly different greys, and nothing else
+    in this file would notice - both paths resolve, so `check_textures` passes.
+
+    ONE exclusion, and it is a rule rather than an allowlist: a file whose own `shape` is
+    VANILLA is speaking that shape's vocabulary, not ours. `haulrope` reuses
+    `game:item/resource/rope`, whose faces name `rope` and expect the item sprite; the mod's
+    own `rope` is `game:block/cloth/reedrope`, the drawn cable. Satisfying a borrowed shape
+    is not a palette choice, and overriding it to match would put a block sprite on a vanilla
+    item model. Nothing is hardcoded here - add another borrowed shape and it is excluded too.
+    """
+    borrowed = {file for file, base in shape_refs() if not base.startswith("ropeway:")}
+    palette: dict[str, set[str]] = {}
+    for file, key, path in texture_refs():
+        if file in borrowed:
+            continue
+        palette.setdefault(key, set()).add(path)
+    for key, sprites in sorted(palette.items()):
+        if len(sprites) > 1:
+            fail(f"palette #{key} names {len(sprites)} sprites: {', '.join(sorted(sprites))}")
+    return len(palette)
 
 
 # ---------------------------------------------------------------- 2. recipe codes
@@ -315,6 +348,7 @@ def main() -> int:
 
     textures = check_textures(install)
     shapes = check_shapes(install)
+    palette = check_palette()
     ingredients = check_recipes(codes, install)
     stacks = check_handbook_codes(codes)
     keys = check_lang(codes)
@@ -322,6 +356,7 @@ def main() -> int:
     print(f"json parsed        {parsed}")
     print(f"texture paths      {textures}")
     print(f"shape refs         {shapes}")
+    print(f"palette keys       {palette}")
     print(f"recipe codes       {ingredients}")
     print(f"handbook itemstack {stacks}")
     print(f"lang keys          {keys}")

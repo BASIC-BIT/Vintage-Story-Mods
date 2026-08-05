@@ -500,6 +500,38 @@ public class BEPylonBase : BlockEntity
     public const float CableRadius = 0.06f;
 
     /// <summary>
+    /// Blocks between the haul rope's two strands - the going strand the cabin hangs on and the return strand
+    /// stacked above it. DERIVED off the wheel and nothing else, which is the point of writing it as an
+    /// expression: <see cref="WrapPath"/> puts the groove tangent to the going strand at the BOTTOM of the
+    /// bullwheel, so a rope that wraps 180 degrees round it leaves at the TOP, one wheel DIAMETER up.
+    /// 1.3263 blocks.
+    /// <para>
+    /// A literal here is the whole failure mode this constant exists to prevent - re-author
+    /// <c>bullwheelrim.json</c> and the loop has to follow the rim rather than drift off it.
+    /// <c>TheTwoStrandsAreOneCurveAWheelApart</c> is what holds that, and it reads the rim rather than this.
+    /// </para>
+    /// <para>
+    /// There is no second cabin, no second <c>Travelled</c> and no second corridor. The return strand is the
+    /// half a loop that nothing hangs on: the same polyline, plus this in Y, drawn one more time. Everything
+    /// that decides where a cabin is - <see cref="RopewayLine.PositionAt"/>, <c>IsSpanClear</c>, the rail,
+    /// the jaw - is untouched by it.
+    /// </para>
+    /// <para>
+    /// AT A PLAIN END TOWER the strand comes in at this same height and ENDS ON THE SHOE, which is the
+    /// element <c>pylonhead.json</c> already carries for it - <c>returnshoe</c>'s top face is
+    /// <c>ReturnLift - CableRadius</c> by construction, so the rope lands on its saddle and stops. It used to
+    /// converge onto the sheave instead, over the <see cref="SpanMath.TrimForTowers"/> window, and that ramp
+    /// is what drove the loop through a parked cabin's grip: <see cref="OnTesselation"/> carries the numbers
+    /// and <c>TheReturnStrandStaysAWheelAboveTheCabinOnEveryTopology</c> is what holds it shut. The two
+    /// answers the pinch was chosen over are unchanged and still cost what they cost - a smaller sheave has
+    /// to have a 0.663-block radius against a 0.325-block throat and would be a new block, and asking whether
+    /// the LINE has a terminal anywhere needs persisted state <see cref="OnTesselation"/>'s two- or
+    /// three-tower <see cref="LocalLine"/> cannot see. Ending on the shoe needs neither.
+    /// </para>
+    /// </summary>
+    public const double ReturnLift = 2 * BullwheelRenderer.WrapRadius;
+
+    /// <summary>
     /// The station rail's cross-section, in blocks: two boxes 2.2 units wide and 4 units deep with their
     /// inner faces 2.6 units off the centre line, hanging so the band runs 0.75 to 0.50 blocks under the
     /// sheave. The cabin's guide rollers reach 2.5 units, so the fit is 0.1 unit - 0.00625 blocks - per
@@ -615,7 +647,24 @@ public class BEPylonBase : BlockEntity
         {
             if (peer == me) continue;
 
-            Emit(mesher, BuildRun(HalfSpanPath(line, me, peer), CableRadius, CableRadius, rope));
+            // THE LOOP, and it is one more call over the same list. The return strand cannot scissor away
+            // from the going one at a corner because there is no second curve to scissor: PositionAt's bend
+            // is horizontal, so a path raised by a constant is the SAME plan curve rather than an offset of
+            // it. Lateral stacking is what cannot do this - 2*rho on the inside of the tightest bend the mod
+            // draws (radius of curvature 1.317 blocks at a right angle) has radius -0.009 and cusps.
+            //
+            // The constant is CONSTANT, at every tower including a plain end one, and that is a fix rather
+            // than a tidy-up. The lift used to ramp back to zero at a tower with one span and no wheel, so
+            // the two strands converged onto the sheave - and the cabin parks on that sheave and departs
+            // along that ramp. The jaw's top plate stands w +0.0625..+0.15 and the strand carries its own
+            // 0.06 either side, so a ramp is inside cabin metal for 0.2075 of its 1.3263 blocks of lift:
+            // 0.77 blocks of travel, measured, every trip, both ways. There is no window to start the ramp
+            // in either - travel is clamped to the anchor and the plate reaches 0.131 blocks past it, so the
+            // cabin sweeps every point a ramp could occupy at any span length. What ends the strand at such
+            // a tower instead is the shoe it has been riding all along; see ReturnLift.
+            var going = HalfSpanPath(line, me, peer);
+            Emit(mesher, BuildRun(going, CableRadius, CableRadius, rope));
+            Emit(mesher, BuildRun(Lift(going, ReturnLift), CableRadius, CableRadius, rope));
             if (metal == null) continue;
 
             // Both cheeks of the slot, from one function, off the same curve. Every authored rail element is
@@ -632,21 +681,52 @@ public class BEPylonBase : BlockEntity
             Emit(mesher, BuildRun(RailPath(line, me, peer, -RailOffset), RailHalfWidth, depth, metal));
         }
 
-        // The wrap, and everything that carries the wheel out to it. A property of the TOWER rather than of
-        // a span, so it is outside the loop: one ring per terminal, drawn once.
-        var dead = WearsABullwheel ? DeadSide : null;
-        if (dead == null) return replacedDefault;
+        // The wrap, and everything that carries the wheel to wherever the LINE has put it. A property of the
+        // TOWER rather than of a span, so it is outside the loop: one arc per terminal, drawn once.
+        if (!WearsABullwheel) return replacedDefault;
 
+        var dead = DeadSide;
         Emit(mesher, BuildRun(WrapPath(dead), CableRadius, CableRadius, rope, turnsVertically: true));
         if (metal == null) return replacedDefault;
+
+        // Where the renderer is about to stand the wheel, read from the SAME function the renderer reads, so
+        // the brackets end on the hub by construction rather than by two files agreeing. Zero on a tower with
+        // no rope on it at all, which draws nothing.
+        var hub = BEBullwheel.WrapOffset(dead, Spans.Count);
+        if (hub.Length() < 1e-9) return replacedDefault;
+
+        // Across the LINE - the perpendicular of the path's own tangent at this tower, which at a terminal is
+        // its single leg and at a through station is the corner's bisector. Same source as the rail's, so a
+        // wheel placed a quarter turn out still gets its brackets in the plane the line decides.
+        var tangent = line.DirectionAt(line.Cumulative[me]);
+        var plan = Math.Sqrt(tangent.X * tangent.X + tangent.Z * tangent.Z);
+        if (plan < 1e-9) return replacedDefault;
+
+        var across = new Vec3d(-tangent.Z / plan, 0, tangent.X / plan);
 
         // A fiftieth of a unit narrower than the cheek column it stands in, and the reason is JointPhase's:
         // the bearing cap, the bearing stand and the sheave cheek all present a face at that exact x, and a
         // plate flush with them would be 11.5 unit^2 of z-fight against the cap alone.
-        Emit(mesher, BuildRun(OutriggerPath(dead, RailOffset), RailHalfWidth - JointPhase, RailHalfDepth, metal));
-        Emit(mesher, BuildRun(OutriggerPath(dead, -RailOffset), RailHalfWidth - JointPhase, RailHalfDepth, metal));
+        Emit(mesher, BuildRun(BracketPath(across, hub, RailOffset), RailHalfWidth - JointPhase, RailHalfDepth, metal));
+        Emit(mesher, BuildRun(BracketPath(across, hub, -RailOffset), RailHalfWidth - JointPhase, RailHalfDepth, metal));
 
         return replacedDefault;
+    }
+
+    /// <summary>
+    /// The same polyline raised by <paramref name="dy"/> - the return strand, which is the going strand and a
+    /// constant and nothing else. NO position term: the ramp this used to carry at a plain end tower drew the
+    /// strand through the parked cabin's grip, and <see cref="OnTesselation"/> has the numbers.
+    /// <para>
+    /// Public for the same reason <see cref="HalfSpanPath"/> is: it is pure, and it is the whole of the claim
+    /// that there is only one curve here.
+    /// </para>
+    /// </summary>
+    public static List<Vec3d> Lift(IReadOnlyList<Vec3d> points, double dy)
+    {
+        var lifted = new List<Vec3d>(points.Count);
+        foreach (var p in points) lifted.Add(new Vec3d(p.X, p.Y + dy, p.Z));
+        return lifted;
     }
 
     private static void Emit(ITerrainMeshPool mesher, MeshData mesh)
@@ -698,8 +778,13 @@ public class BEPylonBase : BlockEntity
     /// The path from this tower's sheave to the midpoint of one span, in blocks relative to the sheave:
     /// sampled every <see cref="RunStep"/> through the bend window, then ONE straight box for the middle,
     /// which the bend leaves untouched.
+    /// <para>
+    /// Public for the same reason <see cref="WrapPath"/> and <see cref="BuildRun"/> are: it is pure, and the
+    /// no-scissoring claim is about the points it hands back at a real corner rather than about anything a
+    /// render can show. <c>TheTwoStrandsAreOneCurveAWheelApart</c>.
+    /// </para>
     /// </summary>
-    private static List<Vec3d> HalfSpanPath(RopewayLine line, int me, int peer)
+    public static List<Vec3d> HalfSpanPath(RopewayLine line, int me, int peer)
     {
         var origin = line.Anchors[me];
         var start = line.Cumulative[me];
@@ -772,35 +857,38 @@ public class BEPylonBase : BlockEntity
     }
 
     /// <summary>
-    /// Chords in the wrap. EVEN, so <see cref="BuildRun"/>'s alternating joint phase closes round the ring
-    /// instead of putting two full-depth boxes in one plane where it meets itself. Sixteen departs from the
-    /// true circle by 0.20 units, a tenth of the cable's own thickness.
+    /// Chords in the FULL turn the wrap's arc is half of. EVEN, and the reason changed when the ring did: it
+    /// used to be so <see cref="BuildRun"/>'s alternating joint phase closed round a ring, and there is no
+    /// closure any more. What needs even now is the TOP TANGENT - an odd chord count puts no chord midpoint
+    /// at pi, so the rope would leave the wheel off the return strand. Sixteen departs from the true circle
+    /// by 0.20 units, a tenth of the cable's own thickness.
     /// </summary>
     private const int WrapChords = 16;
 
     /// <summary>
-    /// The haul rope at a terminal: out of the sheave along the dead side and round the bullwheel's groove,
-    /// in blocks relative to the sheave. One polyline, so it is one <see cref="BuildRun"/> call.
+    /// The haul rope at a terminal: out of the sheave along the dead side, HALF WAY ROUND the bullwheel's
+    /// groove and away along the return strand, in blocks relative to the sheave. One polyline, so it is one
+    /// <see cref="BuildRun"/> call. Null at a tower with no dead side, which draws no wrap at all.
     /// <para>
-    /// A CLOSED RING, not the 180-degree arc a real terminal wraps. A real one sends its second strand back
-    /// down the line 2*rho above the first; this mod draws ONE strand for a loop everywhere else - the cabin
-    /// hangs on it, <c>IsSpanClear</c> certifies one corridor, one run is drawn per span - so a second strand
-    /// here would be a cable the whole length of the line that nothing hangs on. The two strands of the loop
-    /// collapse onto one ring, which is the same collapse the rest of the mod already makes, and it is the
-    /// only version with no free end: a true arc stops in mid air where the second strand would leave, which
-    /// reads as a snapped rope.
+    /// A 180-DEGREE ARC, and it used to be a closed ring. The ring's own comment said why - "a second strand
+    /// here would be a cable the whole length of the line that nothing hangs on" - and that is now false: the
+    /// second strand is drawn, the whole length of the line, <see cref="ReturnLift"/> above the first, and
+    /// nothing hangs on it because it is the half of the loop coming back. So the collapse is undone and the
+    /// wrap is the real thing: in low, round, out high. It is also CHEAPER - both stubs are collinear with
+    /// the chord they meet, so <see cref="OnTheLine"/> merges twelve points into NINE boxes against the
+    /// ring's sixteen.
     /// </para>
     /// <para>
     /// CHUNK MESH rather than something the renderer turns with the rim, which costs nothing per frame and
     /// is honest: <see cref="BuildBox"/> flat-samples its UVs, so the cable carries no lengthwise detail at
-    /// all and a static ring on a spinning rim is indistinguishable from one that turns with it.
+    /// all and a static arc on a spinning rim is indistinguishable from one that turns with it.
     /// </para>
     /// <para>
     /// The vertices sit on a circle of <c>rho / cos(pi/n)</c> so the chord MIDPOINTS - not the corners -
-    /// land on rho; the bottom midpoint is then exactly on the rope's centreline, which is the whole point
-    /// of the number. The straight stub out of the sheave is collinear with that bottom chord and
-    /// <see cref="OnTheLine"/> merges the two, so what comes back is sixteen boxes and not seventeen, and
-    /// the phase alternates all the way round.
+    /// land on rho. The FIRST chord's midpoint is then exactly on the going strand's centreline and the LAST
+    /// chord's exactly on the return strand's, which is what forces <see cref="ReturnLift"/> to be a wheel
+    /// diameter and not a number somebody picked. Both end chords come out horizontal - cos(15pi/16) equals
+    /// cos(17pi/16) - so both stubs are collinear with them and merge.
     /// </para>
     /// </summary>
     public static List<Vec3d> WrapPath(Vec3d dead)
@@ -810,11 +898,11 @@ public class BEPylonBase : BlockEntity
         var vertex = BullwheelRenderer.WrapRadius / Math.Cos(Math.PI / WrapChords);
 
         // The sheave itself, exactly, the same way HalfSpanPath starts: the rope leaves the throat here.
-        var points = new List<Vec3d>(WrapChords + 2) { new() };
-        for (var k = 0; k <= WrapChords; k++)
+        var points = new List<Vec3d>(WrapChords / 2 + 3) { new() };
+        for (var k = 0; k <= WrapChords / 2 + 1; k++)
         {
-            // Measured from straight down, so k = 0 and k = WrapChords are the same vertex and the ring
-            // closes on itself with no join to explain.
+            // Measured from straight down, so the first chord straddles the bottom of the wheel and the last
+            // straddles the top - half a turn, which is what a terminal wraps.
             var angle = (2 * k - 1) * Math.PI / WrapChords;
             var along = BullwheelRenderer.WrapOut + vertex * Math.Sin(angle);
 
@@ -824,33 +912,41 @@ public class BEPylonBase : BlockEntity
                 dead.Z * along));
         }
 
+        // ...and back to the tower on the return strand, which is where this tower's own lifted half-span
+        // starts. No free end anywhere: the loop leaves the wheel and goes back down the line.
+        points.Add(new Vec3d(0, ReturnLift, 0));
         return points;
     }
 
     /// <summary>
-    /// One of the two side plates that carry the wheel out to where it wraps, in blocks relative to the
-    /// sheave: from the bearing cap standing on that cheek to the wheel's own hub, 17.5 units long at 23.9
-    /// degrees below the lay shaft. On a drive station it reads as the chain case down to the sprocket and
-    /// on a tension station as the carriage tie back to the counterweight head, which is exactly the call
-    /// <c>ropeway:layshaft</c> already makes - at 16 pixels they are the same forged bar.
+    /// One of the two side plates that carry the wheel from its bearing on the sheave cheek to wherever the
+    /// line has stood its hub, in blocks relative to the sheave. At a terminal that is one cell out along the
+    /// dead side and <c>WrapDrop</c> down - 17.5 units at 23.9 degrees below the lay shaft, which reads as
+    /// the chain case down to the sprocket on a drive station and as the carriage tie back to the
+    /// counterweight head on a tension one. At a station the line runs THROUGH it is a vertical strut up to
+    /// the hold-down sheave. One function, because it is one part: the bracket between the bearing and the
+    /// hub.
+    /// <para>
+    /// <paramref name="hub"/> comes from <see cref="BEBullwheel.WrapOffset"/> - the SAME function the
+    /// renderer's matrix reads - so the bracket ends on the axle by construction rather than by two files in
+    /// two lanes agreeing about a sign.
+    /// </para>
     /// <para>
     /// It takes the RAIL's lateral offset and cross-section because those are the cheeks' own columns:
     /// <c>sheavecheekwest</c> and the bearing stand and cap above it all occupy x 3.2..5.4 on both head
-    /// shapes. Offset across the DEAD SIDE rather than across the block's facing, like everything else drawn
-    /// here, so a wheel placed a quarter turn out still gets a bracket in the plane it turns in.
+    /// shapes. Offset across the LINE rather than across the block's facing, like everything else drawn here,
+    /// so a wheel placed a quarter turn out still gets a bracket in the plane the line decides.
     /// </para>
     /// </summary>
-    private static List<Vec3d> OutriggerPath(Vec3d dead, double lateral)
+    private static List<Vec3d> BracketPath(Vec3d across, Vec3f hub, double lateral)
     {
-        // Blocks above the anchor, which is where the axle stands and the shipped bearings hold it.
+        // Blocks above the anchor, which is where the axle rests and the shipped bearings hold it.
         var shaft = BullwheelRenderer.RimPivotY - 0.5;
 
         return new List<Vec3d>
         {
-            new(-dead.Z * lateral, shaft, dead.X * lateral),
-            new(dead.X * BullwheelRenderer.WrapOut - dead.Z * lateral,
-                BullwheelRenderer.WrapRadius,
-                dead.Z * BullwheelRenderer.WrapOut + dead.X * lateral)
+            new(across.X * lateral, shaft, across.Z * lateral),
+            new(hub.X + across.X * lateral, shaft + hub.Y, hub.Z + across.Z * lateral)
         };
     }
 

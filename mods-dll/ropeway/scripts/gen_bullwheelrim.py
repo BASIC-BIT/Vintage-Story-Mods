@@ -21,7 +21,15 @@ SEG = 8            # octagonal rim
 
 apothem = R * math.cos(math.pi / SEG)
 half = R * math.sin(math.pi / SEG)
-FACES = {f: {"texture": "#metal"} for f in ("north", "east", "south", "west", "up", "down")}
+
+# `machine`, the palette's own key for a working mechanism, and NOT a `metal` of this script's invention.
+# The wheel is drawn by BEBullwheel with Tesselator.TesselateShape(Block, ...), which builds a BLOCK texture
+# source and never reads the shape's own map, so the key here has to be one blocktypes/bullwheel.json
+# declares - it declares `machine`. Writing `#metal` regenerates a rim the game renders as the unknown-texture
+# checker and reds EveryTextureKeyAShapeUsesIsDeclaredWhereTheGameWillLookForIt; the map below is written
+# anyway, and matches the blocktype's, so the file is readable on its own.
+TEXTURE = "machine"
+FACES = {f: {"texture": "#" + TEXTURE} for f in ("north", "east", "south", "west", "up", "down")}
 
 
 def el(name, x0, y0, z0, x1, y1, z1, deg):
@@ -48,7 +56,7 @@ for i in range(SEG):
 
 OUT.write_text(json.dumps({
     "textureWidth": 16, "textureHeight": 16,
-    "textures": {"metal": "game:block/metal/sheet/iron1"},
+    "textures": {TEXTURE: "game:block/metal/tarnished/iron"},
     "elements": elements,
 }, indent=2) + "\n")
 

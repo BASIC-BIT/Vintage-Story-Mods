@@ -71,9 +71,17 @@ public class RopewayMathTests
     [Fact]
     public void ClearanceCoversTheCabinBodyAndNotJustTheRopeLine()
     {
-        // Cabin body is anchor-3.25..anchor+0.19; the sampled rows are anchor-ClearanceBelow-0.5..anchor+0.5.
+        // Cabin body is anchor-3.25..anchor+0.19; the sampled rows are
+        // anchor-ClearanceBelow-0.5..anchor+ClearanceAbove+0.5.
         Assert.True(SpanMath.ClearanceBelow + 0.5 >= 3.25);
         Assert.Equal(1, SpanMath.ClearanceRadius);
+
+        // ...and above the rope there is the RETURN STRAND, which the cabin does not ride and terrain still
+        // has to be out of the way of. Its band is ReturnLift +/- CableRadius. ONE row covers it, with 0.766
+        // blocks of that row under it and 0.114 over: two "for margin" would refuse spans over nothing.
+        Assert.True(SpanMath.ClearanceAbove + 0.5 >= BEPylonBase.ReturnLift + BEPylonBase.CableRadius);
+        Assert.True(SpanMath.ClearanceAbove - 0.5 <= BEPylonBase.ReturnLift - BEPylonBase.CableRadius,
+            "a row of clearance rays is being cast above the return strand, over nothing");
     }
 
     [Fact]
@@ -1477,34 +1485,43 @@ public class RopewayMathTests
     }
 
     /// <summary>
-    /// The wrap's own geometry, which is three claims and all of them are about one number. The chord
-    /// MIDPOINTS sit on rho, not the corners, so the bottom of the ring lands exactly on the rope's own
-    /// centreline where the wheel is tangent to it; the ring closes on itself, so there is no free end
-    /// anywhere; and the straight stub out of the sheave is collinear with the bottom chord, which is why
-    /// <c>BuildRun</c> hands back sixteen boxes rather than seventeen and the joint phase alternates all the
-    /// way round instead of putting two full-depth boxes in one plane where it meets itself.
+    /// The wrap's own geometry, and it is one claim made twice. The chord MIDPOINTS sit on rho, not the
+    /// corners, so the FIRST chord lands exactly on the going strand's centreline where the wheel is tangent
+    /// to it from above, and the LAST lands exactly on the RETURN strand's where it is tangent from below.
+    /// That is what makes <c>ReturnLift</c> a wheel diameter rather than a number somebody picked - and it is
+    /// what stops anyone "tidying" the chord count, because an odd count puts no midpoint at pi and the rope
+    /// would silently leave the wheel off its own strand.
+    /// <para>
+    /// It used to be a CLOSED RING, on the argument that a true arc "stops in mid air where the second strand
+    /// would leave". The second strand is drawn now, so there is no free end and the arc is also cheaper:
+    /// both stubs are collinear with the chord they meet, so twelve points come back as nine boxes against
+    /// the ring's sixteen.
+    /// </para>
     /// </summary>
     [Fact]
-    public void TheWrapIsAClosedRingBeddedOnTheRopesOwnCentreline()
+    public void TheWrapLeavesOnTheReturnStrand()
     {
         var dead = new Vec3d(0, 0, 1);
         var points = BEPylonBase.WrapPath(dead);
 
         Assert.Null(BEPylonBase.WrapPath(null));
-        Assert.Equal(18, points.Count);
 
-        // It starts at the sheave, exactly, the same way the half-cable does.
+        // The sheave, ten arc vertices - half of sixteen chords, plus the one that closes each end chord -
+        // and the tower again on the return strand.
+        Assert.Equal(12, points.Count);
+
+        // It starts at the sheave, exactly, the same way the half-cable does...
         Assert.Equal(0, points[0].Length(), 9);
 
-        // Closed: last vertex is first vertex.
-        Assert.Equal(points[1].X, points[17].X, 9);
-        Assert.Equal(points[1].Y, points[17].Y, 9);
-        Assert.Equal(points[1].Z, points[17].Z, 9);
+        // ...and it ends where this tower's own lifted half-span starts. No free end anywhere.
+        Assert.Equal(0, points[11].X, 9);
+        Assert.Equal(BEPylonBase.ReturnLift, points[11].Y, 9);
+        Assert.Equal(0, points[11].Z, 9);
 
         var axleZ = (double)BullwheelRenderer.WrapOut;
         var axleY = (double)BullwheelRenderer.WrapRadius;
 
-        for (var k = 1; k < points.Count - 1; k++)
+        for (var k = 1; k < points.Count - 2; k++)
         {
             // Every chord's MIDPOINT is exactly rho from the axle, which is the tangency. The vertices are
             // 0.208 units outside it, a tenth of the cable's own thickness.
@@ -1512,30 +1529,165 @@ public class RopewayMathTests
             var midZ = (points[k].Z + points[k + 1].Z) / 2 - axleZ;
             Assert.Equal(axleY, Math.Sqrt(midY * midY + midZ * midZ), 6);
 
-            // Flat in the cross-axis: the ring turns in the plane that contains the line, so a wheel that
+            // Flat in the cross-axis: the arc turns in the plane that contains the line, so a wheel that
             // wrapped sideways would show up here rather than in a render.
             Assert.Equal(0, points[k].X, 9);
         }
 
-        // The bottom of the ring is ON the rope, which is what the whole drop is for, and the stub that
-        // reaches it is dead straight out of the sheave.
+        // The BOTTOM chord is ON the going strand and the stub that reaches it is dead straight out of the
+        // sheave, so BuildRun merges the three into one box.
         Assert.Equal(0, points[1].Y, 6);
         Assert.Equal(0, points[2].Y, 6);
         Assert.True(points[1].Z < axleZ && points[2].Z > axleZ,
-            "the ring's bottom chord does not straddle the axle, so it is not tangent under the wheel");
+            "the arc's bottom chord does not straddle the axle, so it is not tangent under the wheel");
 
-        // THE HANDSHAKE, and it is the only thing tying the two lanes together. The ring is chunk mesh from
+        // The TOP chord is on the return strand, at exactly twice the radius, and the closing stub is
+        // collinear with it for the same reason. THIS is where the loop's separation comes from.
+        Assert.Equal(BEPylonBase.ReturnLift, points[9].Y, 6);
+        Assert.Equal(BEPylonBase.ReturnLift, points[10].Y, 6);
+        Assert.True(points[9].Z > axleZ && points[10].Z < axleZ,
+            "the arc's top chord does not straddle the axle, so the rope does not leave over the wheel");
+
+        // Half a turn and no more: the arc never comes back down past the axle's height on the near side.
+        Assert.True(points[10].Z < axleZ && points[10].Y > axleY,
+            "the arc runs past the top of the wheel");
+
+        // THE HANDSHAKE, and it is the only thing tying the two lanes together. The arc is chunk mesh from
         // BEPylonBase and the wheel is a matrix in BullwheelRenderer, computed in different files from
         // different constants, and the whole build is a rope drawn round a wheel that is somewhere else if
         // they disagree by a sign. The wheel rests RimPivotY - 0.5 above the anchor; add the offset and it
-        // has to land on the centre this ring was drawn about.
-        var offset = BEBullwheel.WrapOffset(dead);
+        // has to land on the centre this arc was drawn about.
+        var offset = BEBullwheel.WrapOffset(dead, 1);
         Assert.Equal(dead.X * axleZ, offset.X, 5);
         Assert.Equal(dead.Z * axleZ, offset.Z, 5);
         Assert.Equal(axleY, BullwheelRenderer.RimPivotY - 0.5 + offset.Y, 5);
 
-        // ...and no dead side is no offset, which is the wheel a cabin passes under.
-        Assert.Equal(0, BEBullwheel.WrapOffset(null).Length(), 9);
+        // A tower with no rope on it leaves the wheel where the shape authors it...
+        Assert.Equal(0, BEBullwheel.WrapOffset(null, 0).Length(), 9);
+
+        // ...and a station the line runs THROUGH lifts it onto the return strand instead, groove tangent
+        // from below. Straight up, because there is no dead side to go out along.
+        var held = BEBullwheel.WrapOffset(null, 2);
+        Assert.Equal(0, held.X, 9);
+        Assert.Equal(0, held.Z, 9);
+        Assert.Equal(BEPylonBase.ReturnLift + axleY, BullwheelRenderer.RimPivotY - 0.5 + held.Y, 5);
+    }
+
+    /// <summary>
+    /// THE no-scissoring claim, and it is one assert because it is one list. The return strand is the going
+    /// strand's own polyline with a constant added to Y, so at a 90 degree corner - the sharpest bend the mod
+    /// draws, radius of curvature 1.317 blocks - the two differ by exactly <c>(0, ReturnLift, 0)</c> at every
+    /// sample and by NOTHING in plan. <c>PositionAt</c> adds its bend to X and Z only, which is what makes
+    /// that true rather than approximately true.
+    /// <para>
+    /// Stacked is the only arrangement with this property. An offset curve 1.3263 blocks LATERAL on the
+    /// inside of that same turn has radius -0.009: offsetting a plan curve by more than its own radius of
+    /// curvature folds it over itself, and the two strands cross. A vertical offset does not interact with a
+    /// horizontal curvature at all.
+    /// </para>
+    /// <para>
+    /// The separation itself is the WHEEL, and that half is pinned where the wheel is measured -
+    /// <c>TheWrappedWheelClearsACabinAtEveryPositionTheCabinCanReach</c> re-derives rho off the shipped rim's
+    /// own sweep and ties <c>ReturnLift</c> to it, so re-authoring <c>bullwheelrim.json</c> moves the loop
+    /// with it or fails there.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheTwoStrandsAreOneCurveAWheelApart()
+    {
+        // Two 24-block legs meeting at a right angle, which is the geometry TheBentPathNeverDrives... uses.
+        var line = Line((0, 64, -24), (0, 64, 0), (24, 64, 0));
+
+        foreach (var peer in new[] { 0, 2 })
+        {
+            var going = BEPylonBase.HalfSpanPath(line, 1, peer);
+            var returning = BEPylonBase.Lift(going, BEPylonBase.ReturnLift);
+
+            Assert.Equal(going.Count, returning.Count);
+            Assert.True(going.Count > 8, "the bend window was not sampled, so this proves nothing about a curve");
+
+            for (var i = 0; i < going.Count; i++)
+            {
+                // Bit-identical in plan: the SAME list, not a curve fitted to it.
+                Assert.Equal(going[i].X, returning[i].X);
+                Assert.Equal(going[i].Z, returning[i].Z);
+                Assert.Equal(BEPylonBase.ReturnLift, returning[i].Y - going[i].Y, 12);
+            }
+
+            // The bend is real on this geometry, or the loop above is comparing two straight lines.
+            var bowed = 0.0;
+            for (var i = 0; i < going.Count; i++)
+            {
+                var t = going[i].Length() / going[^1].Length();
+                bowed = Math.Max(bowed, Math.Abs(going[i].X - going[^1].X * t) + Math.Abs(going[i].Z - going[^1].Z * t));
+            }
+
+            Assert.True(bowed > 0.1, $"the sampled half-span only bows {bowed} blocks off its own chord");
+        }
+
+        // A wheel DIAMETER, not a number. Two radii because the rope enters the groove at the bottom of the
+        // bullwheel and a 180 degree wrap leaves at the top.
+        Assert.Equal(2 * BullwheelRenderer.WrapRadius, BEPylonBase.ReturnLift, 12);
+        Assert.Equal(1.3263, BEPylonBase.ReturnLift, 4);
+    }
+
+    /// <summary>
+    /// THE TWO HALVES MEET, at any pitch and at any length, because the lift is a constant and not a ramp.
+    /// Each tower draws only its own half of a span, so the two have to arrive at the midpoint at the same
+    /// height, and a lift that was a function of position along the span did not: it ramped over
+    /// <c>TrimForTowers</c> of the THREE-DIMENSIONAL span while dividing by the HORIZONTAL run, so on a
+    /// pitched span the ramp was still climbing where this tower's half stops - 0.33 blocks of missing rope
+    /// on a 5-block span at 53 degrees, 0.83 at 71.6 - and it switched off entirely at a span of one block
+    /// or less, where <c>TrimForTowers</c> is 0, leaving the strand at full height with no ramp under it.
+    /// <para>
+    /// The rows are the pitches that broke and the two lengths that turn the old window off. What they all
+    /// assert now is the same one thing: the return strand is the going strand's own points plus
+    /// <c>ReturnLift</c>, at every sample, so a half-span cannot end anywhere but where the peer's begins.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData(30, 0)]     // flat, and the ordinary case
+    [InlineData(4, 3)]      // 36.9 degrees - the one pitch the old ramp happened to get right
+    [InlineData(3, 4)]      // 53.1 - a tower on a ledge above another, which is what a ropeway is for
+    [InlineData(2, 6)]      // 71.6, the worst measured gap
+    [InlineData(4, 16)]     // 76.0 over a 16.5-block span
+    [InlineData(1, 0)]      // one block: TrimForTowers is 0, so there was no window at all
+    [InlineData(0, 6)]      // no plan run to divide by
+    public void TheTwoHalvesOfTheReturnStrandMeetAtTheSpanMidpointAtAnyPitch(int run, int rise)
+    {
+        var line = Line((0, 64, 0), (run, 64 + rise, 0));
+
+        Vec3d Meeting(int me, int peer, out double atTheTower)
+        {
+            var going = BEPylonBase.HalfSpanPath(line, me, peer);
+            var returning = BEPylonBase.Lift(going, BEPylonBase.ReturnLift);
+
+            // Every sample, not just the ends: this is the whole no-ramp claim.
+            for (var i = 0; i < going.Count; i++)
+            {
+                Assert.Equal(going[i].X, returning[i].X);
+                Assert.Equal(going[i].Z, returning[i].Z);
+                Assert.Equal(BEPylonBase.ReturnLift, returning[i].Y - going[i].Y, 12);
+            }
+
+            // Half-spans are drawn in coordinates local to their own sheave, so put this one in the world.
+            atTheTower = returning[0].Y;
+            var origin = line.Anchors[me];
+            return new Vec3d(origin.X + returning[^1].X, origin.Y + returning[^1].Y, origin.Z + returning[^1].Z);
+        }
+
+        var mine = Meeting(0, 1, out var atMe);
+        var theirs = Meeting(1, 0, out var atPeer);
+
+        // THE MEETING. Both halves stop at the span's midpoint and both are a wheel above it.
+        Assert.Equal(mine.X, theirs.X, 9);
+        Assert.Equal(mine.Y, theirs.Y, 9);
+        Assert.Equal(mine.Z, theirs.Z, 9);
+
+        // ...and both START at their own tower a wheel above the sheave, which is where the shoe on
+        // pylonhead.json is - its top face IS ReturnLift - CableRadius. No free end and nothing to ramp.
+        Assert.Equal(BEPylonBase.ReturnLift, atMe, 12);
+        Assert.Equal(BEPylonBase.ReturnLift, atPeer, 12);
     }
 
     private static RopewayLine Line(params (int X, int Y, int Z)[] towers)

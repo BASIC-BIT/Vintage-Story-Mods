@@ -1,7 +1,8 @@
 # Cable Car (`ropeway`)
 
 An aerial ropeway for Vintage Story. Build pylon towers by hand, string a haul rope between them,
-and ride a cabin across the valley.
+and ride a cabin across the valley. The rope is a loop - one strand at sheave height carrying the cabin
+and one coming back over it, a bullwheel's diameter above, turned round by the wheel at each terminal.
 
 ## How it works
 

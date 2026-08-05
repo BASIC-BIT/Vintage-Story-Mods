@@ -24,16 +24,19 @@ namespace Ropeway;
 /// it. What buys the room is the axis nobody looked at - ALONG the line, past the tower. At a tower carrying
 /// exactly one span the far side is DEAD: nothing ever passes there, the parked cabin's grip stops 0.13
 /// blocks short of the tower centre and its roof is a full block below. So there the wheel stands one cell
-/// out along that dead side and <see cref="BullwheelRenderer.WrapDrop"/> down, its groove lands on the
-/// rope's centreline, and <see cref="BEPylonBase.WrapPath"/> closes the rope round it in a ring - 0.146
-/// blocks clear of the parked grip in plan, 0.06 clear of the station's own soffit.
+/// out along that dead side and <see cref="BullwheelRenderer.WrapDrop"/> down, its groove lands on the going
+/// strand's centreline, and <see cref="BEPylonBase.WrapPath"/> takes the rope half a turn round it and away
+/// on the RETURN strand, <see cref="BEPylonBase.ReturnLift"/> above the one it arrived on - 0.146 blocks
+/// clear of the parked grip in plan, 0.06 clear of the station's own soffit. That wheel DIAMETER is the
+/// separation of the loop's two strands: the wheel decides it, not the other way round.
 /// </para>
 /// <para>
-/// At a station the line runs THROUGH, the wheel stays where it was and no wrap is drawn: there is no dead
-/// side, and a ring dropped to the rope on either side of such a tower would have a passing cabin's grip
-/// inside it for a block of travel, every trip, in both directions. That is not a wart, it is the machine -
-/// a terminal has a bullwheel with a wrap; a tower in the middle of a line has a deflection sheave, which is
-/// what the raised wheel already was.
+/// At a station the line runs THROUGH there is no dead side and no wrap is drawn - a ring dropped to the
+/// going strand on either side of such a tower would have a passing cabin's grip inside it for a block of
+/// travel, every trip, in both directions. It cannot stay where it rests either, because there the RETURN
+/// strand runs through the middle of the rim. It goes UP by <see cref="BullwheelRenderer.HoldDownRise"/> and
+/// becomes a hold-down sheave on the strand nothing rides on. Still not a wart: a terminal has a bullwheel
+/// that turns the loop, and a tower in the middle of a line has a sheave that holds it.
 /// </para>
 /// <para>
 /// It exists for one job: to TURN. A drive tower with a still wheel is what the trial failed on - the
@@ -121,26 +124,39 @@ public class BEBullwheel : BlockEntity
         RegisterGameTickListener(
             _ =>
             {
+                var tower = Tower;
                 renderer.Speed = LineSpeed();
-                renderer.Offset = WrapOffset(Tower?.DeadSide);
+                renderer.Offset = WrapOffset(tower?.DeadSide, tower?.Spans.Count ?? 0);
             },
             500, 0);
     }
 
     /// <summary>
-    /// Where the wheel stands, given the tower's dead side: out along it by
-    /// <see cref="BullwheelRenderer.WrapOut"/> and down by <see cref="BullwheelRenderer.WrapDrop"/>, or the
-    /// zero vector when there is no dead side to stand on. Pure, and therefore the one part of the pose the
-    /// suite can look at.
+    /// Where the wheel stands, given the tower's dead side and how many spans it carries. Three poses, one
+    /// per shape of rope over the tower, and each of them tangent to a strand:
+    /// <list type="bullet">
+    /// <item>a TERMINAL (one span, so there is a dead side): out along it by
+    /// <see cref="BullwheelRenderer.WrapOut"/> and down by <see cref="BullwheelRenderer.WrapDrop"/>, groove
+    /// on the going strand, and the drawn wrap goes half a turn round it and leaves on the return strand;</item>
+    /// <item>a station the line runs THROUGH (two spans, no dead side): straight up by
+    /// <see cref="BullwheelRenderer.HoldDownRise"/>, groove under the RETURN strand. It has to move, because
+    /// where it rests the return strand runs through the middle of the rim;</item>
+    /// <item>a tower with no rope on it: the zero vector.</item>
+    /// </list>
+    /// Pure, and therefore the one part of the pose the suite can look at. <see cref="BEPylonBase"/> reads it
+    /// too, so the brackets it draws end on the axle by construction.
     /// </summary>
-    public static Vec3f WrapOffset(Vec3d deadSide)
+    public static Vec3f WrapOffset(Vec3d deadSide, int spans)
     {
-        return deadSide == null
-            ? new Vec3f()
-            : new Vec3f(
+        if (deadSide != null)
+        {
+            return new Vec3f(
                 (float)(deadSide.X * BullwheelRenderer.WrapOut),
                 -BullwheelRenderer.WrapDrop,
                 (float)(deadSide.Z * BullwheelRenderer.WrapOut));
+        }
+
+        return spans >= 2 ? new Vec3f(0, BullwheelRenderer.HoldDownRise, 0) : new Vec3f();
     }
 
     private MeshData RimMesh(ICoreClientAPI capi)

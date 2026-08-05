@@ -338,9 +338,31 @@ column → two `layshaft` cells as a tie rod → the return wheel's carriage. `r
 one block used by both: on the drive it turns and on the tensioner it pulls, and at 16 pixels those are the
 same forged bar on the same standards.
 
-**Nothing in the drive train is within 8 units of the rope or the cabin.** The shaft runs along local X at
-25.7 and the haul rope runs along local Z at 8 — `SpanMath.AnchorOf`, the cell centre — so they cross only
-at the wheel and are 17.7 units apart vertically.
+**Nothing in the drive train is within 8 units of the GOING strand or the cabin.** The shaft runs along local
+X at 25.7 and the going strand runs along local Z at 8 — `SpanMath.AnchorOf`, the cell centre — so they cross
+only at the wheel and are 17.7 units apart vertically.
+
+**The RETURN strand is a different question and the answer is 1.56 units (2026-08-04).** The haul rope is a
+loop: a second strand runs the whole length of the line `BEPylonBase.ReturnLift` = 2 × `BullwheelRenderer.WrapRadius`
+= 21.22 units above the first, i.e. cell-local 29.22, band 28.26 … 30.18. The shaft train tops out at 26.7 —
+`layshaft.shaft`, `bullwheel.hubaxle`, `tensionhead.tierod`, all the same bar — so the return strand passes
+**1.56 units over the whole of it**, and over the hub axle it does so in the same column rather than a cell
+along. Not a clash, and it is the tightest *vertical* gap the loop creates; what it means in practice is that
+the shaft's height is now pinned from both sides and cannot be raised. The two genuinely tight clearances the
+loop creates are LATERAL and are asserted rather than written down here:
+`TheReturnStrandClearsTheBullwheelsOwnBearings` (0.74 units per side — the strand threads between the wheel's
+own bearing caps, whose tops stand 0.24 units into its band), and the wheel brackets' 1.64, which is the
+sheave throat's own number.
+
+**And at a station the line runs THROUGH, the wheel is no longer level with the bar that drives it.** There
+is no dead side to stand out on, and where the wheel rests the return strand runs 0.22 blocks above its axle
+— 1.12 blocks of rope inside the swept rim, every revolution. So it rises `BullwheelRenderer.HoldDownRise` =
+3 × `WrapRadius` − (`RimPivotY` − 0.5) = 0.883 blocks and becomes a **hold-down sheave** on the strand
+nothing rides on, its groove tangent to that strand from below exactly as it is tangent to the going strand
+from above at a terminal. The two brackets that carry it out to the rope at a terminal become the two struts
+that carry it up here — one function, `BEPylonBase.BracketPath`, keyed off the same `BEBullwheel.WrapOffset`
+the renderer's own matrix reads. The cost is `CullRadius` 2.0 → 2.75 and the unbroken-bar-at-one-height
+property, which that tower loses in the same way and for the same reason a terminal already had.
 
 **Why a plain `IRenderer` and not `MechBlockRenderer`.** `mods-dll/flywheelpower`'s
 `FlywheelMechBlockRenderer` is an *instanced* renderer registered with `MechanicalPowerMod` and driven

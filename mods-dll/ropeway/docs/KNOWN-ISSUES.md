@@ -1,9 +1,163 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 174 ropeway tests passing — 84 `[Fact]` plus 90 `[InlineData]` across the four files in
+State: build green, 187 ropeway tests passing — 90 `[Fact]` plus 97 `[InlineData]` across the four files in
 `mods-dll/ropeway.Tests`, which is where to re-derive this number rather than trusting the line. (It read
-136 for two rounds after the count moved, 147 for two more, 168 for two more again, and 172 for one.) Everything in the tables below was found by
+136 for two rounds after the count moved, 147 for two more, 168 for two more again, 172 for one, 174 for
+one and 180 for one.) Everything in the tables below was found by
 reading code, not by playing — none of *it* has been observed in game.
+
+## The haul rope is a LOOP (2026-08-04)
+
+Two strands, stacked, one cabin. `BEPylonBase.OnTesselation` draws every half-span twice: once as it always
+did, and once over `Lift(going, ReturnLift)` — the **same point list** with a constant added to Y.
+There is no second cabin, no second `Travelled`, no new block and no new multiblock cell. Full derivation:
+`docs/agentic/ingest/cablecar/STACKED-LOOP-SPEC.md`; renders under
+`docs/agentic/ingest/cablecar/renders/loop/`.
+
+**The separation is tied to the rim by an ASSERTION, not by a derivation, and that distinction is the whole
+of what this paragraph now claims.** `ReturnLift = 2 * BullwheelRenderer.WrapRadius` = **1.3263 blocks**, and
+it is a wheel *diameter* because `WrapPath` puts the groove tangent to the going strand at the BOTTOM of the
+bullwheel — so a rope that wraps 180° leaves at the TOP. What this used to say is that re-authoring
+`bullwheelrim.json` makes the loop follow the rim. **It does not**, and it was tested by doing it: the rim's
+`R` was taken 9.0 → 8.5 and regenerated, and nothing about where the strands are drawn moved, because
+`WrapRadius` is a **hardcoded `10.6104f / 16f`**. What happens instead is that the build goes RED, with the
+number it is out by — `TheWrappedWheelClearsACabinAtEveryPositionTheCabinCanReach` re-derives ρ off the
+shipped rim's own swept corner and fails *"Expected 0.66315, Actual 0.63191"*.
+
+**So re-authoring the wheel is a THREE-PLACE edit, and here are the three places.** Change them together or
+the suite stops you:
+
+1. `BullwheelRenderer.WrapRadius` — the literal, `(swept reach + 0.96) / 16`;
+2. `pylonhead.json`'s `returnshoe` / `returnmast` `y` — the saddle's top face is `8 + 16 * (ReturnLift −
+   CableRadius)`, generated but **typed into the shape**, and `TheTowerCarriesTheReturnStrandOnItsOwnShoe`
+   compares the two;
+3. the pinned constants in the suite — `1.3263` in `TheTwoStrandsAreOneCurveAWheelApart`, `1.1163` in the
+   two cabin sweeps, `0.74` in `TheReturnStrandClearsTheBullwheelsOwnBearings`.
+
+That is a refusal rather than a derivation and it is deliberately not being re-engineered: a hardcoded
+constant caught by a test that fails with its own number is cheaper and louder than a build-time generator,
+and the chain **rim → `WrapRadius` → `ReturnLift` → `returnshoe`** is held end to end by tests that were
+watched failing.
+
+**Nothing can scissor at a corner, because there is no second curve.** `RopewayLine.PositionAt` adds its bend
+to X and Z only, so a path raised by a constant is the *same plan curve* — bit-identical at every sample over
+a right angle. `renders/loop/corner-after/material/top.png` shows one curve in plan, because the return
+strand is exactly on top of the going one. A LATERAL stack cannot have that: 2·rho on the inside of the
+bend's tightest 1.317-block radius of curvature gives radius **−0.009** and cusps, it passes through the
+`x = +1` brace at every tower, and it leaves the cabin 0.94 blocks of clearance against stacked's 1.1163.
+
+**The wrap stopped being a ring.** `WrapPath` is a 180° arc now — twelve points, of which both stubs are
+collinear with the chord they meet, so it emits **nine boxes against the closed ring's sixteen**. The ring's
+own comment said a second strand "would be a cable the whole length of the line that nothing hangs on"; that
+is now exactly what is drawn, so the collapse is undone and the arc is *cheaper* than the thing it replaced.
+`terminal-after` reports 2 coplanar overlaps against `terminal-before`'s 4, and both survivors are the
+cabin's own pre-existing `backrest`/`cargo` pair.
+
+**What changed on the tower: two elements on `pylonhead.json`, and nothing else.** `returnmast` continues the
+head's own centre column off the top of `housing` (which ends at y 14), and `returnshoe` is a flat saddle
+whose top face IS the strand's underside — `8 + 16 * (ReturnLift − CableRadius)` = 28.2608, generated rather
+than typed and held by `TheTowerCarriesTheReturnStrandOnItsOwnShoe`. The shoe is **short along the line**
+(8 units, the sheave's own depth) and **flat rather than a channel**, both for the reason the deleted rail
+plate paid for: a fixture on the tower's cardinal is only right where the path passes *through* the anchor,
+and that is one point. At a 45° corner the strand runs off the side of an 8-unit shoe by 4 units, which a
+flat plate merely stops being under and cheeks would clash with. `bullwheel.json` gets neither element: at a
+terminal the wheel is the carrier. The mast starts where `housing` stops, so the 0.20-unit soffit clearance
+over a parked cabin's grip — the tightest number in the machine — is untouched and `TheCabinFitsThroughTheTower`
+does not move.
+
+**`IsSpanClear` gained one row above the rope.** `SpanMath.ClearanceAbove = 1`, rays per span 12 → 15. Row
+`j = +1` spans w 0.5 … 1.5 against a strand band of 1.2663 … 1.3863, so one row covers it with 0.766 blocks
+of that row under the strand and 0.114 over; two "for margin" would refuse spans over nothing, because 2·rho
+lands in one row and the arithmetic says which. **A span that would have been legal yesterday can be refused
+today** if there is terrain a block above the rope line. That is the point of it, and existing lines are not
+re-checked.
+
+**The cabin cannot reach the return strand, and the proof is a pure vertical.** The whole cabin is under
+`jawtop` at +0.15 blocks and the whole strand is over +1.2663, so the gap is **1.1163 blocks = 17.86 units**
+at every position and every yaw — including parked at a terminal under the wrap's own arc — and no plan
+geometry enters it, so no sweep can beat it. That is 446 × the jaw's own authored play on the rope it *is*
+clamped to. `TheCabinNeverReachesTheReturnStrandAtAnyPositionOrYaw`.
+
+**The tightest thing the loop creates is lateral: 0.74 units.** At a terminal the return strand threads
+**between the bullwheel's own bearing caps**, whose tops stand 0.24 units into its vertical band. Nothing
+vertical is load-bearing there. `bullwheel.json` cannot widen its caps after this, and
+`TheReturnStrandClearsTheBullwheelsOwnBearings` is what says so. Everything else has most of a block:
+0.891 to the pylon head, 0.829 to the braces, 1.766 to the station rail; the wheel brackets leave the sheave
+throat's own 1.64.
+
+**A station the line runs THROUGH lifts its wheel.** There is no dead side, and where the wheel rests the
+return strand runs 0.22 blocks above its axle — **1.12 blocks of rope inside the swept rim, every
+revolution**. So it rises `BullwheelRenderer.HoldDownRise` = 3·`WrapRadius` − (`RimPivotY` − 0.5) = **0.883
+blocks** and becomes a hold-down sheave on the strand nothing rides on, its groove tangent from below exactly
+as it is tangent to the going strand from above at a terminal. `CullRadius` 2.0 → 2.75 goes with it, and the
+two brackets that carry the wheel out at a terminal become the two struts that carry it up here — one
+function, `BEPylonBase.BracketPath`, keyed off the same `BEBullwheel.WrapOffset` the renderer's matrix reads.
+Two alternatives were costed and rejected: **dropping the wheel in place** to carry both strands is refused
+by the cabin (the rim's lowest swept point lands at +0.06 against a passing grip at +0.15, and the grip is
+inside the rim for 0.90 blocks of travel every trip, both directions), and **refusing the second span at a
+station** is cheaper than either but makes a legal, buildable route unbuildable, which this mod has declined
+to do twice. Rendered: `renders/loop/through-{before,after}`.
+
+**A plain END tower ENDS the return strand on its own shoe, and the separation is constant everywhere
+(2026-08-04, and this replaces a pinch that shipped for one round).** The lift used to ramp back to zero over
+the tower's own `TrimForTowers` window so the two strands converged onto the sheave. **The cabin parks on
+that sheave**, and `TryPlaceCabin` only asks whether the line has a tension station *somewhere*, so
+`[tension station] — [plain tower]` is buildable, takes a cabin, and `MarkLoadedEnds` puts `MaxTravel` at the
+plain tower's own anchor: the ramp ran through the parked and departing cabin's `jawtop` plate for **0.77
+blocks of travel, every trip, in both directions**, deepest 0.065 blocks out. That is the same defect at the
+same scale as the one `BULLWHEEL-WRAP-SPEC` §3b refused a dropped wheel for (0.90 blocks), and it was
+introduced by the fix for a different problem.
+
+**There is no window to move the ramp into, which is why the answer is to delete it rather than shift it.**
+The grip's plate stands w +0.0625 … +0.15 and the strand carries its own 0.06 either side, so a lift is
+inside cabin metal for 0.2075 of its 1.3263 blocks — **16% of any window at any span length** — and travel is
+clamped to the anchor while the plate reaches 0.131 blocks *past* it, so the cabin sweeps every point a ramp
+could occupy. What the strand ends on instead is `returnshoe`, which was already under it: the saddle's top
+face **is** the strand's underside, so the rope arrives at full height, lands on the saddle and stops. The
+bare shoe the pinch left standing over such a tower is gone with it — the shoe now carries rope at every
+tower, which is what it was authored for. Two other answers were re-priced and still cost what they cost: a
+smaller return sheave has to have a 0.663-block radius against a 0.325-block throat and would be a new block,
+and drawing one strand on a terminal-less line is a question about the whole LINE that `OnTesselation`'s two-
+or three-tower `LocalLine` cannot answer without new persisted state. Held by
+`TheReturnStrandStaysAWheelAboveTheCabinOnEveryTopology`, which sweeps every drawn strand point against every
+position the cabin can hang at over five topologies — the plain END tower first — and fails at **−0.21
+blocks** against the ramp, and by `TheTwoHalvesOfTheReturnStrandMeetAtTheSpanMidpointAtAnyPitch`.
+
+**The pinch took two more defects out with it, both found in the same review.** It ramped over
+`TrimForTowers` of the **3-D** span while dividing by the **horizontal** run, so on a pitched span each
+tower's half was still climbing where it stopped and the peer's began at full height: a **0.33-block hole in
+the rope** at the midpoint of a 5-block span at 53°, 0.83 at 71.6°, breaking whenever
+`(L/2)·cos(pitch) < TrimForTowers(L)` — which is a tower on a ledge above another, the case a ropeway exists
+for. And at a span of **one block or less** `TrimForTowers` is 0, which the ramp read as "no ramp", leaving
+the strand at full height starting AT the sheave with nothing under it. Both are gone by construction: a
+constant cannot be short at the midpoint and has no window to switch off. **No minimum span was added** —
+nothing is wrong with a one-block span now, and a minimum would refuse a legitimate short hop between two
+ledges to buy nothing.
+
+**One z-fight note, pre-existing.** The return strand is drawn at the going strand's own thickness: the
+`JointPhase` it used to be thinned by, and the cross-axis phasing that went with it, existed only because the
+pinch put the two runs on one bearing, and both went with the pinch — re-rendered, the scene counts are
+unmoved (`straight` 2, `corner` 10, `terminal` 2, `through` 2, `plainend` 2, `line` 6). What is **not** fixed
+is that the return strand adds one more instance of the going strand's own pre-existing artefact at a corner:
+the two half-span runs a two-span tower draws meet at the tower centre with both starting at phase 0, so
+`corner-before`'s 8 coplanar faces become `corner-after`'s 10. Fixing that means seeding a run's parity from
+outside `BuildRun`, which is worth doing for all four runs at once or not at all.
+
+**At line scale the loop reads as a thicker cable, and that is the honest answer.** 1.33 blocks of separation
+against a 5-block tower is about two pixels of gap at 900 px — `renders/loop/zoom-line-after.png`. It reads
+as a loop when you are near a tower; what makes a terminal legible from across a valley is still the turning
+wheel, which is what `BULLWHEEL-REVIEW` concluded.
+
+**What a player with an existing line sees.** Nothing breaks and nothing has to be rebuilt. Every tower,
+span, name, cabin, call and freight bay is untouched — the loop is drawn geometry and one extra row of
+clearance rays, and neither is persisted state. On first load the line simply has a second rope over it, the
+pylon heads have grown a mast and a saddle, and each terminal's hoop has become a rope going round the wheel
+and coming back. **Two things a player could file as bugs and should not:** a plain end tower shows its
+return strand running onto the saddle and simply stopping there, with no wheel to have turned it (the line is
+unfinished — build a station there), and a station the line runs through shows its wheel standing a block
+higher than the shaft that drives it (it is holding the return strand down). One thing genuinely changes: **a new span over terrain that
+rises to within a block above the rope line is now refused** where it would have been allowed. Existing spans
+are never re-checked, so no built line loses anything.
 
 ## Station rail (2026-08-03) — what shipped, what was reverted, what it costs
 
@@ -343,13 +497,19 @@ and a wheel tangent to that rope from above cannot share a point with the clamp 
 the room is the axis along the line, past the tower. At a tower carrying exactly one span the far side is
 **dead** — nothing ever passes there — so `BullwheelRenderer.Offset` carries the wheel one cell out along it
 and `WrapDrop` = 0.443 blocks down, its groove lands on the rope's centreline, and `BEPylonBase.WrapPath`
-closes the rope round it as a sixteen-chord ring. 0.146 blocks clear of the parked grip **in plan**, so no
-vertical margin is load-bearing. At a station the line runs *through* there is no dead side and no wrap is
-drawn: a ring dropped to the rope on either side of such a tower would have a passing cabin's grip inside it
-for a block of travel, every trip. `TheWrappedWheelClearsACabinAtEveryPositionTheCabinCanReach` sweeps the
+takes the rope round it. 0.146 blocks clear of the parked grip **in plan**, so no vertical margin is
+load-bearing. At a station the line runs *through* there is no dead side and no wrap is drawn: a ring dropped
+to the rope on either side of such a tower would have a passing cabin's grip inside it for a block of travel,
+every trip. `TheWrappedWheelClearsACabinAtEveryPositionTheCabinCanReach` sweeps the
 cabin against both poses and is what replaced `TheTurningWheelStaysAboveTheCellTheCabinPassesThrough`, whose
 premise the wrapped pose no longer has. Full derivation:
 `docs/agentic/ingest/cablecar/BULLWHEEL-WRAP-SPEC.md`.
+
+**Superseded on two points by the loop, above (2026-08-04).** The wrap was a *sixteen-chord closed ring* and
+is now a nine-box **180° arc** that leaves on the return strand — `TheWrapLeavesOnTheReturnStrand`. And the
+through-station's wheel no longer "stays where it was": the return strand would run through the middle of it,
+so it rises `HoldDownRise` onto that strand. Everything else in this paragraph stands, including the reason
+no wrap is drawn there.
 
 **What breaks on a world built on the old scheme.** Towers, spans, the drawn cable, names, the cabin,
 calling, riding, the stop key and freight all survive untouched — every one of them is keyed on
@@ -411,6 +571,16 @@ now pins both halves: every `#key` a face names is declared somewhere the game w
 places declare a key the two values must match. Two shapes are exceptions and the test knows it —
 `shapes/entity/cabin.json`'s map *is* the mapping (the entity declares no textures), and `bullwheelrim.json`
 is tesselated by `BEBullwheel` against the `ropeway:bullwheel` **block**, so its own map is never consulted.
+
+**The rim's GENERATOR had parted from the rim, and that is closed too (2026-08-04).** `bullwheelrim.json` is
+the one shape in the mod written by a script, and `scripts/gen_bullwheelrim.py` was still emitting the
+pre-palette `{"metal": "game:block/metal/sheet/iron1"}` with `#metal` on every face — so running the
+documented way to re-author the wheel silently reverted the palette on the one shape the whole loop's
+geometry is derived from, and the only thing standing between that and shipping was
+`EveryTextureKeyAShapeUsesIsDeclaredWhereTheGameWillLookForIt` in a different lane (*"face key(s) #metal are
+declared nowhere"*). The generator now writes `machine` — the key `blocktypes/bullwheel.json` actually
+declares, which is the one that matters, since the rim is tesselated against the block — and **regenerating
+is a byte-for-byte no-op against the shipped file**, checked by SHA-256 rather than by eye.
 
 **Genuinely still deferred, and the reasoning is the valuable part** (PALETTE-SPEC §2 and §4b):
 

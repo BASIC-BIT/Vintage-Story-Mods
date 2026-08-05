@@ -4,7 +4,21 @@ Manual operator checklist. One in-game session has happened: the mod loaded clea
 four findings the previous round fixed — cabin built across the travel axis, cable rendering nothing, the
 picker showing only link candidates, and no way to name a tower.
 
-**This round made the drive and the tensioner STRUCTURE** (`STATION-DESIGN.md`): they are cells of two
+**THIS ROUND MADE THE HAUL ROPE A LOOP** (`STACKED-LOOP-SPEC.md`, and
+[KNOWN-ISSUES.md](KNOWN-ISSUES.md) "The haul rope is a LOOP"). Two strands stacked **1.33 blocks** apart —
+one wheel diameter, which is where the number comes from — the cabin on the lower one, and a bullwheel at
+each terminal taking the rope round from one to the other. **One cabin, and there is no second one to look
+for.** Steps 0, 1b, 3, 10b, 11b, 12b, 23 and 27c-wheel carry new checks for it, and there are three new
+steps: **10e** (the return strand at a plain tower), **11c** (the wrap at a terminal) and **21b** (the row of
+clearance above the rope). If you are holding a copy that talks about "the cable" in the singular, it is
+stale. (This list read *"1b, 7, 10b, 11b, 12b, 20, 21, 23"* for one round and named three steps that carry
+no loop check at all — 7 builds a tower, 20 walls off a span and 21 raises a ridge **below** the rope, and
+none of the three changed. The head's new mast and saddle are checked at **1b** on the block in hand and at
+**10e** with a strand on them; the clearance change is **21b** alone. A step list is a walk order, so a
+tester who cannot find the check the preamble promised has to decide whether the script or the mod is
+wrong.)
+
+**The round before made the drive and the tensioner STRUCTURE** (`STATION-DESIGN.md`): they are cells of two
 new tower kinds, `drivestation` and `tensionstation`, rather than blocks you stand near the line. Steps 0,
 1, 2, 3, 6, 11 and the whole of 27 are rewritten for it, and every "within eight blocks" in the old script
 is gone — if you are holding a copy that still has one, it is stale.
@@ -15,6 +29,8 @@ ground**. Everywhere the old script said "right-click the pylon head" it now say
 footing" — every verb moved. Every measurement in this script was
 re-derived from `blocktypes/pylonbase.json` and the shipped shapes on 2026-08-01, and the same numbers are
 asserted by `renders/scenes/gen_manifests.py` and `RopewayAssetContractTests.TheCabinFitsThroughTheTower`.
+**Walked front to back again on 2026-08-04 for the loop**, which is how steps 0, 3, 10e, 11c, 12b, 21b and
+23's return-strand clause came to be where they are rather than bolted on at the end.
 See [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for what source review already found and did not fix.
 
 
@@ -24,6 +40,18 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 0. **Migration, if and only if you have a world with a line built before this round.** Load it.
    **PASS:** the line itself survives completely — towers still read complete, spans still drawn, names
    still there, the cabin still hanging where it was. Nothing about the chain changed.
+   **PASS — the loop arrives and nothing has to be rebuilt for it.** Every span now shows a **second strand**
+   over the first, every pylon head has grown a **mast and a saddle** above its sheave, and each terminal
+   station's hoop has become a rope **going round the wheel and coming back**. None of that is persisted
+   state — it is drawn geometry and one extra row of clearance rays — so it simply appears on load. **FAIL:**
+   a span that had a cable yesterday has none today, or a tower reads incomplete because of the head shape.
+   **EXPECTED on a migrated world, and neither is a bug to file:** a plain **end** tower shows its two
+   strands converging onto the sheave with an empty saddle above them (the line has no station there yet —
+   step 10e), and a station the line runs **through** shows its wheel standing about seven eighths of a block
+   higher than the shaft driving it (it is holding the return strand down — step 27c-wheel).
+   **The one behaviour that genuinely changed:** a **new** span over terrain that rises to within a block
+   above the rope line is now refused where it would have been allowed. Existing spans are never re-checked,
+   so no built line loses anything — step 21b.
    **PASS:** `server-main.log` carries one *"Failed loading blockentity TensionWeight … Will discard it"*
    line per old tension weight. That is the intended migration, not a bug: the weight has no block entity
    any more, so every one of them fails at once and the blocks stay as decoration.
@@ -84,6 +112,12 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    grey andesite on the plinths and the counterweight. **PASS at range:** from about 30 blocks the drive
    station's dark gearbox and the tension station's pale mass are both still readable against a plain tower.
    That distinction is the whole reason the bullwheel exists, and it is the one thing no test can assert.
+   **PASS — the pylon head has grown, new this round.** A short riveted **mast** rises out of the top of its
+   sheave housing with a small dark **saddle** on top of it, about a block and a third above the throat.
+   That is the **return shoe**, and it is what the loop's upper strand rides on at every plain tower. It is
+   there on a bare block in your hand as well as on a built tower — it is authored geometry, not something
+   drawn only when a span exists. **FAIL:** the bullwheel has grown one too; that block carries neither,
+   because at a station the wheel is the carrier.
 
 2. **Craft the parts.** **Chisel your bits first.** Every station recipe pays its fastenings in **metal
    bits, eight to a slot**, and a whole station wants about a hundred of them. Chisel + ingot = 20 bits,
@@ -177,6 +211,15 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    any single span. **FAIL:** it says a long span is paid out of several stacks; the longest span in the
    game is 12 haul rope. **PASS:** the power page describes a drive that turns the rope and a
    tension weight that keeps it taut, and says nothing about winding, charge or paying for a trip.
+   **PASS — all three pages describe the haul rope as a LOOP, new this round.** Page 50's opening says two
+   strands, one cabin, and its word list has entries for the **going strand**, the **return strand** and the
+   **return shoe**; page 51's *"What blocks a span"* says the corridor runs from a block **above** the going
+   rope down past the cabin's floor; page 52's bullwheel section says the rope goes round the wheel and
+   leaves higher. **FAIL:** anywhere on any of the three that still says the cabin runs on "a haul rope"
+   with nothing coming back, or that describes the span check as running "from the rope line down". A tester
+   who reads that goes looking for one rope and files the second one as a bug.
+   **FAIL:** anything on any page suggesting a **second cabin** on the return strand. There is one cabin, on
+   the lower strand, and the upper one carries nothing.
    **PASS:** the power page carries a *"A windmill needs room"* section, and it states the room as
    **clear blocks under the hub** — four for three sails, six for a maxed five, eleven for a maxed metal
    rotor — not as a height above anything. **FAIL:** it gives those numbers as *"the hub four blocks up"*
@@ -307,10 +350,16 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     **Also check the refusals:** with too little rope the row is prefixed `[!]` and clicking it gives
     *"Not enough haul rope"*; a tower with something solid between them does not appear in the list.
 
-10b. **The cable is visible.** Look at the span you just strung.
+10b. **The cable is visible — and this round there are TWO of it.** Look at the span you just strung.
      **PASS:** a thin rope-textured cable runs from each sheave to the midpoint of the span, **immediately,
      without reloading anything**. Each tower draws its own half, so the two halves meet in the middle and
      there is no z-fighting seam.
+     **PASS — the return strand, new this round.** A second identical strand runs the whole span **directly
+     above** the first, about a block and a third up. Sight along the span from one tower: the two are
+     exactly one over the other with no sideways offset at all, the whole way. **FAIL:** there is only one
+     strand (the loop is not drawn), or the upper one wanders sideways from the lower (it is not the same
+     curve), or the two touch (the separation is not the wheel's diameter). Two ropes is the *whole line's*
+     rope, not two lines: there is still one cabin and it hangs on the **lower** one.
      **FAIL:** nothing there at all. That is the silent-mesh bug — `CubeMeshUtil.GetCube` hands back a mesh
      with `XyzFacesCount == 0` and the chunk tesselator's emit loop never runs, so the cable is dropped with
      no exception and no log line. Nothing in either log will tell you; only looking will.
@@ -359,6 +408,21 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      showing both connections rather than refusing with *"That tower already carries two spans."* — an
      unlinkable full tower is the whole point of the row list. It offers **no link rows**, because every
      one of them would fail on click.
+
+10e. **The return strand at a plain tower, and at a plain END tower.** Walk to the tower in the *middle* of a
+     three-tower line (build step 16 first if you have not) and look at the top of its pylon head.
+     **PASS:** the upper strand runs **over the saddle** on top of the head's mast, touching it, and carries
+     straight on to the next tower. It sits above the crossarm with daylight under it, not inside it.
+     **FAIL:** the strand runs *through* the crossarm or the braces, or the saddle stands a visible distance
+     off it.
+     Now look at an **end** tower of a line whose ends are **plain towers** (no station yet — if both your
+     ends are already stations, break one back to a plain footing or build a fresh two-tower line for this).
+     **PASS:** the two strands **converge onto the sheave** over the last four blocks, so the rope reads as
+     doubled back on itself and there is no cut end hanging in the air. The saddle above it stands empty.
+     **That is correct and is not a bug to file** — the loop has nothing to turn round at a plain tower,
+     because the thing that turns it is a bullwheel and a sheave throat is far too narrow. Build a station
+     there and it becomes a proper loop (step 11c). **FAIL:** the upper strand simply stops in mid air over
+     the sheave, or the two flicker against each other where they meet.
 
 11. **Hang the cabin — but build the line's two STATIONS first, or nothing after this step works.**
     A line refuses a cabin outright until one of its towers is a **finished tension station**, and a cabin
@@ -421,6 +485,27 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      cable runs at footing level, four blocks under the cabin, or the cabin hangs four blocks under the
      cable — that is the cable mesh and `AnchorOf` disagreeing, which is the whole point of drawing the
      cable from the footing with the same offset `AnchorOf` uses.
+     **PASS — and it is closed round the LOWER strand.** The jaw is on the strand at sheave height; the
+     return strand runs a clear block and a bit over the cabin's roof and never comes near it, parked or
+     moving, at any bearing. There is 1.12 blocks of daylight between the top of the jaw and the underside
+     of the upper strand, which is 450 times the play the jaw has on the rope it *is* clamped to, so this is
+     a look-and-move-on check rather than a measurement. **FAIL:** the cabin hangs on the upper strand, or
+     anything on it touches the upper one at any point of a ride.
+
+11c. **The wrap at a terminal — the loop closing, and the picture this round exists for.** Stand off to one
+     side of a **station at the END of a line** (one span only) and look at it side-on, along the crossarm,
+     so you are looking at the plane the wheel turns in.
+     **PASS:** the rope arrives on the **lower** strand, runs past the tower and out onto the bullwheel a
+     cell beyond it, goes **half way round the wheel**, and leaves on the **upper** strand back down the
+     line. In low, round, out high. The two strands are exactly the wheel's own diameter apart because the
+     wheel is what sets them apart.
+     **PASS:** the wheel is carried on **two brackets** running from its bearings on the sheave cheeks out
+     and down to its hub, so nothing floats.
+     **FAIL:** the rope makes a closed **hoop** round the wheel with one strand leaving (that is the old
+     drawing, before the loop), or the upper strand leaves at a tangent that misses the top of the wheel, or
+     the rope leaves the wheel and stops in mid air short of the tower.
+     **PASS — with the cabin parked at that terminal**, nothing about the cabin touches the wheel or either
+     rope but the jaw on its own strand. Watch a full revolution with the mill running.
 
 12. **Board and ride.** Right-click the cabin with an empty hand — **aim at the roof or an upper wall
     panel, not at a seat.** That is the `mountAnySeat` fallback path and it is the single highest-risk
@@ -548,6 +633,12 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      **FAIL:** the cabin **holds one fixed heading** across the tower and then steps to the next in one tick -
      a crab-walk that drags its tail through the post on the outside of the bend. That is the reverted
      angle-station law, and it looks nothing like a continuous sweep.
+     **PASS — the loop does not scissor at the corner, new this round, and the view is from ABOVE.** Fly up
+     over the corner tower and look straight down. The two strands are **one line in plan**: the upper one is
+     exactly on top of the lower one all the way through the bend, so you should not be able to tell there
+     are two of them from directly overhead. **FAIL:** they separate into two curves through the corner, one
+     bowing wider than the other, or they cross. Either means the return strand is being bent on its own
+     curve rather than being the going strand plus a height.
 
 13. **Arrive, and watch it square up.** **PASS — do this at a tower on a line that TURNS, which is where it
     shows:** as the cabin settles it **turns to sit flush with the station**, square across the crossarm and
@@ -766,6 +857,21 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     link, the cabin holds at the tower before it. **FAIL:** a link succeeds and the cabin drives a seated
     rider through solid stone.
 
+21b. **Clearance reaches ABOVE the rope too, new this round, and this is a behaviour CHANGE.** The return
+     strand runs 1.33 blocks over the going one, so one row of the clearance check now sits above the rope
+     line rather than all four below it — rays per span went 12 to 15.
+     Build a stone overhang across the middle of a clear span so that its **underside is one block above the
+     rope line** — well clear of the cabin, in the upper strand's way. **PASS:** the two towers no longer
+     appear in each other's picker, and if you build the overhang after the link, the cabin holds at the
+     tower before it exactly as a low obstruction makes it.
+     **PASS — and one row, not two.** Raise the same overhang so its underside is **two** blocks above the
+     rope line and the link is offered again. **FAIL:** it is still refused — a second row of rays is being
+     cast over nothing and legal spans are being turned down for it.
+     **This is the one thing in this round a player can notice as a loss:** a span over ground that rises
+     to within a block above the rope line is refused now where it would have been allowed before. It is
+     deliberate — without it a link that passes puts the return strand through a hillside — and **existing
+     spans are never re-checked**, so nothing already built comes apart.
+
 22. **Link while riding** (multiplayer — it needs a rider and a linker at once). With a rider seated on
     line A–B, have a second player link a new tower C to
     A. **PASS:** the link is **refused** with *"line in use"* — the same rule unlinking already had, because
@@ -776,6 +882,10 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
 23. **Short spans.** Link two towers only ~6 blocks apart. **PASS:** it links (the clearance check trims
     4 blocks off each end for the towers' own structures, and never trims more than half). Known
     consequence: an obstruction inside those trimmed end zones is not detected.
+    **PASS — both strands are still drawn on a span too short to have a bend window at all**, and they are
+    still the full block and a third apart in the middle of it. The station rail is shorter or absent there
+    (step 10b) because the rail is the window; the rope is not. **FAIL:** the upper strand is missing on a
+    short span, or the two are closer together on a short span than on a long one.
 
 24. **Blow up a tower** (§3c.2 — C2). On a two-tower line A–B with the cabin parked and **nobody seated**,
     set off a powder barrel on A's footing (or `/we` a fill of air over it, or `/blockset air` — any
@@ -1163,6 +1273,24 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     **PASS:** the wheel takes **no axle** and its panel says nothing about power. Try to run an axle into
     it: **PASS:** nothing connects, because it is on no network. **FAIL:** it accepts one — the consumer
     has been left on it and the drive is back four blocks up. The hub axle is geometry, not a connector.
+    **PASS — the wheel now stands in one of THREE places, new this round, and which one is decided by the
+    rope over it rather than by the block.** Check all three; they are cheap to build and the wrong one is
+    obvious.
+    - **A terminal** (the station carries **one** span): the wheel stands **one cell out past the tower** on
+      the side nothing runs, dropped so its groove is on the rope, with the rope half way round it —
+      step 11c. This is the one that reads from across a valley.
+    - **A station the line runs THROUGH** (**two** spans — link a third tower to a station and you have one):
+      there is no side that nothing runs on, so no wrap is drawn, and the wheel **rises about seven eighths
+      of a block** and sits with its groove on top of the **return** strand, pressing it down. It stands
+      higher than the lay shaft it is bolted to, on the same two brackets, and it keeps turning.
+      **This is correct and is not a bug to file.** **FAIL:** the wheel stays level with the shaft and the
+      upper rope runs **through the middle of the rim** — that is the whole reason this pose exists.
+    - **A station with no spans at all** (unlink both): the wheel drops back to the middle of its own cell,
+      level with the shaft, with no brackets and no rope. **FAIL:** it stays lifted, or it stays out to one
+      side, on a tower with nothing strung to it.
+    Now **cut and re-make a span** on a terminal station while watching the wheel. **PASS:** it moves between
+    poses within about half a second and the drawn rope follows on the same re-tesselation. A brief
+    disagreement on the one tick a terminal stops being one is expected; a permanent one is not.
 
     **27d — climbing costs.** Build (or ride) a line with one clearly uphill span and one level one.
     **PASS:** the cabin visibly **slows on the way up** and picks up again on the level or the way down.

@@ -190,15 +190,33 @@ public class RopewayAssetContractTests
         // cross-section every quarter turn, which is a wheel that saws its own cable.
         Assert.Equal(BullwheelRenderer.WrapRadius, (reach + BEPylonBase.CableRadius * 16) / 16, 1e-4);
 
-        // The frustum sphere, in the pose that reaches furthest. Nothing in the game complains when it is too
-        // small - the wheel simply vanishes at the edge of the screen on a tower the player is looking at -
-        // so the number the renderer culls against is tied to the shape here rather than trusted. The wheel
-        // moved a whole cell out of its own block, which is 0.098 blocks of the 0.29 that were spare.
-        var axle = Math.Sqrt(BullwheelRenderer.WrapOut * BullwheelRenderer.WrapOut
-                             + BullwheelRenderer.WrapRadius * BullwheelRenderer.WrapRadius);
-        Assert.True(BullwheelRenderer.CullRadius >= axle + ball / 16,
-            $"the wrapped wheel reaches {axle + ball / 16} blocks from the block centre, outside the "
+        // THE LOOP'S OWN SEPARATION, tied to the wheel right here where the wheel is measured. A rope that
+        // enters the groove at the bottom and wraps 180 degrees leaves at the top, one DIAMETER up, so
+        // re-authoring the rim moves both strands rather than leaving a literal behind.
+        Assert.Equal(BEPylonBase.ReturnLift, 2 * (reach / 16 + BEPylonBase.CableRadius), 1e-4);
+
+        // The frustum sphere, over BOTH poses the line can put the wheel in - a number that fits only the
+        // tallest stops meaning anything when the tallest is deleted. Nothing in the game complains when it
+        // is too small; the wheel simply vanishes at the edge of the screen on a tower the player is looking
+        // at. The HOLD-DOWN is what sets it now: at a station the line runs through, the wheel goes straight
+        // up onto the return strand and its axle stands 1.989 blocks off the block centre against the
+        // wrapped pose's 1.200.
+        var wrapped = Math.Sqrt(BullwheelRenderer.WrapOut * BullwheelRenderer.WrapOut
+                                + BullwheelRenderer.WrapRadius * BullwheelRenderer.WrapRadius);
+        var held = BullwheelRenderer.RimPivotY - 0.5 + BullwheelRenderer.HoldDownRise;
+
+        Assert.True(held > wrapped, "the hold-down is no longer the pose that reaches furthest");
+        Assert.True(BullwheelRenderer.CullRadius >= held + ball / 16,
+            $"the held-down wheel reaches {held + ball / 16} blocks from the block centre, outside the "
             + $"{BullwheelRenderer.CullRadius}-block frustum sphere it is culled against");
+
+        // THE HOLD-DOWN'S OWN TANGENCY, and it is why the wheel moves at all at a through station. Where it
+        // rests, the axle is 1.106 above the anchor and the return strand 1.326, so 0.220 above the axle and
+        // 1.123 blocks of rope run INSIDE the swept circle every revolution. Lifted, the rim's lowest swept
+        // point lands exactly on the strand's upper surface.
+        Assert.True(BullwheelRenderer.RimPivotY - 0.5 - reach / 16 < BEPylonBase.ReturnLift,
+            "the return strand clears the resting wheel, so the hold-down lift is buying nothing");
+        Assert.Equal(BEPylonBase.ReturnLift + BEPylonBase.CableRadius, held - reach / 16, 1e-4);
 
         // ---------------------------------------------------------------- the cabin, swept
         var hangDrop = Load("entities", "cabin.json").GetProperty("attributes").GetProperty("hangDrop").GetDouble();
@@ -266,6 +284,256 @@ public class RopewayAssetContractTests
         // the wrap merely stops cutting the grip.
         var grip = Find(elements, "jawtop").GetProperty("to")[0].GetDouble() / 16;
         Assert.Equal(0.146, BullwheelRenderer.WrapOut - wheel - grip, 3);
+    }
+
+    /// <summary>
+    /// THE CABIN NEVER TOUCHES THE RETURN STRAND, and the proof is a pure vertical - which is why no position
+    /// and no yaw can beat it. The whole cabin, every element of it, is under <c>jawtop</c> at 0.15 blocks
+    /// above the rope it is clamped to; the whole return strand is over 1.2663. So the gap is 1.1163 blocks,
+    /// it is the same 1.1163 with the cabin parked at a terminal under the wrap's own arc, and there is no
+    /// plan geometry in it at all to sweep.
+    /// <para>
+    /// The bar is the jaw's OWN authored play on the rope it is clamped to - 0.0025 blocks per side. 1.1163
+    /// is 446 times it. Asserting the mechanism rather than a swept minimum is deliberate: a sweep would pass
+    /// for whatever cabin length and whatever yaw law happened to be shipped, and this fails the moment any
+    /// part of the cabin reaches above the strand's underside, which is the only way it could ever touch.
+    /// </para>
+    /// <para>
+    /// Lateral stacking is what this compares against and it is worse on the same number: 2*rho ACROSS the
+    /// line leaves 0.94 blocks at a right-angle corner, against a roof rather than a grip.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheCabinNeverReachesTheReturnStrandAtAnyPositionOrYaw()
+    {
+        var hangDrop = Load("entities", "cabin.json").GetProperty("attributes").GetProperty("hangDrop").GetDouble();
+        var (_, _, elements) = CabinBounds();
+
+        var highest = ("", double.MinValue);
+        foreach (var (name, element) in elements)
+        {
+            var top = element.GetProperty("to")[1].GetDouble() / 16 - hangDrop;
+            if (top > highest.Item2) highest = (name, top);
+        }
+
+        // The grip, and it is the only part of a cabin that reaches over the rope at all.
+        Assert.Equal("jawtop", highest.Item1);
+        Assert.Equal(0.15, highest.Item2, 4);
+
+        var underside = BEPylonBase.ReturnLift - BEPylonBase.CableRadius;
+        var gap = underside - highest.Item2;
+
+        // The jaw's own play on the rope it IS closed on, which is the tightest bar there is to beat.
+        var jaw = (Find(elements, "jawtop").GetProperty("from")[1].GetDouble()
+                   - Find(elements, "jawbottom").GetProperty("to")[1].GetDouble()) / 32 - BEPylonBase.CableRadius;
+
+        Assert.True(gap > jaw,
+            $"{highest.Item1} comes within the jaw's own {jaw} blocks of play of the return strand");
+        Assert.Equal(0.0025, jaw, 4);
+        Assert.Equal(1.1163, gap, 4);
+    }
+
+    /// <summary>
+    /// ...AND THE SWEPT PROOF, over the geometry that is actually drawn, because the mechanism above is only
+    /// as good as its premise - that the strand really is <c>ReturnLift</c> over the rope the jaw is closed
+    /// on, everywhere. At a plain END tower it was not: the lift ramped back to zero over the tower's own
+    /// <c>TrimForTowers</c> window so the two strands converged onto the sheave, and the cabin parks on that
+    /// sheave and departs along the ramp. Measured off the shipped emission, the return strand's centreline
+    /// was inside the <c>jawtop</c> plate from the anchor to 0.77 blocks out, deepest at 0.065 - 0.77 blocks
+    /// of travel, every trip, both ways, on any line with a plain tower at an end. That is the same defect at
+    /// the same scale as the one <c>BULLWHEEL-WRAP-SPEC</c> §3b refused a dropped wheel for (0.90 blocks).
+    /// <para>
+    /// A ramp that starts anywhere else does not exist to move it to. The strand's own half thickness on
+    /// either side of a plate at w +0.0625..+0.15 means the lift is inside cabin metal for 0.2075 of its
+    /// 1.3263 blocks, which is 16% of ANY window at ANY span length; travel is clamped to the anchor and the
+    /// plate reaches 0.131 blocks past it, so there is no stretch of a span the cabin cannot put its grip on.
+    /// What the strand ends on instead is <c>returnshoe</c>, which was already under it -
+    /// <see cref="TheTowerCarriesTheReturnStrandOnItsOwnShoe"/>.
+    /// </para>
+    /// <para>
+    /// So this walks every point of every drawn return strand against every position the cabin can hang at,
+    /// on five topologies, and the one it exists for is the first. The wrap's own arc is swept against a
+    /// parked cabin by <see cref="TheWrappedWheelClearsACabinAtEveryPositionTheCabinCanReach"/> and is not
+    /// re-measured here.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheReturnStrandStaysAWheelAboveTheCabinOnEveryTopology()
+    {
+        var hangDrop = Load("entities", "cabin.json").GetProperty("attributes").GetProperty("hangDrop").GetDouble();
+        var (_, _, elements) = CabinBounds();
+
+        // The grip: the only part of a cabin that reaches above the rope, and how far along the line it
+        // reaches from wherever the cabin is standing.
+        var jawtop = Find(elements, "jawtop");
+        var plate = jawtop.GetProperty("to")[1].GetDouble() / 16 - hangDrop;
+        var reach = Math.Max(Math.Abs(jawtop.GetProperty("from")[0].GetDouble()),
+                             Math.Abs(jawtop.GetProperty("to")[0].GetDouble())) / 16;
+
+        var jaw = (jawtop.GetProperty("from")[1].GetDouble()
+                   - Find(elements, "jawbottom").GetProperty("to")[1].GetDouble()) / 32 - BEPylonBase.CableRadius;
+
+        RopewayLine Line(params (int X, int Y, int Z)[] towers) =>
+            RopewayLine.FromTowers(towers.Select(t => new BlockPos(t.X, t.Y, t.Z)).ToList())!;
+
+        // me is the tower that draws; the topologies are every shape a half-span can be drawn in.
+        var topologies = new (string Name, RopewayLine Line, int Me, bool Pitched)[]
+        {
+            ("plain END tower", Line((0, 64, 0), (0, 64, 30)), 0, false),
+            ("plain END tower, one-block span", Line((0, 64, 0), (1, 64, 0)), 0, false),
+            ("plain END tower, 53 degrees of pitch", Line((0, 64, 0), (3, 68, 0)), 0, true),
+            ("mid-line straight", Line((0, 64, -24), (0, 64, 0), (0, 64, 24)), 1, false),
+            ("90 degree corner", Line((0, 64, -24), (0, 64, 0), (24, 64, 0)), 1, false)
+        };
+
+        foreach (var (name, line, me, pitched) in topologies)
+        {
+            var worst = double.MaxValue;
+            for (var peer = 0; peer < line.Towers.Length; peer++)
+            {
+                if (peer == me) continue;
+
+                var going = BEPylonBase.HalfSpanPath(line, me, peer);
+                var returning = BEPylonBase.Lift(going, BEPylonBase.ReturnLift);
+
+                // EVERY position the cabin can hang at against EVERY point of the drawn strand. The cabin
+                // hangs on the going strand, so its plate stands `plate` above going[i]; the strand is only
+                // over that plate while it is within the grip's own half length along the line.
+                for (var i = 0; i < going.Count; i++)
+                for (var j = 0; j < returning.Count; j++)
+                {
+                    var dx = going[i].X - going[j].X;
+                    var dy = going[i].Y - going[j].Y;
+                    var dz = going[i].Z - going[j].Z;
+                    if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
+
+                    worst = Math.Min(worst, returning[j].Y - BEPylonBase.CableRadius - (going[i].Y + plate));
+                }
+            }
+
+            Assert.True(worst > jaw,
+                $"on a {name} the cabin's grip comes within {worst:0.####} blocks of the return strand, "
+                + $"inside the {jaw} blocks of play the jaw is authored with on the rope it IS clamped to");
+
+            // Flat, the sweep measures the mechanism's own number and cannot beat it. Pitched, it gives up
+            // one sample step of the rope's own rise across the grip - 0.1 blocks at 53 degrees - because the
+            // slot is horizontal and the rope through it is not, which is a fact about the jaw that predates
+            // the loop and is measured against the going strand in ONETRACK-REVIEW-geometry.
+            if (!pitched) Assert.Equal(1.1163, worst, 4);
+            else Assert.True(worst > 1.0, $"a pitched span gives up {1.1163 - worst:0.####} blocks");
+        }
+    }
+
+    /// <summary>
+    /// The tightest thing the stacked loop creates, and it is LATERAL rather than vertical: at a terminal the
+    /// return strand threads BETWEEN the bullwheel's own bearing caps. Their tops stand 0.24 units INTO the
+    /// strand's vertical band, so nothing vertical is holding this up - what clears is 0.74 units per side,
+    /// and <c>bullwheel.json</c> cannot widen its caps after this.
+    /// <para>
+    /// Derived off the shape rather than pinned as a pose: every element whose y band overlaps the strand's
+    /// is measured, so a new element authored into that band is caught rather than assumed away.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheReturnStrandClearsTheBullwheelsOwnBearings()
+    {
+        // The strand's band in the head cell's own units: the cell's centre is the anchor, so y = 8 is w = 0.
+        var low = 8 + 16 * (BEPylonBase.ReturnLift - BEPylonBase.CableRadius);
+        var high = 8 + 16 * (BEPylonBase.ReturnLift + BEPylonBase.CableRadius);
+        var half = 16 * BEPylonBase.CableRadius;
+
+        var worst = ("", double.MaxValue);
+        var reaching = new List<string>();
+
+        foreach (var shape in new[] { "bullwheel.json", "pylonhead.json" })
+        foreach (var element in Load("shapes", "block", shape).GetProperty("elements").EnumerateArray())
+        {
+            var name = shape[..^5] + "." + element.GetProperty("name").GetString();
+            var from = element.GetProperty("from").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+            var to = element.GetProperty("to").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+
+            // The shoe is what CARRIES the strand; its top face is the strand's own underside by
+            // construction, so it is the one element allowed to touch the band.
+            if (to[1] <= low + 1e-6 || from[1] >= high - 1e-6) continue;
+
+            reaching.Add(name);
+
+            // Across the line, which is the head cell's own x: the throat runs along z on both shapes. The
+            // better of the two sides, because an element clears by standing off ONE of them - a box that
+            // straddles the strand fails on both and reports the shallower burial, which is still negative.
+            var clear = Math.Max(from[0] - (8 + half), 8 - half - to[0]);
+            if (clear < worst.Item2) worst = (name, clear);
+        }
+
+        // Exactly two things reach into the band, both of them the wheel's bearings. Named, so a third
+        // arriving fails here rather than quietly changing what "worst" means.
+        Assert.Equal(new[] { "bullwheel.bearingcapeast", "bullwheel.bearingcapwest" }, reaching.OrderBy(n => n));
+
+        Assert.True(worst.Item2 > 0,
+            $"{worst.Item1} is {-worst.Item2:0.###} units into the return strand, which passes between the "
+            + "bullwheel's own bearings and has nowhere else to go");
+        Assert.Equal(0.74, worst.Item2, 2);
+    }
+
+    /// <summary>
+    /// The plain tower carries the return strand on its own shoe, and the shoe's TOP FACE is that strand's
+    /// underside - derived from <see cref="BEPylonBase.ReturnLift"/> rather than typed, so re-authoring the
+    /// rim moves the saddle with the rope instead of leaving it a fifth of a unit out.
+    /// <para>
+    /// The mast starts where <c>housing</c> ends, which is what keeps the 0.20-unit soffit clearance over a
+    /// parked cabin's grip - the tightest number in the machine - untouched by any of this;
+    /// <see cref="TheCabinFitsThroughTheTower"/> still owns it.
+    /// </para>
+    /// <para>
+    /// SHORT along the line, and that is the lesson the deleted rail plate paid for rather than a dimension:
+    /// a fixture on the tower's own cardinal is only correct where the path passes through the anchor, and
+    /// that is one point. A long shoe would re-earn the bug where a guide roller ended up 1.37 units inside a
+    /// plate that was right when parked.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheTowerCarriesTheReturnStrandOnItsOwnShoe()
+    {
+        var head = Load("shapes", "block", "pylonhead.json").GetProperty("elements").EnumerateArray().ToList();
+
+        JsonElement Element(string name) =>
+            head.Single(e => e.GetProperty("name").GetString() == name);
+
+        var shoe = Element("returnshoe");
+        var mast = Element("returnmast");
+
+        var shoeFrom = shoe.GetProperty("from").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+        var shoeTo = shoe.GetProperty("to").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+
+        // THE one derived number: the saddle's top face is the strand's own underside.
+        Assert.Equal(8 + 16 * (BEPylonBase.ReturnLift - BEPylonBase.CableRadius), shoeTo[1], 4);
+
+        // As wide as the sheave throat below it and no wider - the strand's own slot, both ends of the tower.
+        var throat = Element("sheavecheekeast").GetProperty("from")[0].GetDouble()
+                     - Element("sheavecheekwest").GetProperty("to")[0].GetDouble();
+        Assert.Equal(throat, shoeTo[0] - shoeFrom[0], 4);
+
+        // 8 units along the line, the sheave's own depth. Nothing longer.
+        Assert.Equal(8, shoeTo[2] - shoeFrom[2], 4);
+        Assert.True(shoeTo[2] - shoeFrom[2] <= 8, "the return shoe is a fixture on the tower's cardinal, so a "
+                                                  + "longer one is metal a corner's rope runs off the side of");
+
+        // A flat saddle, not a channel: nothing stands above its top face to catch a strand that has run off
+        // the side of it at a corner.
+        Assert.All(head, e => Assert.True(
+            e.GetProperty("to")[1].GetDouble() <= shoeTo[1] + 1e-6,
+            $"{e.GetProperty("name")} stands above the return shoe's bearing face"));
+
+        // The mast picks up where the sheave housing stops, so no clearance below the crossarm moves.
+        Assert.Equal(Element("housing").GetProperty("to")[1].GetDouble(),
+            mast.GetProperty("from")[1].GetDouble(), 4);
+        Assert.Equal(shoeFrom[1], mast.GetProperty("to")[1].GetDouble(), 4);
+
+        // ...and bullwheel.json gets NEITHER, because at a terminal the wheel is the carrier and at a station
+        // the line runs through it is lifted onto the strand instead.
+        Assert.DoesNotContain(
+            Load("shapes", "block", "bullwheel.json").GetProperty("elements").EnumerateArray(),
+            e => e.GetProperty("name").GetString()!.StartsWith("return"));
     }
 
     /// <summary>

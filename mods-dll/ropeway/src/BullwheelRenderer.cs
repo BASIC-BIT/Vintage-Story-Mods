@@ -65,20 +65,39 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
     public const float WrapOut = 1f;
 
     /// <summary>
-    /// Radius of the frustum sphere the wheel is culled against, in blocks from the block's own centre. The
-    /// axle stands 1.200 blocks off that centre once the wheel moves out to wrap (one cell along the line and
-    /// 0.443 down) and a felloe corner reaches 0.610 further, so the swept rim reaches 1.810 - it was 1.717
-    /// with the wheel over the tower - and 2 is the next round number past it. Erring large costs at worst a
-    /// draw call that was going to happen anyway; erring small pops the wheel off a tower the player is
-    /// looking at.
+    /// Blocks the wheel RISES at a station the line runs THROUGH - the one tower with no dead side to stand
+    /// out on, where the return strand would otherwise pass straight through the rim (1.12 blocks of rope
+    /// inside the swept circle, every revolution). It becomes a HOLD-DOWN SHEAVE on the strand nothing rides
+    /// on: the axle goes to <c>ReturnLift + WrapRadius</c>, i.e. 3 * <see cref="WrapRadius"/>, so the groove
+    /// is tangent to that strand from below exactly as it is tangent to the going strand from above at a
+    /// terminal. What is left after the wheel's own resting height is 0.8832 blocks.
     /// <para>
-    /// Public only so the asset contract test can measure the shape and check this covers it. The value 2 is
-    /// arrived at by hand from a shape the generator can re-author, and vanilla's own sign renderer passes a
-    /// literal 1 here - copy that number across and 0.810 blocks of wheel hang outside the sphere, with
-    /// nothing in the game or the suite to say so.
+    /// DERIVED like <see cref="WrapDrop"/>, and the only other option that clears is the one the CABIN
+    /// refuses: dropped in place so it carries both strands, the rim's lowest swept point lands 0.06 blocks
+    /// over the rope against a passing grip at 0.15, and the grip is inside the rim for 0.90 blocks of travel
+    /// every trip in both directions. Refusing the second span at a station was the third option and is
+    /// cheaper than either; it makes a legal, buildable route unbuildable, which this mod has declined to do
+    /// twice.
     /// </para>
     /// </summary>
-    public const float CullRadius = 2f;
+    public const float HoldDownRise = 3 * WrapRadius - (RimPivotY - 0.5f);
+
+    /// <summary>
+    /// Radius of the frustum sphere the wheel is culled against, in blocks from the block's own centre. The
+    /// furthest pose is now the HOLD-DOWN, not the wrap: the axle stands <see cref="HoldDownRise"/> + 1.106 =
+    /// 1.989 blocks straight up off that centre against the wrapped pose's 1.200, and a felloe corner reaches
+    /// 0.610 further, so the swept rim reaches 2.600 against the wrapped 1.810. 2.75 is the next quarter past
+    /// it. Erring large costs at worst a draw call that was going to happen anyway; erring small pops the
+    /// wheel off a tower the player is looking at.
+    /// <para>
+    /// Public only so the asset contract test can measure the shape and check this covers it - and it covers
+    /// BOTH poses there, because a number that fits only the tallest is a number that stops meaning anything
+    /// when the tallest is deleted. The value is arrived at by hand from a shape the generator can re-author,
+    /// and vanilla's own sign renderer passes a literal 1 here - copy that number across and 1.6 blocks of
+    /// wheel hang outside the sphere, with nothing in the game or the suite to say so.
+    /// </para>
+    /// </summary>
+    public const float CullRadius = 2.75f;
 
     private readonly ICoreClientAPI capi;
     private readonly BlockPos pos;
@@ -95,9 +114,11 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
     public double Speed;
 
     /// <summary>
-    /// Where the wheel stands relative to the cell it belongs to, in blocks: the zero vector at a station
-    /// the line runs THROUGH, and one cell along the dead side plus <see cref="WrapDrop"/> down at a
-    /// terminal, where the groove lands on the rope and the drawn wrap closes round it.
+    /// Where the wheel stands relative to the cell it belongs to, in blocks: one cell along the dead side
+    /// plus <see cref="WrapDrop"/> down at a terminal, where the groove lands on the going strand and the
+    /// drawn wrap goes half way round it; <see cref="HoldDownRise"/> straight up at a station the line runs
+    /// THROUGH, where the groove lands under the return strand instead; and the zero vector on a tower with
+    /// no rope on it at all.
     /// <para>
     /// Replaced wholesale rather than written component by component, and that is the reason it is a Vec3f
     /// and not three floats: <see cref="BEBullwheel"/> writes it on a 500 ms tick and

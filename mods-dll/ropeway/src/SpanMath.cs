@@ -27,6 +27,19 @@ public static class SpanMath
     public const int ClearanceBelow = 3;
 
     /// <summary>
+    /// Rows ABOVE the rope line that must also be clear, for the return strand. The haul rope is a loop with
+    /// two strands stacked <c>BEPylonBase.ReturnLift</c> = 1.3263 blocks apart, so the upper one occupies
+    /// 1.2663 to 1.3863 above the anchor - and the anchor is a block centre, so row j = +1 spans exactly
+    /// 0.5 to 1.5.
+    /// <para>
+    /// ONE row covers it exactly and with room at both ends: 0.7663 blocks of that row below the strand and
+    /// 0.1137 above it. Two "for margin" would refuse spans over nothing, because 2*rho lands in one row and
+    /// the arithmetic says which. Rays per span 12 -> 15.
+    /// </para>
+    /// </summary>
+    public const int ClearanceAbove = 1;
+
+    /// <summary>
     /// Length of each end of a span that the tower's own structure occupies and that is therefore not
     /// checked. The posts are player-chosen logs and planks, so <see cref="RopewayBlockFilter"/> cannot
     /// tell them from terrain; without this the <see cref="ClearanceBelow"/> rays leave the sheave, drop
@@ -216,8 +229,8 @@ public static class SpanMath
     };
 
     /// <summary>
-    /// True when the corridor the cabin sweeps between the two anchors is clear: 3 wide, and from the rope
-    /// line down to the bottom of the cabin. Parallel block-only ray casts through the engine's own DDA -
+    /// True when the corridor the rope needs between the two anchors is clear: 3 wide, from the return
+    /// strand's own row down to the bottom of the cabin. Parallel block-only ray casts through the engine's own DDA -
     /// a zero-width ray cannot certify a 3-wide cabin, and hand-rolling a voxel walk when
     /// <c>IWorldAccessor.InteresectionTester</c> already exists would be silly. Main thread only.
     /// Fails closed - a rope through a mountain is a bug report, a refused build is an annoyance.
@@ -248,7 +261,7 @@ public static class SpanMath
 
             for (var i = -ClearanceRadius; i <= ClearanceRadius; i++)
             {
-                for (var j = -ClearanceBelow; j <= 0; j++)
+                for (var j = -ClearanceBelow; j <= ClearanceAbove; j++)
                 {
                     var offset = new Vec3d(
                         right.X * i + up.X * j,
