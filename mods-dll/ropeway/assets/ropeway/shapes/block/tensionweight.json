@@ -1,0 +1,357 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "stone": "game:block/stone/rock/andesite1",
+    "shaft": "game:block/metal/plate/steel",
+    "rope": "game:block/cloth/reedrope",
+    "girder": "game:block/metal/riveted/iron1"
+  },
+  "elements": [
+    {
+      "//": "ONE cell now, where this used to be a six-element shape reaching three cells up out of a one-cell hole with nothing checking the headroom. The rails and the rope carry on in ropeway:tensionguide above it, which is structure the station's multiblock check requires - so the headroom is checked by construction.",
+      "name": "pad",
+      "from": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "to": [
+        16.0,
+        2.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#stone"
+        },
+        "east": {
+          "texture": "#stone"
+        },
+        "south": {
+          "texture": "#stone"
+        },
+        "west": {
+          "texture": "#stone"
+        },
+        "up": {
+          "texture": "#stone"
+        },
+        "down": {
+          "texture": "#stone"
+        }
+      }
+    },
+    {
+      "name": "railwest",
+      "from": [
+        2.0,
+        2.0,
+        7.0
+      ],
+      "to": [
+        4.0,
+        16.0,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "name": "raileast",
+      "from": [
+        12.0,
+        2.0,
+        7.0
+      ],
+      "to": [
+        14.0,
+        16.0,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "//": "The mass hangs LOW in its guide, where a rope tensioner rests: it takes up slack, it does not climb, and its height means nothing numeric. Half a block wide, so the two rails bracket it exactly.",
+      "name": "mass",
+      "from": [
+        4.0,
+        3.0,
+        4.0
+      ],
+      "to": [
+        12.0,
+        13.0,
+        12.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#stone"
+        },
+        "east": {
+          "texture": "#stone"
+        },
+        "south": {
+          "texture": "#stone"
+        },
+        "west": {
+          "texture": "#stone"
+        },
+        "up": {
+          "texture": "#stone"
+        },
+        "down": {
+          "texture": "#stone"
+        }
+      }
+    },
+    {
+      "name": "hanger",
+      "from": [
+        7.0,
+        13.0,
+        7.0
+      ],
+      "to": [
+        9.0,
+        16.0,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rope"
+        },
+        "east": {
+          "texture": "#rope"
+        },
+        "south": {
+          "texture": "#rope"
+        },
+        "west": {
+          "texture": "#rope"
+        },
+        "up": {
+          "texture": "#rope"
+        },
+        "down": {
+          "texture": "#rope"
+        }
+      }
+    },
+    {
+      "//": "The guide column's four corner posts stopped at this cell's top face, so the machine leg stood on nothing and the whole frame read as hovering over its own base course. They carry on down here and land ON the pad, which is the foot plate - a post run to the cell floor instead would have its foot buried in the plate rather than bearing on it. Not done by reaching tensionguide.json downward out of its own cell: two of those stack in this column and would double up.",
+      "name": "anglewn",
+      "from": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "to": [
+        2.0,
+        16.0,
+        2.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "anglews",
+      "from": [
+        0.0,
+        2.0,
+        14.0
+      ],
+      "to": [
+        2.0,
+        16.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "angleen",
+      "from": [
+        14.0,
+        2.0,
+        0.0
+      ],
+      "to": [
+        16.0,
+        16.0,
+        2.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "anglees",
+      "from": [
+        14.0,
+        2.0,
+        14.0
+      ],
+      "to": [
+        16.0,
+        16.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    }
+  ]
+}

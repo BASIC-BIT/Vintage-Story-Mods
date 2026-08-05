@@ -1,0 +1,298 @@
+using System;
+using System.Collections.Generic;
+using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
+
+namespace Ropeway;
+
+/// <summary>Pure span arithmetic. No engine state, so it is the one thing that is unit-tested.</summary>
+public static class SpanMath
+{
+    /// <summary>
+    /// Half-width of the corridor the cabin needs, in blocks. 1 gives the 3-wide passage the tower's
+    /// posts leave open.
+    /// </summary>
+    public const int ClearanceRadius = 1;
+
+    /// <summary>
+    /// Rows below the rope line that must also be clear. The cabin hangs 2.25 blocks under the rope and its
+    /// body runs anchor-3.5..anchor (jaw closed on the rope), so certifying only the rope line lets a rise two
+    /// blocks under the rope drag a seated rider through solid stone - riders have no block collision to stop it.
+    /// <para>
+    /// 3 rows still covers it exactly, and only just. The anchor is a block centre, so the j = -3 ray runs down
+    /// the centre of the row spanning anchor-3.5..anchor-2.5 - the cabin's floor lands on that row's bottom
+    /// face. Any further increase in <c>hangDrop</c> needs a fourth row.
+    /// </para>
+    /// </summary>
+    public const int ClearanceBelow = 3;
+
+    /// <summary>
+    /// Rows ABOVE the rope line that must also be clear, for the return strand. The haul rope is a loop with
+    /// two strands stacked <c>BEPylonBase.ReturnLift</c> = 1.3263 blocks apart, so the upper one occupies
+    /// 1.2663 to 1.3863 above the anchor - and the anchor is a block centre, so row j = +1 spans exactly
+    /// 0.5 to 1.5.
+    /// <para>
+    /// ONE row covers it exactly and with room at both ends: 0.7663 blocks of that row below the strand and
+    /// 0.1137 above it. Two "for margin" would refuse spans over nothing, because 2*rho lands in one row and
+    /// the arithmetic says which. Rays per span 12 -> 15.
+    /// </para>
+    /// </summary>
+    public const int ClearanceAbove = 1;
+
+    /// <summary>
+    /// Length of each end of a span that the tower's own structure occupies and that is therefore not
+    /// checked. The posts are player-chosen logs and planks, so <see cref="RopewayBlockFilter"/> cannot
+    /// tell them from terrain; without this the <see cref="ClearanceBelow"/> rays leave the sheave, drop
+    /// three blocks and run straight into the tower's own posts, and every span is silently refused.
+    /// The posts stand at x = +/-3, y = 0..3 above the footing; their far corners sit
+    /// sqrt(3.5^2 + 0.5^2) = 3.54 blocks horizontally from the sheave column, so 4 still clears them on any
+    /// bearing - but the margin is 0.46 now, not 1.45. Widening the passage again needs this raised too.
+    /// </summary>
+    public const double TowerClearance = 4.0;
+
+    /// <summary>
+    /// Cells from the ground-placed controller up to the sheave block at the top of its crossarm -
+    /// <c>ropeway:pylonhead</c> on a plain tower, <c>ropeway:bullwheel</c> on a station. The one number that
+    /// turns a tower's canonical position into its geometry, which is why it lives next to
+    /// <see cref="AnchorOf"/>. It is the same for all three footings because all three carry one offset
+    /// list; <c>RopewayAssetContractTests.AllThreeFootingsShareOneCellList</c> is what pins that.
+    /// <para>
+    /// Forced by the cabin, not chosen: the cabin body runs 1.25 below its origin to 1.25 above it, the
+    /// origin hangs <c>hangDrop</c> = 2.25 below the sheave, and the footing occupies the ground cell the
+    /// cabin passes over. Floor above the footing needs <c>SheaveHeight + 0.5 - 2.25 - 1.25 &gt; 0.5</c>
+    /// and roof under the crossarm needs <c>SheaveHeight + 0.5 - 2.25 + 1.25 &lt; SheaveHeight</c>;
+    /// together those admit only 4. See <c>RopewayAssetContractTests.TheCabinFitsThroughTheTower</c>.
+    /// </para>
+    /// </summary>
+    public const int SheaveHeight = 4;
+
+    private const double Epsilon = 1e-6;
+
+    /// <summary>Haul rope charged for a span of the given length. Always rounds up.</summary>
+    public static int RopeCost(double span, double ropePerBlock = 1.0)
+    {
+        if (double.IsNaN(span) || span <= 0 || ropePerBlock <= 0) return 0;
+        return (int)Math.Ceiling(span * ropePerBlock - Epsilon);
+    }
+
+    /// <summary>Haul rope handed back when a span is removed. Always rounds down, so a span never pays for itself.</summary>
+    public static int RopeRefund(double span, double ropePerBlock = 1.0)
+    {
+        if (double.IsNaN(span) || span <= 0 || ropePerBlock <= 0) return 0;
+        return (int)Math.Floor(span * ropePerBlock + Epsilon);
+    }
+
+    /// <summary>
+    /// How much to cut off each end of a span before checking it, so the tower structures at the ends do
+    /// not block their own line. Never more than half, so a very short span keeps at least a token check.
+    /// </summary>
+    public static double TrimForTowers(double length)
+    {
+        var trim = Math.Min(TowerClearance, (length - 1) / 2);
+        return trim > 0 ? trim : 0;
+    }
+
+    /// <summary>Centre of a block. Dimension-encoded Y, the same space Vec3d world positions and raycasts use.</summary>
+    public static Vec3d CentreOf(BlockPos pos)
+    {
+        return pos == null ? null : new Vec3d(pos.X + 0.5, pos.InternalY + 0.5, pos.Z + 0.5);
+    }
+
+    /// <summary>
+    /// Where the haul rope actually runs for a tower whose canonical position is its ground-placed footing:
+    /// the centre of the sheave block, <see cref="SheaveHeight"/> cells up. Every spatial consumer -
+    /// clearance sweeps, span length, rope cost, picker distances, the drawn cable and the cabin's own
+    /// position - goes through here, so the offset belongs in this one function and nowhere else. A
+    /// per-caller offset is how the cable and the cabin end up at different heights.
+    /// </summary>
+    public static Vec3d AnchorOf(BlockPos pos)
+    {
+        var centre = CentreOf(pos);
+        if (centre != null) centre.Y += SheaveHeight;
+        return centre;
+    }
+
+    /// <summary>
+    /// The pitch-about-X and yaw-about-Y that aim a mesh's local +Z straight down a span of the given delta,
+    /// applied in that order. Pure and therefore unit-tested: a flipped sign or a swapped order gives cables
+    /// pointing off into the sky, which compiles, renders, and is only visible by standing in the world.
+    /// </summary>
+    public static void CableAngles(double dx, double dy, double dz, out float radX, out float radY)
+    {
+        var horizontal = Math.Sqrt(dx * dx + dz * dz);
+        radX = -(float)Math.Atan2(dy, horizontal);
+        radY = (float)Math.Atan2(dx, dz);
+    }
+
+    /// <summary>
+    /// Lang key for the eight-point compass bearing from one tower to another. This is what an unnamed tower
+    /// is called, so it has to be a bearing a player can act on rather than a placeholder. Returns whole lang
+    /// keys rather than a bare code so the shipped-lang-key test can see every one of them. Pure.
+    /// </summary>
+    public static string CompassKey(double dx, double dz)
+    {
+        // Two towers on the same column have no bearing, and -0.0 would otherwise send atan2 due south.
+        if (dx == 0 && dz == 0) return "ropeway:dir-n";
+
+        // -dz because north is -Z, and atan2(east, north) puts 0 at north and grows clockwise.
+        var octant = ((int)Math.Round(Math.Atan2(dx, -dz) / (Math.PI / 4)) + 8) % 8;
+        return octant switch
+        {
+            0 => "ropeway:dir-n",
+            1 => "ropeway:dir-ne",
+            2 => "ropeway:dir-e",
+            3 => "ropeway:dir-se",
+            4 => "ropeway:dir-s",
+            5 => "ropeway:dir-sw",
+            6 => "ropeway:dir-w",
+            _ => "ropeway:dir-nw"
+        };
+    }
+
+    /// <summary>
+    /// The widest error between a corner tower's crossarm and the corner's own bisector that still lets the
+    /// cabin through without clipping a post, in degrees, for a corner that deflects the line by
+    /// <paramref name="turnDeg"/>. Pure.
+    /// <para>
+    /// A FIT TO THREE MEASURED POINTS, not a derivation, and it is stated that way on purpose. The rig in
+    /// <c>docs/agentic/ingest/cablecar/TURNING-SPEC.md</c> §2.5 swept the tower facing at each corner angle
+    /// and found the widest error keeping penetration under the cabin's own 0.0625-block wall thickness:
+    /// <b>+/-1.0 degree at a 90 degree turn, +/-23.2 at 45, +/-30.8 at 30</b>. Half the shortfall from a right
+    /// angle reproduces all three to within a degree (0 / 22.5 / 30) and errs on the warning side, which is
+    /// the right side for something that only ever prints a chat line. Past 90 degrees it is zero: a corner
+    /// that sharp is dirty at every facing, which the acceptance test's hairpin row measures.
+    /// </para>
+    /// <para>
+    /// This is NOT a closed form waiting to be found. The cabin fits the passage at any yaw - its 2.463-block
+    /// half-diagonal against post inner faces at 2.5 - so what a facing error costs is not the rotation but
+    /// where the cabin's ORIGIN is, twenty blocks out, which no local geometry knows.
+    /// </para>
+    /// </summary>
+    public static double CornerTolerance(double turnDeg)
+    {
+        return Math.Max(0, (90 - turnDeg) / 2);
+    }
+
+    /// <summary>
+    /// How far a bearing is off a facing's AXIS rather than off the facing itself, in degrees, folded into
+    /// [0, 90]. The passage runs through the tower both ways and the cabin is symmetric front to back, so a
+    /// north-facing crossarm and a south-facing one are the same crossarm - measuring against the facing
+    /// would report 180 degrees of error for a tower that is exactly right. Pure.
+    /// </summary>
+    public static double AxisError(double bearingRad, BlockFacing axis)
+    {
+        if (axis == null) return 90;
+
+        // Folded modulo PI rather than through GameMath.AngleRadDistance, which is float: a due-north axis is
+        // atan2(0, -1) = PI exactly in double and 1.4e-5 degrees off it in float, and this is compared against
+        // a tolerance that is legitimately zero at a right angle.
+        var off = (bearingRad - Math.Atan2(axis.Normalf.X, axis.Normalf.Z)) % Math.PI;
+        if (off < 0) off += Math.PI;
+
+        // 180 / PI in double, not GameMath.RAD2DEG, which is a float and puts a perpendicular tower at 89.99995.
+        return Math.Min(off, Math.PI - off) * (180 / Math.PI);
+    }
+
+    /// <summary>
+    /// How much to take out of each candidate slot to reach <paramref name="quantity"/>, or null when the
+    /// stacks do not add up. Null means the caller mutates nothing - a short inventory must never be
+    /// partially drained.
+    /// </summary>
+    public static int[] PlanConsumption(IReadOnlyList<int> stackSizes, int quantity)
+    {
+        if (stackSizes == null) return null;
+
+        var takes = new int[stackSizes.Count];
+        if (quantity <= 0) return takes;
+
+        var remaining = quantity;
+        for (var i = 0; i < stackSizes.Count && remaining > 0; i++)
+        {
+            var take = Math.Min(Math.Max(0, stackSizes[i]), remaining);
+            takes[i] = take;
+            remaining -= take;
+        }
+
+        return remaining > 0 ? null : takes;
+    }
+
+    /// <summary>
+    /// Blocks that stop a span. Air, foliage and our own tower parts pass - a straight line of towers must
+    /// not block itself, and refusing to build through a fern is infuriating.
+    /// </summary>
+    public static readonly BlockFilter RopewayBlockFilter = (pos, block) =>
+    {
+        if (block == null || block.Id == 0) return false;
+        if (block.BlockMaterial == EnumBlockMaterial.Leaves || block.BlockMaterial == EnumBlockMaterial.Plant) return false;
+        if (block.Code?.Domain == "ropeway") return false;
+        return block.SideSolid.Any || block.CollisionBoxes is { Length: > 0 };
+    };
+
+    /// <summary>
+    /// True when the corridor the rope needs between the two anchors is clear: 3 wide, from the return
+    /// strand's own row down to the bottom of the cabin. Parallel block-only ray casts through the engine's own DDA -
+    /// a zero-width ray cannot certify a 3-wide cabin, and hand-rolling a voxel walk when
+    /// <c>IWorldAccessor.InteresectionTester</c> already exists would be silly. Main thread only.
+    /// Fails closed - a rope through a mountain is a bug report, a refused build is an annoyance.
+    /// </summary>
+    public static bool IsSpanClear(IWorldAccessor world, Vec3d from, Vec3d to, out BlockPos firstBlocker)
+    {
+        firstBlocker = null;
+        if (world == null || from == null || to == null) return false;
+
+        try
+        {
+            var dir = to.Clone().Sub(from);
+            var length = dir.Length();
+            if (length < Epsilon) return true;
+            dir.Normalize();
+
+            var trim = TrimForTowers(length);
+            if (trim > 0)
+            {
+                from = from.Clone().Add(dir.X * trim, dir.Y * trim, dir.Z * trim);
+                to = to.Clone().Add(-dir.X * trim, -dir.Y * trim, -dir.Z * trim);
+            }
+
+            var right = Math.Abs(dir.Y) > 0.999
+                ? new Vec3d(1, 0, 0)
+                : new Vec3d(-dir.Z, 0, dir.X).Normalize();
+            var up = Cross(right, dir).Normalize();
+
+            for (var i = -ClearanceRadius; i <= ClearanceRadius; i++)
+            {
+                for (var j = -ClearanceBelow; j <= ClearanceAbove; j++)
+                {
+                    var offset = new Vec3d(
+                        right.X * i + up.X * j,
+                        right.Y * i + up.Y * j,
+                        right.Z * i + up.Z * j);
+
+                    var hit = world.InteresectionTester.GetSelectedBlock(
+                        from.Clone().Add(offset), to.Clone().Add(offset), RopewayBlockFilter);
+
+                    if (hit?.Block != null && hit.Block.Id != 0)
+                    {
+                        firstBlocker = hit.Position;
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+        catch (Exception)
+        {
+            firstBlocker = null;
+            return false;
+        }
+    }
+
+    private static Vec3d Cross(Vec3d a, Vec3d b)
+    {
+        return new Vec3d(
+            a.Y * b.Z - a.Z * b.Y,
+            a.Z * b.X - a.X * b.Z,
+            a.X * b.Y - a.Y * b.X);
+    }
+}
