@@ -1113,6 +1113,11 @@ public class RopewayAssetContractTests
     [Theory]
     [InlineData("drivestation.json")]
     [InlineData("tensionstation.json")]
+    // The shaft head is the drive station's own leg at its own block numbers, so it is the same claim about
+    // the same two shapes - and it was not being made about it. The passage half-width the bound protects is
+    // not a shaft's concern (the car goes UP through the head, not across it), but the leg is, because a
+    // drive station 3 blocks away shares the column.
+    [InlineData("shafthead.json")]
     public void AStationsMachineLegStaysInsideThePostColumn(string footing)
     {
         var postX = Offsets("pylonbase.json").Where(o => o.Y < SpanMath.SheaveHeight).Min(o => Math.Abs(o.X));
@@ -1203,6 +1208,10 @@ public class RopewayAssetContractTests
     [Theory]
     [InlineData("drivestation.json")]
     [InlineData("tensionstation.json")]
+    // shafthead.json declares the drive station's leg at the drive station's own numbers, so it inherits the
+    // whole of that bug and none of the coverage until it is named here. Its `ropeway:drivehead-*` head cell
+    // is what carries the refusal, exactly as the drive station's does.
+    [InlineData("shafthead.json")]
     public void ASharedMachineLegSatisfiesAtMostOneStation(string footing)
     {
         var offsets = Offsets(footing);
@@ -1260,6 +1269,84 @@ public class RopewayAssetContractTests
 
         // Or the loop asserted nothing: the placements still EXIST, they simply cannot both be finished.
         Assert.True(reached >= 3, $"found only {reached} placements sharing a {footing[..^5]}'s machine leg");
+    }
+
+    /// <summary>
+    /// EVERY ASYMMETRIC CELL A FOOTING NAMES BY FAMILY IS NARROWED TO THAT FOOTING'S OWN FACING, and this is
+    /// the test that catches a new one being added without the narrowing. <c>MultiblockStructure</c> matches a
+    /// cell with <c>WildcardUtil.Match</c> and has no notion of ownership or of orientation, so a
+    /// <c>-*</c> family cell is satisfied by ANY of its four side variants - which is right for a block that
+    /// is symmetric about the axis it stands on and silently wrong for one that is not.
+    /// <para>
+    /// <c>shaftsheave</c> is why this exists as its own test rather than as a line of
+    /// <see cref="ASharedMachineLegSatisfiesAtMostOneStation"/>. That one only ever sees a cell two footings
+    /// SHARE, and a shaft head's sheave is not shared with anything - so a mis-faced sheave was invisible to
+    /// the whole suite while being the most visible defect in the machine: the sheave is a
+    /// <c>HorizontalOrientable</c>, taking the PLAYER's facing at placement, and it carries headframe columns,
+    /// a beam to the hub, a chain case on one face and an authored wrap arc in ONE vertical plane.
+    /// <c>BullwheelRenderer</c> takes its yaw from the sheave's own side while <c>BEBullwheel.WrapOffset</c>
+    /// and <c>ShaftRenderer</c> take theirs from the footing, so three of the four placements completed the
+    /// structure with the wheel, the headframe and the rope pointing three different ways.
+    /// </para>
+    /// <para>
+    /// The break-it half is the second loop: each of the three OTHER side variants must fail to satisfy the
+    /// narrowed cell. Delete a family from <c>BEPylonBase.OwnTheHeadCell</c>'s array and that loop fails on
+    /// the first mis-faced block, with the code it wrongly accepted.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("drivestation.json", "drivehead")]
+    [InlineData("tensionstation.json", "tensionhead")]
+    [InlineData("shafthead.json", "shaftsheave")]
+    public void AnAsymmetricHeadCellIsNarrowedToItsOwnFootingsFacing(string footing, string family)
+    {
+        var wildcard = new AssetLocation("ropeway", family + "-*");
+
+        // The JSON still ships the family wildcard, or the narrowing has nothing to narrow and this test is
+        // asserting about a cell that no longer exists.
+        Assert.True(Structure(footing).GetProperty("blockNumbers").TryGetProperty(wildcard.ToString(), out _),
+            $"{footing} no longer declares {wildcard}, so OwnTheHeadCell has nothing to narrow");
+
+        // ...and the block really does carry the four side variants, or "narrowed to its own facing" is a
+        // claim about a variant group that is not there.
+        Assert.Equal(
+            new[] { "north", "east", "south", "west" },
+            Load("blocktypes", family + ".json").GetProperty("variantgroups").EnumerateArray()
+                .Single(g => g.GetProperty("code").GetString() == "side")
+                .GetProperty("states").EnumerateArray().Select(s => s.GetString()).ToArray());
+
+        foreach (var side in new[] { "north", "east", "south", "west" })
+        {
+            var structure = new MultiblockStructure();
+            foreach (var pair in Structure(footing).GetProperty("blockNumbers").EnumerateObject())
+            {
+                structure.BlockNumbers[new AssetLocation(pair.Name)] = pair.Value.GetInt32();
+            }
+
+            // The production narrowing, called rather than restated - a copy of the rule here would pass while
+            // the shipped one did nothing.
+            BEPylonBase.OwnTheHeadCell(structure, side);
+
+            // The code the engine actually ends up asking that cell for.
+            var cell = structure.BlockNumbers.Keys.Single(code => code.Path.StartsWith(family + "-"));
+
+            // THE MIS-FACED BLOCK, through the engine's own matcher: MultiblockStructure.InCompleteBlockCount
+            // asks exactly this of whatever is standing in the cell, so a surviving `-*` accepts all four and
+            // three placements in four complete a structure they point the wrong way in.
+            foreach (var placed in new[] { "north", "east", "south", "west" })
+            {
+                var candidate = new AssetLocation("ropeway", family + "-" + placed);
+                Assert.True(
+                    Vintagestory.API.Util.WildcardUtil.Match(cell, candidate) == (placed == side),
+                    $"a {footing[..^5]} facing {side} asks its cell for {cell}, and {candidate} "
+                    + (placed == side
+                        ? "does not satisfy it - the footing cannot complete with its own block"
+                        : "satisfies it - a mis-faced block completes the structure"));
+            }
+
+            Assert.Equal(new AssetLocation("ropeway", family + "-" + side), cell);
+            Assert.DoesNotContain(wildcard, structure.BlockNumbers.Keys);
+        }
     }
 
     /// <summary>
@@ -2447,5 +2534,291 @@ public class RopewayAssetContractTests
 
         Assert.NotEmpty(used);
         Assert.All(used, k => Assert.Contains(k, lang));
+    }
+
+    // ------------------------------------------------------------------ the shaft
+
+    private const double ShaftLane = 2 * BEBullwheel.ShaftWrapOut;
+
+    private static (double[] Min, double[] Max) Bounds(JsonElement shape, string prefix = "")
+    {
+        var min = new[] { double.MaxValue, double.MaxValue, double.MaxValue };
+        var max = new[] { double.MinValue, double.MinValue, double.MinValue };
+
+        foreach (var element in shape.GetProperty("elements").EnumerateArray())
+        {
+            if (prefix.Length > 0 && !element.GetProperty("name").GetString()!.StartsWith(prefix)) continue;
+
+            var from = element.GetProperty("from").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+            var to = element.GetProperty("to").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+            for (var axis = 0; axis < 3; axis++)
+            {
+                min[axis] = Math.Min(min[axis], Math.Min(from[axis], to[axis]));
+                max[axis] = Math.Max(max[axis], Math.Max(from[axis], to[axis]));
+            }
+        }
+
+        return (min, max);
+    }
+
+    /// <summary>
+    /// A SHAFT HEAD IS A DRIVE STATION WITH THE CROSSARM AND BOTH POST COLUMNS DELETED, and that is a claim
+    /// about the JSON rather than a description of it: every cell of the machine leg carries the drive
+    /// station's OWN block number, so <c>BEPylonBase.Intake</c> - which looks the intake up by number out of
+    /// its own <c>TransformedOffsets</c> - resolves <c>ropeway:drivehousing</c> with no C# anywhere. Change one
+    /// of those numbers on either side and the shaft head silently stops being a drive.
+    /// </summary>
+    [Fact]
+    public void TheShaftHeadIsTheDriveStationsOwnMachineLegAtItsOwnBlockNumbers()
+    {
+        var drive = Offsets("drivestation.json").ToDictionary(o => (o.X, o.Y, o.Z), o => o.W);
+        var shaft = Offsets("shafthead.json");
+
+        // Eight cells, and every one of them except the sheave is the drive station's, byte for byte.
+        Assert.Equal(8, shaft.Count);
+        foreach (var cell in shaft)
+        {
+            if (cell.X == 0 && cell.Y == SpanMath.SheaveHeight && cell.Z == 0) continue;
+
+            Assert.True(drive.TryGetValue((cell.X, cell.Y, cell.Z), out var number),
+                $"shafthead wants a cell at ({cell.X},{cell.Y},{cell.Z}) that drivestation does not have - the "
+                + "leg is only free because it is the SAME leg");
+            Assert.Equal(number, cell.W);
+            Assert.Equal(Wanted("drivestation.json", number), Wanted("shafthead.json", cell.W));
+        }
+
+        // Fifteen cells become eight: the crossarm's west half, its three braces and both four-block post
+        // columns are gone, which is the whole of what premise "no crossarm" buys.
+        Assert.Equal(15, Offsets("drivestation.json").Count);
+        Assert.All(shaft, cell => Assert.True(cell.X >= 0, "a shaft head has no west half"));
+        Assert.DoesNotContain(shaft, cell => cell.X == 0 && cell.Y < SpanMath.SheaveHeight);
+
+        // The intake is the same cell by the same number, so DriveSpeedOn and DeclareLoad need no change.
+        var head = Structure("shafthead.json");
+        Assert.Equal(7, Load("blocktypes", "shafthead.json").GetProperty("attributes")
+            .GetProperty("driveIntakeCell").GetInt32());
+        Assert.Equal("ropeway:drivehousing", Wanted("shafthead.json", 7));
+        Assert.Contains(shaft, cell => cell.W == 7 && cell.X == 3 && cell.Y == 0 && cell.Z == 0);
+        Assert.True(head.GetProperty("blockNumbers").TryGetProperty("ropeway:drivehead-*", out _),
+            "the drivehead wildcard has to survive into the shaft head, or OwnTheHeadCell has nothing to "
+            + "narrow and two stations can share one leg again");
+
+        // The foot is two blocks: itself and the counterweight's own bottom guide, out on the lane.
+        var foot = Offsets("shaftfoot.json");
+        Assert.Single(foot);
+        Assert.Equal((0, 0, -(int)ShaftLane), (foot[0].X, foot[0].Y, foot[0].Z));
+        Assert.Equal("ropeway:tensionguide", Wanted("shaftfoot.json", foot[0].W));
+    }
+
+    /// <summary>
+    /// BOTH SHAFT FOOTINGS ARE HALF-BLOCK PLINTHS, and this is not a style note - it is what makes
+    /// <c>EntityRopewayCabin.DropGhostPassengers</c> safe on a shaft with the code untouched. That method puts
+    /// a relogging rider at <c>footingY + 0.5</c> and its comment says why in those words: "the top of the
+    /// footing's plinth. Subtracting the 0.5 as well would drop them at footingY, which is inside that plinth's
+    /// own collision box." A solid deck would put them INSIDE the block; a ring or a plate at the top of the
+    /// cell would put them in the void over a 48-block shaft, and <c>ParkAtNearestEnd</c> sends about half of
+    /// them to the head. The shared code is fine either way - what changes is the authored element it was
+    /// calibrated against.
+    /// </summary>
+    [Fact]
+    public void AGhostPassengerDroppedAtEitherShaftFootingLandsOnItsPlinth()
+    {
+        foreach (var footing in new[] { "shaftfoot.json", "shafthead.json", "pylonbase.json" })
+        {
+            var box = Load("blocktypes", footing).GetProperty("collisionbox");
+            Assert.Equal(0, box.GetProperty("y1").GetDouble());
+            Assert.Equal(0.5, box.GetProperty("y2").GetDouble());
+        }
+
+        // ...and the drawn plinth reaches that face, so the rider is not standing on an invisible one.
+        var plinth = Bounds(Load("shapes", "block", "pylonbase.json"));
+        Assert.Equal(0, plinth.Min[1]);
+        Assert.Equal(8, plinth.Max[1]);
+
+        // Which is also the drop the shipped arithmetic makes: park.Y is the anchor, so subtracting
+        // SheaveHeight alone lands exactly here.
+        Assert.Equal(0.5, SpanMath.AnchorOf(new BlockPos(0, 0, 0, 0)).Y - SpanMath.SheaveHeight, 9);
+    }
+
+    /// <summary>
+    /// The head sheave, measured off its own shipped shapes. Four numbers and each of them is forced:
+    /// <list type="bullet">
+    /// <item>the rope radius is <see cref="BEBullwheel.ShaftWrapOut"/>, because the counterweight has to pass
+    /// the car and the car's half-length is 2.0 - a bullwheel's 0.663 separates the strands by 1.326, which is
+    /// inside the car;</item>
+    /// <item>the rim's swept CORNER sits one rope half-thickness inside that circle, which is the same
+    /// derivation <see cref="BullwheelRenderer.WrapRadius"/> carries for the bullwheel;</item>
+    /// <item>the swept rim clears the parked car's roof, which is what stops the wheel turning through it;</item>
+    /// <item>the wrap's two end chords straddle the two tangent points, so the rope leaves the wheel ON the
+    /// strands and <see cref="ShaftRenderer.WrapChord"/> knows where to stop drawing them.</item>
+    /// </list>
+    /// </summary>
+    [Fact]
+    public void TheHeadSheaveWrapsTheRopeOntoBothStrandsAndClearsTheParkedCarsRoof()
+    {
+        var rim = Load("shapes", "block", "shaftrim.json");
+        var hub = BullwheelRenderer.RimPivotY * 16;
+
+        // The rim turns about the SAME axle the bullwheel does, so RimMatrix and RimPivotY carry over whole.
+        foreach (var element in rim.GetProperty("elements").EnumerateArray())
+        {
+            if (!element.TryGetProperty("rotationOrigin", out var origin)) continue;
+            Assert.Equal(hub, origin[1].GetDouble(), 4);
+        }
+
+        // The furthest swept corner of any element, all the way round - not the flat, which is the mistake
+        // gen_bullwheelrim.py's own comment records making.
+        var reach = 0.0;
+        foreach (var element in rim.GetProperty("elements").EnumerateArray())
+        {
+            foreach (var y in new[] { element.GetProperty("from")[1].GetDouble(), element.GetProperty("to")[1].GetDouble() })
+            {
+                foreach (var z in new[] { element.GetProperty("from")[2].GetDouble(), element.GetProperty("to")[2].GetDouble() })
+                {
+                    reach = Math.Max(reach, Math.Sqrt((y - hub) * (y - hub) + (z - 8) * (z - 8)));
+                }
+            }
+        }
+
+        var rope = BEBullwheel.ShaftWrapOut * 16;
+        Assert.Equal(rope - BEPylonBase.CableRadius * 16, reach, 2);
+
+        // The parked car's roof top is anchor - 1.0, and the sheave cell's own centre IS the anchor. The rim's
+        // lowest swept point stands over the car's tail, so this gap is load-bearing rather than incidental.
+        var roofUnderAnchor = (EntityRopewayCabin.DefaultHangDrop - SpanMath.CabinHalfHeight) * 16;
+        var rimUnderAnchor = 8 - (hub - reach);
+        Assert.True(rimUnderAnchor < roofUnderAnchor,
+            $"the head sheave's rim reaches {rimUnderAnchor:0.00} units under the anchor and the parked car's "
+            + $"roof is at {roofUnderAnchor:0.00}");
+        Assert.Equal(0.666, (roofUnderAnchor - rimUnderAnchor) / 16, 3);
+
+        // The wrap: nine chords, the first straddling the going strand's tangent at plan 0 and the last the
+        // return strand's at plan Lane, both on the hub's own height.
+        var sheave = Load("shapes", "block", "shaftsheave.json");
+        var chords = sheave.GetProperty("elements").EnumerateArray()
+            .Where(e => e.GetProperty("name").GetString()!.StartsWith("wrap")).ToList();
+        Assert.Equal(9, chords.Count);
+
+        var hubZ = 8 - BEBullwheel.ShaftWrapOut * 16;
+        foreach (var (chord, plan) in new[] { (chords[0], 8.0), (chords[chords.Count - 1], 8 - ShaftLane * 16) })
+        {
+            var angle = chord.GetProperty("rotationX").GetDouble() * Math.PI / 180;
+            var radius = chord.GetProperty("from")[1].GetDouble() + BEPylonBase.CableRadius * 16 - hub;
+
+            Assert.Equal(rope, radius, 4);
+            Assert.Equal(plan, hubZ + radius * Math.Sin(angle), 4);
+            Assert.Equal(hub, hub + radius * Math.Cos(angle), 4);
+        }
+
+        // ...and ShaftRenderer stops each strand exactly where that end chord starts, so the two butt instead
+        // of overlapping for a third of a block of z-fight.
+        var half = chords[0].GetProperty("to")[2].GetDouble() - hubZ;
+        Assert.Equal(half / 16, ShaftRenderer.WrapChord, 4);
+
+        // NOTHING THE SHAFT HEAD OWNS ENTERS THE CAR'S SWEPT VOLUME, which is premise 1 stated as a number: a
+        // ropeway tower drives the cabin's roof through its own crossarm above 11.3 degrees, and a shaft
+        // station has no crossarm to drive it through. This cell's floor is anchor - 0.5 and the parked car's
+        // roof top is anchor - 1.0, so every element of this block - bedplate, headframe, axle, chain case and
+        // wrap - has to stay at or above its own cell floor, and half a block of daylight is what is left.
+        var lowest = Bounds(sheave).Min[1];
+        Assert.True(lowest >= 0,
+            $"the shaft sheave reaches {lowest:0.00} units below its own cell, and the car passes under it");
+        Assert.Equal(0.5, EntityRopewayCabin.DefaultHangDrop - SpanMath.CabinHalfHeight - 0.5, 9);
+    }
+
+    /// <summary>
+    /// The counterweight fits its own lane and clears the car, both measured off the shipped shape. The lane
+    /// is one column, three blocks along the head's facing - which is where the wrap puts the return strand and
+    /// nowhere else - so the weight has to be under a block wide, and its near face has to stay off a car whose
+    /// half-length is 2.0.
+    /// </summary>
+    [Fact]
+    public void TheCounterweightFitsItsOwnColumnAndClearsTheCarsNose()
+    {
+        var (min, max) = Bounds(Load("shapes", "block", "shaftweight.json"));
+
+        // Inside one column in plan, or the block the player is told to dig is the wrong block.
+        Assert.True(min[0] >= 0 && max[0] <= 16, "the counterweight is wider than its own lane");
+        Assert.True(min[2] >= 0 && max[2] <= 16, "the counterweight is deeper than its own lane");
+
+        // Its rope point is the top of the column and it hangs the CAR's own drop below it, so the two bodies
+        // are mirrors and the weight's shoe lands on the foot's guide as the car's floor lands on the head.
+        Assert.Equal(0, min[1]);
+        Assert.Equal(ShaftRenderer.WeightDrop * 16, max[1], 4);
+
+        // The gap in plan, which is what the 3-block lane was chosen for: the lane's near face against the
+        // car's nose. Half a block, and the only thing that can eat it is a wider weight.
+        var nearFace = ShaftLane - (max[2] - 8) / 16;
+        Assert.True(nearFace > SpanMath.CabinHalfLength,
+            $"the counterweight reaches {nearFace:0.000} blocks from the shaft axis and the car's nose is at "
+            + $"{SpanMath.CabinHalfLength}");
+        Assert.Equal(0.5625, nearFace - SpanMath.CabinHalfLength, 4);
+
+        // The one block of rope this renderer scales in Y is the drawn cable's own thickness, so a strand in a
+        // shaft is the same rope as a strand on a ropeway.
+        var strand = Bounds(Load("shapes", "block", "shaftstrand.json"));
+        Assert.Equal(8 - BEPylonBase.CableRadius * 16, strand.Min[0], 4);
+        Assert.Equal(8 + BEPylonBase.CableRadius * 16, strand.Max[0], 4);
+        Assert.Equal(0, strand.Min[1]);
+        Assert.Equal(16, strand.Max[1]);
+    }
+
+    /// <summary>
+    /// THE CAR'S FLOOR IS THE NUMBER THE SHAFT'S CORRIDOR IS EXTENDED BY, re-derived off the shipped shape so
+    /// it cannot become a margin somebody picked. On a shaft <c>IsSpanClear</c>'s <c>up</c> is HORIZONTAL - the
+    /// span's direction is <c>(0, +/-1, 0)</c>, so the whole clearance band lands across the plan and every ray
+    /// spans exactly <c>[anchorFoot, anchorHead]</c> in Y, which is the ROPE's segment. The car hangs
+    /// <c>hangDrop +/- CabinHalfHeight</c> under that, so the bottom <see cref="SpanMath.ShaftCarDrop"/> blocks
+    /// of the hoistway - where the car parks and the rider sits - went uncertified until the lower end of the
+    /// cast was dropped by exactly this.
+    /// <para>
+    /// Three bodies share the number and each of them used to write it out: the car's own floor, the corridor's
+    /// lower end, and the counterweight's mass. <c>SpanMath.ShaftCarDrop</c> is the one constant now, and this
+    /// is what ties it to the shape rather than to the other two.
+    /// <c>RopewayMathTests.TheShaftsCertifiedVolumeIsTheCarsSweptBodyAndNotTheRopesSegment</c> is the other
+    /// half - the geometry that makes it the right number.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheCarsFloorIsTheDropTheShaftsCorridorIsExtendedBy()
+    {
+        var hangDrop = Load("entities", "cabin.json").GetProperty("attributes").GetProperty("hangDrop").GetDouble();
+        var (_, _, elements) = CabinBounds();
+        var floor = Find(elements, "floor").GetProperty("from")[1].GetDouble() / 16;
+
+        // The shipped shape's own lowest floor face, under the cabin's origin, plus the hang. Nothing here is
+        // a literal except the 3.5 the docs and the handbook quote.
+        Assert.Equal(-SpanMath.CabinHalfHeight, floor, 9);
+        Assert.Equal(SpanMath.ShaftCarDrop, hangDrop - floor, 9);
+        Assert.Equal(3.5, SpanMath.ShaftCarDrop, 9);
+
+        // The counterweight is the same body mirrored, so it is the same constant and not a copy of it.
+        Assert.Equal(SpanMath.ShaftCarDrop, ShaftRenderer.WeightDrop, 9);
+
+        // And the parked car's floor is the top landing's own face, one block over the footing - which is what
+        // makes the uncertified stretch precisely the car rather than an arbitrary margin under it.
+        Assert.Equal(1.0, SpanMath.SheaveHeight + 0.5 - SpanMath.ShaftCarDrop, 9);
+    }
+
+    /// <summary>
+    /// The three shapes the shaft sheave's block entity tesselates in C# rather than naming in
+    /// <c>shapeByType</c>. <c>Tesselator.TesselateShape(Block, ...)</c> builds a BLOCK texture source and never
+    /// consults the shape's own map, so a key one of them uses and the blocktype does not declare renders as
+    /// the magenta checker with one line on the tesselation thread. Same handshake the bullwheel's rim has, and
+    /// the same test - there is no <c>shapeByType</c> entry for any of them to be caught by.
+    /// </summary>
+    [Fact]
+    public void TheShaftsRuntimeDrawnShapesAskForKeysTheSheaveDeclares()
+    {
+        var block = Load("blocktypes", "shaftsheave.json");
+        var rimShape = block.GetProperty("attributes").GetProperty("rimShape").GetString();
+        Assert.Equal("shapes/block/shaftrim.json", rimShape);
+
+        foreach (var name in new[] { "shaftrim.json", "shaftweight.json", "shaftstrand.json" })
+        {
+            var shape = Load("shapes", "block", name);
+            AssertDeclares($"{name} -> blocktypes/shaftsheave.json", FaceKeys(shape), Declared(block));
+            AssertShadowCopyAgrees("blocktypes/shaftsheave.json", "ropeway:block/" + name[..^5], block, shape);
+        }
     }
 }

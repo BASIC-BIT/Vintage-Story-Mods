@@ -157,6 +157,82 @@ HaulResistance × (1 + 0.5·max(0,climb) + cargo)    when a cabin is trying to m
 many other drives are powered — a number that changes when somebody walks away and a chunk unloads, which is
 the coupling this design refuses to have. Each drive pulls its own weight and their speeds add.
 
+### A SHAFT declares no climb, and the term is cancelled rather than discounted (2026-08-10)
+
+`BEPylonBase.DeclareLoad` passes `climb = 0` on a shaft line, and the argument is one sentence:
+`ClimbLoad · climb` is the cost of lifting **the car's own mass** up the grade, and a counterweight is
+precisely that mass hung on the other strand. What is left for the drive to lift is the **imbalance**, which
+is `cargo`, which is 0. So there is no new constant, no `CounterweightRelief`, and no ropeway span's number
+moves: on every line that is not a shaft the climb term is untouched and fully legible, which is exactly the
+objection a global discount would have earned. The player has built the thing that removes it.
+
+Two consequences fall out and neither needs a case:
+
+- **Descending already costs the level figure**, because `Resistance` clamps a negative climb to zero. So the
+  counterweight makes going *up* cost what coming *down* already cost.
+- **An over-counterweight would be free power** — a heavier weight lowers the empty car by itself — and the
+  model cannot express that, for the reason directly above: a negative resistance is a ropeway that drives
+  the network. So the counterweight is exactly matched and never over.
+
+**The ladder, in blocks of RISE per second.** On a vertical leg blocks along the line *are* blocks of rise,
+so no `sin θ` appears anywhere:
+
+| drive | torque factor | counterweighted, R = 0.300 | bare, R = 0.450 |
+|---|---|---|---|
+| 2-sail wood | 0.500 | stalls | stalls |
+| **3-sail wood** | 0.750 | **1.20** — a knife edge, see below | **stalls** (0.6 − 0.6 = 0 exactly) |
+| **4-sail wood** | 1.000 | **1.80** — the tier to rely on | 0.90 |
+| 5-sail wood | 1.250 | 2.16 | 1.44 |
+| **10-sail metal** | 3.125 | **3.02** | 2.74 |
+| water wheel, flow `f` | `f` | `6(0.3 − 0.3/f)`, ≤ 1.80 hard cap | ≤ 1.80 |
+
+That is **the level-line ladder, unchanged**, which is the point: one table, and
+`RopewayPowerTests.ABiggerDriveIsAVisiblyFasterCabin` keeps its numbers.
+
+**The three-sail row is a knife edge and the headline has to say so.** `0.6 − 0.3/0.75 = 0.2` *exactly*, and
+three independent variables sit on that edge: `TargetSpeed` is `min(0.6, windSpeed)`, so any wind under 0.4
+stalls it outright; and `BEBehaviorWindmillRotor`'s `turbulenceExposed` halves the torque factor to 0.375,
+giving `0.6 − 0.8 < 0` — **a turbulence-exposed three-sail mill stalls a counterweighted lift.** The honest
+claim is *"a sheltered three-sail mill in good wind"*, and the tier a player can rely on is **four**.
+
+**Say the balance decision rather than presenting it as an economy.** A counterweighted shaft is *strictly*
+cheaper on power than a steep ropeway, *strictly* steeper, and a third of the placed blocks:
+
+| | load on the network | rise per block travelled | placed blocks | rope |
+|---|---|---|---|---|
+| level ropeway | 0.300 | 0.00 | 30 | 0.25/blk |
+| 70° ropeway | 0.441 | 0.94 | 30 | 0.25/blk |
+| **counterweighted shaft** | **0.300** | **1.00** | **11** | **0.50/blk** |
+
+**The 0.94 column is NOT a speed ratio, and reading it as one is a mistake this table has already caused
+once.** It says a 70° span turns 0.94 blocks of *travel* into a block of *rise*; it says nothing about how
+fast the cabin travels. The two columns compound, because the 70° span pays 0.441 where the shaft pays 0.300
+and `s* = 0.6 − R/T` is what that buys. Height gained per second, as a fraction of the shaft's:
+
+| torque | 3-sail wood | 4-sail wood | 5-sail wood (maxed) | 10-sail metal (maxed) | T → ∞ |
+|---|---|---|---|---|---|
+| 70° ropeway ÷ shaft | **6%** | **50%** | **64%** | **86%** | 94% |
+
+So 0.94 is a **ceiling the machine never reaches**, and at the four-sail tier this document calls the one to
+rely on, a shaft climbs **twice** as fast as the steepest ropeway. Handbook page 53 and QA step 3 carried
+*"96% of a shaft's rate"* until 2026-08-10, which was this column transposed into a rate; both now quote the
+half. The row is asserted rather than described, for exactly that reason.
+
+The only axis it loses on is haul rope — ten extra on a 40-block climb — and digging, which is a wash: a
+vertical shaft for 40 blocks of rise is 40 × 16 = 640 columns against a 70° corridor's ~640 block-volumes,
+and the steep ropeway is free *only* where it runs up a cliff face. That is intended under the author's
+premise (*"we should be able to drive an elevator with relatively little force"*), and the one lever free to
+move if it turns out too strong is `ropePerBlock`, which is JSON.
+`RopewayPowerTests.ACounterweightedShaftCostsTheNetworkWhatALevelLineCosts` pins every claim in this section.
+
+**There is no hand crank, and inventing one would be a new mechanical power source in a transport mod.**
+Vanilla 1.22.1 ships none: the only `BEBehaviorMPRotor` subclasses are the windmill rotor, the water wheel
+and the creative rotor. The honest equivalent is the table above — the counterweight is the difference
+between *"the first windmill you build cannot move the lift at all"* and *"the first windmill you build runs
+it at a walk."* `HaulResistance` is three times a quern's 0.1, so a crank sized like a quern's would not turn
+it anyway, and that is the right answer rather than a disappointing one: a lift you can raise by hand is a
+lift with no reason to have a mill.
+
 ## The drive station — where power enters (2026-08-04)
 
 **The consumer is `ropeway:drivehousing`, cell `[3,0,0]` of a `ropeway:drivestation`**: the foot of that

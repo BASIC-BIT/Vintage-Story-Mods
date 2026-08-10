@@ -4,7 +4,18 @@ Manual operator checklist. One in-game session has happened: the mod loaded clea
 four findings the previous round fixed — cabin built across the travel axis, cable rendering nothing, the
 picker showing only link candidates, and no way to name a tower.
 
-**THIS ROUND MADE THE HAUL ROPE A LOOP** (`STACKED-LOOP-SPEC.md`, and
+**THIS ROUND ADDED A SECOND MACHINE: THE SHAFT** — a counterweighted lift that goes straight up
+(`ELEVATOR-DESIGN-2.md`, `ELEVATOR-CHALLENGE-2.md`, and [KNOWN-ISSUES.md](KNOWN-ISSUES.md) "The shaft").
+Three new blocks, **eleven placed against a ropeway pair's thirty**, one car and one counterweight on an
+**open** rope — car, head sheave, counterweight, and no loop. **It is a whole second walk and it lives at
+step 28**, after the power step, because a shaft cannot be ridden until you can run a mill; that is the walk
+order and not an appendix. Steps **1**, **1b**, **2**, **3** and **6** carry its build-time checks, and
+**0** carries its migration line. If you are holding a copy whose step 1b says *fifteen blocks*, it is stale.
+**Nothing about the ropeway changed**, and that is itself the biggest thing to check: every ropeway step
+below is unaltered and every one of them still has to pass. A horizontal line that behaves differently from
+last round is a regression, not a shaft.
+
+**The round before made the haul rope a LOOP** (`STACKED-LOOP-SPEC.md`, and
 [KNOWN-ISSUES.md](KNOWN-ISSUES.md) "The haul rope is a LOOP"). Two strands stacked **1.33 blocks** apart —
 one wheel diameter, which is where the number comes from — the cabin on the lower one, and a bullwheel at
 each terminal taking the rope round from one to the other. **One cabin, and there is no second one to look
@@ -31,6 +42,9 @@ re-derived from `blocktypes/pylonbase.json` and the shipped shapes on 2026-08-01
 asserted by `renders/scenes/gen_manifests.py` and `RopewayAssetContractTests.TheCabinFitsThroughTheTower`.
 **Walked front to back again on 2026-08-04 for the loop**, which is how steps 0, 3, 10e, 11c, 12b, 21b and
 23's return-strand clause came to be where they are rather than bolted on at the end.
+**Walked front to back again on 2026-08-10 for the shaft**, which is how its build-time checks ended up
+inside steps 0, 1, 1b, 2, 3 and 6 and its ride at 28 — after the mill, because a shaft with no drive is a
+step you cannot finish.
 See [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for what source review already found and did not fix.
 
 
@@ -81,13 +95,21 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    **FAIL:** a crash on load, a tower that lost its spans, or a cable that stopped being drawn.
    **Also still true from the round before:** a world with towers older than the ground footing carries one
    *"Failed loading blockentity PylonHead …"* line per old tower and those towers are inert decoration.
+   **THE SHAFT NEEDS NO MIGRATION AT ALL, and that is the check.** It is three new blocktypes and no change
+   to any persisted field: nothing on an existing line reads the `shaft` attribute, and `RopewayLine.IsShaft`
+   is derived from the towers rather than saved. **PASS:** an old world comes back with every span, name,
+   cabin and freight bay exactly as it was, no new log line, and no tower reading incomplete. **FAIL:**
+   anything about an existing ropeway differs — that is the shaft reaching a machine it must not touch, and
+   step 28h is where you would confirm it.
 
 1. **Install and load.** Copy `ropeway_0_1_0.zip` into `%APPDATA%\VintagestoryData\Mods\`, start the game,
    open a world. **PASS:** no `Ropeway:` error lines in either log at startup. In particular there must be
    no *"multiblockStructure on ropeway:… lists '…', which matches no loaded block"* — that line
-   means a structure wildcard does not resolve at runtime. **Three footings carry a structure now** —
-   `pylonbase`, `drivestation` and `tensionstation` — so read the block code in the message before you
-   assume it is the post wildcard. The post wildcard accepts eight families:
+   means a structure wildcard does not resolve at runtime. **Five footings carry a structure now** —
+   `pylonbase`, `drivestation`, `tensionstation` and, new this round, `shafthead` and `shaftfoot` — so read
+   the block code in the message before you assume it is the post wildcard. The two shaft footings name no
+   post wildcard at all (a shaft has no posts); what they name is `ropeway:shaftsheave-*` plus the drive
+   station's own leg, and `ropeway:tensionguide`. The post wildcard accepts eight families:
    `log-placed-*`, `debarkedlog-*`, `planks-*`, `rock-*`, `cobblestone-*`, `drystone-*`, `rockpolished-*`
    and `stonebricks-*`. Note the verifier only tests the whole key, so a dud alternative hides behind the
    live ones — step 7 is what actually proves each family.
@@ -110,8 +132,9 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    key pointing at a path that does not exist on disk resolves to the unknown-texture checker at tesselation
    time and logs on that thread. A green build and a magenta block are compatible.
 
-1b. **Look at all fifteen blocks.** In creative, place one of each — footing, drive station footing, tension
-   station footing, pylon head, brace, bullwheel, drive housing, drive shaft, drive head, lay shaft, tension
+1b. **Look at all eighteen blocks.** In creative, place one of each — footing, drive station footing, tension
+   station footing, **shaft head footing**, **shaft foot footing**, pylon head, brace, bullwheel,
+   **shaft sheave**, drive housing, drive shaft, drive head, lay shaft, tension
    weight, tension guide, tension head — plus the cabin. **PASS:** nothing draws the magenta-and-black
    checker, and the palette reads as a ladder: riveted iron on the crossarm and lattice, dark tarnished
    castings on the drum, gearbox, sheave cheeks and wheel, bright steel on the shafts and bearing caps, cool
@@ -124,6 +147,20 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    there on a bare block in your hand as well as on a built tower — it is authored geometry, not something
    drawn only when a span exists. **FAIL:** the bullwheel has grown one too; that block carries neither,
    because at a station the wheel is the carrier.
+   **PASS — the shaft sheave, new this round, and it is the biggest single thing in the mod.** Place one and
+   stand back. A **two-and-three-quarter-block octagonal wheel** hangs in a riveted headframe that reaches
+   about three and a half cells above the block, with a rope arc **half way round the wheel** and a chain case
+   running east to where a lay shaft would be. All of that hangs **outside** its own cell — the block itself
+   is a two-unit bedplate you can stand on with a hole down the middle. **PASS:** the wheel turns only when a
+   shaft's drive is running (step 28), so on a bare block in creative it stands still.
+   **FAIL:** the wheel or the rope arc draws the magenta checker. Those three shapes — the rim, the
+   counterweight and the strand — are tesselated against this BLOCK's texture map and never their own, so a
+   key that moved on one side and not the other fails here and in no test.
+   **PASS — the two shaft footings are half-block plinths, the same as every other footing**, and there is no
+   crossarm anywhere on either of them. **FAIL:** either is a full cube; a rider relogging out of a cabin is
+   put down on that face and a full cube puts them inside it.
+   **PASS — the block-info panel on a bare shaft sheave says it is not part of a shaft** and names where it
+   goes, rather than repeating the bullwheel's line about a crossarm.
 
 2. **Craft the parts.** **Chisel your bits first.** Every station recipe pays its fastenings in **metal
    bits, eight to a slot**, and a whole station wants about a hundred of them. Chisel + ingot = 20 bits,
@@ -166,8 +203,19 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    - **Tension head ×1** — **8 bits**/plate/**8 bits** on the top row, **8 bits**/stick/**8 bits** under it.
    - **Tension guide ×3** — stick, plate, stick on the top row, then **8 bits**, **rope**, **8 bits**. One
      craft per leg, exact.
+   **The shaft's three, and craft them at step 28 rather than here** — two of the three eat something this
+   bill does not fund twice, so buying them now leaves you short at step 4:
+   - **Shaft head footing ×1** — metal plate, **pylon footing**, metal plate in a 1×3 *row*. Two plates
+     against the drive station footing's one, because a shaft head is both of a ropeway's stations in one
+     block.
+   - **Shaft foot footing ×1** — **haul rope**, **pylon footing**, **8 bits** in a 1×3 **column**. The one
+     recipe in the mod whose grid is a vertical strip, and it is that way because BFB in a *row* is already
+     the tension station footing's.
+   - **Shaft sheave ×1** — **8 bits**/plate/**8 bits** on the top row, then **8 bits**/**bullwheel**/**8
+     bits**. It eats a whole bullwheel, which eats a pylon head: forty-eight bits and two plates all told,
+     which is one step above the drive head and makes it the dearest block in the mod.
    **PASS:** all thirteen appear in the crafting output under real names rather than raw lang keys — the
-   two station footings at step 11 make fifteen.
+   two station footings at step 11 and the shaft's three at step 28 make eighteen.
    **PASS:** every one of them takes **any** metal — try a bit or plate of a metal you have spare rather
    than iron, and try a plate of one metal beside bits of another in the same grid. The wildcards carry no
    `name` any more, so nothing couples the two.
@@ -195,10 +243,26 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    then take the rest in creative; nobody is meant to hand-craft that in survival.
 
 3. **Handbook.** Press `H`, find the **Ropeway** category tab. **PASS:** the tab is labelled "Ropeway"
-   (not `handbook-category-ropeway`), all **three** pages open — *Aerial Ropeways*, *Building a Line*,
-   *Power and the Drive* — the `<itemstack>` renders spin, and every link between them works, including
-   50 → 51 → 52 and both pages' way back. **PASS:** the overview page describes a footing and one
-   crossarm, not two gantries.
+   (not `handbook-category-ropeway`), all **four** pages open — *Aerial Ropeways*, *Building a Line*,
+   *Power and the Drive* and, new this round, *Sinking a Shaft* — the `<itemstack>` renders spin, and every
+   link between them works, including 50 → 51 → 52, 50 → 53, and every page's way back. **PASS:** the
+   overview page describes a footing and one crossarm, not two gantries.
+   **PASS — page 53 tells the player when NOT to build one.** Its second paragraph has to say, in words a
+   player can act on, that a **70-degree ropeway span up a cliff** keeps the view, needs no new blocks and
+   costs half the rope — but gains height at only about **half** a shaft's rate on a four-sail mill — and
+   that a shaft is for when there is no room for the run. **FAIL:** the page sells the lift as strictly
+   better. It is not: it does not beat a ladder door to door and there is no payload a climbing player
+   cannot carry. What it buys is no footprint, floors at one block, and no crossarm to eat.
+   **FAIL — the page quotes a climb rate in the nineties.** It said *96%* until 2026-08-10, and that is the
+   *rise per block travelled* column of POWER-AND-STORAGE's table (`sin 70°` = 0.94) read as though it were
+   a rate. It is a ceiling the machine never reaches, because a 70-degree span **also** pays the climb load
+   the counterweight cancels: the ratio is **50%** on a four-sail wooden mill, 64% on a maxed wooden one and
+   86% on a maxed metal rotor, approaching 94% only as torque goes to infinity. At three sails it is 6% —
+   the steep ropeway is all but stalled where the shaft still walks. Pinned by
+   `RopewayPowerTests.ACounterweightedShaftCostsTheNetworkWhatALevelLineCosts`.
+   **PASS:** page 53's excavation figure is **five columns along the head's facing by three across, plus one
+   more for the counterweight** — sixteen columns dug, fifteen certified. **FAIL:** it quotes a bigger hole
+   or says the lane is checked; the lane deliberately is not.
    **PASS:** the overview page carries a *"What it costs"* section and **every number in it matches what
    you actually spent in step 2** — a plain tower about two ingots, a drive station about 16 and a tension
    station about 13, a whole short line about 31 for **ten plates and 215 bits**. It is the
@@ -278,6 +342,10 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    is the deleted rule, and the guide is the last place still saying so if it does.
    **FAIL modes to report:** cabin invisible (renderer/tesselation), cabin clipped out of the inset
    (the size/offset knob in §4.6), a `Ropeway: could not build the guide cabin preview` log line.
+   **EXPECTED and not a bug to file: sneak + right-click on a SHAFT footing opens this same tower guide**,
+   seven cells and all. The guide has no shaft variant in phase 1 — the shaft's build order is handbook page
+   53 (*Sinking a Shaft*), and the multiblock overlay on the footing itself names every cell it is short of,
+   which is what a player actually builds from. Recorded in `KNOWN-ISSUES.md`.
 
 7. **Build the tower.** Following the guide: two posts of **four** blocks each, standing on the ground **three**
    blocks either side of the footing; then the crossarm across their tops,
@@ -1437,3 +1505,149 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     on a line with a dark end (step 25) a rider who sits through the pause latches `departed` with nothing
     turning, and the line's drive stations write `HaulResistance` until something does. Do not run this check on such a
     line and do not file it; `KNOWN-ISSUES.md` records the trade. It clears itself the moment anything turns.
+
+28. **THE SHAFT — a counterweighted lift, the whole of it, and it is a second machine rather than a variant.**
+    This step is last because a shaft cannot be finished without a mill: step 27 is where you learn to run
+    one, and 28 is where you stand it on end. Everything below is new this round.
+    You need, on top of what you already have: **shaft head footing ×1**, **shaft foot footing ×1**,
+    **shaft sheave ×1**, **tension guide ×1**, and the drive station's own leg — **drive housing ×1**,
+    **drive shaft ×3**, **drive head ×1**, **lay shaft ×2**. Eleven placed blocks. Craft the three new ones
+    now (step 2 lists their grids and says why they are not crafted there).
+    **PASS — the three recipes craft, under real names, out of what step 2's bill bought**: two plates and a
+    pylon footing; a haul rope, a pylon footing and eight bits; and eight-bits / plate / eight-bits over
+    eight-bits / **bullwheel** / eight-bits. **FAIL:** the shaft sheave's grid does not accept a bullwheel —
+    it is meant to eat one, because it *is* one, re-rimmed.
+
+    **28a — dig it, and dig it before you place anything.** Pick a drop of **at least 12 blocks** and no
+    more than 48 (`maxSpan`). Decide which way the car's doors will face — that is the shaft head's facing,
+    it is the only heading in the machine, and everything else is measured off it.
+    Dig a hole **five columns along that facing by three across**, from the top landing straight down to the
+    bottom landing, and then **one more column three along the facing from the axis** for the counterweight.
+    Sixteen columns.
+    **And keep going four blocks ABOVE the top landing over the same 5 × 3** — the sheave's own row is part of
+    the certified corridor, so a top station roofed at three blocks is refused with the generic
+    *"…is blocked"* and nothing to look at. Same at the bottom: the corridor now covers the parked car's own
+    body, so the block **directly above the foot footing** and the three above that have to be air. Both of
+    those are new this round — the corridor used to certify the rope's line and not the car's volume, so a
+    shaft sunk from the top and stopped at the foot footing linked happily and parked the car in rock.
+    **PASS:** the top landing's floor and the bottom landing's floor are at the SAME levels as the two
+    footings you are about to place — the head footing goes in the top landing's own floor level, in the
+    middle of the opening, and the foot footing goes in the bottom landing's.
+
+    **28b — place the two footings and watch the refusals.** Put the **shaft foot footing** on the shaft
+    floor facing the way you chose, and the **shaft head footing** directly above it, **the same X and Z**,
+    facing the same way. Right-click each: the overlay lights what is missing.
+    **PASS:** the foot wants exactly **one** cell — a **tension guide**, three columns along its facing.
+    Place it; the panel goes to *"Tower complete"*.
+    **PASS:** the head wants **eight** — a **shaft sheave** four blocks up, then the drive leg three columns
+    to its right: a **drive housing** on the landing, three **drive shafts**, a **drive head**, and two **lay
+    shafts** back in to the sheave. That is the drive station's leg block for block; if you have a spare
+    drive station's parts they fit.
+    **PASS — THE SHEAVE HAS TO FACE THE FOOTING, and this is the one to actually try.** Stand so you place the
+    **shaft sheave** facing 90 degrees off the head footing, and the head stays **incomplete** — the overlay
+    keeps asking for that cell. Break it, face it the same way as the footing, and the tower completes.
+    **FAIL:** any of the four completes it. Then the wheel, the headframe and the rope point three different
+    ways, the chain case misses the lay shafts it is drawn to meet, and nothing anywhere says why.
+    **PASS — the link refusals, and this is the step that proves verticality is a rule and not an intention.**
+    Right-click the head footing with an empty hand to open the picker.
+    - **PASS:** the shaft foot is offered, and nothing else is. Click it: *"Span strung to …"*, and the rope
+      cost is **double** a ropeway's — a 12-block shaft is **6** haul rope, not 3.
+    - **PASS:** no **ropeway** tower anywhere in range is ever offered to a shaft footing, and a shaft
+      footing is never offered to a ropeway tower's picker. Stand a plain tower ten blocks away and check
+      both directions.
+    - **PASS:** a shaft foot placed one block off the head's column is **not** offered, and forcing it (if
+      you can) is refused with *"A shaft runs straight up one column…"*. Try it: move the foot one block
+      sideways and re-open the picker.
+    - **PASS:** **two shaft feet** in one column, or **two shaft heads**, are refused with the same message.
+      A shaft has exactly one sheave and it is on top.
+    - **PASS — the two footings must FACE THE SAME WAY.** Break the foot and re-place it turned 90 degrees.
+      It is **not** offered, and forcing it is refused with the same *"A shaft runs straight up one column…"*
+      line, which now names the facing. That is not cosmetic: the foot's facing is where the multiblock made
+      you dig the **tension guide**, and the head's is where the counterweight actually comes down — mismatch
+      them and the weight descends into rock you never dug.
+    - **PASS — one span per shaft footing.** With the shaft linked, open either footing's picker: **no link
+      row is offered at all**, only the existing span to unlink. Build a third shaft footing in the same
+      column and it is not offered either. **FAIL:** a second span links — that is a fold or a two-headed
+      line, and a fold draws the counterweight below bedrock. Phase 1 has no intermediate floors and the
+      refusal says so: *"A shaft footing carries one span."*
+    - **PASS — no pitch warning.** Linking a shaft prints **no** *"That span climbs at 90 degrees"* line.
+      **FAIL:** it does. A shaft has no crossarm to eat and the warning names a defect it cannot have.
+
+    **28c — the machine, looked at.** Stand on the top landing and look at what you built.
+    **PASS:** a **headframe** over the opening carrying a wheel two and three quarter blocks across, with the
+    rope coming up the shaft, **half a turn over the wheel**, and back down a lane three blocks along the
+    head's facing. In low, round, out high — the same picture as a ropeway terminal's wrap, at four times the
+    size.
+    **PASS:** the head footing is a small plinth sitting **in the middle of the opening**, half a block below
+    the landing surface. That is correct and it is the price of the anchor staying where it is.
+    **PASS — there is no rope yet.** An unhung shaft draws neither strand and no counterweight, because the
+    rope is **open** — it terminates on the car — and there is no car. **FAIL:** a rope hangs there with
+    nothing on it. Recorded in `KNOWN-ISSUES.md`; it is the one place a shaft reads differently from a
+    ropeway, where the loop is chunk mesh and exists without a cabin.
+    **PASS:** run a mill into the drive housing exactly as at step 27 — angled gear at the hub, wooden axles
+    down the outside of the drive leg, angled gear at the bottom, one level axle into any of the housing's
+    four sides. Nothing about that changed. Pin the weather (`/weather acp false`, then
+    `/weather setw strongbreeze`) before you go on; 27's warning applies here too.
+
+    **28d — hang the car, and the machine finishes.** Hold the **ropeway cabin** and right-click either
+    footing.
+    **PASS:** it is accepted — the shaft foot carries `tensioner`, because a counterweight is exactly what
+    keeps a traction rope taut, so a shaft needs no tension station of its own. **FAIL:** *"This line has no
+    tension station"*; the foot's flag is gone.
+    **PASS — the rope appears, and so does the counterweight.** Two strands now run the shaft: one from the
+    car up to the wheel, and one from the wheel down to a **mass in the lane column**. **PASS:** the car and
+    the counterweight are at **opposite ends** — put the car at the bottom and the weight stands proud of the
+    top landing beside you, which is correct for a hoistway and is not a bug.
+    **PASS:** send the car up and watch them cross. **They pass level at the middle of the shaft**, exactly,
+    in their two lanes. **FAIL:** they are at different heights at the midpoint, or the two strands' lengths
+    do not add up to one rope.
+    **PASS:** the car hangs on the **lower** strand's own line — the shaft axis, over the two footings — and
+    the weight on the lane's. Nothing in the counterweight's lane has collision; walking into it is walking
+    through it.
+
+    **28e — ride it, both ways.** Board and wait out the boarding pause.
+    **PASS:** it goes **straight up**, and the car **does not rotate at all** — not on departure, not on
+    arrival, not at either end. Its long side stays square to the shaft the whole way.
+    **FAIL, and this is the specific thing to watch for:** the car faces **south** for the ride and then
+    swings when it parks. That is the degenerate yaw back — a vertical leg has no bearing and `atan2(0,0)`
+    answers 0 rather than saying so.
+    **PASS:** the ride is smooth, the sway rocks fore and aft, and the ride camera (step 13c) works.
+    **PASS:** the stop key (step 13b) reverses it — on a two-stop shaft one press means "the other end".
+    **PASS — the speed.** With a **four-sail wooden mill in a strong breeze** the car climbs at about **1.8
+    blocks a second**, and a maxed metal rotor at about **3**. That is the same ladder a LEVEL ropeway runs
+    at, and it is the whole point of the counterweight: the climb is cancelled by the weight rather than paid
+    for. **FAIL:** it is visibly slower than a flat ropeway on the same mill.
+    **EXPECTED at three sails and not a bug:** a three-sail wooden mill runs it in a **strong breeze out of
+    turbulence** and stalls in anything less. Four is the tier to rely on. If yours will not start, check the
+    weather is still pinned before you file anything.
+
+    **28f — get out at the top, which is the one that could kill you.** Ride to the head and step out.
+    **PASS:** you are **put down on the landing**, on solid floor, beside the opening. You do not fall.
+    **FAIL, and it is fatal:** you are left standing in the opening and drop the whole shaft. The top landing
+    has a car-sized hole in it by construction — the car parks with its floor level with the landing and then
+    descends through its whole footprint — so "the block under the seat" is air, and vanilla's own dismount
+    teleport only ever probes one block either side, which is still inside a three-wide hoistway.
+    **PASS:** ride to the foot and step out. You are on the bottom landing, half a block down off the plinth,
+    exactly as at a ropeway tower.
+    **PASS:** mid-shaft, the step out is **refused** — *"Nothing under the cabin but air"* — which is step
+    13d's rule doing its job in the machine it matters most in. **The bail-out is NOT the answer here**: it
+    unmounts you where you are, on purpose, and in a shaft that is the whole remaining drop. A becalmed car
+    is **waiting**, not trapped; it resumes by itself and always resumes to a station.
+
+    **28g — relog out of it, at both ends.** With a rider seated, have them disconnect (or alt-F4 in
+    singleplayer) while the car is parked at the **head**, and again at the **foot**.
+    **PASS:** they come back **standing on the footing's plinth**, half a block below the landing, not inside
+    it and not in the shaft. **FAIL at the head:** they log in falling. **FAIL at the foot:** they log in
+    suffocating inside a solid block. Both footings are half-block plinths for exactly this reason and it is
+    the one thing that would have broken silently.
+
+    **28h — break it, and check the ropeway is untouched.** Break the shaft head's footing with the car
+    parked and nobody aboard. **PASS:** the rope refunds, the cabin comes back as an item, and the two
+    strands and the counterweight stop being drawn.
+    **PASS — the regression check, and it is the most important line in this step:** go back to the ropeway
+    line you built at steps 7–16 and re-run **10b** (two strands, drawn), **12** (ride through a tower),
+    **12b** (a corner), **12c** (a steep span still warns), **13** (it squares up at a tower) and **21b**
+    (the clearance row above the rope). Every one of them has to behave exactly as it did before this round.
+    **FAIL:** any of them differs. Nothing in the shaft is allowed to reach a horizontal line — every change
+    to shared code is behind a flag that is false on one, and this is where that claim is worth checking
+    rather than reading.

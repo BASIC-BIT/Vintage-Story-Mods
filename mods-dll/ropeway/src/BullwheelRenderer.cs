@@ -96,12 +96,20 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
     /// and vanilla's own sign renderer passes a literal 1 here - copy that number across and 1.6 blocks of
     /// wheel hang outside the sphere, with nothing in the game or the suite to say so.
     /// </para>
+    /// <para>
+    /// A DEFAULT rather than the only value since the shaft sheave landed: that wheel's rope radius is 1.5
+    /// blocks against this one's 0.663, so its swept rim reaches 2.94 from its own hub and 4.44 from the block
+    /// centre it is culled about, and 2.75 would pop it off a headframe the player is standing under. The
+    /// constant stays because it is the BULLWHEEL's number and the asset contract test measures the bullwheel's
+    /// own shape against it; the instance field is what lets a second wheel carry a second number.
+    /// </para>
     /// </summary>
     public const float CullRadius = 2.75f;
 
     private readonly ICoreClientAPI capi;
     private readonly BlockPos pos;
     private readonly float yawRad;
+    private readonly float cullRadius;
     private readonly Matrixf modelMat = new();
 
     private MeshRef mesh;
@@ -128,11 +136,12 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
     /// </summary>
     public Vec3f Offset = new();
 
-    public BullwheelRenderer(ICoreClientAPI capi, BlockPos pos, MeshData rim, float yawRad)
+    public BullwheelRenderer(ICoreClientAPI capi, BlockPos pos, MeshData rim, float yawRad, float cullRadius = CullRadius)
     {
         this.capi = capi;
         this.pos = pos;
         this.yawRad = yawRad;
+        this.cullRadius = cullRadius;
         if (rim != null) mesh = capi.Render.UploadMesh(rim);
     }
 
@@ -208,7 +217,7 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
         // line is the whole tell, so it has to keep being drawn.
         // Still the BLOCK's own centre rather than the wheel's: CullRadius covers the offset pose, so a
         // sphere that moved with the wheel would only be a second thing to keep in step.
-        if (!render.DefaultFrustumCuller.SphereInFrustum(pos.X + 0.5, pos.InternalY + 0.5, pos.Z + 0.5, CullRadius)) return;
+        if (!render.DefaultFrustumCuller.SphereInFrustum(pos.X + 0.5, pos.InternalY + 0.5, pos.Z + 0.5, cullRadius)) return;
 
         var cameraPos = capi.World.Player.Entity.CameraPos;
 

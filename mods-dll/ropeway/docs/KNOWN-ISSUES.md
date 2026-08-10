@@ -1,11 +1,198 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 199 ropeway tests passing — 97 `[Fact]` plus 102 `[InlineData]` across the five test
+State: build green, 218 ropeway tests passing — 111 `[Fact]` plus 107 `[InlineData]` across the five test
 files in `mods-dll/ropeway.Tests`, which is where to re-derive this number rather than trusting the line.
 (It read 136 for two rounds after the count moved, 147 for two more, 168 for two more again, 172 for one,
-174 for one, 180 for one and 187 for one. It briefly read 195 in this round's working tree, because two
-agents landed tests in parallel and each counted only its own.) Everything in the tables below was found by
-reading code, not by playing — none of *it* has been observed in game.
+174 for one, 180 for one, 187 for one, 199 for two and 211 for one. It briefly read 195 in one round's
+working tree, because two agents landed tests in parallel and each counted only its own.) Everything in the
+tables below was found by reading code, not by playing — none of *it* has been observed in game.
+
+## The shaft — a counterweighted lift, phase 1 (2026-08-10)
+
+Three new blocktypes, no new block class, no new block-entity class, no new entity, one new renderer, and
+**eleven placed blocks against a ropeway pair's thirty**. Design and adversarial round:
+`docs/agentic/ingest/cablecar/ELEVATOR-DESIGN-2.md` and `ELEVATOR-CHALLENGE-2.md`. Renders:
+`docs/agentic/ingest/cablecar/renders/elevator/`, built from the **shipped** shapes rather than from proposal
+geometry.
+
+**The ropeway did not move.** Every change to shared code is behind one flag or one optional parameter that
+every shipped caller leaves at its default: `BEPylonBase.ShaftRole` (null on every ropeway footing),
+`RopewayLine.IsShaft`/`ShaftFacing` (false/null unless `GetOrBuild` walks a shaft), `IsSpanClear`'s
+`shaftAxis` (null at every ropeway call site), `BEBullwheel.WrapOffset`'s `shaftAxis` (ditto),
+`BEBullwheel.RimShape` and `BullwheelRenderer.CullRadius` becoming defaults rather than the only values.
+`AnchorOf`, `SheaveHeight`, `hangDrop`, `PassablePitchTan`, `TrimForTowers`, `ClearanceRows`, `ReturnLift`,
+`WrapRadius`, `RimPivotY`, `HaulResistance`, `ClimbLoad` and every shipped shape are untouched.
+
+### The four things a shaft had to be told
+
+1. **Verticality is structural, not arithmetic.** Nothing anywhere asks `|dir.Y| > 0.999`.
+   `SpanMath.ShaftLinkFits` refuses at link time every span two shaft stations could otherwise carry — out of
+   the column, two sheaves, no sheave, the sheave underneath, or **the two footings facing different ways** —
+   and `ScanCandidates` applies the same predicate so no offered row can fail on click. A ropeway tower and a
+   shaft station will not link to each other at all.
+   **The predicate is per-SPAN and on its own does not give the per-LINE invariant those branches want**, which
+   this section claimed for one round. `MaxSpansPerTower` is 2, so "exactly one head" was false at line scale:
+   `foot@0 → head@10` then `head@10 → foot@5` is a **fold** — `Cumulative [0, 10, 15]`, `DirectionAt` flipping
+   to `(0,−1,0)` at t = 10, and `ShaftRenderer`'s counterweight mirror (about `Anchors[0]` and `Anchors[^1]`, by
+   then both *feet*) drawing the mass at world **Y = −0.5** — and `foot@0 → head@10` plus `foot@0 → head@20`
+   puts **two sheaves on one line**, each with its own `ShaftRenderer` drawing the whole rope. Both passed every
+   clause of the predicate and every `ScanCandidates` filter, so the picker offered the row. What closes them is
+   one rule at both callers: **on a shaft, refuse when either footing already carries a span**, which is exactly
+   what "no intermediate floors" means. Predicate plus that rule is what makes every `line.IsShaft` branch safe,
+   because the mixed line, the fold and the second sheave are all unbuildable.
+2. **The heading is supplied, not derived.** `DirectionAt` on a vertical leg is `(0, ±1, 0)` and
+   `Math.Atan2(0.0, 0.0)` is **0.0** — not NaN, a silent permanent south. The car's yaw is the **head's**
+   `PassageFacing`, held constant everywhere, through the same `SquareTo` a parked ropeway cabin uses. There is
+   no second *heading* to reconcile and nothing snaps at either end — but **the foot's facing is not inert**,
+   and `shaftfoot.json` said it was. `BEPylonBase.Init` passes `RotationFor(side)` to `InitForUse`, which
+   rotates every offset including the `tensionguide` cell `shaftfoot` requires, so the guide is dug along the
+   *foot's* facing while the counterweight's lane follows the *head's*. `ShaftLinkFits` compares the two
+   facings; without that, a foot facing east under a head facing north validated and the weight descended into
+   undug rock.
+   `RopewayLine.GetOrBuild` also reads **`IsShaft` and `ShaftFacing` off the head alone**. Off *any* shaft
+   footing there was a window between the foot's `Initialize` and the head's where the line was
+   `IsShaft = true, ShaftFacing = null` — not covered by `Truncated` at
+   `travelled == MinTravel == MaxTravel == 0` — in which `Place` ran `SquareTo(null, 0f)` and got **due south**,
+   `SegmentClear` silently took the ropeway frame, and `ShaftRenderer` drew no rope. A shaft has exactly one
+   head, so keying both off it costs nothing.
+3. **The corridor needs the shaft's own frame.** `IsSpanClear`'s near-vertical fallback hard-codes
+   `right = (1,0,0)`, so its corridor is a fixed box in *world* axes — right for a car lying along Z and
+   transposed for one lying along X, which would sweep two blocks of the car's nose and tail through
+   uncertified rock. And at exactly vertical the derived rows are **half-integers** against a plan coordinate
+   that is a block centre, so all four rays would run down block-boundary planes and the column the car's tail
+   occupies would never be tested at any level of the shaft. `SpanMath.OnColumnCentres` re-lays the ladder on
+   whole numbers — five rays, not four — and it is applied **only** where a shaft axis is supplied. The trim
+   goes to zero on a shaft for the reason `TowerClearance` exists in the first place: it is there because a
+   tower's posts are player-chosen blocks the filter cannot tell from terrain, and a shaft station has no
+   player-chosen cells at all.
+   **And the corridor is the CAR's volume, not the rope's segment** — the fourth thing, added after the first
+   three shipped. On a level span the ladder *is* the car's height, because `up` is vertical. On a shaft `up` is
+   **horizontal** (its Y is identically zero, since `dir` is `(0, ±1, 0)`), so every offset is a plan offset and
+   every ray spans exactly `[anchorFoot, anchorHead]` in Y. The car's body hangs `rope−3.5 … rope−1.0`, so its
+   swept volume is `[anchorFoot−3.5, anchorHead−1.0]` and **the bottom 3.5 blocks of the hoistway were never
+   tested** — `footY+1.0 … footY+4.5`, over the whole 3 × 5 footprint, which is exactly where the car parks and
+   the rider sits. Sink a shaft from the top, stop at the foot footing's own cell, and the link succeeded, the
+   car parked in rock, and `RopewayCabinSeat.Landing` found no landing because every neighbour column was solid
+   wall. `IsSpanClear` now drops the lower end of a shaft cast by `hangDrop + CabinHalfHeight` before laying its
+   rays; the top needs nothing, because the car's roof is 1.0 *below* its rope point. The consequence the
+   handbook now states is the real clear volume: **3 wide × 5 long, from the block above the foot footing up to
+   and including the sheave's own row four blocks above the top landing** — a top station roofed at three blocks
+   was always refused, and nothing said so.
+4. **The sheave has to face the footing, and the multiblock cannot make it.** `shafthead.json` names its
+   sheave cell as the wildcard `ropeway:shaftsheave-*` and `MultiblockStructure.InCompleteBlockCount` matches
+   with `WildcardUtil.Match`, so **any of the four side variants completed the structure**. `shaftsheave` is
+   the least symmetric block in the mod — headframe columns, a beam reaching the hub, a chain case on one face,
+   and an authored wrap arc that turns in *one* vertical plane — and it is a `HorizontalOrientable`, so it takes
+   the **player's** facing at placement. `BullwheelRenderer.YawFor` then reads the *sheave's* side while
+   `BEBullwheel.WrapOffset` and `ShaftRenderer` read the *footing's*: three of four placements put the wheel,
+   the headframe and the rope in different orientations, the overlay said complete, and the lift ran.
+   `BEPylonBase.OwnTheHeadCell` — which exists for exactly this and whose own comment states the test for
+   inclusion ("NEW and untracked, so no saved world can hold a wrongly-faced one, and both are visibly
+   asymmetric") — now narrows **three** families instead of two.
+
+### Why the rope cannot be chunk mesh, and why the loop cannot close
+
+A haul loop's geometry never changes, which is what makes `BEPylonBase.OnTesselation` affordable: the cabin
+is a **slider** on a rope whose two ends are wheels. Stand the machine on end and the car becomes the rope's
+**end** — the going strand is `H − travelled` long and the return strand `travelled`, both changing every
+tick — and a rope that simply ran past the car would run down through the roof and out through the
+passengers, because on a vertical leg the rope is directly above the roof's centre rather than out in open air
+beside it. `Lift` is the same fact from the other side: it offsets in **+Y**, which on a vertical leg is
+*along* the rope, so the two strands would be collinear and z-fight for the whole shaft. So `OnTesselation`
+early-returns on a shaft and `ShaftRenderer` draws the two strands and the counterweight per frame off the
+cabin's synced `Pos.Y`. The **wrap** is authored on `shaftsheave.json` instead, because it is the one part of
+the rope that never moves.
+
+**The loop cannot close at the bottom, and that is a proof rather than a preference.** A 180° wheel spanning
+the lane has radius `r = lane/2` with its centre at the bottom anchor, so its rim reaches `r` *below* that
+anchor over a plan range containing the parked car's roof. It clears the roof only if its centre is past the
+car's nose (`r ≥ 2.0`) and fits under the strand only if `r ≤ 1.0`. Both cannot hold, at any radius. So the
+rope is **open** — car, head sheave, counterweight — which is what a 1:1 traction elevator actually is, and
+the counterweight is the second body on the second strand rather than a wheel.
+
+### The top station has no floor, and the dismount is what answers it
+
+The car parks with its floor level with the top landing and then descends through its **whole 5 × 3
+footprint**, so that footprint has to be a hole in the landing. A rider stepping out there is over the hole.
+Vanilla's own dismount teleport (`EntityRideableSeat.tryTeleportToFreeLocation`) probes exactly **two**
+columns, one block either side of the mount, and one block from the axis is still inside a three-wide
+hoistway — so both are air, no teleport happens, and `RopewayCabinSeat.DidUnmount` has just re-datumed
+`PositionBeforeFalling` to the seat. The rider would fall the length of the shaft and be billed for all of it.
+
+`RopewayCabinSeat` overrides that method — it is `protected virtual`, which is the sanctioned extension point
+— and widens the search: `base` first, then, **only on a shaft**, Chebyshev rings out to
+`ShaftExitReach` = 3 columns for a solid top face with room to stand, in a fixed order so the server and both
+clients pick the same block. On a ropeway nothing here fires: the gate is a shaft flag and `base` has already
+run. Vanilla's own elevator answers the same question by writing `meta-collider` blocks into the world at
+every stop and taking them out again, which is a block write per stop on a machine that already knows where
+its landing is.
+
+### What is deliberately not cured, and what it costs
+
+- **The head's own footing is in the car's path.** `AnchorOf` stays `CentreOf + SheaveHeight`, so the car's
+  parked floor is `headY + 1.0` — the top landing's own face — and the footing sits in the middle of the
+  opening the car descends through. It is a **half-block plinth**, so it is inside the car's body from
+  `rope = anchor − 3.5` to `rope = anchor − 0.5`: **0.5 blocks of steel, over 3.0 blocks of travel, once each
+  way, at the top station only.** Compare the crossarm defect below — 0.938 blocks over 1.6, at *every* steep
+  tower, both ways, every trip. It is not curable without moving the anchor, and the real reason that is
+  refused is not cost: `RopewayLine.FromTowers` is **pure**, and a per-block anchor offset needs the peer's
+  *facing*, which needs the peer's block entity — a cross-chunk read on the tesselation thread, from
+  `BEPylonBase.LocalLine`. The plinth is not free to thin either: `DropGhostPassengers` puts a relogging rider
+  at `footingY + 0.5` and that face has to be there.
+  `AGhostPassengerDroppedAtEitherShaftFootingLandsOnItsPlinth` pins both footings to it.
+- **The counterweight's lane is not certified.** `IsSpanClear` sweeps the car's 5 × 3 columns and nothing
+  else. A player who digs the car's hole and not the lane gets a counterweight visibly inside stone in a
+  column nobody stands in — the same status the return strand has on a ropeway. What *is* enforced is the
+  bottom of that column: `ropeway:tensionguide` is a required cell of `shaftfoot`, so the multiblock refuses
+  to complete until the lane is at least started.
+- **The counterweight stands proud of the top landing.** With the car at the bottom the weight's rope point
+  is the head anchor, so the mass occupies `headY + 1.0 … headY + 3.5` — entirely above the landing floor, in
+  the lane column, beside where the player waits. Correct for a hoistway, and it has no collision.
+- **An empty shaft shows no rope.** The rope is *open*, so it terminates on a car that is not there yet;
+  `ShaftRenderer` draws nothing until the cabin is hung. Different from a ropeway, where the loop is chunk
+  mesh and exists without one. The handbook says so.
+- **The jaw is a clamp authored on a horizontal rope.** A vertical strand enters it through the top plate.
+  Cosmetic, and it is the only part of the cabin that still reads as built for the other machine.
+- **The tower guide dialog is the ropeway's.** Sneak + right-click on a shaft footing opens the same
+  seven-cell strip a tower gets. The handbook page *Sinking a Shaft* is the shaft's build order; branching the
+  guide wants its own strip and its own body text and is not phase 1.
+- **A shaft never warns about pitch.** `PitchTan` is `+∞` for a vertical span — deliberately, and documented
+  there — so `WarnOnPitch` would have told the player their brand-new lift climbs at 90° against a ceiling of
+  11, on the one machine in the mod that was given no crossarm precisely so it would not eat one. `TryLink`
+  skips the warning on a shaft and nothing else about it changes.
+
+### Two things the shaft gives back
+
+- **`ropePerBlock` proves out as the per-blocktype knob it was written as.** A shaft prices its second strand
+  at 0.5 in JSON, with no code, and that is the one lever free to move if a lift turns out to be too cheap a
+  way to climb. It **is** cheap: a counterweighted shaft costs the network exactly what a *level* ropeway
+  costs it (0.300), climbs one block of rise per block travelled, and is a third of the placed blocks. That
+  is the balance decision, stated rather than presented as a maintenance economy.
+- **`cargo` acquires a meaning.** On a ropeway it is "extra"; on a counterweighted lift it is the whole load,
+  because the counterweight cancels everything else. Whoever lands cargo weight now has a case where the
+  parameter is not a placeholder.
+
+### What phase 1 is not
+
+No intermediate floors — costed at one blocktype and **zero** lines of route code, because
+`Bisect(null, null)` is null at a vertical interior tower, `MaxSpansPerTower` is already 2, and
+`NextStop`/`PlanCall`/`TowerAt`/`SpanAheadOf` are written for N towers — but phase 1 should prove the
+machine, not the product, and **`TryLink` and `ScanCandidates` refuse a second span on either shaft footing
+until it lands.** That is the rule, restated: this line used to say `ShaftLinkFits` refuses a *foot-to-foot*
+span, which is true and was irrelevant — a three-station shaft needs no foot-to-foot span, only two ordinary
+foot-to-head ones, and it was buildable. Whatever lands intermediate floors takes the one-span clause out and
+owns the fold and the second sheave. No doors, call
+buttons or floor indicators. No cargo weight. No brake, gravity descent or overspeed governor — a second
+motion authority in `ServerTick` is the one thing forty lines of comment in it warn against. No second car.
+No mixed lines. Nothing touching `AnchorOf`, `SheaveHeight`, `hangDrop`, `TrimForTowers`, `ReturnLift`,
+`WrapRadius`, `RimPivotY`, `PassablePitchTan`, `ClearanceRows`, `HaulResistance`, `ClimbLoad` or any shipped
+shape.
+
+**The bail-out is not the shaft's safety story, and it must not be presented as one.** `Jump` unmounts the
+rider where they are with `DoTeleportOnUnmount = false` *because taking the drop is the price*; on a ropeway
+that price is a hillside and in a shaft it is up to 48 blocks of pit. The honest position is
+`RopewayPower`'s own: a becalmed cabin is **waiting**, not trapped — it resumes by itself, and in a shaft
+that argument is *stronger* than on a ropeway, because the car always resumes to a station.
 
 ## A rider who steps out of a stalled cabin at height — FIXED (2026-08-10)
 
@@ -85,17 +272,23 @@ authority in that method is the one thing forty lines of comment in it warn agai
   with a rider aboard does run through `UnlinkAll` first, so it was covered; one line at the chokepoint makes
   it true by construction and costs nothing.
 
-### Still open, and it is one line in `EntityRopewayCabin.cs`
+### The arming line — CLOSED, and this section claimed otherwise for two rounds
 
-`BailOut` arms the hold off `IsMoving`, and `HoldSneak` zeroes the accumulator whenever that is false — so
-**the emergency exit is disarmed in exactly the state that now refuses the ordinary one.** A rider in a
-becalmed cabin over a valley is not trapped (the cabin carries on by itself when the line turns, and
-`ropeway:cantunmount-noground` says so in those words, with their own live sneak binding in it), but until
-it does, holding sneak counts to nothing. The arming condition wants to be the same question the refusal
-asks. The change and its edge-trigger caveat are written out in
-`docs/agentic/ingest/cablecar/HANDOFF-stalled-dismount.md`; it wants a new `AtRest` predicate on the cabin
-and a re-run of QA 13a's crouch-board step, which is why it is deferred rather than done here. (That
-handoff's *second, smaller* item — the `UnseatAll` line — **is** done; see above.)
+`BailOut` used to arm the hold off `IsMoving`, and `HoldSneak` zeroes the accumulator whenever that is false —
+so **the emergency exit was disarmed in exactly the state that refuses the ordinary one.** It is armed off
+`RopewayCabinSeat.HeldIn` now (`Moving || !OverGround()`), which is the same question the refusal is raised
+by, and `HoldSneak`'s `heldIn` parameter carries the rationale in its own doc comment. `EntityRopewayCabin`
+line 932 and `RopewayCabinSeat.HeldIn` are the whole change.
+
+**This paragraph is here as a tombstone, because the stale version of it was believed twice.**
+`ELEVATOR-DESIGN-2.md` §10 made "ship the arming line first" a prerequisite for the elevator on the strength
+of *this heading* rather than of the code, and `ELEVATOR-CHALLENGE-2.md` C5 caught it: the line had landed
+about eighty minutes earlier and the commit that landed it did not update this file. A doc that says a defect
+is open is a defect. Re-derive from `src/`, not from here.
+
+What is genuinely still true is the *smaller* half of `docs/agentic/ingest/cablecar/HANDOFF-stalled-dismount.md`:
+QA 13a's crouch-board step wants re-walking, because the edge trigger (`SneakReleased`) is what stops a rider
+who boarded crouching from being ejected two seconds later having pressed nothing.
 
 Two consequences of the fix that are deliberate and not bugs:
 

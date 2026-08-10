@@ -49,8 +49,10 @@ public sealed class RopewayModSystem : ModSystem
     {
         base.Start(api);
 
-        // One block class for all three footings - pylonbase, drivestation and tensionstation. They differ
-        // only in the multiblockStructure their own Attributes carry, which BEPylonBase reads off its block.
+        // One block class for all FIVE footings - pylonbase, drivestation, tensionstation, and the shaft's
+        // shafthead and shaftfoot. They differ only in the multiblockStructure and the handful of attributes
+        // their own Attributes carry, which BEPylonBase reads off its block. The shaft is a second machine
+        // and it added no block class, no block entity class and no entity.
         api.RegisterBlockClass("BlockPylonBase", typeof(BlockPylonBase));
         api.RegisterBlockClass("BlockPylonHead", typeof(BlockPylonHead));
         api.RegisterBlockClass("BlockDriveHousing", typeof(BlockDriveHousing));

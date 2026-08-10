@@ -211,8 +211,9 @@ public sealed class RopewayLinkService
         var result = new List<TowerCandidate>();
 
         // TryLink refuses on a full tower, so offering one a link row would break the "every row succeeds"
-        // contract the moment the picker started opening on full towers.
-        if (be.Spans.Count >= BEPylonBase.MaxSpansPerTower) return result;
+        // contract the moment the picker started opening on full towers. A SHAFT footing is full at one span,
+        // not two - phase 1 has no intermediate floors and TryLink says so.
+        if (be.Spans.Count >= (be.IsShaft ? 1 : BEPylonBase.MaxSpansPerTower)) return result;
 
         var anchorFrom = SpanMath.AnchorOf(from);
         var lineFrom = RopewayLine.GetOrBuild(modSystem, from);
@@ -228,6 +229,18 @@ public sealed class RopewayLinkService
             if (other.Spans.Count >= BEPylonBase.MaxSpansPerTower) continue;
             if (be.HasSpanTo(pos)) continue;
             if (lineFrom != null && Contains(lineFrom, pos)) continue;
+
+            // The picker's contract is that every row it shows succeeds on click, so it applies TryLink's shaft
+            // rules rather than looser ones - a shaft station is offered only the other end of its own shaft,
+            // facing the same way, with neither footing already carrying a span, and a ropeway tower is never
+            // offered a shaft station at all. See TryLink for what the one-span clause closes.
+            if (be.IsShaft != other.IsShaft) continue;
+            if (be.IsShaft && other.Spans.Count > 0) continue;
+            if (be.IsShaft && !SpanMath.ShaftLinkFits(
+                    from, be.IsShaftHead, be.PassageFacing, pos, other.IsShaftHead, other.PassageFacing))
+            {
+                continue;
+            }
 
             double span = anchorFrom.DistanceTo(SpanMath.AnchorOf(pos));
             if (span > be.MaxSpan) continue;
@@ -246,14 +259,18 @@ public sealed class RopewayLinkService
             var lineTo = RopewayLine.GetOrBuild(modSystem, pos);
             if (lineTo?.Truncated == true) continue;
             if (lengthFrom + (lineTo?.TotalLength ?? 0) + span > be.MaxLineLength) continue;
-            if (!SpanMath.IsSpanClear(sapi.World, anchorFrom, SpanMath.AnchorOf(pos), out _)) continue;
+            var peer = TowerAt(pos);
+            if (!SpanMath.IsSpanClear(sapi.World, anchorFrom, SpanMath.AnchorOf(pos), out _, ShaftAxis(be, peer)))
+            {
+                continue;
+            }
 
             result.Add(new TowerCandidate
             {
                 Pos = pos.Copy(),
                 Distance = (int)Math.Round(span),
                 RopeCost = SpanMath.RopeCost(span, be.RopePerBlock),
-                Name = TowerAt(pos)?.TowerName
+                Name = peer?.TowerName
             });
         }
 
@@ -300,6 +317,41 @@ public sealed class RopewayLinkService
             return false;
         }
 
+        // VERTICALITY IS STRUCTURAL, and this is where it is enforced. Nothing in the mod asks whether a span
+        // is vertical; a shaft line is a line whose footings are shaft stations, and the only span two shaft
+        // stations may carry is straight up their own column with the sheave on top. That refusal is what
+        // makes every "on a shaft..." branch downstream safe to write: the mixed line those branches would be
+        // wrong about - a vertical stub bolted onto a hill line, a ropeway leg hung off a hoistway - is not
+        // buildable, so there is no per-span geometric fact being hoisted to a whole line anywhere.
+        // See SpanMath.ShaftLinkFits for what each clause closes.
+        if (beFrom.IsShaft || beTo.IsShaft)
+        {
+            if (!beFrom.IsShaft || !beTo.IsShaft
+                || !SpanMath.ShaftLinkFits(
+                    from, beFrom.IsShaftHead, beFrom.PassageFacing, to, beTo.IsShaftHead, beTo.PassageFacing))
+            {
+                player.SendIngameError("ropeway-shaft-column", Lang.Get("ropeway:err-shaft-column"));
+                return false;
+            }
+
+            // ONE SPAN PER SHAFT FOOTING, and it lives here rather than in ShaftLinkFits because it is a
+            // question about the footing's EXISTING spans, not about this span's geometry. ShaftLinkFits is a
+            // per-SPAN predicate and MaxSpansPerTower is 2, so its "one head" clause does not make "one head
+            // per line" true: `foot@0 -> head@10` then `head@10 -> foot@5` is a FOLD - Cumulative [0, 10, 15],
+            // DirectionAt flipping to (0,-1,0) at t = 10, and ShaftRenderer's counterweight mirror (which
+            // takes Anchors[0] and Anchors[^1], now both FEET) drawing the mass at world Y = -0.5. And
+            // `foot@0 -> head@10` plus `foot@0 -> head@20` puts TWO sheaves on one line: two ShaftRenderers
+            // each drawing the whole rope, two drives pooled, and ShaftFacing taken from whichever head the
+            // GetOrBuild walk reaches last. Phase 1 explicitly has no intermediate floors, so the honest rule
+            // is the one that exactly implements that. Whatever lands intermediate floors takes this clause
+            // out and owns the fold and the second sheave instead.
+            if (beFrom.Spans.Count > 0 || beTo.Spans.Count > 0)
+            {
+                player.SendIngameError("ropeway-shaft-one-span", Lang.Get("ropeway:err-shaft-one-span"));
+                return false;
+            }
+        }
+
         var anchorFrom = SpanMath.AnchorOf(from);
         var anchorTo = SpanMath.AnchorOf(to);
         double span = anchorFrom.DistanceTo(anchorTo);
@@ -339,7 +391,7 @@ public sealed class RopewayLinkService
         // slowly, or not until you build a bigger mill, and both of those are answers the player can act on
         // from inside the game. Refusing the link was only ever needed because a flat store could not pay
         // for a steep trip at any speed.
-        if (!SpanMath.IsSpanClear(sapi.World, anchorFrom, anchorTo, out _))
+        if (!SpanMath.IsSpanClear(sapi.World, anchorFrom, anchorTo, out _, ShaftAxis(beFrom, beTo)))
         {
             player.SendIngameError("ropeway-span-blocked", Lang.Get("ropeway:err-span-blocked"));
             return false;
@@ -392,9 +444,26 @@ public sealed class RopewayLinkService
         // Either end of the new span may have just become a corner, so both are asked.
         WarnOnCorner(player, beFrom, from, to);
         WarnOnCorner(player, beTo, to, from);
-        WarnOnPitch(player, anchorFrom, anchorTo);
+
+        // NOT on a shaft, and this is the one guard the pitch warning needs. PitchTan is +infinity for a
+        // vertical span - deliberately, and documented there - so WarnOnPitch would tell a player that their
+        // brand-new lift climbs at 90 degrees against a ceiling of 11, on the very machine that was given no
+        // crossarm precisely so it would not eat one. The warning names a defect a shaft cannot have.
+        if (!beFrom.IsShaft) WarnOnPitch(player, anchorFrom, anchorTo);
 
         return true;
+    }
+
+    /// <summary>
+    /// The corridor frame for a span between two footings: the SHAFT HEAD's own passage facing, or null on
+    /// every ropeway span. At link time there is no line yet, so this cannot come from "the line's upper
+    /// tower" - it comes from whichever of the two footings wears the sheave, which is the same tower
+    /// <c>RopewayLine.ShaftFacing</c> reads once a line exists.
+    /// </summary>
+    private static BlockFacing ShaftAxis(BEPylonBase a, BEPylonBase b)
+    {
+        if (a is { IsShaftHead: true }) return a.PassageFacing;
+        return b is { IsShaftHead: true } ? b.PassageFacing : null;
     }
 
     /// <summary>

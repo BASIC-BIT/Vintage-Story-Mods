@@ -487,11 +487,21 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
         return travelled < line.MinTravel || travelled > line.MaxTravel;
     }
 
+    /// <summary>
+    /// The cabin is on a SHAFT line. Server side only and deliberately not synced: the one thing that reads it
+    /// is <c>RopewayCabinSeat.tryTeleportToFreeLocation</c>, which vanilla runs on the server alone
+    /// (<c>EntityRideableSeat.DidUnmount</c>), so a WatchedAttribute would be a packet per cabin for nobody.
+    /// Written before <see cref="NotReady"/>'s early return, because a rider getting out of a cabin whose far
+    /// chunk has just unloaded still has to be put on the landing rather than in the shaft.
+    /// </summary>
+    public bool OnShaft { get; private set; }
+
     private void ServerTick(float dt)
     {
         dt = Math.Min(0.5f, dt);
 
         var line = ResolveLine();
+        OnShaft = line?.IsShaft == true;
         if (NotReady(line, LineKey, Travelled))
         {
             // THE RULE, and the reason NotReady exists as one predicate rather than three branches: a cabin
@@ -1369,7 +1379,8 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     private bool SegmentClear(RopewayLine line, int segment)
     {
         if (line.Anchors == null || segment < 0 || segment + 1 >= line.Anchors.Length) return true;
-        return SpanMath.IsSpanClear(World, line.Anchors[segment], line.Anchors[segment + 1], out _);
+        return SpanMath.IsSpanClear(
+            World, line.Anchors[segment], line.Anchors[segment + 1], out _, line.ShaftFacing);
     }
 
     private void Place(RopewayLine line)
@@ -1379,6 +1390,20 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         // Never TeleportTo - it sets IsTeleport and resets the client interpolation queue into a visible snap.
         Pos.SetPosWithDimension(new Vec3d(point.X, point.Y - hangDrop, point.Z));
+
+        // A SHAFT's heading is SUPPLIED, not derived, and it is the same one everywhere - moving, parked, at
+        // either end. `DirectionAt` on a vertical leg is (0, +/-1, 0), and `Math.Atan2(0.0, 0.0)` is 0.0: not
+        // NaN, a silent permanent SOUTH. The car would face south for the whole ride and StationYaw would
+        // square it to the local footing when it parked, so it snapped at both ends and took the rider's own
+        // camera clamp with it (see ConstrainRiderYaw). atan2(0,0) is not a heading, it is the ABSENCE of one,
+        // so the fix has to hand one over rather than repair what came back. The head's facing is the only
+        // facing in the machine - the sheave's plane, the counterweight's lane and the certified corridor are
+        // all measured off it - so there is nothing to reconcile and nothing to snap.
+        if (line.IsShaft)
+        {
+            Pos.Yaw = SquareTo(line.ShaftFacing, 0f);
+            return;
+        }
 
         // Read ahead only while the cabin is actually going somewhere: the lead cancels a lag that a parked
         // cabin does not have, and applying it to a stopped one would aim it down a span it is not on.

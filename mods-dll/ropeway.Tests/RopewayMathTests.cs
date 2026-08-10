@@ -1297,7 +1297,10 @@ public class RopewayMathTests
         Assert.Null(BEPylonBase.SanitiseName(null));
         Assert.Null(BEPylonBase.SanitiseName(""));
         Assert.Null(BEPylonBase.SanitiseName("   \t\r\n "));
-        Assert.Null(BEPylonBase.SanitiseName(" "));
+        // ESCAPES, not the raw bytes. These two characters were written literally until 2026-08-10,
+        // which put a NUL in the file - and one NUL is all it takes for grep, ripgrep and `git diff`
+        // to call the whole 106 KB suite "binary" and print nothing. Same string, same test.
+        Assert.Null(BEPylonBase.SanitiseName("\u0000\u0001"));
     }
 
     /// <summary>
@@ -1811,6 +1814,331 @@ public class RopewayMathTests
         var positions = new List<BlockPos>();
         foreach (var t in towers) positions.Add(new BlockPos(t.X, t.Y, t.Z));
         return RopewayLine.FromTowers(positions);
+    }
+
+    /// <summary>
+    /// THE SHAFT'S CORRIDOR RAYS FALL ON COLUMN CENTRES, and this is the assert that says the derived ladder is
+    /// not enough on its own. <see cref="SpanMath.ClearanceRows"/>'s whole convention is "one ray down the
+    /// centre of its own row so it certifies +/-0.5 either side", and on a level span that is free: <c>up</c> is
+    /// vertical, the anchor's Y is a block centre, and the offsets come out integral. At exactly vertical
+    /// <c>up</c> is HORIZONTAL and the anchor's plan coordinate is <c>pos + 0.5</c> - also a centre - but the
+    /// offsets are HALF-integers, so every ray would run down a block-boundary plane and the DDA would floor it
+    /// onto one side. Deterministically: four rays sampling plan columns {-1, 0, +1, +2} against a car sweeping
+    /// {-2 .. +2}. The column its tail occupies goes untested at every level of the shaft, and the check stops
+    /// being symmetric about the cabin - which <c>IsSpanClear</c>'s own comment names as the thing that must not
+    /// silently re-open.
+    /// </summary>
+    [Fact]
+    public void TheShaftsClearanceRaysRunDownColumnCentresAndCoverEveryColumnTheCarSweeps()
+    {
+        var derived = SpanMath.ClearanceRows(1);
+        var laid = SpanMath.OnColumnCentres(derived);
+
+        // The defect, stated: the derived ladder is half-integral at vertical and would sit on boundaries.
+        Assert.All(derived, row => Assert.Equal(0.5, Math.Abs(row % 1), 9));
+        Assert.All(laid, row => Assert.Equal(0, row % 1, 9));
+
+        // Five rays, not four, because the car spans centre +/- CabinHalfLength about a block CENTRE and that
+        // is five columns rather than four.
+        Assert.Equal(new[] { -2.0, -1.0, 0.0, 1.0, 2.0 }, laid);
+        Assert.Equal((int)(2 * SpanMath.CabinHalfLength) + 1, laid.Length);
+
+        // Every column the car's floor slab passes through is the row of one ray, and no ray reaches outside
+        // the band the derived ladder certified.
+        for (var column = -2; column <= 2; column++) Assert.Contains((double)column, laid);
+        Assert.True(laid[0] >= derived[0] - 0.5);
+        Assert.True(laid[laid.Length - 1] <= derived[derived.Length - 1] + 0.5);
+
+        // Still symmetric about the cabin from either end, which is what
+        // TheVerticalCorridorIsTheSameOneFromEitherEnd holds for the derived rows and the shaft must not lose.
+        Assert.Equal(SpanMath.OnColumnCentres(SpanMath.ClearanceRows(-1)), laid);
+        Assert.Equal(0, laid[0] + laid[laid.Length - 1], 9);
+    }
+
+    /// <summary>
+    /// THE LADDER IS THE WHOLE OF THE PLAN AND NONE OF THE HEIGHT, on a shaft, and that is what makes the
+    /// cast's own ENDS load-bearing there in a way they never are on a ropeway. On a level span <c>up</c> is
+    /// vertical, so <see cref="SpanMath.ClearanceRows"/>'s <c>-3.5 .. +1.33</c> band IS the cabin's height and
+    /// the rays carry the car. At exactly vertical <c>up = Cross(right, dir)</c> with <c>dir = (0, +/-1, 0)</c>
+    /// has an identically zero Y - asserted below rather than argued - so the same band is laid entirely
+    /// ACROSS THE PLAN and every ray spans exactly <c>[anchorFoot, anchorHead]</c> in Y. The rope's segment.
+    /// <para>
+    /// The car's body hangs <see cref="SpanMath.ShaftCarDrop"/> to <c>hangDrop - CabinHalfHeight</c> under its
+    /// rope point, so the volume it actually sweeps is <c>[anchorFoot - 3.5, anchorHead - 1.0]</c>. The bottom
+    /// 3.5 blocks - <c>footY+1.0 .. footY+4.5</c>, over the whole 3 x 5 footprint, which is precisely where the
+    /// car parks and the rider sits - were therefore never tested, and a shaft sunk from the top and stopped at
+    /// the foot footing's own cell linked, parked the car in rock and left the dismount search with no landing.
+    /// <c>IsSpanClear</c> drops the lower end of a shaft cast by that much before laying its rays; the top end
+    /// needs nothing, which is the second assertion here.
+    /// </para>
+    /// <para>
+    /// This pins the ARITHMETIC rather than the cast: <c>IsSpanClear</c> takes an <c>IWorldAccessor</c> and its
+    /// DDA is the engine's, so nothing in this suite can call it. What the suite can hold is that the number it
+    /// drops by is the car's own floor and not a margin somebody picked, which is
+    /// <c>TheCarsFloorIsTheDropTheShaftsCorridorIsExtendedBy</c> in the asset suite off the shipped shape.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheShaftsCertifiedVolumeIsTheCarsSweptBodyAndNotTheRopesSegment()
+    {
+        // `up` at vertical is the head's own facing laid flat, in every one of the eight cases - four facings
+        // times both directions of cast. Its Y is not small, it is exactly zero, which is why the band that
+        // carries the cabin's height on a level span carries none of it here.
+        foreach (var facing in BlockFacing.HORIZONTALS)
+        foreach (var sign in new[] { 1.0, -1.0 })
+        {
+            var right = new Vec3d(-facing.Normalf.Z, 0, facing.Normalf.X);
+            var dir = new Vec3d(0, sign, 0);
+            var up = new Vec3d(
+                right.Y * dir.Z - right.Z * dir.Y,
+                right.Z * dir.X - right.X * dir.Z,
+                right.X * dir.Y - right.Y * dir.X);
+
+            Assert.Equal(0, up.Y, 12);
+            Assert.Equal(1, up.Length(), 9);
+            Assert.Equal(-sign * facing.Normalf.X, up.X, 6);
+            Assert.Equal(-sign * facing.Normalf.Z, up.Z, 6);
+        }
+
+        var foot = new BlockPos(10, 40, 10, 0);
+        var head = new BlockPos(10, 80, 10, 0);
+        var anchorFoot = SpanMath.AnchorOf(foot).Y;
+        var anchorHead = SpanMath.AnchorOf(head).Y;
+
+        // What the rays used to span in Y, and what the car actually occupies.
+        var carFloor = anchorFoot - SpanMath.ShaftCarDrop;
+        var carRoof = anchorHead - (EntityRopewayCabin.DefaultHangDrop - SpanMath.CabinHalfHeight);
+
+        // The uncertified stretch was the parked car itself: its floor is the top landing's own face one block
+        // over the footing, and its rope point is 3.5 blocks above that.
+        Assert.Equal(foot.Y + 1.0, carFloor, 9);
+        Assert.Equal(foot.Y + 4.5, anchorFoot, 9);
+        Assert.Equal(3.5, anchorFoot - carFloor, 9);
+
+        // And nothing is owed at the TOP: the car's roof is a full block below its own rope point, so the
+        // unextended upper end already covers it. Extending both ends would demand a clear block above the
+        // sheave that nothing ever sweeps.
+        Assert.True(carRoof < anchorHead, $"the car's roof at {carRoof} is not below the head anchor {anchorHead}");
+        Assert.Equal(1.0, anchorHead - carRoof, 9);
+
+        // The same drop the counterweight hangs by, because it is the same body mirrored - one constant now,
+        // not the same arithmetic written at three sites.
+        Assert.Equal(ShaftRenderer.WeightDrop, SpanMath.ShaftCarDrop, 9);
+    }
+
+    /// <summary>
+    /// Nothing but a shaft gets the re-laid ladder, and a level span could not tell if it did: at zero pitch
+    /// <see cref="SpanMath.ClearanceRows"/> already returns whole numbers, so the re-lay is the IDENTITY there
+    /// and no ropeway ray can move. That is this half of the "a horizontal line is byte-identical" claim,
+    /// checked rather than argued.
+    /// <para>
+    /// It is NOT the identity in between, and it is not meant to be: at half a degree the band's ends are 3.500
+    /// and 1.326, and rounding those INWARD onto centres would drop coverage the derived ladder had. Which is
+    /// exactly why <see cref="SpanMath.IsSpanClear"/> applies it only where a shaft axis is supplied, and why
+    /// <see cref="SpanMath.ShaftLinkFits"/> makes "a shaft axis exists" mean "this leg is straight up".
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void RelayingTheLadderOnColumnCentresChangesNothingOnALevelSpan()
+    {
+        Assert.Equal(SpanMath.ClearanceRows(0), SpanMath.OnColumnCentres(SpanMath.ClearanceRows(0)));
+
+        // The mid-pitch case, stated so nobody widens the re-lay to every span thinking it is free.
+        var tilted = SpanMath.ClearanceRows(Math.Sin(0.5 * Math.PI / 180));
+        Assert.NotEqual(tilted, SpanMath.OnColumnCentres(tilted));
+
+        // At vertical the RAYS land on the five column centres the car sweeps, so what each of them certifies
+        // reaches half a block past the car's own nose and tail. That surplus is the price of testing whole
+        // columns and it is symmetric, which is the property that matters.
+        var laid = SpanMath.OnColumnCentres(SpanMath.ClearanceRows(1));
+        Assert.Equal(-SpanMath.CabinHalfLength, laid[0], 9);
+        Assert.Equal(SpanMath.CabinHalfLength, laid[laid.Length - 1], 9);
+        Assert.Equal(0.5, -SpanMath.CabinHalfLength - (laid[0] - 0.5), 9);
+    }
+
+    /// <summary>
+    /// VERTICALITY IS STRUCTURAL. Nothing in the mod asks whether a span is vertical; a shaft line is a line
+    /// whose footings are shaft stations, and this predicate is what decides which spans those may carry.
+    /// Every "on a shaft..." branch downstream is safe because the shapes it would be wrong about - a vertical
+    /// stub bolted onto a hill line, two feet with no sheave, a sheave under the car, a foot and a head facing
+    /// different ways - are refused here.
+    /// <para>
+    /// PER-SPAN, and the last block below is what says so out loud. <c>MaxSpansPerTower</c> is 2, so the "one
+    /// head" clause does NOT give one head per LINE: a fold and a two-headed line both satisfy every clause of
+    /// this predicate. Those are closed by the one-span-per-shaft-footing rule in
+    /// <c>RopewayLinkService.TryLink</c> and <c>ScanCandidates</c>, which is a question about a footing's
+    /// existing spans rather than about this span's geometry and so cannot live in a pure function of two
+    /// positions.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void AShaftSpanRunsUpOneColumnWithExactlyOneSheaveAndTheSheaveOnTop()
+    {
+        var foot = new BlockPos(10, 40, 10, 0);
+        var head = new BlockPos(10, 88, 10, 0);
+        var n = BlockFacing.NORTH;
+
+        Assert.True(SpanMath.ShaftLinkFits(foot, false, n, head, true, n));
+        Assert.True(SpanMath.ShaftLinkFits(head, true, n, foot, false, n));
+
+        // Not out of its own column, by even one block, at any height.
+        Assert.False(SpanMath.ShaftLinkFits(foot, false, n, new BlockPos(11, 88, 10, 0), true, n));
+        Assert.False(SpanMath.ShaftLinkFits(foot, false, n, new BlockPos(10, 88, 11, 0), true, n));
+
+        // Exactly one head on this SPAN: two feet have no sheave to hang the rope on, and two heads have two.
+        Assert.False(SpanMath.ShaftLinkFits(foot, false, n, head, false, n));
+        Assert.False(SpanMath.ShaftLinkFits(foot, true, n, head, true, n));
+
+        // And the head on TOP - everything the sheave carries is drawn downward from it.
+        Assert.False(SpanMath.ShaftLinkFits(foot, true, n, head, false, n));
+        Assert.False(SpanMath.ShaftLinkFits(head, false, n, foot, true, n));
+
+        // THE SAME FACING AT BOTH ENDS. The foot's facing is not decoration: BEPylonBase.Init rotates its
+        // structure by it, which moves the one cell shaftfoot requires - the tensionguide at (0, 0, -3), the
+        // bottom of the counterweight's lane - while the lane the weight actually descends follows the HEAD's
+        // facing. Mismatched, the multiblock made the player dig a guide one way and the weight came down the
+        // other, into undug rock, with every check passing.
+        foreach (var other in new[] { BlockFacing.EAST, BlockFacing.SOUTH, BlockFacing.WEST })
+        {
+            Assert.False(SpanMath.ShaftLinkFits(foot, false, n, head, true, other));
+            Assert.False(SpanMath.ShaftLinkFits(foot, false, other, head, true, n));
+
+            // Any facing will do, as long as it is the same one - nothing prefers north.
+            Assert.True(SpanMath.ShaftLinkFits(foot, false, other, head, true, other));
+        }
+
+        // Fail closed on a facing nobody supplied. PassageFacing never hands back null, so this is about a
+        // caller that has not established the thing the clause is about rather than about a real footing.
+        Assert.False(SpanMath.ShaftLinkFits(foot, false, null, head, true, n));
+        Assert.False(SpanMath.ShaftLinkFits(foot, false, n, head, true, null));
+
+        // One cell is not a span, and a missing footing is not a link.
+        Assert.False(SpanMath.ShaftLinkFits(foot, true, n, foot.Copy(), false, n));
+        Assert.False(SpanMath.ShaftLinkFits(null, true, n, head, false, n));
+
+        // THE TWO SHAPES THIS PREDICATE DOES NOT REFUSE, pinned so nobody reads it as a per-LINE invariant
+        // again. A fold - foot@0 -> head@10 then head@10 -> foot@5 - and a two-headed line - foot@0 -> head@10
+        // plus foot@0 -> head@20 - are both four legal spans by this function alone. What refuses them is the
+        // callers' one-span-per-shaft-footing rule.
+        var mid = new BlockPos(10, 50, 10, 0);
+        var upper = new BlockPos(10, 60, 10, 0);
+        Assert.True(SpanMath.ShaftLinkFits(foot, false, n, mid, true, n));
+        Assert.True(SpanMath.ShaftLinkFits(mid, true, n, new BlockPos(10, 45, 10, 0), false, n));
+        Assert.True(SpanMath.ShaftLinkFits(foot, false, n, upper, true, n));
+    }
+
+    /// <summary>
+    /// The two degenerate facts a vertical leg hands the cabin, pinned so the branch that answers them cannot
+    /// be deleted as redundant. <c>DirectionAt</c> is exact and useful - the climb really is +/-1 - while the
+    /// yaw derived from it is a SILENT WRONG ANSWER: <c>Math.Atan2(0.0, 0.0)</c> is 0.0, not NaN, so a car with
+    /// no bearing at all faces due south for the whole ride and then snaps to the station when it parks.
+    /// </summary>
+    [Fact]
+    public void AVerticalLegHasNoBearingAndAtan2SaysSouthRatherThanSayingSo()
+    {
+        var line = RopewayLine.FromTowers(new List<BlockPos>
+        {
+            new(4, 20, 7, 0),
+            new(4, 68, 7, 0)
+        });
+
+        var dir = line.DirectionAt(line.TotalLength / 2);
+        Assert.Equal(0, dir.X, 9);
+        Assert.Equal(0, dir.Z, 9);
+        Assert.Equal(1, dir.Y, 9);
+
+        // The tombstone: this is the yaw Place would otherwise have written, and it is a heading nobody chose.
+        Assert.Equal(0f, (float)Math.Atan2(dir.X, dir.Z));
+
+        // No NaN anywhere - LegOf refuses a bearing rather than dividing by a zero plan length, and that guard
+        // was written for exactly this case long before an elevator was proposed.
+        Assert.False(double.IsNaN(line.PositionAt(line.TotalLength / 2).X));
+        Assert.Null(line.Tangents[0]);
+        Assert.Null(line.Tangents[1]);
+
+        // What a shaft uses instead: the head's own facing, through the same SquareTo a parked ropeway cabin
+        // squares to. Constant everywhere, so there is nothing to snap at either end. Compared as a DIRECTION
+        // rather than as a number, because SquareTo answers a north facing with axis + PI = 2 PI - the same
+        // heading, and a raw equality here would be a test of the branch it happened to take.
+        foreach (var (facing, x, z) in new[]
+                 {
+                     (BlockFacing.NORTH, 0.0, -1.0), (BlockFacing.EAST, 1.0, 0.0),
+                     (BlockFacing.SOUTH, 0.0, 1.0), (BlockFacing.WEST, -1.0, 0.0)
+                 })
+        {
+            var yaw = EntityRopewayCabin.SquareTo(facing, 0f);
+
+            // The cabin is symmetric front to back, so either of the axis's two yaws is correct - what must
+            // not happen is a yaw off the axis altogether.
+            Assert.Equal(0, Math.Abs(Math.Sin(yaw) * z - Math.Cos(yaw) * x), 5);
+        }
+    }
+
+    /// <summary>
+    /// A rider stepping out at the TOP of a shaft is over a hole - the top landing must have a car-sized
+    /// opening in it, because the car parks with its floor level with that landing and then descends through
+    /// its whole footprint. Vanilla's own dismount teleport probes exactly two columns, one block either side,
+    /// and one block from the axis is still inside a three-wide hoistway. This is the widened search: rings
+    /// outward from the cabin's own column, in a fixed order so the server and both clients pick the same block.
+    /// </summary>
+    [Fact]
+    public void TheDismountSearchFindsTheLandingRoundAThreeWideHoistway()
+    {
+        // The shaft as dug: three columns across the head's facing, five along, plus the counterweight's lane
+        // one further. Everything else at this level is landing.
+        bool Standable(int x, int z) => !(Math.Abs(x) <= 1 && z >= -3 && z <= 2);
+
+        var found = RopewayCabinSeat.Landing(0, 0, RopewayCabinSeat.ShaftExitReach, Standable);
+        Assert.NotNull(found);
+        Assert.False(Standable(0, 0));
+        Assert.True(Standable(found.Value.X, found.Value.Z));
+
+        // Two blocks across the doors is the nearest landing there is, and the search has to reach it.
+        Assert.Equal(2, Math.Max(Math.Abs(found.Value.X), Math.Abs(found.Value.Z)));
+        Assert.True(RopewayCabinSeat.ShaftExitReach >= 2);
+
+        // Deterministic: the same rig gives the same block every time.
+        Assert.Equal(found, RopewayCabinSeat.Landing(0, 0, RopewayCabinSeat.ShaftExitReach, Standable));
+
+        // The cabin's own column wins when it IS standable, so a foot station with a solid deck round it never
+        // moves anybody sideways.
+        Assert.Equal((0, 0), RopewayCabinSeat.Landing(0, 0, 3, (_, _) => true));
+
+        // Nothing within reach is nothing rather than a guess: the rider is left where vanilla left them.
+        Assert.Null(RopewayCabinSeat.Landing(0, 0, 3, (_, _) => false));
+        Assert.Null(RopewayCabinSeat.Landing(0, 0, 3, null));
+    }
+
+    /// <summary>
+    /// The counterweight is a pure function of the car and needs no state of its own: no <c>Travelled</c>, no
+    /// persistence, no despawn path, no corridor and no seat. The two are exact mirrors, so they pass level at
+    /// the shaft's midpoint by construction rather than by tuning, and the two strands' lengths always add up
+    /// to one rope.
+    /// </summary>
+    [Fact]
+    public void TheCounterweightIsTheCarsMirrorAndTheTwoStrandsAlwaysSumToOneRope()
+    {
+        const double bottom = 72 / 16.0;
+        const double top = 264 / 16.0;
+        const double sum = top + bottom;
+
+        double Weight(double car) => sum - car;
+
+        // The car at one stop puts the weight at the other, both ways round.
+        Assert.Equal(bottom, Weight(top), 9);
+        Assert.Equal(top, Weight(bottom), 9);
+
+        // They meet level at the midpoint, and nowhere else.
+        Assert.Equal(sum / 2, Weight(sum / 2), 9);
+
+        // The rope is one length whatever the car is doing, which is why an open 1:1 rope needs no take-up.
+        foreach (var car in new[] { bottom, sum / 2, top, bottom + 3.25 })
+        {
+            Assert.Equal(top - bottom, (top - car) + (top - Weight(car)), 9);
+        }
+
+        // And the weight hangs the car's own drop below its rope point, so the two bodies are the same body.
+        Assert.Equal(EntityRopewayCabin.DefaultHangDrop + SpanMath.CabinHalfHeight, ShaftRenderer.WeightDrop, 9);
     }
 
     private static int Sum(int[] values)

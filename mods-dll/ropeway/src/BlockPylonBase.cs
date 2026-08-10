@@ -27,11 +27,12 @@ namespace Ropeway;
 /// docs/POWER-AND-STORAGE.md.
 /// </para>
 /// <para>
-/// This ONE class serves all three footings - <c>ropeway:pylonbase</c>, <c>ropeway:drivestation</c> and
-/// <c>ropeway:tensionstation</c>. Nothing here branches on which: a station differs only in the
-/// <c>multiblockStructure</c> its own block carries, which <see cref="BEPylonBase"/> reads off
-/// <c>Block.Attributes</c>. That is what let stations ship with no new C# block class and no new block
-/// entity class, and it is the reason nothing in this file names a block code.
+/// This ONE class serves all FIVE footings - <c>ropeway:pylonbase</c>, <c>ropeway:drivestation</c>,
+/// <c>ropeway:tensionstation</c> and the shaft's <c>ropeway:shafthead</c> and <c>ropeway:shaftfoot</c>.
+/// Nothing here branches on which: a station differs only in the <c>multiblockStructure</c> and the handful
+/// of attributes its own block carries, which <see cref="BEPylonBase"/> reads off <c>Block.Attributes</c>.
+/// That is what let stations ship with no new C# block class and no new block entity class - and then let a
+/// whole second MACHINE do the same - and it is the reason nothing in this file names a block code.
 /// </para>
 /// </summary>
 public class BlockPylonBase : Block

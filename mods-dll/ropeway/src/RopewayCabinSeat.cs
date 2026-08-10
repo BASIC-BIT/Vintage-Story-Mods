@@ -3,6 +3,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 namespace Ropeway;
@@ -239,6 +240,97 @@ public class RopewayCabinSeat : EntityRideableSeat
             var block = blocks.GetBlockOrNull(x, y, z, BlockLayersAccess.MostSolid);
             return block != null && (block.SideSolid.Any || block.CollisionBoxes is { Length: > 0 });
         });
+    }
+
+    /// <summary>
+    /// How far out a rider stepping out at a SHAFT station is allowed to be put, in blocks. Two would do -
+    /// the shaft is three columns across, so the nearest landing block across the car's doors is at 2 - and
+    /// three is what reaches the landing along the car's own length past the counterweight's lane.
+    /// </summary>
+    public const int ShaftExitReach = 3;
+
+    /// <summary>
+    /// THE TOP STATION HAS NO FLOOR, and this is what answers it. A shaft's top landing must have a car-sized
+    /// hole in it, because the car parks with its floor level with that landing and then descends through its
+    /// whole footprint - so the one thing a shaft cannot give a rider is ground where they are sitting.
+    /// <para>
+    /// THE GATE IS <c>OnShaft</c>, NOT "AT THE TOP", so this fires at the foot as well, and that is stated
+    /// rather than claimed away: with the pit deck laid at the foot footing's own cell - which is what the
+    /// handbook's "you are on the pad, half a block down" describes - the ring-1 probe finds solid deck at the
+    /// car's floor level and puts the rider one block sideways onto it instead of leaving them on the plinth.
+    /// Harmless, arguably the better landing, and cheaper than a second predicate that would have to know
+    /// which end of the shaft the car is standing at. What it is NOT is symmetric with a ropeway tower, which
+    /// is why it is written down here.
+    /// </para>
+    /// <para>
+    /// Vanilla already teleports a dismounting rider to solid ground and this is that mechanism widened, not a
+    /// second one: <c>EntityRideableSeat.tryTeleportToFreeLocation</c> tests exactly TWO candidates, one block
+    /// either side of the mount, needing <c>SideSolid[UP]</c> under each. One block from the axis is still
+    /// inside a three-wide hoistway, so both are air, no teleport happens, and
+    /// <see cref="DidUnmount"/> has just re-datumed <c>PositionBeforeFalling</c> to the seat - the rider falls
+    /// the length of the shaft and is billed for all of it. Vanilla's own elevator answers the same question
+    /// by writing <c>meta-collider</c> blocks into the world at every stop and taking them out again; that is
+    /// a block write per stop on a machine that already knows where its landing is.
+    /// </para>
+    /// <para>
+    /// <c>base</c> runs FIRST, so on a ropeway nothing here fires at all: either vanilla's two candidates
+    /// answered it or the tower's own ground is already under the rider, and the gate below is a shaft flag
+    /// besides. The search is the same three tests vanilla makes - solid top face, no collision at the target -
+    /// over more columns.
+    /// </para>
+    /// </summary>
+    protected override void tryTeleportToFreeLocation()
+    {
+        base.tryTeleportToFreeLocation();
+
+        if (Entity is not EntityRopewayCabin { OnShaft: true } || Passenger == null) return;
+
+        // The car's own floor, which at either stop is the top face of the block the landing is laid at.
+        var floor = Entity.Pos.Y - SpanMath.CabinHalfHeight;
+        var world = Passenger.World;
+        var blocks = world?.BlockAccessor;
+        if (blocks == null) return;
+
+        var stand = Landing(
+            (int)Math.Floor(Entity.Pos.X), (int)Math.Floor(Entity.Pos.Z), ShaftExitReach,
+            (x, z) =>
+            {
+                // GetBlockRaw and MostSolid, exactly as vanilla's own probe reads the two blocks beside the
+                // mount. An unloaded chunk answers air and is skipped, which is the safe way round: it cannot
+                // teleport anyone into a chunk nobody can see.
+                var below = blocks.GetBlockRaw(x, (int)(floor - 0.1), z, BlockLayersAccess.MostSolid);
+                if (below == null || !below.SideSolid[BlockFacing.UP.Index]) return false;
+
+                return !world.CollisionTester.IsColliding(
+                    blocks, Passenger.CollisionBox, new Vec3d(x + 0.5, floor, z + 0.5), alsoCheckTouch: false);
+            });
+
+        if (stand != null) Passenger.TeleportTo(new Vec3d(stand.Value.X + 0.5, floor, stand.Value.Z + 0.5));
+    }
+
+    /// <summary>
+    /// The nearest column to <paramref name="x"/>/<paramref name="z"/> that a rider may be put down in, out to
+    /// <paramref name="reach"/> blocks, or null when there is none. Chebyshev rings outward from the cabin's own
+    /// column, and inside a ring in a fixed order, so two clients and the server cannot disagree about which
+    /// block the same dismount picked. The block probe is a parameter, so the walk is pure and therefore tested.
+    /// </summary>
+    public static (int X, int Z)? Landing(int x, int z, int reach, System.Func<int, int, bool> standable)
+    {
+        if (standable == null) return null;
+
+        for (var r = 0; r <= reach; r++)
+        {
+            for (var dx = -r; dx <= r; dx++)
+            {
+                for (var dz = -r; dz <= r; dz++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != r) continue;
+                    if (standable(x + dx, z + dz)) return (x + dx, z + dz);
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

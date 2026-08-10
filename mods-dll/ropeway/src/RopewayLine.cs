@@ -61,6 +61,40 @@ public sealed class RopewayLine
     /// <summary>See <see cref="MinTravel"/>.</summary>
     public double MaxTravel;
 
+    /// <summary>
+    /// This line's footings are SHAFT stations, so it is a hoistway rather than a ropeway. A cached READ-OUT of
+    /// the towers and not the guarantee: the guarantee is <see cref="SpanMath.ShaftLinkFits"/> PLUS the
+    /// one-span-per-shaft-footing rule its two callers apply (<c>RopewayLinkService.TryLink</c> and
+    /// <c>ScanCandidates</c>), which together refuse at link time every shape a shaft line could otherwise
+    /// take - the predicate alone is per-SPAN and would let a fold and a two-headed line through. By the time
+    /// anything reads this flag there is no mixed line, no fold and no second sheave for it to be wrong about.
+    /// <para>
+    /// ONE WRITER, <see cref="GetOrBuild"/>, and that is deliberate. <see cref="FromTowers"/> is pure - no world
+    /// access, and it is what the whole unit-test surface and <c>BEPylonBase.LocalLine</c> are built on - so it
+    /// cannot ask a footing what kind it is without becoming a cross-chunk read on the tesselation thread. It
+    /// leaves this false, which is the answer every consumer of a bare <c>FromTowers</c> line wants.
+    /// </para>
+    /// </summary>
+    public bool IsShaft;
+
+    /// <summary>
+    /// The shaft head's own <c>PassageFacing</c> - the car's long axis, the counterweight's lane, the plane the
+    /// head sheave turns in and the frame <see cref="SpanMath.IsSpanClear"/> lays its corridor on. Null off a
+    /// shaft.
+    /// <para>
+    /// THE ONE SOURCE OF TRUTH FOR THE HEADING, which is what makes the degenerate yaw a non-problem rather than
+    /// a thing to snap. <c>DirectionAt</c> on a vertical leg is <c>(0, +/-1, 0)</c> and
+    /// <c>Math.Atan2(0.0, 0.0)</c> is <b>0.0</b> - not NaN, a silent permanent south - so a heading has to be
+    /// SUPPLIED rather than patched. There is no second HEADING to reconcile with this one - the foot's plinth
+    /// is symmetric on both horizontal axes and nothing draws off it - so a car arrives at the yaw it left. The
+    /// foot's facing is not inert, though: it rotates the <c>tensionguide</c> cell <c>shaftfoot</c> requires,
+    /// which is the counterweight's own lane, so <see cref="SpanMath.ShaftLinkFits"/> refuses a link whose two
+    /// footings do not face the same way. Without that the guide is dug along the foot's facing while the lane
+    /// this field decides runs along the head's.
+    /// </para>
+    /// </summary>
+    public BlockFacing ShaftFacing;
+
     /// <summary>Builds the cumulative-length table for an already-ordered tower chain. Pure.</summary>
     public static RopewayLine FromTowers(IReadOnlyList<BlockPos> towers)
     {
@@ -499,6 +533,26 @@ public sealed class RopewayLine
         // Still a real line - the cabin's "line is gone for good" test wants it - but with the unproven end
         // fenced off so nobody parks or reverses on a false endpoint.
         line.MarkLoadedEnds(pos => modSystem.LoadedTowers.ContainsKey(pos));
+
+        // The kind of line this is, read off the towers that are already in hand. A walk of at most 64 entries
+        // on a cache miss, and the cache is what every consumer actually holds.
+        //
+        // OFF THE HEAD ALONE, so the flag and the heading can never disagree. Reading IsShaft off ANY loaded
+        // shaft footing left a window between the foot's Initialize and the head's where the line was
+        // `IsShaft = true, ShaftFacing = null`, and Truncated does not cover it at
+        // travelled == MinTravel == MaxTravel == 0. In that tick three consumers degraded three different ways:
+        // `Place` ran SquareTo(null, 0f), which is 0.0 - due SOUTH, the exact silent-yaw failure ShaftFacing
+        // exists to make impossible; `SegmentClear` passed null and silently took the ropeway branch (4 blocks
+        // trimmed off each end and right = (1,0,0) in world axes, transposed for an east-facing head); and
+        // ShaftRenderer.Track nulled its rig so the shaft drew no rope. A shaft has exactly one head
+        // (SpanMath.ShaftLinkFits), so keying both off it costs nothing and closes all three.
+        foreach (var tower in line.Towers)
+        {
+            if (!modSystem.LoadedTowers.TryGetValue(tower, out var station) || station?.IsShaftHead != true) continue;
+
+            line.IsShaft = true;
+            line.ShaftFacing = station.PassageFacing;
+        }
 
         foreach (var tower in line.Towers) modSystem.LineCache[tower] = line;
         return line;

@@ -53,6 +53,85 @@ public class RopewayPowerTests
     }
 
     /// <summary>
+    /// A COUNTERWEIGHTED SHAFT COSTS THE NETWORK WHAT A LEVEL ROPEWAY COSTS IT, and the climb term is
+    /// CANCELLED rather than discounted. <c>ClimbLoad * climb</c> is the cost of lifting the car's own mass up
+    /// the grade; a counterweight is exactly that mass hung on the other strand, so what the drive lifts is the
+    /// imbalance - which is <c>cargo</c>, and <c>cargo</c> is 0 until cargo weight lands. So
+    /// <c>BEPylonBase.DeclareLoad</c> passes 0 for the climb on a shaft and there is no new constant anywhere.
+    /// <para>
+    /// STATE THE BALANCE DECISION rather than presenting it as a maintenance economy, because it is not
+    /// neutral: the shaft is strictly cheaper on power than a steep ropeway, strictly steeper, and a third of
+    /// the placed blocks. What it costs more of is haul rope - <c>ropePerBlock</c> 0.5 against 0.25, in JSON -
+    /// and that is the one lever free to move if it turns out to be too strong.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ACounterweightedShaftCostsTheNetworkWhatALevelLineCosts()
+    {
+        var level = RopewayPower.Resistance(hauling: true, climb: 0, cargo: 0);
+        var shaft = RopewayPower.Resistance(hauling: true, climb: 0, cargo: 0);
+        var bare = RopewayPower.Resistance(hauling: true, climb: 1, cargo: 0);
+
+        Assert.Equal(level, shaft);
+        Assert.Equal(RopewayPower.HaulResistance, shaft, 6);
+        Assert.True(bare > shaft, "an uncounterweighted vertical line is dearer, or the term never existed");
+
+        // Descending already costs the level figure today, because Resistance clamps a negative climb to zero.
+        // So the counterweight makes going UP cost what coming DOWN already costs - symmetric, and no case.
+        Assert.Equal(shaft, RopewayPower.Resistance(hauling: true, climb: -1, cargo: 0), 6);
+
+        // WHERE IT LANDS ON THE LADDER, in blocks of RISE per second - on a vertical leg blocks along the line
+        // ARE blocks of rise, so there is no sinus anywhere. The point of the counterweight is the BOTTOM rung:
+        // a bare vertical line stalls the first mill a player builds and a counterweighted one walks.
+        Assert.Equal(0, WindmillSpeed(3, metal: false, (float)bare), 6);
+        Assert.InRange(WindmillSpeed(3, metal: false, (float)shaft), 1.0, 1.5);
+
+        // ...and it is a KNIFE EDGE at three sails, which the headline has to say out loud. TargetSpeed is
+        // min(0.6, windSpeed), so any wind under 0.4 stalls a 3-sail mill outright, and
+        // BEBehaviorWindmillRotor's turbulenceExposed halves the torque factor - which takes a 3-sail mill
+        // below zero even counterweighted. The tier a player can rely on is four.
+        var turbulent = RopewayPower.CabinSpeed(FullWind - shaft / (3 / 4.0 * 0.5));
+        Assert.Equal(0, turbulent, 6);
+        Assert.True(WindmillSpeed(4, metal: false, (float)shaft) > 1.5, "a four-sail mill is the reliable tier");
+
+        // And the whole ladder is the LEVEL ladder, unchanged, so RopewayPowerTests keeps one table.
+        foreach (var sails in new[] { 2, 3, 4, 5 })
+        {
+            Assert.Equal(WindmillSpeed(sails, metal: false, (float)level),
+                WindmillSpeed(sails, metal: false, (float)shaft), 6);
+        }
+
+        // IS THE SHAFT REDUNDANT NEXT TO A 70 DEGREE ROPEWAY SPAN? No, and this is the arithmetic that says
+        // so - the surviving objection from ELEVATOR-CHALLENGE, answered in numbers rather than in prose.
+        // It is asserted here because the prose got it WRONG: handbook page 53 and QA step 3 claimed a 70
+        // degree span climbs at "96% of a shaft's rate" until 2026-08-10, which is POWER-AND-STORAGE's
+        // `rise per block travelled` column (sin 70 = 0.94) transposed into a rate it is not. The two
+        // effects COMPOUND - the steep span turns 0.94 blocks of travel into a block of rise AND pays 0.441
+        // where the shaft pays 0.300 - so 0.94 is a ceiling reached only as torque goes to infinity.
+        var steep = RopewayPower.Resistance(hauling: true, climb: Math.Sin(70 * Math.PI / 180), cargo: 0);
+        Assert.Equal(0.441, steep, 3);
+
+        double Climb(int sails, bool metal, float load, double rise)
+        {
+            return WindmillSpeed(sails, metal, load) * rise;
+        }
+
+        // Height gained per second, as a fraction of the shaft's, at each rung of the ladder above.
+        var rise70 = Math.Sin(70 * Math.PI / 180);
+        Assert.Equal(0.50, Climb(4, false, steep, rise70) / Climb(4, false, (float)shaft, 1), 2);
+        Assert.Equal(0.86, Climb(10, true, steep, rise70) / Climb(10, true, (float)shaft, 1), 2);
+
+        // THE ROW THAT DECIDES IT: at the tier the docs call the one to rely on, the shaft climbs TWICE as
+        // fast, and at three sails the steep ropeway is all but stalled where the shaft still walks.
+        Assert.True(Climb(4, false, (float)shaft, 1) > 1.9 * Climb(4, false, steep, rise70));
+        Assert.InRange(Climb(3, false, steep, rise70) / Climb(3, false, (float)shaft, 1), 0.0, 0.10);
+
+        // And no mill anywhere reaches the number the prose used to quote.
+        Assert.True(Climb(10, true, steep, rise70) / Climb(10, true, (float)shaft, 1) < rise70,
+            "a 70 degree span cannot beat sin 70, and it does not reach it either");
+    }
+
+    /// <summary>
     /// The bottom of the ladder is a stall, and that is the design: a two-sail mill cannot haul a cabin, so
     /// the answer to a cabin that will not move is a bigger mill rather than a longer wait.
     /// </summary>

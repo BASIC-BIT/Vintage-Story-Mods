@@ -64,6 +64,17 @@ public static class SpanMath
     public const double CabinHalfHeight = 1.25;
 
     /// <summary>
+    /// Blocks from the rope point down to the BOTTOM of the body hanging on it - the car's floor. Not a new
+    /// number: it is <c>hangDrop + CabinHalfHeight</c>, which <see cref="ClearanceRows"/> already spells out
+    /// inline as the bottom of its band, and it is named here because two other things are the same 3.5 and
+    /// were each writing it out. <see cref="IsSpanClear"/> drops the lower end of a SHAFT cast by it, so the
+    /// corridor is the car's swept volume rather than the rope's segment, and <c>ShaftRenderer.WeightDrop</c>
+    /// IS this constant - which is what makes the counterweight the car's exact mirror rather than a body
+    /// tuned to look like one.
+    /// </summary>
+    public const double ShaftCarDrop = EntityRopewayCabin.DefaultHangDrop + CabinHalfHeight;
+
+    /// <summary>
     /// The steepest span a tower can pass the cabin through, as a TANGENT - rise over horizontal run. Above it
     /// the cabin's roof drives through the crossarm cells on the way out of a tower and its floor through the
     /// footing's plinth on the way down out of one.
@@ -234,6 +245,81 @@ public static class SpanMath
     }
 
     /// <summary>
+    /// The same band as <paramref name="rows"/>, sampled on WHOLE-block offsets instead of half-block ones.
+    /// Pure, and it exists for exactly one case: a SHAFT.
+    /// <para>
+    /// <see cref="ClearanceRows"/>'s own convention is "one ray down the centre of its own row so it certifies
+    /// +/-0.5 either side", and on a level span that is free - <c>up</c> is vertical, the anchor's Y is
+    /// <c>pos.Y + 4.5</c> which is a block centre, and the offsets come out integral. At exactly vertical
+    /// <c>up</c> is HORIZONTAL and the anchor's plan coordinate is <c>pos + 0.5</c>, also a centre, but the
+    /// offsets are half-integers - so every ray runs along a block BOUNDARY plane and the DDA floors it onto
+    /// one side. The four rays would sample plan columns {-1, 0, +1, +2} while the car sweeps {-2 .. +2}: the
+    /// column its tail occupies is never tested, at any level of the shaft, and the check stops being
+    /// symmetric about the cabin - which is the thing <see cref="IsSpanClear"/>'s own comment says must not
+    /// silently re-open.
+    /// </para>
+    /// <para>
+    /// Re-laying the ladder on integers covers the band with one more ray (4 -> 5) and puts every one of them
+    /// on a column centre. It is applied ONLY where a shaft axis is supplied, so no ropeway span's ray moves.
+    /// </para>
+    /// </summary>
+    public static double[] OnColumnCentres(double[] rows)
+    {
+        if (rows == null || rows.Length == 0) return rows;
+
+        var low = (int)Math.Ceiling(rows[0] - 0.5 - Epsilon);
+        var high = (int)Math.Floor(rows[rows.Length - 1] + 0.5 + Epsilon);
+        if (high < low) high = low;
+
+        var offsets = new double[high - low + 1];
+        for (var i = 0; i < offsets.Length; i++) offsets[i] = low + i;
+        return offsets;
+    }
+
+    /// <summary>
+    /// Whether two footings may be joined by a SHAFT span. Pure, and it is most of what makes verticality
+    /// STRUCTURAL rather than arithmetic: nothing anywhere asks <c>|dir.Y| &gt; 0.999</c>, because a line whose
+    /// footings are shaft stations cannot be anything but vertical - the link refuses every other shape.
+    /// <para>
+    /// Four clauses, each closing one thing. ONE COLUMN, so a player cannot bolt a vertical stub onto a hill
+    /// line and get a mixed line whose per-span facts are hoisted to the whole of it. ONE HEAD ON THIS SPAN,
+    /// so the span has one sheave. THE HEAD ON TOP, because everything the head carries - the wheel, the wrap,
+    /// the two strands hanging off it - is drawn downward from the sheave, and a sheave under the car is a
+    /// machine drawn inside out. AND THE SAME FACING AT BOTH ENDS, which is the clause this predicate shipped
+    /// without: <c>BEPylonBase.Init</c> passes <c>RotationFor(side)</c> to <c>InitForUse</c>, which rotates
+    /// every offset of the footing's structure - including the one cell <c>shaftfoot</c> requires, the
+    /// <c>tensionguide</c> at local (0, 0, -3). So the guide the multiblock makes the player dig lies along the
+    /// FOOT's facing while the counterweight's lane (<c>ShaftRenderer.Lane</c>, off
+    /// <c>RopewayLine.ShaftFacing</c>) follows the HEAD's. A foot facing east under a head facing north used to
+    /// validate, and the weight then descended three blocks north into undug rock and landed on nothing.
+    /// Fail-closed on a null facing: <c>BEPylonBase.PassageFacing</c> never hands one back, and a caller that
+    /// cannot say which way a footing points has not established the thing this clause is about.
+    /// </para>
+    /// <para>
+    /// PER-SPAN, and that is the whole of its scope. <c>BEPylonBase.MaxSpansPerTower</c> is 2, so "one head"
+    /// here does NOT make "one head per line" true - <c>foot@0 -&gt; head@10</c> plus <c>foot@0 -&gt; head@20</c>
+    /// is two sheaves on one line and <c>foot@0 -&gt; head@10</c> plus <c>head@10 -&gt; foot@5</c> is a fold that
+    /// flips <c>DirectionAt</c> mid-line, and both pass every clause below. What closes those is the per-LINE
+    /// rule at the two callers - <c>RopewayLinkService.TryLink</c> and <c>ScanCandidates</c> refuse a shaft
+    /// span when either footing already carries one - because it is a question about the footing's existing
+    /// spans rather than about this span's geometry.
+    /// </para>
+    /// </summary>
+    public static bool ShaftLinkFits(
+        BlockPos a, bool aIsHead, BlockFacing aFacing, BlockPos b, bool bIsHead, BlockFacing bFacing)
+    {
+        if (a == null || b == null) return false;
+        if (a.X != b.X || a.Z != b.Z) return false;
+        if (aIsHead == bIsHead) return false;
+
+        // Index rather than reference equality: the four facings are singletons today and this stays right if
+        // one is ever rebuilt from a code.
+        if (aFacing == null || bFacing == null || aFacing.Index != bFacing.Index) return false;
+
+        return aIsHead ? a.Y > b.Y : b.Y > a.Y;
+    }
+
+    /// <summary>
     /// Lang key for the eight-point compass bearing from one tower to another. This is what an unnamed tower
     /// is called, so it has to be a bearing a player can act on rather than a placeholder. Returns whole lang
     /// keys rather than a bare code so the shipped-lang-key test can see every one of them. Pure.
@@ -351,8 +437,42 @@ public static class SpanMath
     /// top tower certify <c>Z-1..Z+3</c> and the ride check <c>Z-3..Z+1</c> - a link that succeeded and a cabin
     /// that then refused to move. Anything that makes these rows asymmetric again re-opens it silently.
     /// </para>
+    /// <para>
+    /// <paramref name="shaftAxis"/> is the SHAFT HEAD's own passage facing, and null on every ropeway span -
+    /// every shipped caller passes nothing and the body takes the branch it has always taken. It buys three
+    /// things a vertical leg cannot get any other way, and all three are the same fact said once:
+    /// <list type="bullet">
+    /// <item>THE FRAME. The <c>|dir.Y| &gt; 0.999</c> fallback hard-codes <c>right = (1,0,0)</c>, so the corridor
+    /// is a fixed box in WORLD axes - 3 wide on X, 5 long on Z. That is right for a car lying along Z and
+    /// TRANSPOSED for one lying along X: face the head east and two blocks of the car's nose and tail sweep
+    /// uncertified rock. The shaft's <c>right</c> is the horizontal perpendicular of its own facing, so
+    /// <c>up</c> lands ON that facing and the corridor turns with the car.</item>
+    /// <item>THE LADDER. See <see cref="OnColumnCentres"/> - at exactly vertical the half-integer rows run down
+    /// block BOUNDARIES and one column of the car is never tested at all.</item>
+    /// <item>THE TRIM. <see cref="TowerClearance"/> exists because "the posts are player-chosen logs and planks,
+    /// so <see cref="RopewayBlockFilter"/> cannot tell them from terrain". A shaft station has no posts and no
+    /// player-chosen cells: every cell either station owns is in the <c>ropeway</c> domain, which the filter
+    /// passes before it looks at <c>SideSolid</c>. So the trim buys nothing and costs everything - a 10-block
+    /// shaft would certify 2 blocks of itself and a 9-block shaft 1. <see cref="TrimForTowers"/> itself is NOT
+    /// touched: it is also <see cref="RopewayLine.PositionAt"/>'s bend window and <c>HalfSpanPath</c>'s and
+    /// <c>RailPath</c>'s sample window. It is skipped HERE and only here.</item>
+    /// <item>THE CAR'S OWN BODY, and this one is the reason the corridor was certifying the ROPE rather than
+    /// the thing that has to fit down it. On a level span the ladder carries the cabin: <c>up</c> is vertical,
+    /// so <see cref="ClearanceRows"/>'s <c>-3.5 .. +1.33</c> band IS the car's height. On a shaft <c>up</c> is
+    /// HORIZONTAL - its Y is identically zero, because <c>dir</c> is <c>(0, +/-1, 0)</c> - so every offset is a
+    /// plan offset and every ray spans exactly <c>[anchorFoot, anchorHead]</c> in Y. The car's body hangs
+    /// <c>rope-3.5 .. rope-1.0</c>, so its swept volume is <c>[anchorFoot-3.5, anchorHead-1.0]</c> and the
+    /// bottom 3.5 blocks of the hoistway - <c>footY+1.0 .. footY+4.5</c>, over the whole 3x5 footprint, which
+    /// is precisely where the car PARKS and the rider SITS - were never tested at all. Sink a shaft from the
+    /// top, stop at the foot footing's own cell, and the link succeeded, the car parked in rock, and
+    /// <c>RopewayCabinSeat.Landing</c> then found no landing because every neighbour column was solid wall.
+    /// Dropping the lower end by that much is the whole fix; nothing is needed at the top, where the car's roof
+    /// is 1.0 BELOW its rope point and so already inside the segment.</item>
+    /// </list>
+    /// </para>
     /// </summary>
-    public static bool IsSpanClear(IWorldAccessor world, Vec3d from, Vec3d to, out BlockPos firstBlocker)
+    public static bool IsSpanClear(
+        IWorldAccessor world, Vec3d from, Vec3d to, out BlockPos firstBlocker, BlockFacing shaftAxis = null)
     {
         firstBlocker = null;
         if (world == null || from == null || to == null) return false;
@@ -364,21 +484,34 @@ public static class SpanMath
             if (length < Epsilon) return true;
             dir.Normalize();
 
-            var trim = TrimForTowers(length);
+            var trim = shaftAxis == null ? TrimForTowers(length) : 0;
             if (trim > 0)
             {
                 from = from.Clone().Add(dir.X * trim, dir.Y * trim, dir.Z * trim);
                 to = to.Clone().Add(-dir.X * trim, -dir.Y * trim, -dir.Z * trim);
             }
 
-            var right = Math.Abs(dir.Y) > 0.999
-                ? new Vec3d(1, 0, 0)
-                : new Vec3d(-dir.Z, 0, dir.X).Normalize();
+            // The rays cover the CAR, not the rope. See the fourth bullet above for why that is a shaft-only
+            // difference. Whichever end is lower, because a link is clicked from either footing and the
+            // corridor has to be the same one from both - the same symmetry the rows were re-laid for. Cloned,
+            // because TryLink still reads its own anchors afterwards.
+            if (shaftAxis != null)
+            {
+                if (from.Y <= to.Y) from = from.Clone().Add(0, -ShaftCarDrop, 0);
+                else to = to.Clone().Add(0, -ShaftCarDrop, 0);
+            }
+
+            var right = shaftAxis != null
+                ? new Vec3d(-shaftAxis.Normalf.Z, 0, shaftAxis.Normalf.X)
+                : Math.Abs(dir.Y) > 0.999
+                    ? new Vec3d(1, 0, 0)
+                    : new Vec3d(-dir.Z, 0, dir.X).Normalize();
             var up = Cross(right, dir).Normalize();
 
             // The rows the cabin and the strand actually occupy at THIS pitch, rather than a fixed ladder that
             // was only ever the level-span answer.
             var rows = ClearanceRows(dir.Y);
+            if (shaftAxis != null) rows = OnColumnCentres(rows);
 
             for (var i = -ClearanceRadius; i <= ClearanceRadius; i++)
             {

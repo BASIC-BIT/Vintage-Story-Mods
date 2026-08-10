@@ -115,6 +115,30 @@ public class BEPylonBase : BlockEntity
     /// </summary>
     public bool IsTensioner { get; set; }
 
+    /// <summary>
+    /// Which end of a SHAFT this footing is, or null on every ropeway tower - read once out of the blocktype's
+    /// own <c>shaft</c> attribute, beside <see cref="IsTensioner"/>, because a station's kind is a property of
+    /// its blocktype and cannot change under it.
+    /// <para>
+    /// A STRING and not a bool, because the two shaft footings are not interchangeable and exactly one thing
+    /// has to say which is which: the HEAD wears the sheave, owns the drive leg, and its facing is the machine's
+    /// only heading. Everything else in the mod that needs to tell two station kinds apart already reads an
+    /// attribute (<c>tensioner</c>, <c>driveIntakeCell</c>); this is the same idiom with one more state, and it
+    /// keeps <see cref="IsShaft"/> and <see cref="IsShaftHead"/> from being two flags that can disagree.
+    /// </para>
+    /// <para>
+    /// Publicly settable for the same reason <see cref="IsTensioner"/> is: a BEPylonBase built without a world
+    /// has no Block to read it off. Nothing in the mod writes it.
+    /// </para>
+    /// </summary>
+    public string ShaftRole { get; set; }
+
+    /// <summary>Whether this footing is either end of a shaft. See <see cref="ShaftRole"/>.</summary>
+    public bool IsShaft => ShaftRole != null;
+
+    /// <summary>Whether this footing is the TOP of a shaft - the one carrying the sheave and the drive.</summary>
+    public bool IsShaftHead => ShaftRole == "head";
+
     public RopewayModSystem ModSystem => Api?.ModLoader?.GetModSystem<RopewayModSystem>();
 
     /// <summary>
@@ -157,6 +181,7 @@ public class BEPylonBase : BlockEntity
 
         // All read once: a station's kind is a property of its blocktype and cannot change under it.
         IsTensioner = Block?.Attributes?["tensioner"].AsBool() ?? false;
+        ShaftRole = Block?.Attributes?["shaft"].AsString();
         intakeNumber = Block?.Attributes?["driveIntakeCell"].AsInt() ?? 0;
         WearsABullwheel = WantsABullwheel(structure);
 
@@ -206,8 +231,9 @@ public class BEPylonBase : BlockEntity
     }
 
     /// <summary>
-    /// The two crossarm-end cells that carry a facing - <c>drivehead</c> and <c>tensionhead</c> - narrowed
-    /// in this footing's OWN copy of the structure from the <c>-*</c> wildcard to the footing's own side.
+    /// The three ASYMMETRIC cells a footing's structure names by family - <c>drivehead</c>,
+    /// <c>tensionhead</c> and <c>shaftsheave</c> - narrowed in this footing's OWN copy of the structure from
+    /// the <c>-*</c> wildcard to the footing's own side.
     /// That is the whole of the shared-leg fix, and it is five lines because
     /// <see cref="MultiblockStructure.BlockNumbers"/> is a public dictionary on a per-block-entity
     /// <c>AsObject</c> copy and <c>InitForUse</c> builds <c>BlockCodes</c> out of it - so this has to run
@@ -226,15 +252,29 @@ public class BEPylonBase : BlockEntity
     /// leg, so narrowing it is enough: a shared head can face one way, so it can satisfy one station.
     /// </para>
     /// <para>
-    /// WHY only these two, when M4's looseness covers five blocks. The refusal M4 defers is the one that
+    /// WHY only these three, when M4's looseness covers five blocks. The refusal M4 defers is the one that
     /// would bite <c>pylonhead</c> and <c>bullwheel</c>: those are symmetric along the rope axis, so a player
     /// who placed one from the other side of the tower has a geometrically identical block that would stop
     /// validating, and an incomplete tower is un-clickable - a saved world would lose its picker, its call
     /// and its rename over a block that looks perfectly right. Neither applies here.
-    /// <c>ropeway:drivehead</c> and <c>ropeway:tensionhead</c> are NEW and untracked, so no saved world can
-    /// hold a wrongly-faced one, and both are visibly asymmetric - <c>drivehead.shaftwest</c> is x 0..4 and
-    /// <c>tensionhead</c>'s tie rod is x 0..12 against a sheave at x 8..16 - so a wrong facing is self-evident
-    /// to the player rather than invisible. The other three keep the wildcard until M4's placement half lands.
+    /// <c>ropeway:drivehead</c>, <c>ropeway:tensionhead</c> and <c>ropeway:shaftsheave</c> are NEW and
+    /// untracked, so no saved world can hold a wrongly-faced one, and all three are visibly asymmetric -
+    /// <c>drivehead.shaftwest</c> is x 0..4, <c>tensionhead</c>'s tie rod is x 0..12 against a sheave at
+    /// x 8..16 - so a wrong facing is self-evident to the player rather than invisible. The other two keep the
+    /// wildcard until M4's placement half lands.
+    /// </para>
+    /// <para>
+    /// <c>shaftsheave</c> WAS MISSING FROM THIS LIST AND THAT WAS THE WHOLE OF THE BUG. It is a
+    /// <c>HorizontalOrientable</c>, so it takes the PLAYER's facing at placement, and it is the least
+    /// symmetric block in the mod: headframe columns at z 9.5..15.5, a beam and hangers reaching HUB_Z = -16,
+    /// a chain case on the east face and an authored 180 degree wrap arc that turns in ONE vertical plane.
+    /// Three of the four variants complete <c>shafthead.json</c>'s structure while pointing somewhere the rest
+    /// of the machine does not: <see cref="BullwheelRenderer"/>'s yaw reads the SHEAVE's own side while
+    /// <c>BEBullwheel.WrapOffset</c> and <c>ShaftRenderer</c> read the FOOTING's, so the wheel, the headframe
+    /// and the rope end up in three different orientations, the chain case no longer meets the lay shafts it
+    /// is drawn to meet - and the overlay says complete, the link succeeds and the lift runs.
+    /// <c>AnAsymmetricHeadCellIsNarrowedToItsOwnFootingsFacing</c> pins all three families and fails on a
+    /// mis-faced sheave.
     /// </para>
     /// <para>
     /// Static and null-tolerant so the suite can run the tie-break enumeration over a structure of its own -
@@ -249,7 +289,7 @@ public class BEPylonBase : BlockEntity
         // Two-argument AssetLocation, so the domain is not re-parsed out of a string on every tower - and so
         // these read as BLOCK codes rather than as the lang keys EveryLangKeyTheCodeAsksForIsShipped greps
         // "ropeway:..." literals for.
-        foreach (var head in new[] { "drivehead", "tensionhead" })
+        foreach (var head in new[] { "drivehead", "tensionhead", "shaftsheave" })
         {
             var wildcard = new AssetLocation("ropeway", head + "-*");
             if (!structure.BlockNumbers.TryGetValue(wildcard, out var number)) continue;
@@ -324,7 +364,18 @@ public class BEPylonBase : BlockEntity
         var line = RopewayLine.GetOrBuild(ModSystem, Pos);
         var cabin = line == null ? null : EntityRopewayCabin.FindOn(Api.World, line);
 
-        consumer.Resistance = RopewayPower.Resistance(cabin?.IsHauling == true, cabin?.ClimbOn(line) ?? 0, 0);
+        // A SHAFT declares no climb, and the term is CANCELLED rather than discounted: the player has built the
+        // machine that removes it. `ClimbLoad * climb` is the cost of lifting the car's own mass up the grade,
+        // and a counterweight is precisely the car's own mass hung on the other strand - so on a shaft the drive
+        // lifts only the imbalance, which is `cargo`, which is 0 until cargo weight lands. No new constant, no
+        // relief factor, and no ropeway span's number moves: on every line that is not a shaft the climb term is
+        // untouched and fully legible, which is the whole objection to a global discount answered.
+        // The one thing it buys is the bottom rung: a sheltered 3-sail wooden mill in good wind goes from a hard
+        // stall on a vertical line to 1.20 blocks a second. See docs/POWER-AND-STORAGE.md.
+        consumer.Resistance = RopewayPower.Resistance(
+            cabin?.IsHauling == true,
+            line?.IsShaft == true ? 0 : cabin?.ClimbOn(line) ?? 0,
+            0);
     }
 
     /// <summary>
@@ -622,6 +673,20 @@ public class BEPylonBase : BlockEntity
         base.OnTesselation(mesher, tessThreadTesselator);
         const bool replacedDefault = false;
         if (Spans.Count == 0 || Block == null) return replacedDefault;
+
+        // A SHAFT draws none of this, and the reason is that a haul loop's geometry never changes while an
+        // elevator's rope has MOVING ENDS. Everything below is chunk mesh, which is only affordable because the
+        // cabin is a SLIDER on a rope whose two ends are wheels; stand the machine on end and the car becomes
+        // the rope's own end, so the going strand is `H - travelled` long and the return strand `travelled`,
+        // both changing every tick. Nor can the rope simply run past the car: on a level span it passes over the
+        // cabin in open air, but on a vertical one it is directly above the roof centre, so a strand continuing
+        // below the jaw runs down through the roof and out through the passengers.
+        // `Lift` is the second half of the same fact - it offsets in +Y, which on a vertical leg is ALONG the
+        // rope, so the two strands would be collinear and z-fight for the whole shaft. Generalising it would
+        // move the shipped strand separation at every pitch; not calling it is free.
+        // ShaftRenderer draws the two strands and the counterweight per frame off the cabin's synced Pos.Y, and
+        // the wrap over the head sheave is authored geometry on shaftsheave.json because it never moves.
+        if (IsShaft) return replacedDefault;
 
         var line = LocalLine(out var me);
         if (line == null) return replacedDefault;

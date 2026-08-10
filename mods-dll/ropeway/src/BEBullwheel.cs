@@ -83,10 +83,24 @@ namespace Ropeway;
 /// </summary>
 public class BEBullwheel : BlockEntity
 {
-    /// <summary>The turning half of the wheel. Client only; the rest of the shape is chunk mesh.</summary>
+    /// <summary>
+    /// The turning half of the wheel. Client only; the rest of the shape is chunk mesh. A DEFAULT since the
+    /// shaft sheave landed - that block names <c>shapes/block/shaftrim.json</c> in its own <c>rimShape</c>
+    /// attribute, because a 1.5-block rope radius is a different wheel and not a different renderer.
+    /// </summary>
     public const string RimShape = "shapes/block/bullwheelrim.json";
 
+    /// <summary>
+    /// Blocks from the shaft axis to the head sheave's HUB - half the separation of the two strands, because a
+    /// 180 degree wrap puts them a diameter apart. It is 1.5 and not the bullwheel's own 0.663 for a reason
+    /// that has nothing to do with the wheel: the car and the counterweight have to pass each other, and the
+    /// car's half-length is 2.0, so the lane has to be at least 2.0 plus half the weight plus clearance. 3.0 is
+    /// the first value that puts the lane on a block centre, and this is half of it.
+    /// </summary>
+    public const double ShaftWrapOut = 1.5;
+
     private BullwheelRenderer renderer;
+    private ShaftRenderer shaftRenderer;
 
     public RopewayModSystem ModSystem => Api?.ModLoader?.GetModSystem<RopewayModSystem>();
 
@@ -113,8 +127,27 @@ public class BEBullwheel : BlockEntity
 
         if (api is not ICoreClientAPI capi) return;
 
-        renderer = new BullwheelRenderer(capi, Pos, RimMesh(capi), BullwheelRenderer.YawFor(Block?.Variant["side"]));
+        var rim = Block?.Attributes?["rimShape"].AsString(RimShape) ?? RimShape;
+        var cull = Block?.Attributes?["cullRadius"].AsFloat(BullwheelRenderer.CullRadius)
+                   ?? BullwheelRenderer.CullRadius;
+
+        renderer = new BullwheelRenderer(
+            capi, Pos, RimMesh(capi, rim), BullwheelRenderer.YawFor(Block?.Variant["side"]), cull);
         capi.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "ropewaybullwheel");
+
+        // A SHAFT sheave carries the machine's whole rope, because on a hoistway the rope has moving ends and
+        // cannot be chunk mesh (BEPylonBase.OnTesselation says why). It lives here rather than on the footing
+        // for the plain reason that this block entity is the only one in the mod that already registers a
+        // renderer, disposes it, and polls the line on a tick - the shaft's rope needs all three and nothing
+        // else.
+        // An `if` and NOT an early return, which is what this was for one revision: everything below is the
+        // BULLWHEEL's tick, so returning here would have left every wheel on every ropeway standing still.
+        if (Block?.Attributes?["shaft"].AsBool() == true)
+        {
+            shaftRenderer = new ShaftRenderer(
+                capi, Pos, ShaftMesh(capi, "shaftstrand"), ShaftMesh(capi, "shaftweight"));
+            capi.Event.RegisterRenderer(shaftRenderer, EnumRenderStage.Opaque, "ropewayshaft");
+        }
 
         // Polled rather than read per frame: LineSpeed walks the tower chain and the housing table, and a
         // wheel that picks up half a second late is a wheel nobody can tell picked up late. The pose rides
@@ -126,7 +159,16 @@ public class BEBullwheel : BlockEntity
             {
                 var tower = Tower;
                 renderer.Speed = LineSpeed();
-                renderer.Offset = WrapOffset(tower?.DeadSide, tower?.Spans.Count ?? 0);
+                renderer.Offset = WrapOffset(
+                    tower?.DeadSide, tower?.Spans.Count ?? 0, tower?.IsShaft == true ? tower.PassageFacing : null);
+
+                // The HANDLE only. The cabin's position is read per frame off Pos.Y - which is synced, unlike
+                // Travelled - so the rope never lags the car; what is polled here is the O(loaded entities)
+                // scan that finds it, which a rope cannot afford to do every frame.
+                if (shaftRenderer == null) return;
+
+                var line = tower == null ? null : RopewayLine.GetOrBuild(ModSystem, tower.Pos);
+                shaftRenderer.Track(line, line == null ? null : EntityRopewayCabin.FindOn(Api.World, line));
             },
             500, 0);
     }
@@ -146,8 +188,24 @@ public class BEBullwheel : BlockEntity
     /// Pure, and therefore the one part of the pose the suite can look at. <see cref="BEPylonBase"/> reads it
     /// too, so the brackets it draws end on the axle by construction.
     /// </summary>
-    public static Vec3f WrapOffset(Vec3d deadSide, int spans)
+    /// <param name="shaftAxis">
+    /// The head's own passage facing on a SHAFT, and null everywhere else - so every shipped caller passes
+    /// nothing and gets the three poses above unchanged. It is a fourth pose and it has to come from the
+    /// facing rather than from <c>DeadSide</c>, which is null at a vertical terminal by construction
+    /// (<c>plan &lt; 1e-9</c>) and so cannot express it: the shaft's wheel stands OUT along the lane and not
+    /// down, because the going strand is tangent to it at the shaft axis and the return strand
+    /// <see cref="ShaftWrapOut"/> x 2 along the lane. It does not drop, because the hub is already on the drive
+    /// bar's own line - <see cref="BullwheelRenderer.RimPivotY"/> is the height <c>layshaft</c> and
+    /// <c>drivehead</c> run their bar at, so the shaft is one unbroken bar from the gearbox to the wheel.
+    /// </param>
+    public static Vec3f WrapOffset(Vec3d deadSide, int spans, BlockFacing shaftAxis = null)
     {
+        if (shaftAxis != null)
+        {
+            return new Vec3f(
+                (float)(shaftAxis.Normalf.X * ShaftWrapOut), 0, (float)(shaftAxis.Normalf.Z * ShaftWrapOut));
+        }
+
         if (deadSide != null)
         {
             return new Vec3f(
@@ -159,11 +217,11 @@ public class BEBullwheel : BlockEntity
         return spans >= 2 ? new Vec3f(0, BullwheelRenderer.HoldDownRise, 0) : new Vec3f();
     }
 
-    private MeshData RimMesh(ICoreClientAPI capi)
+    private MeshData RimMesh(ICoreClientAPI capi, string path)
     {
         try
         {
-            var shape = Shape.TryGet(capi, new AssetLocation("ropeway", RimShape));
+            var shape = Shape.TryGet(capi, new AssetLocation("ropeway", path));
             if (shape == null) return null;
 
             capi.Tesselator.TesselateShape(Block, shape, out var mesh);
@@ -177,11 +235,27 @@ public class BEBullwheel : BlockEntity
         }
     }
 
+    /// <summary>
+    /// One of the shaft's two drawn parts, tesselated against THIS block's texture map - the same handshake
+    /// the rim has, and the same trap: <c>TesselateShape(Block, ...)</c> builds a BLOCK texture source and
+    /// never consults the shape's own, so every key these two shapes name has to be declared on
+    /// <c>shaftsheave.json</c> or they render as the magenta checker.
+    /// </summary>
+    private MeshData ShaftMesh(ICoreClientAPI capi, string name)
+    {
+        return RimMesh(capi, "shapes/block/" + name + ".json");
+    }
+
     public override void GetBlockInfo(IPlayer forPlayer, StringBuilder dsc)
     {
         base.GetBlockInfo(forPlayer, dsc);
 
-        dsc.AppendLine(Tower == null ? Lang.Get("ropeway:bullwheel-orphan") : Lang.Get("ropeway:bullwheel-what"));
+        // The block-info panel is this mod's handbook-on-the-block, and a wheel that describes a crossarm it
+        // does not have is the one place a shaft would read as a mis-built ropeway.
+        var shaft = Block?.Attributes?["shaft"].AsBool() == true;
+        dsc.AppendLine(Tower == null
+            ? Lang.Get(shaft ? "ropeway:shaftsheave-orphan" : "ropeway:bullwheel-orphan")
+            : Lang.Get(shaft ? "ropeway:shaftsheave-what" : "ropeway:bullwheel-what"));
     }
 
     public override void OnBlockRemoved()
@@ -200,5 +274,7 @@ public class BEBullwheel : BlockEntity
     {
         renderer?.Dispose();
         renderer = null;
+        shaftRenderer?.Dispose();
+        shaftRenderer = null;
     }
 }
