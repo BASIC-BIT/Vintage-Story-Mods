@@ -11,7 +11,15 @@ namespace Ropeway;
 /// There is no store, no charge and no gate. The cabin is driven at the speed the network is running at,
 /// exactly like a quern is ground at the speed the network is running at, and a network that stops means a
 /// cabin that stops. That is ordinary machine behaviour rather than a failure state because a rider is
-/// never trapped: the sneak-hold bail-out gets them out of a stopped cabin anywhere on the line.
+/// never trapped: a stalled cabin carries on by itself when the network turns again and stops at a tower,
+/// and that is the exit.
+/// </para>
+/// <para>
+/// This used to say "the sneak-hold bail-out gets them out of a stopped cabin anywhere on the line", and
+/// that sentence is false at both ends now. <see cref="RopewayCabinSeat.CanUnmount"/> refuses the ordinary
+/// step out with nothing under the cabin, and <c>EntityRopewayCabin.BailOut</c> arms the hold off
+/// <c>IsMoving</c>, so a stall closes both doors until the line moves. Not trapped, but waiting - which is
+/// what the refusal message says in those words. See docs/KNOWN-ISSUES.md.
 /// </para>
 /// </summary>
 public static class RopewayPower

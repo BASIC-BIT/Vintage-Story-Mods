@@ -82,6 +82,122 @@ public class RopewayMathTests
         Assert.True(SpanMath.ClearanceAbove + 0.5 >= BEPylonBase.ReturnLift + BEPylonBase.CableRadius);
         Assert.True(SpanMath.ClearanceAbove - 0.5 <= BEPylonBase.ReturnLift - BEPylonBase.CableRadius,
             "a row of clearance rays is being cast above the return strand, over nothing");
+
+        // ...and the derived ladder IS those rows on a level span, which is the whole claim that nothing about
+        // the flat case changed: rays at -3, -2, -1, 0, +1, certifying -3.5 to +1.5.
+        Assert.Equal(new[] { -3.0, -2.0, -1.0, 0.0, 1.0 }, SpanMath.ClearanceRows(0));
+    }
+
+    /// <summary>
+    /// The corridor has to certify what the cabin SWEEPS, and the cabin does not lie along the span. It hangs
+    /// plumb and stays level - <c>EntityRopewayCabin.Place</c> writes yaw and nothing else - while the sweep's
+    /// own <c>up</c> axis is perpendicular to the chord and leans back with the pitch. So the 4-block body
+    /// projects onto <c>up</c> as an extra <c>2*sin(pitch)</c> at each end, down at the tail and up at the nose,
+    /// on top of its own height.
+    /// <para>
+    /// The fixed <c>[-3.5, +1.5]</c> window that shipped was exact at zero and wrong everywhere else. Worst
+    /// under the floor at 29.74 degrees, which is an ordinary hillside; worst over the nose approaching
+    /// vertical. Both numbers are pinned below so the two ends of the mistake cannot come back one at a time.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheCorridorFollowsTheCabinRatherThanTheRopeLine()
+    {
+        const double hang = EntityRopewayCabin.DefaultHangDrop;
+
+        // The band, worked independently of SpanMath: the cabin's eight body corners and the return strand,
+        // each projected onto up = (-sin along the bearing, +cos vertical).
+        (double Low, double High) Band(double deg)
+        {
+            var sin = Math.Sin(deg * Math.PI / 180);
+            var cos = Math.Cos(deg * Math.PI / 180);
+            var low = double.MaxValue;
+            var high = double.MinValue;
+
+            foreach (var along in new[] { -SpanMath.CabinHalfLength, SpanMath.CabinHalfLength })
+            {
+                foreach (var vertical in new[] { -hang - SpanMath.CabinHalfHeight, -hang + SpanMath.CabinHalfHeight })
+                {
+                    var onUp = -along * sin + vertical * cos;
+                    low = Math.Min(low, onUp);
+                    high = Math.Max(high, onUp);
+                }
+            }
+
+            return (low, Math.Max(high, BEPylonBase.ReturnLift * cos));
+        }
+
+        var shortfallBelow = 0.0;
+        var shortfallAbove = 0.0;
+        for (var deg = 0.0; deg <= 90.0; deg += 0.02)
+        {
+            var (low, high) = Band(deg);
+            var rows = SpanMath.ClearanceRows(Math.Sin(deg * Math.PI / 180));
+
+            Assert.True(rows[0] - 0.5 <= low + 1e-9,
+                $"at {deg:0.00} degrees the corridor's lowest ray certifies down to {rows[0] - 0.5:0.000} " +
+                $"and the cabin's floor reaches {low:0.000} - uncertified ground under a seated rider");
+            Assert.True(rows[^1] + 0.5 >= high - 1e-9,
+                $"at {deg:0.00} degrees the corridor's highest ray certifies up to {rows[^1] + 0.5:0.000} " +
+                $"and the cabin's nose reaches {high:0.000}");
+
+            // Rows are one block apart and in order, or a gap between two of them is uncertified ground.
+            for (var i = 1; i < rows.Length; i++) Assert.Equal(1.0, rows[i] - rows[i - 1], 9);
+
+            // What the old fixed window would have missed at this pitch, for the two numbers below.
+            shortfallBelow = Math.Max(shortfallBelow, -(SpanMath.ClearanceBelow + 0.5) - low);
+            shortfallAbove = Math.Max(shortfallAbove, high - (SpanMath.ClearanceAbove + 0.5));
+        }
+
+        // Both ends of the bug it replaced, pinned. Below: 2*sin + 3.5*cos peaks at sqrt(2^2 + 3.5^2) = 4.031
+        // at atan(2/3.5) = 29.74 degrees, so a fixed 3 rows was 0.531 blocks short under the cabin on the
+        // pitch a hill line is actually built at. Above: the nose reaches the cabin's own half-length, 2.0,
+        // as the span goes vertical and the strand collapses onto the rope line, against 1.5 certified.
+        Assert.Equal(0.531, shortfallBelow, 3);
+        Assert.Equal(SpanMath.CabinHalfLength - (SpanMath.ClearanceAbove + 0.5), shortfallAbove, 3);
+
+        // The price, and it is only paid where it is earned: 5 rows on the flat, 6 through the middle of the
+        // range where the leaning band is widest, back to 5 once the strand has collapsed onto the rope line.
+        Assert.Equal(5, SpanMath.ClearanceRows(0).Length);
+        Assert.Equal(6, SpanMath.ClearanceRows(Math.Sin(30 * Math.PI / 180)).Length);
+        Assert.Equal(5, SpanMath.ClearanceRows(Math.Sin(85 * Math.PI / 180)).Length);
+        Assert.Equal(4, SpanMath.ClearanceRows(1).Length);
+    }
+
+    /// <summary>
+    /// A vertical span has no bearing, so <see cref="SpanMath.IsSpanClear"/> falls back to a hard-coded
+    /// <c>right</c> and its <c>up</c> flips with the direction of travel. The rows have to be symmetric about
+    /// the cabin or the corridor certified from the top tower is not the one certified from the bottom - which
+    /// is a link that succeeds followed by a cabin that refuses to move.
+    /// </summary>
+    [Fact]
+    public void TheVerticalCorridorIsTheSameOneFromEitherEnd()
+    {
+        var up = SpanMath.ClearanceRows(1);
+        var down = SpanMath.ClearanceRows(-1);
+
+        Assert.Equal(up, down);
+        Assert.Equal(0, up[0] + up[^1], 9);
+        Assert.Equal(SpanMath.CabinHalfLength, up[^1] + 0.5, 9);
+    }
+
+    /// <summary>
+    /// The pitch a span is built at, which is the number <c>PassablePitchTan</c> is compared against. Unsigned,
+    /// because a line is ridden both ways and the cabin eats the crossarm going up whichever end it started at.
+    /// </summary>
+    [Fact]
+    public void PitchIsRiseOverRunAndUnsigned()
+    {
+        var foot = new Vec3d(0, 64, 0);
+
+        Assert.Equal(0, SpanMath.PitchTan(foot, new Vec3d(30, 64, 0)));
+        Assert.Equal(1, SpanMath.PitchTan(foot, new Vec3d(30, 94, 0)), 9);
+        Assert.Equal(1, SpanMath.PitchTan(foot, new Vec3d(30, 34, 0)), 9);
+        Assert.Equal(SpanMath.PassablePitchTan, SpanMath.PitchTan(foot, new Vec3d(0, 70, 30)), 9);
+        Assert.Equal(double.PositiveInfinity, SpanMath.PitchTan(foot, new Vec3d(0, 104, 0)));
+
+        // A tower linked to itself is not a climb, and must not read as an infinite one.
+        Assert.Equal(0, SpanMath.PitchTan(foot, foot.Clone()));
     }
 
     [Fact]
@@ -1296,23 +1412,23 @@ public class RopewayMathTests
         var released = true;
 
         // Two ticks of holding while moving accumulate.
-        held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
-        held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
+        held = EntityRopewayCabin.HoldSneak(held, sneaking: true, heldIn: true, 0.5f, ref released);
+        held = EntityRopewayCabin.HoldSneak(held, sneaking: true, heldIn: true, 0.5f, ref released);
         Assert.Equal(1.0, held, 6);
         Assert.True(held < EntityRopewayCabin.BailHoldSeconds, "one second must not be enough to jump");
 
         // Letting go throws the lot away - the next press starts from zero.
-        Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: false, moving: true, 0.5f, ref released));
+        Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: false, heldIn: true, 0.5f, ref released));
 
         // So does the cabin stopping, even with the key still down.
-        Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: false, 0.5f, ref released));
+        Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: true, heldIn: false, 0.5f, ref released));
 
         // And an unbroken hold does reach the threshold, at the moment it says it does.
         held = 0;
         released = true;
         for (var i = 0; i < (int)(EntityRopewayCabin.BailHoldSeconds / 0.5); i++)
         {
-            held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
+            held = EntityRopewayCabin.HoldSneak(held, sneaking: true, heldIn: true, 0.5f, ref released);
         }
 
         Assert.True(held >= EntityRopewayCabin.BailHoldSeconds);
@@ -1332,27 +1448,27 @@ public class RopewayMathTests
         var released = false;
 
         // The cabin sits at the tower through the boarding grace, key already down.
-        for (var i = 0; i < 10; i++) held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: false, 0.5f, ref released);
+        for (var i = 0; i < 10; i++) held = EntityRopewayCabin.HoldSneak(held, sneaking: true, heldIn: false, 0.5f, ref released);
 
         // It departs and they keep holding, well past the threshold. Still nothing.
-        for (var i = 0; i < 20; i++) held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
+        for (var i = 0; i < 20; i++) held = EntityRopewayCabin.HoldSneak(held, sneaking: true, heldIn: true, 0.5f, ref released);
         Assert.Equal(0, held);
 
         // One tick off the key while moving is the edge the arm actually wants.
-        held = EntityRopewayCabin.HoldSneak(held, sneaking: false, moving: true, 0.5f, ref released);
+        held = EntityRopewayCabin.HoldSneak(held, sneaking: false, heldIn: true, 0.5f, ref released);
         Assert.True(released);
         for (var i = 0; i < (int)(EntityRopewayCabin.BailHoldSeconds / 0.5); i++)
         {
-            held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released);
+            held = EntityRopewayCabin.HoldSneak(held, sneaking: true, heldIn: true, 0.5f, ref released);
         }
 
         Assert.True(held >= EntityRopewayCabin.BailHoldSeconds);
 
         // And the cabin stopping revokes it again: a rider who rides on through a stop still holding the key
         // has to press it afresh, exactly as if they had just boarded.
-        held = EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: false, 0.5f, ref released);
+        held = EntityRopewayCabin.HoldSneak(held, sneaking: true, heldIn: false, 0.5f, ref released);
         Assert.False(released);
-        Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: true, moving: true, 0.5f, ref released));
+        Assert.Equal(0, EntityRopewayCabin.HoldSneak(held, sneaking: true, heldIn: true, 0.5f, ref released));
     }
 
     /// <summary>

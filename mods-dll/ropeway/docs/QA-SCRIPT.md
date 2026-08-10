@@ -50,8 +50,11 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    step 10e), and a station the line runs **through** shows its wheel standing about seven eighths of a block
    higher than the shaft driving it (it is holding the return strand down — step 27c-wheel).
    **The one behaviour that genuinely changed:** a **new** span over terrain that rises to within a block
-   above the rope line is now refused where it would have been allowed. Existing spans are never re-checked,
-   so no built line loses anything — step 21b.
+   above the rope line is now refused where it would have been allowed — step 21b. **An existing line is not
+   re-LINKED, but it is re-CHECKED every ride:** `ServerTick` runs the clearance test on each span the cabin
+   enters, so a hill line whose terrain sat between 3.5 and 4.03 blocks under the rope will now Hold at the
+   tower before that span until the player digs. Nothing unlinks and no tower comes apart, but a line that
+   ran yesterday can stop today — do not dismiss that as unrelated.
    **PASS:** `server-main.log` carries one *"Failed loading blockentity TensionWeight … Will discard it"*
    line per old tension weight. That is the intended migration, not a bug: the weight has no block entity
    any more, so every one of them fails at once and the blocks stay as decoration.
@@ -59,8 +62,11 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    station"*. Both are true — a free-standing drive housing is not a cell of a station, so it drives
    nothing however close it stands, and the old weight is not a tension station. The old housing keeps its
    axle and its own panel still reads what it is turning at; it simply turns nothing.
-   **PASS:** a cabin already on the line stops and **is not stranded** — `IsMoving` is false, so right-click
-   steps you out. A cabin cannot be *placed* on that line until a tension station exists.
+   **PASS:** a cabin already on the line stops and **is not stranded** — it is not moving, so right-click
+   steps you out **wherever there is ground under it**, which after the 2026-08-10 dismount fix means at a
+   tower or over a low span rather than anywhere at all (13d). Stopped mid-span over a drop it refuses and
+   says so; ride it out once the line turns. A cabin cannot be *placed* on that line until a tension station
+   exists.
    **EXPECTED, and it is the one migration case the list used to miss:** a **plain tower wearing a decorative
    bullwheel** now loads **incomplete**, and while it is incomplete it takes no clicks at all — no picker, no
    call, no rename. A plain footing's centre cell used to accept a pylon head *or* a bullwheel and the old
@@ -640,6 +646,26 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      bowing wider than the other, or they cross. Either means the return strand is being bent on its own
      curve rather than being the going strand plus a height.
 
+12c. **String a span that CLIMBS, and expect it to say so — and then to clip.** The pitch twin of 12b, and
+     the same law: warn, never refuse. Build two towers 20 blocks apart on the ground with the second
+     footing **20 blocks higher** than the first — a 45-degree span — and link them.
+     **PASS — the chat line.** One line naming the pitch and the pitch a tower can pass cleanly, roughly
+     *"That span climbs at 45 degrees. A tower can pass the cabin cleanly up to about 11"*. **The link is
+     still made and still paid for.** **FAIL:** the link is refused, or nothing is printed.
+     **PASS — it stays quiet on a line nobody needs warning about.** A level span, and a 30-block span
+     rising 5 (about 9 degrees), print nothing. **FAIL:** a flat or gently graded line warns.
+     **EXPECTED, and it is the whole reason for the warning — ride it and watch the cabin leave the lower
+     tower.** The roof passes **through** the brace, the sheave and, at a station, the lay shaft, for about
+     a block and a half of travel; the floor passes through the footing plinth coming back down into a
+     tower. **Do not report it.** It is measured, it is not cured this round, and it is not a collision —
+     a mounted rider has none, so it renders as clipping and does nothing else. The archway is 3.5 blocks
+     tall and the cabin is 2.5 hanging centred in it, which leaves half a block each way and runs out at
+     11.3 degrees; the only lever with travel in it is a taller tower. `KNOWN-ISSUES.md`, *"The cabin eats
+     its own crossarm past 11.3 degrees"*.
+     **PASS:** the same ride still **arrives**, squares up, and lets you out at the top tower. The clipping
+     is cosmetic and nothing else about a steep line may be broken by it. **FAIL:** the cabin stops short,
+     holds, or refuses the dismount at a tower.
+
 13. **Arrive, and watch it square up.** **PASS — do this at a tower on a line that TURNS, which is where it
     shows:** as the cabin settles it **turns to sit flush with the station**, square across the crossarm and
     parallel to the posts, instead of staying angled at the next tower. It is a turn of roughly **half a
@@ -698,7 +724,8 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      out mid-span having pressed nothing and seen no message — the hold must need a fresh press *after* the
      cabin is moving, because boarding copies the key you were already holding into the seat. Now let go
      for a moment and hold again: **PASS:** two seconds later you bail normally.
-     **PASS:** holding sneak while the cabin is **stopped** just gets you out normally, as always. Keep
+     **PASS:** holding sneak while the cabin is stopped **at a tower** just gets you out normally, as
+     always — that is step 13d's other half, and it is not the same thing as stopped *anywhere*. Keep
      holding as it sets off again: **PASS:** nothing happens until you release and press afresh.
      **PASS — the trap this exists for.** Do this one on a **three-or-more-tower line** — build step 16
      first if you have not — because there has to be a surviving line to re-base onto; break a tower of a
@@ -762,6 +789,33 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      vanilla's third-person wall check raycasts blocks only, and the cabin is an entity — and passing a
      tower can snap you to first person for a frame where a post crosses the camera ray. Report only if it
      is constant rather than occasional.
+
+13d. **Step out of a STALLED cabin — the one that used to kill you.** Ride out over a drop of twenty blocks
+     or more and stop the drive under yourself: take the sails off the rotor, break the axle run into the
+     housing, or simply wait out the wind. The cabin stops mid-span and hangs there. That much is correct
+     and it carries on by itself when power comes back.
+     **PASS:** a single **tap** of sneak gets *"Nothing under the cabin but air. It carries on to a tower by
+     itself once the line turns again - then hold [your sneak key] for 2 seconds if you would rather jump,
+     and take the fall."* and **you stay seated**. Right-click to get out: **PASS:** the same refusal, same
+     message. **FAIL, and it is the whole point of this step:** you step out into the air and fall. That
+     was shipped behaviour until 2026-08-10 — `IsMoving` goes false the moment the network stalls, so the
+     ordinary dismount opened in exactly the state the two-second hold exists to price.
+     **PASS:** the key it names is **your own current sneak binding**, like every other message in this mod
+     — rebind sneak in Settings > Controls and the refusal follows it.
+     **PASS — the other half, and do it in the same session.** Put the drive back, ride on to a tower, and
+     with the cabin **stopped at that tower** tap sneak once. You are out, standing on the tower, unhurt. A
+     stopped cabin at a station must never refuse, wind or no wind: nothing about this fix is allowed to
+     make arriving somewhere feel like being stuck.
+     **PASS — the low line, which must NOT be refused.** Find or build a span running two or three blocks
+     over the ground and stall the cabin over that. Tapping sneak **gets you out**, and you take no damage.
+     The rule is "is there ground under you", not "are you at a tower" — ground within 3.5 blocks is a free
+     drop in vanilla, and refusing there would be a lie about the danger.
+     **KNOWN, do not report:** stalled over **water**, or over a chunk that has not loaded, you are refused.
+     Both read as "no ground" on purpose.
+     **KNOWN, and the one thing still open:** while stalled mid-span, *holding* sneak for two seconds does
+     not get you out either — the bail-out hold is armed off `IsMoving` in `EntityRopewayCabin.BailOut`,
+     which is why the message says "once the line turns again … **then** hold". Wait for the line to move
+     and the hold works exactly as in 13a. See `docs/KNOWN-ISSUES.md`.
 
 14. **Return trip.** Board again at the far end. **PASS:** it departs back the way it came.
 
@@ -856,6 +910,18 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     tower does not appear in the picker while the ridge is there, and if you build the ridge after the
     link, the cabin holds at the tower before it. **FAIL:** a link succeeds and the cabin drives a seated
     rider through solid stone.
+    **PASS — and it follows the PITCH as well, new this round.** The corridor is the band the cabin sweeps,
+    and the cabin hangs plumb and stays level while the band leans over with the span — so on a slope it
+    reaches further under the rope than it does on the flat: **4.03 blocks at worst, near 30 degrees,
+    against 3.5 on the level.** Do the ridge test again on a **30-degree** span and it is fussier by that
+    half block; a level span is checked exactly as it always was, same five rows, same 15 rays. This is a
+    behaviour change in the same direction as 21b — a steep span over ground that used to be a hair inside
+    the limit is refused now. **An existing span is not re-LINKED, but the RIDE re-checks it:**
+    `EntityRopewayCabin.ServerTick` calls the same clearance test on every span the cabin enters, so a steep
+    span already built over ground in that half-block band now Holds the cabin at the tower before it. No
+    tower or link comes apart — but the line stops, and that is the symptom, not a separate bug.
+    **FAIL:** the level case got stricter, or a steep span links over ground that a level one at the
+    same gap refuses.
 
 21b. **Clearance reaches ABOVE the rope too, new this round, and this is a behaviour CHANGE.** The return
      strand runs 1.33 blocks over the going one, so one row of the clearance check now sits above the rope
@@ -869,8 +935,9 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      cast over nothing and legal spans are being turned down for it.
      **This is the one thing in this round a player can notice as a loss:** a span over ground that rises
      to within a block above the rope line is refused now where it would have been allowed before. It is
-     deliberate — without it a link that passes puts the return strand through a hillside — and **existing
-     spans are never re-checked**, so nothing already built comes apart.
+     deliberate — without it a link that passes puts the return strand through a hillside. **Existing spans
+     keep their link, but the ride re-checks them**, so a built line under an overhang in that band Holds the
+     cabin rather than coming apart. The tower and the rope stay; the cabin stops.
 
 22. **Link while riding** (multiplayer — it needs a rider and a linker at once). With a rider seated on
     line A–B, have a second player link a new tower C to
@@ -1100,7 +1167,8 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     tells you one of its towers has to be a finished **drive station**. **FAIL:** it mentions eight blocks,
     or tells you to read a nearby housing's own panel to find out which line it decided to drive — both are
     the deleted rule.
-    **PASS:** get out. You can, because it is not moving.
+    **PASS:** get out. You can, because it never left the tower and the footing is under you — not merely
+    because it is not moving, which stopped being the rule at 13d.
     **PASS — calling refuses out loud.** Still with no drive on the line, stand at a tower with an empty
     hand and **call the cabin** (plain right-click). You get one **red error toast** — the same channel as
     step 5's, not a chat line — telling you nothing on this
@@ -1345,8 +1413,11 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     **PASS:** the cabin **stops where it is**. No message, no toast, nothing in the log.
     **PASS:** it starts again **by itself** when the wind comes back, going the same way, and finishes at
     the tower it was heading for.
-    **PASS:** while it is stopped you can **right-click to get out** normally — you are in mid-air, you
-    fall, and that is correct. You are never trapped; that is why the gate could be deleted.
+    **PASS:** while it is stopped mid-span you are **refused** the step out — right-click or a tap of sneak
+    gets *"Nothing under the cabin but air"* and you stay seated. This step used to read the other way
+    round (*"you are in mid-air, you fall, and that is correct"*) and that was the bug 13d fixed: a stall is
+    not an arrival, and the drop it handed you was the whole remaining height. You are still not trapped —
+    the exit is the line turning again, which the message says. **FAIL:** you step out into the air.
     **PASS:** save and reload while it is stopped mid-span. It comes back exactly there, still pointed the
     same way, and carries on when there is wind. **FAIL:** it teleports to a tower on reload.
 

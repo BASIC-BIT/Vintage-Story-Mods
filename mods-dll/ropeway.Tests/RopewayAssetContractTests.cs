@@ -1441,6 +1441,113 @@ public class RopewayAssetContractTests
     }
 
     /// <summary>
+    /// THE PITCH TERM <see cref="TheCabinFitsThroughTheTower"/> never had, and the reason it could not catch
+    /// the cabin eating its own crossarm: every height in that test is a constant, so it measures ONE cabin
+    /// PARKED at ONE tower. Departing a tower the cabin rises with the rope while the crossarm does not, and
+    /// arriving down into one its floor falls while the footing does not - so the fit is a function of pitch
+    /// and the guard was a photograph of it at zero.
+    /// <para>
+    /// This sweeps 0 to 89 degrees and asserts that the tower's own blocks stay out of the cabin everywhere at
+    /// or under <see cref="SpanMath.PassablePitchTan"/> and are inside it above - the second half is what stops
+    /// the constant drifting upward to whatever the geometry happens to allow. Every input is read off the
+    /// shipped shapes, the shipped multiblock and the shipped hang, so shortening the cabin, thinning a slab,
+    /// raising the crossarm or lengthening the hanger all land here first.
+    /// </para>
+    /// <para>
+    /// Run against the geometry before <c>PassablePitchTan</c> existed, with the naive assertion that the cabin
+    /// clears at every pitch, this failed at <b>7.25 degrees</b>: <c>crossarm 0.182 plinth 0.190 rail -0.004</c>,
+    /// deepening to <c>-0.943 / -0.907 / -0.905</c> at 30 degrees. Those are the numbers below.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheCabinFitsThroughTheTowerAtEveryPitch()
+    {
+        var hangDrop = Load("entities", "cabin.json").GetProperty("attributes").GetProperty("hangDrop").GetDouble();
+        var (_, _, elements) = CabinBounds();
+        double Bottom(string e) => Find(elements, e).GetProperty("from")[1].GetDouble() / 16;
+        double Top(string e) => Find(elements, e).GetProperty("to")[1].GetDouble() / 16;
+        double HalfLength(string e) => Math.Max(
+            Math.Abs(Find(elements, e).GetProperty("from")[0].GetDouble()),
+            Math.Abs(Find(elements, e).GetProperty("to")[0].GetDouble())) / 16;
+
+        // The shape is what SpanMath's two cabin constants claim it is - they are used by the corridor sweep,
+        // which has no assets to read.
+        Assert.Equal(SpanMath.CabinHalfLength, HalfLength("roof"));
+        Assert.Equal(SpanMath.CabinHalfHeight, Top("roof"));
+        Assert.Equal(SpanMath.CabinHalfHeight, -Bottom("floor"));
+
+        var anchor = SpanMath.SheaveHeight + 0.5;
+        var origin = anchor - hangDrop;
+
+        // The three things over and under the passage, all derived: the footing's own plinth, the lowest face
+        // any crossarm cell hangs to, and the drawn station rail, which is not a block and follows the rope.
+        var plinth = Load("shapes", "block", "pylonbase.json").GetProperty("elements").EnumerateArray()
+            .Max(e => e.GetProperty("to")[1].GetDouble()) / 16;
+        var crossarm = SpanMath.SheaveHeight
+            + new[] { "brace.json", "pylonhead.json", "bullwheel.json", "layshaft.json" }
+                .Select(s => Load("shapes", "block", s).GetProperty("elements").EnumerateArray()
+                    .Min(e => e.GetProperty("from")[1].GetDouble())).Min() / 16;
+        var rail = anchor - BEPylonBase.RailDrop - BEPylonBase.RailHalfDepth;
+
+        // The crossarm row is one cell deep along the travel axis, so the cabin's tail still overlaps it until
+        // the cabin is half its own length plus half that cell past the tower - and by then the roof has risen
+        // by that whole distance times the pitch. The plinth is the same cell and the same arithmetic on the
+        // way down. The rail is not a cell: it runs ALONG the span at a fixed drop under the rope, so what the
+        // level roof meets is the rail over the cabin's own tail, half a cabin back and that much lower.
+        double Crossarm(double tan) => crossarm - (origin + Top("roof")) - (HalfLength("roof") + 0.5) * tan;
+        double Plinth(double tan) => origin + Bottom("floor") - plinth - (HalfLength("floor") + 0.5) * tan;
+        double Rail(double tan) => rail - (origin + Top("roof")) - HalfLength("roof") * tan;
+
+        var clear = new List<string>();
+        var clipped = new List<string>();
+        for (var deg = 0.0; deg <= 89.0; deg += 0.25)
+        {
+            var tan = Math.Tan(deg * Math.PI / 180);
+            var worst = Math.Min(Crossarm(tan), Plinth(tan));
+            var line = $"{deg:0.00} deg: crossarm {Crossarm(tan):0.000} plinth {Plinth(tan):0.000} rail {Rail(tan):0.000}";
+
+            if (tan <= SpanMath.PassablePitchTan && worst < 0) clear.Add(line);
+            if (tan > SpanMath.PassablePitchTan + 0.02 && worst >= 0) clipped.Add(line);
+        }
+
+        Assert.True(clear.Count == 0,
+            "the cabin drives through its own tower at a pitch the mod calls passable:\n" + string.Join("\n", clear.Take(6)));
+        Assert.True(clipped.Count == 0,
+            "SpanMath.PassablePitchTan is lower than the geometry needs - raise it and say why:\n" + string.Join("\n", clipped.Take(6)));
+
+        // Where each one actually runs out, pinned. The crossarm is the binding one and PassablePitchTan is
+        // exactly it; the plinth mirrors it a quarter of a degree later because the floor slab is 1/16 shorter
+        // than the roof; the drawn rail grazes 4 degrees earlier because it hangs 0.25 over the roof and tips
+        // with the rope. Anything that moves one of these three moves a number here.
+        double Threshold(System.Func<double, double> clearance)
+        {
+            double lo = 0, hi = 89;
+            for (var i = 0; i < 60; i++)
+            {
+                var mid = (lo + hi) / 2;
+                if (clearance(Math.Tan(mid * Math.PI / 180)) >= 0) lo = mid; else hi = mid;
+            }
+
+            return lo;
+        }
+
+        Assert.Equal(11.310, Threshold(Crossarm), 3);
+        Assert.Equal(11.592, Threshold(Plinth), 3);
+        Assert.Equal(7.125, Threshold(Rail), 3);
+        Assert.Equal(Math.Atan(SpanMath.PassablePitchTan) * (180 / Math.PI), Threshold(Crossarm), 3);
+
+        // And what it costs on the mod's own headline case, a 30 degree hillside: the roof reaches the
+        // crossarm's underside 0.866 blocks out of the tower and does not leave the cell row until 2.5, so it
+        // is inside the brace, the sheave and a station's lay shaft for 1.634 blocks of travel, 0.943 deep at
+        // the worst. This is the measurement KNOWN-ISSUES quotes.
+        var tan30 = Math.Tan(30 * Math.PI / 180);
+        var enters = (crossarm - (origin + Top("roof"))) / tan30;
+        Assert.Equal(0.866, enters, 3);
+        Assert.Equal(1.634, HalfLength("roof") + 0.5 - enters, 3);
+        Assert.Equal(-0.943, Crossarm(tan30), 3);
+    }
+
+    /// <summary>
     /// THE SAFETY ARGUMENT for <see cref="EntityRopewayCabin.SquareTo"/>, and it is tight. A cabin stopped at
     /// a tower turns to that tower's passage axis, in place, about its own origin - which is the tower's
     /// centre line. So it sweeps a CIRCLE of its own half-diagonal, not its half-width: sqrt(2.0^2 +

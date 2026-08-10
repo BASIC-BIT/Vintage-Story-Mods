@@ -621,9 +621,12 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
 
         // LIVE network speed, which the store design forbade and this one is built on. The cabin is a load
         // on the line's drives and runs at whatever they are turning: no wind is no motion, and it picks up
-        // again by itself when the wind does. Nothing here can strand a rider - the sneak-hold bail-out gets
-        // them out of a stopped cabin anywhere - and BEPylonBase.DriveSpeedOn documents why the drives are
-        // always loaded when a rider is on the line.
+        // again by itself when the wind does. Nothing here can strand a rider - the cabin resumes and stops
+        // at a tower, and BEPylonBase.DriveSpeedOn documents why the drives are always loaded when a rider
+        // is on the line. It is NOT the bail-out that saves them, which is what this used to claim:
+        // RopewayCabinSeat.CanUnmount now refuses the step out over air, and HoldSneak zeroes the bail hold
+        // whenever IsMoving is false, so a stall closes both doors until the line turns. See
+        // docs/KNOWN-ISSUES.md for the arming line that would reopen the second one.
         var speed = RopewayPower.CabinSpeed(BEPylonBase.DriveSpeedOn(ModSystem, line));
         if (speed <= 0)
         {
@@ -834,14 +837,26 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     }
 
     /// <summary>
-    /// Unseats everyone where the cabin currently is. <see cref="RopewayCabinSeat.CanUnmount"/> refuses while
-    /// the cabin is moving, so this stops it first.
+    /// Unseats everyone where the cabin currently is. This is the game THROWING a rider out rather than the
+    /// rider asking, so it clears its own way past both of <see cref="RopewayCabinSeat.CanUnmount"/>'s
+    /// refusals: <c>IsMoving = false</c> for the moving one, and <c>ClearToLeave</c> for the nothing-under-us
+    /// one. Un-cleared, a tower blown out from under an occupied cabin leaves the rider seated - carried off
+    /// by the re-base (the teleport the unseat exists to prevent), or still mounted when
+    /// <see cref="DropAndDie"/> despawns the cabin under them, which is a softlock rather than a fall.
+    /// <para>
+    /// The clearance lives HERE and not at the callers, which is where it first landed. There are two
+    /// callers - <c>RopewayLinkService.UnlinkAll</c> and <see cref="DropAndDie"/>, the latter reached from
+    /// this tick's tower-vanished backstop - and clearing only the first made "the second can never hold a
+    /// rider" an argument about call order rather than something the code enforces. One line at the
+    /// chokepoint costs nothing and makes it true by construction.
+    /// </para>
     /// </summary>
     public void UnseatAll()
     {
         if (World?.Side != EnumAppSide.Server) return;
 
         IsMoving = false;
+        RopewayCabinSeat.ClearToLeave(this);
 
         var seats = GetBehavior<EntityBehaviorSeatable>()?.Seats;
         if (seats == null) return;
@@ -867,12 +882,19 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
     /// explains the bail-out always comes first.
     /// </para>
     /// </summary>
-    public static double HoldSneak(double held, bool sneaking, bool moving, float dt, ref bool released)
+    /// <param name="heldIn">
+    /// Whether the seat is refusing the ordinary step out - <see cref="RopewayCabinSeat.HeldIn"/>, which is
+    /// moving OR over air. It used to be IsMoving alone, and that was the same question until the over-air
+    /// refusal was added: after it, a stalled cabin over a valley refused the tap AND reset this accumulator
+    /// every tick, so the refusal advertised a hold that could not complete. The hold has to be armed by the
+    /// same condition the refusal is raised by, or the exit it names is not there.
+    /// </param>
+    public static double HoldSneak(double held, bool sneaking, bool heldIn, float dt, ref bool released)
     {
-        if (!moving) released = false;
+        if (!heldIn) released = false;
         else if (!sneaking) released = true;
 
-        return sneaking && moving && released ? held + dt : 0;
+        return sneaking && heldIn && released ? held + dt : 0;
     }
 
     /// <summary>
@@ -907,7 +929,7 @@ public class EntityRopewayCabin : Entity, ISeatInstSupplier, IMountableListener
                 continue;
             }
 
-            seat.SneakHeld = HoldSneak(seat.SneakHeld, seat.Controls?.Sneak == true, IsMoving, dt, ref seat.SneakReleased);
+            seat.SneakHeld = HoldSneak(seat.SneakHeld, seat.Controls?.Sneak == true, seat.HeldIn, dt, ref seat.SneakReleased);
             if (seat.SneakHeld < BailHoldSeconds) continue;
 
             seat.SneakHeld = 0;

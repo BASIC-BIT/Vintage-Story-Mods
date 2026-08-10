@@ -14,14 +14,26 @@ stops, and it starts again by itself when the wind comes back.
 ### Why the store went
 
 It existed to guarantee that a trip which *started* would *finish*, because a cabin stopped mid-span was a
-trap: the rider could not get out. **That is no longer true.** The phase-1 emergency bail-out (hold sneak
-for two seconds) means a rider can always leave, anywhere on the line, and a stopped cabin lets them step
-straight out because `IsMoving` is false. Once nobody can be trapped, "the cabin stopped because the wind
-stopped" is ordinary machine behaviour — and the entire apparatus built to prevent it (charge arithmetic,
-capacity, `paidTo` and the `Fare` credit rule, `Quote`/`TripCost`/`WorstTripCost`, the link-time steepness
-refusal, and the `NoStore` / `StoreUnreachable` / `NoPower` / `TooDear` refusal states with their strings,
-block-info lines and tests) was dead weight protecting against a problem that had already been solved
-somewhere else.
+trap: the rider could not get out. **That is no longer true**, and the reason has since been corrected.
+Once nobody can be trapped, "the cabin stopped because the wind stopped" is ordinary machine behaviour —
+and the entire apparatus built to prevent it (charge arithmetic, capacity, `paidTo` and the `Fare` credit
+rule, `Quote`/`TripCost`/`WorstTripCost`, the link-time steepness refusal, and the `NoStore` /
+`StoreUnreachable` / `NoPower` / `TooDear` refusal states with their strings, block-info lines and tests)
+was dead weight protecting against a problem that had already been solved somewhere else.
+
+**The escape this rests on is not the one written here originally, and the difference matters.** This used
+to say *"the bail-out means a rider can always leave, anywhere on the line, and a stopped cabin lets them
+step straight out because `IsMoving` is false"*. Both halves are gone: `RopewayCabinSeat.CanUnmount` refuses
+the ordinary step out with nothing under the cabin (a `IsMoving`-false stall over a valley used to hand the
+rider the whole remaining drop on one tap of sneak), and the bail hold is armed off `IsMoving` too, so it
+counts to nothing while stalled. What actually holds the argument up is **the cabin itself**: a stall leaves
+`departed` and `Travelled` intact, so the trip resumes by itself when the network turns and finishes at a
+tower, where the rider gets out for free. The store guaranteed a trip would finish; so does the tick, for
+nothing. See `KNOWN-ISSUES.md`, *"A rider who steps out of a stalled cabin at height"*.
+
+**The link-time steepness *refusal* stays deleted.** `ropeway:span-too-steep` is a chat **warning** about a
+different thing entirely — the cabin's roof clipping its own crossarm, geometry, not power — and it never
+refuses a link. Nothing about the store came back with it.
 
 It also closes `POWER-REVIEW.md` **F1 through F10** outright — every one of them was a property of the
 store, the quote or the weight's persisted binding.

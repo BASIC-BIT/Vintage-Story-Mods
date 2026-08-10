@@ -1,10 +1,180 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 187 ropeway tests passing — 90 `[Fact]` plus 97 `[InlineData]` across the four files in
-`mods-dll/ropeway.Tests`, which is where to re-derive this number rather than trusting the line. (It read
-136 for two rounds after the count moved, 147 for two more, 168 for two more again, 172 for one, 174 for
-one and 180 for one.) Everything in the tables below was found by
+State: build green, 199 ropeway tests passing — 97 `[Fact]` plus 102 `[InlineData]` across the five test
+files in `mods-dll/ropeway.Tests`, which is where to re-derive this number rather than trusting the line.
+(It read 136 for two rounds after the count moved, 147 for two more, 168 for two more again, 172 for one,
+174 for one, 180 for one and 187 for one. It briefly read 195 in this round's working tree, because two
+agents landed tests in parallel and each counted only its own.) Everything in the tables below was found by
 reading code, not by playing — none of *it* has been observed in game.
+
+## A rider who steps out of a stalled cabin at height — FIXED (2026-08-10)
+
+**It was live on every line the mod ships, it had nothing to do with the elevator question it was found
+under, and it killed people.** Found while re-deriving `docs/agentic/ingest/cablecar/ELEVATOR-CHALLENGE.md`
+§4; re-derived from the source before it was believed.
+
+### The path, end to end
+
+1. `RopewayCabinSeat.CanUnmount` read `if (!Moving || Bailing(...)) return true;` — one tap of sneak got the
+   **ordinary** dismount whenever the cabin was not moving.
+2. `Moving` is `Entity is EntityRopewayCabin { IsMoving: true }`, and `IsMoving` is false in far more states
+   than "parked at a tower". `ServerTick` writes it false the moment the mechanical network stalls (the
+   `speed <= 0` branch: *"Standing still is not stopping"*), on every `NotReady` tick, and on every `Hold` —
+   a blocked span, a truncated chain, a re-based line. All of those leave the cabin **exactly where it is**,
+   which is usually mid-span.
+3. `EntitySeat.onControls` calls `TryUnmount()` on the sneak **press**, so the whole thing is one tap.
+4. `DoTeleportOnUnmount` is true on that path (only `EntityRopewayCabin.Jump` clears it), so vanilla's
+   `EntityRideableSeat.DidUnmount` runs `tryTeleportToFreeLocation` (`EntityRideableSeat.cs:239-259`). It
+   checks **exactly two** candidate blocks — one to each side of the mount, at `Pos.Y - 0.1`, each needing
+   `SideSolid[UP]` and a clear collision box. Out on a span both are air. Neither branch fires and the
+   rider is simply left at the seat.
+5. `RopewayCabinSeat.DidUnmount` then re-datums `PositionBeforeFalling` to that point — correctly, for the
+   reason written there — so `EntityBehaviorHealth.OnFallToGround` bills the **entire** drop.
+
+So the two-second sneak-**hold** that exists to make leaving a cabin at height a deliberate act with a known
+price was silently converted into a **tap** by a lull in the wind. Nothing warned, nothing refused.
+
+### The predicate it has now, and the two that were rejected
+
+`CanUnmount` asks whether anything solid stands within `RopewayCabinSeat.FreeFall` = **3.5 blocks** under
+the cabin's own origin, straight down one column.
+
+- **3.5 is vanilla's, not ours.** `EntityBehaviorHealth.OnFallToGround:381-387` returns without damage while
+  the fall is under `3.5 * fallDamageThreshold`. Ground within that is ground a rider steps onto for
+  nothing, so a line running low over a hillside is not made annoying to get out of.
+- **Measured from the cabin, not the rider**, which makes it conservative by the 1.25 blocks the rider sits
+  below the cabin origin. The cabin is the datum because it is the position both sides agree on, and because
+  `DropGhostPassengers` unmounts a rider on the very tick it parks the cabin at a tower — a rider's own `Pos`
+  is a tick behind the seat it is pinned to.
+- **A cabin at a tower passes**, and that is the case the rule was checked against first: the anchor is
+  `SheaveHeight + 0.5` over the footing and the cabin hangs `hangDrop` under it, so the footing block is
+  2.25 blocks under the cabin origin and the test is `TheCabinFitsThroughTheTower`'s frame exactly.
+  `RopewayDismountTests` pins both halves off `SpanMath.SheaveHeight` and
+  `EntityRopewayCabin.DefaultHangDrop`, so moving the tower moves the test.
+
+**Rejected: `line.IsAtTower(Travelled, ArrivalTolerance)`,** which is the obvious predicate and cannot be
+used here. `Travelled` lives in `Entity.Attributes`, and `Entity.ToBytes` writes that tree only
+`if (!forClient)` while `FromBytes` reads it only `if (!isSync)` — **a client's `Travelled` is always 0**.
+`CanUnmount` is answered on every machine, so a server-only predicate means the server and the rider's own
+client disagree about whether they just got out, which is the failure `BailKey` exists to prevent. Blocks
+are the one thing both sides hold identically. (The cabin itself *can* ask that question cheaply, and
+should, for the arming half below.)
+
+**Rejected: fixing it in `ServerTick`.** Nothing there is wrong: a stalled cabin standing still with
+`departed` intact is the behaviour that lets a trip resume when the wind returns, and a second motion
+authority in that method is the one thing forty lines of comment in it warn against.
+
+### What else had to move for it
+
+- **Every other client now answers `CanUnmount` yes.** A watching client reaches it through the `mountedOn`
+  listener, answering an unmount the server has *already* made, exactly once — a client that refuses there
+  keeps the rider drawn inside a cabin they have left for the rest of the session. It had nothing to refuse
+  with that the server did not have. That was survivable while the answer was one synced bool; it is not now
+  the answer is a block lookup, which a client at the edge of its loaded chunks can legitimately get
+  differently. `RopewayCabinSeat.Answering` is the gate: the server, and the rider's own client.
+- **A forced unseat is not a dismount.** `UnseatAll` used to clear its own way past the refusal by writing
+  `IsMoving = false`, which no longer answers the question being asked. It now also calls
+  `RopewayCabinSeat.ClearToLeave(this)`, which sets the bail-out clearance on each rider's own tree. Without
+  it a tower blown out from under an occupied cabin leaves the rider seated: carried off by the re-base (the
+  teleport the unseat exists to prevent), or still mounted when the no-survivor branch despawns the cabin
+  under them, which is a softlock rather than a fall.
+  **The clearance is in `UnseatAll` and not at its callers**, which is where it first landed. There are two —
+  `RopewayLinkService.UnlinkAll` (the explosion / `SetBlock(0)` path) and `DropAndDie` (reached from
+  `ServerTick`'s tower-vanished backstop) — and clearing only the first made *"the second can never hold a
+  rider"* an argument about call order rather than something the code enforces. Every route to that backstop
+  with a rider aboard does run through `UnlinkAll` first, so it was covered; one line at the chokepoint makes
+  it true by construction and costs nothing.
+
+### Still open, and it is one line in `EntityRopewayCabin.cs`
+
+`BailOut` arms the hold off `IsMoving`, and `HoldSneak` zeroes the accumulator whenever that is false — so
+**the emergency exit is disarmed in exactly the state that now refuses the ordinary one.** A rider in a
+becalmed cabin over a valley is not trapped (the cabin carries on by itself when the line turns, and
+`ropeway:cantunmount-noground` says so in those words, with their own live sneak binding in it), but until
+it does, holding sneak counts to nothing. The arming condition wants to be the same question the refusal
+asks. The change and its edge-trigger caveat are written out in
+`docs/agentic/ingest/cablecar/HANDOFF-stalled-dismount.md`; it wants a new `AtRest` predicate on the cabin
+and a re-run of QA 13a's crouch-board step, which is why it is deferred rather than done here. (That
+handoff's *second, smaller* item — the `UnseatAll` line — **is** done; see above.)
+
+Two consequences of the fix that are deliberate and not bugs:
+
+- **Water is not ground.** The probe reads `BlockLayersAccess.MostSolid`, so a cabin stalled over a lake
+  refuses the step out even though the landing would be survivable. Refusing costs a wait; the alternative
+  is a rule that has to be right about depth.
+- **An unloaded chunk is not ground.** `GetBlockOrNull` comes back null and the refusal stands. A rider
+  cannot see a landing there either.
+
+## The cabin eats its own crossarm past 11.3 degrees — MEASURED, GUARDED, NOT CURED (2026-08-10)
+
+Found in `docs/agentic/ingest/cablecar/ELEVATOR-CHALLENGE.md` §2, re-derived from the shipped shapes before
+it was believed, and it is live on the mod's headline case. Renders:
+`docs/agentic/ingest/cablecar/renders/steep/`.
+
+**The arithmetic.** The archway is **3.5 blocks** tall — plinth top at `anchor-4.0`, crossarm cells'
+underside at `anchor-0.5` — and the cabin is **2.5** tall hanging centred in it, so there is 0.5 of slack
+over the roof and 0.5 under the floor. `EntityRopewayCabin.Place` writes `Pos.Yaw` and touches neither
+pitch nor roll, so the cabin hangs plumb and stays **level**: leaving a tower on a climbing span its roof
+rises with the rope while the crossarm does not, and it still overlaps the one-cell-deep crossarm row until
+2.0 + 0.5 = **2.5 blocks** of plan out. `0.5 / 2.5 = 0.2` → **11.31°**. `TheCabinFitsThroughTheTower` could
+not catch it because every height in it is a constant: it measures one cabin parked at one tower.
+
+Three contacts, all re-derived, all pinned by `TheCabinFitsThroughTheTowerAtEveryPitch`:
+
+| | clearance parked | reach | first contact | at 30° |
+|---|---|---|---|---|
+| roof vs the crossarm cells | 0.500 | 2.5 | **11.31°** | −0.943 blocks, over 1.634 of travel |
+| floor vs the footing plinth (the mirror, on the way DOWN into a tower — not in the challenge doc) | 0.500 | 2.4375 | **11.59°** | −0.907 |
+| roof vs the DRAWN station rail (follows the rope, so it tips; also not in the doc) | 0.250 | 2.0 | **7.13°** | −0.905 |
+
+**Nothing in the cabin can fix it, and that is arithmetic rather than an opinion.** Trading roof height for
+floor height moves both limits at once and the best split is *worse* — 9.6°, because the rail binds first.
+Shortening the cabin to 3 blocks buys 14.0°; thinning both slabs buys 14.4°. Even a crossarm hollowed all
+the way up to the rope line caps a level cabin at **26.6°** — past that its roof would have to rise through
+the rope it hangs from — and no attitude at all gets past **30.6°**, because a 2.5-block section tilted by
+φ crossing a one-cell-deep row stands `2.5·secφ + tanφ` tall and the archway is 3.5. Pitching the cabin with the rope is
+not a cure either: it is the wrong field (`Pos.Roll`, not `Pos.Pitch` — the model's long axis is X and the
+renderer applies pitch about world X *after* yaw), vanilla's `EntityRideableSeat.SeatPosition` reads
+neither, so both riders would stay at their level seat positions — 0.66 blocks out of the bench at 30° —
+and it runs out at 29.7° anyway when the tail digs into the plinth.
+
+**The only lever with travel in it is the archway**, i.e. `SheaveHeight` and `hangDrop` together: each extra
+cell of tower adds 0.5 of slack per side and 0.2 to the tangent — **5 → 21.8°, 6 → 31.0°, 8 → 45°**. That is
+a multiblock change (three blocktypes, 15 → 19 offsets, the hanger art, `ClearanceBelow`) and it was not
+made here. Costed, not started.
+
+**What shipped instead:** the ceiling is a named constant, `SpanMath.PassablePitchTan`, derived in its own
+doc comment and pinned to the shipped shapes by a test that sweeps 0–89° and fails in *both* directions —
+if the cabin clips under it, and if the geometry would allow more. `TryLink` says so once, in chat, when a
+span is strung above it (`ropeway:span-too-steep`): **warn, never refuse**, the same rule corner towers get,
+because a ropeway that refused climbs would be refusing the thing it exists for. A mounted rider has no
+block collision, so what a player sees above 11.3° is the roof passing through the brace, the sheave and a
+station's lay shaft for ~1.6 blocks of travel, and the floor through the plinth coming back down.
+
+## The corridor was certified for a level line only — FIXED (2026-08-10)
+
+`IsSpanClear` laid its rays on a fixed ladder, `j ∈ [−ClearanceBelow, +ClearanceAbove]` = −3.5…+1.5 blocks
+about the rope. That window is exact at zero pitch and wrong at every other, because `up` is perpendicular
+to the **chord** and leans back with the pitch while the cabin hangs plumb and stays level — so the cabin's
+own 4-block length projects onto `up` as a further `2·sin(pitch)` at each end. Required band:
+
+```
+-(2·sin + 3.5·cos)  …  max(2·sin - 1.0·cos, ReturnLift·cos)
+```
+
+Worst **under the floor at 29.74°** — `√(2² + 3.5²)` = 4.031 against 3.5 certified, **0.531 blocks of
+uncertified ground under a seated rider**, on exactly the pitch a hill line is built at, and the challenge
+doc's table skips 15–45° and so missed it. Worst **over the nose approaching vertical**, 2.0 against 1.5.
+
+`SpanMath.ClearanceRows` now returns the ladder for the span's own pitch: one block per row over that band,
+each ray down its row's centre. At zero pitch it *is* the old ladder (rays at −3…+1), so nothing about the
+flat case moved; it costs a sixth row through the middle of the range where the leaning band is widest
+(15 → 18 rays a span) and drops back to five near vertical as the strand collapses onto the rope line. It
+also makes the near-vertical branch symmetric, which silently closes the direction-dependence the challenge
+doc's §4 found: `right` is hard-coded there, so `up` flips with the direction of travel, and against an
+asymmetric window a link clicked from the **top** tower certified `Z−1…Z+3` while the ride checked
+`Z−3…Z+1` — a link that succeeded and a cabin that then refused to move. `TheVerticalCorridorIsTheSameOneFromEitherEnd`
+is what keeps it shut.
 
 ## The haul rope is a LOOP (2026-08-04)
 
@@ -359,7 +529,7 @@ Three things BASIC saw riding it. All three are closed.
 
 | what was wrong | root cause | fix |
 |---|---|---|
-| **Every reload put the cabin back at the start of the line.** | Two independent teleports, both on the load path, diagnosed in `docs/agentic/ingest/cablecar/RELOAD-DIAGNOSIS.md`. (1) **`WalkChain` canonicalises by the two ends the WALK reached.** At world load the tower chunks register one column at a time, so the walk produces a *prefix* of the line — and a prefix whose far end sorts below `LineKey` **reverses**. `Towers[0]` then stops equalling the cabin's `LineKey`, and `ServerTick`'s re-base branch read that as "the chain re-canonicalised under us" and ran `Hold` → `RebaseTo` → `ParkAtNearestEnd` → `Place`, rewriting `LineKey`, `Travelled` **and** `Pos` from a chain `MarkLoadedEnds` had already flagged `Truncated`. It was the one branch in the tick that treated a truncated line as whole, and it is self-reinforcing: it re-keys onto an *interior* tower, which can never be `Towers[0]` of the finished chain, so it fires again when the last column lands and parks the cabin at `MinTravel` = the start of the line. (2) **`departed` was not persisted.** Restored false, so a cabin saved *in motion* mid-span looked like a cabin stopped in mid-air, and the `!departed && !IsAtTower` recovery parked it at an end. A called trip already survived (through `Destination`); an ordinary ride had nothing to survive on. | (1) One guard, stated once — **a truncated chain's `Towers[0]` is not evidence of anything**. `EntityRopewayCabin.NotReady` is every way there is to be waiting on the world (no line at all; a truncated chain measuring from a different tower; a truncated chain that no longer reaches the cabin), and its single call site at the top of `ServerTick` is the whole recovery: **stand still and write nothing else**. It has to be one predicate rather than three branches, because the first attempt *was* three and the third of them called `Hold` — which clears `departed`, undoing (2) and handing the cabin back to the mid-span park one tick later. `RebaseTo` carries the same rule for the link-service callers as `RebaseMustWait`, plus the clause that matters more than the guard: **hold only while the cabin's key is still on that chain**. `LineKey` is always an end tower, so "the broken tower was the key" is `UnlinkAll`'s *ordinary* case, and refusing to re-key there leaves the cabin keyed to a block `Forget()` is about to remove — `ResolveLine` null forever, and `DropAndDie` unable to fire because it requires `LoadedTowers` to contain `LineKey`. An uncollectable cabin hanging in mid-air with its item destroyed is strictly worse than the teleport, so the guard asks whether there is anything to hold *for*. No delay and nothing to serialise: `MarkLoadedEnds` widens the window by itself and `BEPylonBase.Initialize` drops the cached line, so a genuine re-base still runs on the tick after the last tower registers. (2) `departed` is written in `ToBytes` and read in `FromBytes`, and **only `Hold` may clear it**. A cabin saved mid-span comes back exactly there and carries on in the direction it was going, `lastSegment` still -1 so the span it resumes into is re-checked for clearance. That deliberately includes a cabin saved in motion whose **rider is still offline**: it resumes and runs to the end of the line, because the alternative is to drop the trip and dropping the trip is the bug. `DropGhostPassengers` still unseats a despawned player at a tower, and `RopewayCabinSeat.CanUnmount` keeps whoever reconnects into it aboard until it stops — QA step 19 checks that shape, not the old "parked at an end, empty" one. (3) A **rider is never teleported**, which was claimed before and not true: the re-base branch was already gated on `HasPassenger`, the mid-span park is now gated on it too (every `Hold` lands a cabin in that branch on the next tick, so a blocked span alone reached it), and `TryLink` refuses to merge an occupied line exactly as `TryUnlink` already did. A seated rider's cabin stops where it stands instead — it is not moving, so they can step out, and the stop key aims it at a station and sets it going again, including back the way it came. Guarded by `TheWorldIsNotReadyUntilTheChainCanVouchForWhereTheCabinIs`, `ARebaseWaitsForChunksOnlyWhileTheOldKeyIsStillOnTheChain` and `APartialChainCanCanonicaliseTheOppositeWayFromTheWholeLine`; the tick ordering they feed needs QA 18/18b. |
+| **Every reload put the cabin back at the start of the line.** | Two independent teleports, both on the load path, diagnosed in `docs/agentic/ingest/cablecar/RELOAD-DIAGNOSIS.md`. (1) **`WalkChain` canonicalises by the two ends the WALK reached.** At world load the tower chunks register one column at a time, so the walk produces a *prefix* of the line — and a prefix whose far end sorts below `LineKey` **reverses**. `Towers[0]` then stops equalling the cabin's `LineKey`, and `ServerTick`'s re-base branch read that as "the chain re-canonicalised under us" and ran `Hold` → `RebaseTo` → `ParkAtNearestEnd` → `Place`, rewriting `LineKey`, `Travelled` **and** `Pos` from a chain `MarkLoadedEnds` had already flagged `Truncated`. It was the one branch in the tick that treated a truncated line as whole, and it is self-reinforcing: it re-keys onto an *interior* tower, which can never be `Towers[0]` of the finished chain, so it fires again when the last column lands and parks the cabin at `MinTravel` = the start of the line. (2) **`departed` was not persisted.** Restored false, so a cabin saved *in motion* mid-span looked like a cabin stopped in mid-air, and the `!departed && !IsAtTower` recovery parked it at an end. A called trip already survived (through `Destination`); an ordinary ride had nothing to survive on. | (1) One guard, stated once — **a truncated chain's `Towers[0]` is not evidence of anything**. `EntityRopewayCabin.NotReady` is every way there is to be waiting on the world (no line at all; a truncated chain measuring from a different tower; a truncated chain that no longer reaches the cabin), and its single call site at the top of `ServerTick` is the whole recovery: **stand still and write nothing else**. It has to be one predicate rather than three branches, because the first attempt *was* three and the third of them called `Hold` — which clears `departed`, undoing (2) and handing the cabin back to the mid-span park one tick later. `RebaseTo` carries the same rule for the link-service callers as `RebaseMustWait`, plus the clause that matters more than the guard: **hold only while the cabin's key is still on that chain**. `LineKey` is always an end tower, so "the broken tower was the key" is `UnlinkAll`'s *ordinary* case, and refusing to re-key there leaves the cabin keyed to a block `Forget()` is about to remove — `ResolveLine` null forever, and `DropAndDie` unable to fire because it requires `LoadedTowers` to contain `LineKey`. An uncollectable cabin hanging in mid-air with its item destroyed is strictly worse than the teleport, so the guard asks whether there is anything to hold *for*. No delay and nothing to serialise: `MarkLoadedEnds` widens the window by itself and `BEPylonBase.Initialize` drops the cached line, so a genuine re-base still runs on the tick after the last tower registers. (2) `departed` is written in `ToBytes` and read in `FromBytes`, and **only `Hold` may clear it**. A cabin saved mid-span comes back exactly there and carries on in the direction it was going, `lastSegment` still -1 so the span it resumes into is re-checked for clearance. That deliberately includes a cabin saved in motion whose **rider is still offline**: it resumes and runs to the end of the line, because the alternative is to drop the trip and dropping the trip is the bug. `DropGhostPassengers` still unseats a despawned player at a tower, and `RopewayCabinSeat.CanUnmount` keeps whoever reconnects into it aboard until it stops — QA step 19 checks that shape, not the old "parked at an end, empty" one. (3) A **rider is never teleported**, which was claimed before and not true: the re-base branch was already gated on `HasPassenger`, the mid-span park is now gated on it too (every `Hold` lands a cabin in that branch on the next tick, so a blocked span alone reached it), and `TryLink` refuses to merge an occupied line exactly as `TryUnlink` already did. A seated rider's cabin stops where it stands instead — and the stop key aims it at a station and sets it going again, including back the way it came. (This row used to add "it is not moving, so they can step out". That was the defect fixed on 2026-08-10 and recorded at the top of this file: mid-span, stepping out is the fall, and `CanUnmount` now refuses it.) Guarded by `TheWorldIsNotReadyUntilTheChainCanVouchForWhereTheCabinIs`, `ARebaseWaitsForChunksOnlyWhileTheOldKeyIsStillOnTheChain` and `APartialChainCanCanonicaliseTheOppositeWayFromTheWholeLine`; the tick ordering they feed needs QA 18/18b. |
 | **A seated rider could spin all the way round** on a bench that faces one way. | `bodyYawLimit` was dead JSON, and the key is not decorative — `SeatConfig.BodyYawLimit` is only ever *read* by `EntityBoat.SeatsToMotion` and `EntityBehaviorRideable.SeatsToMotion`, and the cabin is neither, so nothing was going to apply it for us. | `EntityRopewayCabin.ConstrainRiderYaw`, eight lines on the tick, identical to vanilla's: `EntityPlayer.BodyYawLimits` / `HeadYawLimits` centred on `Pos.Yaw + mountRotation.y`, range `bodyYawLimit` (now **1.5707963 = ±90°**, so a rider can look out either side and not sit backwards). It needs **no controllable seat** — it constrains the passenger, not the mount, so `controllable: false` and the smooth-motion tests are untouched. What it clamps, exactly: `HeadYawLimits` is read by `ClientMain.UpdateCameraYawPitch` (:2377-2383), which clamps `mouseYaw`, so this is the seated player's **own camera**, client side; `BodyYawLimits` clamps that same player's rendered body through the `BodyYaw` setter. Neither reaches what other players see — `EntityPlayerShapeRenderer` (:429-431) already forces a remote rider's drawn body yaw to the mount's, so onlookers see him squared to the cabin whichever way he is looking. Running it server side would change nothing: the server assigns `BodyYawServer` from the position packet, not `BodyYaw`, so the clamping setter never sees it. |
 | **The front seat was too far forward** — the rider's toes 2.34 units off the west wall while the rear row had 22.34 units in front of its own. | Forward-facing rows are asymmetric about the mast by construction (the rear row backs onto the east wall, the front row needs a footwell), and the front row was placed by mirroring the pan rather than by the clearance ahead of the rider. | The front bench moved back 10 units: pan −21..−11 → **−11..−1**, and `backrestwest`, `apronwest`, both mullions and both thresholds with it (the AP is `posX`-relative to the pan, so it follows on its own and stays at the pan's depth centre). Both rows face −X, so "evenly placed" is one number — the clear floor ahead of each rider's toes, which reach lip − 4.66 — and 10 is what equalises it at **12.34 each**. It also tiles: footwell 17 + pan 10 = a 27-unit seat bay, twice, in a 56-unit interior, with the rear row's 2-unit reveal off the east wall as the remainder. The threshold plank shortened 24 → 14 and its uv widths with it (size/4, like every face in that shape). `TheSeatedRidersContactPatchLandsOnItsPan` and `TheSeatAttachmentPointsStayOnTheCentreLine` both still pass, and the plan/section renders were re-read rather than the asserts alone. |
 
@@ -521,7 +691,8 @@ has lost its `entityClass`, and `TensionWeight` is no longer registered, so `Ser
 loading blockentity TensionWeight … Will discard it"* and drops every one of them — the same benign,
 self-completing migration the `PylonHead` → `PylonBase` rename used, with the same property that they all
 fail at once and nothing is left holding a reference. The block stays as decoration. A cabin already hanging
-on the line stops where it is and is **not** stranded (`IsMoving` false, so the rider steps out), but a
+on the line stops where it is and is **not** stranded (it is not moving, so the rider steps out — at a
+tower, or anywhere with ground under the cabin; see the 2026-08-10 dismount fix at the top of this file), but a
 cabin cannot be *placed* on that line until a tension station exists. The repair is two towers of rework per
 line: break each end tower's footing, re-place it as the station footing, build the leg. Breaking a footing
 refunds its span's rope, so each end costs one re-link, and the old housing and weight are picked up and
@@ -799,9 +970,12 @@ and the arithmetic are in [POWER-AND-STORAGE.md](POWER-AND-STORAGE.md); this is 
 list.
 
 **Why it could go.** The store existed to guarantee a started trip finished, because a cabin stopped
-mid-span was a trap. The phase-1 bail-out ended that: a rider can always get out, and a stopped cabin lets
-them step straight out (`IsMoving` false). Once nobody is trapped, "it stopped because the wind stopped" is
-ordinary machine behaviour.
+mid-span was a trap. Once nobody is trapped, "it stopped because the wind stopped" is ordinary machine
+behaviour. **Corrected 2026-08-10:** this used to credit the bail-out and *"a stopped cabin lets them step
+straight out (`IsMoving` false)"*, and that second clause was the defect at the top of this file rather than
+a feature — a stall over a valley is not an arrival. What carries the argument is that a stalled cabin keeps
+`departed` and `Travelled` and **finishes the trip by itself** when the network turns, so the tick guarantees
+for free what the store was charging for. See POWER-AND-STORAGE.md.
 
 **Closed outright by the deletion** — every one of these was a property of the store, the quote or the
 weight's persisted binding, and none of them exists to be fixed any more:
@@ -1020,9 +1194,13 @@ fixed — it is the guard being put where all the callers actually meet.
   peer must pass `Claims.TryAccess`. Unlink is destructive *and* pays out rope, so a forgeable packet that
   reached any loaded tower in the world was the one worth closing.
 - **A rider unseated mid-span by an explosion now falls.** The pre-fix behaviour put them at a tower,
-  but that was a rider teleport (F3). Falling was chosen over teleporting; it is not an accident.
+  but that was a rider teleport (F3). Falling was chosen over teleporting; it is not an accident. It stayed
+  the choice through the 2026-08-10 dismount fix: `UnlinkAll` clears the riders past the new refusal rather
+  than keeping them aboard, because the alternative is the teleport again, or a rider mounted to a cabin
+  that is about to despawn.
 - **The bail-out clearance rides in the same packet as the unmount, on the rider's own tree.** `CanUnmount`
-  refuses while the cabin moves; a rider who holds sneak for `EntityRopewayCabin.BailHoldSeconds` gets out
+  refuses while the cabin moves — and, since 2026-08-10, while there is nothing under it either; a rider who
+  holds sneak for `EntityRopewayCabin.BailHoldSeconds` gets out
   anyway. Every client answers the `mountedOn` removal by calling `TryUnmount` — and so `CanUnmount` —
   exactly once, from a listener that never fires again, and a client that says no there keeps the rider
   drawn inside a cabin they have already left for the rest of the session. So the clearance

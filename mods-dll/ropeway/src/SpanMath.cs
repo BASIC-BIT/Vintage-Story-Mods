@@ -15,29 +15,82 @@ public static class SpanMath
     public const int ClearanceRadius = 1;
 
     /// <summary>
-    /// Rows below the rope line that must also be clear. The cabin hangs 2.25 blocks under the rope and its
-    /// body runs anchor-3.5..anchor (jaw closed on the rope), so certifying only the rope line lets a rise two
-    /// blocks under the rope drag a seated rider through solid stone - riders have no block collision to stop it.
+    /// Rows below the rope line that must also be clear ON A LEVEL SPAN. The cabin hangs 2.25 blocks under the
+    /// rope and its body runs anchor-3.5..anchor (jaw closed on the rope), so certifying only the rope line lets
+    /// a rise two blocks under the rope drag a seated rider through solid stone - riders have no block collision
+    /// to stop it.
     /// <para>
-    /// 3 rows still covers it exactly, and only just. The anchor is a block centre, so the j = -3 ray runs down
-    /// the centre of the row spanning anchor-3.5..anchor-2.5 - the cabin's floor lands on that row's bottom
-    /// face. Any further increase in <c>hangDrop</c> needs a fourth row.
+    /// 3 rows covers it exactly, and only just. The anchor is a block centre, so the bottom ray runs down the
+    /// centre of the row spanning anchor-3.5..anchor-2.5 - the cabin's floor lands on that row's bottom face.
+    /// </para>
+    /// <para>
+    /// NO LONGER THE LOOP BOUND, and that is the fix rather than a tidy-up: <see cref="IsSpanClear"/> now lays
+    /// its ladder on <see cref="ClearanceRows"/>, which is this pair of numbers at zero pitch and something else at
+    /// every other pitch. Held fixed, they were a level-line assumption - the cabin hangs PLUMB and stays LEVEL
+    /// while <c>up</c> leans back with the pitch, so at 30 degrees the cabin's floor reaches 4.031 blocks below
+    /// the path against the 3.5 these certify, and 0.531 blocks of ground under a seated rider went unchecked.
+    /// They stay as the level case the derivation has to reproduce, which
+    /// <c>RopewayMathTests.ClearanceCoversTheCabinBodyAndNotJustTheRopeLine</c> is what pins.
     /// </para>
     /// </summary>
     public const int ClearanceBelow = 3;
 
     /// <summary>
-    /// Rows ABOVE the rope line that must also be clear, for the return strand. The haul rope is a loop with
-    /// two strands stacked <c>BEPylonBase.ReturnLift</c> = 1.3263 blocks apart, so the upper one occupies
-    /// 1.2663 to 1.3863 above the anchor - and the anchor is a block centre, so row j = +1 spans exactly
-    /// 0.5 to 1.5.
+    /// Rows ABOVE the rope line that must also be clear ON A LEVEL SPAN, for the return strand. The haul rope is
+    /// a loop with two strands stacked <c>BEPylonBase.ReturnLift</c> = 1.3263 blocks apart, so the upper one
+    /// occupies 1.2663 to 1.3863 above the anchor - and the anchor is a block centre, so the top row spans
+    /// exactly 0.5 to 1.5.
     /// <para>
     /// ONE row covers it exactly and with room at both ends: 0.7663 blocks of that row below the strand and
     /// 0.1137 above it. Two "for margin" would refuse spans over nothing, because 2*rho lands in one row and
-    /// the arithmetic says which. Rays per span 12 -> 15.
+    /// the arithmetic says which. Rays per span 12 -> 15. See <see cref="ClearanceBelow"/> for why this is the
+    /// level case rather than the loop bound.
     /// </para>
     /// </summary>
     public const int ClearanceAbove = 1;
+
+    /// <summary>
+    /// Half the cabin's length along its own direction of travel, in blocks, read off the roof slab
+    /// (<c>shapes/entity/cabin.json</c>, x -32..32). It is here rather than only in the shape because the
+    /// corridor and the tower fit both turn on it, and
+    /// <c>RopewayAssetContractTests.TheCabinIsBuiltAlongTheTravelAxis</c> pins the two together.
+    /// </summary>
+    public const double CabinHalfLength = 2.0;
+
+    /// <summary>
+    /// Half the cabin's height, in blocks: roof top +1.25, floor bottom -1.25 about its own origin. Same shape,
+    /// same reason as <see cref="CabinHalfLength"/>.
+    /// </summary>
+    public const double CabinHalfHeight = 1.25;
+
+    /// <summary>
+    /// The steepest span a tower can pass the cabin through, as a TANGENT - rise over horizontal run. Above it
+    /// the cabin's roof drives through the crossarm cells on the way out of a tower and its floor through the
+    /// footing's plinth on the way down out of one.
+    /// <para>
+    /// DERIVED, NOT CHOSEN, and it is the whole of what the tower has to give. The archway is 3.5 blocks tall -
+    /// plinth top at anchor-4.0, crossarm cells' underside at anchor-0.5 - the cabin is 2.5 tall and hangs
+    /// centred in it, so there is exactly 0.5 of slack over the roof and 0.5 under the floor. The cabin hangs
+    /// plumb and stays LEVEL (<c>EntityRopewayCabin.Place</c> writes yaw and nothing else), so on a climbing
+    /// span its roof rises with the rope while the crossarm does not, and it still overlaps the one-cell-deep
+    /// crossarm row until it is <see cref="CabinHalfLength"/> + 0.5 = 2.5 blocks of plan past the tower:
+    /// <c>0.5 / 2.5 = 0.2</c>, i.e. 11.31 degrees. The floor mirrors it on the descending side at 0.5 / 2.4375
+    /// = 11.59 degrees, so this is the binding one.
+    /// </para>
+    /// <para>
+    /// NOTHING IN THE CABIN CAN RAISE IT. Trading roof height for floor height moves both limits at once and the
+    /// best split is WORSE (9.6 degrees), because the drawn station rail hangs 0.75 under the rope, follows the
+    /// rope's pitch, and is already only 0.25 over the roof - it grazes the roof's tail from tan 0.125 (7.13
+    /// degrees), which is 2.2 units of decoration rather than the tower's own blocks and is why this number is
+    /// the crossarm's and not the rail's. Shortening the cabin to 3 blocks buys 14.0 degrees; thinning both
+    /// slabs buys 14.4. The only lever with real travel in it is the archway, i.e.
+    /// <see cref="SheaveHeight"/> and <c>hangDrop</c> together: each extra cell of tower adds 0.5 of slack per
+    /// side and 0.2 to this tangent (5 -> 21.8 degrees, 6 -> 31.0, 8 -> 45.0). That is a multiblock change and
+    /// it is not this one. <c>RopewayAssetContractTests.TheCabinFitsThroughTheTowerAtEveryPitch</c> re-derives
+    /// every number in this comment off the shipped shapes and fails if any of them moves.
+    /// </para>
+    /// </summary>
+    public const double PassablePitchTan = 0.2;
 
     /// <summary>
     /// Length of each end of a span that the tower's own structure occupies and that is therefore not
@@ -122,6 +175,62 @@ public static class SpanMath
         var horizontal = Math.Sqrt(dx * dx + dz * dz);
         radX = -(float)Math.Atan2(dy, horizontal);
         radY = (float)Math.Atan2(dx, dz);
+    }
+
+    /// <summary>
+    /// How steeply a span climbs, as a TANGENT - rise over horizontal run, unsigned, because a span is ridden
+    /// both ways. <see cref="double.PositiveInfinity"/> for a purely vertical span, which is buildable. Pure.
+    /// </summary>
+    public static double PitchTan(Vec3d from, Vec3d to)
+    {
+        if (from == null || to == null) return 0;
+
+        var plan = Math.Sqrt((to.X - from.X) * (to.X - from.X) + (to.Z - from.Z) * (to.Z - from.Z));
+        var rise = Math.Abs(to.Y - from.Y);
+        if (plan >= Epsilon) return rise / plan;
+        return rise < Epsilon ? 0 : double.PositiveInfinity;
+    }
+
+    /// <summary>
+    /// The rows <see cref="IsSpanClear"/> casts along, as offsets on its own <c>up</c> axis in blocks off the
+    /// rope line: one block apart, covering the band the cabin and the return strand sweep out on a span of the
+    /// given pitch (<paramref name="pitchSin"/> is the unit direction's Y). Pure, and the reason the sweep is
+    /// not a fixed ladder.
+    /// <para>
+    /// <c>up</c> is the PATH's vertical - perpendicular to the chord - so it leans back by the pitch, while the
+    /// cabin hangs plumb and stays level. The cabin's own length therefore projects onto <c>up</c>:
+    /// <c>hangDrop +/- CabinHalfHeight</c> vertically becomes <c>(hangDrop +/- 1.25)*cos</c>, and each end of
+    /// the 4-block body reaches a further <c>2.00*sin</c> - down at the tail, up at the nose. The return strand
+    /// sits <c>ReturnLift</c> straight up from the rope, so it projects as <c>ReturnLift*cos</c> and collapses
+    /// onto the rope line as the span goes vertical.
+    /// </para>
+    /// <para>
+    /// The fixed <c>[-ClearanceBelow-0.5, +ClearanceAbove+0.5] = [-3.5, +1.5]</c> this replaced was exactly
+    /// right at zero pitch and wrong at every other: worst under the cabin at 29.74 degrees, where the floor
+    /// reaches 4.031 below the path and 0.531 blocks of ground under a seated rider went uncertified; worst over
+    /// its nose at 89, where it reaches 1.977 against 1.5. Both are the same mistake and this is the one place
+    /// to fix it. At zero pitch this returns [-3.5, +1.3263] and the ladder built from it IS the old one.
+    /// </para>
+    /// </summary>
+    public static double[] ClearanceRows(double pitchSin)
+    {
+        var sin = Math.Min(1, Math.Abs(pitchSin));
+        var cos = Math.Sqrt(Math.Max(0, 1 - sin * sin));
+
+        var low = -(CabinHalfLength * sin + (EntityRopewayCabin.DefaultHangDrop + CabinHalfHeight) * cos);
+        var high = Math.Max(
+            CabinHalfLength * sin - (EntityRopewayCabin.DefaultHangDrop - CabinHalfHeight) * cos,
+            BEPylonBase.ReturnLift * cos);
+
+        // One block per row, each ray down the centre of its own row so it certifies +/-0.5 either side.
+        // Ceiling, so the ladder always covers the band and never leaves a sliver of it between two rays; the
+        // surplus goes at the top, over the strand, where the rope has just come from, rather than under the
+        // floor. The Epsilon keeps a band that is an exact multiple of a block from buying a row it does not
+        // need - at zero pitch it is 4.8263 and rounds to the 5 rows that shipped.
+        var rows = Math.Max(1, (int)Math.Ceiling(high - low - Epsilon));
+        var offsets = new double[rows];
+        for (var i = 0; i < rows; i++) offsets[i] = low + 0.5 + i;
+        return offsets;
     }
 
     /// <summary>
@@ -229,11 +338,19 @@ public static class SpanMath
     };
 
     /// <summary>
-    /// True when the corridor the rope needs between the two anchors is clear: 3 wide, from the return
-    /// strand's own row down to the bottom of the cabin. Parallel block-only ray casts through the engine's own DDA -
+    /// True when the corridor the rope needs between the two anchors is clear: 3 wide, and from the return
+    /// strand's own row down to the bottom of the cabin AT THIS SPAN'S PITCH - see <see cref="ClearanceRows"/> for
+    /// why that is not a fixed pair of rows. Parallel block-only ray casts through the engine's own DDA -
     /// a zero-width ray cannot certify a 3-wide cabin, and hand-rolling a voxel walk when
     /// <c>IWorldAccessor.InteresectionTester</c> already exists would be silly. Main thread only.
     /// Fails closed - a rope through a mountain is a bug report, a refused build is an annoyance.
+    /// <para>
+    /// The band is symmetric about the cabin, which also closes a direction-dependence in the near-vertical
+    /// branch below: it hard-codes <c>right = (1,0,0)</c>, so <c>up = Cross(right, dir)</c> flips sign with the
+    /// direction of travel. Against the old fixed and ASYMMETRIC row window that made a link clicked from the
+    /// top tower certify <c>Z-1..Z+3</c> and the ride check <c>Z-3..Z+1</c> - a link that succeeded and a cabin
+    /// that then refused to move. Anything that makes these rows asymmetric again re-opens it silently.
+    /// </para>
     /// </summary>
     public static bool IsSpanClear(IWorldAccessor world, Vec3d from, Vec3d to, out BlockPos firstBlocker)
     {
@@ -259,9 +376,13 @@ public static class SpanMath
                 : new Vec3d(-dir.Z, 0, dir.X).Normalize();
             var up = Cross(right, dir).Normalize();
 
+            // The rows the cabin and the strand actually occupy at THIS pitch, rather than a fixed ladder that
+            // was only ever the level-span answer.
+            var rows = ClearanceRows(dir.Y);
+
             for (var i = -ClearanceRadius; i <= ClearanceRadius; i++)
             {
-                for (var j = -ClearanceBelow; j <= ClearanceAbove; j++)
+                foreach (var j in rows)
                 {
                     var offset = new Vec3d(
                         right.X * i + up.X * j,

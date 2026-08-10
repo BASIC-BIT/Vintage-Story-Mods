@@ -392,8 +392,37 @@ public sealed class RopewayLinkService
         // Either end of the new span may have just become a corner, so both are asked.
         WarnOnCorner(player, beFrom, from, to);
         WarnOnCorner(player, beTo, to, from);
+        WarnOnPitch(player, anchorFrom, anchorTo);
 
         return true;
+    }
+
+    /// <summary>
+    /// One chat line when the span just strung is steeper than the tower can pass the cabin through. WARN,
+    /// NEVER REFUSE, for the same reason <see cref="WarnOnCorner"/> does: the route is legal, buildable and
+    /// works, and a ropeway that refused a climb would be refusing the thing it exists for. What the player
+    /// sees is the cabin's roof passing through the crossarm as it leaves the lower tower, and its floor
+    /// through the footing plinth as it comes down into one - both inside the four blocks at each end that
+    /// <see cref="SpanMath.TrimForTowers"/> hands to the tower's own structure, and neither of them a
+    /// collision, because a mounted rider has none.
+    /// <para>
+    /// It says the number rather than "too steep" because the number is the only actionable part: the cure is
+    /// a shallower span, and a player standing between two towers can see whether that is available. There is
+    /// no facing to turn and no block to break. See <see cref="SpanMath.PassablePitchTan"/> for why the tower
+    /// cannot simply be given the headroom instead.
+    /// </para>
+    /// </summary>
+    private static void WarnOnPitch(IServerPlayer player, Vec3d anchorFrom, Vec3d anchorTo)
+    {
+        var tan = SpanMath.PitchTan(anchorFrom, anchorTo);
+        if (tan <= SpanMath.PassablePitchTan) return;
+
+        player.SendMessage(
+            GlobalConstants.InfoLogChatGroup,
+            Lang.Get("ropeway:span-too-steep",
+                (int)Math.Round(Math.Atan(tan) * (180 / Math.PI)),
+                (int)Math.Round(Math.Atan(SpanMath.PassablePitchTan) * (180 / Math.PI))),
+            EnumChatType.Notification);
     }
 
     /// <summary>
@@ -567,6 +596,10 @@ public sealed class RopewayLinkService
             // the line. Nobody rides that: unseat first, exactly as DropAndDie does, and whoever was aboard
             // stays where the cabin was rather than being carried to where it is going. (The hand-break path
             // refuses outright while occupied; this is the explosion / SetBlock(0) path.)
+            //
+            // UnseatAll clears the riders past CanUnmount's nothing-under-us refusal itself - that clearance
+            // was here first and moved to the chokepoint, because DropAndDie is the other caller and clearing
+            // only this one left the other one covered by an argument about call order. See UnseatAll.
             cabin.UnseatAll();
 
             var survivor = PickSurvivor(survivors, cabin.LineKey);
