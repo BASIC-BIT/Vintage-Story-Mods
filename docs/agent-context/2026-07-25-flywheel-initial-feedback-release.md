@@ -469,9 +469,9 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   in its manifest's deterministic input provenance. Authored UV corners now follow each cuboid face's vertex order,
   including opposite-facing south, west, and down planes, while preserving authored quarter-turn rotations. Procedural
   spoke evidence now mirrors the runtime renderer's six face orders and UV assignments instead of generic cuboid UVs.
-- The post-review exact package contains 31 allowlisted entries, is 84,871 bytes, and has SHA-256
-  `842EE0765263549EDD9E18ECFADCFE07A39DD12C3A27E0754939FC3B1BFC88AC`. Entries are sorted, use a fixed ZIP timestamp,
-  and path-map build outputs to remove checkout-specific debug paths;
+- The post-review exact package contains 31 allowlisted entries, is 84,776 bytes, and has SHA-256
+  `7B7F47BBC0B05C993386E6108B1DFA2D5E3B541D11371ACCCAB4F74D0C2D0197`. Entries are sorted, use a fixed ZIP timestamp,
+  normalize packaged JSON and Markdown to UTF-8 LF, and path-map build outputs to remove checkout-specific debug paths;
   a second package run after changing a packaged source file's filesystem timestamp reproduced the same hash.
   Archive inspection finds no disabled content,
   compact-web residue, or obsolete player-facing tyre, rim, or blank labels.

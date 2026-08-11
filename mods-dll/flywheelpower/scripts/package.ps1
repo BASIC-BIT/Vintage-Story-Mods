@@ -58,6 +58,7 @@ $packageFiles = @(
         [pscustomobject]@{
             SourcePath = [string]$file
             EntryName = [System.IO.Path]::GetFileName($file)
+            IsText = [System.IO.Path]::GetExtension([string]$file) -in @('.json', '.md')
         }
     }
 
@@ -65,6 +66,7 @@ $packageFiles = @(
         [pscustomobject]@{
             SourcePath = $file.FullName
             EntryName = $file.FullName.Substring($projectRoot.Path.Length + 1).Replace('\', '/')
+            IsText = [System.IO.Path]::GetExtension($file.FullName) -in @('.json', '.md')
         }
     }
 ) | Sort-Object -Property EntryName -CaseSensitive
@@ -75,14 +77,26 @@ try {
     foreach ($file in $packageFiles) {
         $entry = $zip.CreateEntry($file.EntryName, [System.IO.Compression.CompressionLevel]::Optimal)
         $entry.LastWriteTime = $fixedEntryTimestamp
-        $sourceStream = [System.IO.File]::OpenRead($file.SourcePath)
         $entryStream = $entry.Open()
         try {
-            $sourceStream.CopyTo($entryStream)
+            if ($file.IsText) {
+                $text = [System.IO.File]::ReadAllText($file.SourcePath)
+                $normalizedText = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+                $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($normalizedText)
+                $entryStream.Write($bytes, 0, $bytes.Length)
+            }
+            else {
+                $sourceStream = [System.IO.File]::OpenRead($file.SourcePath)
+                try {
+                    $sourceStream.CopyTo($entryStream)
+                }
+                finally {
+                    $sourceStream.Dispose()
+                }
+            }
         }
         finally {
             $entryStream.Dispose()
-            $sourceStream.Dispose()
         }
     }
 }
@@ -182,6 +196,20 @@ try {
     )
     if ($unexpectedTimestamps.Count -gt 0) {
         throw "Package entries do not share the deterministic timestamp: $($unexpectedTimestamps.FullName -join ', ')"
+    }
+
+    foreach ($entry in $archive.Entries | Where-Object { [System.IO.Path]::GetExtension($_.FullName) -in @('.json', '.md') }) {
+        $stream = $entry.Open()
+        try {
+            for ($byte = $stream.ReadByte(); $byte -ge 0; $byte = $stream.ReadByte()) {
+                if ($byte -eq 13) {
+                    throw "Packaged text entry contains a non-normalized carriage return: $($entry.FullName)"
+                }
+            }
+        }
+        finally {
+            $stream.Dispose()
+        }
     }
 
     if ($missingEntries.Count -gt 0) {

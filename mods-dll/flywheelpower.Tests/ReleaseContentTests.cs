@@ -694,6 +694,8 @@ public sealed class ReleaseContentTests
 
         Assert.Contains("Sort-Object -Property EntryName -CaseSensitive", source, StringComparison.Ordinal);
         Assert.Contains("$entry.LastWriteTime = $fixedEntryTimestamp", source, StringComparison.Ordinal);
+        Assert.Contains("$text.Replace(\"`r`n\", \"`n\").Replace(\"`r\", \"`n\")", source, StringComparison.Ordinal);
+        Assert.Contains("[System.Text.UTF8Encoding]::new($false)", source, StringComparison.Ordinal);
         Assert.Contains("$sourceStream.CopyTo($entryStream)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("CreateEntryFromFile", source, StringComparison.Ordinal);
         Assert.Contains("<Deterministic>true</Deterministic>", project, StringComparison.Ordinal);
