@@ -106,8 +106,9 @@ public class ProximityLifecycleMessageFilterTests
 
     private static IServerPlayer CreatePlayerWithGroups(params int[] groupIds)
     {
-        var player = Substitute.For<IServerPlayer>();
-        player.Groups.Returns(groupIds.Select(groupId => new PlayerGroupMembership { GroupUid = groupId }).ToArray());
-        return player;
+        return new FakeServerPlayer
+        {
+            Groups = groupIds.Select(groupId => new PlayerGroupMembership { GroupUid = groupId }).ToArray()
+        };
     }
 }

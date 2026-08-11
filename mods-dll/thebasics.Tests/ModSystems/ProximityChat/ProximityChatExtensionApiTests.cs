@@ -92,9 +92,6 @@ public class ProximityChatExtensionApiTests
 
     private static IServerPlayer CreatePlayer(string uid, string name)
     {
-        var player = Substitute.For<IServerPlayer>();
-        player.PlayerUID.Returns(uid);
-        player.PlayerName.Returns(name);
-        return player;
+        return new FakeServerPlayer(uid, name);
     }
 }

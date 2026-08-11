@@ -356,7 +356,7 @@ public class CharacterSheetSystemTests
         EnsureLangInitialized();
         var admin = CreatePlayer("admin-1", "Admin");
         var target = CreatePlayer("player-1", "Alice");
-        admin.HasPrivilege("commandplayer").Returns(true);
+        admin.PrivilegeCheck = privilege => privilege == "commandplayer";
         var system = CreateSystem(admin, target, CreateConfig(new CharacterSheetFieldDefinition { Id = "adminnote", Label = "Admin Note", Visibility = CharacterSheetFieldVisibilities.Admin }));
 
         var view = system.SaveClientFields(admin, CreateSaveRequest("adminnote", "Needs review", target.PlayerUID, isAdminAction: true));
@@ -451,7 +451,9 @@ public class CharacterSheetSystemTests
         var transformedContext = transformer.Transform(context);
 
         transformedContext.State.Should().Be(MessageContextState.STOP);
-        player.Received(1).SendMessage(Arg.Any<int>(), "thebasics:charsheet-required-warning", EnumChatType.CommandError);
+        player.SentMessages.Should().ContainSingle()
+            .Which.Should().Match<(int GroupId, string Message, EnumChatType ChatType, string Data)>(
+                sent => sent.Message == "thebasics:charsheet-required-warning" && sent.ChatType == EnumChatType.CommandError);
     }
 
     [Fact]
@@ -517,18 +519,9 @@ public class CharacterSheetSystemTests
         };
     }
 
-    private static IServerPlayer CreatePlayer(string uid = "player-1", string name = "Alice")
+    private static FakeServerPlayer CreatePlayer(string uid = "player-1", string name = "Alice")
     {
-        var player = Substitute.For<IServerPlayer>();
-        player.PlayerUID.Returns(uid);
-        player.PlayerName.Returns(name);
-        var modData = new Dictionary<string, byte[]>();
-        player.GetModdata(Arg.Any<string>()).Returns(call => modData.TryGetValue(call.Arg<string>(), out var value) ? value : null);
-        player.When(call => call.SetModdata(Arg.Any<string>(), Arg.Any<byte[]>()))
-            .Do(call => modData[call.ArgAt<string>(0)] = call.ArgAt<byte[]>(1));
-        player.When(call => call.RemoveModdata(Arg.Any<string>()))
-            .Do(call => modData.Remove(call.ArgAt<string>(0)));
-        return player;
+        return new FakeServerPlayer(uid, name);
     }
 
     private static CharacterSheetSystem CreateSystem(IServerPlayer player, ModConfig config)
