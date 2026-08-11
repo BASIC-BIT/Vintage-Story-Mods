@@ -621,9 +621,16 @@ public sealed class ReleaseContentTests
     [Fact]
     public void MultiblockPartsDelegateOnlyToFlywheelPrincipals()
     {
+        BlockFlywheelStand compactStand = new()
+        {
+            Variant = new Vintagestory.API.Util.RelaxedReadOnlyDictionary<string, string>(
+                new Dictionary<string, string> { ["size"] = "compact" })
+        };
+
         Assert.True(BlockFlywheelPart.IsValidPrincipalBlock(new BlockFlywheelStand()));
         Assert.True(BlockFlywheelPart.IsValidPrincipalBlock(new BlockFlywheel()));
-        Assert.True(BlockFlywheelPart.IsValidPrincipalBlock(new BlockCompactFlywheel()));
+        Assert.False(BlockFlywheelPart.IsValidPrincipalBlock(compactStand));
+        Assert.False(BlockFlywheelPart.IsValidPrincipalBlock(new BlockCompactFlywheel()));
         Assert.False(BlockFlywheelPart.IsValidPrincipalBlock(new Block()));
         Assert.False(BlockFlywheelPart.IsValidPrincipalBlock(null));
     }

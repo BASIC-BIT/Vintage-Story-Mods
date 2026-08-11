@@ -108,42 +108,41 @@ def sample_animation_pose(
     for name in element_names:
         pose: dict[str, Vec3] = {}
         for channel, properties in channels.items():
-            keyed = []
-            for keyframe in keyframes:
-                definition = keyframe.get("elements", {}).get(name)
-                if definition is not None and any(prop in definition for prop in properties):
-                    keyed.append((
-                        int(keyframe["frame"]),
-                        tuple(
-                            float(definition.get(prop, defaults[channel][index]))
-                            for index, prop in enumerate(properties)
-                        ),
-                        tuple(
-                            bool(definition.get(prop, False))
-                            for prop in shortest_rotation_properties
-                        ),
-                    ))
-            if not keyed:
-                continue
+            sampled_axes = []
+            channel_is_keyed = False
+            for axis, prop in enumerate(properties):
+                keyed = []
+                for keyframe in keyframes:
+                    definition = keyframe.get("elements", {}).get(name)
+                    if definition is not None and prop in definition:
+                        keyed.append((
+                            int(keyframe["frame"]),
+                            float(definition[prop]),
+                            channel == "rotation"
+                            and bool(definition.get(shortest_rotation_properties[axis], False)),
+                        ))
+                if not keyed:
+                    sampled_axes.append(defaults[channel][axis])
+                    continue
 
-            right_index = next((index for index, (at, _, _) in enumerate(keyed) if at > frame), 0)
-            right_frame, right_value, _ = keyed[right_index]
-            left_frame, left_value, left_shortest_rotation = keyed[(right_index - 1) % len(keyed)]
-            if len(keyed) == 1:
-                amount = 0.0
-            elif right_frame <= left_frame:
-                distance = right_frame + quantity - left_frame
-                amount = ((frame - left_frame) % quantity) / distance
-            else:
-                amount = (frame - left_frame) / (right_frame - left_frame)
-            pose[channel] = tuple(
-                (
-                    lerp_angle(left_value[index], right_value[index], amount)
-                    if channel == "rotation" and left_shortest_rotation[index]
-                    else lerp(left_value[index], right_value[index], amount)
+                channel_is_keyed = True
+                right_index = next((index for index, (at, _, _) in enumerate(keyed) if at > frame), 0)
+                right_frame, right_value, _ = keyed[right_index]
+                left_frame, left_value, left_shortest_rotation = keyed[(right_index - 1) % len(keyed)]
+                if len(keyed) == 1:
+                    amount = 0.0
+                elif right_frame <= left_frame:
+                    distance = right_frame + quantity - left_frame
+                    amount = ((frame - left_frame) % quantity) / distance
+                else:
+                    amount = (frame - left_frame) / (right_frame - left_frame)
+                sampled_axes.append(
+                    lerp_angle(left_value, right_value, amount)
+                    if left_shortest_rotation
+                    else lerp(left_value, right_value, amount)
                 )
-                for index in range(3)
-            )  # type: ignore[assignment]
+            if channel_is_keyed:
+                pose[channel] = tuple(sampled_axes)  # type: ignore[assignment]
         poses[name] = pose
     return poses
 

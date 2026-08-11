@@ -356,6 +356,28 @@ class HierarchicalShapeTests(unittest.TestCase):
         self.assertEqual((360, 180, 0), midpoint)
         self.assertEqual((0, 180, 0), wrapped)
 
+    def test_animation_pose_interpolates_axes_on_their_own_keyframes(self):
+        data = {
+            "animations": [{
+                "code": "independent-axes",
+                "quantityframes": 20,
+                "keyframes": [
+                    {"frame": 0, "elements": {"Body": {"rotationX": 0}}},
+                    {"frame": 5, "elements": {"Body": {"rotationY": 100}}},
+                    {"frame": 10, "elements": {"Body": {"rotationX": 10}}},
+                    {"frame": 15, "elements": {"Body": {"rotationY": 200}}},
+                ],
+            }],
+        }
+
+        rotation = renderer.sample_animation_pose(
+            data,
+            "independent-axes",
+            7.5,
+        )["Body"]["rotation"]
+
+        self.assertEqual((7.5, 125, 0), rotation)
+
     def test_animated_parent_rotation_moves_child(self):
         faces, _ = self.load_shape({
             "elements": [{

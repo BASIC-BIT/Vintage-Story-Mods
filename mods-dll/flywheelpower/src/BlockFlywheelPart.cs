@@ -122,6 +122,7 @@ public sealed class BlockFlywheelPart : Block
 
     internal static bool IsValidPrincipalBlock(Block block)
     {
-        return block is BlockFlywheelStand or BlockFlywheel or BlockCompactFlywheel;
+        return block is BlockFlywheel
+            || block is BlockFlywheelStand && block.Variant?["size"] != "compact";
     }
 }
