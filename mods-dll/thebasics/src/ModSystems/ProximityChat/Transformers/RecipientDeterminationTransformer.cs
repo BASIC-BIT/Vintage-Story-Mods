@@ -125,8 +125,8 @@ public class RecipientDeterminationTransformer : MessageTransformerBase
 
     private bool RequiresSpeechLineOfSight(ProximityChatMode chatMode)
     {
-        return _config.RequireLineOfSightForSpeech != null &&
-               _config.RequireLineOfSightForSpeech.TryGetValue(chatMode, out var required) &&
+        return _config.RequireClearSoundPathForSpeech != null &&
+               _config.RequireClearSoundPathForSpeech.TryGetValue(chatMode, out var required) &&
                required;
     }
 

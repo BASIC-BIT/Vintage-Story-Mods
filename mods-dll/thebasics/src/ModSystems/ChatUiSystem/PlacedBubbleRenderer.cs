@@ -204,7 +204,7 @@ public sealed class PlacedBubbleRenderer : IRenderer
 
         if (!_losCache.TryGetValue(key, out var entry) || nowMs >= entry.nextCheckMs)
         {
-            var canSee = VisibilityUtils.HasLineOfSight(world, observer, targetPos);
+            var canSee = VisibilityUtils.HasStrictLineOfSight(world, observer, targetPos);
             var refreshMs = canSee ? 250L : 500L;
             entry = (canSee, nowMs + refreshMs);
             _losCache[key] = entry;

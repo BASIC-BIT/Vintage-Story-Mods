@@ -29,7 +29,7 @@ public class ChatOcclusionTests
             var config = CreateConfig();
 
             config.SpeechOcclusionWallPenaltyBlocks.Should().Be(0);
-            config.RequireLineOfSightForSpeech.Values.Should().AllSatisfy(required => required.Should().BeFalse());
+            config.RequireClearSoundPathForSpeech.Values.Should().AllSatisfy(required => required.Should().BeFalse());
         }
 
         [Fact]
@@ -37,7 +37,7 @@ public class ChatOcclusionTests
         {
             var config = CreateConfig();
 
-            config.RequireLineOfSightForSpeech.Keys.Should().BeEquivalentTo(
+            config.RequireClearSoundPathForSpeech.Keys.Should().BeEquivalentTo(
                 [ProximityChatMode.Normal, ProximityChatMode.Whisper, ProximityChatMode.Yell]);
         }
     }

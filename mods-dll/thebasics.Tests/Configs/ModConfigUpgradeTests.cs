@@ -63,8 +63,53 @@ public class ModConfigUpgradeTests
         var config = LoadLegacyConfig();
 
         config.SpeechOcclusionWallPenaltyBlocks.Should().Be(0);
-        config.RequireLineOfSightForSpeech.Should().NotBeNull();
-        config.RequireLineOfSightForSpeech.Values.Should().AllSatisfy(v => v.Should().BeFalse());
+        config.RequireClearSoundPathForSpeech.Should().NotBeNull();
+        config.RequireClearSoundPathForSpeech.Values.Should().AllSatisfy(v => v.Should().BeFalse());
+    }
+
+    [Fact]
+    public void ConfiguredClampFontSizesSurviveTheRaisedDefaultFloor()
+    {
+        // Raising the shipped floor from 6 to 9 must not rewrite a server that chose its own sizes.
+        var config = LoadLegacyConfig();
+
+        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 6);
+    }
+
+    [Fact]
+    public void RenamedSoundPathKeyIsReadFromTheOldConfigKey()
+    {
+        // A live server's the_basics.json still says RequireLineOfSightForSpeech. Dropping it on
+        // rename would silently turn the experiment off for anyone who had switched it on.
+        const string json = """
+        {
+          "RequireLineOfSightForSpeech": { "Yell": true, "Normal": false, "Whisper": false }
+        }
+        """;
+
+        var config = JsonConvert.DeserializeObject<ModConfig>(json);
+        config!.InitializeDefaultsIfNeeded();
+
+        config.RequireClearSoundPathForSpeech[ProximityChatMode.Yell].Should().BeTrue();
+        config.RequireClearSoundPathForSpeech[ProximityChatMode.Normal].Should().BeFalse();
+    }
+
+    [Fact]
+    public void CurrentSoundPathKeyWinsWhenAConfigCarriesBoth()
+    {
+        // A config rewritten by the admin panel can carry the new key while the hand-edited old one
+        // lingers. The current key has to win regardless of which appears first in the document.
+        const string json = """
+        {
+          "RequireClearSoundPathForSpeech": { "Yell": true, "Normal": true, "Whisper": true },
+          "RequireLineOfSightForSpeech": { "Yell": false, "Normal": false, "Whisper": false }
+        }
+        """;
+
+        var config = JsonConvert.DeserializeObject<ModConfig>(json);
+        config!.InitializeDefaultsIfNeeded();
+
+        config.RequireClearSoundPathForSpeech.Values.Should().AllSatisfy(required => required.Should().BeTrue());
     }
 
     [Theory]
@@ -91,7 +136,7 @@ public class ModConfigUpgradeTests
         var config = LoadLegacyConfig();
         config.ProximityChatModeQuestionVerbs.Remove(ProximityChatMode.Whisper);
         config.ProximityChatModeVerbs.Remove(ProximityChatMode.Whisper);
-        config.RequireLineOfSightForSpeech.Remove(ProximityChatMode.Whisper);
+        config.RequireClearSoundPathForSpeech.Remove(ProximityChatMode.Whisper);
 
         var verb = ChatHelper.GetProximityChatVerb(null, ProximityChatMode.Whisper, config, "anyone?");
 
@@ -105,7 +150,7 @@ public class ModConfigUpgradeTests
         // collide with existing ones, which would silently corrupt an unrelated field.
         var config = LoadLegacyConfig();
         config.ProximityChatModeQuestionVerbs[ProximityChatMode.Normal] = ["inquires"];
-        config.RequireLineOfSightForSpeech[ProximityChatMode.Yell] = true;
+        config.RequireClearSoundPathForSpeech[ProximityChatMode.Yell] = true;
         config.SpeechOcclusionWallPenaltyBlocks = 7;
         config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
 
@@ -115,7 +160,7 @@ public class ModConfigUpgradeTests
         var restored = Serializer.Deserialize<ModConfig>(stream);
 
         restored.ProximityChatModeQuestionVerbs[ProximityChatMode.Normal].Should().BeEquivalentTo(["inquires"]);
-        restored.RequireLineOfSightForSpeech[ProximityChatMode.Yell].Should().BeTrue();
+        restored.RequireClearSoundPathForSpeech[ProximityChatMode.Yell].Should().BeTrue();
         restored.SpeechOcclusionWallPenaltyBlocks.Should().Be(7);
         restored.ProximityChatModeDistances[ProximityChatMode.Normal].Should().Be(ModConfig.UnlimitedRange);
 

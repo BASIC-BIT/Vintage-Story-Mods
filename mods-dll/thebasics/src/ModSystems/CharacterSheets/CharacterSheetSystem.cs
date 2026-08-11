@@ -656,7 +656,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
                 return Error(Lang.Get("thebasics:charsheet-error-look-range", Config.CharacterSheetLookRange));
             }
 
-            if (Config.CharacterSheetLookRequiresLineOfSight && !VisibilityUtils.HasLineOfSight(API.World, viewer.Entity, target.Entity))
+            if (Config.CharacterSheetLookRequiresLineOfSight && !VisibilityUtils.HasStrictLineOfSight(API.World, viewer.Entity, target.Entity))
             {
                 return Error(Lang.Get("thebasics:charsheet-error-look-los"));
             }
@@ -717,7 +717,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
             return CreateErrorView(Lang.Get("thebasics:charsheet-error-look-range", Config.CharacterSheetLookRange));
         }
 
-        if (Config.CharacterSheetLookRequiresLineOfSight && !VisibilityUtils.HasLineOfSight(API.World, viewer.Entity, target.Entity))
+        if (Config.CharacterSheetLookRequiresLineOfSight && !VisibilityUtils.HasStrictLineOfSight(API.World, viewer.Entity, target.Entity))
         {
             return CreateErrorView(Lang.Get("thebasics:charsheet-error-look-los"));
         }

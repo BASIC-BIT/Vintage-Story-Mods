@@ -61,7 +61,7 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
         return clampedSize;
     }
 
-    private static readonly int[] FallbackClampFontSizes = [30, 16, 12, 6];
+    private static readonly int[] FallbackClampFontSizes = [30, 16, 12, 9];
 
     private int[] ClampFontSizes =>
         _config.ProximityChatClampFontSizes is { Length: > 0 }

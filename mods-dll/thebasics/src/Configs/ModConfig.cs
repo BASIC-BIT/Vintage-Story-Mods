@@ -1,4 +1,7 @@
 #pragma warning disable S1133 // Deprecated config members are retained for live config compatibility.
+#pragma warning disable S1168 // Legacy shims must getter-return null: NullValueHandling.Ignore only
+                              // skips nulls, so an empty collection would write the retired key back
+                              // into every saved config.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -186,7 +189,7 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, 12 }
             };
 
-            ProximityChatClampFontSizes ??= [30, 16, 12, 6];
+            ProximityChatClampFontSizes ??= [30, 16, 12, 9];
 
 
             InitializeProximityChatVerbDefaults();
@@ -222,7 +225,7 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, new[] { "asks" } }
             };
 
-            RequireLineOfSightForSpeech ??= new Dictionary<ProximityChatMode, bool>
+            RequireClearSoundPathForSpeech ??= new Dictionary<ProximityChatMode, bool>
             {
                 { ProximityChatMode.Yell, false },
                 { ProximityChatMode.Normal, false },
@@ -538,11 +541,33 @@ namespace thebasics.Configs
         public IDictionary<ProximityChatMode, string[]> ProximityChatModeQuestionVerbs { get; set; }
 
         /// <summary>
-        /// Experimental, off by default. When set for a mode, speech in that mode only reaches players
-        /// the speaker has an unobstructed line to. Glass and water block speech; foliage does not.
+        /// Experimental, off by default. When set for a mode, speech in that mode only reaches
+        /// players the speaker has an unobstructed <em>sound</em> path to. Glass and water block it;
+        /// foliage does not.
+        ///
+        /// Named for sound rather than sight deliberately. It was once RequireClearSoundPathForSpeech,
+        /// which described neither the filter it uses nor the behaviour it produces: a sealed glass
+        /// window blocks speech while a hedge does not.
         /// </summary>
         [ProtoMember(148)]
-        public IDictionary<ProximityChatMode, bool> RequireLineOfSightForSpeech { get; set; }
+        public IDictionary<ProximityChatMode, bool> RequireClearSoundPathForSpeech { get; set; }
+
+        [ProtoIgnore]
+        [JsonProperty("RequireLineOfSightForSpeech", NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Use RequireClearSoundPathForSpeech. The setting models sound, not sight.")]
+        public IDictionary<ProximityChatMode, bool> RequireLineOfSightForSpeechLegacy
+        {
+            get => null;
+            set
+            {
+                // Only adopt the old key when the new one is absent, so a config carrying both does
+                // not have its current setting overwritten by the stale one.
+                if (value != null && RequireClearSoundPathForSpeech == null)
+                {
+                    RequireClearSoundPathForSpeech = value;
+                }
+            }
+        }
 
         /// <summary>
         /// Experimental, off by default (0). Blocks of effective distance added per sound-occluding

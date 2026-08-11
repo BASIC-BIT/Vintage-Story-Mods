@@ -75,12 +75,12 @@ public static class ConfigAdminSettingRegistry
             errors.Add($"{mode} range must be greater than its obfuscation start.");
         }
 
-        // Line of sight needs a bounded range to raycast against; at unlimited range the check
-        // is skipped rather than run against the whole map. Say so instead of ignoring it.
+        // The sound path check needs a bounded range to raycast against; at unlimited range it is
+        // skipped rather than run against the whole map. Say so instead of ignoring it.
         if (ModConfig.IsUnlimitedRange(range) &&
-            ModConfig.GetModeValue(config.RequireLineOfSightForSpeech, mode, false))
+            ModConfig.GetModeValue(config.RequireClearSoundPathForSpeech, mode, false))
         {
-            errors.Add($"{mode} cannot combine an unlimited range with RequireLineOfSightForSpeech. Set a bounded range or turn the line-of-sight requirement off.");
+            errors.Add($"{mode} cannot combine an unlimited range with RequireClearSoundPathForSpeech. Set a bounded range or turn the sound path requirement off.");
         }
     }
 
@@ -275,7 +275,7 @@ public static class ConfigAdminSettingRegistry
             settings.Add(ModeText(ModeMeta("ProximityChatModePunctuation", "Chat/RP Text", mode, "punctuation", "Punctuation appended by auto-punctuation."), mode, c => c.ProximityChatModePunctuation, DefaultPunctuation(mode), maxLength: 8));
             settings.Add(ModeTextArray(ModeMeta("ProximityChatModeVerbs", "Chat/RP Text", mode, "verbs", "Comma-separated speech verbs for this mode."), mode, c => c.ProximityChatModeVerbs, DefaultVerbs(mode)));
             settings.Add(ModeTextArray(ModeMeta("ProximityChatModeQuestionVerbs", "Chat/RP Text", mode, "question verbs", "Comma-separated verbs used when a message ends in a question mark."), mode, c => c.ProximityChatModeQuestionVerbs, DefaultQuestionVerbs()));
-            settings.Add(ModeBool(ModeMeta("RequireLineOfSightForSpeech", "Chat/Occlusion", mode, "require line of sight", "Experimental. Only deliver speech in this mode to players the speaker has a clear line to."), mode, c => c.RequireLineOfSightForSpeech, defaultValue: false));
+            settings.Add(ModeBool(ModeMeta("RequireClearSoundPathForSpeech", "Chat/Occlusion", mode, "require clear sound path", "Experimental. Only deliver speech in this mode to players with an unobstructed sound path from the speaker. Glass and water block it; foliage does not."), mode, c => c.RequireClearSoundPathForSpeech, defaultValue: false));
         }
 
         settings.Add(IntArray(new SettingMeta("ProximityChatClampFontSizes", "Chat/Font Sizes", "Clamp font sizes", "Comma-separated allowed distance font sizes.", ConfigAdminReloadBehavior.Live), c => c.ProximityChatClampFontSizes, (c, v) => c.ProximityChatClampFontSizes = v, (1, 128)));
