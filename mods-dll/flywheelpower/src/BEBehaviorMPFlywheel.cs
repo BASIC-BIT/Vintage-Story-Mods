@@ -14,7 +14,11 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
     private const float VanillaAngleScale = 5f;
     private const float PassiveResistance = 0.0005f;
     private const float Epsilon = 0.00001f;
-    private const float StateSpeedDeltaTolerance = 0.00025f;
+    private const int MinimumSparkIntervalTicks = 8;
+    private const int SparkIntervalJitterTicks = 8;
+    private const float SpeedTrendSmoothing = 0.25f;
+    private const float SpeedTrendWindowSeconds = 0.5f;
+    private const float NetworkSpeedDampingSeconds = 0.5f;
 
     private CompositeShape axleShape;
     private CompositeShape flywheelShape;
@@ -38,11 +42,20 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
     private long lastTorqueTick = -1;
     private float lastNetworkSpeed;
     private float lastTransferTorque;
-    private float lastTransferEnergyDelta;
+    private float lastReturnedTorque;
+    private float smoothedSpeedChangePerSecond;
     private float lastResistance;
     private float lastLossTorque;
+    private float filteredNetworkSpeed;
+    private bool hasFilteredNetworkSpeed;
+    private float trendWindowStartSpeed;
+    private float trendWindowElapsedSeconds;
+    private bool trendWindowInitialized;
     private float flywheelAngleRad;
     private long lastAngleMs;
+    private long nextSlipSparkTick;
+    private long nextOverspeedSparkTick;
+    private long nextOverspeedSmokeTick;
 
     public override float AngleRad => base.AngleRad;
 
@@ -107,19 +120,36 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         {
             (flywheelSpeed, lastNetworkSpeed, lastTransferTorque, flywheelAngleRad) =
                 FlywheelDirectionRebase.Rebase(flywheelSpeed, lastNetworkSpeed, lastTransferTorque, flywheelAngleRad);
+            filteredNetworkSpeed = -filteredNetworkSpeed;
+            lastReturnedTorque = 0f;
         }
     }
 
     public override float GetTorque(long tick, float speed, out float resistance)
     {
         float dt = GetDeltaTime(tick);
+        float intervalNetworkSpeed = FlywheelCouplingMath.DampNetworkSpeed(
+            filteredNetworkSpeed,
+            speed,
+            hasFilteredNetworkSpeed,
+            dt,
+            NetworkSpeedDampingSeconds);
+        filteredNetworkSpeed = intervalNetworkSpeed;
+        hasFilteredNetworkSpeed = true;
         if (!slipCoupled)
         {
             flywheelSpeed = speed;
             lastNetworkSpeed = speed;
             lastTransferTorque = 0f;
-            lastTransferEnergyDelta = 0f;
-            lastLossTorque = GetLossTorque(Math.Abs(speed));
+            lastReturnedTorque = 0f;
+            smoothedSpeedChangePerSecond = 0f;
+            ResetSpeedTrend();
+            lastLossTorque = FlywheelCouplingMath.GetLossTorque(
+                Math.Abs(speed),
+                baseBearingLoss,
+                viscousBearingLoss,
+                windageLoss,
+                safeSpeed);
             resistance = PassiveResistance + lastLossTorque;
             lastResistance = resistance;
 
@@ -132,16 +162,26 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         }
 
         couplingEngagement = Math.Min(1f, couplingEngagement + dt / Math.Max(couplingRampSeconds, Epsilon));
-        float transferTorque = GameMath.Clamp(couplingStrength * couplingEngagement * (flywheelSpeed - speed), -maxTransferTorque, maxTransferTorque);
+        FlywheelStep step = FlywheelCouplingMath.Step(
+            flywheelSpeed,
+            intervalNetworkSpeed,
+            inertia,
+            couplingStrength,
+            couplingEngagement,
+            maxTransferTorque,
+            baseBearingLoss,
+            viscousBearingLoss,
+            windageLoss,
+            safeSpeed,
+            dt);
+        flywheelSpeed = step.Speed;
+        float transferTorque = step.TransferTorque;
+        lastLossTorque = step.LossTorque;
+        UpdateSpeedTrend(dt);
 
-        float beforeTransferSpeed = flywheelSpeed;
-        ApplyFlywheelTorque(-transferTorque, dt);
-        lastTransferEnergyDelta = Math.Abs(flywheelSpeed) - Math.Abs(beforeTransferSpeed);
-        ApplyLosses(dt);
-
-        bool drivesNetwork = Math.Abs(speed) < Epsilon
+        bool drivesNetwork = Math.Abs(intervalNetworkSpeed) < Epsilon
             ? Math.Abs(transferTorque) > Epsilon
-            : transferTorque * speed > 0f;
+            : transferTorque * intervalNetworkSpeed > 0f;
 
         resistance = PassiveResistance;
         float torque = 0f;
@@ -154,13 +194,20 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
             resistance += Math.Abs(transferTorque);
         }
 
-        lastNetworkSpeed = speed;
+        lastNetworkSpeed = intervalNetworkSpeed;
         lastTransferTorque = transferTorque;
+        lastReturnedTorque = torque;
         lastResistance = resistance;
 
-        if (Api.Side == EnumAppSide.Server && tick % 10 == 0)
+        if (Api.Side == EnumAppSide.Server)
         {
-            Blockentity.MarkDirty(false);
+            SpawnSlipSparks(tick);
+            SpawnOverspeedSparks(tick);
+            SpawnOverspeedSmoke(tick);
+            if (tick % 10 == 0)
+            {
+                Blockentity.MarkDirty(false);
+            }
         }
 
         return torque;
@@ -172,7 +219,8 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         flywheelSpeed = tree.GetFloat("flywheelSpeed");
         lastNetworkSpeed = tree.GetFloat("lastNetworkSpeed");
         lastTransferTorque = tree.GetFloat("lastTransferTorque");
-        lastTransferEnergyDelta = tree.GetFloat("lastTransferEnergyDelta");
+        lastReturnedTorque = tree.GetFloat("lastReturnedTorque");
+        smoothedSpeedChangePerSecond = tree.GetFloat("smoothedSpeedChangePerSecond");
         lastResistance = tree.GetFloat("lastResistance");
         lastLossTorque = tree.GetFloat("lastLossTorque");
         base.FromTreeAttributes(tree, worldAccessForResolve);
@@ -190,7 +238,8 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         tree.SetFloat("flywheelSpeed", flywheelSpeed);
         tree.SetFloat("lastNetworkSpeed", lastNetworkSpeed);
         tree.SetFloat("lastTransferTorque", lastTransferTorque);
-        tree.SetFloat("lastTransferEnergyDelta", lastTransferEnergyDelta);
+        tree.SetFloat("lastReturnedTorque", lastReturnedTorque);
+        tree.SetFloat("smoothedSpeedChangePerSecond", smoothedSpeedChangePerSecond);
         tree.SetFloat("lastResistance", lastResistance);
         tree.SetFloat("lastLossTorque", lastLossTorque);
         base.ToTreeAttributes(tree);
@@ -199,21 +248,33 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
     public override void GetBlockInfo(IPlayer forPlayer, StringBuilder sb)
     {
         base.GetBlockInfo(forPlayer, sb);
+        if (!FlywheelPowerModSystem.Config.ShowDebugBlockInfo)
+        {
+            return;
+        }
 
         float displayFlywheelSpeed = GetDisplayFlywheelSpeed();
         float speedAbs = Math.Abs(displayFlywheelSpeed);
-        float safeRatio = safeSpeed <= 0f ? 0f : GameMath.Clamp(speedAbs / safeSpeed, 0f, 1.5f);
-        float storedPercent = GameMath.Clamp(safeRatio * safeRatio * 100f, 0f, 150f);
-        float slip = Math.Abs(displayFlywheelSpeed - lastNetworkSpeed);
+        float safeRatio = FlywheelSafety.GetRatedSpeedRatio(speedAbs, safeSpeed);
+        double storedPercent = FlywheelSafety.GetStoredEnergyPercent(speedAbs, safeSpeed);
+        float couplingLoadPercent = FlywheelTelemetry.GetCouplingLoadPercent(lastTransferTorque, maxTransferTorque);
+        float slipPercent = FlywheelTelemetry.GetSlipPercent(displayFlywheelSpeed, lastNetworkSpeed, safeSpeed);
 
         sb.AppendLine(Lang.Get("flywheelpower:blockinfo-state", GetStateLabel()));
         sb.AppendLine(Lang.Get("flywheelpower:blockinfo-speed", Math.Round(displayFlywheelSpeed, 2), Math.Round(lastNetworkSpeed, 2)));
         sb.AppendLine(Lang.Get("flywheelpower:blockinfo-energy", Math.Round(storedPercent, 0)));
         sb.AppendLine(Lang.Get("flywheelpower:blockinfo-physical", Math.Round(rotatingMassKg), Math.Round(inertia, 3)));
         string torqueKey = slipCoupled ? "flywheelpower:blockinfo-coupling" : "flywheelpower:blockinfo-shaft";
-        sb.AppendLine(Lang.Get(torqueKey, Math.Round(lastTransferTorque, 3), Math.Round(lastResistance, 3)));
+        string couplingLimit = slipCoupled && couplingLoadPercent >= 99.5f
+            ? Lang.Get("flywheelpower:blockinfo-coupling-limit")
+            : string.Empty;
+        sb.AppendLine(Lang.Get(torqueKey, Math.Round(couplingLoadPercent), couplingLimit));
+        if (slipCoupled)
+        {
+            sb.AppendLine(Lang.Get("flywheelpower:blockinfo-mismatch", Math.Round(slipPercent)));
+        }
 
-        if (slipCoupled && slip > 0.15f)
+        if (IsActivelySlipping())
         {
             sb.AppendLine(Lang.Get("flywheelpower:blockinfo-slipping"));
         }
@@ -223,9 +284,14 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
             sb.AppendLine(Lang.Get("flywheelpower:blockinfo-losses", Math.Round(lastLossTorque, 3)));
         }
 
-        if (safeRatio >= 0.9f)
+        double ratedSpeedPercent = Math.Round(safeRatio * 100f);
+        if (safeRatio > 1f)
         {
-            sb.AppendLine(Lang.Get("flywheelpower:blockinfo-overspeed"));
+            sb.AppendLine(Lang.Get("flywheelpower:blockinfo-overspeed", ratedSpeedPercent));
+        }
+        else if (safeRatio >= 0.9f)
+        {
+            sb.AppendLine(Lang.Get("flywheelpower:blockinfo-near-limit", ratedSpeedPercent));
         }
     }
 
@@ -260,49 +326,11 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         if (tickDelta > 5)
         {
             couplingEngagement = 0f;
+            hasFilteredNetworkSpeed = false;
+            ResetSpeedTrend();
         }
 
         return Math.Min(0.25f, tickDelta * SecondsPerMechanicalTick);
-    }
-
-    private void ApplyFlywheelTorque(float torque, float dt)
-    {
-        if (inertia <= 0f)
-        {
-            return;
-        }
-
-        flywheelSpeed += torque / inertia * dt;
-        if (float.IsNaN(flywheelSpeed) || float.IsInfinity(flywheelSpeed))
-        {
-            flywheelSpeed = 0f;
-        }
-    }
-
-    private void ApplyLosses(float dt)
-    {
-        float speedAbs = Math.Abs(flywheelSpeed);
-        if (speedAbs < Epsilon)
-        {
-            flywheelSpeed = 0f;
-            lastLossTorque = 0f;
-            return;
-        }
-
-        float lossTorque = GetLossTorque(speedAbs);
-        float speedLoss = lossTorque / Math.Max(inertia, Epsilon) * dt;
-        flywheelSpeed = Math.Sign(flywheelSpeed) * Math.Max(0f, speedAbs - speedLoss);
-        lastLossTorque = lossTorque;
-    }
-
-    private float GetLossTorque(float speedAbs)
-    {
-        if (speedAbs < Epsilon)
-        {
-            return 0f;
-        }
-
-        return baseBearingLoss + viscousBearingLoss * speedAbs + windageLoss * speedAbs * speedAbs;
     }
 
     private string GetStateLabel()
@@ -314,22 +342,36 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
                 : Lang.Get("flywheelpower:blockinfo-state-idle");
         }
 
-        if (lastTransferEnergyDelta > StateSpeedDeltaTolerance)
-        {
-            return Lang.Get("flywheelpower:blockinfo-state-charging");
-        }
+        float gearedRatio = GearedRatio;
+        float networkSpeed = Network?.Speed ?? lastNetworkSpeed;
+        float ownNetworkTorque = gearedRatio * lastReturnedTorque;
+        float ownNetworkResistance = Math.Abs(gearedRatio) * lastResistance
+            + networkSpeed * networkSpeed * gearedRatio * gearedRatio / 1000f;
+        FlywheelOperatingState state = FlywheelTelemetry.GetOperatingState(
+            flywheelSpeed,
+            smoothedSpeedChangePerSecond,
+            Network?.NetworkTorque ?? ownNetworkTorque,
+            ownNetworkTorque,
+            Network?.NetworkResistance ?? ownNetworkResistance,
+            ownNetworkResistance,
+            maxTransferTorque);
+        double speedChange = Math.Round(Math.Abs(smoothedSpeedChangePerSecond), 2);
 
-        if (lastTransferEnergyDelta < -StateSpeedDeltaTolerance)
+        return state switch
         {
-            return Lang.Get("flywheelpower:blockinfo-state-discharging");
-        }
-
-        if (Math.Abs(flywheelSpeed) > 0.01f)
-        {
-            return Lang.Get("flywheelpower:blockinfo-state-coasting");
-        }
-
-        return Lang.Get("flywheelpower:blockinfo-state-idle");
+            FlywheelOperatingState.Coasting when smoothedSpeedChangePerSecond < -0.005f =>
+                Lang.Get("flywheelpower:blockinfo-state-coasting-slowing", speedChange),
+            FlywheelOperatingState.Coasting => Lang.Get("flywheelpower:blockinfo-state-coasting"),
+            FlywheelOperatingState.CoastingUnderLoad =>
+                Lang.Get("flywheelpower:blockinfo-state-coasting-load", speedChange),
+            FlywheelOperatingState.Charging =>
+                Lang.Get("flywheelpower:blockinfo-state-charging", speedChange),
+            FlywheelOperatingState.Discharging =>
+                Lang.Get("flywheelpower:blockinfo-state-discharging", speedChange),
+            FlywheelOperatingState.DrivenHoldingSpeed =>
+                Lang.Get("flywheelpower:blockinfo-state-driven-steady"),
+            _ => Lang.Get("flywheelpower:blockinfo-state-idle")
+        };
     }
 
     private float GetDisplayFlywheelSpeed()
@@ -436,6 +478,195 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
             manager?.RemoveDeviceForRender(standRenderable);
             standRenderable = null;
         }
+    }
+
+    private bool IsActivelySlipping()
+    {
+        return slipCoupled && FlywheelTelemetry.IsActivelySlipping(
+            flywheelSpeed,
+            lastNetworkSpeed,
+            safeSpeed);
+    }
+
+    private void SpawnSlipSparks(long tick)
+    {
+        if (!IsActivelySlipping() || tick < nextSlipSparkTick)
+        {
+            return;
+        }
+
+        Random random = Api.World.Rand;
+        nextSlipSparkTick = tick + MinimumSparkIntervalTicks + random.Next(SparkIntervalJitterTicks + 1);
+        Vec3d origin = GetHubParticleOrigin(random, out double radialX, out double radialY, out double radialZ, out double side);
+        var particles = new SimpleParticleProperties
+        {
+            LifeLength = 0.5f,
+            Color = ColorUtil.ToRgba(255, 255, 185, 45),
+            GravityEffect = 0.35f,
+            ParticleModel = EnumParticleModel.Cube,
+            MinPos = origin,
+            AddPos = new Vec3d(0.04, 0.04, 0.04),
+            SelfPropelled = true,
+            MinVelocity = new Vec3f(
+                (float)(radialX * 0.9 + AxisSign[0] * side * 0.3),
+                (float)(radialY * 0.9 + AxisSign[1] * side * 0.3 + 0.25),
+                (float)(radialZ * 0.9 + AxisSign[2] * side * 0.3)),
+            AddVelocity = new Vec3f(0.45f, 0.35f, 0.45f),
+            ShouldDieInAir = false,
+            ShouldSwimOnLiquid = false,
+            ShouldDieInLiquid = false,
+            WithTerrainCollision = false,
+            MinSize = 0.1f,
+            MaxSize = 0.16f,
+            WindAffected = false,
+            MinQuantity = 8f,
+            DieOnRainHeightmap = false
+        };
+        Api.World.SpawnParticles(particles);
+    }
+
+    private void SpawnOverspeedSparks(long tick)
+    {
+        int interval = FlywheelSafety.GetOverspeedSparkIntervalTicks(flywheelSpeed, safeSpeed);
+        if (interval == int.MaxValue || tick < nextOverspeedSparkTick)
+        {
+            return;
+        }
+
+        Random random = Api.World.Rand;
+        nextOverspeedSparkTick = tick + interval;
+        Vec3d origin = GetHubParticleOrigin(random, out double radialX, out double radialY, out double radialZ, out double side);
+        var particles = new SimpleParticleProperties
+        {
+            LifeLength = 0.65f,
+            Color = ColorUtil.ToRgba(255, 255, 70, 15),
+            GravityEffect = 0.45f,
+            ParticleModel = EnumParticleModel.Cube,
+            MinPos = origin,
+            AddPos = new Vec3d(0.06, 0.06, 0.06),
+            SelfPropelled = true,
+            MinVelocity = new Vec3f(
+                (float)(radialX * 1.3 + AxisSign[0] * side * 0.45),
+                (float)(radialY * 1.3 + AxisSign[1] * side * 0.45 + 0.35),
+                (float)(radialZ * 1.3 + AxisSign[2] * side * 0.45)),
+            AddVelocity = new Vec3f(0.6f, 0.5f, 0.6f),
+            ShouldDieInAir = false,
+            ShouldSwimOnLiquid = false,
+            ShouldDieInLiquid = false,
+            WithTerrainCollision = false,
+            MinSize = 0.12f,
+            MaxSize = 0.2f,
+            WindAffected = false,
+            MinQuantity = FlywheelSafety.GetOverspeedSparkQuantity(flywheelSpeed, safeSpeed),
+            DieOnRainHeightmap = false
+        };
+        Api.World.SpawnParticles(particles);
+    }
+
+    private void SpawnOverspeedSmoke(long tick)
+    {
+        int interval = FlywheelSafety.GetOverspeedSmokeIntervalTicks(flywheelSpeed, safeSpeed);
+        if (interval == int.MaxValue || tick < nextOverspeedSmokeTick)
+        {
+            return;
+        }
+
+        Random random = Api.World.Rand;
+        nextOverspeedSmokeTick = tick + interval;
+        Vec3d origin = GetHubParticleOrigin(random, out _, out _, out _, out _);
+        var particles = new SimpleParticleProperties
+        {
+            LifeLength = 1.8f,
+            addLifeLength = 0.5f,
+            Color = ColorUtil.ToRgba(110, 75, 70, 65),
+            GravityEffect = -0.00625f,
+            ParticleModel = EnumParticleModel.Quad,
+            MinPos = origin,
+            AddPos = new Vec3d(0.08, 0.04, 0.08),
+            MinVelocity = new Vec3f(-0.04f, 0.12f, -0.04f),
+            AddVelocity = new Vec3f(0.08f, 0.12f, 0.08f),
+            ShouldDieInAir = false,
+            ShouldSwimOnLiquid = false,
+            ShouldDieInLiquid = true,
+            WithTerrainCollision = false,
+            MinSize = 0.18f,
+            MaxSize = 0.35f,
+            WindAffected = true,
+            MinQuantity = FlywheelSafety.GetOverspeedSmokeQuantity(flywheelSpeed, safeSpeed),
+            AddQuantity = 0.5f,
+            DieOnRainHeightmap = false
+        };
+        Api.World.SpawnParticles(particles);
+    }
+
+    private Vec3d GetHubParticleOrigin(
+        Random random,
+        out double radialX,
+        out double radialY,
+        out double radialZ,
+        out double side)
+    {
+        double angle = random.NextDouble() * GameMath.TWOPI;
+        if (Math.Abs(AxisSign[0]) > 0)
+        {
+            radialX = 0;
+            radialY = Math.Cos(angle);
+            radialZ = Math.Sin(angle);
+        }
+        else if (Math.Abs(AxisSign[1]) > 0)
+        {
+            radialX = Math.Cos(angle);
+            radialY = 0;
+            radialZ = Math.Sin(angle);
+        }
+        else
+        {
+            radialX = Math.Cos(angle);
+            radialY = Math.Sin(angle);
+            radialZ = 0;
+        }
+
+        bool compact = Blockentity.Block?.Code?.Path?.StartsWith("compactflywheel", StringComparison.Ordinal) == true;
+        double radius = (compact ? FlywheelModelDimensions.CompactHubOuterRadius : FlywheelModelDimensions.HubOuterRadius) + 0.03;
+        double axialDepth = (compact ? FlywheelModelDimensions.CompactHubHalfThickness : FlywheelModelDimensions.HubHalfThickness) + 0.03;
+        side = random.Next(2) == 0 ? -1 : 1;
+        return new Vec3d(
+            Position.X + 0.5 + radialX * radius + AxisSign[0] * side * axialDepth,
+            Position.Y + 0.5 + radialY * radius + AxisSign[1] * side * axialDepth,
+            Position.Z + 0.5 + radialZ * radius + AxisSign[2] * side * axialDepth);
+    }
+
+    private void UpdateSpeedTrend(float dt)
+    {
+        float speedAbs = Math.Abs(flywheelSpeed);
+        if (!trendWindowInitialized)
+        {
+            trendWindowStartSpeed = speedAbs;
+            trendWindowElapsedSeconds = 0f;
+            trendWindowInitialized = true;
+            smoothedSpeedChangePerSecond = 0f;
+            return;
+        }
+
+        trendWindowElapsedSeconds += dt;
+        if (trendWindowElapsedSeconds < SpeedTrendWindowSeconds)
+        {
+            return;
+        }
+
+        float measuredSpeedChange = (speedAbs - trendWindowStartSpeed)
+            / Math.Max(trendWindowElapsedSeconds, Epsilon);
+        smoothedSpeedChangePerSecond +=
+            (measuredSpeedChange - smoothedSpeedChangePerSecond) * SpeedTrendSmoothing;
+        trendWindowStartSpeed = speedAbs;
+        trendWindowElapsedSeconds = 0f;
+    }
+
+    private void ResetSpeedTrend()
+    {
+        trendWindowStartSpeed = Math.Abs(flywheelSpeed);
+        trendWindowElapsedSeconds = 0f;
+        trendWindowInitialized = false;
     }
 
     private sealed class FlywheelStandRenderable : IMechanicalPowerRenderable

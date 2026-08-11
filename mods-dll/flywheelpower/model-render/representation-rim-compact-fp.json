@@ -1,0 +1,16 @@
+{
+  "name": "flywheel-rim-compact-fp-transform",
+  "representation": "first-person-held-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-rim-compact.json"
+  ],
+  "textures": {
+    "rim": "game:block/metal/ingot/steel"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/flywheelrim.json",
+    "property": "fpHandTransform",
+    "variantCode": "flywheelrim-compact-steel",
+    "reference": "grip-proxy"
+  }
+}

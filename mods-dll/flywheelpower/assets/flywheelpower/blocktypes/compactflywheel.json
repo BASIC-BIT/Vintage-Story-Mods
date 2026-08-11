@@ -1073,5 +1073,70 @@
     "break": "game:block/metalbreak",
     "place": "game:block/metalplace",
     "walk": "game:walk/stone"
+  },
+  "groundTransform": {
+    "translation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "rotation": {
+      "x": -90,
+      "y": 0,
+      "z": 0
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 2.8
+  },
+  "guiTransform": {
+    "rotation": {
+      "x": -55,
+      "y": -10,
+      "z": -43
+    },
+    "scale": 1.8
+  },
+  "fpHandTransform": {
+    "translation": {
+      "x": 0,
+      "y": -0.15,
+      "z": 0
+    },
+    "rotation": {
+      "x": 180,
+      "y": 90,
+      "z": -30
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 0.58
+  },
+  "heldTpIdleAnimation": "holdbothhandslarge",
+  "heldRightReadyAnimation": "heldblockready",
+  "heldTpUseAnimation": "twohandplaceblock",
+  "tpHandTransform": {
+    "translation": {
+      "x": -1.0,
+      "y": -0.72,
+      "z": -0.7
+    },
+    "rotation": {
+      "x": 10,
+      "y": 18,
+      "z": -80
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.45,
+      "z": 0.5
+    },
+    "scale": 0.58
   }
 }

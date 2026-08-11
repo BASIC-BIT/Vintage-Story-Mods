@@ -262,28 +262,6 @@
     }
   },
   {
-    "ingredientPattern": "P_P,PSP",
-    "ingredients": {
-      "P": {
-        "type": "block",
-        "code": "game:planks-*",
-        "quantity": 1
-      },
-      "S": {
-        "type": "item",
-        "code": "game:saw-*",
-        "isTool": true,
-        "toolDurabilityCost": 4
-      }
-    },
-    "width": 3,
-    "height": 2,
-    "output": {
-      "type": "item",
-      "code": "flywheelweb-compact"
-    }
-  },
-  {
     "ingredientPattern": "PPP,PHP,PPP",
     "ingredients": {
       "P": {

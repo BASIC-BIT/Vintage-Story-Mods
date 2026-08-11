@@ -137,6 +137,9 @@ Suggested loss model:
 lossTorque = baseBearingLoss
            + viscousBearingLoss * abs(flywheelSpeed)
            + windageLoss * flywheelSpeed^2
+
+if abs(flywheelSpeed) > safeSpeed:
+    lossTorque *= 1 + 5 * (abs(flywheelSpeed) / safeSpeed - 1)
 ```
 
 Design meaning:
@@ -157,6 +160,11 @@ Gameplay result:
 - Medium-speed storage is useful and practical.
 - High-speed storage is powerful but increasingly wasteful.
 - Dangerous overspeed can be introduced without making the first version destructive.
+
+V0.5 treats `safeSpeed` as a rated limit rather than a hard cap. Stored energy remains visible above 100% of rated safe
+capacity, the tooltip reports the exact rated-speed percentage, orange-red hub sparks and bearing smoke intensify above the rating, and
+bearing/windage losses rise linearly from their already speed-scaled baseline. Catastrophic damage is deliberately deferred
+until material-dependent strength, warning, debris, and multiplayer consequences can be designed and tested together.
 
 ### Transfer Torque Cap
 
@@ -186,8 +194,8 @@ Block info should include some subset of:
 Potential qualitative labels:
 
 - `Idle`
-- `Charging`
-- `Discharging`
+- `Absorbing network power`
+- `Supplying network power`
 - `Coasting`
 - `Slipping`
 - `High windage losses`
@@ -435,9 +443,13 @@ Key technical question:
 
 - Can a custom block entity behavior cleanly join vanilla mechanical networks and provide custom torque/resistance without patching `MechanicalNetwork`? If yes, V0.5 should avoid Harmony patches. If no, evaluate the smallest patch surface.
 
+## Resolved V0.5 Decisions
+
+- Overspeed is non-destructive in V0.5. It uses uncapped rated-capacity feedback, escalating visual warning, and progressive
+  loss scaling above rated speed. Damage and destruction remain later failure-model work.
+
 ## Open Questions
 
-- Should V0.5 include any overspeed damage, or should it only include loss scaling and safe caps?
 - What should the first flywheel material be: wood, iron, or a deliberately generic prototype flywheel?
 - Should V0.5 expose exact numeric speed/energy or mostly qualitative information?
 - Should stored energy be displayed as a percent of current safe capacity?
@@ -475,7 +487,7 @@ Prototype validation scenarios:
 
 This PRD is ready for implementation planning when these decisions are made:
 
-- V0.5 overspeed behavior is chosen.
+- V0.5 overspeed behavior is chosen: rated, visible, progressively lossy, and non-destructive.
 - First flywheel material/theme is chosen.
 - Desired V0.5 player feedback style is chosen.
 - Initial balancing targets are chosen for at least one vanilla machine load.

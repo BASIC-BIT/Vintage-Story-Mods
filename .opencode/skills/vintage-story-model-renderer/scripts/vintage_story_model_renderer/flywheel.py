@@ -207,7 +207,15 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
 
     marker_half = (0.025 if size == "compact" else 0.04) * 16
     marker_outer = wheel_radius + marker_raise * 2
-    marker_uvs = [(0, 1), (0, 0), (1, 0), (1, 1)]
+    texture_units = 0.72 * 16
+
+    def planar_uvs(vertices: list[Vec3]) -> list[tuple[float, float]]:
+        tile_y = math.floor(min(vertex[1] for vertex in vertices) / texture_units)
+        tile_z = math.floor(min(vertex[2] for vertex in vertices) / texture_units)
+        return [
+            (vertex[1] / texture_units - tile_y, vertex[2] / texture_units - tile_z)
+            for vertex in vertices
+        ]
 
     def mark_face(x: float, inner: float, outer: float, front: bool, element: str) -> Face:
         if front:
@@ -224,7 +232,7 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
                 (x, 8 + marker_half, 8 + outer),
                 (x, 8 + marker_half, 8 + inner),
             ]
-        return Face(vertices, "chalk", element, marker_uvs)
+        return Face(vertices, "chalk", element, planar_uvs(vertices))
 
     start_radius = wheel_radius * 0.18
     bearing_radius = value("BearingOuterRadius")
@@ -247,10 +255,18 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
     def rim(x: float, angle: float) -> Vec3:
         return (x, 8 + radius * math.sin(angle), 8 + radius * math.cos(angle))
 
-    faces.append(Face([
+    rim_vertices = [
         rim(wheel_min - marker_raise * 2, -half_angle),
         rim(wheel_max + marker_raise * 2, -half_angle),
         rim(wheel_max + marker_raise * 2, half_angle),
         rim(wheel_min - marker_raise * 2, half_angle),
-    ], "chalk", "RegistrationMarkRim", marker_uvs))
+    ]
+    rim_u = 2 * marker_half / texture_units
+    rim_v = (2 * wheel_half + marker_raise * 4) / texture_units
+    faces.append(Face(
+        rim_vertices,
+        "chalk",
+        "RegistrationMarkRim",
+        [(0, 0), (0, rim_v), (rim_u, rim_v), (rim_u, 0)],
+    ))
     return faces

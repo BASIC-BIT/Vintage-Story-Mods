@@ -378,10 +378,12 @@ public sealed class FlywheelMechBlockRenderer : MechBlockRenderer
     private static void AddChalkRimLine(MeshData mesh, TextureAtlasPosition tex, float radius, float minX, float maxX, float halfWidth)
     {
         float halfAngle = halfWidth / radius;
+        float u1 = 2f * halfWidth / TextureMeters;
+        float v1 = Math.Abs(maxX - minX) / TextureMeters;
         MeshVertex a = CylinderVertex(minX, radius, -halfAngle, 0f, 0f);
-        MeshVertex b = CylinderVertex(maxX, radius, -halfAngle, 0f, 1f);
-        MeshVertex c = CylinderVertex(maxX, radius, halfAngle, 1f, 1f);
-        MeshVertex d = CylinderVertex(minX, radius, halfAngle, 1f, 0f);
+        MeshVertex b = CylinderVertex(maxX, radius, -halfAngle, 0f, v1);
+        MeshVertex c = CylinderVertex(maxX, radius, halfAngle, u1, v1);
+        MeshVertex d = CylinderVertex(minX, radius, halfAngle, u1, 0f);
         AddQuad(mesh, tex, a, b, c, d, RadialNormal(0f, 1f));
     }
 

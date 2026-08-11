@@ -1,0 +1,10 @@
+{
+  "name": "flywheel-compact-wheel-blank-item",
+  "representation": "inventory-and-held-component",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-rim-compact.json"
+  ],
+  "textures": {
+    "rim": "game:block/stone/rock/granite1"
+  }
+}

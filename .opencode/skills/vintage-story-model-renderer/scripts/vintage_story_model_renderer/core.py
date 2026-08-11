@@ -58,6 +58,9 @@ FALLBACK_COLORS = {
     "bearing": (79, 82, 81),
     "chalk": (148, 38, 38),
     "stone": (111, 105, 96),
+    "reference-hand": (177, 132, 101),
+    "reference-cuff": (63, 78, 88),
+    "reference-axis-z": (55, 132, 218),
 }
 
 

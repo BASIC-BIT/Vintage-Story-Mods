@@ -1,0 +1,17 @@
+{
+  "name": "flywheel-bearing-compact-gui-transform",
+  "representation": "gui-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-bearing-compact.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/ingot/copper",
+    "bearing": "game:block/metal/tarnished/iron-riveted1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/flywheelbearing.json",
+    "property": "guiTransform",
+    "variantCode": "flywheelbearing-compact-copper"
+  }
+}

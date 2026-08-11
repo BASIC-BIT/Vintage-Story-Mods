@@ -1,0 +1,20 @@
+{
+  "name": "flywheel-assembly-full-gui-transform",
+  "representation": "gui-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/flywheel-wheel-coupled.json",
+    "../assets/flywheelpower/shapes/block/flywheel-axle.json"
+  ],
+  "textures": {
+    "wheel": "game:block/metal/ingot/iron",
+    "metal": "game:block/metal/ingot/steel",
+    "bearing": "game:block/metal/tarnished/iron-riveted1",
+    "chalk": "game:block/cloth/wool/red1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/blocktypes/flywheel.json",
+    "property": "guiTransform",
+    "variantCode": "flywheel-iron-steel-ud"
+  }
+}

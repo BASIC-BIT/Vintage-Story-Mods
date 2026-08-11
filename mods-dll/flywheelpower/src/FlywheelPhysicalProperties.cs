@@ -16,6 +16,11 @@ internal static class FlywheelPhysicalProperties
     private const float IronDensity = 7870f;
     private const float MeteoricIronDensity = 7800f;
     private const float SteelDensity = 7820f;
+    private const float IngotEquivalentVolumeM3 = 0.001f;
+    private const float WoodPlankMassKg = 2.5f;
+    private const float StoneBlankPieceMassKg = 5f;
+    private const float FullAxleMassKg = 5f;
+    private const float CompactAxleMassKg = 3f;
     private const float FullAxleLength = 1.5f;
     private const float CompactAxleLength = 1.16f;
 
@@ -63,11 +68,29 @@ internal static class FlywheelPhysicalProperties
         Component plates = Annulus(hubDensity, spec.ShaftClearanceRadius, spec.PlateOuterRadius, spec.PlateThickness * 2f);
         Component axle = SolidCylinder(WoodDensity, spec.AxleRadius, spec.AxleLength);
 
-        float mass = wheel.MassKg + hub.MassKg + bearing.MassKg + plates.MassKg + axle.MassKg;
+        float mass = EstimateRecipeMass(spec.IsCompact, wheelDensity, hubDensity);
         float polarInertia = wheel.PolarInertia + hub.PolarInertia + bearing.PolarInertia + plates.PolarInertia + axle.PolarInertia;
         float referencePolarInertia = FullIronReferencePolarInertia();
         float effectiveInertia = Math.Max(0.01f, referenceInertia * polarInertia / referencePolarInertia);
         return new FlywheelPhysicalProfile(mass, effectiveInertia);
+    }
+
+    private static float EstimateRecipeMass(bool compact, float wheelDensity, float hubDensity)
+    {
+        int rimPieces = compact ? 4 : 8;
+        int hubIngotEquivalents = compact ? 2 : 8;
+        int webPlanks = compact ? 4 : 8;
+        float rimPieceMass = wheelDensity switch
+        {
+            WoodDensity => WoodPlankMassKg,
+            StoneDensity => StoneBlankPieceMassKg,
+            _ => wheelDensity * IngotEquivalentVolumeM3
+        };
+
+        return rimPieces * rimPieceMass
+            + hubIngotEquivalents * hubDensity * IngotEquivalentVolumeM3
+            + webPlanks * WoodPlankMassKg
+            + (compact ? CompactAxleMassKg : FullAxleMassKg);
     }
 
     private static float FullIronReferencePolarInertia()

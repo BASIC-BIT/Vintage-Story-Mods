@@ -1,0 +1,16 @@
+{
+  "name": "flywheel-stand-compact-ground-transform",
+  "representation": "ground-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/compact-flywheel-frame-horizontal.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/tarnished/sheet/iron1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/blocktypes/flywheelstand.json",
+    "property": "groundTransform",
+    "variantCode": "flywheelstand-compact-ud"
+  }
+}

@@ -6,6 +6,12 @@ $modInfoFile = Join-Path $projectRoot 'modinfo.json'
 $readmeFile = Join-Path $projectRoot 'README.md'
 $assetsDir = Join-Path $projectRoot 'assets'
 $materialGenerator = Join-Path $PSScriptRoot 'generate-material-content.py'
+$componentGenerator = Join-Path $PSScriptRoot 'generate-component-shapes.py'
+
+& python $componentGenerator --check
+if ($LASTEXITCODE -ne 0) {
+    throw 'Generated Flywheel component shapes are stale.'
+}
 
 & python $materialGenerator --check
 if ($LASTEXITCODE -ne 0) {
@@ -66,6 +72,7 @@ finally {
 }
 
 $expectedEntries = @(
+    'assets/game/lang/en.json',
     'assets/flywheelpower/blocktypes/flywheel.json',
     'assets/flywheelpower/blocktypes/compactflywheel.json',
     'assets/flywheelpower/blocktypes/flywheelpart.json',
@@ -86,6 +93,12 @@ $expectedEntries = @(
     'assets/flywheelpower/shapes/block/flywheel-frame-horizontal.json',
     'assets/flywheelpower/shapes/block/flywheel-frame-vertical.json',
     'assets/flywheelpower/shapes/block/flywheel-wheel-coupled.json',
+    'assets/flywheelpower/shapes/item/bearing-fitting.json',
+    'assets/flywheelpower/shapes/item/flywheel-bearing-compact.json',
+    'assets/flywheelpower/shapes/item/flywheel-bearing-full.json',
+    'assets/flywheelpower/shapes/item/flywheel-rim-compact.json',
+    'assets/flywheelpower/shapes/item/flywheel-rim-full.json',
+    'assets/flywheelpower/shapes/item/flywheel-web-full.json',
     'flywheelpower.dll',
     'flywheelpower.pdb',
     'modinfo.json',
@@ -186,6 +199,25 @@ try {
 
     if ($languageText -match 'sliptransmission|keyedflywheel|blockinfo-shaft|cupronickel|brass|gold|silver|lead') {
         throw 'Disabled or unsupported player-facing localization was included in the package.'
+    }
+
+    $placementLanguageReader = [System.IO.StreamReader]::new(
+        $archive.GetEntry('assets/game/lang/en.json').Open())
+    try {
+        $placementLanguageText = $placementLanguageReader.ReadToEnd()
+    }
+    finally {
+        $placementLanguageReader.Dispose()
+    }
+
+    foreach ($placementKey in @(
+        'placefailure-flywheelrequiresclearance',
+        'placefailure-flywheelrequiresfoundation',
+        'placefailure-flywheelrequiresstand'
+    )) {
+        if ($placementLanguageText -notmatch [regex]::Escape($placementKey)) {
+            throw "Engine-domain placement localization is missing from the package: $placementKey"
+        }
     }
 }
 finally {

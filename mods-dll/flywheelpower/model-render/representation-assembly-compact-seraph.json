@@ -1,0 +1,24 @@
+{
+  "name": "flywheel-assembly-compact-seraph-held",
+  "representation": "third-person-seraph-held-scene",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/compact-flywheel-wheel-coupled.json",
+    "../assets/flywheelpower/shapes/block/flywheel-axle.json"
+  ],
+  "textures": {
+    "wheel": "game:block/metal/ingot/steel",
+    "metal": "game:block/metal/ingot/steel",
+    "bearing": "game:block/metal/tarnished/iron-riveted1",
+    "chalk": "game:block/cloth/wool/red1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "seraphHeldScene": {
+    "collectibleDefinition": "../assets/flywheelpower/blocktypes/compactflywheel.json",
+    "transformProperty": "tpHandTransform",
+    "variantCode": "compactflywheel-steel-steel-ud",
+    "seraphShape": "game:entity/humanoid/seraph-hairless",
+    "seraphTexture": "game:entity/humanoid/seraph-naked-hairless",
+    "attachment": "RightHand",
+    "animationFrame": 0
+  }
+}

@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
-import json
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from .core import FACE_INDICES, Face, Vec2, Vec3, add, cuboid, rotate
+from .jsonio import load_vintage_story_json
+
+
+@dataclass(frozen=True)
+class AttachmentPose:
+    code: str
+    element: str
+    element_path: str
+    position: Vec3
+    rotation: Vec3
+    transform: Callable[[Vec3], Vec3]
 
 
 def face_uvs(
@@ -118,13 +130,55 @@ def sample_animation_pose(
     return poses
 
 
+def resolve_internal_step_parents(elements: list[dict]) -> list[dict]:
+    """Attach same-shape stepParentName elements to their named parent element."""
+
+    entries: list[tuple[dict, list[dict]]] = []
+
+    def collect(children: list[dict]) -> None:
+        for element in list(children):
+            entries.append((element, children))
+            collect(element.get("children", []))
+
+    collect(elements)
+    by_name: dict[str, list[dict]] = {}
+    for element, _ in entries:
+        by_name.setdefault(str(element.get("name", "")), []).append(element)
+
+    for element, current_parent in entries:
+        parent_name = element.get("stepParentName")
+        if not parent_name:
+            continue
+        matches = by_name.get(str(parent_name), [])
+        if len(matches) != 1:
+            raise ValueError(
+                f"stepParentName '{parent_name}' for {element.get('name')} resolved to {len(matches)} elements."
+            )
+        target_children = matches[0].setdefault("children", [])
+        if current_parent is target_children:
+            continue
+        current_parent.remove(element)
+        target_children.append(element)
+    return elements
+
+
 def load_shape(
     path: Path,
     animation_code: str | None = None,
     animation_frame: float = 0,
 ) -> tuple[list[Face], dict[str, str]]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    faces, textures, _ = load_shape_scene(path, animation_code, animation_frame)
+    return faces, textures
+
+
+def load_shape_scene(
+    path: Path,
+    animation_code: str | None = None,
+    animation_frame: float = 0,
+) -> tuple[list[Face], dict[str, str], list[AttachmentPose]]:
+    data = load_vintage_story_json(path)
     faces: list[Face] = []
+    attachments: list[AttachmentPose] = []
     texture_width = float(data.get("textureWidth", 16))
     texture_height = float(data.get("textureHeight", 16))
     poses = sample_animation_pose(data, animation_code, animation_frame) if animation_code else {}
@@ -132,8 +186,10 @@ def load_shape(
     def identity(point: Vec3) -> Vec3:
         return point
 
-    def visit(elements: list[dict], parent_transform=identity) -> None:
+    def visit(elements: list[dict], parent_transform=identity, parent_path: str = "") -> None:
         for element in elements:
+            element_name = element.get("name", "unnamed")
+            element_path = f"{parent_path}/{element_name}" if parent_path else element_name
             start = tuple(element["from"])
             end = tuple(element["to"])
             vertices = cuboid(start, end)
@@ -172,7 +228,7 @@ def load_shape(
                     faces.append(Face(
                         [vertices[index] for index in indices],
                         str(definition.get("texture", "#missing")).lstrip("#"),
-                        element.get("name", "unnamed"),
+                        element_name,
                         face_uvs(definition, texture_width, texture_height, direction, start, end),
                         direction,
                         str(path),
@@ -206,7 +262,17 @@ def load_shape(
                     point_in_parent = add(point_in_parent, animation_offset)
                 return parent_transform(point_in_parent)
 
-            visit(element.get("children", []), child_transform)
+            for definition in element.get("attachmentpoints", []):
+                attachments.append(AttachmentPose(
+                    str(definition["code"]),
+                    element_name,
+                    element_path,
+                    tuple(float(definition.get(f"pos{axis}", 0)) for axis in "XYZ"),  # type: ignore[arg-type]
+                    tuple(float(definition.get(f"rotation{axis}", 0)) for axis in "XYZ"),  # type: ignore[arg-type]
+                    child_transform,
+                ))
 
-    visit(data.get("elements", []))
-    return faces, dict(data.get("textures", {}))
+            visit(element.get("children", []), child_transform, element_path)
+
+    visit(resolve_internal_step_parents(data.get("elements", [])))
+    return faces, dict(data.get("textures", {})), attachments

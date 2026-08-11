@@ -170,6 +170,7 @@ def rasterize_triangle(
     texture: Image.Image | None = None,
     uvs: list[Vec2] | None = None,
     brightness: float = 1,
+    opacity: float = 1,
 ) -> None:
     min_x = max(0, math.floor(min(point[0] for point in points)))
     min_y = max(0, math.floor(min(point[1] for point in points)))
@@ -220,9 +221,25 @@ def rasterize_triangle(
         sampled = texture_pixels[texture_y, texture_x]
         if brightness != 1:
             sampled = np.clip(np.rint(sampled * brightness), 0, 255).astype(np.uint8)
-        target[visible] = sampled[visible]
+        if opacity < 1:
+            blended = np.clip(
+                np.rint(target * (1 - opacity) + sampled * opacity),
+                0,
+                255,
+            ).astype(np.uint8)
+            target[visible] = blended[visible]
+        else:
+            target[visible] = sampled[visible]
     else:
-        target[visible] = fill
+        if opacity < 1:
+            blended_fill = np.clip(
+                np.rint(target * (1 - opacity) + np.asarray(fill) * opacity),
+                0,
+                255,
+            ).astype(np.uint8)
+            target[visible] = blended_fill[visible]
+        else:
+            target[visible] = fill
     current_depth[visible] = interpolated_depth[visible]
 
 
@@ -299,6 +316,7 @@ def render(
             brightness = 0.58 + 0.42 * max(0, dot(normal, light))
             base = colors.get(face.material, (155, 155, 155))
             fill = base if mode == "material" else tuple(round(channel * 0.72) for channel in base)
+            opacity = 0.28 if face.source == "representation-reference" else 1
             face_uv_coordinates = face.uvs or [(0, 1), (0, 0), (1, 0), (1, 1)]
             for index in range(1, len(points) - 1):
                 triangle = [points[0], points[index], points[index + 1]]
@@ -317,10 +335,11 @@ def render(
                     texture,
                     triangle_uvs,
                     brightness,
+                    opacity,
                 )
-            visible_faces.append((points, vertex_depths))
+            visible_faces.append((points, vertex_depths, face.source == "representation-reference"))
 
-        for points, vertex_depths in visible_faces:
+        for points, vertex_depths, is_reference in visible_faces:
             for index, start in enumerate(points):
                 end_index = (index + 1) % len(points)
                 rasterize_edge(
@@ -330,7 +349,7 @@ def render(
                     points[end_index],
                     vertex_depths[index],
                     vertex_depths[end_index],
-                    (16, 18, 20),
+                    (122, 157, 176) if is_reference else (16, 18, 20),
                     line_width,
                 )
         image = Image.fromarray(pixels)

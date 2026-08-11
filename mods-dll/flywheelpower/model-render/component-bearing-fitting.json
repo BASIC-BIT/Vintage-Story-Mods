@@ -1,0 +1,10 @@
+{
+  "name": "flywheel-bearing-fitting-item",
+  "representation": "inventory-and-held-component",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/bearing-fitting.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/sheet/iron1"
+  }
+}

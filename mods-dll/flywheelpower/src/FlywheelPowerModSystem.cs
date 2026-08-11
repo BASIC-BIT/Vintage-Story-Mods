@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -7,6 +8,10 @@ namespace FlywheelPower;
 
 public sealed class FlywheelPowerModSystem : ModSystem
 {
+    private const string ConfigName = "flywheelpower.json";
+
+    internal static FlywheelPowerConfig Config { get; private set; } = new();
+
     internal static readonly string[] FullWheelMaterials =
         { "wood", "copper", "tinbronze", "bismuthbronze", "blackbronze", "iron", "meteoriciron", "steel" };
     internal static readonly string[] CompactWheelMaterials =
@@ -18,6 +23,7 @@ public sealed class FlywheelPowerModSystem : ModSystem
 
     public override void Start(ICoreAPI api)
     {
+        Config = LoadConfig(api);
         api.RegisterBlockClass("BlockFlywheel", typeof(BlockFlywheel));
         api.RegisterBlockClass("BlockCompactFlywheel", typeof(BlockCompactFlywheel));
         api.RegisterBlockClass("BlockFlywheelStand", typeof(BlockFlywheelStand));
@@ -32,6 +38,23 @@ public sealed class FlywheelPowerModSystem : ModSystem
         {
             MechNetworkRenderer.RendererByCode[rendererCode] = typeof(FlywheelMechBlockRenderer);
         }
+    }
+
+    private static FlywheelPowerConfig LoadConfig(ICoreAPI api)
+    {
+        FlywheelPowerConfig config;
+        try
+        {
+            config = api.LoadModConfig<FlywheelPowerConfig>(ConfigName) ?? new FlywheelPowerConfig();
+        }
+        catch (Exception ex)
+        {
+            api.Logger.Warning("[FlywheelPower] Failed to load {0}; using defaults: {1}", ConfigName, ex.Message);
+            config = new FlywheelPowerConfig();
+        }
+
+        api.StoreModConfig(config, ConfigName);
+        return config;
     }
 
     internal static bool IsReleasedMaterialCombination(string wheelMaterial, string hubMaterial)

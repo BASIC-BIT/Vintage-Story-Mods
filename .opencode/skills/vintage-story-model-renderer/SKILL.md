@@ -42,6 +42,8 @@ does not grow the executable back into a monolith. See `VIEWER_ROADMAP.md` befor
    construction even when the authored dimensions are correct.
 4. Read `render-metadata.json`. Confirm expected input hashes, representation, element count, bounds, exactly 24 primary
    images, no unexpected unresolved textures, and `coplanarOverlapCount: 0`.
+   For definition-backed collectible poses, also verify the item/block definition hash, resolved `collectibleTransform`,
+   `unitsPerBlock`, and the declared representation-reference limitation.
 5. Compare before/after contact sheets. Do not infer in-game lighting, animation, selection, collision, or mechanical alignment.
 6. Present the bounded contact sheet or the relevant fixed views in chat so the human reviewer can inspect the same evidence.
    State clearly that the image is an automated render and record any human feedback separately.
@@ -115,8 +117,9 @@ python .opencode/skills/vintage-story-model-renderer/scripts/vintage_story_model
 ## Manifests and representations
 
 Paths are relative to the manifest. Give each materially different representation its own manifest. At minimum, cover the
-placed model and any different inventory, ground, first-person, or third-person held shape. A transform alone does not need
-a second manifest when it reuses identical geometry, but its in-game pose still needs human QA.
+placed model and any different inventory, ground, first-person, or third-person held shape. When editing a collectible's
+GUI, ground, first-person, third-person, or off-hand transform, add a transform manifest and inspect its fixed-view evidence;
+do not treat an unchanged raw shape render as held-pose evidence. The in-game pose still needs human QA.
 
 ```json
 {
@@ -127,6 +130,74 @@ a second manifest when it reuses identical geometry, but its in-game pose still 
   }
 }
 ```
+
+To apply a transform directly from the authoritative item or block definition:
+
+```json
+{
+  "name": "example-third-person-held",
+  "representation": "third-person-held-transform",
+  "shapes": ["../assets/example/shapes/item/model.json"],
+  "collectibleTransform": {
+    "definition": "../assets/example/itemtypes/example.json",
+    "property": "tpHandTransform",
+    "variantCode": "example-full-steel",
+    "reference": "grip-proxy"
+  }
+}
+```
+
+Supported properties are `guiTransform`, `groundTransform`, `fpHandTransform`, `tpHandTransform`, and
+`tpOffHandTransform`. The adapter reproduces `ModelTransformNoDefaults.AsMatrix` order and converts block-space origin and
+translation values at 16 model units per block. It deliberately requires the property to exist in the definition instead
+of silently inventing item/block defaults. `grip-proxy` adds a deterministic scale-and-pivot reference for hand transforms;
+it is not a Seraph hand, animation, or attachment-anchor simulation, and metadata records that limitation. When
+`variantCode` is present, the adapter resolves the first matching `*ByType` entry in authored order and recursively merges
+object overrides into the direct property, matching `RegistryObjectType.solveByType` for the supported top-level property.
+
+For a full-body third-person attachment check, replace `collectibleTransform` with `seraphHeldScene`:
+
+```json
+{
+  "name": "example-seraph-held",
+  "representation": "third-person-seraph-held-scene",
+  "shapes": ["../assets/example/shapes/item/model.json"],
+  "seraphHeldScene": {
+    "collectibleDefinition": "../assets/example/itemtypes/example.json",
+    "transformProperty": "tpHandTransform",
+    "variantCode": "example-full-steel",
+    "seraphShape": "game:entity/humanoid/seraph-hairless",
+    "seraphTexture": "game:entity/humanoid/seraph-naked-hairless",
+    "attachment": "RightHand",
+    "animationFrame": 0
+  }
+}
+```
+
+This scene loads the installed hairless Seraph, resolves same-shape `stepParentName` links, samples the named animation,
+and composes the held item through the animated attachment using the matrix order in
+`EntityShapeRenderer.RenderItem`/`ItemFishingPole.LoadHeldItemModelMatrix`. If the manifest omits `animation`, the adapter
+uses the resolved `heldRightTpIdleAnimation` or legacy `heldTpIdleAnimation` when present and otherwise records the player
+default `idle1`; it does not invent a more flattering pose. This includes variant-specific `*ByType` animation rules.
+Render a bounded animation proof with the normal animation flags, for example:
+
+```powershell
+python .opencode/skills/vintage-story-model-renderer/scripts/vintage_story_model_renderer `
+  --manifest <seraph-scene-manifest.json> `
+  --output-dir <bounded-output-directory> `
+  --animation idle1 `
+  --animation-output <video.mp4> `
+  --animation-view isometric-opposite `
+  --animation-cycles 2
+```
+
+The scene is deliberately one hairless Seraph plus one right-hand item. Vintage Story's authored two-hand animations are
+supported: the item remains rigidly attached to `RightHand` while the animation positions the support arm, which is how the
+game implements `holdbothhands` and `holdbothhandslarge`. This is pose alignment, not a second item constraint. The scene
+does not yet reproduce wearable/skinnable-part assembly, animation blending or easing, or the first-person arm-only
+camera/shader pass. Vintage Story 1.22.1's first-person player renderer still requests the `HandTp` item target and uses
+this same attachment chain; its distinct appearance comes from a first-person player model matrix, arm-only mesh, hand FOV,
+and shader depth offset.
 
 For Flywheel Power's runtime mesh, add:
 
@@ -176,12 +247,16 @@ happens not to flicker.
   procedural quads for its round wheel, felloe, spokes, bearing, hub, and marker.
 - This renderer currently supports Vintage Story cuboid JSON plus the Flywheel procedural manifest. Entity shapes render
   in their authored rest pose by default. Pass `--animation <code>` to render a fixed-camera textured MP4 of one looping
-  shape animation; runtime shape alternates, blended animations, step-parent attachments, OBJ/GLTF import, atlas stitching,
-  emissive/glow channels, and player-hand/body backdrops are not yet reproduced.
+  shape animation. Same-shape step parents and a bounded full-Seraph right-hand scene are supported. Runtime shape
+  alternates, blended animations, wearable/skinnable-part assembly, OBJ/GLTF import, atlas stitching, emissive/glow
+  channels, hard two-point item constraints, and the first-person arm-only render pass are not yet reproduced. Authored
+  two-hand poses are supported using the same right-hand attachment plus support-arm animation as the game. Explicit collectible
+  transform properties and top-level `*ByType` rules can be resolved for an explicit variant code. Definition inheritance,
+  placeholder-expanded variant generation, and implicit registered defaults are not yet reproduced.
 - Add importers behind the same `Face` representation rather than converting external meshes into hundreds of cuboids.
   Triangulated OBJ is the sensible next importer; embedded GLTF should remain experimental until its game support is proven.
 - Texture mode samples source PNGs and UVs deterministically, but Vintage Story remains authoritative for atlas padding,
-  mipmapping, filtering, lighting, animation, and held transforms.
+  mipmapping, filtering, lighting, animation blending, wearable assembly, and final held appearance.
 
 ## Evidence boundary
 

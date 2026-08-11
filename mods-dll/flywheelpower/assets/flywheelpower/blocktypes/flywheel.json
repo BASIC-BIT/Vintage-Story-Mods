@@ -625,6 +625,24 @@
     },
     "scale": 1.35
   },
+  "fpHandTransform": {
+    "translation": {
+      "x": 0,
+      "y": -0.15,
+      "z": 0
+    },
+    "rotation": {
+      "x": 180,
+      "y": 90,
+      "z": -30
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 0.42
+  },
   "heldTpIdleAnimation": "holdbothhandslarge",
   "heldRightReadyAnimation": "heldblockready",
   "heldTpUseAnimation": "twohandplaceblock",

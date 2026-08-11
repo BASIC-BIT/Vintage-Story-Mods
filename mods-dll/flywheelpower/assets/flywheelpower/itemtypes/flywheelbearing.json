@@ -27,30 +27,102 @@
     "flywheelbearing-full-bismuthbronze",
     "flywheelbearing-full-blackbronze"
   ],
-  "shape": {
-    "base": "game:item/plate"
+  "shapeByType": {
+    "flywheelbearing-full-*": {
+      "base": "flywheelpower:item/flywheel-bearing-full"
+    },
+    "flywheelbearing-compact-*": {
+      "base": "flywheelpower:item/flywheel-bearing-compact"
+    }
   },
-  "textureByType": {
-    "*-copper": {
-      "base": "game:block/metal/ingot/copper"
-    },
-    "*-tinbronze": {
-      "base": "game:block/metal/ingot/tinbronze"
-    },
-    "*-bismuthbronze": {
-      "base": "game:block/metal/ingot/bismuthbronze"
-    },
-    "*-blackbronze": {
-      "base": "game:block/metal/ingot/blackbronze"
-    },
-    "*-iron": {
+  "textures": {
+    "metal": {
       "base": "game:block/metal/ingot/iron"
     },
+    "bearing": {
+      "base": "game:block/metal/tarnished/iron-riveted1"
+    },
+    "wood": {
+      "base": "game:block/wood/planks/generic"
+    }
+  },
+  "texturesByType": {
+    "*-copper": {
+      "metal": {
+        "base": "game:block/metal/ingot/copper"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-tinbronze": {
+      "metal": {
+        "base": "game:block/metal/ingot/tinbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-bismuthbronze": {
+      "metal": {
+        "base": "game:block/metal/ingot/bismuthbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-blackbronze": {
+      "metal": {
+        "base": "game:block/metal/ingot/blackbronze"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
+    "*-iron": {
+      "metal": {
+        "base": "game:block/metal/ingot/iron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
+    },
     "*-meteoriciron": {
-      "base": "game:block/metal/ingot/meteoriciron"
+      "metal": {
+        "base": "game:block/metal/ingot/meteoriciron"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
     },
     "*-steel": {
-      "base": "game:block/metal/ingot/steel"
+      "metal": {
+        "base": "game:block/metal/ingot/steel"
+      },
+      "bearing": {
+        "base": "game:block/metal/tarnished/iron-riveted1"
+      },
+      "wood": {
+        "base": "game:block/wood/planks/generic"
+      }
     }
   },
   "creativeinventory": {
@@ -67,15 +139,82 @@
   "maxstacksize": 8,
   "guiTransform": {
     "rotation": {
-      "x": -30,
-      "y": -44,
-      "z": -180
+      "x": -20,
+      "y": -35,
+      "z": -15
     },
     "origin": {
       "x": 0.5,
-      "y": 0.0625,
+      "y": 0.5,
       "z": 0.5
     },
-    "scale": 2.3
+    "scale": 1.65
+  },
+  "groundTransform": {
+    "translation": {
+      "x": 0,
+      "y": 0.05,
+      "z": 0
+    },
+    "rotation": {
+      "x": 90,
+      "y": 0,
+      "z": 0
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 1.5
+  },
+  "fpHandTransform": {
+    "translation": {
+      "x": 0.05,
+      "y": 0,
+      "z": 0
+    },
+    "rotation": {
+      "x": 180,
+      "y": 90,
+      "z": -30
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 0.9
+  },
+  "tpHandTransform": {
+    "translation": {
+      "x": -1.25,
+      "y": -1.25,
+      "z": -1.15
+    },
+    "rotation": {
+      "x": 0,
+      "y": -62,
+      "z": 18
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 0.42
+  },
+  "heldTpIdleAnimationByType": {
+    "flywheelbearing-full-*": "holdbothhandslarge"
+  },
+  "tpHandTransformByType": {
+    "flywheelbearing-full-*": {
+      "translation": {
+        "x": -0.625,
+        "y": -0.625,
+        "z": -0.575
+      },
+      "scale": 0.84
+    }
   }
 }

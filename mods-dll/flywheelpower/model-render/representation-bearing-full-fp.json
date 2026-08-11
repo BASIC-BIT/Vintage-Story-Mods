@@ -1,0 +1,18 @@
+{
+  "name": "flywheel-bearing-full-fp-transform",
+  "representation": "first-person-held-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-bearing-full.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/ingot/steel",
+    "bearing": "game:block/metal/tarnished/iron-riveted1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/flywheelbearing.json",
+    "property": "fpHandTransform",
+    "variantCode": "flywheelbearing-full-steel",
+    "reference": "grip-proxy"
+  }
+}

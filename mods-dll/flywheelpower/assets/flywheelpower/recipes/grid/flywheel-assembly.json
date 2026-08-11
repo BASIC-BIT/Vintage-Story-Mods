@@ -6,13 +6,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-wood"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-iron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -29,13 +29,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-wood"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-meteoriciron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -52,13 +52,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-wood"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-steel"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -75,13 +75,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-copper"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-iron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -98,13 +98,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-copper"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-meteoriciron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -121,13 +121,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-copper"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-steel"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -144,13 +144,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-tinbronze"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-iron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -167,13 +167,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-tinbronze"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-meteoriciron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -190,13 +190,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-tinbronze"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-steel"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -213,13 +213,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-bismuthbronze"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-iron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -236,13 +236,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-bismuthbronze"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-meteoriciron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -259,13 +259,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-bismuthbronze"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-steel"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -282,13 +282,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-blackbronze"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-iron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -305,13 +305,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-blackbronze"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-meteoriciron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -328,13 +328,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-blackbronze"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-steel"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -351,13 +351,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-iron"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-iron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -374,13 +374,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-iron"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-meteoriciron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -397,13 +397,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-iron"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-steel"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -420,13 +420,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-meteoriciron"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-iron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -443,13 +443,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-meteoriciron"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-meteoriciron"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -466,13 +466,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-meteoriciron"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-steel"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -489,13 +489,13 @@
         "type": "item",
         "code": "flywheelpower:flywheelrim-full-steel"
       },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-full"
-      },
       "B": {
         "type": "item",
         "code": "flywheelpower:flywheelbearing-full-steel"
+      },
+      "W": {
+        "type": "item",
+        "code": "flywheelpower:flywheelweb-full"
       }
     },
     "width": 1,
@@ -506,15 +506,11 @@
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-wood"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -522,22 +518,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-wood-copper-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-wood"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -545,22 +537,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-wood-tinbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-wood"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -568,22 +556,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-wood-bismuthbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-wood"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -591,22 +575,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-wood-blackbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-wood"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -614,22 +594,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-wood-iron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-wood"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -637,22 +613,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-wood-meteoriciron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-wood"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -660,22 +632,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-wood-steel-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-stone"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -683,22 +651,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-stone-copper-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-stone"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -706,22 +670,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-stone-tinbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-stone"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -729,22 +689,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-stone-bismuthbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-stone"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -752,22 +708,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-stone-blackbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-stone"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -775,22 +727,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-stone-iron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-stone"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -798,22 +746,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-stone-meteoriciron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-stone"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -821,22 +765,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-stone-steel-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-copper"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -844,22 +784,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-copper-copper-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-copper"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -867,22 +803,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-copper-tinbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-copper"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -890,22 +822,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-copper-bismuthbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-copper"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -913,22 +841,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-copper-blackbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-copper"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -936,22 +860,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-copper-iron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-copper"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -959,22 +879,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-copper-meteoriciron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-copper"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -982,22 +898,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-copper-steel-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-tinbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1005,22 +917,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-tinbronze-tinbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-tinbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1028,22 +936,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-tinbronze-bismuthbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-tinbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1051,22 +955,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-tinbronze-blackbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-tinbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1074,22 +974,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-tinbronze-iron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-tinbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1097,22 +993,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-tinbronze-meteoriciron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-tinbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1120,22 +1012,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-tinbronze-steel-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-bismuthbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1143,22 +1031,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-bismuthbronze-tinbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-bismuthbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1166,22 +1050,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-bismuthbronze-bismuthbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-bismuthbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1189,22 +1069,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-bismuthbronze-blackbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-bismuthbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1212,22 +1088,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-bismuthbronze-iron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-bismuthbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1235,22 +1107,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-bismuthbronze-meteoriciron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-bismuthbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1258,22 +1126,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-bismuthbronze-steel-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-blackbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1281,22 +1145,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-blackbronze-tinbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-blackbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1304,22 +1164,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-blackbronze-bismuthbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-blackbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1327,22 +1183,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-blackbronze-blackbronze-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-blackbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1350,22 +1202,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-blackbronze-iron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-blackbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1373,22 +1221,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-blackbronze-meteoriciron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-blackbronze"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1396,22 +1240,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-blackbronze-steel-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-iron"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1419,22 +1259,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-iron-iron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-iron"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1442,22 +1278,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-iron-meteoriciron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-iron"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1465,22 +1297,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-iron-steel-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-meteoriciron"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1488,22 +1316,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-meteoriciron-iron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-meteoriciron"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1511,22 +1335,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-meteoriciron-meteoriciron-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-meteoriciron"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1534,22 +1354,18 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-meteoriciron-steel-ud"
     }
   },
   {
-    "ingredientPattern": "R,W,B",
+    "ingredientPattern": "R,B",
     "ingredients": {
       "R": {
         "type": "item",
         "code": "flywheelpower:flywheelrim-compact-steel"
-      },
-      "W": {
-        "type": "item",
-        "code": "flywheelpower:flywheelweb-compact"
       },
       "B": {
         "type": "item",
@@ -1557,7 +1373,7 @@
       }
     },
     "width": 1,
-    "height": 3,
+    "height": 2,
     "output": {
       "type": "block",
       "code": "flywheelpower:compactflywheel-steel-steel-ud"

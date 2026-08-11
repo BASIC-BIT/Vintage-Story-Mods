@@ -192,7 +192,7 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
-    public void PhysicalComparisonAppearsOnHeldAndPlacedBlockInfo()
+    public void PhysicalComparisonStaysOnHeldItemsWhilePlacedTelemetryIsDebugOnly()
     {
         string fullBlockSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));
         string compactBlockSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockCompactFlywheel.cs"));
@@ -204,7 +204,27 @@ public sealed class ReleaseContentTests
         Assert.Contains("flywheelpower:blockinfo-physical", fullBlockSource, StringComparison.Ordinal);
         Assert.Contains("flywheelpower:blockinfo-physical", compactBlockSource, StringComparison.Ordinal);
         Assert.Contains("flywheelpower:blockinfo-physical", behaviorSource, StringComparison.Ordinal);
-        Assert.Contains("Rotating mass: {0} kg; effective inertia: {1}", activeLanguage, StringComparison.Ordinal);
+        Assert.Contains("if (!FlywheelPowerModSystem.Config.ShowDebugBlockInfo)", behaviorSource, StringComparison.Ordinal);
+        Assert.Contains("Estimated rotating mass: {0} kg; effective inertia: {1}", activeLanguage, StringComparison.Ordinal);
+        Assert.Contains("Coupling effort: {0}%{1}", activeLanguage, StringComparison.Ordinal);
+        Assert.Contains(" (at limit)", activeLanguage, StringComparison.Ordinal);
+        Assert.Contains("Stored energy: {0}% of rated safe capacity", activeLanguage, StringComparison.Ordinal);
+        Assert.Contains("Shaft speed difference: {0}% of rated speed", activeLanguage, StringComparison.Ordinal);
+        Assert.Contains("Approaching rated limit: {0}% of rated speed", activeLanguage, StringComparison.Ordinal);
+        Assert.Contains("Overspeed: {0}% of rated speed", activeLanguage, StringComparison.Ordinal);
+        Assert.Contains("SpawnOverspeedSmoke(tick)", behaviorSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("friction-coupled", activeLanguage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SpawnSlipSparks(tick)", behaviorSource, StringComparison.Ordinal);
+        Assert.Contains("SpawnOverspeedSparks(tick)", behaviorSource, StringComparison.Ordinal);
+        Assert.Contains("Api.World.SpawnParticles(particles)", behaviorSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DetailedPlacedTelemetryDefaultsOff()
+    {
+        FlywheelPowerConfig config = new();
+
+        Assert.False(config.ShowDebugBlockInfo);
     }
 
     [Fact]
@@ -471,7 +491,7 @@ public sealed class ReleaseContentTests
     public void FullSizePlacementExplainsItsReservedFootprint()
     {
         string multiblockSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "FlywheelMultiblock.cs"));
-        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "game", "lang", "en.json"));
 
         Assert.Contains("""failureCode = "flywheelrequiresclearance";""", multiblockSource, StringComparison.Ordinal);
         Assert.DoesNotContain("""failureCode = "notenoughspace";""", multiblockSource, StringComparison.Ordinal);
@@ -500,7 +520,7 @@ public sealed class ReleaseContentTests
         Assert.All(vertical, pos => Assert.Equal(19, pos.Y));
 
         string standSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheelStand.cs"));
-        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "game", "lang", "en.json"));
         Assert.Contains("""failureCode = "flywheelrequiresfoundation";""", standSource, StringComparison.Ordinal);
         Assert.Contains("placefailure-flywheelrequiresfoundation", activeLanguage, StringComparison.Ordinal);
     }
@@ -563,6 +583,18 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
+    public void EnginePlacementFailuresAreLocalizedInTheGameDomain()
+    {
+        string engineLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "game", "lang", "en.json"));
+        string modLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+
+        Assert.Contains("placefailure-flywheelrequiresclearance", engineLanguage, StringComparison.Ordinal);
+        Assert.Contains("placefailure-flywheelrequiresfoundation", engineLanguage, StringComparison.Ordinal);
+        Assert.Contains("placefailure-flywheelrequiresstand", engineLanguage, StringComparison.Ordinal);
+        Assert.DoesNotContain("placefailure-flywheel", modLanguage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SurvivalRecipesExposeTheStagedConstructionChain()
     {
         string recipeDirectory = Path.Combine(ProjectRoot, "assets", "flywheelpower", "recipes", "grid");
@@ -583,6 +615,7 @@ public sealed class ReleaseContentTests
         Assert.Contains("flywheelstand-full-ud", recipes, StringComparison.Ordinal);
         Assert.Contains("flywheelstand-compact-ud", recipes, StringComparison.Ordinal);
         Assert.DoesNotContain("flywheelrim-full-stone", recipes, StringComparison.Ordinal);
+        Assert.DoesNotContain("flywheelweb-compact", recipes, StringComparison.Ordinal);
         Assert.Contains("game:supportbeam-*", recipes, StringComparison.Ordinal);
 
         using JsonDocument components = JsonDocument.Parse(
@@ -610,12 +643,34 @@ public sealed class ReleaseContentTests
                 "bearingfittings.json")));
         JsonElement fittingsRecipe = Assert.Single(smithing.RootElement.EnumerateArray());
         Assert.Equal(4, fittingsRecipe.GetProperty("output").GetProperty("stacksize").GetInt32());
+        string[] fittingPattern = fittingsRecipe.GetProperty("pattern")[0]
+            .EnumerateArray()
+            .Select(row => row.GetString()!)
+            .ToArray();
+        Assert.Equal(
+            ["_#####_", "##___##", "##___##", "##___##", "##___##", "###_###"],
+            fittingPattern);
+        Assert.Equal(27, fittingPattern.Sum(row => row.Count(voxel => voxel == '#')));
         Assert.Equal(
             FlywheelPowerModSystem.CompactHubMaterials,
             fittingsRecipe.GetProperty("ingredient")
                 .GetProperty("allowedVariants")
                 .EnumerateArray()
                 .Select(value => value.GetString()!)
+                .ToArray());
+
+        using JsonDocument fittingShape = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            ProjectRoot,
+            "assets",
+            "flywheelpower",
+            "shapes",
+            "item",
+            "bearing-fitting.json")));
+        Assert.Equal(
+            ["LeftFoot", "RightFoot", "LeftCheek", "RightCheek", "Crown"],
+            fittingShape.RootElement.GetProperty("elements")
+                .EnumerateArray()
+                .Select(element => element.GetProperty("name").GetString()!)
                 .ToArray());
 
         JsonElement stoneBlank = components.RootElement
@@ -626,6 +681,175 @@ public sealed class ReleaseContentTests
         Assert.Equal(
             1,
             stoneBlank.GetProperty("ingredientPattern").GetString()!.Count(character => character == 'C'));
+
+        using JsonDocument assemblies = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(recipeDirectory, "flywheel-assembly.json")));
+        JsonElement[] compactAssemblies = assemblies.RootElement
+            .EnumerateArray()
+            .Where(recipe => recipe.GetProperty("output").GetProperty("code").GetString()!
+                .StartsWith("flywheelpower:compactflywheel-", StringComparison.Ordinal))
+            .ToArray();
+        Assert.NotEmpty(compactAssemblies);
+        Assert.All(compactAssemblies, recipe =>
+        {
+            Assert.Equal("R,B", recipe.GetProperty("ingredientPattern").GetString());
+            Assert.False(recipe.GetProperty("ingredients").TryGetProperty("W", out _));
+        });
+        Assert.All(
+            assemblies.RootElement.EnumerateArray().Where(recipe =>
+                recipe.GetProperty("output").GetProperty("code").GetString()!
+                    .StartsWith("flywheelpower:flywheel-", StringComparison.Ordinal)),
+            recipe => Assert.Equal(
+                "flywheelpower:flywheelweb-full",
+                recipe.GetProperty("ingredients").GetProperty("W").GetProperty("code").GetString()));
+
+        string language = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+        Assert.DoesNotContain("Tyre", language, StringComparison.Ordinal);
+        Assert.DoesNotContain("Wheel Blank", language, StringComparison.Ordinal);
+        Assert.DoesNotContain("Wooden Rim", language, StringComparison.Ordinal);
+        Assert.Contains("Full-Size Copper Wheel", language, StringComparison.Ordinal);
+        Assert.Contains("Compact Copper Wheel", language, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void IntermediatePartsUseDedicatedInventoryGroundAndHeldModels()
+    {
+        string itemtypeDirectory = Path.Combine(ProjectRoot, "assets", "flywheelpower", "itemtypes");
+        string[] itemtypeFiles =
+        [
+            "bearingfittings.json",
+            "flywheelbearing.json",
+            "flywheelrim.json",
+            "flywheelweb.json",
+        ];
+
+        foreach (string fileName in itemtypeFiles)
+        {
+            string text = File.ReadAllText(Path.Combine(itemtypeDirectory, fileName));
+            using JsonDocument document = JsonDocument.Parse(text);
+            JsonElement root = document.RootElement;
+            Assert.True(root.TryGetProperty("guiTransform", out _), $"{fileName} lacks a toolbar transform");
+            Assert.True(root.TryGetProperty("groundTransform", out _), $"{fileName} lacks a ground transform");
+            Assert.True(root.TryGetProperty("fpHandTransform", out _), $"{fileName} lacks a first-person transform");
+            Assert.True(root.TryGetProperty("tpHandTransform", out _), $"{fileName} lacks a third-person transform");
+            Assert.DoesNotContain("game:item/plate", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("game:item/resource/metalnailsandstrips", text, StringComparison.Ordinal);
+        }
+
+        string allItemtypes = string.Join(
+            '\n',
+            itemtypeFiles.Select(fileName => File.ReadAllText(Path.Combine(itemtypeDirectory, fileName))));
+        string[] shapeCodes =
+        [
+            "flywheelpower:item/bearing-fitting",
+            "flywheelpower:item/flywheel-bearing-full",
+            "flywheelpower:item/flywheel-bearing-compact",
+            "flywheelpower:item/flywheel-web-full",
+            "flywheelpower:item/flywheel-rim-full",
+            "flywheelpower:item/flywheel-rim-compact",
+        ];
+        Assert.All(shapeCodes, code => Assert.Contains(code, allItemtypes, StringComparison.Ordinal));
+
+        string shapeDirectory = Path.Combine(ProjectRoot, "assets", "flywheelpower", "shapes", "item");
+        string[] shapeFiles = Directory.EnumerateFiles(shapeDirectory, "*.json").ToArray();
+        Assert.Equal(6, shapeFiles.Length);
+        Assert.All(shapeFiles, path =>
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+            Assert.NotEmpty(document.RootElement.GetProperty("elements").EnumerateArray());
+        });
+
+        string stand = File.ReadAllText(Path.Combine(
+            ProjectRoot,
+            "assets",
+            "flywheelpower",
+            "blocktypes",
+            "flywheelstand.json"));
+        Assert.Contains("guiTransformByType", stand, StringComparison.Ordinal);
+        Assert.Contains("groundTransformByType", stand, StringComparison.Ordinal);
+        Assert.Contains("fpHandTransform", stand, StringComparison.Ordinal);
+        Assert.Contains("tpHandTransformByType", stand, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReleasedCollectiblesHaveCompleteDeterministicRepresentationEvidence()
+    {
+        string blocktypeDirectory = Path.Combine(ProjectRoot, "assets", "flywheelpower", "blocktypes");
+        foreach (string fileName in new[] { "flywheel.json", "compactflywheel.json" })
+        {
+            using JsonDocument document = JsonDocument.Parse(
+                File.ReadAllText(Path.Combine(blocktypeDirectory, fileName)));
+            JsonElement root = document.RootElement;
+            Assert.True(root.TryGetProperty("guiTransform", out _), $"{fileName} lacks a toolbar transform");
+            Assert.True(root.TryGetProperty("groundTransform", out _), $"{fileName} lacks a ground transform");
+            Assert.True(root.TryGetProperty("fpHandTransform", out _), $"{fileName} lacks a first-person transform");
+            Assert.True(root.TryGetProperty("tpHandTransform", out _), $"{fileName} lacks a third-person transform");
+            Assert.Equal("holdbothhandslarge", root.GetProperty("heldTpIdleAnimation").GetString());
+        }
+
+        string manifestDirectory = Path.Combine(ProjectRoot, "model-render");
+        string[] collectibleKeys =
+        [
+            "bearing-fitting", "bearing-compact", "bearing-full",
+            "rim-compact", "rim-full", "web-full",
+            "stand-compact", "stand-full", "assembly-compact", "assembly-full",
+        ];
+        string[] contexts = ["gui", "ground", "fp", "seraph"];
+        Assert.All(collectibleKeys, key =>
+            Assert.All(contexts, context =>
+                Assert.True(
+                    File.Exists(Path.Combine(manifestDirectory, $"representation-{key}-{context}.json")),
+                    $"Missing {context} evidence manifest for {key}")));
+    }
+
+    [Fact]
+    public void RuntimeRegistrationBandUsesPhysicalScaleUvs()
+    {
+        string rendererSource = File.ReadAllText(Path.Combine(
+            ProjectRoot,
+            "src",
+            "FlywheelMechBlockRenderer.cs"));
+
+        Assert.Contains("float u1 = 2f * halfWidth / TextureMeters;", rendererSource, StringComparison.Ordinal);
+        Assert.Contains("float v1 = Math.Abs(maxX - minX) / TextureMeters;", rendererSource, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "CylinderVertex(maxX, radius, halfAngle, 1f, 1f)",
+            rendererSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FullSizeIntermediatePartsUseLargeTwoHandPoseWithoutChangingCompactPose()
+    {
+        string itemtypeDirectory = Path.Combine(ProjectRoot, "assets", "flywheelpower", "itemtypes");
+        (string FileName, string FullPattern, double X, double Y, double Z)[] largeParts =
+        [
+            ("flywheelbearing.json", "flywheelbearing-full-*", -0.625d, -0.625d, -0.575d),
+            ("flywheelrim.json", "flywheelrim-full-*", -0.307d, -0.694d, -0.665d),
+            ("flywheelweb.json", "flywheelweb-full", -0.625d, -0.625d, -0.575d),
+        ];
+
+        foreach ((string fileName, string fullPattern, double x, double y, double z) in largeParts)
+        {
+            using JsonDocument document = JsonDocument.Parse(
+                File.ReadAllText(Path.Combine(itemtypeDirectory, fileName)));
+            JsonElement root = document.RootElement;
+            JsonElement compactTransform = root.GetProperty("tpHandTransform");
+            JsonElement fullTransform = root.GetProperty("tpHandTransformByType").GetProperty(fullPattern);
+            JsonElement fullAnimations = root.GetProperty("heldTpIdleAnimationByType");
+
+            Assert.Equal("holdbothhandslarge", fullAnimations.GetProperty(fullPattern).GetString());
+            Assert.Equal(0.42d, compactTransform.GetProperty("scale").GetDouble(), 2);
+            Assert.Equal(0.84d, fullTransform.GetProperty("scale").GetDouble(), 2);
+            Assert.Equal(x, fullTransform.GetProperty("translation").GetProperty("x").GetDouble(), 3);
+            Assert.Equal(y, fullTransform.GetProperty("translation").GetProperty("y").GetDouble(), 3);
+            Assert.Equal(z, fullTransform.GetProperty("translation").GetProperty("z").GetDouble(), 3);
+        }
+
+        using JsonDocument fittings = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(itemtypeDirectory, "bearingfittings.json")));
+        Assert.False(fittings.RootElement.TryGetProperty("heldTpIdleAnimationByType", out _));
+        Assert.False(fittings.RootElement.TryGetProperty("tpHandTransformByType", out _));
     }
 
     private static string FindProjectRoot()

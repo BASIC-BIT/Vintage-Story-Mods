@@ -418,6 +418,30 @@ class RegistrationMarkWindingTests(unittest.TestCase):
         self.assertGreater(renderer.dot(normal(front), (1, 0, 0)), 0.999)
         self.assertGreater(renderer.dot(normal(back), (-1, 0, 0)), 0.999)
 
+    def test_compact_and_full_marks_wrap_the_corner_with_physical_scale_uvs(self):
+        root = Path(__file__).parents[4]
+        dimensions = root / "mods-dll" / "flywheelpower" / "src" / "FlywheelModelDimensions.cs"
+        expected = {
+            "compact": (0.05 / 0.72, (0.32 + 0.024) / 0.72),
+            "full": (0.08 / 0.72, (0.1875 + 0.024) / 0.72),
+        }
+
+        for size, (expected_u, expected_v) in expected.items():
+            with self.subTest(size=size):
+                faces = renderer.load_flywheel(dimensions, size)
+                front = next(face for face in faces if face.element == "RegistrationMarkFaceFront")
+                back = next(face for face in faces if face.element == "RegistrationMarkFaceBack")
+                rim = next(face for face in faces if face.element == "RegistrationMarkRim")
+
+                self.assertGreaterEqual(max(vertex[2] for vertex in front.vertices), max(vertex[2] for vertex in rim.vertices))
+                self.assertGreaterEqual(max(vertex[2] for vertex in back.vertices), max(vertex[2] for vertex in rim.vertices))
+                self.assertLessEqual(min(vertex[0] for vertex in rim.vertices), max(vertex[0] for vertex in back.vertices))
+                self.assertGreaterEqual(max(vertex[0] for vertex in rim.vertices), min(vertex[0] for vertex in front.vertices))
+
+                self.assertAlmostEqual(expected_u, max(uv[0] for uv in rim.uvs) - min(uv[0] for uv in rim.uvs))
+                self.assertAlmostEqual(expected_v, max(uv[1] for uv in rim.uvs) - min(uv[1] for uv in rim.uvs))
+                self.assertAlmostEqual(expected_u, max(uv[0] for uv in front.uvs) - min(uv[0] for uv in front.uvs))
+
 
 class CoplanarOverlapTests(unittest.TestCase):
     @staticmethod
