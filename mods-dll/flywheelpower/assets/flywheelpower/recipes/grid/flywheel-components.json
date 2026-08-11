@@ -368,7 +368,7 @@
     }
   },
   {
-    "ingredientPattern": "R_R,CR_",
+    "ingredientPattern": "R_R,RCR",
     "ingredients": {
       "R": {
         "type": "block",

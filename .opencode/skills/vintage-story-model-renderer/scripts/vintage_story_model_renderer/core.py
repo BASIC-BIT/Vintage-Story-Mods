@@ -17,6 +17,7 @@ class Face:
     uvs: list[Vec2] | None = None
     surface: str = ""
     source: str = ""
+    texture_key: str = ""
 
 
 @dataclass(frozen=True)

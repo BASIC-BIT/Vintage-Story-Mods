@@ -77,7 +77,6 @@ def main(argv: list[str] | None = None) -> None:
         path = (base / spec["dimensionsSource"]).resolve()
         faces.extend(load_flywheel(path, spec["size"]))
         inputs.append(path)
-    textures.update(manifest.get("textures", {}))
     overlaps = find_coplanar_overlaps(faces)
     item_faces = list(faces)
 
@@ -186,21 +185,38 @@ def main(argv: list[str] | None = None) -> None:
         elif spec.get("reference") not in {None, "none"}:
             raise ValueError(f"Unsupported collectible transform reference: {spec['reference']}")
 
+    for material, location in manifest.get("textures", {}).items():
+        textures[material] = location
+        for face in [*faces, *item_faces]:
+            if face.material == material:
+                textures[face.texture_key or material] = location
+
     render_faces = faces + reference_faces
 
     resolved: dict[str, str | None] = {}
     colors: dict[str, tuple[int, int, int]] = {}
     texture_images: dict[str, Image.Image | None] = {}
-    for material in sorted({face.material for face in render_faces}):
+    faces_by_render_key = {
+        face.texture_key or face.material: face
+        for face in render_faces
+    }
+    material_binding_counts = {
+        material: sum(face.material == material for face in faces_by_render_key.values())
+        for material in {face.material for face in faces_by_render_key.values()}
+    }
+    for render_key, face in sorted(faces_by_render_key.items()):
+        material = face.material
+        metadata_key = material if material_binding_counts[material] == 1 else render_key
         if material.startswith("reference-"):
-            resolved[material] = "builtin:representation-reference-color"
-            colors[material] = average_color(None, material)
-            texture_images[material] = None
+            resolved[metadata_key] = "builtin:representation-reference-color"
+            colors[render_key] = average_color(None, material)
+            texture_images[render_key] = None
             continue
-        texture = resolve_texture(textures.get(material, ""), roots) if textures.get(material) else None
-        resolved[material] = str(texture) if texture else None
-        colors[material] = average_color(texture, material, textures.get(material, ""))
-        texture_images[material] = Image.open(texture).convert("RGBA") if texture else None
+        location = textures.get(render_key, "")
+        texture = resolve_texture(location, roots) if location else None
+        resolved[metadata_key] = str(texture) if texture else None
+        colors[render_key] = average_color(texture, material, location)
+        texture_images[render_key] = Image.open(texture).convert("RGBA") if texture else None
 
     all_images: list[Path] = []
     for mode in RENDER_MODES:
@@ -266,6 +282,7 @@ def main(argv: list[str] | None = None) -> None:
                 args.animation_source_fps,
                 args.animation_cycles,
                 args.animation_orbit,
+                collectible_transform,
             )
 
     turntable_metadata = None

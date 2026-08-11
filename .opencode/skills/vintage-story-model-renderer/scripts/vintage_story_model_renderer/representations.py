@@ -158,6 +158,7 @@ def transform_faces(faces: list[Face], transform: CollectibleTransform) -> list[
             face.uvs,
             face.surface,
             face.source,
+            face.texture_key,
         )
         for face in faces
     ]

@@ -11,7 +11,7 @@ public sealed class FlywheelPhysicalPropertiesTests
             hubMaterial: "iron");
 
         Assert.Equal(8f, profile.EffectiveInertia, 3);
-        Assert.Equal(150.92f, profile.RotatingMassKg, 2);
+        Assert.Equal(119.44f, profile.RotatingMassKg, 2);
     }
 
     [Fact]
@@ -27,8 +27,8 @@ public sealed class FlywheelPhysicalPropertiesTests
         Assert.True(meteoric.RotatingMassKg < steel.RotatingMassKg);
         Assert.True(meteoric.EffectiveInertia < steel.EffectiveInertia);
         Assert.NotEqual(iron.RotatingMassKg, meteoric.RotatingMassKg);
-        Assert.InRange(wood.RotatingMassKg, 100f, 115f);
-        Assert.InRange(steel.RotatingMassKg, 145f, 155f);
+        Assert.InRange(wood.RotatingMassKg, 75f, 85f);
+        Assert.InRange(steel.RotatingMassKg, 115f, 125f);
     }
 
     [Fact]
@@ -44,9 +44,9 @@ public sealed class FlywheelPhysicalPropertiesTests
         Assert.True(compactWood.EffectiveInertia < compactStone.EffectiveInertia);
         Assert.True(compactStone.EffectiveInertia < compactIron.EffectiveInertia);
         Assert.True(compactIron.EffectiveInertia < fullIron.EffectiveInertia);
-        Assert.InRange(compactWood.RotatingMassKg, 25f, 35f);
-        Assert.InRange(compactStone.RotatingMassKg, 35f, 45f);
-        Assert.InRange(compactIron.RotatingMassKg, 45f, 55f);
+        Assert.InRange(compactWood.RotatingMassKg, 18f, 23f);
+        Assert.InRange(compactStone.RotatingMassKg, 28f, 33f);
+        Assert.InRange(compactIron.RotatingMassKg, 40f, 45f);
         Assert.True(compactIron.RotatingMassKg < fullIron.RotatingMassKg);
     }
 

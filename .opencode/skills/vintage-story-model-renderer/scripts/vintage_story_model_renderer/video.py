@@ -10,8 +10,8 @@ from PIL import Image
 
 from .core import VIEWS, Face, Vec3
 from .jsonio import load_vintage_story_json
-from .representations import CollectibleTransform
-from .rendering import fixed_animation_projections, render, rotate_view_around_y
+from .representations import CollectibleTransform, transform_faces
+from .rendering import fixed_animation_projections, orbit_view, render
 from .scenes import load_seraph_held_frame
 from .shapes import load_shape
 
@@ -49,6 +49,7 @@ def render_animation(
     source_fps: int,
     cycles: int,
     orbit: bool,
+    transform: CollectibleTransform | None = None,
 ) -> dict:
     data = load_vintage_story_json(shape_path)
     animation = next(
@@ -63,10 +64,10 @@ def render_animation(
         raise ValueError(f"Animation '{animation_code}' was not found in {shape_path}.")
     quantity = int(animation["quantityframes"])
     source_positions = animation_sample_positions(quantity, fps, source_fps)
-    sampled_cycle_faces = [
-        load_shape(shape_path, animation_code, source_position)[0]
-        for source_position in source_positions
-    ]
+    sampled_cycle_faces = []
+    for source_position in source_positions:
+        frame = load_shape(shape_path, animation_code, source_position)[0]
+        sampled_cycle_faces.append(transform_faces(frame, transform) if transform else frame)
     samples_per_cycle = len(sampled_cycle_faces)
     total_frames = samples_per_cycle * cycles
     if orbit:
@@ -76,7 +77,7 @@ def render_animation(
         ]
         base_view = VIEWS[view_name][0]
         views = [
-            rotate_view_around_y(base_view, frame / total_frames)
+            orbit_view(base_view, frame / total_frames)
             for frame in range(total_frames)
         ]
     else:
@@ -189,7 +190,7 @@ def render_seraph_held_animation(
     ]
     base_view = VIEWS[view_name][0]
     views = (
-        [rotate_view_around_y(base_view, frame / total_frames) for frame in range(total_frames)]
+        [orbit_view(base_view, frame / total_frames) for frame in range(total_frames)]
         if orbit
         else [base_view] * samples_per_cycle
     )
@@ -256,7 +257,7 @@ def render_turntable(
     frame_faces = [faces] * total_frames
     base_view = VIEWS[view_name][0]
     views = [
-        rotate_view_around_y(base_view, frame / total_frames)
+        orbit_view(base_view, frame / total_frames)
         for frame in range(total_frames)
     ]
     projections = fixed_animation_projections(frame_faces, views, size)

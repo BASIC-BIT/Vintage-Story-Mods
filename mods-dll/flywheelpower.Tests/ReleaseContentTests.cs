@@ -549,18 +549,28 @@ public sealed class ReleaseContentTests
         BlockPos groundTarget = BlockFlywheelStand.ResolvePlacementPosition(
             selected,
             compact: false,
-            EnumAxis.Y);
+            EnumAxis.Y,
+            EnumAxis.X);
         Assert.Equal(new BlockPos(10, 21, 30, 2), groundTarget);
+
+        BlockPos verticalGroundTarget = BlockFlywheelStand.ResolvePlacementPosition(
+            selected,
+            compact: false,
+            EnumAxis.Y,
+            EnumAxis.Y);
+        Assert.Equal(selected, verticalGroundTarget);
 
         BlockPos centerTarget = BlockFlywheelStand.ResolvePlacementPosition(
             selected,
             compact: false,
+            EnumAxis.Z,
             EnumAxis.Z);
         Assert.Equal(selected, centerTarget);
 
         BlockPos compactTarget = BlockFlywheelStand.ResolvePlacementPosition(
             selected,
             compact: true,
+            EnumAxis.Y,
             EnumAxis.Y);
         Assert.Equal(selected, compactTarget);
     }
@@ -691,7 +701,10 @@ public sealed class ReleaseContentTests
             .EnumerateArray()
             .Single(recipe =>
                 recipe.GetProperty("output").GetProperty("code").GetString() == "flywheelrim-compact-stone");
-        Assert.Equal("R_R,CR_", stoneBlank.GetProperty("ingredientPattern").GetString());
+        Assert.Equal("R_R,RCR", stoneBlank.GetProperty("ingredientPattern").GetString());
+        Assert.Equal(
+            4,
+            stoneBlank.GetProperty("ingredientPattern").GetString()!.Count(character => character == 'R'));
         Assert.Equal(
             1,
             stoneBlank.GetProperty("ingredientPattern").GetString()!.Count(character => character == 'C'));

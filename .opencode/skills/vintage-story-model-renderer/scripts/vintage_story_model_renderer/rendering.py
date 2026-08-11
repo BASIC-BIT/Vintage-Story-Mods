@@ -97,10 +97,16 @@ def projection_for_view(
     return view, right, up, center, scale
 
 
-def rotate_view_around_y(view: Vec3, turns: float) -> Vec3:
+def orbit_view(view: Vec3, turns: float) -> Vec3:
     angle = turns * math.tau
     cosine = math.cos(angle)
     sine = math.sin(angle)
+    if abs(view[0]) < 1e-9 and abs(view[2]) < 1e-9:
+        return (
+            -view[1] * sine,
+            view[1] * cosine,
+            view[2],
+        )
     return (
         view[0] * cosine + view[2] * sine,
         view[1],
@@ -322,9 +328,10 @@ def render(
                 continue
             points = [screen_point(vertex, center, right, up, size, scale) for vertex in face.vertices]
             vertex_depths = [dot(sub(vertex, center), view) for vertex in face.vertices]
-            texture = textures.get(face.material) if mode == "textured" else None
+            render_key = face.texture_key or face.material
+            texture = textures.get(render_key) if mode == "textured" else None
             brightness = 0.58 + 0.42 * max(0, dot(normal, light))
-            base = colors.get(face.material, (155, 155, 155))
+            base = colors.get(render_key, colors.get(face.material, (155, 155, 155)))
             fill = base if mode == "material" else tuple(round(channel * 0.72) for channel in base)
             opacity = 0.28 if face.source == "representation-reference" else 1
             face_uv_coordinates = face.uvs or [(0, 1), (0, 0), (1, 0), (1, 1)]
@@ -347,7 +354,12 @@ def render(
                     brightness,
                     opacity,
                 )
-            visible_faces.append((points, vertex_depths, face.source == "representation-reference"))
+            texture_has_transparency = (
+                texture is not None
+                and texture.convert("RGBA").getextrema()[3][0] < 255
+            )
+            if not texture_has_transparency:
+                visible_faces.append((points, vertex_depths, face.source == "representation-reference"))
 
         for points, vertex_depths, is_reference in visible_faces:
             for index, start in enumerate(points):

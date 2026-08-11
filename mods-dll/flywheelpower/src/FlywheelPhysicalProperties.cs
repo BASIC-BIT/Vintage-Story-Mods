@@ -78,7 +78,7 @@ internal static class FlywheelPhysicalProperties
     private static float EstimateRecipeMass(bool compact, float wheelDensity, float hubDensity)
     {
         int rimPieces = compact ? 4 : 8;
-        int hubIngotEquivalents = compact ? 2 : 8;
+        int hubIngotEquivalents = compact ? 1 : 4;
         int webPlanks = compact ? 0 : 8;
         float rimPieceMass = wheelDensity switch
         {

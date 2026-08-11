@@ -86,6 +86,7 @@ def compose_held_faces(
             face.uvs,
             face.surface,
             face.source,
+            face.texture_key,
         )
         for face in faces
     ]

@@ -440,7 +440,7 @@ def components_recipes() -> list[dict]:
             },
         ])
     recipes.append({
-        "ingredientPattern": "R_R,CR_",
+        "ingredientPattern": "R_R,RCR",
         "ingredients": {
             "R": {"type": "block", "code": "game:rockpolished-granite"},
             "C": {"type": "item", "code": "game:chisel-*", "isTool": True, "toolDurabilityCost": 4},

@@ -21,7 +21,7 @@ public sealed class BlockFlywheelStand : Block
             byPlayer.Entity?.Pos.Yaw ?? 0f,
             byPlayer.Entity?.Controls?.Sneak == true);
         BlockSelection placementSel = blockSel.Clone();
-        placementSel.Position = ResolvePlacementPosition(blockSel.Position, compact, blockSel.Face.Axis);
+        placementSel.Position = ResolvePlacementPosition(blockSel.Position, compact, blockSel.Face.Axis, axis);
         string rotation = FlywheelMultiblock.RotationForAxis(axis);
         Block orientedBlock = world.GetBlock(CodeWithVariant("rotation", rotation));
         if (orientedBlock == null || !orientedBlock.CanPlaceBlock(world, byPlayer, placementSel, ref failureCode))
@@ -58,9 +58,10 @@ public sealed class BlockFlywheelStand : Block
     internal static BlockPos ResolvePlacementPosition(
         BlockPos selectedPosition,
         bool compact,
-        EnumAxis selectedFaceAxis)
+        EnumAxis selectedFaceAxis,
+        EnumAxis placementAxis)
     {
-        return !compact && selectedFaceAxis == EnumAxis.Y
+        return !compact && selectedFaceAxis == EnumAxis.Y && placementAxis != EnumAxis.Y
             ? selectedPosition.UpCopy()
             : selectedPosition.Copy();
     }

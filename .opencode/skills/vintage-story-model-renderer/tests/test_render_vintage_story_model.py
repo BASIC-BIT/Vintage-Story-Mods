@@ -139,10 +139,10 @@ class RenderMatrixTests(unittest.TestCase):
 
     def test_orbit_view_completes_one_seamless_revolution(self):
         start = (1, 0.78, 1)
-        quarter = renderer.rotate_view_around_y(start, 0.25)
-        complete = renderer.rotate_view_around_y(start, 1)
+        quarter = renderer.orbit_view(start, 0.25)
+        complete = renderer.orbit_view(start, 1)
         views = [
-            renderer.normalize(renderer.rotate_view_around_y(start, frame / 120))
+            renderer.normalize(renderer.orbit_view(start, frame / 120))
             for frame in range(120)
         ]
 
@@ -155,6 +155,56 @@ class RenderMatrixTests(unittest.TestCase):
             renderer.dot(views[0], views[1]),
             renderer.dot(views[-1], views[0]),
         )
+
+    def test_top_and_bottom_orbits_move_off_the_poles_and_close_the_loop(self):
+        for view_name in ("top", "bottom"):
+            with self.subTest(view_name=view_name):
+                start = renderer.VIEWS[view_name][0]
+                quarter = renderer.orbit_view(start, 0.25)
+                complete = renderer.orbit_view(start, 1)
+
+                self.assertNotEqual(start, quarter)
+                self.assertAlmostEqual(0, quarter[1])
+                for actual, expected in zip(complete, start):
+                    self.assertAlmostEqual(expected, actual)
+
+    def test_multiple_shapes_preserve_same_named_material_texture_bindings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            assets = root / "assets"
+            red = assets / "fixture" / "textures" / "red.png"
+            blue = assets / "fixture" / "textures" / "blue.png"
+            red.parent.mkdir(parents=True)
+            Image.new("RGBA", (1, 1), (255, 0, 0, 255)).save(red)
+            Image.new("RGBA", (1, 1), (0, 0, 255, 255)).save(blue)
+
+            for name, offset in (("red", 0), ("blue", 2)):
+                (root / f"{name}.json").write_text(json.dumps({
+                    "textures": {"surface": f"fixture:{name}"},
+                    "elements": [{
+                        "name": name,
+                        "from": [offset, 0, 0],
+                        "to": [offset + 1, 1, 1],
+                        "faces": {"north": {"texture": "#surface"}},
+                    }],
+                }), encoding="utf-8")
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps({
+                "name": "texture-binding-fixture",
+                "shapes": ["red.json", "blue.json"],
+            }), encoding="utf-8")
+            output = root / "output"
+
+            renderer.main([
+                "--manifest", str(manifest),
+                "--output-dir", str(output),
+                "--assets-root", str(assets),
+                "--size", "64",
+            ])
+            metadata = json.loads((output / "render-metadata.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(set(metadata["resolvedTextures"].values()), {str(red), str(blue)})
+            self.assertEqual([], metadata["unresolvedTextures"])
 
     def test_animation_sampling_interpolates_source_frames_at_higher_output_rate(self):
         positions = renderer.animation_sample_positions(30, 60, 30)
@@ -382,6 +432,27 @@ class DepthBufferTests(unittest.TestCase):
 
         self.assertTrue(np.all(pixels == (10, 20, 30)))
         self.assertTrue(np.all(np.isneginf(depths)))
+
+    def test_fully_transparent_textured_face_does_not_draw_an_outline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "transparent.png"
+            face = renderer.Face(
+                [(1, 0, 0), (1, 1, 0), (1, 1, 1), (1, 0, 1)],
+                "surface",
+                "transparent",
+            )
+            renderer.render(
+                [face],
+                {"surface": (255, 0, 0)},
+                {"surface": Image.new("RGBA", (1, 1), (255, 0, 0, 0))},
+                "front",
+                "textured",
+                output,
+                64,
+            )
+
+            pixels = np.asarray(Image.open(output))
+            self.assertTrue(np.all(pixels[45:, :, :] == (28, 31, 34)))
 
 
 class AnimationProjectionTests(unittest.TestCase):

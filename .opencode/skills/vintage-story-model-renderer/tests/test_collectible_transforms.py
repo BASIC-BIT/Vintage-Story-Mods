@@ -2,6 +2,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import numpy as np
@@ -139,6 +140,58 @@ class CollectibleTransformTests(unittest.TestCase):
         self.assertEqual("plate", transformed.element)
         self.assertEqual(source.uvs, transformed.uvs)
         self.assertEqual((2, 2, 0), transformed.vertices[2])
+
+    def test_shape_animation_applies_the_selected_collectible_transform(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shape = root / "shape.json"
+            shape.write_text(json.dumps({
+                "elements": [{
+                    "name": "cube",
+                    "from": [0, 0, 0],
+                    "to": [1, 1, 1],
+                    "faces": {"north": {"texture": "#surface"}},
+                }],
+                "textures": {"surface": "fixture:surface"},
+                "animations": [{
+                    "code": "idle",
+                    "quantityframes": 1,
+                    "keyframes": [],
+                }],
+            }), encoding="utf-8")
+            transform = renderer.CollectibleTransform(
+                "groundTransform",
+                (1, 0, 0),
+                (0, 0, 0),
+                (0, 0, 0),
+                (1, 1, 1),
+                True,
+                16,
+            )
+
+            with (
+                mock.patch("vintage_story_model_renderer.video.render") as render_call,
+                mock.patch("vintage_story_model_renderer.video.subprocess.run"),
+                mock.patch("vintage_story_model_renderer.video.sha256", return_value="HASH"),
+            ):
+                renderer.render_animation(
+                    shape,
+                    "idle",
+                    {},
+                    {},
+                    "front",
+                    root / "animation.mp4",
+                    64,
+                    1,
+                    1,
+                    1,
+                    False,
+                    transform,
+                )
+
+            rendered_faces = render_call.call_args.args[0]
+            self.assertEqual(16, min(vertex[0] for face in rendered_faces for vertex in face.vertices))
+            self.assertTrue(all(face.texture_key for face in rendered_faces))
 
     def test_grip_proxy_is_explicit_reference_geometry_centered_on_transformed_pivot(self):
         transform = renderer.CollectibleTransform(

@@ -177,6 +177,8 @@ def load_shape_scene(
     animation_frame: float = 0,
 ) -> tuple[list[Face], dict[str, str], list[AttachmentPose]]:
     data = load_vintage_story_json(path)
+    resolved_path = str(path.resolve())
+    authored_textures = dict(data.get("textures", {}))
     faces: list[Face] = []
     attachments: list[AttachmentPose] = []
     texture_width = float(data.get("textureWidth", 16))
@@ -225,13 +227,15 @@ def load_shape_scene(
             for direction, definition in element.get("faces", {}).items():
                 indices = FACE_INDICES.get(direction)
                 if indices and definition.get("enabled", True):
+                    material = str(definition.get("texture", "#missing")).lstrip("#")
                     faces.append(Face(
                         [vertices[index] for index in indices],
-                        str(definition.get("texture", "#missing")).lstrip("#"),
+                        material,
                         element_name,
                         face_uvs(definition, texture_width, texture_height, direction, start, end),
                         direction,
-                        str(path),
+                        resolved_path,
+                        f"{resolved_path}::{material}",
                     ))
 
             def child_transform(
@@ -275,4 +279,11 @@ def load_shape_scene(
             visit(element.get("children", []), child_transform, element_path)
 
     visit(resolve_internal_step_parents(data.get("elements", [])))
-    return faces, dict(data.get("textures", {})), attachments
+    return (
+        faces,
+        {
+            f"{resolved_path}::{material}": location
+            for material, location in authored_textures.items()
+        },
+        attachments,
+    )

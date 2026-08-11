@@ -36,7 +36,7 @@ from .rendering import (
     rasterize_triangle,
     render,
     resolve_texture,
-    rotate_view_around_y,
+    orbit_view,
     screen_point,
 )
 from .scenes import (
@@ -114,6 +114,7 @@ __all__ = [
     "main",
     "mul",
     "normalize",
+    "orbit_view",
     "projected_face",
     "projection",
     "projection_for_view",
@@ -128,7 +129,6 @@ __all__ = [
     "resolve_internal_step_parents",
     "resolve_collectible_property",
     "rotate",
-    "rotate_view_around_y",
     "sample_animation_pose",
     "screen_point",
     "sha256",
