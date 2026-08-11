@@ -61,12 +61,12 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
         return clampedSize;
     }
 
-    private static readonly int[] FallbackClampFontSizes = [30, 16, 12, 9];
-
+    // Reads the config's own default rather than repeating it. A fallback that does not equal the
+    // real default silently retunes any server that falls back to it.
     private int[] ClampFontSizes =>
         _config.ProximityChatClampFontSizes is { Length: > 0 }
             ? _config.ProximityChatClampFontSizes
-            : FallbackClampFontSizes;
+            : ModConfig.DefaultClampFontSizes;
 
     private int GetClampedFontSize(double unclamped)
     {

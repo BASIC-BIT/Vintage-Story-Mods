@@ -98,8 +98,9 @@ public class VisibilityFilterTests
         [InlineData(EnumBlockMaterial.Plant)]
         public void FoliageBlocksStrictSightButNotGeneralSight(EnumBlockMaterial material)
         {
-            // The whole reason two sight filters exist. General sight backs delivery, bubbles,
-            // nametags and the typing indicator; strict sight backs reading a character sheet.
+            // The whole reason two sight filters exist. General sight backs delivery, speech and
+            // placed bubbles, nametags and the typing indicator; strict sight backs one thing only,
+            // reading another player's character sheet.
             var block = Foliage(material);
 
             VisibilityUtils.StrictSightBlockFilter(AnyPos, block).Should().BeTrue();

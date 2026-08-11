@@ -25,7 +25,8 @@ public static class VisibilityUtils
     /// Default-deny: an unrecognised block occludes rather than silently leaking through.
     ///
     /// Reserved for deliberate close inspection, where reading detail through a hedge would be
-    /// wrong. Perceiving a person or their live message uses <see cref="SightBlockFilter"/>.
+    /// wrong. Its only consumer is the character-sheet look-up, which shows one player another's
+    /// written description at close range. Everything else uses <see cref="SightBlockFilter"/>.
     /// </summary>
     internal static readonly BlockFilter StrictSightBlockFilter = (BlockPos pos, Block block) =>
     {
@@ -50,9 +51,9 @@ public static class VisibilityUtils
     /// does not block: tree leaves and plants declare no render pass, so they default to Opaque and
     /// would otherwise hide a player standing under a canopy.
     ///
-    /// Everything that perceives a person or their live message reads through this one — sign
-    /// language delivery, speech bubbles, nametags, the typing indicator — so those four agree
-    /// about who is visible. They used to disagree: a signed message delivered through leaves
+    /// Everything that decides whether a player can perceive something reads through this one —
+    /// sign language delivery, speech bubbles, nametags, the typing indicator, placed environmental
+    /// bubbles — so they cannot disagree. They used to: a signed message delivered through leaves
     /// rendered no bubble, because delivery used this rule and rendering used the strict one.
     /// </summary>
     internal static readonly BlockFilter SightBlockFilter = (BlockPos pos, Block block) =>
@@ -123,6 +124,9 @@ public static class VisibilityUtils
     /// <summary>
     /// Sight for deliberate close inspection, where foliage does block. Reading a character sheet
     /// through a hedge is different from noticing that someone is standing there.
+    ///
+    /// The character-sheet look-up is the only caller. Everything else that decides whether a
+    /// player can perceive something uses <see cref="HasLineOfSight(IWorldAccessor, Entity, Entity, bool, bool)"/>.
     /// </summary>
     public static bool HasStrictLineOfSight(IWorldAccessor world, Entity observer, Entity target, bool failOpen = false)
     {
@@ -130,10 +134,10 @@ public static class VisibilityUtils
     }
 
     /// <summary>
-    /// Strict sight from an observer entity to an arbitrary world position.
+    /// Sight from an observer entity to an arbitrary world position.
     /// Used for placed environmental bubbles where the target is a point, not an entity.
     /// </summary>
-    public static bool HasStrictLineOfSight(IWorldAccessor world, Entity observer, Vec3d targetPos, bool failOpen = false)
+    public static bool HasLineOfSight(IWorldAccessor world, Entity observer, Vec3d targetPos, bool failOpen = false)
     {
         if (world == null || observer == null || targetPos == null)
         {
@@ -145,7 +149,7 @@ public static class VisibilityUtils
             var fromBase = observer.Pos.XYZ;
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
 
-            return IsRayClear(world, fromPos, targetPos, failOpen, StrictSightBlockFilter);
+            return IsRayClear(world, fromPos, targetPos, failOpen, SightBlockFilter);
         }
         catch (Exception ex)
         {

@@ -145,6 +145,19 @@ namespace thebasics.Configs
 
         private const int DefaultSignLanguageRange = 60;
 
+        /// <summary>
+        /// Distance font sizes, largest to smallest. The floor is the size a listener at maximum
+        /// range reads at, so it has to stay legible: unreadable text conveys nothing while still
+        /// taking up chat.
+        /// </summary>
+        internal static readonly int[] DefaultClampFontSizes = [30, 16, 12, 9];
+
+        /// <summary>
+        /// The floor shipped before <see cref="DefaultClampFontSizes"/>. Size 6 was not
+        /// small-but-legible, it was unreadable. Retained so upgrades can recognise and replace it.
+        /// </summary>
+        internal static readonly int[] RetiredClampFontSizes = [30, 16, 12, 6];
+
         private static int DefaultModeDistance(ProximityChatMode mode) => mode switch
         {
             ProximityChatMode.Yell => 90,
@@ -189,7 +202,19 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, 12 }
             };
 
-            ProximityChatClampFontSizes ??= [30, 16, 12, 9];
+            ProximityChatClampFontSizes ??= [.. DefaultClampFontSizes];
+
+            // Every successful load rewrites the config to disk, so an already-running server has
+            // the retired default written out explicitly and the ??= above never fires for it. Left
+            // alone, the readability fix would only ever reach fresh installs.
+            //
+            // Only the exact retired array is replaced, so a genuinely custom set survives. The cost
+            // is that this one array can no longer be chosen deliberately — it is the unreadable
+            // default that prompted the change, and any other floor is still available.
+            if (ProximityChatClampFontSizes.SequenceEqual(RetiredClampFontSizes))
+            {
+                ProximityChatClampFontSizes = [.. DefaultClampFontSizes];
+            }
 
 
             InitializeProximityChatVerbDefaults();

@@ -94,8 +94,8 @@ Features:
 - Sticky override modes toggle: running the same override command again returns you to speech, and running a different one replaces it. An explicit message prefix still wins for that single line.
 - Recipient filtering by distance, sign-language line of sight, and chat mode.
 - Sign-language line-of-sight checks use multiple target points and can deliver shortly after send if line of sight is acquired within the retry window.
-- Sight treats foliage as see-through, so signing carries through a tree canopy and the speech bubble, nametag, and typing indicator above a player under one still render. These four share a single filter deliberately: they previously disagreed, delivering a signed message whose bubble never appeared.
-- The character-sheet look-up gate and placed environmental bubbles keep the stricter filter, where foliage does block. Noticing that someone is standing there and reading their character sheet through a hedge are different things.
+- Sight treats foliage as see-through, so signing carries through a tree canopy and the speech bubble, nametag, typing indicator, and placed environmental bubbles all remain visible under one. They share a single filter deliberately: they previously disagreed, delivering a signed message whose bubble never appeared.
+- The character-sheet look-up keeps a stricter filter, where foliage does block. Noticing that someone is standing there and reading their written description off them at close range are different things.
 - Experimental, off by default: per-mode `RequireClearSoundPathForSpeech` gating, and wall muffling that converts sound-blocking geometry into extra effective distance. Sound and sight occlude differently: glass and water stop speech but not sight, and foliage stops neither.
 - Automatic IC formatting with configurable verbs, punctuation, delimiters, nicknames, nickname colors, OOC styling, and optional global OOC.
 - Question verbs: a message ending in `?` uses `ProximityChatModeQuestionVerbs` (default `asks`) instead of the mode's normal verbs.

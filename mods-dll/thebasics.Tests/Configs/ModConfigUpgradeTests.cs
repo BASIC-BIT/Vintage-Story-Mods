@@ -68,12 +68,28 @@ public class ModConfigUpgradeTests
     }
 
     [Fact]
-    public void ConfiguredClampFontSizesSurviveTheRaisedDefaultFloor()
+    public void TheRetiredFontFloorIsUpgradedOnAnExistingConfig()
     {
-        // Raising the shipped floor from 6 to 9 must not rewrite a server that chose its own sizes.
+        // Every successful load rewrites the config, so a running server has the retired default
+        // written out explicitly. Without an upgrade path the readability fix reaches nobody who
+        // already runs the mod.
         var config = LoadLegacyConfig();
 
-        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 6);
+        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 9);
+    }
+
+    [Fact]
+    public void CustomClampFontSizesAreLeftAlone()
+    {
+        // Only the exact retired array is replaced. Anything a server actually chose survives.
+        const string json = """
+        { "ProximityChatClampFontSizes": [28, 14, 10, 6] }
+        """;
+
+        var config = JsonConvert.DeserializeObject<ModConfig>(json);
+        config!.InitializeDefaultsIfNeeded();
+
+        config.ProximityChatClampFontSizes.Should().Equal(28, 14, 10, 6);
     }
 
     [Fact]
