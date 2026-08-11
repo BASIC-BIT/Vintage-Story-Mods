@@ -463,11 +463,11 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   are four pre-existing The BASICs analyzer findings. Flywheel Power tests pass 77/77 and DimensionLib tests pass 58/58.
   The all-repository The BASICs test lane is temporarily dependent on PR #219: current `main` lacks the 1.22.6
   `IServerPlayer.IsInInteractionRangeOf` test-fixture implementation and produces 123 unrelated dynamic-proxy failures.
-- All six configured whitespace checks, the agent-tooling check, generated-content drift checks, the Lizard gate, and 58/58
+- All six configured whitespace checks, the Flywheel source formatting check, the agent-tooling check, generated-content drift checks, the Lizard gate, and 60/60
   renderer regression tests pass. The exact model sweep covers 74 manifests and 1,776 primary images with zero unresolved
   textures, zero coplanar overlaps, and exactly 24 images per manifest.
-- The exact package contains 31 allowlisted entries, is 84,209 bytes, and has SHA-256
-  `5998E1DBF941041D5F384242EC7590BDBD1F20A500353A4A65D96A58F2777FB0`. Archive inspection finds no disabled content,
+- The exact package contains 31 allowlisted entries, is 84,186 bytes, and has SHA-256
+  `210102D65913CFA8DEBDB7C1B9A3DA145F803224FD9180B1EE845AA88AA76694`. Archive inspection finds no disabled content,
   compact-web residue, or obsolete player-facing tyre, rim, or blank labels.
 - Runtime/model manual QA remains applicable because the final post-deployment delta changes recipes, compact mass, and the
   vertical-placement gesture. Before merge, the exact final package still needs the bounded observations: forge the 7-by-6

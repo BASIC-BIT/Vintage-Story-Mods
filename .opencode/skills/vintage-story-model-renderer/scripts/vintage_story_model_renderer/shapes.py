@@ -56,6 +56,11 @@ def lerp(left: float, right: float, amount: float) -> float:
     return left + (right - left) * amount
 
 
+def lerp_angle(left: float, right: float, amount: float) -> float:
+    distance = ((right - left) % 360 + 540) % 360 - 180
+    return left + distance * amount
+
+
 def sample_animation_pose(
     data: dict,
     animation_code: str,
@@ -83,6 +88,11 @@ def sample_animation_pose(
         "stretch": ("stretchX", "stretchY", "stretchZ"),
         "origin": ("originX", "originY", "originZ"),
     }
+    shortest_rotation_properties = (
+        "rotShortestDistanceX",
+        "rotShortestDistanceY",
+        "rotShortestDistanceZ",
+    )
     defaults = {
         "offset": (0.0, 0.0, 0.0),
         "rotation": (0.0, 0.0, 0.0),
@@ -108,13 +118,17 @@ def sample_animation_pose(
                             float(definition.get(prop, defaults[channel][index]))
                             for index, prop in enumerate(properties)
                         ),
+                        tuple(
+                            bool(definition.get(prop, False))
+                            for prop in shortest_rotation_properties
+                        ),
                     ))
             if not keyed:
                 continue
 
-            right_index = next((index for index, (at, _) in enumerate(keyed) if at > frame), 0)
-            right_frame, right_value = keyed[right_index]
-            left_frame, left_value = keyed[(right_index - 1) % len(keyed)]
+            right_index = next((index for index, (at, _, _) in enumerate(keyed) if at > frame), 0)
+            right_frame, right_value, _ = keyed[right_index]
+            left_frame, left_value, left_shortest_rotation = keyed[(right_index - 1) % len(keyed)]
             if len(keyed) == 1:
                 amount = 0.0
             elif right_frame <= left_frame:
@@ -123,7 +137,11 @@ def sample_animation_pose(
             else:
                 amount = (frame - left_frame) / (right_frame - left_frame)
             pose[channel] = tuple(
-                lerp(left_value[index], right_value[index], amount)
+                (
+                    lerp_angle(left_value[index], right_value[index], amount)
+                    if channel == "rotation" and left_shortest_rotation[index]
+                    else lerp(left_value[index], right_value[index], amount)
+                )
                 for index in range(3)
             )  # type: ignore[assignment]
         poses[name] = pose

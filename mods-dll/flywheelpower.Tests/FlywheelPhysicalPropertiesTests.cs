@@ -14,13 +14,13 @@ public sealed class FlywheelPhysicalPropertiesTests
     }
 
     [Fact]
-    public void MetalWheelMassCountsTwoIngotsPerPlate()
+    public void RecipeMassCountsTwoIngotsPerPlateAndTheSharedWoodenAxle()
     {
         FlywheelPhysicalProfile fullIron = FlywheelPhysicalProperties.ForVariant(false, "iron", "iron");
         FlywheelPhysicalProfile compactIron = FlywheelPhysicalProperties.ForVariant(true, "iron", "iron");
 
         Assert.Equal(182.4f, fullIron.RotatingMassKg, 2);
-        Assert.Equal(73.83f, compactIron.RotatingMassKg, 2);
+        Assert.Equal(75.83f, compactIron.RotatingMassKg, 2);
     }
 
     [Fact]
@@ -53,9 +53,9 @@ public sealed class FlywheelPhysicalPropertiesTests
         Assert.True(compactWood.EffectiveInertia < compactStone.EffectiveInertia);
         Assert.True(compactStone.EffectiveInertia < compactIron.EffectiveInertia);
         Assert.True(compactIron.EffectiveInertia < fullIron.EffectiveInertia);
-        Assert.InRange(compactWood.RotatingMassKg, 18f, 23f);
-        Assert.InRange(compactStone.RotatingMassKg, 28f, 33f);
-        Assert.InRange(compactIron.RotatingMassKg, 70f, 80f);
+        Assert.InRange(compactWood.RotatingMassKg, 20f, 25f);
+        Assert.InRange(compactStone.RotatingMassKg, 30f, 35f);
+        Assert.InRange(compactIron.RotatingMassKg, 75f, 80f);
         Assert.True(compactIron.RotatingMassKg < fullIron.RotatingMassKg);
     }
 

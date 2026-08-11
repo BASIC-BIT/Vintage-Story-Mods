@@ -26,7 +26,7 @@ from .core import (
     signed_polygon_area,
     sub,
 )
-from .flywheel import add_annulus, add_rotated_cuboid, constants, load_flywheel
+from .flywheel import add_annulus, add_rotated_cuboid, constants, load_flywheel, planar_uvs
 from .rendering import (
     average_color,
     fixed_animation_projections,
@@ -116,6 +116,7 @@ __all__ = [
     "mul",
     "normalize",
     "orbit_view",
+    "planar_uvs",
     "projected_face",
     "projection",
     "projection_for_view",

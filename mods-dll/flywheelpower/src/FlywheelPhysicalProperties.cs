@@ -20,8 +20,7 @@ internal static class FlywheelPhysicalProperties
     private const int MetalPlateIngotEquivalents = 2;
     private const float WoodPlankMassKg = 2.5f;
     private const float StoneBlankPieceMassKg = 5f;
-    private const float FullAxleMassKg = 5f;
-    private const float CompactAxleMassKg = 3f;
+    private const float WoodenAxleMassKg = 5f;
     private const float FullAxleLength = 1.5f;
     private const float CompactAxleLength = 1.16f;
 
@@ -91,7 +90,7 @@ internal static class FlywheelPhysicalProperties
         return rimPieces * rimPieceMass
             + hubIngotEquivalents * hubDensity * IngotEquivalentVolumeM3
             + webPlanks * WoodPlankMassKg
-            + (compact ? CompactAxleMassKg : FullAxleMassKg);
+            + WoodenAxleMassKg;
     }
 
     private static float FullIronReferencePolarInertia()

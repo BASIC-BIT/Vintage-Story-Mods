@@ -36,6 +36,8 @@ class AnnulusWindingTests(unittest.TestCase):
             material="wheel",
             element="test",
             segments=8,
+            radial_steps=1,
+            texture_units=100,
         )
 
         near_cap = faces[0]
@@ -67,10 +69,12 @@ class AnnulusWindingTests(unittest.TestCase):
             material="wheel",
             element="test",
             segments=8,
+            radial_steps=1,
+            texture_units=100,
         )
 
-        outer_rim = faces[2]
-        inner_rim = faces[3]
+        outer_rim = faces[16]
+        inner_rim = faces[24]
 
         def normal(face):
             return renderer.normalize(
@@ -322,6 +326,32 @@ class HierarchicalShapeTests(unittest.TestCase):
         self.assertEqual((5, 0, 0), midpoint["offset"])
         self.assertEqual((5, 0, 0), wrapped["offset"])
         self.assertEqual((0, 0, 0), midpoint.get("rotation", (0, 0, 0)))
+
+    def test_animation_pose_honors_per_axis_shortest_rotation(self):
+        data = {
+            "animations": [{
+                "code": "turn",
+                "quantityframes": 20,
+                "keyframes": [
+                    {"frame": 0, "elements": {"Body": {
+                        "rotationX": 350,
+                        "rotationY": 350,
+                        "rotShortestDistanceX": True,
+                    }}},
+                    {"frame": 10, "elements": {"Body": {
+                        "rotationX": 10,
+                        "rotationY": 10,
+                        "rotShortestDistanceX": True,
+                    }}},
+                ],
+            }],
+        }
+
+        midpoint = renderer.sample_animation_pose(data, "turn", 5)["Body"]["rotation"]
+        wrapped = renderer.sample_animation_pose(data, "turn", 15)["Body"]["rotation"]
+
+        self.assertEqual((360, 180, 0), midpoint)
+        self.assertEqual((0, 180, 0), wrapped)
 
     def test_animated_parent_rotation_moves_child(self):
         faces, _ = self.load_shape({
@@ -586,11 +616,16 @@ class RegistrationMarkWindingTests(unittest.TestCase):
         dimensions = root / "mods-dll" / "flywheelpower" / "src" / "FlywheelModelDimensions.cs"
         with tempfile.TemporaryDirectory() as directory:
             changed = Path(directory) / "FlywheelModelDimensions.cs"
+            renderer_source = dimensions.with_name("FlywheelMechBlockRenderer.cs")
             changed.write_text(
                 dimensions.read_text(encoding="utf-8").replace(
                     "internal const int SpokeCount = 8;",
                     "internal const int SpokeCount = 6;",
                 ),
+                encoding="utf-8",
+            )
+            changed.with_name("FlywheelMechBlockRenderer.cs").write_text(
+                renderer_source.read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             faces = renderer.load_flywheel(changed, "full")
@@ -601,6 +636,31 @@ class RegistrationMarkWindingTests(unittest.TestCase):
             if face.element.startswith("RuntimeWoodSpoke")
         }
         self.assertEqual(6, len(spoke_elements))
+
+    def test_procedural_disc_matches_runtime_radial_cells_and_planar_uvs(self):
+        root = Path(__file__).parents[4]
+        dimensions = root / "mods-dll" / "flywheelpower" / "src" / "FlywheelModelDimensions.cs"
+        faces = renderer.load_flywheel(dimensions, "compact")
+        values = renderer.constants(dimensions)
+        runtime_values = renderer.constants(dimensions.with_name("FlywheelMechBlockRenderer.cs"))
+        wheel_max = 8 + values["CompactWheelHalfThickness"] * 16
+        texture_units = runtime_values["TextureMeters"] * 16
+        front = [
+            face
+            for face in faces
+            if face.element == "RuntimeWheel"
+            and all(abs(vertex[0] - wheel_max) < 1e-9 for vertex in face.vertices)
+        ]
+
+        self.assertEqual(
+            int(runtime_values["WheelSegments"] * runtime_values["WheelRadialSteps"]),
+            len(front),
+        )
+        for face in front:
+            expected = renderer.planar_uvs(face.vertices, texture_units)
+            for actual_uv, expected_uv in zip(face.uvs, expected):
+                self.assertAlmostEqual(expected_uv[0], actual_uv[0])
+                self.assertAlmostEqual(expected_uv[1], actual_uv[1])
 
     def test_front_and_back_marks_face_opposite_directions(self):
         root = Path(__file__).parents[4]

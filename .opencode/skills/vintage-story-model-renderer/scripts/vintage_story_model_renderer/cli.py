@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> None:
         spec = manifest["proceduralFlywheel"]
         path = (base / spec["dimensionsSource"]).resolve()
         faces.extend(load_flywheel(path, spec["size"]))
-        inputs.append(path)
+        inputs.extend((path, path.with_name("FlywheelMechBlockRenderer.cs")))
     overlaps = find_coplanar_overlaps(faces)
     item_faces = list(faces)
 

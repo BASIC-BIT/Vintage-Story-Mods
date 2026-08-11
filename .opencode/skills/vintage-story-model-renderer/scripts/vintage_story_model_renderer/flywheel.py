@@ -11,10 +11,19 @@ from .core import FACE_INDICES, Face, Vec2, Vec3, cuboid, rotate
 
 def constants(path: Path) -> dict[str, float]:
     matches = re.findall(
-        r"internal const (?:float|int)\s+(\w+)\s*=\s*([0-9.]+)f?;",
+        r"(?:internal|private) const (?:float|int)\s+(\w+)\s*=\s*([0-9.]+)f?;",
         path.read_text(encoding="utf-8"),
     )
     return {name: float(value) for name, value in matches}
+
+
+def planar_uvs(vertices: list[Vec3], texture_units: float) -> list[Vec2]:
+    tile_y = math.floor(min(vertex[1] for vertex in vertices) / texture_units)
+    tile_z = math.floor(min(vertex[2] for vertex in vertices) / texture_units)
+    return [
+        (vertex[1] / texture_units - tile_y, vertex[2] / texture_units - tile_z)
+        for vertex in vertices
+    ]
 
 
 def add_annulus(
@@ -25,79 +34,65 @@ def add_annulus(
     outer_radius: float,
     material: str,
     element: str,
-    segments: int = 72,
+    segments: int,
+    radial_steps: int,
+    texture_units: float,
 ) -> None:
     def vertex(x: float, radius: float, angle: float) -> Vec3:
         return (x, 8 + radius * math.sin(angle), 8 + radius * math.cos(angle))
 
-    def disc_uv(radius: float, angle: float) -> Vec2:
-        return (
-            0.5 + 0.5 * radius * math.sin(angle) / outer_radius,
-            0.5 - 0.5 * radius * math.cos(angle) / outer_radius,
-        )
+    def add_disc_face(x: float, r0: float, r1: float, a0: float, a1: float) -> None:
+        vertices = [
+            vertex(x, r0, a0),
+            vertex(x, r1, a0),
+            vertex(x, r1, a1),
+            vertex(x, r0, a1),
+        ]
+        uvs = planar_uvs(vertices, texture_units)
+        order = (0, 3, 2, 1)
+        vertices = [vertices[index] for index in order]
+        uvs = [uvs[index] for index in order]
+        faces.append(Face(vertices, material, element, uvs))
 
-    for segment in range(segments):
-        a0 = math.tau * segment / segments
-        a1 = math.tau * (segment + 1) / segments
-        t0 = segment / segments
-        t1 = (segment + 1) / segments
-        faces.extend([
-            Face(
-                [
-                    vertex(max_x, inner_radius, a0),
-                    vertex(max_x, inner_radius, a1),
-                    vertex(max_x, outer_radius, a1),
-                    vertex(max_x, outer_radius, a0),
-                ],
-                material,
-                element,
-                [
-                    disc_uv(inner_radius, a0),
-                    disc_uv(inner_radius, a1),
-                    disc_uv(outer_radius, a1),
-                    disc_uv(outer_radius, a0),
-                ],
-            ),
-            Face(
-                [
-                    vertex(min_x, inner_radius, a0),
-                    vertex(min_x, outer_radius, a0),
-                    vertex(min_x, outer_radius, a1),
-                    vertex(min_x, inner_radius, a1),
-                ],
-                material,
-                element,
-                [
-                    disc_uv(inner_radius, a0),
-                    disc_uv(outer_radius, a0),
-                    disc_uv(outer_radius, a1),
-                    disc_uv(inner_radius, a1),
-                ],
-            ),
-            Face(
-                [
-                    vertex(min_x, outer_radius, a0),
-                    vertex(max_x, outer_radius, a0),
-                    vertex(max_x, outer_radius, a1),
-                    vertex(min_x, outer_radius, a1),
-                ],
-                material,
-                element,
-                [(t0, 1), (t0, 0), (t1, 0), (t1, 1)],
-            ),
-        ])
-        if inner_radius:
-            faces.append(Face(
-                [
-                    vertex(max_x, inner_radius, a0),
-                    vertex(min_x, inner_radius, a0),
-                    vertex(min_x, inner_radius, a1),
-                    vertex(max_x, inner_radius, a1),
-                ],
-                material,
-                element,
-                [(t0, 0), (t0, 1), (t1, 1), (t1, 0)],
-            ))
+    radius_span = outer_radius - inner_radius
+    for radial in range(radial_steps):
+        r0 = inner_radius + radius_span * radial / radial_steps
+        r1 = inner_radius + radius_span * (radial + 1) / radial_steps
+        for segment in range(segments):
+            a0 = math.tau * segment / segments
+            a1 = math.tau * (segment + 1) / segments
+            add_disc_face(max_x, r0, r1, a0, a1)
+            add_disc_face(min_x, r0, r1, a1, a0)
+
+    def add_radius_side(radius: float, start_x: float, end_x: float) -> None:
+        axial_steps = max(1, math.ceil(abs(end_x - start_x) / texture_units))
+        angular_steps = max(1, math.ceil(math.tau * radius / texture_units))
+        max_segment_angle = math.tau / segments
+        for axial in range(axial_steps):
+            x0 = start_x + (end_x - start_x) * axial / axial_steps
+            x1 = start_x + (end_x - start_x) * (axial + 1) / axial_steps
+            v1 = abs(x1 - x0) / texture_units
+            for angular in range(angular_steps):
+                cell_a0 = math.tau * angular / angular_steps
+                cell_a1 = math.tau * (angular + 1) / angular_steps
+                sub_segments = max(1, math.ceil((cell_a1 - cell_a0) / max_segment_angle))
+                for sub in range(sub_segments):
+                    u0 = sub / sub_segments
+                    u1 = (sub + 1) / sub_segments
+                    a0 = cell_a0 + (cell_a1 - cell_a0) * u0
+                    a1 = cell_a0 + (cell_a1 - cell_a0) * u1
+                    vertices = [
+                        vertex(x0, radius, a0),
+                        vertex(x1, radius, a0),
+                        vertex(x1, radius, a1),
+                        vertex(x0, radius, a1),
+                    ]
+                    uvs = [(u0, 0), (u0, v1), (u1, v1), (u1, 0)]
+                    faces.append(Face(vertices, material, element, uvs))
+
+    add_radius_side(outer_radius, min_x, max_x)
+    if inner_radius:
+        add_radius_side(inner_radius, max_x, min_x)
 
 
 def add_rotated_cuboid(
@@ -118,6 +113,7 @@ def add_rotated_cuboid(
 
 def load_flywheel(path: Path, size: str) -> list[Face]:
     values = constants(path)
+    renderer_values = constants(path.with_name("FlywheelMechBlockRenderer.cs"))
     prefix = "Compact" if size == "compact" else ""
 
     def value(name: str) -> float:
@@ -128,8 +124,14 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
     wheel_inner = value("CoupledInnerRadius")
     wheel_half = value("WheelHalfThickness")
     wheel_min, wheel_max = 8 - wheel_half, 8 + wheel_half
+    wheel_segments = int(renderer_values["WheelSegments"])
+    wheel_radial_steps = int(renderer_values["WheelRadialSteps"])
+    texture_units = renderer_values["TextureMeters"] * 16
     if size == "compact":
-        add_annulus(faces, wheel_min, wheel_max, wheel_inner, wheel_radius, "wheel", "RuntimeWheel")
+        add_annulus(
+            faces, wheel_min, wheel_max, wheel_inner, wheel_radius,
+            "wheel", "RuntimeWheel", wheel_segments, wheel_radial_steps, texture_units,
+        )
     else:
         spoke_count = int(values["SpokeCount"])
         if spoke_count <= 0:
@@ -155,6 +157,9 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
             value("FelloeOuterRadius"),
             "wood",
             "RuntimeWoodFelloe",
+            wheel_segments,
+            2,
+            texture_units,
         )
         add_annulus(
             faces,
@@ -164,6 +169,9 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
             wheel_radius,
             "wheel",
             "RuntimeOuterTyre",
+            wheel_segments,
+            2,
+            texture_units,
         )
     add_annulus(
         faces,
@@ -174,6 +182,8 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
         "bearing",
         "BearingCollar",
         48,
+        2,
+        texture_units,
     )
     add_annulus(
         faces,
@@ -183,11 +193,14 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
         value("HubOuterRadius"),
         "metal",
         "Hub",
+        wheel_segments,
+        2,
+        texture_units,
     )
     plate_thickness = value("CouplingPlateThickness")
     plate_radius = value("CouplingPlateOuterRadius")
     shaft_radius = value("ShaftClearanceRadius")
-    marker_raise = 0.006 * 16
+    marker_raise = renderer_values["ChalkRaise"] * 16
     plate_gap = min(marker_raise * 2, plate_thickness * 0.4)
     add_annulus(
         faces,
@@ -197,6 +210,9 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
         plate_radius,
         "metal",
         "FrontCouplingPlate",
+        wheel_segments,
+        3,
+        texture_units,
     )
     add_annulus(
         faces,
@@ -206,19 +222,13 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
         plate_radius,
         "metal",
         "BackCouplingPlate",
+        wheel_segments,
+        3,
+        texture_units,
     )
 
     marker_half = (0.025 if size == "compact" else 0.04) * 16
-    marker_outer = wheel_radius + marker_raise * 2
-    texture_units = 0.72 * 16
-
-    def planar_uvs(vertices: list[Vec3]) -> list[tuple[float, float]]:
-        tile_y = math.floor(min(vertex[1] for vertex in vertices) / texture_units)
-        tile_z = math.floor(min(vertex[2] for vertex in vertices) / texture_units)
-        return [
-            (vertex[1] / texture_units - tile_y, vertex[2] / texture_units - tile_z)
-            for vertex in vertices
-        ]
+    marker_outer = wheel_radius + renderer_values["ChalkEdgeOverlap"] * 16
 
     def mark_face(x: float, inner: float, outer: float, front: bool, element: str) -> Face:
         if front:
@@ -235,7 +245,7 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
                 (x, 8 + marker_half, 8 + outer),
                 (x, 8 + marker_half, 8 + inner),
             ]
-        return Face(vertices, "chalk", element, planar_uvs(vertices))
+        return Face(vertices, "chalk", element, planar_uvs(vertices, texture_units))
 
     start_radius = wheel_radius * 0.18
     bearing_radius = value("BearingOuterRadius")
