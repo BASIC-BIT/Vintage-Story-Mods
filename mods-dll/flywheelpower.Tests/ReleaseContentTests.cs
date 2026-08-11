@@ -636,6 +636,21 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
+    public void MultiblockPartDelegationRechecksClaimAccessAtThePrincipal()
+    {
+        string source = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheelPart.cs"));
+
+        Assert.Contains(
+            "world.Claims.TryAccess(byPlayer, principal, EnumBlockAccessFlags.BuildOrBreak)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "world.Claims.TryAccess(byPlayer, principal, EnumBlockAccessFlags.Use)",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AssemblyBlocksRequireAPlacedStandAndReturnBothPartsWhenBroken()
     {
         string fullSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));

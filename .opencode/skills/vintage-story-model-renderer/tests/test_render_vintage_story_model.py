@@ -614,6 +614,38 @@ class UvTests(unittest.TestCase):
 
         self.assertEqual([(0, 0.375), (0, 0), (0.25, 0), (0.25, 0.375)], uvs)
 
+    def test_uv_corners_follow_each_cuboid_faces_vertex_order(self):
+        expected_forward = [(0, 0.25), (0, 0), (0.5, 0), (0.5, 0.25)]
+        expected_reversed = [(0, 0.25), (0.5, 0.25), (0.5, 0), (0, 0)]
+
+        for direction in ("north", "east", "up"):
+            with self.subTest(direction=direction):
+                self.assertEqual(
+                    expected_forward,
+                    renderer.face_uvs(
+                        {"uv": [0, 0, 8, 4]},
+                        16,
+                        16,
+                        direction,
+                        (0, 0, 0),
+                        (2, 3, 5),
+                    ),
+                )
+
+        for direction in ("south", "west", "down"):
+            with self.subTest(direction=direction):
+                self.assertEqual(
+                    expected_reversed,
+                    renderer.face_uvs(
+                        {"uv": [0, 0, 8, 4]},
+                        16,
+                        16,
+                        direction,
+                        (0, 0, 0),
+                        (2, 3, 5),
+                    ),
+                )
+
     def test_face_rotation_cycles_uv_corners(self):
         unrotated = renderer.face_uvs(
             {"uv": [0, 0, 8, 4]},

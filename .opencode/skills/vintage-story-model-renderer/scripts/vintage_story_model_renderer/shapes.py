@@ -39,12 +39,14 @@ def face_uvs(
     }.get(direction, (texture_width, texture_height))
     raw = definition.get("uv", (0, 0, automatic_size[0], automatic_size[1]))
     u0, v0, u1, v1 = (float(value) for value in raw)
-    result = [
+    corners = [
         (u0 / texture_width, v1 / texture_height),
         (u0 / texture_width, v0 / texture_height),
         (u1 / texture_width, v0 / texture_height),
         (u1 / texture_width, v1 / texture_height),
     ]
+    corner_order = (0, 3, 2, 1) if direction in {"south", "west", "down"} else (0, 1, 2, 3)
+    result = [corners[index] for index in corner_order]
     quarter_turns = int(definition.get("rotation", 0)) // 90
     if quarter_turns:
         quarter_turns %= 4

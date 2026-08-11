@@ -28,6 +28,11 @@ public sealed class BlockFlywheelPart : Block
             return;
         }
 
+        if (byPlayer != null && !world.Claims.TryAccess(byPlayer, principal, EnumBlockAccessFlags.BuildOrBreak))
+        {
+            return;
+        }
+
         Block principalBlock = world.BlockAccessor.GetBlock(principal);
         if (principalBlock.Id == 0)
         {
@@ -43,6 +48,11 @@ public sealed class BlockFlywheelPart : Block
         if (!TryGetPrincipal(world, blockSel.Position, out BlockPos principal))
         {
             return base.OnBlockInteractStart(world, byPlayer, blockSel);
+        }
+
+        if (byPlayer != null && !world.Claims.TryAccess(byPlayer, principal, EnumBlockAccessFlags.Use))
+        {
+            return false;
         }
 
         BlockSelection principalSel = blockSel.Clone();
