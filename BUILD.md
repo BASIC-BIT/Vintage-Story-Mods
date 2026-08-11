@@ -82,11 +82,11 @@ Uploads VS DLLs from your local installation to the vs-build-dependencies reposi
 
 **Parameters:**
 - `-VsInstallPath` - Override VS installation path
-- `-VsVersion` - Version string for the upload (default: "1.22.2")
+- `-VsVersion` - Version string for the upload (default: "1.22.6")
 
 **Example:**
 ```powershell
-.\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.2"
+.\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.6"
 ```
 
 ### `scripts/update-project-references.ps1`
@@ -135,7 +135,7 @@ Updates project files to use CI-compatible DLL paths.
 
 ```
 vs-build-dependencies/
-├── 1.22.2/            # Version directory
+├── 1.22.6/            # Version directory
 │   ├── core/          # Core VS DLLs
 │   ├── mods/          # Mod DLLs  
 │   ├── lib/           # Library DLLs
@@ -151,18 +151,28 @@ When Vintage Story updates:
 
 1. **Upload new dependencies:**
    ```powershell
-   .\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.2"
+   .\scripts\upload-vs-dependencies.ps1 -VsVersion "1.22.6"
    ```
 
-2. **Update workflow file** (`.github/workflows/build.yml`):
+2. **Update every `VS_VERSION` pin together.** A partial update leaves build, release,
+   and CodeQL compiling against different game DLLs:
+   - `.github/workflows/build.yml`
+   - `.github/workflows/codeql.yml`
+   - `.github/workflows/release.yml`
+   - the `-VsVersion` default in `scripts/upload-vs-dependencies.ps1`
+
    ```yaml
    env:
-      VS_VERSION: "1.22.2"  # Update this line
+      VS_VERSION: "1.22.6"
    ```
 
 3. **Test the build** with the new version
 
 4. **Update this documentation** if needed
+
+> Keep the local Vintage Story install on the same version as these pins. Developing
+> against one API while CI gates against another hides breakage until something forces
+> a clean rebuild.
 
 ## Legal Notice
 

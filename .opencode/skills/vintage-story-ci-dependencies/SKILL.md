@@ -65,7 +65,7 @@ gh api repos/BASIC-BIT/vs-build-dependencies/contents --jq '.[].name'
 Check a specific version directory:
 
 ```powershell
-gh api repos/BASIC-BIT/vs-build-dependencies/contents/1.22.2 --jq '.[].name'
+gh api repos/BASIC-BIT/vs-build-dependencies/contents/1.22.6 --jq '.[].name'
 ```
 
 Expected contents for a valid dependency version:
@@ -83,7 +83,7 @@ Only run this after explicit maintainer approval.
 Use the local install as the source of the DLLs:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\upload-vs-dependencies.ps1" -VsInstallPath "D:\Games\Vintagestory" -VsVersion "1.22.2"
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\upload-vs-dependencies.ps1" -VsInstallPath "D:\Games\Vintagestory" -VsVersion "1.22.6"
 ```
 
 The upload script will:
@@ -134,7 +134,7 @@ Commit only those files:
 
 ```powershell
 git add -- .github/workflows/build.yml .github/workflows/codeql.yml .github/workflows/release.yml scripts/upload-vs-dependencies.ps1
-git commit -m "Update CI to Vintage Story 1.22.2 dependencies"
+git commit -m "Update CI to Vintage Story 1.22.6 dependencies"
 ```
 
 Push only after explicit maintainer approval:
