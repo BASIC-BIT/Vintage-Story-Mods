@@ -20,6 +20,7 @@
   "flywheelpower:blockinfo-physical": "Estimated rotating mass: {0} kg; effective inertia: {1}",
   "flywheelpower:error-fullstand": "This wheel assembly requires a full-size flywheel stand.",
   "flywheelpower:error-compactstand": "This wheel assembly requires a compact flywheel stand.",
+  "flywheelpower:error-damagedstand": "Repair or clear the full 3x3 stand area before installing the wheel.",
   "flywheelpower:blockinfo-coupling": "Coupling effort: {0}%{1}",
   "flywheelpower:blockinfo-coupling-limit": " (at limit)",
   "flywheelpower:blockinfo-mismatch": "Shaft speed difference: {0}% of rated speed",

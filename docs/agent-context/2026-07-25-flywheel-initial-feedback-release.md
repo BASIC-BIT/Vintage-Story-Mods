@@ -460,16 +460,20 @@ Remove this packet after the initial-feedback pull request is merged or closed a
 - Stand placement on a top or bottom face remains horizontal and follows player yaw by default. Holding Sneak while placing
   on that face deliberately selects the supported vertical orientation; side-face placement keeps the selected face axis.
 - Flywheel Power targets Vintage Story 1.22.6. All six configured projects build with zero errors; the only build warnings
-  are four pre-existing The BASICs analyzer findings. Flywheel Power tests pass 77/77 and DimensionLib tests pass 58/58.
+  are four pre-existing The BASICs analyzer findings. Flywheel Power tests pass 80/80 and DimensionLib tests pass 58/58.
   The all-repository The BASICs test lane is temporarily dependent on PR #219: current `main` lacks the 1.22.6
   `IServerPlayer.IsInInteractionRangeOf` test-fixture implementation and produces 123 unrelated dynamic-proxy failures.
 - All six configured whitespace checks, the Flywheel source formatting check, the agent-tooling check, generated-content drift checks, the Lizard gate, and 60/60
   renderer regression tests pass. The exact model sweep covers 74 manifests and 1,776 primary images with zero unresolved
   textures, zero coplanar overlaps, and exactly 24 images per manifest. Every resolved texture file is included by SHA-256
   in its manifest's deterministic input provenance.
-- The exact package contains 31 allowlisted entries, is 84,180 bytes, and has SHA-256
-  `D439B6D614F99943E53184103CEC5C359C8128C59F499EDE5E8C90F07790D8B2`. Archive inspection finds no disabled content,
+- The exact package contains 31 allowlisted entries, is 84,657 bytes, and has SHA-256
+  `FE0A0EC07C9E8E8BD286639486A04B7324A0FB244BE489B047231B28DAD13BBC`. Archive inspection finds no disabled content,
   compact-web residue, or obsolete player-facing tyre, rim, or blank labels.
+- Full-size wheel installation now requires all eight reservation block entities to remain linked to the selected stand before
+  replacing any blocks, so a partial schematic or world-edited stand cannot overwrite an unrelated occupant.
+- Collectible turntables now render the same grip reference geometry as fixed-view evidence. A bounded 32-frame full-bearing
+  turntable retained that reference throughout all four quarter-turn samples.
 - Runtime/model manual QA remains applicable because the final post-deployment delta changes recipes, compact mass, and the
   vertical-placement gesture. Before merge, the exact final package still needs the bounded observations: forge the 7-by-6
   saddle from one ingot and confirm four fittings; confirm compact/full bearing recipes consume 4/16 fittings; confirm

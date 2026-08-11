@@ -54,6 +54,32 @@ internal static class FlywheelMultiblock
         }
     }
 
+    internal static bool HasIntactReservations(IWorldAccessor world, BlockPos center, EnumAxis axis)
+    {
+        return ReservationsMatch(
+            center,
+            axis,
+            partPos => world.BlockAccessor.GetBlockEntity(partPos) is BEFlywheelPart part
+                && part.Principal != null
+                && part.Principal.Equals(center));
+    }
+
+    internal static bool ReservationsMatch(
+        BlockPos center,
+        EnumAxis axis,
+        System.Func<BlockPos, bool> isLinkedToPrincipal)
+    {
+        foreach (BlockPos partPos in GetPartPositions(center, axis))
+        {
+            if (!isLinkedToPrincipal(partPos))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     internal static void RemoveParts(IWorldAccessor world, BlockPos center)
     {
         foreach (EnumAxis axis in new[] { EnumAxis.X, EnumAxis.Y, EnumAxis.Z })

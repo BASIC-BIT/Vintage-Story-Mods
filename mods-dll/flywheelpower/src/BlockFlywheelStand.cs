@@ -111,9 +111,26 @@ public sealed class BlockFlywheelStand : Block
             return true;
         }
 
+        string rotation = Variant["rotation"];
+        if (!IsCompact
+            && !FlywheelMultiblock.HasIntactReservations(
+                world,
+                blockSel.Position,
+                FlywheelMultiblock.AxisForRotation(rotation)))
+        {
+            if (world.Side == EnumAppSide.Client)
+            {
+                (world.Api as ICoreClientAPI)?.TriggerIngameError(
+                    this,
+                    "flywheeldamagedstand",
+                    Lang.Get("flywheelpower:error-damagedstand"));
+            }
+
+            return true;
+        }
+
         if (world.Side == EnumAppSide.Server)
         {
-            string rotation = Variant["rotation"];
             Block installed = world.GetBlock(heldBlock.CodeWithVariant("rotation", rotation));
             if (installed == null)
             {

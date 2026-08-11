@@ -892,6 +892,17 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
+    public void FullSizeInstallationRevalidatesItsReservedFootprint()
+    {
+        string standSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheelStand.cs"));
+        string activeLanguage = File.ReadAllText(Path.Combine(ProjectRoot, "assets", "flywheelpower", "lang", "en.json"));
+
+        Assert.Contains("FlywheelMultiblock.HasIntactReservations", standSource, StringComparison.Ordinal);
+        Assert.Contains("flywheelpower:error-damagedstand", standSource, StringComparison.Ordinal);
+        Assert.Contains("flywheelpower:error-damagedstand", activeLanguage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FullSizeIntermediatePartsUseLargeTwoHandPoseWithoutChangingCompactPose()
     {
         string itemtypeDirectory = Path.Combine(ProjectRoot, "assets", "flywheelpower", "itemtypes");

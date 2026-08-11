@@ -248,11 +248,18 @@ class CollectibleTransformTests(unittest.TestCase):
             }), encoding="utf-8")
             output = root / "output"
 
-            renderer.main([
-                "--manifest", str(manifest),
-                "--output-dir", str(output),
-                "--size", "64",
-            ])
+            with mock.patch(
+                "vintage_story_model_renderer.cli.render_turntable",
+                return_value={"output": str(root / "turntable.mp4")},
+            ) as render_turntable:
+                renderer.main([
+                    "--manifest", str(manifest),
+                    "--output-dir", str(output),
+                    "--size", "64",
+                    "--turntable-output", str(root / "turntable.mp4"),
+                    "--turntable-fps", "1",
+                    "--turntable-seconds", "1",
+                ])
             metadata = json.loads((output / "render-metadata.json").read_text(encoding="utf-8"))
 
             self.assertEqual(24, metadata["renderedImageCount"])
@@ -265,6 +272,8 @@ class CollectibleTransformTests(unittest.TestCase):
             )
             self.assertEqual(str(definition.resolve()), metadata["inputs"][-1]["path"])
             self.assertEqual(renderer.sha256(definition), metadata["inputs"][-1]["sha256"])
+            turntable_faces = render_turntable.call_args.args[0]
+            self.assertEqual(metadata["faceCount"] + metadata["referenceFaceCount"], len(turntable_faces))
 
     def test_reference_opacity_blends_without_hiding_existing_geometry(self):
         pixels = np.full((3, 3, 3), 10, dtype=np.uint8)

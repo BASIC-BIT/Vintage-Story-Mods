@@ -299,7 +299,7 @@ def main(argv: list[str] | None = None) -> None:
         turntable_output = args.turntable_output.resolve()
         turntable_output.parent.mkdir(parents=True, exist_ok=True)
         turntable_metadata = render_turntable(
-            faces,
+            render_faces,
             colors,
             texture_images,
             args.turntable_view,
