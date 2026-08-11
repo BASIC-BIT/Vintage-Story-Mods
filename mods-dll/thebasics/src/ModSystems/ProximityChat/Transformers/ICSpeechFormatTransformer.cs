@@ -44,9 +44,11 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
             return FormatProseSpeech(context, lang, languageEnabled, nickname);
         }
 
-        context.Message = FormatSpeechBody(context, lang, languageEnabled, presentationMode);
+        // Resolved once in the sender phase; verb lists are a random pick, so re-resolving here
+        // would show two recipients of the same line different verbs.
+        var verb = TransformerSystem.GetResolvedSpeechVerb(context, lang, mode, _config);
 
-        var verb = GetProximityChatVerb(lang, mode);
+        context.Message = FormatSpeechBody(context, lang, languageEnabled, presentationMode);
 
         context.Message = presentationMode switch
         {
@@ -107,27 +109,6 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
         return ChatVisualPreferenceResolver.FormatLanguageText(message, lang, context.ReceivingPlayer);
     }
 
-    private string GetProximityChatVerb(Language lang, ProximityChatMode mode)
-    {
-        // Check for sign language first
-        if (_config.EnableLanguageSystem && !_config.DisableRPChat && lang == LanguageSystem.SignLanguage)
-        {
-            return Lang.Get("thebasics:chat-sign-verb");
-        }
-
-        if (_config.EnableLanguageSystem && !_config.DisableRPChat && lang == LanguageSystem.BabbleLang)
-        {
-            return string.IsNullOrWhiteSpace(_config.ProximityChatModeBabbleVerb) || _config.ProximityChatModeBabbleVerb == "babbles"
-                ? Lang.Get("thebasics:chat-babble-verb")
-                : _config.ProximityChatModeBabbleVerb;
-        }
-
-        // Use the verbs from config
-        var verbs = _config.ProximityChatModeVerbs[mode];
-
-        return verbs.GetRandomElement();
-    }
-
     private string ProcessProseQuotedText(MessageContext context, string text, Language lang, bool languageEnabled)
     {
         var processed = text;
@@ -139,7 +120,9 @@ public class ICSpeechFormatTransformer : MessageTransformerBase
 
         if (_distanceObfuscationSystem != null && context.SendingPlayer != null && context.ReceivingPlayer != null)
         {
-            _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed);
+            _distanceObfuscationSystem.ObfuscateMessage(context.SendingPlayer, context.ReceivingPlayer, ref processed,
+                tempMode: context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode()),
+                occlusionPenalty: context.GetOcclusionPenalty(context.ReceivingPlayer));
         }
 
         return processed;

@@ -124,7 +124,7 @@
 <pre>{
   // ----- Proximity Chat ----- //
   "ProximityChatModeDistances": {
-    "Yell": 90,    // Maximum distance for yelling
+    "Yell": 90,    // Maximum distance for yelling. Use -1 for unlimited (server-wide)
     "Normal": 35,  // Normal talking distance
     "Whisper": 5,  // Whisper range
     "Sign": 15     // Sign language visibility range
@@ -147,6 +147,17 @@
     "Sign": 16
   },
   "ProximityChatClampFontSizes": [30, 16, 12, 6],
+  "ProximityChatModeQuestionVerbs": {   // Verbs used when a message ends in "?"
+    "Yell": ["asks"],
+    "Normal": ["asks"],
+    "Whisper": ["asks"]
+  },
+  "RequireLineOfSightForSpeech": {      // Experimental, off by default
+    "Yell": false,
+    "Normal": false,
+    "Whisper": false
+  },
+  "SpeechOcclusionWallPenaltyBlocks": 0,  // Experimental. Blocks of extra effective distance per sound-blocking block. 0 disables
   "BoldNicknames": false,
   
   // Message formatting

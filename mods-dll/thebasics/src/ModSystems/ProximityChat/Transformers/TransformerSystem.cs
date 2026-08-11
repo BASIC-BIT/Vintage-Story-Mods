@@ -102,29 +102,6 @@ public class TransformerSystem
         return context;
     }
 
-    // TODO: Refactor common usage
-    private string GetProximityChatVerb(Language lang, ProximityChatMode mode)
-    {
-        // Check for sign language first
-        if (lang == LanguageSystem.SignLanguage)
-        {
-            return Lang.Get("thebasics:chat-sign-verb");
-        }
-
-        if (lang == LanguageSystem.BabbleLang)
-        {
-            return string.IsNullOrWhiteSpace(_chatSystem.Config.ProximityChatModeBabbleVerb) || _chatSystem.Config.ProximityChatModeBabbleVerb == "babbles"
-                ? Lang.Get("thebasics:chat-babble-verb")
-                : _chatSystem.Config.ProximityChatModeBabbleVerb;
-        }
-
-        // Use the verbs from config
-        var verbs = _chatSystem.Config.ProximityChatModeVerbs[mode];
-
-        return verbs.GetRandomElement();
-    }
-
-    // TODO: Refactor common usage with ICSpeechFormatTransformer
     private string BuildChatLogMessage(MessageContext context)
     {
         return FormatChatLogMessage(context);
@@ -153,7 +130,7 @@ public class TransformerSystem
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
         var presentationMode = ProximityChatPresentationModes.Normalize(_chatSystem.Config.ProximityChatPresentationMode);
         var outputMessage = FormatLoggedSpeechBody(context, lang, presentationMode, nickname);
-        var verb = GetProximityChatVerb(lang, mode);
+        var verb = GetResolvedSpeechVerb(context, lang, mode, _chatSystem.Config);
 
         return presentationMode switch
         {
@@ -194,6 +171,7 @@ public class TransformerSystem
             return;
         }
 
+        ResolveSpeechVerbOnce(context);
         LogChatMessageOnce(context);
 
         // History/logging happens even when no one can hear the message; delivery still stops here.
@@ -226,6 +204,42 @@ public class TransformerSystem
     internal static bool IsWithinSignLanguageRetryWindow(int elapsedMs)
     {
         return elapsedMs <= SignLanguageLineOfSightRetryWindowMs;
+    }
+
+    /// <summary>
+    /// Reads the verb resolved in the sender phase, falling back to resolving one when a transformer
+    /// is driven directly without the pipeline having run.
+    /// </summary>
+    internal static string GetResolvedSpeechVerb(MessageContext context, Language lang, ProximityChatMode mode, ModConfig config)
+    {
+        if (context.TryGetMetadata(MessageContext.SPEECH_VERB, out string verb) && !string.IsNullOrEmpty(verb))
+        {
+            return verb;
+        }
+
+        var speechText = context.TryGetSpeechText(out var raw) ? raw : context.Message;
+        return ChatHelper.GetProximityChatVerb(lang, mode, config, speechText);
+    }
+
+    /// <summary>
+    /// Picks the speech verb once, in the sender phase, and stores it for everyone downstream.
+    /// Verb lists are a random pick, so resolving in the recipient phase would show two players
+    /// standing side by side different verbs for the same line, and a third one in the chat log.
+    /// </summary>
+    private void ResolveSpeechVerbOnce(MessageContext context)
+    {
+        if (!context.HasFlag(MessageContext.IS_SPEECH) || context.HasMetadata(MessageContext.SPEECH_VERB))
+        {
+            return;
+        }
+
+        context.TryGetMetadata<Language>(MessageContext.LANGUAGE, out var lang);
+        var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
+        var speechText = context.TryGetSpeechText(out var raw) ? raw : context.Message;
+
+        context.SetMetadata(
+            MessageContext.SPEECH_VERB,
+            ChatHelper.GetProximityChatVerb(lang, mode, _chatSystem.Config, speechText));
     }
 
     private void LogChatMessageOnce(MessageContext context)
@@ -339,7 +353,7 @@ public class TransformerSystem
         }
 
         var distance = recipient.Entity.Pos.AsBlockPos.ManhattanDistance(GetPendingSignLanguageOrigin(context));
-        return distance < _chatSystem.Config.SignLanguageRange &&
+        return distance < _chatSystem.Config.GetSignLanguageRange() &&
                _proximityCheckUtils.CanSeePlayer(context.SendingPlayer, recipient, useMultiPointTargets: true);
     }
 

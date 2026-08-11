@@ -9,6 +9,87 @@ namespace thebasics.Tests.ModSystems.AdminConfig;
 public class ConfigAdminSettingRegistryTests
 {
     [Fact]
+    public void ValidateConfig_AcceptsTheUnlimitedSentinel()
+    {
+        var config = CreateConfig();
+        config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsNegativeRangesOtherThanTheSentinel()
+    {
+        // A typo like -2 must be reported, not silently read as a server-wide channel.
+        var config = CreateConfig();
+        config.ProximityChatModeDistances[ProximityChatMode.Normal] = -2;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("Normal range must be a positive block count");
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsUnlimitedRangeCombinedWithSpeechLineOfSight()
+    {
+        // Line of sight needs a bounded range to raycast against, so the combination is refused
+        // rather than the setting being silently ignored.
+        var config = CreateConfig();
+        config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
+        config.RequireLineOfSightForSpeech[ProximityChatMode.Normal] = true;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("cannot combine an unlimited range with RequireLineOfSightForSpeech");
+    }
+
+    [Fact]
+    public void GetSignLanguageRange_FallsBackForNegativeValues()
+    {
+        // Both the recipient filter and the deferred-delivery retry read through this. Normalising
+        // in only one of them would queue a listener the retry could then never deliver to.
+        var config = CreateConfig();
+        config.SignLanguageRange = -1;
+
+        config.GetSignLanguageRange().Should().Be(60);
+
+        config.SignLanguageRange = 25;
+        config.GetSignLanguageRange().Should().Be(25);
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsNegativeSignLanguageRange()
+    {
+        var config = CreateConfig();
+        config.SignLanguageRange = -1;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("SignLanguageRange must be a positive block count");
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(129)]
+    public void ValidateConfig_RejectsOutOfBoundsWallPenalty(int penalty)
+    {
+        // The admin setting declares 0..128, but a hand-edited the_basics.json skips that check.
+        // A negative one is clamped to zero downstream, silently disabling configured muffling.
+        var config = CreateConfig();
+        config.SpeechOcclusionWallPenaltyBlocks = penalty;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("SpeechOcclusionWallPenaltyBlocks must be a whole number from 0 to 128");
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsOversizedSignLanguageRange()
+    {
+        var config = CreateConfig();
+        config.SignLanguageRange = 513;
+
+        ConfigAdminSettingRegistry.ValidateConfig(config)
+            .Should().ContainSingle().Which.Should().Contain("SignLanguageRange must be 512 blocks or fewer");
+    }
+
+    [Fact]
     public void ValidateConfig_RejectsRangeAtOrBelowObfuscationStart()
     {
         var config = CreateConfig();

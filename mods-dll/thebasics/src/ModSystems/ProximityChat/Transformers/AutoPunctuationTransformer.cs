@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
@@ -25,7 +26,8 @@ public class AutoPunctuationTransformer : MessageTransformerBase
         context.UpdateMessage(AutoPunctuationRegex.Replace(context.Message, match =>
         {
             var possiblePunctuation = match.Groups[2].Value[0];
-            var punctuation = _config.ProximityChatModePunctuation[context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode())];
+            var punctuation = _config.GetModePunctuation(
+                context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode()));
             if (context.HasFlag(MessageContext.IS_EMOTE) || context.HasFlag(MessageContext.IS_ENVIRONMENTAL))
             {
                 punctuation = "."; // Emotes and environmental messages don't need punctuation based on chat mode

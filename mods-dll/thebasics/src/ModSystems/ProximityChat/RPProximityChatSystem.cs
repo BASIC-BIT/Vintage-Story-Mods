@@ -235,7 +235,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             API.ChatCommands.GetOrCreate("me")
                 .WithAlias("m")
                 .WithDescription(Lang.Get("thebasics:chat-cmd-me-desc"))
-                .WithArgs(new StringArgParser("emote", true))
+                .WithArgs(new StringArgParser("emote", false))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(Emote);
@@ -279,20 +279,20 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
             API.ChatCommands.GetOrCreate("ooc")
                     .WithDescription(Lang.Get("thebasics:chat-cmd-ooc-desc"))
-                .WithArgs(new StringArgParser("message", true))
+                .WithArgs(new StringArgParser("message", false))
                 .RequiresPrivilege(Privilege.chat)
                 .RequiresPlayer()
                 .HandleWith(SendOOCMessage);
 
-            if (Config.EnableGlobalOOC)
-            {
-                API.ChatCommands.GetOrCreate("gooc")
-                    .WithDescription(Lang.Get("thebasics:chat-cmd-gooc-desc"))
-                    .WithArgs(new StringArgParser("message", true))
-                    .RequiresPrivilege(Privilege.chat)
-                    .RequiresPlayer()
-                    .HandleWith(SendGlobalOOCMessage);
-            }
+            // Registered even when global OOC is off. An unknown-command error tells the player
+            // nothing, and the command's own gate already refuses with a message that explains the
+            // state. It also keeps registration consistent when the config is flipped live.
+            API.ChatCommands.GetOrCreate("gooc")
+                .WithDescription(Lang.Get("thebasics:chat-cmd-gooc-desc"))
+                .WithArgs(new StringArgParser("message", false))
+                .RequiresPrivilege(Privilege.chat)
+                .RequiresPlayer()
+                .HandleWith(SendGlobalOOCMessage);
         }
 
         // Chatter opt-out is always available (not gated behind DisableRPChat)
@@ -446,7 +446,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private TextCommandResult HandleReloadConfigCommand(TextCommandCallingArgs args)
     {
         var before = CloneConfig(Config);
-        ReloadSharedConfigFromDisk(API);
+
+        // Refuse rather than apply defaults over a running server's settings. The file is
+        // unparseable, so "reloading" it would mean discarding every live setting and telling the
+        // admin it succeeded.
+        if (!TryReloadSharedConfigFromDisk(API, out _))
+        {
+            return TextCommandResult.Error(Lang.Get("thebasics:config-reload-failed"));
+        }
+
         var changedKeys = GetChangedConfigKeys(before, Config);
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();
@@ -462,6 +470,28 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private TextCommandResult SendGlobalOOCMessage(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
+
+        if (args.Parsers[0].IsMissing)
+        {
+            return HandleOverrideModeCommand(player, ChatOverrideMode.GlobalOoc, "gooc");
+        }
+
+        // The command stays registered when the config is flipped live, so the one-off form has to
+        // ask the same predicate every other global OOC path asks. Checking EnableGlobalOOC directly
+        // here would miss DisableRPChat and drift from the sticky and prefix paths again.
+        if (!CanEnterOverrideMode(player, ChatOverrideMode.GlobalOoc, out var goocRefusal))
+        {
+            // Command-level counterpart to the failure recorded inside the gate, so a refused
+            // /gooc still appears in command analytics rather than vanishing.
+            AnalyticsService.TrackCommandUsed("gooc", false, "blocked", AnalyticsService.ChatProperties("gooc"));
+
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = goocRefusal,
+            };
+        }
+
         var message = (string)args.Parsers[0].GetValue();
         var groupId = args.Caller.FromChatGroupId;
 
@@ -476,11 +506,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             }
         };
 
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
-
-        var chatProperties = AnalyticsService.ChatProperties("gooc");
-        AnalyticsService.TrackCommandUsed("gooc", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("global_ooc", "send", properties: chatProperties);
+        SendThroughPipeline(context, "gooc", "global_ooc", "send");
 
         return new TextCommandResult
         {
@@ -533,6 +559,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private TextCommandResult SendOOCMessage(TextCommandCallingArgs args)
     {
         var player = (IServerPlayer)args.Caller.Player;
+
+        if (args.Parsers[0].IsMissing)
+        {
+            return HandleOverrideModeCommand(player, ChatOverrideMode.Ooc, "ooc");
+        }
+
         var message = (string)args.Parsers[0].GetValue();
         var groupId = args.Caller.FromChatGroupId;
 
@@ -547,11 +579,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             },
         };
 
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
-
-        var chatProperties = AnalyticsService.ChatProperties("ooc");
-        AnalyticsService.TrackCommandUsed("ooc", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("ooc", "send", properties: chatProperties);
+        SendThroughPipeline(context, "ooc", "ooc", "send");
 
         return new TextCommandResult
         {
@@ -779,7 +807,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var reloadChangedKeys = ReloadConfigAndGetChangedKeys();
+        if (!TryReloadConfigAndGetChangedKeys(out var reloadChangedKeys))
+        {
+            AnalyticsService.TrackFailure("config_admin", "reload", "error", "config_unreadable");
+            SendConfigAdminResult(player, false, Lang.Get("thebasics:config-reload-failed"), []);
+            return true;
+        }
+
         AnalyticsService.TrackFeatureUsed("config_admin", "reload");
         SendConfigAdminResult(player, true, $"Reloaded config from disk. Changed settings: {reloadChangedKeys.Count}.", reloadChangedKeys);
         return true;
@@ -851,7 +885,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var changedKeys = ReloadConfigAndGetChangedKeys();
+        if (!TryReloadConfigAndGetChangedKeys(out var changedKeys))
+        {
+            AnalyticsService.TrackFailure("language_config", "reload", "error", "config_unreadable");
+            SendLanguageConfigResult(player, false, Lang.Get("thebasics:config-reload-failed"), LanguageConfigAdmin.BuildEntries(Config));
+            return true;
+        }
+
         AnalyticsService.TrackFeatureUsed("language_config", "reload");
         SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {changedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config));
         return true;
@@ -924,7 +964,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        var changedKeys = ReloadConfigAndGetChangedKeys();
+        if (!TryReloadConfigAndGetChangedKeys(out var changedKeys))
+        {
+            AnalyticsService.TrackFailure("character_sheet_fields", "reload", "error", "config_unreadable");
+            SendCharacterSheetFieldConfigResult(player, false, Lang.Get("thebasics:config-reload-failed"), CharacterSheetFieldConfigAdmin.BuildEntries(Config));
+            return true;
+        }
+
         AnalyticsService.TrackFeatureUsed("character_sheet_fields", "reload");
         SendCharacterSheetFieldConfigResult(player, true, $"Reloaded character sheet fields from disk. Changed settings: {changedKeys.Count}.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
         return true;
@@ -969,14 +1015,25 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         AnalyticsService.TrackFailure(featureName, action, "warning", "validation_failed", properties: properties);
     }
 
-    private HashSet<string> ReloadConfigAndGetChangedKeys()
+    /// <summary>
+    /// False when the file on disk could not be read. A Try shape rather than an empty set, because
+    /// "no settings changed" is a legitimate successful reload and must stay distinguishable from
+    /// "nothing was reloaded"; conflating them is what let the editors report success on a parse
+    /// failure.
+    /// </summary>
+    private bool TryReloadConfigAndGetChangedKeys(out HashSet<string> changedKeys)
     {
         var before = CloneConfig(Config);
-        ReloadSharedConfigFromDisk(API);
-        var changedKeys = GetChangedConfigKeys(before, Config);
+        if (!TryReloadSharedConfigFromDisk(API, out _))
+        {
+            changedKeys = [];
+            return false;
+        }
+
+        changedKeys = GetChangedConfigKeys(before, Config);
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();
-        return changedKeys;
+        return true;
     }
 
     private void OnChatTypingStateMessage(IServerPlayer player, ChatTypingStateMessage message)
@@ -1308,6 +1365,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return;
         }
 
+        changedKeys ??= [];
         var restartRequired = GetRestartRequiredKeys(changedKeys);
         var liveApplied = changedKeys.Where(key => !restartRequired.Contains(key, StringComparer.OrdinalIgnoreCase)).ToList();
 
@@ -1800,8 +1858,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private (float gain, float falloff) CalculateSpeechAudioParameters(MessageContext context)
     {
         var mode = context.GetMetadata(MessageContext.CHAT_MODE, context.SendingPlayer.GetChatMode());
-        var gain = Config.RPTTS_ModeGain[mode];
-        var falloff = Config.RPTTS_ModeFalloff[mode];
+        var gain = Config.GetRpttsGain(mode);
+        var falloff = Config.GetRpttsFalloff(mode);
 
         return (gain, falloff);
     }
@@ -1892,6 +1950,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void Event_PlayerJoin(IServerPlayer byPlayer)
     {
+        ReconcileChatTypeOnJoin(byPlayer);
+
         if (!Config.UseGeneralChannelAsProximityChat)
         {
             var proximityGroup = GetProximityGroup();
@@ -2102,6 +2162,11 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
 
+        if (args.Parsers[0].IsMissing)
+        {
+            return HandleOverrideModeCommand(player, ChatOverrideMode.Emote, "me");
+        }
+
         var context = new MessageContext
         {
             Message = (string)args.Parsers[0].GetValue(),
@@ -2114,11 +2179,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         };
 
         // Process the entire pipeline
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.OthersMessage);
-
-        var chatProperties = AnalyticsService.ChatProperties("me");
-        AnalyticsService.TrackCommandUsed("me", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("proximity_emote", "send", properties: chatProperties);
+        SendThroughPipeline(context, "me", "proximity_emote", "send");
 
         return new TextCommandResult
         {
@@ -2142,11 +2203,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         };
 
         // Process the entire pipeline
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.Notification);
-
-        var chatProperties = AnalyticsService.ChatProperties("it");
-        AnalyticsService.TrackCommandUsed("it", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("environment_message", "send", properties: chatProperties);
+        SendThroughPipeline(context, "it", "environment_message", "send", EnumChatType.Notification);
 
         return new TextCommandResult
         {
@@ -2173,11 +2230,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         // Process the entire pipeline — PlacedEnvironmentTransformer will raycast and
         // either store the position or fall back to standard env.
-        TransformerSystem.ProcessMessagePipeline(context, EnumChatType.Notification);
-
-        var chatProperties = AnalyticsService.ChatProperties("envhere");
-        AnalyticsService.TrackCommandUsed("envhere", true, properties: chatProperties);
-        AnalyticsService.TrackFeatureUsed("environment_message", "place", properties: chatProperties);
+        SendThroughPipeline(context, "envhere", "environment_message", "place", EnumChatType.Notification);
 
         return new TextCommandResult
         {
@@ -2262,18 +2315,17 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 Flags =
                 {
                     [MessageContext.IS_PLAYER_CHAT] = true, // Mark as player chat so it goes through player transformers
-                    [MessageContext.IS_FROM_COMMAND] = true
+                    [MessageContext.IS_FROM_COMMAND] = true,
+                    [MessageContext.IS_EXPLICIT_RANGE_COMMAND] = true
                 }
             };
 
             // Process the entire pipeline
-            TransformerSystem.ProcessMessagePipeline(context);
-
             var modeName = mode.ToString().ToLowerInvariant();
-            var chatProperties = AnalyticsService.ChatProperties(modeName);
-            AnalyticsService.TrackCommandUsed(modeName, true, properties: chatProperties);
-            AnalyticsService.TrackFeatureUsed("proximity_chat", "send_" + modeName, properties: chatProperties);
+            SendThroughPipeline(context, modeName, "proximity_chat", "send_" + modeName);
 
+            // Status stays Success even on a refusal: the pipeline has already sent the player a
+            // specific explanation, and an empty command error on top would just add noise.
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -2283,12 +2335,269 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         // If no message provided, just set the player's chat mode
         player.SetChatMode(mode);
         AnalyticsService.TrackFeatureUsed("chat_mode", "set_" + mode.ToString().ToLowerInvariant(), properties: AnalyticsService.ChatProperties(mode.ToString().ToLowerInvariant()));
+        return ChatModeStatus(player, ChatAxis.Mode);
+    }
+
+    /// <summary>
+    /// Toggles a sticky override mode. Running the command for the mode you are already in clears it,
+    /// and running a different one replaces it, so the three override commands are mutually exclusive.
+    /// </summary>
+    /// <summary>
+    /// Bare <c>/me</c>, <c>/ooc</c> and <c>/gooc</c>. Takes the command name because this returns
+    /// before each caller's own analytics, so without it both successful toggles and gate-refused
+    /// attempts would be missing from command analytics for exactly the three commands whose
+    /// disabled-demand this branch set out to measure.
+    /// </summary>
+    private TextCommandResult HandleOverrideModeCommand(IServerPlayer player, ChatOverrideMode mode, string commandName)
+    {
+        // Raw value, not the effective one: the effective getter clears and explains a mode the
+        // player may no longer hold, which for a player trying to LEAVE that mode would emit the
+        // refusal twice and never confirm the change. Leaving is always allowed, and /emotemode
+        // and /oocToggle already read the raw value for the same reason.
+        var result = SetOverrideMode(player, mode, enabled: player.GetChatOverrideMode() != mode);
+
+        var succeeded = result.Status == EnumCommandStatus.Success;
+        AnalyticsService.TrackCommandUsed(
+            commandName,
+            succeeded,
+            succeeded ? null : "blocked",
+            AnalyticsService.ChatProperties(commandName));
+
+        return result;
+    }
+
+    /// <summary>
+    /// The single gated way any command changes the override axis. <c>/me</c>, <c>/ooc</c>,
+    /// <c>/gooc</c>, <c>/emotemode</c> and <c>/oocToggle</c> all route through here, so a gate added
+    /// in one place cannot be bypassed by a sibling command writing the same state directly.
+    /// Leaving a mode is always allowed; nobody should be trapped in one.
+    /// </summary>
+    private TextCommandResult SetOverrideMode(IServerPlayer player, ChatOverrideMode mode, bool enabled)
+    {
+        if (!enabled)
+        {
+            if (player.GetChatOverrideMode() == mode)
+            {
+                player.SetChatOverrideMode(ChatOverrideMode.None);
+            }
+
+            return ChatModeStatus(player, ChatAxis.Type);
+        }
+
+        if (!CanEnterOverrideMode(player, mode, out var refusal))
+        {
+            return new TextCommandResult
+            {
+                Status = EnumCommandStatus.Error,
+                StatusMessage = refusal,
+            };
+        }
+
+        player.SetChatOverrideMode(mode);
+
+        AnalyticsService.TrackFeatureUsed("chat_override_mode", "set_" + mode.ToString().ToLowerInvariant());
+
+        return ChatModeStatus(player, ChatAxis.Type);
+    }
+
+    /// <summary>
+    /// Whether the player may park themselves in an override mode. Sending a one-off OOC line only
+    /// needs chat privilege, but staying in OOC is what <c>/oocToggle</c> grants, so it answers to
+    /// the same server switch and privilege rather than being reachable by a bare <c>/ooc</c>.
+    /// </summary>
+    private bool CanEnterOverrideMode(IServerPlayer player, ChatOverrideMode mode, out string refusal)
+    {
+        var allowed = IsOverrideModeAvailable(player, mode, out var refusalLangKey);
+        refusal = refusalLangKey == null ? null : Lang.Get(refusalLangKey);
+
+        if (!allowed)
+        {
+            // Measuring these is the whole reason the commands stay registered when a feature is off:
+            // a command that does not exist produces no signal that anyone wanted it. Recorded here
+            // because this is the one seam every command-layer gate check passes through, whereas
+            // IsOverrideModeAvailable is also consulted on join and on delivery, which are not
+            // player-initiated attempts and would pollute the count.
+            AnalyticsService.TrackFailure(
+                "chat_override_mode",
+                "enter_" + mode.ToString().ToLowerInvariant(),
+                "blocked",
+                refusalLangKey ?? "unknown");
+        }
+
+        return allowed;
+    }
+
+    /// <summary>
+    /// The single answer to "may this player be in this override mode right now?".
+    ///
+    /// Entry, delivery, and status all consult this. They each used to carry their own copy, and
+    /// every time the copies drifted, a setting silently stopped applying to players already holding
+    /// the mode. Every gate here is live-reloadable or role-dependent, so none can be checked only
+    /// at entry time.
+    /// </summary>
+    internal bool IsOverrideModeAvailable(IServerPlayer player, ChatOverrideMode mode, out string refusalLangKey)
+    {
+        refusalLangKey = null;
+
+        if (mode == ChatOverrideMode.None)
+        {
+            return true;
+        }
+
+        // The override commands are not registered when RP chat is off, but the config can be
+        // flipped live, so guard the capability rather than relying on registration.
+        if (Config.DisableRPChat)
+        {
+            refusalLangKey = "thebasics:chat-override-rp-disabled";
+            return false;
+        }
+
+        // With RP text off for this player, plain lines bypass the pipeline entirely and go out as
+        // vanilla chat, so a stored type does nothing. Storing one anyway would leave it waiting to
+        // spring back to life the moment they re-enable RP text. One-off /ooc and /me still work,
+        // because those run the pipeline directly rather than through the chat event.
+        if (!player.GetRpTextEnabled())
+        {
+            refusalLangKey = "thebasics:chat-type-rptext-disabled";
+            return false;
+        }
+
+        // Global OOC answers only to its own switch. AllowOOCToggle and OOCTogglePermission govern
+        // local OOC; gating global OOC behind them would let an unrelated setting remove a working
+        // feature, and refuse it with a message naming the wrong one.
+        if (mode == ChatOverrideMode.GlobalOoc)
+        {
+            if (Config.EnableGlobalOOC)
+            {
+                return true;
+            }
+
+            refusalLangKey = "thebasics:chat-gooc-disabled";
+            return false;
+        }
+
+        if (mode != ChatOverrideMode.Ooc)
+        {
+            return true;
+        }
+
+        if (!Config.AllowOOCToggle)
+        {
+            refusalLangKey = "thebasics:chat-ooc-disabled";
+            return false;
+        }
+
+        // Matches how /oocToggle is registered, so the two routes into the same state agree. Roles
+        // change at runtime with no config edit at all, so this must be re-checked on delivery.
+        if (!player.HasPrivilege(Config.OOCTogglePermission))
+        {
+            refusalLangKey = "thebasics:chat-ooc-mode-no-privilege";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// A player parked in global OOC when an admin disables the feature would otherwise be stuck:
+    /// <c>/gooc</c> is no longer registered to toggle it back off. Clears the stale value outright
+    /// rather than masking it, so re-enabling global OOC later cannot silently drop the player back
+    /// into a server-wide channel they never asked to rejoin.
+    /// </summary>
+    private ChatOverrideMode GetEffectiveOverrideMode(IServerPlayer player)
+    {
+        var mode = player.GetChatOverrideMode();
+        if (IsOverrideModeAvailable(player, mode, out var refusalLangKey))
+        {
+            return mode;
+        }
+
+        player.SetChatOverrideMode(ChatOverrideMode.None);
+
+        // Say why. This runs on status-adjacent commands like a bare /w, so dropping the mode
+        // quietly would leave the player reading "Chat mode: whisper" with the override clause
+        // simply gone, and their next line published in character.
+        player.SendMessage(ProximityChatId, Lang.Get(refusalLangKey), EnumChatType.CommandError);
+
+        return ChatOverrideMode.None;
+    }
+
+    /// <summary>
+    /// Reports both axes at once. Range alone is ambiguous now that a player can be whispering in
+    /// character or whispering out of character.
+    /// </summary>
+    /// <summary>
+    /// Puts a player back into ordinary chat when the type they were parked in is no longer allowed,
+    /// so they never start a session in a state the server will refuse.
+    ///
+    /// The delivery path clears stale types too, but only once the player has already tried to speak,
+    /// which costs them a message and reads as being stuck. Doing it at join makes that the rare
+    /// live-config-flip case rather than the normal one.
+    /// </summary>
+    private void ReconcileChatTypeOnJoin(IServerPlayer byPlayer)
+    {
+        var mode = byPlayer.GetChatOverrideMode();
+        if (mode == ChatOverrideMode.None || IsOverrideModeAvailable(byPlayer, mode, out var refusalLangKey))
+        {
+            return;
+        }
+
+        byPlayer.SetChatOverrideMode(ChatOverrideMode.None);
+
+        // Say why, and say what they are now. A silent change would leave them believing their next
+        // line goes somewhere it does not.
+        byPlayer.SendMessage(
+            ProximityChatId,
+            Lang.Get("thebasics:chat-type-reset-on-join", Lang.Get(refusalLangKey)),
+            EnumChatType.Notification);
+    }
+
+    /// <summary>
+    /// Which of the two axes the player just changed. The confirmation leads with that one and
+    /// parenthesises the other, so a single line teaches that both exist without either looking
+    /// like the only setting.
+    /// </summary>
+    private enum ChatAxis
+    {
+        Mode,
+        Type
+    }
+
+    private TextCommandResult ChatModeStatus(IServerPlayer player, ChatAxis changed)
+    {
+        var mode = player.GetChatMode().ToString().ToLowerInvariant();
+        var type = Lang.Get(ChatTypeLangKey(GetEffectiveOverrideMode(player)));
+
+        string message;
+        if (changed == ChatAxis.Type)
+        {
+            // Always show both here: the player just discovered the type axis exists, so naming the
+            // mode alongside it is the cheapest place to teach that they are independent.
+            message = Lang.Get("thebasics:chat-chattype-set", type, mode);
+        }
+        else
+        {
+            // Only mention the type when one is actually set; otherwise this is the plain, familiar
+            // confirmation that shipped before the type axis existed.
+            message = GetEffectiveOverrideMode(player) == ChatOverrideMode.None
+                ? Lang.Get("thebasics:chat-chatmode-set", mode)
+                : Lang.Get("thebasics:chat-chatmode-set-with-type", mode, type);
+        }
+
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
-            StatusMessage = Lang.Get("thebasics:chat-chatmode-set", mode.ToString().ToLower()),
+            StatusMessage = message,
         };
     }
+
+    private static string ChatTypeLangKey(ChatOverrideMode mode) => mode switch
+    {
+        ChatOverrideMode.Emote => "thebasics:chat-type-emote",
+        ChatOverrideMode.Ooc => "thebasics:chat-type-ooc",
+        ChatOverrideMode.GlobalOoc => "thebasics:chat-type-gooc",
+        _ => "thebasics:chat-type-none"
+    };
 
     private TextCommandResult Yell(TextCommandCallingArgs args)
     {
@@ -2310,14 +2619,18 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
         // If no argument provided, toggle the current state
         var emoteMode = args.Parsers[0].IsMissing ? !player.GetEmoteMode() : (bool)args.Parsers[0].GetValue();
-        player.SetEmoteMode(emoteMode);
-        AnalyticsService.TrackCommandUsed("emotemode", true);
-        AnalyticsService.TrackFeatureUsed("emote_mode", emoteMode ? "enable" : "disable");
-        return new TextCommandResult
+
+        // Track after the gate has had its say. Emitting the success events up front recorded
+        // refused attempts as completed mode changes.
+        var result = SetOverrideMode(player, ChatOverrideMode.Emote, emoteMode);
+        var succeeded = result.Status == EnumCommandStatus.Success;
+        AnalyticsService.TrackCommandUsed("emotemode", succeeded);
+        if (succeeded)
         {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = Lang.Get("thebasics:chat-emotemode-set", ChatHelper.OnOff(emoteMode)),
-        };
+            AnalyticsService.TrackFeatureUsed("emote_mode", emoteMode ? "enable" : "disable");
+        }
+
+        return result;
     }
 
     private TextCommandResult RpTextEnabled(TextCommandCallingArgs args)
@@ -2326,6 +2639,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         // If no argument provided, toggle the current state
         var rpTextEnabled = args.Parsers[0].IsMissing ? !player.GetRpTextEnabled() : (bool)args.Parsers[0].GetValue();
         player.SetRpTextEnabled(rpTextEnabled);
+
+        // With RP text off the pipeline hands the line to vanilla chat untouched, so a lingering
+        // override would never be applied and never be cleared: the player's next line would go out
+        // verbatim to the whole group while they still believed they were in OOC.
+        if (!rpTextEnabled)
+        {
+            player.SetChatOverrideMode(ChatOverrideMode.None);
+        }
+
         AnalyticsService.TrackCommandUsed("rptext", true);
         AnalyticsService.TrackFeatureUsed("rp_text", rpTextEnabled ? "enable" : "disable");
         return new TextCommandResult
@@ -2337,27 +2659,20 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private TextCommandResult OOCMode(TextCommandCallingArgs args)
     {
-        if (!Config.AllowOOCToggle)
-        {
-            return new TextCommandResult
-            {
-                Status = EnumCommandStatus.Error,
-                StatusMessage = Lang.Get("thebasics:chat-ooc-disabled"),
-            };
-        }
-
         var player = (IServerPlayer)args.Caller.Player;
         var newMode = args.Parsers[0].IsMissing ? !player.GetOOCEnabled() : (bool)args.Parsers[0].GetValue();
-        player.SetOOCEnabled(newMode);
 
-        AnalyticsService.TrackCommandUsed("ooctoggle", true);
-        AnalyticsService.TrackFeatureUsed("ooc_mode", newMode ? "enable" : "disable");
-
-        return new TextCommandResult
+        // Track after the gate has had its say. Emitting the success events up front recorded
+        // refused attempts as completed mode changes.
+        var result = SetOverrideMode(player, ChatOverrideMode.Ooc, newMode);
+        var succeeded = result.Status == EnumCommandStatus.Success;
+        AnalyticsService.TrackCommandUsed("ooctoggle", succeeded);
+        if (succeeded)
         {
-            Status = EnumCommandStatus.Success,
-            StatusMessage = Lang.Get("thebasics:chat-ooc-set", newMode ? Lang.Get("thebasics:chat-ooc-enabled") : Lang.Get("thebasics:chat-ooc-disabled-label")),
-        };
+            AnalyticsService.TrackFeatureUsed("ooc_mode", newMode ? "enable" : "disable");
+        }
+
+        return result;
     }
 
     private TextCommandResult ChatterToggle(TextCommandCallingArgs args)
@@ -2393,6 +2708,47 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         return string.IsNullOrWhiteSpace(Config.ProximityChatName) ? "Proximity" : Config.ProximityChatName;
     }
 
+    /// <summary>
+    /// Runs a message through the pipeline and records what actually happened to it.
+    /// </summary>
+    /// <remarks>
+    /// The pipeline can refuse a line without throwing — a cleared stale chat type, a disabled
+    /// surface — and it tells the player itself when it does. Every send reports through this one
+    /// exit so that no caller can drift back to assuming its own send landed; that assumption was
+    /// separately true of all seven call sites, which would have reported a server silently dropping
+    /// chat as one delivering every line.
+    /// </remarks>
+    private void SendThroughPipeline(MessageContext context, string surface, string featureName, string featureAction,
+        EnumChatType defaultChatType = EnumChatType.OthersMessage)
+    {
+        if (TransformerSystem == null)
+        {
+            // A missing pipeline is a dropped line, not a delivered one.
+            AnalyticsService.TrackFailure(featureName, surface, "error", "no_transformer_system");
+            return;
+        }
+
+        TransformerSystem.ProcessMessagePipeline(context, defaultChatType);
+
+        var delivered = context.State == MessageContextState.CONTINUE;
+        var chatProperties = AnalyticsService.ChatProperties(surface);
+
+        if (context.HasFlag(MessageContext.IS_FROM_COMMAND))
+        {
+            AnalyticsService.TrackCommandUsed(surface, delivered, delivered ? null : "rejected", chatProperties);
+        }
+        else if (!delivered)
+        {
+            // Chat-tab lines have no command event to carry the refusal, so record it as a failure.
+            AnalyticsService.TrackFailure(featureName, surface, "rejected", "pipeline_stopped");
+        }
+
+        if (delivered)
+        {
+            AnalyticsService.TrackFeatureUsed(featureName, featureAction, properties: chatProperties);
+        }
+    }
+
     private void Event_PlayerChat(IServerPlayer byPlayer, int channelId, ref string message, ref string data,
         Vintagestory.API.Datastructures.BoolRef consumed)
     {
@@ -2421,8 +2777,9 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 return;
             }
 
-            // Only consume after we've validated the message — if our pipeline fails,
-            // vanilla chat handles the message instead of silently swallowing it.
+            // Consumed before processing: once we take the message, vanilla will not deliver it.
+            // That makes an unhandled pipeline exception a silent drop, so the call below is
+            // wrapped rather than left to propagate.
             consumed.value = true;
 
             // Create a player chat context
@@ -2441,9 +2798,23 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 }
             };
 
-            // Process the message through the pipeline
-            TransformerSystem?.ProcessMessagePipeline(context);
-            AnalyticsService.TrackFeatureUsed("proximity_chat", "send_chat_tab", properties: AnalyticsService.ChatProperties("chat_tab"));
+            // The message is already consumed, so an exception here would drop the player's line with
+            // no delivery and no feedback. Tell them and log it rather than losing it silently.
+            try
+            {
+                SendThroughPipeline(context, "chat_tab", "proximity_chat", "send_chat_tab");
+            }
+            catch (Exception ex)
+            {
+                API.Logger.Error("THEBASICS: proximity chat pipeline threw for player {0}: {1}", byPlayer?.PlayerName, ex);
+                byPlayer?.SendMessage(ProximityChatId, Lang.Get("thebasics:chat-pipeline-failed"), EnumChatType.CommandError);
+
+                // Report it here too. Handling the throw locally means it never reaches the outer
+                // catch, so without this a server whose pipeline is failing would report 100% chat
+                // success and zero failures, hiding the very problem this handler exists to surface.
+                AnalyticsService.TrackFailure("proximity_chat", "chat_tab_pipeline", "error", "pipeline_exception", ex);
+                return;
+            }
         }
         catch (Exception e)
         {

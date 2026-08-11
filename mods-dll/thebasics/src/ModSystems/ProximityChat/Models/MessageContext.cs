@@ -77,6 +77,10 @@ public class MessageContext
     public static readonly string IS_ROLEPLAY = "isRoleplay";
     public static readonly string IS_GLOBAL_OOC = "isGlobalOOC";
     public static readonly string IS_FROM_COMMAND = "isFromCommand";
+
+    // Set only by /say, /yell and /whisper when given a message. Those name a range explicitly, and
+    // a global OOC override has no range, so the combination cannot be honoured as written.
+    public static readonly string IS_EXPLICIT_RANGE_COMMAND = "isExplicitRangeCommand";
     public static readonly string LANGUAGE = "language";
     public static readonly string CHAT_MODE = "chatMode";
     public static readonly string CHAT_TYPE = "chatType";
@@ -85,6 +89,16 @@ public class MessageContext
     public static readonly string SPEECH_COLOR = "speechColor";
     public static readonly string SPEECH_TEXT = "speechText";
     public static readonly string PENDING_SIGN_LANGUAGE_RECIPIENTS = "pendingSignLanguageRecipients";
+
+    // The speech verb, resolved once in the sender phase. Verb lists are random-pick, so resolving
+    // per recipient would show two players standing together different verbs for the same line.
+    public static readonly string SPEECH_VERB = "speechVerb";
+
+    // Player UID -> extra effective distance in blocks from sound-occluding geometry between the
+    // speaker and that recipient. Populated during recipient determination so obfuscation and font
+    // size fade with the same wall penalty the range check applied. Note the base distance differs:
+    // the range check is Manhattan, both consumers are Euclidean. Only the penalty is shared.
+    public static readonly string OCCLUSION_PENALTY_BY_RECIPIENT = "occlusionPenaltyByRecipient";
 
     // Stores the pre-recipient-phase bubble text for speech messages.
     // Used when we want to keep overhead bubbles closer to vanilla behavior.
@@ -111,6 +125,21 @@ public class MessageContext
         }
 
         Metadata[SPEECH_TEXT] = text;
+    }
+
+    /// <summary>
+    /// Extra effective distance in blocks for this recipient from sound-occluding geometry.
+    /// Zero when wall muffling is disabled or nothing stands between the two players.
+    /// </summary>
+    public int GetOcclusionPenalty(IServerPlayer recipient)
+    {
+        if (recipient == null ||
+            !TryGetMetadata(OCCLUSION_PENALTY_BY_RECIPIENT, out IDictionary<string, int> penalties))
+        {
+            return 0;
+        }
+
+        return penalties.TryGetValue(recipient.PlayerUID, out var penalty) ? penalty : 0;
     }
 
     public bool TryGetSpeechText(out string text)

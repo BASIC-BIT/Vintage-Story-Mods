@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using thebasics.Configs;
+using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.Analytics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -78,7 +79,29 @@ namespace thebasics.ModSystems
 
         protected static ModConfig ReloadSharedConfigFromDisk(ICoreServerAPI api)
         {
-            var loaded = LoadConfigFromDisk(api);
+            TryReloadSharedConfigFromDisk(api, out var config);
+            return config;
+        }
+
+        /// <summary>
+        /// Reloads from disk, refusing to apply a config that could not actually be read.
+        ///
+        /// An unparseable file (a stray comma in a hand-edited config) falls back to pure defaults.
+        /// Copying those over the live config would silently wipe every setting the server is
+        /// currently running, broadcast the defaults to clients, and leave the next admin-panel save
+        /// to persist them over the operator's real file. The load already declines to overwrite the
+        /// file itself; this declines to overwrite the running config to match.
+        /// </summary>
+        protected static bool TryReloadSharedConfigFromDisk(ICoreServerAPI api, out ModConfig config)
+        {
+            var loaded = LoadConfigFromDisk(api, out var usedFallbackDefaults);
+
+            if (usedFallbackDefaults && _sharedConfig != null)
+            {
+                config = _sharedConfig;
+                return false;
+            }
+
             if (_sharedConfig == null)
             {
                 _sharedConfig = loaded;
@@ -88,7 +111,8 @@ namespace thebasics.ModSystems
                 CopyConfigValues(loaded, _sharedConfig);
             }
 
-            return _sharedConfig;
+            config = _sharedConfig;
+            return true;
         }
 
         protected static void SaveSharedConfig(ICoreServerAPI api)
@@ -109,8 +133,27 @@ namespace thebasics.ModSystems
             return _sharedConfig;
         }
 
+        /// <summary>
+        /// Single exit on purpose. This has four ways of producing a config (loaded, JSON-string
+        /// repaired, fallback after a parse failure, and freshly created), and validation warnings
+        /// have to cover all of them. Validating at each return is how the repaired path silently
+        /// skipped it.
+        /// </summary>
         private static ModConfig LoadConfigFromDisk(ICoreServerAPI api)
         {
+            return LoadConfigFromDisk(api, out _);
+        }
+
+        private static ModConfig LoadConfigFromDisk(ICoreServerAPI api, out bool usedFallbackDefaults)
+        {
+            var config = LoadOrRecoverConfig(api, out usedFallbackDefaults);
+            LogConfigValidationWarnings(api, config);
+            return config;
+        }
+
+        private static ModConfig LoadOrRecoverConfig(ICoreServerAPI api, out bool usedFallbackDefaults)
+        {
+            usedFallbackDefaults = false;
             ModConfig config;
 
             try
@@ -119,12 +162,15 @@ namespace thebasics.ModSystems
             }
             catch (Exception e)
             {
+                // A repaired legacy file is a real config, so it is not a fallback. Only the
+                // defaults-after-parse-failure path loses the operator's settings.
                 var repaired = TryRepairJsonStringConfig(api);
                 if (repaired != null)
                 {
                     return repaired;
                 }
 
+                usedFallbackDefaults = true;
                 return CreateFallbackConfig(api, e);
             }
 
@@ -143,6 +189,27 @@ namespace thebasics.ModSystems
             // Optionally persist any backfilled defaults for future runs
             api.StoreModConfig(config, ConfigName);
             return config;
+        }
+
+        /// <summary>
+        /// The admin panel rejects invalid combinations on save, but a hand-edited file never passes
+        /// through that path. Warn rather than reject: refusing to boot on a bad value would be a
+        /// worse failure than running with the documented fallback, but the admin needs to know
+        /// their setting is not doing what they think.
+        /// </summary>
+        private static void LogConfigValidationWarnings(ICoreServerAPI api, ModConfig config)
+        {
+            try
+            {
+                foreach (var error in ConfigAdminSettingRegistry.ValidateConfig(config))
+                {
+                    api.Server.LogWarning("The BASICs config: " + error);
+                }
+            }
+            catch (Exception e)
+            {
+                api.Server.LogWarning("The BASICs: config validation failed to run: " + e.Message);
+            }
         }
 
         private static ModConfig TryRepairJsonStringConfig(ICoreServerAPI api)
