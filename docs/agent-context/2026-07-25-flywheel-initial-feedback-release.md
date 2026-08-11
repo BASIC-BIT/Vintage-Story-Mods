@@ -459,17 +459,19 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   diagnostic panel when deliberately enabled. Overspeed sparks and smoke remain visible gameplay feedback.
 - Stand placement on a top or bottom face remains horizontal and follows player yaw by default. Holding Sneak while placing
   on that face deliberately selects the supported vertical orientation; side-face placement keeps the selected face axis.
-- Flywheel Power targets Vintage Story 1.22.6. All six configured projects build with zero errors; the only build warnings
-  are four pre-existing The BASICs analyzer findings. Flywheel Power tests pass 80/80 and DimensionLib tests pass 58/58.
-  The all-repository The BASICs test lane is temporarily dependent on PR #219: current `main` lacks the 1.22.6
-  `IServerPlayer.IsInInteractionRangeOf` test-fixture implementation and produces 123 unrelated dynamic-proxy failures.
+- Flywheel Power targets Vintage Story 1.22.6. After PR #219 merged and this branch refreshed from `main`, all six configured
+  projects build with zero errors. The merged tree reports four existing The BASICs analyzer warnings and 14 nullable
+  warnings in its new `FakeServerPlayer` test fixture. The BASICs tests pass 608/608, Flywheel Power tests pass 80/80,
+  and DimensionLib tests pass 58/58.
 - All six configured whitespace checks, the Flywheel source formatting check, the agent-tooling check, generated-content drift checks, the Lizard gate, and 61/61
   renderer regression tests pass. The exact model sweep covers 74 manifests and 1,776 primary images with zero unresolved
   textures, zero coplanar overlaps, and exactly 24 images per manifest. Every resolved texture file is included by SHA-256
   in its manifest's deterministic input provenance.
-- The exact package contains 31 allowlisted entries, is 84,675 bytes, and has SHA-256
-  `7E78682E33876AF71B6D67D084BFC364496F95706765FC4C9204E5BAC13AFED7`. Archive inspection finds no disabled content,
+- The post-refresh exact package contains 31 allowlisted entries, is 84,670 bytes, and has SHA-256
+  `C45CC18E252D1FE9EAFCB9D453A52AE46B38FB753F0B0C3F0250DF7EF644F62B`. Archive inspection finds no disabled content,
   compact-web residue, or obsolete player-facing tyre, rim, or blank labels.
+- PR #219 merged as `e07ceda`; this branch incorporated that exact `main` commit in merge commit `09d0e10`. The prior
+  `IServerPlayer.IsInInteractionRangeOf` dynamic-proxy failure is cleared by the complete 608-test pass above.
 - Full-size wheel installation now requires all eight reservation block entities to remain linked to the selected stand before
   replacing any blocks, so a partial schematic or world-edited stand cannot overwrite an unrelated occupant.
 - Full-size reservation parts delegate only to full-size stands or installed full-size flywheels. Compact stands and compact
