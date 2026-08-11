@@ -1,16 +1,217 @@
 # Ropeway v0.1 — known issues
 
-State: build green, 218 ropeway tests passing — 111 `[Fact]` plus 107 `[InlineData]` across the five test
+State: build green, 244 ropeway tests passing — 117 `[Fact]` plus 127 `[InlineData]` across the five test
 files in `mods-dll/ropeway.Tests`, which is where to re-derive this number rather than trusting the line.
 (It read 136 for two rounds after the count moved, 147 for two more, 168 for two more again, 172 for one,
-174 for one, 180 for one, 187 for one, 199 for two and 211 for one. It briefly read 195 in one round's
-working tree, because two agents landed tests in parallel and each counted only its own.) Everything in the
-tables below was found by reading code, not by playing — none of *it* has been observed in game.
+174 for one, 180 for one, 187 for one, 199 for two, 211 for one and 218 for one. It briefly read 195 in one
+round's working tree, because two agents landed tests in parallel and each counted only its own.)
+Everything in the tables below was found by reading code, not by playing — **except the section directly
+below**, which is the second in-game session, where every symptom was seen and every cause was measured
+afterwards.
+
+## The second in-game session — eight findings, and three of them were one bug (2026-08-11)
+
+The mod author played a chain, a corner and a shaft and wrote eight things down. Renders of every
+before-and-after are in `docs/agentic/ingest/cablecar/renders/qa1/`, `renders/qa1-chain/` and
+`renders/qa1-wheel/`, and the ghost preview's own scenes in `docs/agentic/ingest/cablecar/ghost-preview/`;
+the walk that checks them is
+[QA-SCRIPT.md](QA-SCRIPT.md) steps 0, 1b, 3, 5, 6, 7, 10b, 11, 11c, 12b, 16, 27c-wheel and 28c.
+
+| He saw | It was |
+| --- | --- |
+| *"has a hard time generating the ropes when you have multiple chained ones — seems like half of it disappears"* | One mesh bug, below. A corner tower drew **nothing at all**. |
+| *"the top rope doesn't extend all the way to the bullwheel"* | The same bug. A terminal's wrap died after its first segment, taking both brackets with it. |
+| *"on the elevator gantry thing the rope isn't aligned with the wheel, it's off to the side"* | The shaft headframe's beam was a 2-block stub that stopped 17 units short of its own wheel. |
+| *"the rails and travel path really should generate a curve, it looks so weird"* | The same bug again. The curve was implemented, tested and correct, and had **never once been drawn**. |
+| *"bullwheel shifts to the side but doesn't rotate around the Z axis"* | The renderer took its translation from the line and its rotation from the block. |
+| *"I wish the multiblock preview would show you the actual block… instead of you having to guess"* | Nothing existed. Vanilla's highlight API cannot draw a block. |
+| *"it'd be nice if the drive and tension stations could be put on either side of the posts"* | They always could — all four facings shipped — and nothing in the world said so. |
+| *"the journal tutorial page should show examples and give a BOM up front as bullets"* | Fair. All three structure pages opened with prose that buried the counts inside sentences. |
+
+**The lesson worth keeping is the fourth row.** Three of the eight were one fault, and the one that read as
+a missing FEATURE was the same fault as the two that read as missing GEOMETRY. `RopewayLine.Tangents`,
+`BendOffset`, `BendSlope`, `Steer`, `PositionAt` and `DirectionAt` were all shipped and all correct;
+`ACornerTowersDrawnHalfSpanIsTheBentCurveAndNotItsChord` had been green for rounds. A report of "please
+build X" against a codebase that already has X is a rendering question until proved otherwise, and the
+first move is to find out whether the thing reaches the screen — not to write X again.
+
+### A run of more than one box was thrown away, on the tesselation thread, in silence
+
+`BEPylonBase.BuildRun` assembles a curve out of boxes: `CubeMeshUtil.GetCube` per segment, then
+`MeshData.AddMeshData` to merge them. `GetCube` fills the three per-face SIDE arrays — `TextureIndices`,
+`ClimateColorMapIds`, `SeasonColorMapIds`, 6 long apiece — and leaves their `*Count` fields at **0**.
+`SetTexPos` writes `TextureIndices[0..Length)` without touching `TextureIndicesCount`; `WithColorMaps`
+sizes the two colour-map arrays without touching `ColorMapIdsCount`. Only `XyzFacesCount` is real, because
+`AddXyzFace` maintains one.
+
+`MeshData.addMeshDataEtc` (1.22.1 `MeshData.cs:1028-1046`) copies each side array **by its `*Count`, not by
+its `Length`**. So merging box 2 into box 1 added 6 more faces and **zero** side entries: an N-box run
+reached the chunk tesselator with `XyzFacesCount = 6N` and 6-long side arrays. `JsonTesselator`'s emit loop
+runs `for (l = 0; l < xyzFacesCount; l++)` and indexes `TextureIds[TextureIndices[l * …]]` — so at l = 6 it
+threw `IndexOutOfRangeException`, on the tesselation thread, caught and logged per block entity by
+`JsonTesselator.Tesselate` under the block entity's position and nothing naming this mod.
+
+What that did in the world, and why the report reads the way it does:
+
+- **A straight tower**: every run is **one box** (collinear samples collapse), 6 faces against a 6-long
+  array. The only case that lined up, and it looked perfect. Hence *"mostly worked"*.
+- **A corner tower**: 29-30 boxes per half-span. Threw on box 2, and because vertices commit per face,
+  **every later box and every later run of that whole `OnTesselation` call** was lost — cable, return
+  strand and both rail cheeks, in both directions. Hence *"half of it disappears"* on a chain.
+- **A terminal**: the wrap is 9 boxes and is drawn last, so the arc kept one stub and the two brackets that
+  follow it were never built. Hence *"the top rope doesn't extend all the way to the bullwheel"*.
+
+The fix is two assignments at the bottom of the box builder — `TextureIndicesCount = XyzFacesCount`,
+`ColorMapIdsCount = XyzFacesCount` — because one box is always six faces, so `XyzFacesCount` is the count
+all three arrays share. Assigned rather than `AddTextureId`/`AddColorMapIndex`-ed: the arrays are already
+populated and the adders would append a second six.
+
+**Why no test caught it, which is the part worth fixing structurally.** The shipped test for this exact
+failure class asserted the right property on `BuildHalfCable` — the **one-box** case, the only case that
+was ever right. `EveryBoxOfARunCarriesTheSideArrayEntriesTheTesselatorIndexesPerFace` now runs it over 2-,
+9- and 30-box runs, which are a joint, a terminal's wrap and a right-angle corner's half-span.
+
+### The joint the alternation could not see
+
+`JointPhase` already thins alternate boxes so no two neighbours in a run share a plane. What it cannot see
+is the joint **between two runs**: a two-span tower leaves the sheave from the same point in two
+directions, so both runs' box 0 overlap in plan and present their up and down faces coplanar. Measured on a
+corner tower: four pairs (cable, return strand, both rail cheeks), 0.028-0.031 unit² each. `BuildRun` now
+takes a `phaseFrom` that says which end of the alternation a run starts on, and the caller flips it per
+side. Invisible before this round, because a corner tower drew nothing at all.
+
+### The wheel followed the line's translation and never its rotation
+
+`BullwheelRenderer` polled `Offset` off the tower every tick and kept `yawRad` `readonly`, set once from
+the block's own `side` variant at construction. So the hub landed on the rope's plan line and the disc it
+turns in stayed on the nearest cardinal: the two crossed at the hub and diverged everywhere else — exactly
+*"shifts to the side but doesn't rotate"*. Two independent errors stacked into it: the line's bearing
+against the tower's facing (0-45°, and `WarnOnCorner` never checks a terminal), and the wheel block's own
+facing against the tower's (0/90/180/270, free, because both station structures name the cell
+`ropeway:bullwheel-*` and `OwnTheHeadCell` narrows only the three asymmetric heads). At 22.5° the felloe
+already sweeps through both brackets drawn to carry it; at 90° the rope crosses the disc through the spokes.
+
+`Yaw` is now polled beside `Offset`, off `BEPylonBase.LineTangent` — the same expression the brackets and
+both rail cheeks are already drawn across, lifted to a property. Three things it deliberately does not do:
+
+- **It does not fix the loose variant.** A wheel placed a quarter turn out still validates the tower. That
+  is now genuinely cosmetic, and the real fix is unchanged and is still one fix in one place: orient the
+  crossarm cells from the footing below them, for `pylonhead`, `bullwheel` and `layshaft` at once.
+- **It does not decide the SPIN.** The disc is 180°-symmetric, so the bearing leaves two branches that draw
+  the identical wheel and turn opposite ways. The branch nearer the block's own facing is taken, which
+  keeps the shipped behaviour at every cardinal and — more to the point — keeps the direction a property of
+  the wheel rather than of which of a corner's two spans happened to be linked first, since `LocalLine`
+  orders by link order.
+- **It does not answer on a shaft.** A vertical tangent has no bearing and `Atan2(0, 0)` is a silent due
+  north, so `YawAlong` refuses it and falls back to the block. That is the right answer there rather than a
+  degradation: `OwnTheHeadCell` narrows `shaftsheave-*` to the footing's side, so the sheave's variant is
+  the machine's heading.
+
+`BEBullwheel` now returns early when its footing lookup comes back null instead of passing nulls on.
+`WrapOffset`'s last branch is the zero vector, and on a shaft that branch is the only one that can fire —
+so one missed lookup during an ordinary chunk-load window snapped the rim 1.5 blocks off its hub and onto
+the going strand while the authored arc, the hangers and both strands stayed put.
+
+### The headframe stopped short of the wheel it carries
+
+`gen_shaftsheave.py`'s top beam reached 6 units past the hub — enough for the hanger and nothing else. The
+wheel's own swept edge is 23.04 units out and the counterweight's strand is a full 24, so the bar covered
+the car's strand, stopped **17 units short of the wheel**, and left the wheel and the counterweight's rope
+hanging in open air past the end of it. That is *"the rope isn't aligned with the wheel, it's off to the
+side"*: the rope was where it belonged and the metal was not.
+
+`BEAM_REACH = RHO + ROPE + 1` now clears the return strand's far face by a unit, so the bar spans both
+strands — about 3.2 blocks — with the wheel slung under its middle, which is what a headframe over a
+counterweighted hoistway looks like. It stays a **cantilever off the one column pair** on purpose: the only
+place a second pair could stand is the lane, and the lane is the column the counterweight travels down.
+Pinned by `TheHeadframeStraddlesBothStrandsAndTheWheelItCarries`.
+
+### The build overlay shows the actual blocks now, and the panel names them
+
+`IWorldAccessor.HighlightBlocks` takes an `EnumHighlightShape`, and the whole enum is `Arbitrary, Cube,
+Ball, Cubes, Cylinder`. There is no option anywhere in the API that draws a BLOCK, and both vanilla users
+of `MultiblockStructure` (`BlockEntityBeeHiveKiln`, `BlockEntityStoneCoffin`) just call
+`HighlightIncompleteParts` and take the coloured cuboids. So *"show the actual block"* was a custom
+renderer or it was nothing.
+
+`StructureGhostRenderer` is a cheap one, which is what made it worth doing: the mesh is
+`ITesselatorManager.GetDefaultBlockMeshRef`, the same already-uploaded ref the engine hands the inventory
+renderer, owned and disposed by the engine — nothing to tesselate, upload, cache or free. Per frame it is
+one frustum test, one shader bind and at most fifteen draw calls, on the one tower a player asked about.
+
+Three rules in it that are not obvious:
+
+1. **The vanilla overlay is deliberately left on underneath.** It draws with no depth test, so it marks the
+   cells through terrain and from any angle, which a ghost cannot; and if the renderer ever draws nothing
+   the player is exactly where he was before this shipped.
+2. **One name or no ghost.** A wildcard whose matches all share a name is one block wearing four facings
+   and there is something honest to draw. The post columns are an alternation over every log, plank and
+   dressed stone in the game — drawing whichever acacia log the registry returned first would read as a
+   *requirement*. Those cells keep the coloured box, which is what "your material here" looks like, and the
+   panel calls them *"log, planks or dressed stone"*.
+3. **Empty cells only.** A wrong block is already standing there to look at, and a ghost inside it would
+   z-fight it face for face. Vanilla reddens those, and red on a block you can see is the whole message.
+
+The panel is the naming channel and the ghosts are the spatial one; either alone still leaves a guess, so
+`MissingByName` prints counts by block name in the structure's own cell order. And because nothing clears
+the overlay of a tower a player clicked and walked away from, guidance now switches itself off past
+`GuidanceRange` = 24 blocks — free when a stale highlight was a distant marker, not free when it is a solid
+block standing in the air.
+
+### The machine leg always mirrored, and nothing said so
+
+Every station's leg is the crossarm's local +X and the passage is its local Z, so the leg is one quarter
+turn clockwise of `PassageFacing` — and the two variants that share a line's bearing put it on **opposite**
+sides of the posts. That has shipped since stations did. What had not shipped was any way to know which of
+the two you were about to place: both read *"the cabin will pass through north to south"* and stopped.
+
+`MachineLegSide` is a derivation, not a new choice, and the footing's panel now names the side and says
+how to mirror it — break it and place it again standing on the other side. Rejected: a second blocktype or
+a second variant group crossed with `side`, which costs eight placements per station instead of four for
+`ASharedMachineLegSatisfiesAtMostOneStation` to keep apart, a second code for `OwnTheHeadCell` to narrow,
+and every recipe, handbook group and creative entry doubled — to reach placements the four existing
+variants already reach.
+
+Gated on `WearsABullwheel`, which is the two footings whose structure names `bullwheel-*` for the crossarm
+centre. **The shaft head is left out deliberately** even though it carries the same leg: its facing also
+lays the counterweight's lane and `SpanMath.ShaftLinkFits` demands both footings share it, so a shaft's leg
+is not free to mirror and telling a player it is would be worse than saying nothing.
+
+### The handbook leads with a bill of materials, and a typed number was already wrong
+
+Pages 50, 52 and 53 opened with prose that carried the counts inside sentences — *"you then place fifteen
+more"*, *"eleven placed blocks in all"*. Each now leads with bullets, and the prose after them is build
+ORDER and warnings, which is what prose is for.
+
+Writing them turned up the drift that was the point of doing it properly: page 53 priced a shaft *"against
+**thirty** for a pair of ropeway stations"*, and a pair of stations is **thirty-two**. Typed counts beside a
+`multiblockStructure` is a drift this mod has already paid for twice — once when the passage went from five
+cells wide to seven, once when the drive came down off the crossarm — so the bullets and the totals are now
+DERIVED in `TheHandbooksBillOfMaterialsIsTheShippedCellList` from `offsets` and `blockNumbers` and asserted
+verbatim against the page. Move a cell and the bullet it produces stops appearing, and the test names the
+line. What it deliberately does not read is the prose: this is a contract about numbers, not a
+spell-checker.
+
+### What is deliberately not cured this round
+
+- **The loose crossarm variants.** `pylonhead`, `bullwheel` and `layshaft` still validate at any facing.
+  Cosmetic now that the rim reads the line, and the fix is one fix in one place — see above.
+- **The corner-tower post hit at a right angle between two cardinals.** Unchanged, and unchanged for the
+  same reason: it is a translation, not a yaw, and the "angle-station" law that was tried made 45° and 60°
+  corners worse. QA-SCRIPT 12b.
+- **The incoming rope buried in braces at a right angle with the footing down a leg.** The bend fixed the
+  outgoing side and cannot fix this one — the rope arrives from twenty blocks out and a curve confined to
+  the last four cannot change where it comes from.
+- **Ghosts of blocks that draw part of themselves per frame.** A bullwheel ghost shows its cheeks and
+  bearings and no rim, because the rim is `BullwheelRenderer`'s and there is no block entity in an empty
+  cell to own one. Spinning ghost wheels are not worth a second renderer; the silhouette already says
+  bullwheel.
 
 ## The shaft — a counterweighted lift, phase 1 (2026-08-10)
 
 Three new blocktypes, no new block class, no new block-entity class, no new entity, one new renderer, and
-**eleven placed blocks against a ropeway pair's thirty**. Design and adversarial round:
+**eleven placed blocks against a ropeway pair's thirty-two** (this read "thirty" until the counts were
+derived rather than typed — see the section above). Design and adversarial round:
 `docs/agentic/ingest/cablecar/ELEVATOR-DESIGN-2.md` and `ELEVATOR-CHALLENGE-2.md`. Renders:
 `docs/agentic/ingest/cablecar/renders/elevator/`, built from the **shipped** shapes rather than from proposal
 geometry.
@@ -81,7 +282,8 @@ every shipped caller leaves at its default: `BEPylonBase.ShaftRole` (null on eve
 4. **The sheave has to face the footing, and the multiblock cannot make it.** `shafthead.json` names its
    sheave cell as the wildcard `ropeway:shaftsheave-*` and `MultiblockStructure.InCompleteBlockCount` matches
    with `WildcardUtil.Match`, so **any of the four side variants completed the structure**. `shaftsheave` is
-   the least symmetric block in the mod — headframe columns, a beam reaching the hub, a chain case on one face,
+   the least symmetric block in the mod — headframe columns, a beam reaching out over both strands, a chain
+   case on one face,
    and an authored wrap arc that turns in *one* vertical plane — and it is a `HorizontalOrientable`, so it takes
    the **player's** facing at placement. `BullwheelRenderer.YawFor` then reads the *sheave's* side while
    `BEBullwheel.WrapOffset` and `ShaftRenderer` read the *footing's*: three of four placements put the wheel,

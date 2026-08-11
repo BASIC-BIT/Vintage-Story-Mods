@@ -108,7 +108,6 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
 
     private readonly ICoreClientAPI capi;
     private readonly BlockPos pos;
-    private readonly float yawRad;
     private readonly float cullRadius;
     private readonly Matrixf modelMat = new();
 
@@ -136,11 +135,34 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
     /// </summary>
     public Vec3f Offset = new();
 
+    /// <summary>
+    /// Which way the wheel's groove PLANE runs, in radians about Y. Polled beside <see cref="Offset"/> and for
+    /// the same reason it is: both are directions the LINE decides, and until this field existed only the
+    /// offset followed it. The yaw was <c>readonly</c>, set once from the block's own <c>side</c> variant -
+    /// so the hub landed on the rope's plan line and the disc it turns in stayed on the nearest cardinal, and
+    /// the two crossed at the hub and diverged everywhere else. Two independent errors stacked into it: the
+    /// line's bearing against the tower's facing (0-45 degrees, and <c>WarnOnCorner</c> never checks a
+    /// terminal), and the wheel block's own facing against the tower's (0/90/180/270, free, because both
+    /// station structures name the cell <c>ropeway:bullwheel-*</c> and <c>OwnTheHeadCell</c> narrows only the
+    /// three asymmetric heads). At 22.5 degrees the felloe already sweeps through both brackets drawn to
+    /// carry it, and at 90 the rope crosses the disc through the spokes.
+    /// <para>
+    /// A plain float rather than a struct paired with <see cref="Offset"/>: a single float write cannot tear,
+    /// and the worst a torn PAIR can show is one frame of new position with old yaw on the tick a span is
+    /// linked or cut - which is the same tick the footing re-tesselates its chunk anyway.
+    /// </para>
+    /// <para>
+    /// Seeded from <see cref="YawFor"/> at construction so a wheel whose footing has not answered yet stands
+    /// where the shipped one stood, rather than snapping from due north on the first tick.
+    /// </para>
+    /// </summary>
+    public float Yaw;
+
     public BullwheelRenderer(ICoreClientAPI capi, BlockPos pos, MeshData rim, float yawRad, float cullRadius = CullRadius)
     {
         this.capi = capi;
         this.pos = pos;
-        this.yawRad = yawRad;
+        Yaw = yawRad;
         this.cullRadius = cullRadius;
         if (rim != null) mesh = capi.Render.UploadMesh(rim);
     }
@@ -229,7 +251,7 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
 
         prog.ModelMatrix = RimMatrix(
             modelMat.Identity().Translate(pos.X - cameraPos.X, pos.InternalY - cameraPos.Y, pos.Z - cameraPos.Z),
-            yawRad,
+            Yaw,
             angleRad,
             Offset).Values;
 
@@ -237,6 +259,42 @@ public sealed class BullwheelRenderer : IRenderer, IDisposable
         prog.ProjectionMatrix = render.CurrentProjectionMatrix;
         render.RenderMesh(mesh);
         prog.Stop();
+    }
+
+    /// <summary>
+    /// The yaw that stands the rim's groove in the vertical plane the LINE runs in at this tower, given that
+    /// line's plan <paramref name="tangent"/> there - which is exactly the vector <c>BEPylonBase</c> already
+    /// takes the wrap's brackets and both rail cheeks across, so the wheel now comes off the same source as
+    /// everything drawn round it. Falls back to <paramref name="blockYaw"/> when there is no line to read: a
+    /// wheel on a tower with no span has nothing to align to and stands on its own facing, as it always did.
+    /// <para>
+    /// <c>Atan2(x, z)</c> and not <c>Atan2(z, x)</c>: the rim is authored with its disc in the plane x = 8 and
+    /// its axle along X, and <c>RimMatrix</c>'s <c>RotateY</c> carries that disc's own direction (0, 0, 1) to
+    /// (sin yaw, 0, cos yaw). <see cref="YawFor"/>'s four cardinals are the same map, which is why this
+    /// reproduces them exactly on a line that happens to run along one.
+    /// </para>
+    /// <para>
+    /// The BRANCH is the only subtlety. The disc is 180-degree symmetric (spokes are full diameters, felloes
+    /// run the whole ring), so <c>yaw</c> and <c>yaw + pi</c> draw the identical wheel - but the spin is
+    /// <c>RotateX</c> INSIDE the yaw, so the two turn opposite ways. The tangent points ALONG the line, and
+    /// which way along is not something a player chose: <c>BEPylonBase.LocalLine</c> orders its mini-chain by
+    /// the tower's own <c>Spans</c> list, which is LINK ORDER, so a corner tower's raw bearing flips by half
+    /// a turn depending on which of its two spans was made first. Folding onto the branch nearer the block's
+    /// own facing keeps the shipped spin at every cardinal and makes the direction a property of the wheel
+    /// rather than of the order somebody happened to build in.
+    /// </para>
+    /// </summary>
+    public static float YawAlong(Vec3d tangent, float blockYaw)
+    {
+        if (tangent == null) return blockYaw;
+
+        // A purely vertical tangent has no bearing to stand in. Atan2(0, 0) is 0.0 rather than NaN - a silent
+        // due north - so this is a real guard and not belt and braces: a shaft's own DirectionAt is (0, +/-1, 0).
+        var plan = Math.Sqrt(tangent.X * tangent.X + tangent.Z * tangent.Z);
+        if (plan < 1e-9) return blockYaw;
+
+        var yaw = (float)Math.Atan2(tangent.X / plan, tangent.Z / plan);
+        return Math.Abs(GameMath.AngleRadDistance(yaw, blockYaw)) > GameMath.PI / 2 ? yaw + GameMath.PI : yaw;
     }
 
     /// <summary>Degrees of yaw for a <c>side</c> variant, matching the block's own <c>shapeByType</c>.</summary>

@@ -1087,6 +1087,123 @@ public class RopewayAssetContractTests
         Structure(footing).GetProperty("blockNumbers").EnumerateObject()
             .Single(p => p.Value.GetInt32() == number).Name;
 
+    // ------------------------------------------------------- the handbook's bills of materials
+
+    /// <summary>
+    /// English for a cell's wildcard, singular and plural. NOT a count and not a cell list - the counts and
+    /// the ordering below are derived from the shipped offsets. This is only the half a blocktype cannot
+    /// supply, which is what to call the thing in a sentence.
+    /// </summary>
+    private static readonly Dictionary<string, (string One, string Many)> CellWords = new()
+    {
+        ["ropeway:pylonhead-*"] = ("pylon head", "pylon heads"),
+        ["ropeway:brace-*"] = ("ropeway brace", "ropeway braces"),
+        ["ropeway:bullwheel-*"] = ("bullwheel", "bullwheels"),
+        ["ropeway:layshaft-*"] = ("lay shaft", "lay shafts"),
+        ["ropeway:drivehead-*"] = ("drive head", "drive heads"),
+        ["ropeway:driveshaft"] = ("drive shaft", "drive shafts"),
+        ["ropeway:drivehousing"] = ("drive housing", "drive housings"),
+        ["ropeway:tensionhead-*"] = ("tension head", "tension heads"),
+        ["ropeway:tensionguide"] = ("tension guide", "tension guides"),
+        ["ropeway:tensionweight"] = ("tension weight", "tension weights"),
+        ["ropeway:shaftsheave-*"] = ("shaft sheave", "shaft sheaves")
+    };
+
+    private static readonly Dictionary<string, string> FootingWords = new()
+    {
+        ["pylonbase.json"] = "pylon footing",
+        ["drivestation.json"] = "drive station footing",
+        ["tensionstation.json"] = "tension station footing",
+        ["shafthead.json"] = "shaft head footing",
+        ["shaftfoot.json"] = "shaft foot footing"
+    };
+
+    /// <summary>The three totals the handbook spells out in words rather than digits.</summary>
+    private static readonly Dictionary<int, string> Spelled =
+        new() { [11] = "eleven", [16] = "sixteen", [32] = "thirty-two" };
+
+    /// <summary>
+    /// The bullet lines a footing's own cell list comes to: the footing itself, then one line per distinct
+    /// wanted block IN THE ORDER THE OFFSETS NAME THEM, so a station's crossarm reads left to right and its
+    /// leg bottom to top - the order the build overlay is standing in.
+    /// </summary>
+    private static List<string> BillOfMaterials(string footing)
+    {
+        var counts = new List<(string Wildcard, int Count)>();
+        foreach (var offset in Offsets(footing))
+        {
+            var wildcard = Wanted(footing, offset.W);
+            var at = counts.FindIndex(c => c.Wildcard == wildcard);
+            if (at < 0) counts.Add((wildcard, 1));
+            else counts[at] = (wildcard, counts[at].Count + 1);
+        }
+
+        var lines = new List<string> { "- <strong>1</strong> " + FootingWords[footing] };
+        foreach (var (wildcard, count) in counts)
+        {
+            // The one wildcard that is not a block of ours is the post columns, an alternation over every
+            // log, plank and dressed stone in the game. It has no one name and the handbook does not give
+            // it one - the player picks.
+            var words = wildcard.StartsWith("game:") ? ("post", "posts") : CellWords[wildcard];
+            lines.Add($"- <strong>{count}</strong> " + (count == 1 ? words.Item1 : words.Item2));
+        }
+
+        return lines;
+    }
+
+    private static string Handbook(string page) =>
+        Load("config", "handbook", page).GetProperty("text").GetString()!;
+
+    /// <summary>
+    /// THE HANDBOOK'S BILLS OF MATERIALS ARE THE SHIPPED CELL LISTS, and this test is the only thing that
+    /// can say so. A handbook page is static JSON with no access to a blocktype, so its counts are typed -
+    /// and typed counts beside a multiblockStructure is exactly the drift this mod has already paid for
+    /// twice, once when the passage went from five cells wide to seven and once when the drive came down
+    /// off the crossarm and half a station's cells changed block. Both times the prose kept the old number
+    /// and nothing said a word.
+    /// <para>
+    /// So the bullets are derived here from <c>offsets</c> and <c>blockNumbers</c> and asserted verbatim
+    /// against the page. Move a cell, change what a cell wants, add one, and the bullet the derivation
+    /// produces stops appearing in the page and this fails naming the exact line. The headings carry the
+    /// totals for the same reason - <c>offsets.Count + 1</c>, the footing being the block you are standing
+    /// on rather than a cell of the pattern.
+    /// </para>
+    /// <para>
+    /// What it deliberately does NOT check is the prose around the bullets. This is a contract about
+    /// numbers, not a spell-checker: the build order, the warnings and the costing are English and belong to
+    /// whoever writes them.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheHandbooksBillOfMaterialsIsTheShippedCellList()
+    {
+        var pages = new (string Footing, string Page, string? Heading)[]
+        {
+            ("pylonbase.json", "50-ropeway.json", "<strong>A plain tower is {0} blocks</strong>"),
+            ("drivestation.json", "52-power.json", "<strong>A drive station is {0} blocks</strong>"),
+            ("tensionstation.json", "52-power.json", "<strong>A tension station is {0} blocks</strong>"),
+            ("shafthead.json", "53-the-shaft.json", null),
+            ("shaftfoot.json", "53-the-shaft.json", null)
+        };
+
+        foreach (var (footing, page, heading) in pages)
+        {
+            var text = Handbook(page);
+            foreach (var line in BillOfMaterials(footing)) Assert.Contains(line, text);
+
+            if (heading == null) continue;
+            Assert.Contains(string.Format(heading, Spelled[Offsets(footing).Count + 1]), text);
+        }
+
+        // The shaft is priced against a pair of stations on its own page, so both of those numbers are the
+        // cell lists too - eleven placed blocks against thirty-two, and neither is typed here either.
+        var shaft = Offsets("shafthead.json").Count + 1 + Offsets("shaftfoot.json").Count + 1;
+        var stations = 2 * (Offsets("drivestation.json").Count + 1);
+        Assert.Contains(
+            $"<strong>A shaft is {Spelled[shaft]} placed blocks</strong>, against {Spelled[stations]} for a pair of ropeway stations.",
+            Handbook("53-the-shaft.json"));
+    }
+
     /// <summary>
     /// The premise <see cref="AllThreeFootingsShareOneCellList"/> rests on, and the one thing about a
     /// station the shared cell list does NOT give you. Post inner faces at 2.5 blocks follow from the
@@ -1269,6 +1386,74 @@ public class RopewayAssetContractTests
 
         // Or the loop asserted nothing: the placements still EXIST, they simply cannot both be finished.
         Assert.True(reached >= 3, $"found only {reached} placements sharing a {footing[..^5]}'s machine leg");
+    }
+
+    /// <summary>
+    /// ITEM 7 - "it'd be nice for both the drive and tension stations if they could be put on either side of
+    /// the posts." THEY ALREADY CAN, and this is the derivation stated as an assertion so the block-info line
+    /// that now says so cannot start lying.
+    /// <para>
+    /// The machine leg is the crossarm's local +X on both stations, the passage is its local Z, and
+    /// <c>InitForUse(RotationFor(side))</c> turns the whole cell list together - so the two side variants
+    /// that share a bearing (north/south for a line running north to south, east/west for one running east
+    /// to west) have the SAME passage axis and put the leg on OPPOSITE sides of the posts. A player picks
+    /// between them by standing on the other side of the block when he places it, because
+    /// <c>BlockBehaviorHorizontalOrientable</c> takes <c>Block.SuggestedHVOrientation</c>. Nothing in the
+    /// world said so, which is the whole of the report: both variants read "the cabin will pass through
+    /// north to south" and nothing distinguished them.
+    /// </para>
+    /// <para>
+    /// So there is NO mirrored variant to add, and the enumeration
+    /// <see cref="ASharedMachineLegSatisfiesAtMostOneStation"/> already runs is already the enumeration over
+    /// the mirrors - all four sides at every reachable separation. A fifth variant, or a second variant group
+    /// crossed with <c>side</c>, would double the placements that test has to keep apart and double every
+    /// recipe, handbook group and creative entry, to reach placements these four already reach.
+    /// </para>
+    /// <para>
+    /// The passage really is an AXIS and not a direction on a ropeway, which is what makes the two
+    /// interchangeable: <c>SpanMath.AxisError</c> folds a bearing into [0, 90] against it and
+    /// <c>EntityRopewayCabin.SquareTo</c> takes whichever of its two yaws is nearer. The SHAFT is the
+    /// exception and is excluded from <c>MachineLegSide</c> for it - there the facing also lays the
+    /// counterweight's lane and <c>SpanMath.ShaftLinkFits</c> demands both footings share it.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("drivestation.json")]
+    [InlineData("tensionstation.json")]
+    public void AStationsMachineLegMirrorsWhenTheFootingIsPlacedFromTheOtherSide(string footing)
+    {
+        var offsets = Offsets(footing);
+
+        // The leg's own ground cell - the drive housing or the tension weight - is the one y = 0 cell that
+        // wants a block of ours; the other is the plain post column's vanilla wildcard.
+        var legFoot = offsets.Single(o => o.Y == 0 && Wanted(footing, o.W).StartsWith("ropeway:"));
+        Assert.Equal((3, 0), (legFoot.X, legFoot.Z));
+
+        (int X, int Z) Leg(string side)
+        {
+            var rad = BEPylonBase.RotationFor(side) * Math.PI / 180;
+            return ((int)Math.Round(legFoot.X * Math.Cos(rad) + legFoot.Z * Math.Sin(rad)),
+                    (int)Math.Round(-legFoot.X * Math.Sin(rad) + legFoot.Z * Math.Cos(rad)));
+        }
+
+        foreach (var side in new[] { "north", "east", "south", "west" })
+        {
+            var facing = BlockFacing.FromCode(side);
+            var opposite = facing.Opposite.Code;
+
+            // The two variants that share a passage axis put the leg on opposite sides of the posts, and the
+            // leg's cell is the exact negation - the same column, the other side.
+            Assert.Equal((-Leg(side).X, -Leg(side).Z), Leg(opposite));
+
+            // ...and the crossarm has not turned with it: both variants leave the passage on the same axis,
+            // so a line that one of them serves is served by the other.
+            Assert.Equal(facing.Axis, BlockFacing.FromCode(opposite).Axis);
+
+            // The direction BEPylonBase.MachineLegSide reports, derived the same way the engine transforms
+            // the cells rather than restated: one quarter turn clockwise of the passage facing.
+            var leg = facing.GetCW();
+            Assert.Equal((leg.Normali.X * 3, leg.Normali.Z * 3), Leg(side));
+        }
     }
 
     /// <summary>
@@ -2724,6 +2909,71 @@ public class RopewayAssetContractTests
         Assert.True(lowest >= 0,
             $"the shaft sheave reaches {lowest:0.00} units below its own cell, and the car passes under it");
         Assert.Equal(0.5, EntityRopewayCabin.DefaultHangDrop - SpanMath.CabinHalfHeight - 0.5, 9);
+    }
+
+    /// <summary>
+    /// ITEM 3'S LEGIBILITY HALF. The shaft head's geometry is exact at all four facings - the authored hub,
+    /// the rendered hub, both strands and the wrap arc all agree to the unit, and
+    /// <see cref="TheHeadSheaveWrapsTheRopeOntoBothStrandsAndClearsTheParkedCarsRoof"/> is what holds that.
+    /// What the author could still be looking at is the FRAME: the beam used to stop 6 units past the hub,
+    /// which carried the hanger and nothing else, while the wheel's own far swept edge is 23.04 out and the
+    /// counterweight's strand a full 24. The frame covered one strand, stopped 1.06 blocks short of the wheel
+    /// it is drawn to carry, and left the wheel and the return rope hanging in open air past the end of it -
+    /// which is a fair reading of "the rope isn't aligned with the wheel, it's off to the side".
+    /// <para>
+    /// It stays a cantilever off the one column pair, and that is not laziness: the only place a second pair
+    /// could stand is the lane, and the lane is the column the counterweight travels down.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheHeadframeStraddlesBothStrandsAndTheWheelItCarries()
+    {
+        var sheave = Load("shapes", "block", "shaftsheave.json");
+        var beam = Bounds(sheave, "beam");
+        var hubZ = 8 - BEBullwheel.ShaftWrapOut * 16;
+
+        // The going strand is on the shaft axis and the return strand a lane along, both a rope
+        // half-thickness either side of their own centre. The beam has to cover both.
+        var rope = BEPylonBase.CableRadius * 16;
+        Assert.True(beam.Max[2] >= 8 + rope,
+            $"the headframe's beam stops at z = {beam.Max[2]:0.##} and the going strand reaches {8 + rope:0.##}");
+        Assert.True(beam.Min[2] <= 8 - ShaftLane * 16 - rope,
+            $"the headframe's beam reaches z = {beam.Min[2]:0.##} and the counterweight's strand is at "
+            + $"{8 - ShaftLane * 16 - rope:0.##} - the frame stops short of the rope it is drawn to carry");
+
+        // ...and past the wheel's own far swept edge, or the wheel hangs off the end of its own beam. The rim
+        // is placed at the hub by BEBullwheel.WrapOffset's shaft branch, so its reach is measured from there.
+        var rim = Load("shapes", "block", "shaftrim.json");
+        var hub = BullwheelRenderer.RimPivotY * 16;
+        var reach = 0.0;
+        foreach (var element in rim.GetProperty("elements").EnumerateArray())
+        foreach (var y in new[] { element.GetProperty("from")[1].GetDouble(), element.GetProperty("to")[1].GetDouble() })
+        foreach (var z in new[] { element.GetProperty("from")[2].GetDouble(), element.GetProperty("to")[2].GetDouble() })
+        {
+            reach = Math.Max(reach, Math.Sqrt((y - hub) * (y - hub) + (z - 8) * (z - 8)));
+        }
+
+        Assert.True(beam.Min[2] <= hubZ - reach,
+            $"the beam reaches z = {beam.Min[2]:0.##} and the wheel it carries sweeps to {hubZ - reach:0.##}");
+
+        // The beam still clears the WRAP, which is the constraint it was first placed against: the arc runs
+        // at ShaftWrapOut from the hub with its own half-thickness on top, and the beam's underside is above
+        // all of it. Extending it along the lane cannot break this - the arc's highest point is over the hub,
+        // which the beam already spanned - but the number is what says so.
+        Assert.True(beam.Min[1] > hub + BEBullwheel.ShaftWrapOut * 16 + rope,
+            $"the beam's underside is at y = {beam.Min[1]:0.##} and the wrap's top at "
+            + $"{hub + BEBullwheel.ShaftWrapOut * 16 + rope:0.##}");
+
+        // And neither beam has grown into the wheel's own thickness band, which is what would put the frame
+        // inside the turning rim rather than either side of it.
+        var band = Bounds(rim);
+        foreach (var tag in new[] { "beamwest", "beameast" })
+        {
+            var one = Bounds(sheave, tag);
+            Assert.True(one.Max[0] <= band.Min[0] || one.Min[0] >= band.Max[0],
+                $"{tag} spans x {one.Min[0]:0.##}..{one.Max[0]:0.##} and the rim turns in "
+                + $"{band.Min[0]:0.##}..{band.Max[0]:0.##}");
+        }
     }
 
     /// <summary>

@@ -6,6 +6,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 using Vintagestory.GameContent.Mechanics;
 
 namespace Ropeway;
@@ -95,6 +96,68 @@ public class BEPylonBase : BlockEntity
             var dz = Pos.Z - peer.Z;
             var plan = Math.Sqrt(dx * dx + dz * dz);
             return plan < 1e-9 ? null : new Vec3d(dx / plan, 0, dz / plan);
+        }
+    }
+
+    /// <summary>
+    /// Which side of the tower this footing's MACHINE LEG stands on - the drive housing and its shaft column,
+    /// or the tension weight and its guides - and null on a plain tower, which has a post column on both
+    /// sides and no machinery on either.
+    /// <para>
+    /// A DERIVATION AND NOT A CHOICE, and this property exists because the choice was already there and
+    /// nothing said so. Every station's leg is the crossarm's local +X, the passage is its local Z, and
+    /// <c>InitForUse(RotationFor(side))</c> turns the whole cell list together - so the leg is one quarter
+    /// turn clockwise of <see cref="PassageFacing"/>, and the two variants that share a line's bearing
+    /// (north/south for a line running north-south, east/west for one running east-west) put it on OPPOSITE
+    /// sides of the posts. The mirrored station has shipped since stations did; what had not shipped was any
+    /// way for a player to know which of the two he was about to place, because both read
+    /// "the cabin will pass through north to south" and nothing else.
+    /// <c>AStationsMachineLegMirrorsWhenTheFootingIsPlacedFromTheOtherSide</c> holds the derivation against
+    /// the shipped offsets at all four facings, so this cannot start lying if the leg ever moves.
+    /// </para>
+    /// <para>
+    /// A SECOND blocktype, or a second variant group crossed with <c>side</c>, was the other way to offer
+    /// this and is what it would have cost: eight placements per station instead of four for
+    /// <c>ASharedMachineLegSatisfiesAtMostOneStation</c> to keep apart, a second code for
+    /// <see cref="OwnTheHeadCell"/> to narrow, and every recipe, handbook group and creative entry doubled -
+    /// to reach placements the four existing variants already reach.
+    /// </para>
+    /// <para>
+    /// Gated on <see cref="WearsABullwheel"/>, which is not a coincidence dressed as a predicate: the drive
+    /// and tension stations are exactly the two footings whose structure names <c>bullwheel-*</c> for the
+    /// crossarm centre (a plain tower names <c>pylonhead-*</c> and a shaft head <c>shaftsheave-*</c>), and
+    /// <c>AStationWearsTheBullwheelAndAPlainTowerWearsTheHead</c> pins that both ways. The SHAFT head is left
+    /// out deliberately even though it carries the same leg: its facing also lays the counterweight's lane
+    /// and <c>SpanMath.ShaftLinkFits</c> demands both footings share it, so a shaft's leg is not free to
+    /// mirror and telling a player it is would be worse than saying nothing.
+    /// </para>
+    /// </summary>
+    public BlockFacing MachineLegSide => WearsABullwheel ? PassageFacing.GetCW() : null;
+
+    /// <summary>
+    /// Which way the LINE runs at this tower - the unit tangent of the drawn path at this tower's own anchor,
+    /// which at a terminal is its single leg and at a through station is the corner's bisector. Null when
+    /// nothing is linked.
+    /// <para>
+    /// The SAME expression <see cref="OnTesselation"/> already takes the brackets and both rail cheeks across,
+    /// lifted to a property because the wheel needs it too: <see cref="BullwheelRenderer"/> took its
+    /// translation from the line and its rotation from the block's own <c>side</c> variant, which put the hub
+    /// on the rope and the groove plane on the nearest cardinal, up to 90 degrees apart. Pure -
+    /// <see cref="LocalLine"/> reads nothing but <see cref="Spans"/> and <see cref="Pos"/> - so it is as safe
+    /// on the tesselation thread as it is on the client tick that polls it.
+    /// </para>
+    /// <para>
+    /// Vertical on a SHAFT, where the peer is directly below and there is no bearing at all;
+    /// <see cref="BullwheelRenderer.YawAlong"/> is what refuses that rather than letting <c>Atan2(0, 0)</c>
+    /// answer due south.
+    /// </para>
+    /// </summary>
+    public Vec3d LineTangent
+    {
+        get
+        {
+            var line = LocalLine(out var me);
+            return line?.DirectionAt(line.Cumulative[me]);
         }
     }
 
@@ -472,16 +535,36 @@ public class BEPylonBase : BlockEntity
     }
 
     /// <summary>
+    /// Blocks from the footing at which a tower stops showing its own build guidance. Walking away is the
+    /// only way a player ever stops asking for it - nothing clears the overlay of a tower he did not go back
+    /// and click a second time - and before the ghosts landed that cost nothing, because a highlight cuboid
+    /// has no depth test and reads as a distant marker. A GHOST is a solid block standing in the air, so a
+    /// stale one reads as a tower somebody actually built. 24 is comfortably past the ~14 a player needs to
+    /// stand back far enough to see a whole 7-wide, 5-tall pattern at once.
+    /// </summary>
+    public const double GuidanceRange = 24;
+
+    /// <summary>
     /// The overlay is the primary build-guidance channel, so it has to follow the blocks the player is
     /// placing - a one-shot snapshot leaves ghost cells glowing on top of blocks that are already there.
     /// HighlightBlocks replaces the whole slot, so re-issuing it is the entire update. Idle until someone
-    /// has actually asked for highlights on this tower.
+    /// has actually asked for highlights on this tower, and done with it as soon as he finishes the tower or
+    /// walks out of <see cref="GuidanceRange"/>.
+    /// <para>
+    /// The plain <c>Pos.Y</c> and not <c>InternalY</c>: <c>EntityPos.Y</c> is a position WITHIN the entity's
+    /// own dimension while <c>BlockPos.InternalY</c> carries the dimension's 32768-block offset, so comparing
+    /// the two would put every tower in a pocket dimension permanently out of range. A player in a different
+    /// dimension from the tower cannot be looking at it anyway, and the horizontal terms still hold.
+    /// </para>
     /// </summary>
     private void OnClientTick500ms(float dt)
     {
         if (highlightFor == null) return;
 
-        if (IncompleteCount() == 0)
+        var eye = highlightFor.Entity?.Pos;
+        if (eye == null
+            || eye.SquareDistanceTo(Pos.X + 0.5, Pos.Y + 0.5, Pos.Z + 0.5) > GuidanceRange * GuidanceRange
+            || IncompleteCount() == 0)
         {
             ClearHighlights(highlightFor);
             return;
@@ -534,13 +617,203 @@ public class BEPylonBase : BlockEntity
             // client over build guidance.
             highlightFor = null;
             Api.Logger.Error("Ropeway: could not highlight tower at {0}: {1}", Pos, e.Message);
+            return;
         }
+
+        Ghost();
+    }
+
+    /// <summary>
+    /// The ghosts, refreshed off the same walk and the same tick as the coloured overlay. EMPTY cells only:
+    /// a wrong block is already standing there, so the wanted one drawn in the same cell would z-fight it
+    /// face for face and neither would be legible - vanilla reddens those, and red on a block you can see is
+    /// the whole message there.
+    /// <para>
+    /// Created lazily. A tower nobody has clicked never allocates a renderer, and a plain line of a dozen
+    /// finished towers has none at all.
+    /// </para>
+    /// </summary>
+    private void Ghost()
+    {
+        if (Api is not ICoreClientAPI capi) return;
+
+        try
+        {
+            var cells = new List<WantedCell>();
+            foreach (var cell in MissingCells())
+            {
+                if (cell.Empty && cell.Ghost != null) cells.Add(cell);
+            }
+
+            ghosts ??= new StructureGhostRenderer(capi, Pos);
+            ghosts.Cells = cells;
+        }
+        catch (Exception e)
+        {
+            // Same rule as the highlight above: a cosmetic aid must never take the client down. Dropping the
+            // renderer leaves the player with exactly the overlay he had before this shipped, and clearing
+            // highlightFor is what stops the 500 ms tick coming straight back for a second helping - a
+            // wildcard that resolves to nothing will fail every time it is asked.
+            DropGhosts();
+            highlightFor = null;
+            capi.Logger.Warning("Ropeway: could not ghost the tower at {0}: {1}", Pos, e.Message);
+        }
+    }
+
+    private void DropGhosts()
+    {
+        ghosts?.Dispose();
+        ghosts = null;
     }
 
     public void ClearHighlights(IPlayer byPlayer)
     {
         highlightFor = null;
+        DropGhosts();
         if (Api is ICoreClientAPI && byPlayer != null) highlightedStructure?.ClearHighlights(Api.World, byPlayer);
+    }
+
+    /// <summary>A cell of this tower's pattern that is not built yet, and the block that goes in it.</summary>
+    /// <param name="Pos">World position of the cell.</param>
+    /// <param name="Ghost">The one block to draw here, or null when there is no one block - see <see cref="Wanted"/>.</param>
+    /// <param name="Name">What to call that cell in the panel. Null when the wildcard resolves to nothing.</param>
+    /// <param name="Empty">Whether the cell is air. False means a WRONG block is standing in it.</param>
+    public readonly record struct WantedCell(BlockPos Pos, Block Ghost, string Name, bool Empty);
+
+    /// <summary>
+    /// Block number to (the block to ghost, the name to call it), resolved once per footing. Both halves are
+    /// a <c>SearchBlocks</c> wildcard scan, which is why this is cached rather than asked per cell per tick.
+    /// </summary>
+    private Dictionary<int, (Block Ghost, string Name)> wantedByNumber;
+
+    private StructureGhostRenderer ghosts;
+
+    /// <summary>
+    /// Every cell of this tower's pattern that does not hold what it wants, with the block that does.
+    /// <para>
+    /// Its own walk of <c>TransformedOffsets</c> rather than
+    /// <see cref="MultiblockStructure.InCompleteBlockCount"/>, and the reason is the engine's signature:
+    /// <c>PositionMismatchDelegate</c> is <c>(Block haveBlock, AssetLocation wantCode)</c> and never says
+    /// WHERE, which is the one thing a ghost needs. The wildcard it matches against comes out of
+    /// <see cref="MultiblockStructure.BlockNumbers"/> inverted, which is byte for byte what
+    /// <c>InitForUse</c> builds its own private <c>BlockCodes</c> from - so this walk and the engine's cannot
+    /// disagree about which cells are short, only about which of two wildcards sharing a number won, which
+    /// nothing in this mod has.
+    /// </para>
+    /// <para>
+    /// Client-side in practice (the ghosts and the block info panel), but it reads nothing client-only, so
+    /// nothing here has to branch on side.
+    /// </para>
+    /// </summary>
+    private List<WantedCell> MissingCells()
+    {
+        var cells = new List<WantedCell>();
+        var offsets = structure?.TransformedOffsets;
+        if (offsets == null || Api?.World == null) return cells;
+
+        var codes = new Dictionary<int, AssetLocation>();
+        foreach (var pair in structure.BlockNumbers) codes[pair.Value] = pair.Key;
+
+        foreach (var offset in offsets)
+        {
+            if (!codes.TryGetValue(offset.W, out var wildcard)) continue;
+
+            var pos = Pos.AddCopy(offset.X, offset.Y, offset.Z);
+            var here = Api.World.BlockAccessor.GetBlockRaw(pos.X, pos.InternalY, pos.Z);
+            if (WildcardUtil.Match(wildcard, here.Code)) continue;
+
+            var wanted = Wanted(offset.W, wildcard);
+            cells.Add(new WantedCell(pos, wanted.Ghost, wanted.Name, here.Id == 0));
+        }
+
+        return cells;
+    }
+
+    /// <summary>
+    /// What to DRAW in a cell wanting <paramref name="wildcard"/>, and what to CALL it.
+    /// <para>
+    /// ONE NAME OR NO GHOST, and that is the whole of the rule. A wildcard whose matches all share a name is
+    /// one block wearing four facings - the four <c>brace-*</c> variants are all "Ropeway Brace" - so there
+    /// is something honest to draw. A wildcard whose matches do NOT share a name is a cell the player
+    /// chooses the material for, which in this mod is exactly the post columns: an alternation over every
+    /// log, plank and dressed stone in the game. Drawing whichever acacia log the registry happened to
+    /// return first would read as a requirement rather than an example, so those cells get no ghost and keep
+    /// the coloured cuboid the vanilla overlay puts there - which is what "your material here" looks like -
+    /// and the panel names them "log, planks or dressed stone" instead of naming one wood. Decided by
+    /// walking the matches until two names differ, which for that wildcard is the second entry.
+    /// </para>
+    /// <para>
+    /// The ghost prefers this footing's own <c>side</c>, and it matters only because it is what gets drawn:
+    /// <c>SearchBlocks("ropeway:brace-*")[0]</c> is whichever variant registered first, and a north brace
+    /// ghosted on an east-facing tower stands a quarter turn out of the crossarm it is showing you how to
+    /// build. The three asymmetric heads are already narrowed to one variant by
+    /// <see cref="OwnTheHeadCell"/>, so for those this changes nothing.
+    /// </para>
+    /// <para>
+    /// ponytail: the ghost is the block's PLACED mesh and nothing else, so a cell whose block draws part of
+    /// itself per frame ghosts without that part - a bullwheel shows its cheeks and bearings and no rim,
+    /// because the rim is <see cref="BullwheelRenderer"/>'s and there is no block entity in an empty cell to
+    /// own one. Spinning ghost wheels is not worth a second renderer; the silhouette already says bullwheel.
+    /// </para>
+    /// </summary>
+    private (Block Ghost, string Name) Wanted(int number, AssetLocation wildcard)
+    {
+        wantedByNumber ??= new Dictionary<int, (Block, string)>();
+        if (wantedByNumber.TryGetValue(number, out var cached)) return cached;
+
+        var matches = Api.World.SearchBlocks(wildcard);
+        var resolved = ((Block)null, (string)null);
+
+        if (matches.Length > 0)
+        {
+            var ghost = matches[0];
+            foreach (var match in matches)
+            {
+                if (match?.Variant["side"] != side) continue;
+                ghost = match;
+                break;
+            }
+
+            var name = new ItemStack(ghost).GetName();
+            foreach (var match in matches)
+            {
+                if (new ItemStack(match).GetName() == name) continue;
+                name = Lang.Get("ropeway:cell-any");
+                ghost = null;
+                break;
+            }
+
+            resolved = (ghost, name);
+        }
+
+        wantedByNumber[number] = resolved;
+        return resolved;
+    }
+
+    /// <summary>
+    /// What the player still has to place, as counts by block name. The panel used to print the bare number
+    /// <c>InCompleteBlockCount</c> returns - "15 blocks missing" - and left him to read fifteen coloured
+    /// boxes and guess which. Ordered by the structure's own cell list, so a station's crossarm reads left to
+    /// right and its leg top to bottom, the order the overlay is standing in.
+    /// </summary>
+    private List<(string Name, int Count)> MissingByName()
+    {
+        var order = new List<(string, int)>();
+        var index = new Dictionary<string, int>();
+
+        foreach (var cell in MissingCells())
+        {
+            if (cell.Name == null) continue;
+
+            if (index.TryGetValue(cell.Name, out var at)) order[at] = (cell.Name, order[at].Item2 + 1);
+            else
+            {
+                index[cell.Name] = order.Count;
+                order.Add((cell.Name, 1));
+            }
+        }
+
+        return order;
     }
 
     /// <summary>
@@ -708,6 +981,12 @@ public class BEPylonBase : BlockEntity
 
         if (rope == null) return replacedDefault;
 
+        // Which SIDE of the tower this iteration is drawing, 0 or 1 - not the peer index, which on a
+        // three-tower mini-line is 0 and 2 and so has the same parity twice. It only decides which end of
+        // JointPhase's alternation each run starts on: both sides leave the sheave from the same point, so
+        // their first boxes are coplanar until one of them is drawn a fiftieth of a unit thinner. See BuildRun.
+        var phaseFrom = 0;
+
         for (var peer = 0; peer < line.Towers.Length; peer++)
         {
             if (peer == me) continue;
@@ -728,9 +1007,13 @@ public class BEPylonBase : BlockEntity
             // cabin sweeps every point a ramp could occupy at any span length. What ends the strand at such
             // a tower instead is the shoe it has been riding all along; see ReturnLift.
             var going = HalfSpanPath(line, me, peer);
-            Emit(mesher, BuildRun(going, CableRadius, CableRadius, rope));
-            Emit(mesher, BuildRun(Lift(going, ReturnLift), CableRadius, CableRadius, rope));
-            if (metal == null) continue;
+            Emit(mesher, BuildRun(going, CableRadius, CableRadius, rope, phaseFrom: phaseFrom));
+            Emit(mesher, BuildRun(Lift(going, ReturnLift), CableRadius, CableRadius, rope, phaseFrom: phaseFrom));
+            if (metal == null)
+            {
+                phaseFrom ^= 1;
+                continue;
+            }
 
             // Both cheeks of the slot, from one function, off the same curve. Every authored rail element is
             // gone from both head shapes and none is replaced: a rail drawn ON the path opens by exactly the
@@ -742,8 +1025,9 @@ public class BEPylonBase : BlockEntity
             // runs along under the braces rather than out through the archway - the two would be one plane
             // for the whole 3.5-block reach of the crossarm. Same trick and same reason as JointPhase.
             var depth = RailHalfDepth - JointPhase;
-            Emit(mesher, BuildRun(RailPath(line, me, peer, RailOffset), RailHalfWidth, depth, metal));
-            Emit(mesher, BuildRun(RailPath(line, me, peer, -RailOffset), RailHalfWidth, depth, metal));
+            Emit(mesher, BuildRun(RailPath(line, me, peer, RailOffset), RailHalfWidth, depth, metal, phaseFrom: phaseFrom));
+            Emit(mesher, BuildRun(RailPath(line, me, peer, -RailOffset), RailHalfWidth, depth, metal, phaseFrom: phaseFrom));
+            phaseFrom ^= 1;
         }
 
         // The wrap, and everything that carries the wheel to wherever the LINE has put it. A property of the
@@ -1022,16 +1306,25 @@ public class BEPylonBase : BlockEntity
     /// way - the face count the chunk tesselator loops over, the colour maps it indexes per face, the
     /// flat-sampled UV that stopped the striping - is solved once here and inherited rather than copied.
     /// Null when nothing survives the degenerate check.
+    /// <para>
+    /// <paramref name="phaseFrom"/> is which end of <see cref="JointPhase"/>'s alternation the run STARTS on,
+    /// and it exists for the joint the alternation cannot see: the two runs a two-span tower draws leave the
+    /// sheave from the same point in different directions, so their first boxes overlap in plan and - both
+    /// being box 0 - present their up and down faces in one plane. Measured off the corner tower this
+    /// paragraph was written for: four pairs (cable, return strand and both rail cheeks), 0.028 to 0.031
+    /// unit^2 each, which is one JointPhase joint's worth apiece. Invisible until the mesh plumbing was fixed,
+    /// because a corner tower used to draw nothing at all.
+    /// </para>
     /// </summary>
     public static MeshData BuildRun(
         IReadOnlyList<Vec3d> points, float radiusX, float radiusY, TextureAtlasPosition texPos,
-        bool turnsVertically = false)
+        bool turnsVertically = false, int phaseFrom = 0)
     {
         if (points == null) return null;
 
         MeshData run = null;
         var start = 0;
-        var emitted = 0;
+        var emitted = phaseFrom;
         for (var i = 1; i < points.Count; i++)
         {
             // Collinear samples become ONE longer box. Not a micro-optimisation: the window is sampled
@@ -1149,6 +1442,33 @@ public class BEPylonBase : BlockEntity
         // normalising to 0..1 instead would smear one 32x32 sprite over the whole span.
         Array.Fill(mesh.Uv, 0.5f);
         mesh.SetTexPos(texPos);
+
+        // ...and THIS is what lets a run be more than one box. The three per-face side arrays above are
+        // allocated (6 long) and filled, but their *Count fields are still 0: GetCube never sets
+        // TextureIndicesCount, SetTexPos writes TextureIndices[0..Length) without touching it, and
+        // WithColorMaps sizes the two colour-map arrays without touching ColorMapIdsCount either. Only
+        // XyzFaces has a real count, because AddXyzFace maintains one.
+        //
+        // MeshData.AddMeshData - which BuildRun calls once per extra box - copies each side array by its
+        // *Count and NOT by its Length (MeshData.addMeshDataEtc, 1.22.1 MeshData.cs:1028-1046). So a run of
+        // N boxes reached the chunk tesselator with XyzFacesCount = 6N and 6-long side arrays, and
+        // JsonTesselator.AddJsonModelDataToMesh indexes TextureIndices[l] and Season/ClimateColorMapIds[l]
+        // for l < XyzFacesCount - IndexOutOfRangeException at l = 6, on the tesselation thread, caught and
+        // logged per block entity by JsonTesselator.Tesselate. Vertices commit per face, so box 1 survived
+        // on screen and every later box AND every later run of that OnTesselation call was never built.
+        // In the world that was: a corner tower (29-30 boxes per run) drew nothing at all, a terminal lost
+        // its wrap past the first stub and both brackets with it, and a straight tower - whose runs are one
+        // box each, the one case where 6 faces and a 6-long array line up - looked perfect. Hence "mostly
+        // worked", "half of it disappears" on a chain, "the top rope doesn't reach the bullwheel", and a
+        // bend that has always been correct and has never once been drawn.
+        //
+        // Assigned rather than Add*()-ed: the arrays are already populated, and AddColorMapIndex/AddTextureId
+        // would append a SECOND six. One box is always six faces, so XyzFacesCount is the count all three
+        // share. EveryBoxOfARunCarriesTheSideArrayEntriesTheTesselatorIndexesPerFace is what holds this shut,
+        // over 2-, 9- and 30-box runs - the shipped test for this failure class asserted exactly the right
+        // thing on BuildHalfCable, which is the ONE-box case and the only case that was ever right.
+        mesh.TextureIndicesCount = mesh.XyzFacesCount;
+        mesh.ColorMapIdsCount = mesh.XyzFacesCount;
         return mesh;
     }
 
@@ -1319,6 +1639,7 @@ public class BEPylonBase : BlockEntity
     private void Forget()
     {
         highlightFor = null;
+        DropGhosts();
         if (Api is ICoreClientAPI capi) highlightedStructure?.ClearHighlights(Api.World, capi.World.Player);
 
         var modSystem = ModSystem;
@@ -1342,6 +1663,16 @@ public class BEPylonBase : BlockEntity
             var missing = Math.Max(0, IncompleteCount());
             dsc.AppendLine(Lang.Get("ropeway:tower-incomplete", missing));
 
+            // ...and WHICH blocks, which is the half the number never carried. A count sends the player to
+            // the overlay, and the overlay is fifteen translucent cuboids in the wanted block's average
+            // colour - it says where, it cannot say what, and vanilla's highlight API has no shape option
+            // that could (see StructureGhostRenderer). This is the naming channel and the ghosts are the
+            // spatial one; either alone still leaves a guess.
+            foreach (var (name, count) in MissingByName())
+            {
+                dsc.AppendLine(Lang.Get("ropeway:tower-missing-cell", count, name));
+            }
+
             // The frame is one block deep and symmetric, so nothing about a placed footing shows which way
             // its crossarm will go until the braces are up. Naming the passage axis is what lets a player
             // face the tower down the line BEFORE building it rather than after.
@@ -1349,6 +1680,21 @@ public class BEPylonBase : BlockEntity
                 "ropeway:blockinfo-passage",
                 Lang.Get("game:facing-" + PassageFacing.Code),
                 Lang.Get("game:facing-" + PassageFacing.Opposite.Code)));
+
+            // ...and WHICH SIDE the machinery goes, which the passage line alone cannot say: the two variants
+            // that share a bearing read identically there and put the leg on opposite sides of the posts. It
+            // is the one build decision a station offers that nothing in the world showed - the answer was
+            // "stand on the other side of the footing and place it again", and a player has no way to guess
+            // that from a block whose two faces are the same. See MachineLegSide.
+            var leg = MachineLegSide;
+            if (leg != null)
+            {
+                dsc.AppendLine(Lang.Get(
+                    "ropeway:blockinfo-machineleg",
+                    Lang.Get("game:facing-" + leg.Code),
+                    Lang.Get("game:facing-" + leg.Opposite.Code)));
+            }
+
             return;
         }
 

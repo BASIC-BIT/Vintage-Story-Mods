@@ -1,19 +1,37 @@
 # Ropeway v0.1 — in-game QA script
 
-Manual operator checklist. One in-game session has happened: the mod loaded clean, and it produced the
-four findings the previous round fixed — cabin built across the travel axis, cable rendering nothing, the
-picker showing only link candidates, and no way to name a tower.
+Manual operator checklist. Two in-game sessions have happened. The first produced four findings — cabin
+built across the travel axis, cable rendering nothing, the picker showing only link candidates, and no way
+to name a tower — all fixed rounds ago. The second is what THIS round answers, and it is the paragraph
+below.
 
-**THIS ROUND ADDED A SECOND MACHINE: THE SHAFT** — a counterweighted lift that goes straight up
+**THIS ROUND IS THE SECOND IN-GAME SESSION'S EIGHT FINDINGS, AND THREE OF THEM WERE ONE BUG**
+([KNOWN-ISSUES.md](KNOWN-ISSUES.md) "A run of more than one box"). *"Half of it disappears"* on a chain,
+*"the top rope doesn't extend all the way to the bullwheel"*, and *"the rails and travel path really should
+generate a curve"* were the same missing pair of assignments in `BuildRun`: any drawn run longer than **one
+box** threw on the tesselation thread and was silently dropped, which is every corner tower, every wrap and
+every rail — and left the one case that was always right, a straight tower's single-box run, looking
+perfect. **The bend was never missing; it had never once reached the screen.** So the loudest thing to check
+this round is a shape you have never seen in game, and it is checked at **16** (a chain), **11c** (the wrap
+reaching the wheel) and **12b** (the curve, from above). The other five: the wheel's groove now stands in
+the plane the LINE runs in rather than on the nearest cardinal (**27c-wheel**); a shaft's headframe now
+spans both strands instead of stopping short of the wheel it carries (**1b**, **28c**); an unfinished tower
+draws the **actual blocks** it is short of and its panel **names** them (**5**, **7**); a station footing
+says which side its machine leg goes and how to mirror it (**5**, **11**); and the handbook leads each
+structure with a bill of materials (**3**). If you are holding a copy whose step 5 says *"15 translucent
+ghost cells"* and nothing about see-through blocks, it is stale.
+
+**The round before added a second machine: THE SHAFT** — a counterweighted lift that goes straight up
 (`ELEVATOR-DESIGN-2.md`, `ELEVATOR-CHALLENGE-2.md`, and [KNOWN-ISSUES.md](KNOWN-ISSUES.md) "The shaft").
-Three new blocks, **eleven placed against a ropeway pair's thirty**, one car and one counterweight on an
+Three new blocks, **eleven placed against a ropeway pair's thirty-two**, one car and one counterweight on an
 **open** rope — car, head sheave, counterweight, and no loop. **It is a whole second walk and it lives at
 step 28**, after the power step, because a shaft cannot be ridden until you can run a mill; that is the walk
 order and not an appendix. Steps **1**, **1b**, **2**, **3** and **6** carry its build-time checks, and
 **0** carries its migration line. If you are holding a copy whose step 1b says *fifteen blocks*, it is stale.
-**Nothing about the ropeway changed**, and that is itself the biggest thing to check: every ropeway step
-below is unaltered and every one of them still has to pass. A horizontal line that behaves differently from
-last round is a regression, not a shaft.
+**Nothing about the ropeway changed *for the shaft*** — that was the claim that round was checked against,
+and 28h is where it is still checked. It is not the claim of the round above: the mesh fix, the wheel's yaw
+and the ghosts all reach a horizontal line on purpose, and the shaft inherits the first two rather than the
+other way round.
 
 **The round before made the haul rope a LOOP** (`STACKED-LOOP-SPEC.md`, and
 [KNOWN-ISSUES.md](KNOWN-ISSUES.md) "The haul rope is a LOOP"). Two strands stacked **1.33 blocks** apart —
@@ -45,6 +63,10 @@ asserted by `renders/scenes/gen_manifests.py` and `RopewayAssetContractTests.The
 **Walked front to back again on 2026-08-10 for the shaft**, which is how its build-time checks ended up
 inside steps 0, 1, 1b, 2, 3 and 6 and its ride at 28 — after the mill, because a shaft with no drive is a
 step you cannot finish.
+**Walked front to back again on 2026-08-11 for the second in-game session**, which is how its eight findings
+ended up inside steps 1b, 3, 4, 5, 7, 10b, 11, 11c, 12b, 27c-wheel and 28c rather than in an appendix — and
+why 10b and 12b now say what a chain and a corner have to look like, having never been looked at with the
+mesh actually reaching the screen.
 See [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for what source review already found and did not fix.
 
 
@@ -95,6 +117,14 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    **FAIL:** a crash on load, a tower that lost its spans, or a cable that stopped being drawn.
    **Also still true from the round before:** a world with towers older than the ground footing carries one
    *"Failed loading blockentity PylonHead …"* line per old tower and those towers are inert decoration.
+   **THIS ROUND NEEDS NO MIGRATION EITHER, AND ONE THING WILL LOOK LIKE A NEW BUILD.** Nothing this round
+   persists anything: the mesh fix, the wheel's yaw and the ghosts are all drawn per tesselation or per
+   frame. **PASS:** an old world's **corner** towers come back carrying rope and rails they have never
+   drawn before, and its terminals' wraps finish at the wheel. That is not a line that changed — it is the
+   line that was always described, arriving on screen for the first time (step 16). **PASS:** every
+   bullwheel on a line that does not run down a cardinal has turned to stand square to its rope, and the
+   crossarm, the brackets and the strands are all where they were. **FAIL:** a span that DID draw yesterday
+   draws less today, or a tower reads incomplete.
    **THE SHAFT NEEDS NO MIGRATION AT ALL, and that is the check.** It is three new blocktypes and no change
    to any persisted field: nothing on an existing line reads the `shaft` attribute, and `RopewayLine.IsShaft`
    is derived from the towers rather than saved. **PASS:** an old world comes back with every span, name,
@@ -153,6 +183,17 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    running east to where a lay shaft would be. All of that hangs **outside** its own cell — the block itself
    is a two-unit bedplate you can stand on with a hole down the middle. **PASS:** the wheel turns only when a
    shaft's drive is running (step 28), so on a bare block in creative it stands still.
+   **PASS — the top beam SPANS BOTH STRANDS, new this round, and this is the third reported finding.** The
+   pair of bars across the top of the headframe runs about **three and a quarter blocks** along the facing:
+   from over the shaft's own axis, where the car's rope comes up, out past the counterweight's lane three
+   blocks away, with the **wheel slung under the middle of it**. **FAIL, and this is the exact report:**
+   *"on the elevator gantry thing the rope isn't aligned with the wheel, it's off to the side"* — the beam
+   is a stub about two blocks long, it covers the car's strand and stops **short of the wheel it is drawn to
+   carry**, and the wheel and the counterweight's rope hang in open air past the end of it. It is a
+   cantilever off the one column pair either way, and that is deliberate: the only place a second pair could
+   stand is the lane, and the lane is the column the counterweight travels down. Pinned by
+   `TheHeadframeStraddlesBothStrandsAndTheWheelItCarries`; renders in
+   `docs/agentic/ingest/cablecar/renders/qa1/shaft-front-before-vs-after.png`.
    **FAIL:** the wheel or the rope arc draws the magenta checker. Those three shapes — the rim, the
    counterweight and the strand — are tesselated against this BLOCK's texture map and never their own, so a
    key that moved on one side and not the other fails here and in no test.
@@ -247,6 +288,18 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    *Power and the Drive* and, new this round, *Sinking a Shaft* — the `<itemstack>` renders spin, and every
    link between them works, including 50 → 51 → 52, 50 → 53, and every page's way back. **PASS:** the
    overview page describes a footing and one crossarm, not two gantries.
+   **PASS — every structure leads with a BILL OF MATERIALS, as bullets, before the prose that explains it,
+   new this round.**
+   Page 50 heads its build section *"A plain tower is sixteen blocks"* and lists 1 footing, 8 posts, 6 braces,
+   1 pylon head; page 52 does the same for the drive and the tension station; page 53 for the shaft's two
+   ends, top and bottom, and prices it at *"eleven placed blocks, against thirty-two for a pair of ropeway
+   stations"*. **PASS:** you can shop from the bullets without reading a sentence, which is the point of them
+   — the prose after each list is build ORDER and warnings, not the parts list.
+   **FAIL:** a count in a bullet disagrees with what the tower actually asks for at step 5. That one cannot
+   survive a build: `RopewayAssetContractTests.TheHandbooksBillOfMaterialsIsTheShippedCellList` derives every
+   bullet and every total from the shipped `multiblockStructure` and asserts them verbatim against the page,
+   so a cell that moves takes the page with it. What the test does **not** read is the prose, so judge that
+   here.
    **PASS — page 53 tells the player when NOT to build one.** Its second paragraph has to say, in words a
    player can act on, that a **70-degree ropeway span up a cliff** keeps the view, needs no new blocks and
    costs half the rope — but gains height at only about **half** a shaft's rate on a four-sail mill — and
@@ -320,16 +373,45 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    turns to face you.
 
 5. **Read the guidance.** Look at the footing. **PASS:** the block-info panel says
-   *"Tower is not complete, 15 blocks missing or wrong."* followed by *"The cabin will pass through
-   \<direction\> to \<the opposite direction\>"*. **PASS:** those two directions are the axis you were
-   standing on when you placed it — the crossarm goes across them. Turn the footing (break and replace
-   facing the other way) and check the line changes with it; this is the only orientation cue there is,
-   and building the crossarm 90° out is a tower no line can pass through.
+   *"Tower is not complete, 15 blocks missing or wrong."* followed, **new this round**, by the list of what
+   those fifteen are, one line per kind, with counts, in the structure's own cell order — crossarm first,
+   then the columns:
+   *"- 1 x Pylon Head"*, *"- 6 x Ropeway Brace"*, *"- 8 x Post block - log, planks or dressed stone"*.
+   **PASS:** the counts add up to the number on the line above them, and they come down as you build. **FAIL:**
+   the bare count with nothing under it — that is the panel before this round, and it sent the player to an
+   overlay that can say *where* and cannot say *what*.
+   **PASS:** the post line names a **choice of materials** rather than one wood. Every other line names one
+   block, because every other cell wants one block.
+   Then *"The cabin will pass through \<direction\> to \<the opposite direction\>"*. **PASS:** those two
+   directions are the axis you were standing on when you placed it — the crossarm goes across them. Turn the
+   footing (break and replace facing the other way) and check the line changes with it; this is the only
+   orientation cue there is, and building the crossarm 90° out is a tower no line can pass through.
+   **A station footing carries a third line here**, naming which side its machine leg goes — checked at
+   **11**, because you have not placed one yet.
    Right-click the footing. **PASS:** a red toast with the same missing-block message, and **15**
-   translucent ghost cells light up above and around it — a seven-wide row four blocks up and two
+   translucent highlight cells light up above and around it — a seven-wide row four blocks up and two
    four-block columns under its ends — the colour of the block wanted where the cell is empty, red where
-   the wrong block sits. **PASS:** no ghost cell anywhere in the five columns directly above the footing;
-   that is the archway the cabin goes through.
+   the wrong block sits.
+   **PASS — and standing in those cells, new this round, is the tower itself.** Each empty cell grows a
+   **see-through copy of the actual block that goes in it**, full size, in place, lit by its own cell:
+   a pylon head with its mast and saddle in the middle of the crossarm, six braces beside it, and you can
+   read the shape of the tower before you own a single block of it. **PASS:** the ghosts are obviously
+   ghosts — about half solid, never mistakable for a block already placed.
+   **PASS — the two post columns are the exception and stay plain coloured boxes.** That is deliberate and
+   is not a missing ghost: a post cell takes any log, plank or dressed stone, and drawing one acacia log
+   there would read as a requirement. A coloured box is what "your material here" looks like, and the panel
+   line above says the same thing in words.
+   **PASS — a cell with the WRONG block in it gets no ghost either**, only the red highlight. There is a
+   block already standing there to look at, and a ghost drawn inside it would z-fight it face for face.
+   **PASS:** no ghost and no highlight anywhere in the five columns directly above the footing; that is the
+   archway the cabin goes through.
+   **PASS — walk away.** At about **24 blocks** the whole thing — ghosts and highlights together — switches
+   off; walk back and click again to bring it back. **FAIL:** the ghosts stay lit across the valley. Nothing
+   clears the overlay of a tower you clicked and then abandoned, and a stale ghost at range reads as a tower
+   somebody actually built.
+   **PASS:** this is all client-side dressing. Nothing here appears in `server-main.log`, and a
+   `Ropeway: could not ghost the tower at …` warning in `client-main.log` is a FAIL to report — the tower
+   should still be usable, with the coloured boxes alone, which is the point of that fallback.
 
 6. **Open the guide.** Sneak (hold Shift) and right-click the footing with an empty hand.
    **PASS:** the "Ropeway Tower" dialog opens; **seven** cells turn in 3D — pylon footing, **drive station
@@ -340,6 +422,11 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    **PASS:** the text has a *"Making it move"* paragraph, and it names the two **stations** and the seven
    machine-leg blocks. **FAIL:** it mentions **eight blocks** or a housing standing beside the tower; that
    is the deleted rule, and the guide is the last place still saying so if it does.
+   **PASS — the guide describes the GHOSTS, new this round**, in the same terms step 5 checks: right-click
+   the footing and the rest of the tower appears around it as see-through copies, the panel lists them with
+   counts, a post cell gets a plain coloured box because the material is yours to pick, and a wrong block is
+   lit red. **FAIL:** it still says the overlay lights every cell "in the wanted block's own colour" and
+   stops there — that describes the coloured boxes alone, and a player who reads it goes on guessing.
    **FAIL modes to report:** cabin invisible (renderer/tesselation), cabin clipped out of the inset
    (the size/offset knob in §4.6), a `Ropeway: could not build the guide cabin preview` log line.
    **EXPECTED and not a bug to file: sneak + right-click on a SHAFT footing opens this same tower guide**,
@@ -354,10 +441,18 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    wide to five. That extra pair of braces used to be the one thing in the station-rail work that cost the
    player anything, because six braces did not divide by a yield of four; the yield is eight now, so a
    whole tower's seven braces are one craft with one over and the widening is free.
-   **PASS:** each ghost cell disappears within ~0.5 s of you filling it, **without re-right-clicking** —
-   this is the live-overlay fix; a stale ghost sitting on top of a placed block means it regressed.
-   The count in the block-info panel counts down, and within ~1 s of the last block the panel reads
-   *"Tower complete / Spans: 0/2"* and every remaining highlight clears itself.
+   **PASS:** each cell's highlight **and its ghost** disappear within ~0.5 s of you filling it, **without
+   re-right-clicking** — this is the live-overlay fix; a stale ghost sitting on top of a placed block means
+   it regressed, and now that the ghost is a solid-looking block that failure would be much worse than it was.
+   The count in the block-info panel counts down **and so does the named list under it** — the brace line
+   reads 6, then 5, then 4 — and within ~1 s of the last block the panel reads *"Tower complete / Spans: 0/2"*
+   and every remaining highlight and ghost clears itself.
+   **PASS — the ghosts are drawn in THIS tower's facing.** Build an **east**-facing tower and look at the
+   crossarm ghosts: they run along the crossarm with it, not a quarter turn out of it. **FAIL:** they stand
+   square to the world on every tower — that is `SearchBlocks(...)[0]`, whichever variant registered first,
+   being drawn regardless. (The brace you then place may land in a different facing, because the structure
+   accepts all four and takes whichever way you were standing. That is not a ghost fault and is not this
+   check; the ghost's job is to show you the crossarm, not to constrain it.)
    **PASS:** the posts stand **on the ground**, level with the footing — no gap under them. A tower whose
    legs start one block up is the "posts three tall" mistake and means the offsets moved.
    **PASS:** the tower is **one block deep**. There is no second gantry and nothing behind it.
@@ -372,9 +467,10 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
    must satisfy the structure. Then swap a post block for each of the remaining six accepted families in
    turn — debarked log, planks, raw stone (`rock-*`), cobblestone, drystone, polished rock — and check the
    count does not go up. **PASS:** a **stone brick slab**, a **stairs block**, **soil** or a chiselled block
-   in a post cell counts as *wrong* (red ghost) — the list is structural columns, not "anything".
-   **PASS:** the ghost colour for an empty post cell is still legible against the sky; it is the colour of
-   whichever accepted block the game lists first, not necessarily a log any more.
+   in a post cell counts as *wrong* (red highlight) — the list is structural columns, not "anything".
+   **PASS:** the box colour for an empty post cell is still legible against the sky; it is the colour of
+   whichever accepted block the game lists first, not necessarily a log any more. A post cell is the one
+   kind that never grows a ghost — see step 5.
 
 7b. **The crossarm meets the posts.** Stand back and look at the joint where an outer crossarm cell lands on
    a post.
@@ -437,6 +533,10 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      **FAIL:** nothing there at all. That is the silent-mesh bug — `CubeMeshUtil.GetCube` hands back a mesh
      with `XyzFacesCount == 0` and the chunk tesselator's emit loop never runs, so the cable is dropped with
      no exception and no log line. Nothing in either log will tell you; only looking will.
+     **A straight span is the one case that has ALWAYS drawn**, and that is worth knowing before you trust a
+     PASS here. Collinear samples collapse into one box, so every run at a straight tower is a single box —
+     the one length the *other* mesh fault, the one this round fixed, could not reach. This step passing
+     says nothing about a corner or a wrap; **16** and **11c** are where those are checked.
      Then **quit to menu and reload the world**, and (multiplayer) have a **second player who did not build
      the line** walk up to it. **PASS:** the cable is there for them too, straight away.
      **PASS — the cable's colour.** It is one flat rope-brown along its whole length, the same at both ends
@@ -518,14 +618,34 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
       fifteen recipes. **FAIL:** either grid does not craft, or a station footing turns out to want
       something step 2's bill did not buy.
       Place the **drive station footing** in tower 1's spot facing the same way, and re-link;
+    - **read the footing before you build on it, new this round, and this is the third of the two station
+      lines it now prints.** A station footing's block-info panel says *"The machine leg goes on the
+      \<side\> side. To put it \<the other side\> instead, break this footing and place it again standing on
+      the other side of it - the cabin still passes the same way."*
+      **PASS — try it, because it is the whole point.** Break the footing, walk round to the far side of the
+      spot and place it again from there. The passage line is **unchanged** (the two facings that share a
+      bearing pass the cabin the same way), and the machine-leg line has flipped to the other side. Build the
+      leg and it stands on the other side of the posts, mirrored, still one span of the same line.
+      **FAIL:** both facings put the leg on the same side, or the passage line changes too. **FAIL:** the
+      line is missing, or a **plain** footing prints one — a plain tower has posts on both sides and no
+      machinery on either, and a **shaft** footing deliberately does not print it because its facing also
+      lays the counterweight's lane and is not free to mirror.
+      This is the answer to *"it'd be nice if the drive and tension stations could be put on either side of
+      the posts"*: they always could, all four facings shipped from the start, and nothing in the world said
+      so — both facings of a bearing read *"the cabin will pass through north to south"* and stopped there.
+      Pinned by `AStationsMachineLegMirrorsWhenTheFootingIsPlacedFromTheOtherSide`;
     - build its crossarm: three braces on the plain side, a **bullwheel** in the middle instead of the pylon
       head, two **lay shafts** running out to the machine leg, a **drive head** on the crossarm end, three
       **drive shafts** below it and a **drive housing** on the ground;
     - do the same at tower 2: break its footing, craft the **tension station footing** out of the pylon
       footing that comes back, place it, re-link, then a **tension head**, three **tension guides** and a
       **tension weight** on the ground;
-    - right-click each footing as you go — the overlay lights every cell that is still missing, in the
-      wanted block's own colour, and that is faster than counting;
+    - right-click each footing as you go — the whole machine leg stands there as see-through copies of the
+      blocks themselves, drive housing, three shafts, drive head and both lay shafts, and the panel names
+      them with counts. On a station that is worth more than it is on a plain tower: **seven machine-leg
+      blocks** you have never placed before, and *"- 3 x Ropeway Drive Shaft"*, *"- 1 x Ropeway Drive Head"*
+      in the panel with the shapes standing in the right cells is the difference between building it and
+      looking it up (step 5);
     - then run a mill into the drive housing, **following 27c**.
       Give it **five** sails, not three, and **pin the weather now** — `/weather acp false`, *then*
       `/weather setw strongbreeze`.
@@ -575,6 +695,14 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      wheel is what sets them apart.
      **PASS:** the wheel is carried on **two brackets** running from its bearings on the sheave cheeks out
      and down to its hub, so nothing floats.
+     **PASS — THE WHOLE HALF-TURN IS THERE, and this is the second reported finding.** Follow the rope with
+     your eye from the going strand all the way round to the return strand: it is one continuous arc of nine
+     segments, and the **upper strand reaches the wheel** rather than ending somewhere over the crossarm.
+     **FAIL, and this is the exact report:** *"the top rope doesn't extend all the way to the bullwheel"* —
+     the arc has one stub at the bottom and nothing after it, and **both brackets are missing too**, because
+     they are drawn after the wrap in the same pass and the pass had already died. That is the same
+     multi-box fault as step 16; if the brackets are there and only the rope is short, it is something else
+     and worth its own report.
      **FAIL:** the rope makes a closed **hoop** round the wheel with one strand leaving (that is the old
      drawing, before the loop), or the upper strand leaves at a tangent that misses the top of the wheel, or
      the rope leaves the wheel and stops in mid air short of the tower.
@@ -707,7 +835,20 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
      **FAIL:** the cabin **holds one fixed heading** across the tower and then steps to the next in one tick -
      a crab-walk that drags its tail through the post on the outside of the bend. That is the reverted
      angle-station law, and it looks nothing like a continuous sweep.
-     **PASS — the loop does not scissor at the corner, new this round, and the view is from ABOVE.** Fly up
+     **PASS — THE CORNER IS A CURVE, AND THIS IS THE FIRST ROUND IT HAS EVER BEEN DRAWN.** Fly up over the
+     middle tower of the gentle bend and look straight down. The rope does **not** meet itself at a hard
+     angle over the sheave: it comes in on one leg's bearing, sweeps through the corner over about four
+     blocks either side of the tower, and leaves on the other leg's. Both rail bars do the same thing beside
+     it, because they are sampled off the same curve — so at a corner the slot they make **opens** by
+     exactly as much as the cabin arrives crooked. **FAIL:** two straight lines meeting in a kink, or a
+     corner tower drawing nothing at all.
+     **Read this one carefully before filing it.** The bend has been in the mod since the station rails
+     landed, and `ACornerTowersDrawnHalfSpanIsTheBentCurveAndNotItsChord` has passed the whole time — a
+     corner half-span is 29-30 boxes, and until this round a run of more than one box was thrown away on the
+     tesselation thread with no exception a player could see. So *"it looks so weird right now without it"*
+     was a correct report of a feature that existed, was correct, and had never once reached the screen.
+     If this step fails, the question is not whether the bend is implemented.
+     **PASS — the loop does not scissor at the corner, and the view is from ABOVE.** Fly up
      over the corner tower and look straight down. The two strands are **one line in plan**: the upper one is
      exactly on top of the lower one all the way through the bend, so you should not be able to tell there
      are two of them from directly overhead. **FAIL:** they separate into two curves through the corner, one
@@ -928,6 +1069,21 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     Ride end to end. **PASS:** the cabin passes through tower 2 without stopping and reverses only at the
     ends. Open tower 2's picker. **PASS:** two "Connected:" rows and **no link rows at all** — a full
     tower is not offered a fourth link it would then have to refuse (see step 10d).
+    **PASS — A CHAIN DRAWS ALL OF ITSELF, and this is the finding the whole round came out of.** Put a bend
+    of 20-40 degrees in the middle tower (link 1 → 2 → 3 with a turn rather than in a straight line) and then
+    stand back far enough to see all three towers at once. Every span carries **both strands** and **both
+    rail bars** for its whole length, and the middle tower draws its two half-spans in **both** directions.
+    **FAIL, and this is the exact reported symptom:** *"half of it disappears"* — the corner tower draws
+    nothing at all while the two straight end towers look perfect, so the line has rope on its outer halves
+    and a hole in the middle. Nothing is logged where you would look for it: it is one
+    `IndexOutOfRangeException` per block entity on the **tesselation thread**, caught and written by
+    `JsonTesselator.Tesselate`, so search `client-main.log` for the block entity's own position rather than
+    for anything naming this mod.
+    **PASS:** it survives a reload and a second player. Re-log and check the middle tower again — a mesh
+    fault that only shows on a fresh tesselation is the same bug wearing a different hat.
+    **PASS — extend to FOUR towers with two bends.** Nothing degrades with chain length; each tower draws
+    its own two halves and knows nothing about the rest. **FAIL:** the third and fourth towers draw and the
+    second stops, or the drawing depends on the order you linked in.
 
 17. **Break safety** (the first half is multiplayer — someone has to be seated while someone else swings).
     With a passenger seated, try to break any footing on that line.
@@ -1401,11 +1557,31 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     through. That is the renderer turning the wheel about the block's centre instead of about the rim's
     own axle, and no test in the mod can see it: the authored shape is clean and the fault is in the
     transform. Park the cabin at that tower while you watch; the dip through the cabin is the tell.
+    **PASS — THE GROOVE STANDS IN THE PLANE THE LINE RUNS IN, new this round, and it is checked on a line
+    that does NOT run down a cardinal.** Build a terminal station whose one span leaves at a lazy angle —
+    anything off the compass points will do, 20-40° is easy to see — and look down on the wheel from above.
+    The disc is **edge-on to the rope**, its groove square along the span, all the way round the turn. Then
+    do the fussy version: break the bullwheel and put it back **facing 90° from the tower**, which the
+    structure accepts on any of its four facings. **PASS:** the wheel stands exactly where it did. The pose
+    is read off the LINE now, not off the block.
+    **FAIL, and this is the fifth reported finding:** the wheel *"shifts to the side but doesn't rotate"* —
+    the hub sits correctly on the rope's own plan line, dropped and pushed out to the wrap, while the disc it
+    turns in stays square to the nearest compass point. Two errors used to stack there: the line's bearing
+    against the tower's facing, and the wheel block's own facing against the tower's. At 22.5° the felloe
+    sweeps through both brackets drawn to carry it; at 90° the rope crosses the disc through the spokes.
+    **PASS — a wheel with NO span keeps its own facing.** Unlink a station entirely: the wheel stands on the
+    block's `side` variant, as it always did, because there is no line to read.
+    **PASS — on a SHAFT the same rule falls back the same way** (step 28c): the tangent there is straight up
+    and has no bearing at all, so the sheave's own facing decides — which is the right answer, because the
+    shaft's structure narrows that cell to the footing's side.
     **One thing you will see from this exact view that is known and accepted — do not file it.** On a line
     with **two** drive towers facing opposite ways, the two wheels **turn against each other** — a north-
     and a south-facing wheel are identical standing still and their yaws are 180° apart, so one positive
-    spin reads as opposite rotation in the world. It does not touch the cabin: report only a dip below the
-    crossarm.
+    spin reads as opposite rotation in the world. That survived the yaw fix on purpose: the disc is
+    180°-symmetric, so the line's bearing leaves the direction of spin undecided, and the branch nearer the
+    block's own facing is taken — which keeps the shipped behaviour and keeps the spin a property of the
+    wheel rather than of which of a corner's two spans you happened to link first. It does not touch the
+    cabin: report only a dip below the crossarm.
     **PASS:** the wheel takes **no axle** and its panel says nothing about power. Try to run an axle into
     it: **PASS:** nothing connects, because it is on no network. **FAIL:** it accepts one — the consumer
     has been left on it and the drive is back four blocks up. The hub axle is geometry, not a connector.
@@ -1578,6 +1754,16 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     rope coming up the shaft, **half a turn over the wheel**, and back down a lane three blocks along the
     head's facing. In low, round, out high — the same picture as a ropeway terminal's wrap, at four times the
     size.
+    **PASS — the beam reaches the far strand, new this round.** Stand square to the facing and sight along
+    the top of the frame: it runs from over the shaft axis out past the counterweight's lane, with the wheel
+    hanging under its middle and **both** ropes under the metal. That is what a headframe over a
+    counterweighted hoistway looks like, and step 1b has the failure it replaces.
+    **PASS — the wheel stands on its OWN facing here, and that is correct rather than a fallback failing.**
+    A shaft's line runs straight up: there is no bearing for the yaw rule at 27c-wheel to read, so the
+    sheave's `side` variant decides — which is exactly why 28b makes you face the sheave the same way as the
+    footing. **FAIL:** the wheel points due north on every shaft you build regardless of facing. That is
+    `atan2(0, 0)` answering instead of being refused, and it is the same class of fault as the car's
+    degenerate yaw at 28e.
     **PASS:** the head footing is a small plinth sitting **in the middle of the opening**, half a block below
     the landing surface. That is correct and it is the price of the anchor staying where it is.
     **PASS — there is no rope yet.** An unhung shaft draws neither strand and no counterweight, because the
@@ -1646,8 +1832,9 @@ Watch `%APPDATA%\VintagestoryData\Logs\client-main.log` and `server-main.log` th
     strands and the counterweight stop being drawn.
     **PASS — the regression check, and it is the most important line in this step:** go back to the ropeway
     line you built at steps 7–16 and re-run **10b** (two strands, drawn), **12** (ride through a tower),
-    **12b** (a corner), **12c** (a steep span still warns), **13** (it squares up at a tower) and **21b**
-    (the clearance row above the rope). Every one of them has to behave exactly as it did before this round.
+    **12b** (a corner, and this round its curve), **12c** (a steep span still warns), **13** (it squares up
+    at a tower), **16** (a chain draws all of itself) and **21b** (the clearance row above the rope). Every
+    one of them has to behave exactly as it did before this round.
     **FAIL:** any of them differs. Nothing in the shaft is allowed to reach a horizontal line — every change
     to shared code is behind a flag that is false on one, and this is where that claim is worth checking
     rather than reading.

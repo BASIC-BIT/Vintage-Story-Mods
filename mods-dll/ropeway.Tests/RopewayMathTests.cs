@@ -1239,6 +1239,139 @@ public class RopewayMathTests
     }
 
     /// <summary>
+    /// THE ONE-BOX TRAP, and the test above is the reason it survived a whole build: it makes exactly this
+    /// claim and makes it on <c>BuildHalfCable</c>, which is the degenerate ONE-BOX case - the only case
+    /// where six faces and the six-long arrays <c>CubeMeshUtil.GetCube</c> happens to allocate line up.
+    /// <para>
+    /// <c>GetCube</c> leaves <c>TextureIndicesCount</c> at 0 and <c>WithColorMaps</c> leaves
+    /// <c>ColorMapIdsCount</c> at 0, and <c>MeshData.AddMeshData</c> - which <c>BuildRun</c> calls once per
+    /// extra box - copies each per-face array by its <c>*Count</c> rather than by its <c>Length</c>
+    /// (1.22.1 <c>MeshData.cs:1028-1046</c>). Only <c>XyzFaces</c> carries a real count. So every run of more
+    /// than one box reached the chunk tesselator with <c>XyzFacesCount = 6N</c> against six-long side arrays,
+    /// and <c>JsonTesselator.AddJsonModelDataToMesh</c> indexes <c>TextureIndices[l]</c> and both colour maps
+    /// for <c>l &lt; XyzFacesCount</c> - IndexOutOfRangeException at face 6, caught and logged per block
+    /// entity, with box 1 already committed and every later box AND every later run of that
+    /// <c>OnTesselation</c> call never built.
+    /// </para>
+    /// <para>
+    /// In the world that was three of the author's QA items and not one: a corner tower's runs are 29-30
+    /// boxes so it drew NOTHING (items 1 and 4), a terminal's wrap is 9 so it lost the arc and both brackets
+    /// (item 2), and a straight tower's runs are one box each so a two-tower line looked perfect. The
+    /// assertion that catches it is <c>Length &gt;= XyzFacesCount</c> on every array the face loop indexes,
+    /// over runs long enough to leave the boundary behind.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(9)]     // a terminal's wrap
+    [InlineData(30)]    // one half-span at a right-angle corner
+    public void EveryBoxOfARunCarriesTheSideArrayEntriesTheTesselatorIndexesPerFace(int boxes)
+    {
+        // A polyline that cannot collapse: every sample turns by 30 degrees, so OnTheLine never merges two.
+        var points = new List<Vec3d>();
+        for (var i = 0; i <= boxes; i++)
+        {
+            points.Add(new Vec3d(Math.Cos(i * Math.PI / 6), 0, Math.Sin(i * Math.PI / 6)).Mul(i * 0.5));
+        }
+
+        var mesh = BEPylonBase.BuildRun(
+            points, BEPylonBase.CableRadius, BEPylonBase.CableRadius,
+            new TextureAtlasPosition { x1 = 0, y1 = 0, x2 = 1, y2 = 1 });
+
+        Assert.NotNull(mesh);
+        Assert.Equal(6 * boxes, mesh.XyzFacesCount);
+
+        // The three arrays JsonTesselator indexes by face, and the counts AddMeshData copies them by. Length
+        // is what stops the throw; the counts are what make the NEXT AddMeshData carry them at all, so a run
+        // merged into a longer one has to keep both true.
+        Assert.True(mesh.TextureIndices.Length >= mesh.XyzFacesCount,
+            $"TextureIndices is {mesh.TextureIndices.Length} long for {mesh.XyzFacesCount} faces - the "
+            + "tesselator throws at face " + mesh.TextureIndices.Length);
+        Assert.True(mesh.SeasonColorMapIds.Length >= mesh.XyzFacesCount);
+        Assert.True(mesh.ClimateColorMapIds.Length >= mesh.XyzFacesCount);
+        Assert.Equal(mesh.XyzFacesCount, mesh.TextureIndicesCount);
+        Assert.Equal(mesh.XyzFacesCount, mesh.ColorMapIdsCount);
+
+        // ...and the faces really are addressed, or the arrays above are long enough for a mesh that draws
+        // nothing. Four vertices and six indices per face is what the cube chain is.
+        Assert.Equal(4 * mesh.XyzFacesCount, mesh.VerticesCount);
+        Assert.Equal(6 * mesh.XyzFacesCount, mesh.IndicesCount);
+    }
+
+    /// <summary>
+    /// ITEM 1, as an invariant: the two towers either side of one span draw halves that MEET, and both of
+    /// them are really built. Each end samples its own <c>LocalLine</c> - a two- or three-tower mini-line
+    /// whose far anchor is an END, so its tangent is its single leg - and the claim is that the two answers
+    /// agree at the chord midpoint anyway, because the bend window
+    /// <c>TrimForTowers(L) &lt;= (L-1)/2 &lt; L/2</c> never reaches it.
+    /// <para>
+    /// The MESH half is the half that failed. The geometry has always met to double precision; what the
+    /// author saw was one end of every span drawn and the other missing, because the tower at that end threw
+    /// inside the tesselator before it got to its own half. So this asserts both: the polylines meet, and
+    /// each half is a mesh whose per-face arrays cover its own face count.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheTwoHalvesEitherSideOfOneSpanMeetAndBothAreDrawn()
+    {
+        // Two right-angle corners, so both interior towers bend and neither half is the trivial straight one.
+        var towers = new List<BlockPos>
+        {
+            new(0, 64, 0), new(0, 64, 20), new(20, 64, 20), new(20, 64, 40)
+        };
+
+        var texPos = new TextureAtlasPosition { x1 = 0, y1 = 0, x2 = 1, y2 = 1 };
+
+        for (var span = 0; span < towers.Count - 1; span++)
+        {
+            // Exactly what BEPylonBase.LocalLine hands each of the two footings: this tower between its own
+            // peers, so the far anchor of the span is an end of the mini-line.
+            var near = MiniLine(towers, span, out var nearMe);
+            var far = MiniLine(towers, span + 1, out var farMe);
+
+            var nearPeer = nearMe + 1;
+            var farPeer = farMe - 1;
+
+            var a = BEPylonBase.HalfSpanPath(near, nearMe, nearPeer);
+            var b = BEPylonBase.HalfSpanPath(far, farMe, farPeer);
+
+            // In world coordinates: each half is relative to its own sheave.
+            var meetA = a[a.Count - 1].Clone().Add(near.Anchors[nearMe]);
+            var meetB = b[b.Count - 1].Clone().Add(far.Anchors[farMe]);
+
+            Assert.Equal(0, meetA.DistanceTo(meetB), 9);
+
+            // ...and each reaches exactly half the span, so neither is short and neither overlaps the other.
+            var half = near.Anchors[nearMe].DistanceTo(far.Anchors[farMe]) / 2;
+            Assert.Equal(half, a[a.Count - 1].Length(), 9);
+            Assert.Equal(half, b[b.Count - 1].Length(), 9);
+
+            // Both halves are DRAWN. A corner tower's half is 29-30 boxes; before the per-face counts were
+            // set it built one 0.125-block stub and abandoned the rest of its OnTesselation call.
+            foreach (var half_ in new[] { a, b })
+            {
+                var mesh = BEPylonBase.BuildRun(half_, BEPylonBase.CableRadius, BEPylonBase.CableRadius, texPos);
+                Assert.NotNull(mesh);
+                Assert.True(mesh.TextureIndices.Length >= mesh.XyzFacesCount);
+                Assert.True(mesh.SeasonColorMapIds.Length >= mesh.XyzFacesCount);
+                Assert.True(mesh.ClimateColorMapIds.Length >= mesh.XyzFacesCount);
+            }
+        }
+    }
+
+    /// <summary>The mini-line <c>BEPylonBase.LocalLine</c> builds for one tower of a chain.</summary>
+    private static RopewayLine MiniLine(IReadOnlyList<BlockPos> towers, int index, out int me)
+    {
+        var chain = new List<BlockPos>();
+        if (index > 0) chain.Add(towers[index - 1]);
+        chain.Add(towers[index]);
+        if (index < towers.Count - 1) chain.Add(towers[index + 1]);
+
+        me = chain.IndexOf(towers[index]);
+        return RopewayLine.FromTowers(chain);
+    }
+
+    /// <summary>
     /// The one conversion from a tower's canonical position - its ground-placed footing - to the height its
     /// rope actually runs at. Every spatial consumer goes through it, so an offset applied anywhere else as
     /// well is a cable and a cabin at different heights.
@@ -1566,6 +1699,138 @@ public class RopewayMathTests
     }
 
     /// <summary>
+    /// ITEM 5. The wheel took its TRANSLATION from the line and its ROTATION from its own <c>side</c>
+    /// variant, so the hub landed on the rope's plan line and the groove plane stayed on the nearest
+    /// cardinal: two sources, up to 90 degrees apart, crossing at the hub and diverging everywhere else. Past
+    /// 13.4 degrees the rope has left the felloe entirely; past about 22.5 the turning felloe sweeps through
+    /// both brackets drawn to carry its axle.
+    /// <para>
+    /// The claim is that the disc's own direction - <c>Ry(yaw)</c> applied to the authored disc normal's
+    /// perpendicular <c>(0, 0, 1)</c>, which is <c>(sin yaw, 0, cos yaw)</c> - is PARALLEL to the line's plan
+    /// tangent, on the same axis rather than merely at some angle to it. Parallel and not equal, because the
+    /// rim is 180-degree symmetric and <see cref="BullwheelRenderer.YawAlong"/> deliberately takes the branch
+    /// nearer the block's own facing so the shipped spin direction survives.
+    /// </para>
+    /// </summary>
+    [Theory]
+    // A line on the cardinal reproduces the shipped answer exactly, at every facing.
+    [InlineData(0.0, "north")]
+    [InlineData(0.0, "east")]
+    [InlineData(0.0, "south")]
+    [InlineData(0.0, "west")]
+    // ...and off it, which is every terminal nobody built due north of its peer. 45 is the worst a bearing
+    // can be from the nearest cardinal; the rest are the rows the wrap measurement was taken at.
+    [InlineData(13.41, "north")]
+    [InlineData(22.5, "north")]
+    [InlineData(36.87, "north")]
+    [InlineData(45.0, "east")]
+    [InlineData(-45.0, "south")]
+    [InlineData(30.0, "west")]
+    [InlineData(180.0, "north")]
+    public void TheWheelsGrooveStandsInThePlaneTheLineRunsIn(double bearingDeg, string side)
+    {
+        var bearing = bearingDeg * Math.PI / 180;
+        var tangent = new Vec3d(Math.Sin(bearing), 0, Math.Cos(bearing));
+        var blockYaw = BullwheelRenderer.YawFor(side);
+
+        var yaw = BullwheelRenderer.YawAlong(tangent, blockYaw);
+
+        // The disc's own direction, pushed through the real matrix rather than restated: RimMatrix puts the
+        // axle at (0.5, RimPivotY, 0.5) + offset, so a point one block along the rim's authored +Z lands on
+        // the groove plane's own bearing.
+        var offset = new Vec3f(0.3f, -BullwheelRenderer.WrapDrop, -0.7f);
+        var matrix = BullwheelRenderer.RimMatrix(new Matrixf().Identity(), yaw, 0f, offset).Values;
+        var axle = Mat4f.MulWithVec4(matrix, 0.5f, BullwheelRenderer.RimPivotY, 0.5f, 1f);
+        var along = Mat4f.MulWithVec4(matrix, 0.5f, BullwheelRenderer.RimPivotY, 1.5f, 1f);
+
+        var dx = along[0] - axle[0];
+        var dz = along[2] - axle[2];
+
+        // Parallel: the cross product of the two plan directions is zero. The dot may be either sign.
+        Assert.Equal(0, dx * tangent.Z - dz * tangent.X, 4);
+
+        // The branch, and it is not decoration: RotateX sits INSIDE the yaw, so yaw and yaw + pi draw the
+        // same disc turning opposite ways. Never more than a quarter turn from the block's own facing, which
+        // is what keeps a shaft's wheel spinning the way it always did.
+        Assert.True(Math.Abs(GameMath.AngleRadDistance(yaw, blockYaw)) <= Math.PI / 2 + 1e-5);
+    }
+
+    /// <summary>
+    /// The other half of item 5: a wheel with no line to read, and a wheel on a SHAFT - where the peer is
+    /// directly below, the plan tangent is the zero vector and <c>Math.Atan2(0, 0)</c> is <b>0.0</b> rather
+    /// than NaN, which is a silent permanent due north. Both fall back to the block's own facing, and on a
+    /// shaft that is the right answer rather than a degradation: <c>OwnTheHeadCell</c> narrows
+    /// <c>shaftsheave-*</c> to the footing's own side, so the sheave's variant IS the machine's heading.
+    /// </summary>
+    [Theory]
+    [InlineData("north")]
+    [InlineData("east")]
+    [InlineData("south")]
+    [InlineData("west")]
+    public void AWheelWithNoBearingToReadKeepsItsOwnFacing(string side)
+    {
+        var blockYaw = BullwheelRenderer.YawFor(side);
+
+        Assert.Equal(blockYaw, BullwheelRenderer.YawAlong(null, blockYaw));
+        Assert.Equal(blockYaw, BullwheelRenderer.YawAlong(new Vec3d(0, 1, 0), blockYaw));
+        Assert.Equal(blockYaw, BullwheelRenderer.YawAlong(new Vec3d(0, -1, 0), blockYaw));
+    }
+
+    /// <summary>
+    /// Where the wheel's yaw comes FROM: the tower's own tangent, which is its single leg at a terminal and
+    /// the corner's bisector at a station the line runs through. Same expression the brackets and both rail
+    /// cheeks are already taken across, so the wheel cannot disagree with the metal drawn to carry it.
+    /// </summary>
+    [Fact]
+    public void ATowersLineTangentIsItsLegAtATerminalAndItsBisectorAtACorner()
+    {
+        var tower = new BEPylonBase { Pos = new BlockPos(0, 64, 0) };
+        Assert.Null(tower.LineTangent);
+
+        // One span, 3-4-5 to the south east: the tangent is the leg, 36.87 degrees off due south.
+        tower.Spans.Add(new BlockPos(12, 64, 16));
+        var leg = tower.LineTangent;
+        Assert.Equal(0.6, leg!.X, 6);
+        Assert.Equal(0.8, leg.Z, 6);
+
+        // ...and it is the same axis the wrap is laid on, so the groove and the rope are one plane.
+        var dead = tower.DeadSide;
+        Assert.Equal(0, leg.X * dead!.Z - leg.Z * dead.X, 9);
+
+        // A second span due west makes it a corner, and the mini-line runs peer -> here -> peer. The tangent
+        // is the bisector of the leg ARRIVING, (-0.6, -0.8), and the leg leaving, (-1, 0) - their normalised
+        // sum, exactly between the two and pointing the way the cabin goes.
+        tower.Spans.Add(new BlockPos(-20, 64, 0));
+        var bisector = tower.LineTangent;
+        Assert.NotNull(bisector);
+
+        var sum = new Vec3d(-0.6, 0, -0.8).Add(new Vec3d(-1, 0, 0)).Normalize();
+        Assert.Equal(sum.X, bisector!.X, 6);
+        Assert.Equal(sum.Z, bisector.Z, 6);
+
+        // ...and it is genuinely between them: a corner tower's wheel used to sit on whichever cardinal its
+        // own variant named, which at this 116.57 degree corner is up to 45 degrees off this.
+        Assert.NotEqual(leg.X, bisector.X, 3);
+
+        // A SHAFT head is the case with no bearing at all - its one peer is directly below, so the tangent is
+        // vertical and there is no plan direction to stand a groove in. This is the whole of "the elevator is
+        // untouched": the wheel falls back to its own facing, which OwnTheHeadCell has already narrowed to
+        // the footing's, and nothing about the shaft moves.
+        var head = new BEPylonBase { Pos = new BlockPos(0, 100, 0), ShaftRole = "head" };
+        head.Spans.Add(new BlockPos(0, 52, 0));
+
+        var vertical = head.LineTangent;
+        Assert.Equal(0, vertical!.X, 9);
+        Assert.Equal(0, vertical.Z, 9);
+        Assert.Equal(-1, vertical.Y, 9);
+
+        foreach (var side in new[] { "north", "east", "south", "west" })
+        {
+            Assert.Equal(BullwheelRenderer.YawFor(side), BullwheelRenderer.YawAlong(vertical, BullwheelRenderer.YawFor(side)));
+        }
+    }
+
+    /// <summary>
     /// The wrap is drawn at a tower carrying exactly ONE span and nowhere else, and that conditional is not
     /// a wart. <c>STATION-DESIGN</c> §1 allows a station that is not an end tower, and at such a tower there
     /// is no dead side: a ring dropped to the rope on either side has its underside below a passing cabin's
@@ -1690,6 +1955,122 @@ public class RopewayMathTests
         Assert.Equal(0, held.X, 9);
         Assert.Equal(0, held.Z, 9);
         Assert.Equal(BEPylonBase.ReturnLift + axleY, BullwheelRenderer.RimPivotY - 0.5 + held.Y, 5);
+    }
+
+    /// <summary>
+    /// ITEM 2 - "I think the top rope doesn't extend all the way to the bullwheel." The model had no gap:
+    /// <see cref="TheWrapLeavesOnTheReturnStrand"/> pins the going strand, the wrap's two ends and the return
+    /// strand to the same points and the arc's centre to the renderer's own axle. What the author saw was the
+    /// arc not being BUILT - the wrap collapses to nine boxes, and until the per-face counts were set every
+    /// run past its first box was lost inside the tesselator. So the going strand ran out under the wheel and
+    /// the return strand stopped dead on the tower column with the whole half turn missing.
+    /// <para>
+    /// This is the mesh half of that claim, and it is deliberately made on the VERTICES: the arc has to be in
+    /// the chunk mesh, not merely in the list of points handed to the builder.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheDrawnWrapCarriesTheWholeHalfTurnOntoTheReturnStrand()
+    {
+        var dead = new Vec3d(0, 0, 1);
+        var mesh = BEPylonBase.BuildRun(
+            BEPylonBase.WrapPath(dead), BEPylonBase.CableRadius, BEPylonBase.CableRadius,
+            new TextureAtlasPosition { x1 = 0, y1 = 0, x2 = 1, y2 = 1 }, turnsVertically: true);
+
+        Assert.NotNull(mesh);
+
+        // Nine boxes: both end stubs merge into the chord they meet, which is why the arc is cheaper than the
+        // closed ring it replaced. Six faces each, and the side arrays have to cover all of them.
+        Assert.Equal(9 * 6, mesh.XyzFacesCount);
+        Assert.True(mesh.TextureIndices.Length >= mesh.XyzFacesCount);
+        Assert.True(mesh.SeasonColorMapIds.Length >= mesh.XyzFacesCount);
+
+        var min = new[] { double.MaxValue, double.MaxValue, double.MaxValue };
+        var max = new[] { double.MinValue, double.MinValue, double.MinValue };
+        for (var i = 0; i < mesh.VerticesCount; i++)
+        for (var axis = 0; axis < 3; axis++)
+        {
+            min[axis] = Math.Min(min[axis], mesh.xyz[3 * i + axis]);
+            max[axis] = Math.Max(max[axis], mesh.xyz[3 * i + axis]);
+        }
+
+        // Local to the FOOTING, so the sheave is SheaveHeight above its centre. The arc's top has to reach a
+        // wheel DIAMETER above the going strand, which is where the return strand leaves - the truncated wrap
+        // reached the going strand's own height and stopped.
+        var sheaveY = 0.5 + SpanMath.SheaveHeight;
+        Assert.Equal(sheaveY + BEPylonBase.ReturnLift + BEPylonBase.CableRadius, max[1], 4);
+
+        // ...and it goes round the FAR side of the axle, past the wheel rather than up to it. The axle stands
+        // WrapOut out along the dead side and the groove is WrapRadius beyond that.
+        var axleZ = 0.5 + BullwheelRenderer.WrapOut;
+        Assert.True(max[2] > axleZ + BullwheelRenderer.WrapRadius - 0.01,
+            $"the drawn wrap reaches z = {max[2]:0.####} and the far side of the groove is at "
+            + $"{axleZ + BullwheelRenderer.WrapRadius:0.####} - the arc stops short of the wheel");
+
+        // Both ends are ON the tower and neither runs past it: the two stubs are butt caps on the tower's own
+        // centre line, where the going strand arrives and the return strand leaves.
+        Assert.Equal(0.5, min[2], 4);
+
+        // The lowest the arc goes is the underside of the going strand it is tangent to.
+        Assert.Equal(sheaveY - BEPylonBase.CableRadius, min[1], 4);
+    }
+
+    /// <summary>
+    /// ITEM 4 - "the rails and travel path really should generate a curve". The bend is implemented, has been
+    /// since <c>RopewayLine.Tangents</c> landed, and is not too small to read: 0.4536 blocks off the chord at
+    /// a right angle, which is 3.8 times the cable's own thickness. It never reached the screen because the
+    /// only tower that draws bent geometry is the CORNER tower, and a corner tower's runs are 29-30 boxes -
+    /// exactly the case the tesselator threw on. So the fix for item 4 was the mesh plumbing and NOT a bigger
+    /// bend, and this is the assertion that says the curve is in the mesh rather than only in the maths.
+    /// <para>
+    /// Measured on the box ENDPOINTS the builder emits, because that is what the chunk mesh is made of: a
+    /// straight chord would report zero here whatever <c>PositionAt</c> says.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ACornerTowersDrawnHalfSpanIsTheBentCurveAndNotItsChord()
+    {
+        // A right-angle corner with 20-block spans, so the bend window is its full 4 blocks.
+        var line = MiniLine(
+            new List<BlockPos> { new(0, 64, -20), new(0, 64, 0), new(20, 64, 0) }, 1, out var me);
+
+        var path = BEPylonBase.HalfSpanPath(line, me, 2);
+
+        // Off the chord from the tower to the midpoint of the span, which is what a straight half would be.
+        var chord = path[path.Count - 1].Clone().Normalize();
+        var peak = 0.0;
+        foreach (var p in path)
+        {
+            var along = p.X * chord.X + p.Z * chord.Z;
+            peak = Math.Max(peak, Math.Sqrt(p.X * p.X + p.Z * p.Z - along * along));
+        }
+
+        // 4/27 * window * sin(turn / 2). The bend's own magnitude is 4/27 * window * |leg - bisector|, which
+        // is 0.4536 blocks at a right angle, and the component of it PERPENDICULAR to the chord - which is
+        // what a player sees as bow - works out to sin(turn / 2) exactly, because
+        // |leg - bisector|^2 - (leg . (leg - bisector))^2 = 1 - cos^2(turn / 2). Three decimals rather than
+        // six: RunStep samples at 1.250 and 1.375 blocks and the peak is at window / 3 = 1.333, so the drawn
+        // polyline misses the true crest by 0.0003 blocks.
+        Assert.Equal(4.0 / 27 * 4 * Math.Sin(Math.PI / 4), peak, 3);
+        Assert.True(peak > 3 * 2 * BEPylonBase.CableRadius,
+            $"the bend peaks {peak:0.###} blocks off the chord, which is under three cable thicknesses - "
+            + "at that size item 4 really would be a design question rather than a plumbing one");
+
+        // ...and every one of the boxes that carries it is built. The run is 30 boxes at this corner; before
+        // the per-face counts were set it was one 0.125-block stub and the rest of the tower with it.
+        var mesh = BEPylonBase.BuildRun(
+            path, BEPylonBase.CableRadius, BEPylonBase.CableRadius,
+            new TextureAtlasPosition { x1 = 0, y1 = 0, x2 = 1, y2 = 1 });
+
+        Assert.NotNull(mesh);
+        Assert.True(mesh.XyzFacesCount >= 6 * 29, $"only {mesh.XyzFacesCount / 6} boxes of the bend were built");
+        Assert.True(mesh.TextureIndices.Length >= mesh.XyzFacesCount);
+        Assert.True(mesh.SeasonColorMapIds.Length >= mesh.XyzFacesCount);
+        Assert.True(mesh.ClimateColorMapIds.Length >= mesh.XyzFacesCount);
+
+        // The drawn polyline really tracks the curve rather than cutting it: the sagitta of one RunStep chord
+        // at the tightest radius the bend reaches is 16 times finer than a single texture unit.
+        Assert.True(0.125 * 0.125 / (8 * 1.317) < 1.0 / 16 / 16);
     }
 
     /// <summary>

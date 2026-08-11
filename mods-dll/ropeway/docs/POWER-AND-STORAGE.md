@@ -472,12 +472,21 @@ the renderer carries it one cell out along the dead side and `BullwheelRenderer.
 wraps it, and there it does enter that cell's airspace — on the side of the tower nothing ever passes.
 `TheWrappedWheelClearsACabinAtEveryPositionTheCabinCanReach` is the assert, in both poses.
 
-**Not fixed, and named — and it got worse before it gets better.** The wheel is still `HorizontalOrientable`,
-so one placed while facing the wrong way validates the tower with its throat and station rails running
-across the line, and now with its hub axle pointing at the braces rather than at the lay shaft. `layshaft`,
-`drivehead` and `tensionhead` inherit it, so the count goes 2 → 5. The fix is unchanged and is still one fix
-in one place: orient the crossarm cells from the footing below them, for all of them at once. It is worth
-doing at five where it was not at two.
+**The rim's POSE is the line's, not the block's (2026-08-11).** `BullwheelRenderer.Yaw` is polled off
+`BEPylonBase.LineTangent` beside `Offset`, so the disc stands in the vertical plane the line runs in at that
+tower — the same vector the brackets and both rail cheeks are already drawn across. Until this round the
+translation followed the line and the rotation did not, which put the hub on the rope's plan line and the
+groove on the nearest cardinal, up to 90° apart; see [KNOWN-ISSUES.md](KNOWN-ISSUES.md), "The wheel followed
+the line's translation and never its rotation". A vertical tangent — a shaft — has no bearing to stand in
+and falls back to the block's own facing, which there is the machine's heading rather than a guess.
+
+**Not fixed, and named — but it is cosmetic now.** The wheel is still `HorizontalOrientable`, so one placed
+while facing the wrong way still validates the tower. The count went 2 → 5 when the stations landed and back
+to **3** when `OwnTheHeadCell` narrowed `drivehead` and `tensionhead`, so what is left loose is `pylonhead`,
+`bullwheel` and `layshaft` — and of those, the wheel's own visible pose no longer depends on it. All the
+variant still decides there is which of the disc's two 180°-symmetric branches the spin runs in, on a wheel
+with no marked face. The fix is unchanged and is still one fix in one place: orient the crossarm cells from
+the footing below them, for all of them at once.
 
 ## Power may be supplied at ANY drive station on the line, and pools
 

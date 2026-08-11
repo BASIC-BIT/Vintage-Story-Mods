@@ -59,12 +59,19 @@ namespace Ropeway;
 /// </para>
 /// <para>
 /// ponytail: still <c>HorizontalOrientable</c>, so a wheel placed while facing the wrong way validates the
-/// tower with its throat and station rails running across the line rather than along it - and now with its
-/// hub axle pointing at the braces rather than at the lay shaft. ACCEPTED, not fixed, and COSMETIC: the
-/// count went 2 to 5 when the stations landed and back to 3 when the two heads were narrowed, so what is
-/// left loose is <c>pylonhead</c>, this block and <c>layshaft</c>. The real fix is unchanged and is still
-/// ONE fix in one place - orient the crossarm cells from the footing below them, for all of them at once.
-/// Bolting a private rule onto this one block would leave the bug and add a rule.
+/// tower with its hub axle pointing at the braces rather than at the lay shaft. ACCEPTED, not fixed, and
+/// now genuinely COSMETIC: the count went 2 to 5 when the stations landed and back to 3 when the two heads
+/// were narrowed, so what is left loose is <c>pylonhead</c>, this block and <c>layshaft</c>. The real fix is
+/// unchanged and is still ONE fix in one place - orient the crossarm cells from the footing below them, for
+/// all of them at once. Bolting a private rule onto this one block would leave the bug and add a rule.
+/// </para>
+/// <para>
+/// It used to be more than cosmetic, and that half is closed. The RIM's own pose no longer reads this block's
+/// facing at all: <see cref="BullwheelRenderer.Yaw"/> is polled off the tower's
+/// <see cref="BEPylonBase.LineTangent"/> on the tick below, so a wheel placed a quarter turn out has its
+/// groove in the rope's plane anyway. The variant is left deciding one thing - which of the disc's two
+/// 180-degree-symmetric branches the spin runs in - and that is a direction of rotation on a wheel with no
+/// marked face.
 /// </para>
 /// <para>
 /// ponytail: it was briefly the only fix for a second, STRUCTURAL bug, and that half is closed without it.
@@ -159,15 +166,34 @@ public class BEBullwheel : BlockEntity
             {
                 var tower = Tower;
                 renderer.Speed = LineSpeed();
+
+                // FAIL CLOSED: hold the last good pose rather than answering for a footing nobody could read.
+                // WrapOffset's last branch is the zero vector, and on a SHAFT that is not a small error - the
+                // shaft branch is the only one that can fire there (DeadSide is null by construction, Spans is
+                // 1), so a single missed lookup snapped the rim 1.5 blocks off its hub and onto the going
+                // strand while the authored arc, the hangers and both strands stayed put. `Tower` is a
+                // block-accessor read of the footing SheaveHeight below, and a sheave and its footing can
+                // straddle a chunk boundary, so null here is an ordinary chunk-load window rather than an
+                // impossible state. A cut span still moves the wheel: the tower is there and its DeadSide
+                // changed, which is the case this must NOT skip.
+                if (tower == null) return;
+
                 renderer.Offset = WrapOffset(
-                    tower?.DeadSide, tower?.Spans.Count ?? 0, tower?.IsShaft == true ? tower.PassageFacing : null);
+                    tower.DeadSide, tower.Spans.Count, tower.IsShaft ? tower.PassageFacing : null);
+
+                // ...and the same source for the ORIENTATION, which is the half that never followed. On a
+                // shaft the tangent is vertical and YawAlong falls back to the block's own facing - which is
+                // the right answer there and not a degradation, because OwnTheHeadCell narrows
+                // `shaftsheave-*` to the footing's side, so the sheave's variant IS the machine's heading.
+                renderer.Yaw = BullwheelRenderer.YawAlong(
+                    tower.LineTangent, BullwheelRenderer.YawFor(Block?.Variant["side"]));
 
                 // The HANDLE only. The cabin's position is read per frame off Pos.Y - which is synced, unlike
                 // Travelled - so the rope never lags the car; what is polled here is the O(loaded entities)
                 // scan that finds it, which a rope cannot afford to do every frame.
                 if (shaftRenderer == null) return;
 
-                var line = tower == null ? null : RopewayLine.GetOrBuild(ModSystem, tower.Pos);
+                var line = RopewayLine.GetOrBuild(ModSystem, tower.Pos);
                 shaftRenderer.Track(line, line == null ? null : EntityRopewayCabin.FindOn(Api.World, line));
             },
             500, 0);

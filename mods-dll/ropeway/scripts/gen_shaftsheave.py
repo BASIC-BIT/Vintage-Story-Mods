@@ -112,12 +112,23 @@ sheave = [
 # through it. Measured on the render before it was moved - the rim's top at 48.74 was what the first
 # number cleared, and the rope is a unit and a half further out than the metal it is bedded on.
 TOP = HUB_Y + RHO + ROPE + 5
+
+# How far the beam reaches PAST the hub, along the lane. It used to be 6 units, which carried the hanger
+# and nothing else: the wheel's own far swept edge is REACH = 23.04 units out from that hub and the return
+# strand is a full RHO = 24 out, so the frame covered the shaft strand, stopped 17 units short of the wheel
+# it is drawn to carry, and left the wheel and the counterweight's rope hanging in open air past the end of
+# it. That reads exactly as the author's "the rope isn't aligned with the wheel, it's off to the side" -
+# renders/qa1/shaft-before. Now it clears the return strand's far face by a unit, so the bar visibly spans
+# BOTH strands with the wheel slung under its middle, which is what a headframe over a counterweighted
+# hoistway looks like. It stays a cantilever off the one column pair on purpose: the only place a second
+# pair could stand is the lane, and the lane is the column the counterweight travels down.
+BEAM_REACH = RHO + ROPE + 1
 for tag, x0, x1 in (("west", 0.5, 4.5), ("east", 11.5, 15.5)):
     sheave += [
         # Outside the wheel's own thickness band and on the far side of the cell from the lane, so the
         # headframe carries the wheel without standing in the rope, the wheel or the car's way.
         el("column" + tag, [x0, 2, 9.5], [x1, TOP, 15.5], "girder"),
-        el("beam" + tag, [x0, TOP - 4, HUB_Z - 6], [x1, TOP, 9.5], "girder"),
+        el("beam" + tag, [x0, TOP - 4, HUB_Z - BEAM_REACH], [x1, TOP, 9.5], "girder"),
         el("hanger" + tag, [x0, HUB_Y + 1, HUB_Z - 3], [x1, TOP - 4, HUB_Z + 3], "girder"),
     ]
 
