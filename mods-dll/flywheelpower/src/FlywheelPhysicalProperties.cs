@@ -17,6 +17,7 @@ internal static class FlywheelPhysicalProperties
     private const float MeteoricIronDensity = 7800f;
     private const float SteelDensity = 7820f;
     private const float IngotEquivalentVolumeM3 = 0.001f;
+    private const int MetalPlateIngotEquivalents = 2;
     private const float WoodPlankMassKg = 2.5f;
     private const float StoneBlankPieceMassKg = 5f;
     private const float FullAxleMassKg = 5f;
@@ -84,7 +85,7 @@ internal static class FlywheelPhysicalProperties
         {
             WoodDensity => WoodPlankMassKg,
             StoneDensity => StoneBlankPieceMassKg,
-            _ => wheelDensity * IngotEquivalentVolumeM3
+            _ => MetalPlateIngotEquivalents * wheelDensity * IngotEquivalentVolumeM3
         };
 
         return rimPieces * rimPieceMass
