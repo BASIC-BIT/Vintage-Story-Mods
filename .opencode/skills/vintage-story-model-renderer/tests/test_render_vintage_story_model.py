@@ -518,6 +518,33 @@ class AnimationProjectionTests(unittest.TestCase):
                 self.assertAlmostEqual(0, renderer.dot(view, right))
                 self.assertAlmostEqual(0, renderer.dot(view, up))
 
+    def test_polar_orbit_camera_basis_stays_continuous_through_the_poles(self):
+        face = renderer.Face(
+            [(0, 0, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1)],
+            "wood",
+            "test",
+        )
+        frame_count = 120
+        for view_name in ("top", "bottom"):
+            with self.subTest(view_name=view_name):
+                views = [
+                    renderer.orbit_view(renderer.VIEWS[view_name][0], frame / frame_count)
+                    for frame in range(frame_count)
+                ]
+                projections = renderer.fixed_animation_projections(
+                    [[face]] * frame_count,
+                    views,
+                    100,
+                    [renderer.VIEWS[view_name][1]] * frame_count,
+                )
+                rights = [projection[1] for projection in projections]
+                ups = [projection[2] for projection in projections]
+
+                for index in range(frame_count):
+                    following = (index + 1) % frame_count
+                    self.assertGreater(renderer.dot(rights[index], rights[following]), 0.99)
+                    self.assertGreater(renderer.dot(ups[index], ups[following]), 0.99)
+
 
 class UvTests(unittest.TestCase):
     def test_missing_cuboid_uv_uses_face_dimensions(self):

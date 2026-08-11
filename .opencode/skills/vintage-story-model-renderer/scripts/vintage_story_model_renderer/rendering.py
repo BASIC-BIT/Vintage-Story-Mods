@@ -118,7 +118,10 @@ def fixed_animation_projections(
     frame_faces: list[list[Face]],
     views: list[Vec3],
     size: int,
+    nominal_ups: list[Vec3] | None = None,
 ) -> list[tuple[Vec3, Vec3, Vec3, Vec3, float]]:
+    if nominal_ups is not None and len(nominal_ups) != len(views):
+        raise ValueError("Animation view and up-vector counts must match.")
     all_vertices = [
         vertex
         for faces in frame_faces
@@ -131,9 +134,9 @@ def fixed_animation_projections(
     )
     bases = []
     maximum_span = 1.0
-    for faces, view in zip(frame_faces, views):
+    for index, (faces, view) in enumerate(zip(frame_faces, views)):
         normalized_view = normalize(view)
-        nominal_up = (
+        nominal_up = nominal_ups[index] if nominal_ups is not None else (
             (0, 0, -1 if normalized_view[1] > 0 else 1)
             if abs(normalized_view[1]) > 0.999
             else (0, 1, 0)

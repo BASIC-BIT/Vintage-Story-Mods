@@ -8,6 +8,11 @@ namespace FlywheelPower;
 
 public sealed class BlockFlywheelStand : Block
 {
+    public override AssetLocation GetRotatedBlockCode(int angle)
+    {
+        return CodeWithVariant("rotation", FlywheelMultiblock.RotateRotation(Variant["rotation"], angle));
+    }
+
     public override bool TryPlaceBlock(
         IWorldAccessor world,
         IPlayer byPlayer,

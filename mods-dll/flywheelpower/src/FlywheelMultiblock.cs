@@ -112,6 +112,22 @@ internal static class FlywheelMultiblock
         };
     }
 
+    internal static string RotateRotation(string rotation, int angle)
+    {
+        int normalizedAngle = ((angle % 360) + 360) % 360;
+        if (normalizedAngle != 90 && normalizedAngle != 270)
+        {
+            return rotation;
+        }
+
+        return rotation switch
+        {
+            "ns" => "we",
+            "we" => "ns",
+            _ => rotation
+        };
+    }
+
     private static Block GetPartBlock(IWorldAccessor world)
     {
         return world.GetBlock(AssetLocation.Create(PartBlockCode, "flywheelpower"));

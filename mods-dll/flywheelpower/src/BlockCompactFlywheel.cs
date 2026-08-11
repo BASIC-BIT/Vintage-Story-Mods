@@ -9,6 +9,11 @@ namespace FlywheelPower;
 
 public sealed class BlockCompactFlywheel : BlockMPBase
 {
+    public override AssetLocation GetRotatedBlockCode(int angle)
+    {
+        return CodeWithVariant("rotation", FlywheelMultiblock.RotateRotation(Variant["rotation"], angle));
+    }
+
     public override bool HasMechPowerConnectorAt(IWorldAccessor world, BlockPos pos, BlockFacing face, BlockMPBase forBlock)
     {
         return IsOrientedTo(face);

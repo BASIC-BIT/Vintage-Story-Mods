@@ -1,5 +1,6 @@
 param(
-    [string]$OutputDirectory = ""
+    [string]$OutputDirectory = "",
+    [string]$AssetsRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +16,18 @@ $materialGenerator = Join-Path $projectRoot "scripts\generate-material-content.p
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $projectRoot "output\model-renders"
 }
+
+if ([string]::IsNullOrWhiteSpace($AssetsRoot) -and -not [string]::IsNullOrWhiteSpace($env:VINTAGE_STORY)) {
+    $candidate = Join-Path $env:VINTAGE_STORY "assets"
+    if (Test-Path -LiteralPath $candidate -PathType Container) {
+        $AssetsRoot = $candidate
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($AssetsRoot) -or -not (Test-Path -LiteralPath $AssetsRoot -PathType Container)) {
+    throw "Provide -AssetsRoot or set VINTAGE_STORY to an installation containing the assets directory."
+}
+$assetsRootPath = (Resolve-Path -LiteralPath $AssetsRoot).Path
 
 python $previewGenerator --check
 if ($LASTEXITCODE -ne 0) {
@@ -39,9 +52,19 @@ if ($LASTEXITCODE -ne 0) {
 foreach ($manifest in Get-ChildItem -LiteralPath $manifestDirectory -Filter "*.json" | Sort-Object Name) {
     $name = [System.IO.Path]::GetFileNameWithoutExtension($manifest.Name)
     $target = Join-Path $OutputDirectory $name
-    python $renderer --manifest $manifest.FullName --output-dir $target --fail-on-coplanar-overlap
+    python $renderer --manifest $manifest.FullName --output-dir $target --assets-root $assetsRootPath --fail-on-coplanar-overlap
     if ($LASTEXITCODE -ne 0) {
         throw "Model rendering failed for $($manifest.FullName)"
+    }
+
+    $metadataPath = Join-Path $target "render-metadata.json"
+    $metadata = Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
+    $unresolvedTextures = @($metadata.unresolvedTextures | Where-Object { $_ })
+    if ($unresolvedTextures.Count -gt 0) {
+        throw "Model rendering left unresolved textures for $($manifest.Name): $($unresolvedTextures -join ', ')"
+    }
+    if ($metadata.renderedImageCount -ne 24) {
+        throw "Model rendering produced $($metadata.renderedImageCount) primary images for $($manifest.Name), expected 24."
     }
 }
 

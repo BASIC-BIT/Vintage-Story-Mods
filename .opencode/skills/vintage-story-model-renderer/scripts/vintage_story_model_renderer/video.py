@@ -92,7 +92,12 @@ def render_animation(
     else:
         frame_faces = sampled_cycle_faces
         views = [VIEWS[view_name][0]] * samples_per_cycle
-    projections = fixed_animation_projections(frame_faces, views, size)
+    projections = fixed_animation_projections(
+        frame_faces,
+        views,
+        size,
+        [VIEWS[view_name][1]] * len(views),
+    )
     frame_directory = prepare_frame_directory(output)
     for frame, (faces, frame_projection) in enumerate(zip(frame_faces, projections)):
         camera_label = f"ORBIT {360 * frame / total_frames:06.2f} DEG" if orbit else view_name.upper()
@@ -202,7 +207,12 @@ def render_seraph_held_animation(
         if orbit
         else [base_view] * samples_per_cycle
     )
-    projections = fixed_animation_projections(frame_faces, views, size)
+    projections = fixed_animation_projections(
+        frame_faces,
+        views,
+        size,
+        [VIEWS[view_name][1]] * len(views),
+    )
     frame_directory = prepare_frame_directory(output)
     for frame, (faces, frame_projection) in enumerate(zip(frame_faces, projections)):
         camera_label = f"ORBIT {360 * frame / total_frames:06.2f} DEG" if orbit else view_name.upper()
@@ -267,7 +277,12 @@ def render_turntable(
         orbit_view(base_view, frame / total_frames)
         for frame in range(total_frames)
     ]
-    projections = fixed_animation_projections(frame_faces, views, size)
+    projections = fixed_animation_projections(
+        frame_faces,
+        views,
+        size,
+        [VIEWS[view_name][1]] * len(views),
+    )
     frame_directory = prepare_frame_directory(output)
     for frame, frame_projection in enumerate(projections):
         angle = 360 * frame / total_frames

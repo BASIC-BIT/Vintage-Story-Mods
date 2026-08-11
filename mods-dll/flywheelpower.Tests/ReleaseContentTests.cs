@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
 namespace FlywheelPower.Tests;
@@ -587,6 +588,44 @@ public sealed class ReleaseContentTests
         Assert.NotEqual(
             EnumAxis.Y,
             BlockFlywheelStand.ResolvePlacementAxis(EnumAxis.Y, playerYaw: 0f, verticalPlacement: false));
+    }
+
+    [Theory]
+    [InlineData("ns", 0, "ns")]
+    [InlineData("ns", 90, "we")]
+    [InlineData("we", 270, "ns")]
+    [InlineData("we", -90, "ns")]
+    [InlineData("ns", 180, "ns")]
+    [InlineData("ud", 90, "ud")]
+    public void SchematicRotationKeepsPrincipalVariantsAligned(string rotation, int angle, string expected)
+    {
+        Assert.Equal(expected, FlywheelMultiblock.RotateRotation(rotation, angle));
+    }
+
+    [Fact]
+    public void EveryPrincipalBlockOverridesSchematicRotation()
+    {
+        foreach (Type blockType in new[]
+                 {
+                     typeof(BlockFlywheelStand),
+                     typeof(BlockFlywheel),
+                     typeof(BlockCompactFlywheel)
+                 })
+        {
+            Assert.Equal(
+                blockType,
+                blockType.GetMethod(nameof(Block.GetRotatedBlockCode), new[] { typeof(int) })?.DeclaringType);
+        }
+    }
+
+    [Fact]
+    public void MultiblockPartsDelegateOnlyToFlywheelPrincipals()
+    {
+        Assert.True(BlockFlywheelPart.IsValidPrincipalBlock(new BlockFlywheelStand()));
+        Assert.True(BlockFlywheelPart.IsValidPrincipalBlock(new BlockFlywheel()));
+        Assert.True(BlockFlywheelPart.IsValidPrincipalBlock(new BlockCompactFlywheel()));
+        Assert.False(BlockFlywheelPart.IsValidPrincipalBlock(new Block()));
+        Assert.False(BlockFlywheelPart.IsValidPrincipalBlock(null));
     }
 
     [Fact]

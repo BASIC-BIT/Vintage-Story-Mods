@@ -111,7 +111,17 @@ public sealed class BlockFlywheelPart : Block
             return false;
         }
 
+        if (!IsValidPrincipalBlock(blockAccessor.GetBlock(part.Principal)))
+        {
+            return false;
+        }
+
         principal = part.Principal;
         return true;
+    }
+
+    internal static bool IsValidPrincipalBlock(Block block)
+    {
+        return block is BlockFlywheelStand or BlockFlywheel or BlockCompactFlywheel;
     }
 }
