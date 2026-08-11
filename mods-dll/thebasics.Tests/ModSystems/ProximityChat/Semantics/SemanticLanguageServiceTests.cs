@@ -657,16 +657,7 @@ public class SemanticLanguageServiceTests
 
     private static IServerPlayer CreatePlayer()
     {
-        var player = Substitute.For<IServerPlayer>();
-        player.PlayerUID.Returns("player-1");
-        player.PlayerName.Returns("Alice");
-        var modData = new Dictionary<string, byte[]>();
-        player.GetModdata(Arg.Any<string>()).Returns(call => modData.TryGetValue(call.Arg<string>(), out var value) ? value : null);
-        player.When(call => call.SetModdata(Arg.Any<string>(), Arg.Any<byte[]>()))
-            .Do(call => modData[call.ArgAt<string>(0)] = call.ArgAt<byte[]>(1));
-        player.When(call => call.RemoveModdata(Arg.Any<string>()))
-            .Do(call => modData.Remove(call.ArgAt<string>(0)));
-        return player;
+        return new FakeServerPlayer("player-1", "Alice");
     }
 
     private static void WaitForAtlasIndex(SemanticLanguageService service)

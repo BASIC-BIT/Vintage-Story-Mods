@@ -1903,7 +1903,22 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         API.Event.PlayerChat += Event_PlayerChat;
         API.Event.PlayerJoin += Event_PlayerJoin;
+        API.Event.PlayerNowPlaying += Event_PlayerNowPlaying;
         API.Event.PlayerDisconnect += Event_PlayerDisconnect;
+    }
+
+    /// <summary>
+    /// Anything that sends the player a chat message has to wait for this, not PlayerJoin.
+    /// </summary>
+    /// <remarks>
+    /// At PlayerJoin the client is still on the connecting screen with no composed chat HUD, so a
+    /// message sent then reaches <c>HudDialogChat.UpdateText</c> before it can render one and takes
+    /// the client down with a NullReferenceException. PlayerJoin is for server-side state; player-
+    /// visible messages belong here.
+    /// </remarks>
+    private void Event_PlayerNowPlaying(IServerPlayer byPlayer)
+    {
+        ReconcileChatTypeOnJoin(byPlayer);
     }
 
     private void Event_PlayerDisconnect(IServerPlayer player)
@@ -1950,8 +1965,6 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void Event_PlayerJoin(IServerPlayer byPlayer)
     {
-        ReconcileChatTypeOnJoin(byPlayer);
-
         if (!Config.UseGeneralChannelAsProximityChat)
         {
             var proximityGroup = GetProximityGroup();
@@ -2523,16 +2536,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     }
 
     /// <summary>
-    /// Reports both axes at once. Range alone is ambiguous now that a player can be whispering in
-    /// character or whispering out of character.
-    /// </summary>
-    /// <summary>
     /// Puts a player back into ordinary chat when the type they were parked in is no longer allowed,
     /// so they never start a session in a state the server will refuse.
     ///
     /// The delivery path clears stale types too, but only once the player has already tried to speak,
-    /// which costs them a message and reads as being stuck. Doing it at join makes that the rare
-    /// live-config-flip case rather than the normal one.
+    /// which costs them a message and reads as being stuck. Doing it as they enter the world makes
+    /// that the rare live-config-flip case rather than the normal one.
+    ///
+    /// Called from PlayerNowPlaying, never PlayerJoin: it sends a message, and at join time there is
+    /// no chat HUD on the client to receive one.
     /// </summary>
     private void ReconcileChatTypeOnJoin(IServerPlayer byPlayer)
     {

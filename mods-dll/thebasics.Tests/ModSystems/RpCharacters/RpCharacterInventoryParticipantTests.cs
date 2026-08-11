@@ -47,7 +47,7 @@ public class RpCharacterInventoryParticipantTests
         AssertInventory(inventories["character"], "character", 8);
         manager.ActiveHotbarSlotNumber.Should().Be(7);
         manager.Received(1).BroadcastHotbarSlot();
-        player.Received(1).BroadcastPlayerData(true);
+        player.BroadcastPlayerDataCalls.Should().Equal(true);
         inventories.Values.Should().OnlyContain(inventory =>
             inventory.AfterBlocksLoadedCalls == 1 &&
             ReferenceEquals(inventory.LastWorld, player.Entity.World));
@@ -84,17 +84,13 @@ public class RpCharacterInventoryParticipantTests
         return manager;
     }
 
-    private static IServerPlayer CreatePlayer(IPlayerInventoryManager manager)
+    private static FakeServerPlayer CreatePlayer(IPlayerInventoryManager manager)
     {
         var entity = new EntityPlayer
         {
             World = Substitute.For<IWorldAccessor>()
         };
-        var player = Substitute.For<IServerPlayer>();
-        player.PlayerUID.Returns("player-1");
-        player.InventoryManager.Returns(manager);
-        player.Entity.Returns(entity);
-        return player;
+        return new FakeServerPlayer { InventoryManager = manager, Entity = entity };
     }
 
     private static RpCharacterSwitchContext CreateContext(IServerPlayer player, RpCharacterRecord record)

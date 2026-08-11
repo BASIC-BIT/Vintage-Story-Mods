@@ -59,9 +59,7 @@ public class ChatOcclusionTests
 
         private static IServerPlayer PlayerWithUid(string uid)
         {
-            var player = Substitute.For<IServerPlayer>();
-            player.PlayerUID.Returns(uid);
-            return player;
+            return new FakeServerPlayer(uid);
         }
 
         [Fact]

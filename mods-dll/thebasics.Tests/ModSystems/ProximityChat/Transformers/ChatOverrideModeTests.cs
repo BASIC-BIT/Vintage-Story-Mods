@@ -21,22 +21,19 @@ public class ChatOverrideModeTests
     private const string OverrideKey = "BASIC_CHAT_OVERRIDE_MODE";
     private const string LegacyEmoteKey = "BASIC_EMOTEMODE";
 
-    private static IServerPlayer CreatePlayer(ChatOverrideMode? overrideMode = null, bool? legacyEmoteMode = null)
+    private static FakeServerPlayer CreatePlayer(ChatOverrideMode? overrideMode = null, bool? legacyEmoteMode = null)
     {
-        var player = Substitute.For<IServerPlayer>();
-        player.GetModdata(Arg.Any<string>()).Returns((byte[])null!);
-
-        // OOC delivery re-checks OOCTogglePermission, and NSubstitute denies privileges by default.
-        player.HasPrivilege(Arg.Any<string>()).Returns(true);
+        // OOC delivery re-checks OOCTogglePermission, so grant privileges unless a test revokes them.
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
 
         if (overrideMode.HasValue)
         {
-            player.GetModdata(OverrideKey).Returns(SerializerUtil.Serialize(overrideMode.Value));
+            player.SetModdata(OverrideKey, SerializerUtil.Serialize(overrideMode.Value));
         }
 
         if (legacyEmoteMode.HasValue)
         {
-            player.GetModdata(LegacyEmoteKey).Returns(SerializerUtil.Serialize(legacyEmoteMode.Value));
+            player.SetModdata(LegacyEmoteKey, SerializerUtil.Serialize(legacyEmoteMode.Value));
         }
 
         return player;
@@ -246,7 +243,7 @@ public class ChatOverrideModeTests
         // Roles change at runtime with no config edit, so the privilege that gates entry has to be
         // re-checked on delivery. Otherwise a demoted player keeps posting OOC indefinitely.
         var player = CreatePlayer(ChatOverrideMode.Ooc);
-        player.HasPrivilege(Arg.Any<string>()).Returns(false);
+        player.PrivilegeCheck = _ => false;
 
         var context = Parse(CreateConfig(), player, "still chatting");
 
@@ -259,7 +256,7 @@ public class ChatOverrideModeTests
     {
         // The OOC gates must not leak onto emote mode, which is deliberately ungated.
         var player = CreatePlayer(ChatOverrideMode.Emote);
-        player.HasPrivilege(Arg.Any<string>()).Returns(false);
+        player.PrivilegeCheck = _ => false;
 
         var context = Parse(CreateConfig(), player, "waves");
 
@@ -298,14 +295,12 @@ public class ChatOverrideModeTests
         LangTestHelper.EnsureEnglish();
         var config = CreateConfig();
         config.AllowOOCToggle = false;
-        var sent = new List<string>();
         var player = CreatePlayer(ChatOverrideMode.Ooc);
-        player.When(p => p.SendMessage(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<EnumChatType>(), Arg.Any<string>()))
-            .Do(call => sent.Add(call.ArgAt<string>(1)));
 
         Parse(config, player, "still chatting");
 
-        sent.Should().ContainSingle().Which.Should().Be("thebasics:chat-type-reset-dropped-message");
+        player.SentMessages.Select(message => message.Message).Should().ContainSingle()
+            .Which.Should().Be("thebasics:chat-type-reset-dropped-message");
     }
 
     [Fact]
@@ -314,14 +309,12 @@ public class ChatOverrideModeTests
         // The prefix path refuses without touching the stored type, so claiming a reset would lie.
         LangTestHelper.EnsureEnglish();
         var config = CreateConfig(enableGlobalOoc: false);
-        var sent = new List<string>();
         var player = CreatePlayer();
-        player.When(p => p.SendMessage(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<EnumChatType>(), Arg.Any<string>()))
-            .Do(call => sent.Add(call.ArgAt<string>(1)));
 
         Parse(config, player, "((server restart soon))");
 
-        sent.Should().ContainSingle().Which.Should().Be("thebasics:chat-message-not-sent");
+        player.SentMessages.Select(message => message.Message).Should().ContainSingle()
+            .Which.Should().Be("thebasics:chat-message-not-sent");
     }
 
     [Fact]
@@ -344,12 +337,10 @@ public class ChatOverrideModeTests
         var config = CreateConfig();
         config.DisableRPChat = true;
         var player = CreatePlayer(ChatOverrideMode.GlobalOoc);
-        byte[]? written = null;
-        player.When(p => p.SetModdata(OverrideKey, Arg.Any<byte[]>()))
-            .Do(call => written = call.ArgAt<byte[]>(1));
 
         Parse(config, player, "hello");
 
+        var written = player.GetModdata(OverrideKey);
         written.Should().NotBeNull();
         SerializerUtil.Deserialize(written, ChatOverrideMode.GlobalOoc).Should().Be(ChatOverrideMode.None);
     }
@@ -360,12 +351,10 @@ public class ChatOverrideModeTests
         // Masking alone would leave the stored value intact, so re-enabling global OOC later would
         // silently drop the player back into a server-wide channel on their next ordinary line.
         var player = CreatePlayer(ChatOverrideMode.GlobalOoc);
-        byte[]? written = null;
-        player.When(p => p.SetModdata(OverrideKey, Arg.Any<byte[]>()))
-            .Do(call => written = call.ArgAt<byte[]>(1));
 
         Parse(CreateConfig(enableGlobalOoc: false), player, "hello");
 
+        var written = player.GetModdata(OverrideKey);
         written.Should().NotBeNull("the stale override must be persisted as cleared, not just masked");
         SerializerUtil.Deserialize(written, ChatOverrideMode.GlobalOoc).Should().Be(ChatOverrideMode.None);
     }
