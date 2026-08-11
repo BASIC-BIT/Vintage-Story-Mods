@@ -111,6 +111,59 @@ def add_rotated_cuboid(
         faces.append(Face([vertices[index] for index in indices], material, element, default_uvs))
 
 
+def add_spoke(
+    faces: list[Face],
+    min_x: float,
+    max_x: float,
+    inner_radius: float,
+    outer_radius: float,
+    half_width: float,
+    material: str,
+    element: str,
+    angle: float,
+) -> None:
+    """Mirror FlywheelMechBlockRenderer.AddSpoke geometry and authored UVs."""
+    radial_y = math.sin(angle)
+    radial_z = math.cos(angle)
+    tangent_y = math.cos(angle)
+    tangent_z = -math.sin(angle)
+
+    def vertex(x: float, radius: float, tangent: float, uv: Vec2) -> tuple[Vec3, Vec2]:
+        return (
+            (
+                x,
+                8 + radius * radial_y + tangent * tangent_y,
+                8 + radius * radial_z + tangent * tangent_z,
+            ),
+            uv,
+        )
+
+    f_inner_left = vertex(max_x, inner_radius, -half_width, (0, 0))
+    f_inner_right = vertex(max_x, inner_radius, half_width, (1, 0))
+    f_outer_right = vertex(max_x, outer_radius, half_width, (1, 1))
+    f_outer_left = vertex(max_x, outer_radius, -half_width, (0, 1))
+    b_inner_left = vertex(min_x, inner_radius, -half_width, (0, 0))
+    b_inner_right = vertex(min_x, inner_radius, half_width, (1, 0))
+    b_outer_right = vertex(min_x, outer_radius, half_width, (1, 1))
+    b_outer_left = vertex(min_x, outer_radius, -half_width, (0, 1))
+
+    def face(surface: str, *corners: tuple[Vec3, Vec2]) -> None:
+        faces.append(Face(
+            [corner[0] for corner in corners],
+            material,
+            element,
+            [corner[1] for corner in corners],
+            surface=surface,
+        ))
+
+    face("front", f_inner_left, f_inner_right, f_outer_right, f_outer_left)
+    face("back", b_inner_left, b_outer_left, b_outer_right, b_inner_right)
+    face("tangent-positive", f_inner_right, b_inner_right, b_outer_right, f_outer_right)
+    face("tangent-negative", f_inner_left, f_outer_left, b_outer_left, b_inner_left)
+    face("outer", f_outer_left, f_outer_right, b_outer_right, b_outer_left)
+    face("inner", f_inner_left, b_inner_left, b_inner_right, f_inner_right)
+
+
 def load_flywheel(path: Path, size: str) -> list[Face]:
     values = constants(path)
     renderer_values = constants(path.with_name("FlywheelMechBlockRenderer.cs"))
@@ -141,13 +194,16 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
         spoke_inner = value("HubOuterRadius") * 0.92
         spoke_outer = value("FelloeInnerRadius") + 0.02 * 16
         for index in range(spoke_count):
-            add_rotated_cuboid(
+            add_spoke(
                 faces,
-                (wheel_min + spoke_inset, 8 - spoke_half, 8 + spoke_inner),
-                (wheel_max - spoke_inset, 8 + spoke_half, 8 + spoke_outer),
+                wheel_min + spoke_inset,
+                wheel_max - spoke_inset,
+                spoke_inner,
+                spoke_outer,
+                spoke_half,
                 "wood",
                 f"RuntimeWoodSpoke{index}",
-                index * 360 / spoke_count,
+                math.tau * index / spoke_count,
             )
         add_annulus(
             faces,

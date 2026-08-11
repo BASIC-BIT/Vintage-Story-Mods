@@ -118,6 +118,19 @@ internal static class FlywheelMultiblock
         return positions;
     }
 
+    internal static bool IsPartPosition(BlockPos center, EnumAxis axis, BlockPos candidate)
+    {
+        foreach (BlockPos partPos in GetPartPositions(center, axis))
+        {
+            if (partPos.Equals(candidate))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     internal static EnumAxis AxisForRotation(string rotation)
     {
         return rotation switch

@@ -184,7 +184,7 @@ def blocktype(compact: bool) -> dict:
             f"*-{wheel}-{hub}-*": {
                 "wheel": {"base": texture(wheel)},
                 "metal": {"base": texture(hub)},
-                "bearing": {"base": "game:block/metal/tarnished/iron-riveted1"},
+                "bearing": {"base": texture(hub)},
                 "wood": {"base": "game:block/wood/planks/generic"},
             }
             for wheel, hub in pairs
@@ -266,7 +266,7 @@ def bearing_itemtype() -> dict:
         "texturesByType": {
             f"*-{hub}": {
                 "metal": {"base": texture(hub)},
-                "bearing": {"base": "game:block/metal/tarnished/iron-riveted1"},
+                "bearing": {"base": texture(hub)},
                 "wood": {"base": "game:block/wood/planks/generic"},
             }
             for hub in METALS

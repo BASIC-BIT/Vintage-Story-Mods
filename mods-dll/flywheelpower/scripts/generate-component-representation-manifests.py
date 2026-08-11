@@ -26,7 +26,7 @@ COLLECTIBLES = [
         "variant": "flywheelbearing-compact-copper",
         "textures": {
             "metal": "game:block/metal/ingot/copper",
-            "bearing": "game:block/metal/tarnished/iron-riveted1",
+            "bearing": "game:block/metal/ingot/copper",
             "wood": "game:block/wood/planks/generic",
         },
     },
@@ -37,7 +37,7 @@ COLLECTIBLES = [
         "variant": "flywheelbearing-full-steel",
         "textures": {
             "metal": "game:block/metal/ingot/steel",
-            "bearing": "game:block/metal/tarnished/iron-riveted1",
+            "bearing": "game:block/metal/ingot/steel",
             "wood": "game:block/wood/planks/generic",
         },
     },
@@ -93,7 +93,7 @@ COLLECTIBLES = [
         "textures": {
             "wheel": "game:block/metal/ingot/steel",
             "metal": "game:block/metal/ingot/steel",
-            "bearing": "game:block/metal/tarnished/iron-riveted1",
+            "bearing": "game:block/metal/ingot/steel",
             "chalk": "game:block/cloth/wool/red1",
             "wood": "game:block/wood/planks/generic",
         },
@@ -109,7 +109,7 @@ COLLECTIBLES = [
         "textures": {
             "wheel": "game:block/metal/ingot/iron",
             "metal": "game:block/metal/ingot/steel",
-            "bearing": "game:block/metal/tarnished/iron-riveted1",
+            "bearing": "game:block/metal/ingot/steel",
             "chalk": "game:block/cloth/wool/red1",
             "wood": "game:block/wood/planks/generic",
         },

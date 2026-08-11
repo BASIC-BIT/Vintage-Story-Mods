@@ -85,8 +85,10 @@ public sealed class ReleaseContentTests
         AssertTexture(fullRoot, "*-copper-iron-*", "wheel", "game:block/metal/ingot/copper");
         AssertTexture(fullRoot, "*-blackbronze-steel-*", "wheel", "game:block/metal/ingot/blackbronze");
         AssertTexture(compactRoot, "*-wood-copper-*", "metal", "game:block/metal/ingot/copper");
+        AssertTexture(compactRoot, "*-wood-copper-*", "bearing", "game:block/metal/ingot/copper");
         AssertTexture(compactRoot, "*-tinbronze-bismuthbronze-*", "wheel", "game:block/metal/ingot/tinbronze");
         AssertTexture(compactRoot, "*-tinbronze-bismuthbronze-*", "metal", "game:block/metal/ingot/bismuthbronze");
+        AssertTexture(compactRoot, "*-tinbronze-bismuthbronze-*", "bearing", "game:block/metal/ingot/bismuthbronze");
         Assert.DoesNotContain(
             fullRoot.GetProperty("attributesByType").EnumerateObject(),
             property => property.Name.Contains("-copper-*", StringComparison.Ordinal));
@@ -648,6 +650,7 @@ public sealed class ReleaseContentTests
             "world.Claims.TryAccess(byPlayer, principal, EnumBlockAccessFlags.Use)",
             source,
             StringComparison.Ordinal);
+        Assert.Contains("FlywheelMultiblock.IsPartPosition", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -662,6 +665,10 @@ public sealed class ReleaseContentTests
         Assert.Contains("""failureCode = "flywheelrequiresstand";""", fullSource, StringComparison.Ordinal);
         Assert.Contains("""failureCode = "flywheelrequiresstand";""", compactSource, StringComparison.Ordinal);
         Assert.Contains("SetBlock(installed.BlockId", standSource, StringComparison.Ordinal);
+        Assert.Contains(
+            "world.Claims.TryAccess(byPlayer, blockSel.Position, EnumBlockAccessFlags.BuildOrBreak)",
+            standSource,
+            StringComparison.Ordinal);
         Assert.Contains("slot.TakeOut(1)", standSource, StringComparison.Ordinal);
         Assert.Contains("\"code\": \"flywheelstand-full-ud\"", fullBlocktype, StringComparison.Ordinal);
         Assert.Contains("\"code\": \"flywheelstand-compact-ud\"", compactBlocktype, StringComparison.Ordinal);
@@ -677,6 +684,20 @@ public sealed class ReleaseContentTests
         Assert.Contains("placefailure-flywheelrequiresfoundation", engineLanguage, StringComparison.Ordinal);
         Assert.Contains("placefailure-flywheelrequiresstand", engineLanguage, StringComparison.Ordinal);
         Assert.DoesNotContain("placefailure-flywheel", modLanguage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PackageUsesSortedEntriesAndFixedZipTimestamps()
+    {
+        string source = File.ReadAllText(Path.Combine(ProjectRoot, "scripts", "package.ps1"));
+        string project = File.ReadAllText(Path.Combine(ProjectRoot, "flywheelpower.csproj"));
+
+        Assert.Contains("Sort-Object -Property EntryName -CaseSensitive", source, StringComparison.Ordinal);
+        Assert.Contains("$entry.LastWriteTime = $fixedEntryTimestamp", source, StringComparison.Ordinal);
+        Assert.Contains("$sourceStream.CopyTo($entryStream)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CreateEntryFromFile", source, StringComparison.Ordinal);
+        Assert.Contains("<Deterministic>true</Deterministic>", project, StringComparison.Ordinal);
+        Assert.Contains("<PathMap>$(MSBuildProjectDirectory)=/_/mods-dll/flywheelpower</PathMap>", project, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -461,15 +461,18 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   on that face deliberately selects the supported vertical orientation; side-face placement keeps the selected face axis.
 - Flywheel Power targets Vintage Story 1.22.6. After PR #219 merged and this branch refreshed from `main`, all six configured
   projects build with zero errors. The merged tree reports four existing The BASICs analyzer warnings and 14 nullable
-  warnings in its new `FakeServerPlayer` test fixture. The BASICs tests pass 608/608, Flywheel Power tests pass 81/81,
+  warnings in its new `FakeServerPlayer` test fixture. The BASICs tests pass 608/608, Flywheel Power tests pass 88/88,
   and DimensionLib tests pass 58/58.
-- All six configured whitespace checks, the Flywheel source formatting check, the agent-tooling check, generated-content drift checks, the Lizard gate, and 62/62
+- All six configured whitespace checks, the Flywheel source formatting check, the agent-tooling check, generated-content drift checks, the Lizard gate, and 63/63
   renderer regression tests pass. The exact model sweep covers 74 manifests and 1,776 primary images with zero unresolved
   textures, zero coplanar overlaps, and exactly 24 images per manifest. Every resolved texture file is included by SHA-256
   in its manifest's deterministic input provenance. Authored UV corners now follow each cuboid face's vertex order,
-  including opposite-facing south, west, and down planes, while preserving authored quarter-turn rotations.
-- The post-review exact package contains 31 allowlisted entries, is 84,723 bytes, and has SHA-256
-  `18F681DEBB657A838CAF03C64E6907376BDB1FF25FACE82EF8AE2D8738DBAD21`. A second package run reproduced the same hash.
+  including opposite-facing south, west, and down planes, while preserving authored quarter-turn rotations. Procedural
+  spoke evidence now mirrors the runtime renderer's six face orders and UV assignments instead of generic cuboid UVs.
+- The post-review exact package contains 31 allowlisted entries, is 84,871 bytes, and has SHA-256
+  `842EE0765263549EDD9E18ECFADCFE07A39DD12C3A27E0754939FC3B1BFC88AC`. Entries are sorted, use a fixed ZIP timestamp,
+  and path-map build outputs to remove checkout-specific debug paths;
+  a second package run after changing a packaged source file's filesystem timestamp reproduced the same hash.
   Archive inspection finds no disabled content,
   compact-web residue, or obsolete player-facing tyre, rim, or blank labels.
 - PR #219 merged as `e07ceda`; this branch incorporated that exact `main` commit in merge commit `09d0e10`. The prior
@@ -479,7 +482,10 @@ Remove this packet after the initial-feedback pull request is merged or closed a
 - Full-size reservation parts delegate only to full-size stands or installed full-size flywheels. Compact stands and compact
   assemblies are rejected as principals, preventing stale full-size links from delegating into an unrelated compact machine.
 - Delegation through a full-size reservation cell rechecks build/break or use access at the resolved principal before
-  forwarding the action, preventing a claim-boundary bypass through an outer footprint cell.
+  forwarding the action, validates that the cell belongs to the principal's current rotation plane, and refuses stale or
+  forged cross-plane links. Installing an assembly into a stand separately requires build/break access before replacement.
+- Bearing collars now use the selected hub alloy in physical calculations, placed rendering, and held-item rendering,
+  matching the same-alloy forged fittings used by the recipe rather than silently adding an uncounted iron component.
 - Collectible turntables now render the same grip reference geometry as fixed-view evidence. A bounded 32-frame full-bearing
   turntable retained that reference throughout all four quarter-turn samples.
 - Animation sampling now interpolates each translation, rotation, and scale axis from that axis's own authored keyframes.

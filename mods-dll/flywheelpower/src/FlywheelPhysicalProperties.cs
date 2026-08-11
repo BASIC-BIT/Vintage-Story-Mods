@@ -64,7 +64,7 @@ internal static class FlywheelPhysicalProperties
             ? Annulus(wheelDensity, spec.WheelInnerRadius, spec.WheelOuterRadius, spec.WheelThickness)
             : FullSizeWheel(wheelDensity, spec);
         Component hub = Annulus(hubDensity, spec.BearingOuterRadius, spec.HubOuterRadius, spec.HubThickness);
-        Component bearing = Annulus(IronDensity, spec.ShaftClearanceRadius, spec.BearingOuterRadius, spec.BearingThickness);
+        Component bearing = Annulus(hubDensity, spec.ShaftClearanceRadius, spec.BearingOuterRadius, spec.BearingThickness);
         Component plates = Annulus(hubDensity, spec.ShaftClearanceRadius, spec.PlateOuterRadius, spec.PlateThickness * 2f);
         Component axle = SolidCylinder(WoodDensity, spec.AxleRadius, spec.AxleLength);
 

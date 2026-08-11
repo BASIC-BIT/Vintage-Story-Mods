@@ -6,7 +6,7 @@
   ],
   "textures": {
     "metal": "game:block/metal/ingot/copper",
-    "bearing": "game:block/metal/tarnished/iron-riveted1",
+    "bearing": "game:block/metal/ingot/copper",
     "wood": "game:block/wood/planks/generic"
   },
   "seraphHeldScene": {

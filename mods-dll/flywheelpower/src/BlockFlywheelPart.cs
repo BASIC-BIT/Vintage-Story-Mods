@@ -121,7 +121,18 @@ public sealed class BlockFlywheelPart : Block
             return false;
         }
 
-        if (!IsValidPrincipalBlock(blockAccessor.GetBlock(part.Principal)))
+        Block principalBlock = blockAccessor.GetBlock(part.Principal);
+        if (!IsValidPrincipalBlock(principalBlock))
+        {
+            return false;
+        }
+
+        string rotation = principalBlock.Variant?["rotation"];
+        if (rotation is not ("ns" or "we" or "ud")
+            || !FlywheelMultiblock.IsPartPosition(
+                part.Principal,
+                FlywheelMultiblock.AxisForRotation(rotation),
+                pos))
         {
             return false;
         }

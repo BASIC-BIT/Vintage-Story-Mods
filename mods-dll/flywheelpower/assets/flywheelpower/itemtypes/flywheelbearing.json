@@ -52,7 +52,7 @@
         "base": "game:block/metal/ingot/copper"
       },
       "bearing": {
-        "base": "game:block/metal/tarnished/iron-riveted1"
+        "base": "game:block/metal/ingot/copper"
       },
       "wood": {
         "base": "game:block/wood/planks/generic"
@@ -63,7 +63,7 @@
         "base": "game:block/metal/ingot/tinbronze"
       },
       "bearing": {
-        "base": "game:block/metal/tarnished/iron-riveted1"
+        "base": "game:block/metal/ingot/tinbronze"
       },
       "wood": {
         "base": "game:block/wood/planks/generic"
@@ -74,7 +74,7 @@
         "base": "game:block/metal/ingot/bismuthbronze"
       },
       "bearing": {
-        "base": "game:block/metal/tarnished/iron-riveted1"
+        "base": "game:block/metal/ingot/bismuthbronze"
       },
       "wood": {
         "base": "game:block/wood/planks/generic"
@@ -85,7 +85,7 @@
         "base": "game:block/metal/ingot/blackbronze"
       },
       "bearing": {
-        "base": "game:block/metal/tarnished/iron-riveted1"
+        "base": "game:block/metal/ingot/blackbronze"
       },
       "wood": {
         "base": "game:block/wood/planks/generic"
@@ -96,7 +96,7 @@
         "base": "game:block/metal/ingot/iron"
       },
       "bearing": {
-        "base": "game:block/metal/tarnished/iron-riveted1"
+        "base": "game:block/metal/ingot/iron"
       },
       "wood": {
         "base": "game:block/wood/planks/generic"
@@ -107,7 +107,7 @@
         "base": "game:block/metal/ingot/meteoriciron"
       },
       "bearing": {
-        "base": "game:block/metal/tarnished/iron-riveted1"
+        "base": "game:block/metal/ingot/meteoriciron"
       },
       "wood": {
         "base": "game:block/wood/planks/generic"
@@ -118,7 +118,7 @@
         "base": "game:block/metal/ingot/steel"
       },
       "bearing": {
-        "base": "game:block/metal/tarnished/iron-riveted1"
+        "base": "game:block/metal/ingot/steel"
       },
       "wood": {
         "base": "game:block/wood/planks/generic"

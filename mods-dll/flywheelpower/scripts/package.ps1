@@ -52,19 +52,38 @@ foreach ($file in @($modInfoFile, $readmeFile, $dllFile, $pdbFile)) {
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+$fixedEntryTimestamp = [DateTimeOffset]::new(2000, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
+$packageFiles = @(
+    foreach ($file in @($modInfoFile, $readmeFile, $dllFile, $pdbFile)) {
+        [pscustomobject]@{
+            SourcePath = [string]$file
+            EntryName = [System.IO.Path]::GetFileName($file)
+        }
+    }
+
+    foreach ($file in Get-ChildItem -LiteralPath $assetsDir -Recurse -File) {
+        [pscustomobject]@{
+            SourcePath = $file.FullName
+            EntryName = $file.FullName.Substring($projectRoot.Path.Length + 1).Replace('\', '/')
+        }
+    }
+) | Sort-Object -Property EntryName -CaseSensitive
+
 Remove-Item -LiteralPath $zipFile -Force -ErrorAction SilentlyContinue
 $zip = [System.IO.Compression.ZipFile]::Open($zipFile, [System.IO.Compression.ZipArchiveMode]::Create)
 try {
-    foreach ($file in @($modInfoFile, $readmeFile, $dllFile, $pdbFile)) {
-        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
-            $zip,
-            $file,
-            [System.IO.Path]::GetFileName($file)) | Out-Null
-    }
-
-    Get-ChildItem -LiteralPath $assetsDir -Recurse -File | ForEach-Object {
-        $relativePath = $_.FullName.Substring($projectRoot.Path.Length + 1).Replace('\', '/')
-        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $relativePath) | Out-Null
+    foreach ($file in $packageFiles) {
+        $entry = $zip.CreateEntry($file.EntryName, [System.IO.Compression.CompressionLevel]::Optimal)
+        $entry.LastWriteTime = $fixedEntryTimestamp
+        $sourceStream = [System.IO.File]::OpenRead($file.SourcePath)
+        $entryStream = $entry.Open()
+        try {
+            $sourceStream.CopyTo($entryStream)
+        }
+        finally {
+            $entryStream.Dispose()
+            $sourceStream.Dispose()
+        }
     }
 }
 finally {
@@ -150,8 +169,20 @@ $releasedRendererCodes = @(
 $archive = [System.IO.Compression.ZipFile]::OpenRead($zipFile)
 try {
     $entryNames = @($archive.Entries | ForEach-Object FullName)
+    $sortedEntryNames = @($entryNames | Sort-Object -CaseSensitive)
     $unexpectedEntries = @($entryNames | Where-Object { $_ -notin $expectedEntries })
     $missingEntries = @($expectedEntries | Where-Object { $_ -notin $entryNames })
+
+    if ([string]::Join("`n", $entryNames) -cne [string]::Join("`n", $sortedEntryNames)) {
+        throw 'Package entries are not in deterministic ordinal order.'
+    }
+
+    $unexpectedTimestamps = @(
+        $archive.Entries | Where-Object { $_.LastWriteTime.DateTime -ne $fixedEntryTimestamp.DateTime }
+    )
+    if ($unexpectedTimestamps.Count -gt 0) {
+        throw "Package entries do not share the deterministic timestamp: $($unexpectedTimestamps.FullName -join ', ')"
+    }
 
     if ($missingEntries.Count -gt 0) {
         throw "Required release entries are missing from package: $($missingEntries -join ', ')"

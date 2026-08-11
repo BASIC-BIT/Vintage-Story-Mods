@@ -33,4 +33,23 @@ public sealed class FlywheelMultiblockTests
         Assert.Equal(8, checkedPositions.Count);
         Assert.DoesNotContain(checkedPositions, partPos => partPos.Equals(center));
     }
+
+    [Theory]
+    [InlineData(EnumAxis.X, 10, 21, 31, true)]
+    [InlineData(EnumAxis.X, 11, 20, 30, false)]
+    [InlineData(EnumAxis.Y, 11, 20, 31, true)]
+    [InlineData(EnumAxis.Y, 10, 21, 30, false)]
+    [InlineData(EnumAxis.Z, 11, 21, 30, true)]
+    [InlineData(EnumAxis.Z, 10, 20, 31, false)]
+    public void PartPositionMustBelongToThePrincipalReservationPlane(
+        EnumAxis axis,
+        int x,
+        int y,
+        int z,
+        bool expected)
+    {
+        BlockPos center = new(10, 20, 30, 0);
+
+        Assert.Equal(expected, FlywheelMultiblock.IsPartPosition(center, axis, new BlockPos(x, y, z, 0)));
+    }
 }

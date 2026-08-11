@@ -111,6 +111,11 @@ public sealed class BlockFlywheelStand : Block
             return true;
         }
 
+        if (!world.Claims.TryAccess(byPlayer, blockSel.Position, EnumBlockAccessFlags.BuildOrBreak))
+        {
+            return true;
+        }
+
         string rotation = Variant["rotation"];
         if (!IsCompact
             && !FlywheelMultiblock.HasIntactReservations(

@@ -694,6 +694,32 @@ class RegistrationMarkWindingTests(unittest.TestCase):
         }
         self.assertEqual(6, len(spoke_elements))
 
+    def test_procedural_spokes_match_runtime_face_order_and_uvs(self):
+        faces = []
+        renderer.add_spoke(
+            faces,
+            min_x=7,
+            max_x=9,
+            inner_radius=2,
+            outer_radius=5,
+            half_width=0.5,
+            material="wood",
+            element="spoke",
+            angle=0,
+        )
+
+        self.assertEqual(
+            {
+                "front": [(0, 0), (1, 0), (1, 1), (0, 1)],
+                "back": [(0, 0), (0, 1), (1, 1), (1, 0)],
+                "tangent-positive": [(1, 0), (1, 0), (1, 1), (1, 1)],
+                "tangent-negative": [(0, 0), (0, 1), (0, 1), (0, 0)],
+                "outer": [(0, 1), (1, 1), (1, 1), (0, 1)],
+                "inner": [(0, 0), (0, 0), (1, 0), (1, 0)],
+            },
+            {face.surface: face.uvs for face in faces},
+        )
+
     def test_procedural_disc_matches_runtime_radial_cells_and_planar_uvs(self):
         root = Path(__file__).parents[4]
         dimensions = root / "mods-dll" / "flywheelpower" / "src" / "FlywheelModelDimensions.cs"
