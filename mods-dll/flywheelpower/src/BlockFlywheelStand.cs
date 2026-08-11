@@ -16,9 +16,10 @@ public sealed class BlockFlywheelStand : Block
         ref string failureCode)
     {
         bool compact = IsCompact;
-        EnumAxis axis = blockSel.Face.Axis == EnumAxis.Y
-            ? BlockFacing.HorizontalFromAngle(byPlayer.Entity.Pos.Yaw).Axis
-            : blockSel.Face.Axis;
+        EnumAxis axis = ResolvePlacementAxis(
+            blockSel.Face.Axis,
+            byPlayer.Entity?.Pos.Yaw ?? 0f,
+            byPlayer.Entity?.Controls?.Sneak == true);
         BlockSelection placementSel = blockSel.Clone();
         placementSel.Position = ResolvePlacementPosition(blockSel.Position, compact, blockSel.Face.Axis);
         string rotation = FlywheelMultiblock.RotationForAxis(axis);
@@ -62,6 +63,21 @@ public sealed class BlockFlywheelStand : Block
         return !compact && selectedFaceAxis == EnumAxis.Y
             ? selectedPosition.UpCopy()
             : selectedPosition.Copy();
+    }
+
+    internal static EnumAxis ResolvePlacementAxis(
+        EnumAxis selectedFaceAxis,
+        float playerYaw,
+        bool verticalPlacement)
+    {
+        if (selectedFaceAxis != EnumAxis.Y)
+        {
+            return selectedFaceAxis;
+        }
+
+        return verticalPlacement
+            ? EnumAxis.Y
+            : BlockFacing.HorizontalFromAngle(playerYaw).Axis;
     }
 
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel)

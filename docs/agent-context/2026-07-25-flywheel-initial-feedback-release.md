@@ -457,17 +457,20 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   consume 16.
 - Normal placed blocks no longer show Flywheel-specific telemetry. `ShowDebugBlockInfo` defaults off and restores the full
   diagnostic panel when deliberately enabled. Overspeed sparks and smoke remain visible gameplay feedback.
+- Stand placement on a top or bottom face remains horizontal and follows player yaw by default. Holding Sneak while placing
+  on that face deliberately selects the supported vertical orientation; side-face placement keeps the selected face axis.
 - Flywheel Power targets Vintage Story 1.22.6. All six configured projects build with zero errors; the only build warnings
-  are four pre-existing The BASICs analyzer findings. Flywheel Power tests pass 67/67 and DimensionLib tests pass 58/58.
+  are four pre-existing The BASICs analyzer findings. Flywheel Power tests pass 68/68 and DimensionLib tests pass 58/58.
   The all-repository The BASICs test lane is temporarily dependent on PR #219: current `main` lacks the 1.22.6
   `IServerPlayer.IsInInteractionRangeOf` test-fixture implementation and produces 123 unrelated dynamic-proxy failures.
-- All six configured whitespace checks, the agent-tooling check, generated-content drift checks, the Lizard gate, and 47/47
+- All six configured whitespace checks, the agent-tooling check, generated-content drift checks, the Lizard gate, and 50/50
   renderer regression tests pass. The exact model sweep covers 74 manifests and 1,776 primary images with zero unresolved
   textures, zero coplanar overlaps, and exactly 24 images per manifest.
-- The exact package contains 31 allowlisted entries, is 83,637 bytes, and has SHA-256
-  `27DD897BD99FC4CC003D166CA5704E32DB270117CF7EDB0C6FE787D04A348A09`. Archive inspection finds no disabled content,
+- The exact package contains 31 allowlisted entries, is 83,905 bytes, and has SHA-256
+  `9BDBF1489B3FDA8BE023402AC6678D21D272432B55F2D804C4D306EEE621CF18`. Archive inspection finds no disabled content,
   compact-web residue, or obsolete player-facing tyre, rim, or blank labels.
-- Runtime/model manual QA remains applicable because the final post-deployment delta changes recipes, localization, docs,
-  and generated content registration only. Before merge, the exact final package still needs the bounded anvil/handbook
-  observation: forge the 7-by-6 saddle from one ingot, confirm four fittings, confirm compact assembly omits a timber web,
-  and confirm full-size assembly still requires one.
+- Runtime/model manual QA remains applicable because the final post-deployment delta changes recipes, compact mass, and the
+  vertical-placement gesture. Before merge, the exact final package still needs the bounded observations: forge the 7-by-6
+  saddle from one ingot and confirm four fittings; confirm compact/full bearing recipes consume 4/16 fittings; confirm
+  handbook assembly uses wheel plus bearing for compact and wheel plus web plus bearing for full-size; confirm compact mass
+  no longer counts a timber web; and confirm Sneak plus top/bottom placement selects the vertical orientation.

@@ -349,7 +349,7 @@ def bearing_recipe(size: str, hub: str) -> dict:
             "F": {
                 "type": "item",
                 "code": f"flywheelpower:bearingfittings-{hub}",
-                "quantity": 16 if full else 4,
+                "quantity": 8 if full else 2,
             },
             "A": {"type": "block", "code": "game:woodenaxle-ud"},
             "L": {"type": "item", "code": "game:fat-rendered"},

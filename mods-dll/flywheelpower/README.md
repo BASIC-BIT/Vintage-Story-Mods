@@ -15,6 +15,7 @@ The release provides:
 - Persistent flywheel speed and schematic-safe relative links between the full-size principal block and its multiblock parts.
 - Mechanical rendering on all three axes with a distinct renderer group for each released wheel-and-hub construction.
 - Two-bearing timber stands with connected cross-bracing and open wooden bearing housings that visibly support the shaft without intersecting it. Placement requires a solid supporting footprint beneath the stand.
+- Place a stand normally on a top or bottom face to align its shaft horizontally with your facing direction. Hold Sneak while placing on that face to select the vertical shaft orientation.
 - A staged survival construction loop: lubricated hub-and-bearing sets, full-size timber webs, prepared wheels, finished wheel assemblies, and separately placed stands.
 - Dedicated toolbar, dropped-item, first-person, and third-person models for every staged component, with distinct full-size and compact silhouettes.
 - Held-item information for rotating mass and effective inertia. Detailed placed-block telemetry for live state, flywheel and network speed,

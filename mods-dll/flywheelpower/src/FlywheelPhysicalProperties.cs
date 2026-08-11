@@ -79,7 +79,7 @@ internal static class FlywheelPhysicalProperties
     {
         int rimPieces = compact ? 4 : 8;
         int hubIngotEquivalents = compact ? 2 : 8;
-        int webPlanks = compact ? 4 : 8;
+        int webPlanks = compact ? 0 : 8;
         float rimPieceMass = wheelDensity switch
         {
             WoodDensity => WoodPlankMassKg,

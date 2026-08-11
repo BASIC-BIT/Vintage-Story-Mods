@@ -195,8 +195,6 @@ def find_coplanar_overlaps(
     for first_index, first in enumerate(faces):
         first_normal = face_normal(first)
         for second in faces[first_index + 1:]:
-            if first.element == second.element and first.source == second.source:
-                continue
             second_normal = face_normal(second)
             if dot(first_normal, second_normal) < 1 - normal_tolerance:
                 continue

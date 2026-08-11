@@ -5,7 +5,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-iron",
-        "quantity": 16
+        "quantity": 8
       },
       "A": {
         "type": "block",
@@ -29,7 +29,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-meteoriciron",
-        "quantity": 16
+        "quantity": 8
       },
       "A": {
         "type": "block",
@@ -53,7 +53,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-steel",
-        "quantity": 16
+        "quantity": 8
       },
       "A": {
         "type": "block",
@@ -77,7 +77,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-copper",
-        "quantity": 4
+        "quantity": 2
       },
       "A": {
         "type": "block",
@@ -101,7 +101,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-tinbronze",
-        "quantity": 4
+        "quantity": 2
       },
       "A": {
         "type": "block",
@@ -125,7 +125,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-bismuthbronze",
-        "quantity": 4
+        "quantity": 2
       },
       "A": {
         "type": "block",
@@ -149,7 +149,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-blackbronze",
-        "quantity": 4
+        "quantity": 2
       },
       "A": {
         "type": "block",
@@ -173,7 +173,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-iron",
-        "quantity": 4
+        "quantity": 2
       },
       "A": {
         "type": "block",
@@ -197,7 +197,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-meteoriciron",
-        "quantity": 4
+        "quantity": 2
       },
       "A": {
         "type": "block",
@@ -221,7 +221,7 @@
       "F": {
         "type": "item",
         "code": "flywheelpower:bearingfittings-steel",
-        "quantity": 4
+        "quantity": 2
       },
       "A": {
         "type": "block",

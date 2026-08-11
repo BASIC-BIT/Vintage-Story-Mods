@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 
@@ -364,6 +365,44 @@ class DepthBufferTests(unittest.TestCase):
     def test_crossing_depth_faces_render_correctly_from_opposing_isometric(self):
         self.assert_crossing_depth_faces_render_per_pixel("isometric-opposite")
 
+    def test_fully_transparent_texture_does_not_write_color_or_depth(self):
+        pixels = np.full((4, 4, 3), (10, 20, 30), dtype=np.uint8)
+        depths = np.full((4, 4), -np.inf)
+        texture = Image.new("RGBA", (1, 1), (255, 0, 0, 0))
+
+        renderer.rasterize_triangle(
+            pixels,
+            depths,
+            [(0, 0), (4, 0), (0, 4)],
+            [1, 1, 1],
+            (255, 0, 0),
+            texture,
+            [(0, 0), (0, 0), (0, 0)],
+        )
+
+        self.assertTrue(np.all(pixels == (10, 20, 30)))
+        self.assertTrue(np.all(np.isneginf(depths)))
+
+
+class AnimationProjectionTests(unittest.TestCase):
+    def test_top_and_bottom_views_use_a_nonparallel_up_vector(self):
+        face = renderer.Face(
+            [(0, 0, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1)],
+            "wood",
+            "test",
+        )
+
+        for view_name in ("top", "bottom"):
+            with self.subTest(view_name=view_name):
+                projection = renderer.fixed_animation_projections(
+                    [[face]],
+                    [renderer.VIEWS[view_name][0]],
+                    100,
+                )[0]
+                view, right, up, _, _ = projection
+                self.assertAlmostEqual(0, renderer.dot(view, right))
+                self.assertAlmostEqual(0, renderer.dot(view, up))
+
 
 class UvTests(unittest.TestCase):
     def test_missing_cuboid_uv_uses_face_dimensions(self):
@@ -463,6 +502,15 @@ class CoplanarOverlapTests(unittest.TestCase):
         overlaps = renderer.find_coplanar_overlaps([
             self.face("first", 0, 0, 2, 2),
             self.face("second", 1, 1, 3, 3),
+        ])
+
+        self.assertEqual(1, len(overlaps))
+        self.assertAlmostEqual(1, overlaps[0].overlap_area)
+
+    def test_detects_overlap_between_primitives_that_share_an_element_name(self):
+        overlaps = renderer.find_coplanar_overlaps([
+            self.face("duplicate", 0, 0, 2, 2),
+            self.face("duplicate", 1, 1, 3, 3),
         ])
 
         self.assertEqual(1, len(overlaps))

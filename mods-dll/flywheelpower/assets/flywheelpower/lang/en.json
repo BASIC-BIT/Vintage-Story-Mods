@@ -3,6 +3,8 @@
   "block-flywheelpart": "Flywheel",
   "block-flywheelstand-full-*": "Full-Size Flywheel Stand",
   "block-flywheelstand-compact-*": "Compact Flywheel Stand",
+  "blockdesc-flywheelstand-full-*": "Place normally on a top or bottom face for a horizontal shaft. Hold Sneak while placing for a vertical shaft.",
+  "blockdesc-flywheelstand-compact-*": "Place normally on a top or bottom face for a horizontal shaft. Hold Sneak while placing for a vertical shaft.",
   "item-flywheelweb-full": "Full-Size Timber Flywheel Web",
   "block-compactflywheel": "Compact Flywheel",
   "flywheelpower:blockinfo-state": "Flywheel state: {0}",

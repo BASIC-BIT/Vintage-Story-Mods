@@ -127,7 +127,12 @@ def fixed_animation_projections(
     maximum_span = 1.0
     for faces, view in zip(frame_faces, views):
         normalized_view = normalize(view)
-        right = normalize(cross((0, 1, 0), normalized_view))
+        nominal_up = (
+            (0, 0, -1 if normalized_view[1] > 0 else 1)
+            if abs(normalized_view[1]) > 0.999
+            else (0, 1, 0)
+        )
+        right = normalize(cross(nominal_up, normalized_view))
         up = normalize(cross(normalized_view, right))
         vertices = [vertex for face in faces for vertex in face.vertices]
         projected = [
@@ -205,7 +210,7 @@ def rasterize_triangle(
 
     target = pixels[min_y:max_y + 1, min_x:max_x + 1]
     if texture is not None and uvs is not None:
-        texture_pixels = np.asarray(texture.convert("RGB"))
+        texture_pixels = np.asarray(texture.convert("RGBA"))
         interpolated_u = weight0 * uvs[0][0] + weight1 * uvs[1][0] + weight2 * uvs[2][0]
         interpolated_v = weight0 * uvs[0][1] + weight1 * uvs[1][1] + weight2 * uvs[2][1]
         texture_x = np.clip(
@@ -218,18 +223,23 @@ def rasterize_triangle(
             0,
             texture.height - 1,
         )
-        sampled = texture_pixels[texture_y, texture_x]
+        sampled_rgba = texture_pixels[texture_y, texture_x]
+        sampled = sampled_rgba[..., :3]
+        sampled_opacity = sampled_rgba[..., 3].astype(float) / 255 * opacity
+        visible &= sampled_opacity > 0
+        if not np.any(visible):
+            return
         if brightness != 1:
             sampled = np.clip(np.rint(sampled * brightness), 0, 255).astype(np.uint8)
-        if opacity < 1:
-            blended = np.clip(
-                np.rint(target * (1 - opacity) + sampled * opacity),
-                0,
-                255,
-            ).astype(np.uint8)
-            target[visible] = blended[visible]
-        else:
-            target[visible] = sampled[visible]
+        blended = np.clip(
+            np.rint(
+                target * (1 - sampled_opacity[..., None])
+                + sampled * sampled_opacity[..., None]
+            ),
+            0,
+            255,
+        ).astype(np.uint8)
+        target[visible] = blended[visible]
     else:
         if opacity < 1:
             blended_fill = np.clip(

@@ -200,7 +200,7 @@ def main(argv: list[str] | None = None) -> None:
         texture = resolve_texture(textures.get(material, ""), roots) if textures.get(material) else None
         resolved[material] = str(texture) if texture else None
         colors[material] = average_color(texture, material, textures.get(material, ""))
-        texture_images[material] = Image.open(texture).convert("RGB") if texture else None
+        texture_images[material] = Image.open(texture).convert("RGBA") if texture else None
 
     all_images: list[Path] = []
     for mode in RENDER_MODES:

@@ -566,6 +566,20 @@ public sealed class ReleaseContentTests
     }
 
     [Fact]
+    public void SneakingOnAHorizontalSurfaceSelectsVerticalPlacement()
+    {
+        Assert.Equal(
+            EnumAxis.Y,
+            BlockFlywheelStand.ResolvePlacementAxis(EnumAxis.Y, playerYaw: 0f, verticalPlacement: true));
+        Assert.Equal(
+            EnumAxis.Z,
+            BlockFlywheelStand.ResolvePlacementAxis(EnumAxis.Z, playerYaw: 0f, verticalPlacement: true));
+        Assert.NotEqual(
+            EnumAxis.Y,
+            BlockFlywheelStand.ResolvePlacementAxis(EnumAxis.Y, playerYaw: 0f, verticalPlacement: false));
+    }
+
+    [Fact]
     public void AssemblyBlocksRequireAPlacedStandAndReturnBothPartsWhenBroken()
     {
         string fullSource = File.ReadAllText(Path.Combine(ProjectRoot, "src", "BlockFlywheel.cs"));
@@ -628,8 +642,8 @@ public sealed class ReleaseContentTests
             .EnumerateArray()
             .Single(recipe =>
                 recipe.GetProperty("output").GetProperty("code").GetString() == "flywheelbearing-compact-copper");
-        Assert.Equal(16, fullBearing.GetProperty("ingredients").GetProperty("F").GetProperty("quantity").GetInt32());
-        Assert.Equal(4, compactBearing.GetProperty("ingredients").GetProperty("F").GetProperty("quantity").GetInt32());
+        Assert.Equal(16, FittingsConsumed(fullBearing));
+        Assert.Equal(4, FittingsConsumed(compactBearing));
         Assert.Equal("game:woodenaxle-ud", fullBearing.GetProperty("ingredients").GetProperty("A").GetProperty("code").GetString());
         Assert.Equal("game:fat-rendered", fullBearing.GetProperty("ingredients").GetProperty("L").GetProperty("code").GetString());
 
@@ -708,6 +722,13 @@ public sealed class ReleaseContentTests
         Assert.DoesNotContain("Wheel Blank", language, StringComparison.Ordinal);
         Assert.DoesNotContain("Wooden Rim", language, StringComparison.Ordinal);
         Assert.Contains("Full-Size Copper Wheel", language, StringComparison.Ordinal);
+
+        static int FittingsConsumed(JsonElement recipe)
+        {
+            int fittingSlots = recipe.GetProperty("ingredientPattern").GetString()!.Count(character => character == 'F');
+            int quantityPerSlot = recipe.GetProperty("ingredients").GetProperty("F").GetProperty("quantity").GetInt32();
+            return fittingSlots * quantityPerSlot;
+        }
         Assert.Contains("Compact Copper Wheel", language, StringComparison.Ordinal);
     }
 

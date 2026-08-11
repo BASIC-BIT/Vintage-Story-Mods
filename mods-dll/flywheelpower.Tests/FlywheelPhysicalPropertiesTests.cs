@@ -44,9 +44,9 @@ public sealed class FlywheelPhysicalPropertiesTests
         Assert.True(compactWood.EffectiveInertia < compactStone.EffectiveInertia);
         Assert.True(compactStone.EffectiveInertia < compactIron.EffectiveInertia);
         Assert.True(compactIron.EffectiveInertia < fullIron.EffectiveInertia);
-        Assert.InRange(compactWood.RotatingMassKg, 35f, 45f);
-        Assert.InRange(compactStone.RotatingMassKg, 45f, 55f);
-        Assert.InRange(compactIron.RotatingMassKg, 55f, 65f);
+        Assert.InRange(compactWood.RotatingMassKg, 25f, 35f);
+        Assert.InRange(compactStone.RotatingMassKg, 35f, 45f);
+        Assert.InRange(compactIron.RotatingMassKg, 45f, 55f);
         Assert.True(compactIron.RotatingMassKg < fullIron.RotatingMassKg);
     }
 
