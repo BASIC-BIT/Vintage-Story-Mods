@@ -29,16 +29,16 @@ public class ConfigAdminSettingRegistryTests
     }
 
     [Fact]
-    public void ValidateConfig_RejectsUnlimitedRangeCombinedWithSpeechLineOfSight()
+    public void ValidateConfig_RejectsUnlimitedRangeCombinedWithClearSoundPath()
     {
         // Line of sight needs a bounded range to raycast against, so the combination is refused
         // rather than the setting being silently ignored.
         var config = CreateConfig();
         config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
-        config.RequireLineOfSightForSpeech[ProximityChatMode.Normal] = true;
+        config.RequireClearSoundPathForSpeech[ProximityChatMode.Normal] = true;
 
         ConfigAdminSettingRegistry.ValidateConfig(config)
-            .Should().ContainSingle().Which.Should().Contain("cannot combine an unlimited range with RequireLineOfSightForSpeech");
+            .Should().ContainSingle().Which.Should().Contain("cannot combine an unlimited range with RequireClearSoundPathForSpeech");
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public class ConfigAdminSettingRegistryTests
 
         success.Should().BeFalse();
         error.Should().Contain("whole numbers from 1 to 128");
-        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 6);
+        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 9);
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class ConfigAdminSettingRegistryTests
 
         success.Should().BeFalse();
         error.Should().Contain("must contain at least one whole number");
-        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 6);
+        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 9);
     }
 
     [Theory]

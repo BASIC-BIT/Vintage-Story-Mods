@@ -19,13 +19,16 @@ public static class VisibilityUtils
     private static bool _warnedSegmentSampleCap;
 
     /// <summary>
-    /// Block filter for sight raycasts. Returns true for blocks that should STOP the ray,
-    /// false for blocks the ray should pass through.
+    /// Strict sight filter: anything not rendered see-through stops the ray, foliage included.
+    /// Returns true for blocks that should STOP the ray, false for blocks it should pass through.
     ///
-    /// Both checks are default-deny: an unrecognised block occludes rather than silently
-    /// leaking chat through it.
+    /// Default-deny: an unrecognised block occludes rather than silently leaking through.
+    ///
+    /// Reserved for deliberate close inspection, where reading detail through a hedge would be
+    /// wrong. Its only consumer is the character-sheet look-up, which shows one player another's
+    /// written description at close range. Everything else uses <see cref="SightBlockFilter"/>.
     /// </summary>
-    private static readonly BlockFilter SightBlockFilter = (BlockPos pos, Block block) =>
+    internal static readonly BlockFilter StrictSightBlockFilter = (BlockPos pos, Block block) =>
     {
         if (block == null || block.Id == 0)
         {
@@ -44,22 +47,23 @@ public static class VisibilityUtils
     };
 
     /// <summary>
-    /// Sight filter for sign language specifically. Identical to <see cref="SightBlockFilter"/>
-    /// except that foliage does not block: tree leaves and plants declare no render pass, so they
-    /// default to Opaque and would otherwise stop signing through a canopy.
+    /// General sight filter. Identical to <see cref="StrictSightBlockFilter"/> except that foliage
+    /// does not block: tree leaves and plants declare no render pass, so they default to Opaque and
+    /// would otherwise hide a player standing under a canopy.
     ///
-    /// Deliberately NOT applied to the general sight filter. That one also backs nametags, speech
-    /// bubbles, the typing indicator, and the character-sheet look-up gate, and relaxing it there
-    /// would let players read each other's sheets through a hedge.
+    /// Everything that decides whether a player can perceive something reads through this one —
+    /// sign language delivery, speech bubbles, nametags, the typing indicator, placed environmental
+    /// bubbles — so they cannot disagree. They used to: a signed message delivered through leaves
+    /// rendered no bubble, because delivery used this rule and rendering used the strict one.
     /// </summary>
-    private static readonly BlockFilter SignLanguageBlockFilter = (BlockPos pos, Block block) =>
+    internal static readonly BlockFilter SightBlockFilter = (BlockPos pos, Block block) =>
     {
         if (block?.BlockMaterial is EnumBlockMaterial.Leaves or EnumBlockMaterial.Plant)
         {
             return false;
         }
 
-        return SightBlockFilter(pos, block);
+        return StrictSightBlockFilter(pos, block);
     };
 
     /// <summary>
@@ -71,7 +75,7 @@ public static class VisibilityUtils
     /// decor (tall grass, loose ground cover) does not. Liquids need the extra check because water
     /// has no collision box.
     /// </summary>
-    private static readonly BlockFilter SoundBlockFilter = (BlockPos pos, Block block) => BlocksSound(block);
+    internal static readonly BlockFilter SoundBlockFilter = (BlockPos pos, Block block) => BlocksSound(block);
 
     private static bool BlocksSound(Block block)
     {
@@ -96,6 +100,10 @@ public static class VisibilityUtils
         return block.CollisionBoxes is { Length: > 0 };
     }
 
+    /// <summary>
+    /// Whether the observer can see the target. Foliage does not block; a player under a canopy is
+    /// still visible. Used by everything that perceives a person or their live message.
+    /// </summary>
     public static bool HasLineOfSight(
         IWorldAccessor world,
         Entity observer,
@@ -114,7 +122,19 @@ public static class VisibilityUtils
     }
 
     /// <summary>
-    /// Checks line of sight from an observer entity to an arbitrary world position.
+    /// Sight for deliberate close inspection, where foliage does block. Reading a character sheet
+    /// through a hedge is different from noticing that someone is standing there.
+    ///
+    /// The character-sheet look-up is the only caller. Everything else that decides whether a
+    /// player can perceive something uses <see cref="HasLineOfSight(IWorldAccessor, Entity, Entity, bool, bool)"/>.
+    /// </summary>
+    public static bool HasStrictLineOfSight(IWorldAccessor world, Entity observer, Entity target, bool failOpen = false)
+    {
+        return HasClearPath(world, observer, target, failOpen, useMultiPointTargets: false, StrictSightBlockFilter);
+    }
+
+    /// <summary>
+    /// Sight from an observer entity to an arbitrary world position.
     /// Used for placed environmental bubbles where the target is a point, not an entity.
     /// </summary>
     public static bool HasLineOfSight(IWorldAccessor world, Entity observer, Vec3d targetPos, bool failOpen = false)
@@ -136,19 +156,6 @@ public static class VisibilityUtils
             world.Logger?.Debug("THEBASICS VisibilityUtils: LOS raytrace to Vec3d threw: {0}", ex.Message);
             return failOpen;
         }
-    }
-
-    /// <summary>
-    /// Line of sight for sign language, which carries through foliage where general sight does not.
-    /// </summary>
-    public static bool HasSignLanguageLineOfSight(
-        IWorldAccessor world,
-        Entity observer,
-        Entity target,
-        bool failOpen,
-        bool useMultiPointTargets = false)
-    {
-        return HasClearPath(world, observer, target, failOpen, useMultiPointTargets, SignLanguageBlockFilter);
     }
 
     /// <summary>

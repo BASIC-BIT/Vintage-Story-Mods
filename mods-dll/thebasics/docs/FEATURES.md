@@ -89,13 +89,14 @@ The admin panel exposes fixed-shape complex settings as validated flattened rows
 Features:
 
 - Dedicated proximity chat group, or optional General-chat replacement via `UseGeneralChannelAsProximityChat`.
-- Whisper, normal, yell, and sign-language ranges. The three speech ranges accept exactly `-1` to deliver server-wide; any other negative value is rejected by config validation, and `SignLanguageRange` has no unlimited sentinel at all. An unlimited range cannot be combined with `RequireLineOfSightForSpeech`, since line of sight needs a bounded range to raycast against.
+- Whisper, normal, yell, and sign-language ranges. The three speech ranges accept exactly `-1` to deliver server-wide; any other negative value is rejected by config validation, and `SignLanguageRange` has no unlimited sentinel at all. An unlimited range cannot be combined with `RequireClearSoundPathForSpeech`, since the sound-path check needs a bounded range to raycast against.
 - Two independent chat axes: range (`/whisper`, `/say`, `/yell`) and sticky override kind (`/me`, `/ooc`, `/gooc`). Whispered OOC and yelled emotes are both valid combinations.
 - Sticky override modes toggle: running the same override command again returns you to speech, and running a different one replaces it. An explicit message prefix still wins for that single line.
 - Recipient filtering by distance, sign-language line of sight, and chat mode.
 - Sign-language line-of-sight checks use multiple target points and can deliver shortly after send if line of sight is acquired within the retry window.
-- Sign-language line-of-sight treats foliage as see-through, so signing carries through a tree canopy. Scoped to sign language only: nametags, speech bubbles, the typing indicator, and the character-sheet look-up gate keep the stricter filter, so foliage still hides those.
-- Experimental, off by default: speech line-of-sight gating per chat mode, and wall muffling that converts sound-blocking geometry into extra effective distance. Sound and sight occlude differently: glass and water stop speech but not sight, and foliage stops neither.
+- Sight treats foliage as see-through, so signing carries through a tree canopy and the speech bubble, nametag, typing indicator, and placed environmental bubbles all remain visible under one. They share a single filter deliberately: they previously disagreed, delivering a signed message whose bubble never appeared.
+- The character-sheet look-up keeps a stricter filter, where foliage does block. Noticing that someone is standing there and reading their written description off them at close range are different things.
+- Experimental, off by default: per-mode `RequireClearSoundPathForSpeech` gating, and wall muffling that converts sound-blocking geometry into extra effective distance. Sound and sight occlude differently: glass and water stop speech but not sight, and foliage stops neither.
 - Automatic IC formatting with configurable verbs, punctuation, delimiters, nicknames, nickname colors, OOC styling, and optional global OOC.
 - Question verbs: a message ending in `?` uses `ProximityChatModeQuestionVerbs` (default `asks`) instead of the mode's normal verbs.
 - Distance obfuscation and distance-based font-size changes.
@@ -157,7 +158,7 @@ Primary config areas:
 - `ProximityChatModeVerbs`
 - `ProximityChatModeQuestionVerbs`
 - `ProximityChatModePunctuation`
-- `RequireLineOfSightForSpeech`
+- `RequireClearSoundPathForSpeech`
 - `SpeechOcclusionWallPenaltyBlocks`
 - `ProximityChatName` defaults to the stable persisted group name `Proximity` when unset.
 - `ProximityChatModeBabbleVerb` is a legacy/custom override; default babble text uses lang key `thebasics:chat-babble-verb`.
