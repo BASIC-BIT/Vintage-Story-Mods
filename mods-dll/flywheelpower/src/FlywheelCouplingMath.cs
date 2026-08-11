@@ -5,6 +5,16 @@ namespace FlywheelPower;
 
 internal readonly record struct FlywheelStep(float Speed, float TransferTorque, float LossTorque);
 
+internal readonly record struct FlywheelStepParameters(
+    float Inertia,
+    float CouplingStrength,
+    float CouplingEngagement,
+    float MaxTransferTorque,
+    float BaseBearingLoss,
+    float ViscousBearingLoss,
+    float WindageLoss,
+    float SafeSpeed);
+
 internal static class FlywheelCouplingMath
 {
     private const float Epsilon = 0.00001f;
@@ -43,27 +53,20 @@ internal static class FlywheelCouplingMath
     internal static FlywheelStep Step(
         float flywheelSpeed,
         float networkSpeed,
-        float inertia,
-        float couplingStrength,
-        float couplingEngagement,
-        float maxTransferTorque,
-        float baseBearingLoss,
-        float viscousBearingLoss,
-        float windageLoss,
-        float safeSpeed,
+        FlywheelStepParameters parameters,
         float dt)
     {
         float transferTorque = GameMath.Clamp(
-            couplingStrength * couplingEngagement * (flywheelSpeed - networkSpeed),
-            -maxTransferTorque,
-            maxTransferTorque);
+            parameters.CouplingStrength * parameters.CouplingEngagement * (flywheelSpeed - networkSpeed),
+            -parameters.MaxTransferTorque,
+            parameters.MaxTransferTorque);
 
-        if (inertia <= Epsilon || dt <= 0f)
+        if (parameters.Inertia <= Epsilon || dt <= 0f)
         {
             return new FlywheelStep(flywheelSpeed, transferTorque, 0f);
         }
 
-        float nextSpeed = flywheelSpeed - transferTorque / inertia * dt;
+        float nextSpeed = flywheelSpeed - transferTorque / parameters.Inertia * dt;
         if (!float.IsFinite(nextSpeed))
         {
             nextSpeed = 0f;
@@ -72,11 +75,11 @@ internal static class FlywheelCouplingMath
         float speedAbs = Math.Abs(nextSpeed);
         float lossTorque = GetLossTorque(
             speedAbs,
-            baseBearingLoss,
-            viscousBearingLoss,
-            windageLoss,
-            safeSpeed);
-        float speedLoss = lossTorque / inertia * dt;
+            parameters.BaseBearingLoss,
+            parameters.ViscousBearingLoss,
+            parameters.WindageLoss,
+            parameters.SafeSpeed);
+        float speedLoss = lossTorque / parameters.Inertia * dt;
         nextSpeed = Math.Sign(nextSpeed) * Math.Max(0f, speedAbs - speedLoss);
         return new FlywheelStep(nextSpeed, transferTorque, lossTorque);
     }

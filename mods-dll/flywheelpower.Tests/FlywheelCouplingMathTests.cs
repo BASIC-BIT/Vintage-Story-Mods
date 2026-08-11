@@ -101,14 +101,15 @@ public sealed class FlywheelCouplingMathTests
             FlywheelStep step = FlywheelCouplingMath.Step(
                 wheelSpeed,
                 filteredNetworkSpeed,
-                inertia: 0.452f,
-                couplingStrength: 0.55f,
-                couplingEngagement: 1f,
-                maxTransferTorque: 0.18f,
-                baseBearingLoss: 0.001f,
-                viscousBearingLoss: 0.003f,
-                windageLoss: 0.0015f,
-                safeSpeed: 4.5f,
+                new FlywheelStepParameters(
+                    Inertia: 0.452f,
+                    CouplingStrength: 0.55f,
+                    CouplingEngagement: 1f,
+                    MaxTransferTorque: 0.18f,
+                    BaseBearingLoss: 0.001f,
+                    ViscousBearingLoss: 0.003f,
+                    WindageLoss: 0.0015f,
+                    SafeSpeed: 4.5f),
                 dt: 0.1f);
 
             wheelSpeed = step.Speed;
@@ -124,14 +125,15 @@ public sealed class FlywheelCouplingMathTests
         return FlywheelCouplingMath.Step(
             wheelSpeed,
             networkSpeed,
-            inertia: 7.934f,
-            couplingStrength: 0.8f,
-            couplingEngagement: 1f,
-            maxTransferTorque: 0.35f,
-            baseBearingLoss: 0.001f,
-            viscousBearingLoss: 0.003f,
-            windageLoss: 0.0015f,
-            safeSpeed: 3.5f,
+            new FlywheelStepParameters(
+                Inertia: 7.934f,
+                CouplingStrength: 0.8f,
+                CouplingEngagement: 1f,
+                MaxTransferTorque: 0.35f,
+                BaseBearingLoss: 0.001f,
+                ViscousBearingLoss: 0.003f,
+                WindageLoss: 0.0015f,
+                SafeSpeed: 3.5f),
             dt: 0.1f);
     }
 }

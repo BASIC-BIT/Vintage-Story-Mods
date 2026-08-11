@@ -464,8 +464,8 @@ Remove this packet after the initial-feedback pull request is merged or closed a
 - All six configured whitespace checks, the agent-tooling check, generated-content drift checks, the Lizard gate, and 47/47
   renderer regression tests pass. The exact model sweep covers 74 manifests and 1,776 primary images with zero unresolved
   textures, zero coplanar overlaps, and exactly 24 images per manifest.
-- The exact package contains 31 allowlisted entries, is 82,548 bytes, and has SHA-256
-  `E9DB7C3131AFA76D2D43755FAB3220BBBC6F762885DA5401307F015A37AA03BD`. Archive inspection finds no disabled content,
+- The exact package contains 31 allowlisted entries, is 83,637 bytes, and has SHA-256
+  `27DD897BD99FC4CC003D166CA5704E32DB270117CF7EDB0C6FE787D04A348A09`. Archive inspection finds no disabled content,
   compact-web residue, or obsolete player-facing tyre, rim, or blank labels.
 - Runtime/model manual QA remains applicable because the final post-deployment delta changes recipes, localization, docs,
   and generated content registration only. Before merge, the exact final package still needs the bounded anvil/handbook

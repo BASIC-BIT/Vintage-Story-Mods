@@ -165,14 +165,15 @@ public sealed class BEBehaviorMPFlywheel : BEBehaviorMPBase
         FlywheelStep step = FlywheelCouplingMath.Step(
             flywheelSpeed,
             intervalNetworkSpeed,
-            inertia,
-            couplingStrength,
-            couplingEngagement,
-            maxTransferTorque,
-            baseBearingLoss,
-            viscousBearingLoss,
-            windageLoss,
-            safeSpeed,
+            new FlywheelStepParameters(
+                inertia,
+                couplingStrength,
+                couplingEngagement,
+                maxTransferTorque,
+                baseBearingLoss,
+                viscousBearingLoss,
+                windageLoss,
+                safeSpeed),
             dt);
         flywheelSpeed = step.Speed;
         float transferTorque = step.TransferTorque;
