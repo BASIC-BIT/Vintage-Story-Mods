@@ -329,28 +329,7 @@ public class RpCharacterServiceTests
 
     private static IServerPlayer CreatePlayer(string uid = "player-1", string name = "Alice")
     {
-        var player = Substitute.For<IServerPlayer>();
-        player.PlayerUID.Returns(uid);
-        player.PlayerName.Returns(name);
-        var modData = new Dictionary<string, byte[]>();
-        player.GetModdata(Arg.Any<string>()).Returns(call => modData.TryGetValue(call.Arg<string>(), out var value) ? value : null);
-        player.When(call => call.SetModdata(Arg.Any<string>(), Arg.Any<byte[]>()))
-            .Do(call =>
-            {
-                var key = call.ArgAt<string>(0);
-                var value = call.ArgAt<byte[]>(1);
-                if (value == null)
-                {
-                    modData.Remove(key);
-                }
-                else
-                {
-                    modData[key] = value;
-                }
-            });
-        player.When(call => call.RemoveModdata(Arg.Any<string>()))
-            .Do(call => modData.Remove(call.ArgAt<string>(0)));
-        return player;
+        return new FakeServerPlayer(uid, name);
     }
 
     private static void StoreSheet(IServerPlayer player, string fieldId, string value)

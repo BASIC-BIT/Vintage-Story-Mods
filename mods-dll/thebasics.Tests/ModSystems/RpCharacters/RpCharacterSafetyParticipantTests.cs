@@ -46,8 +46,7 @@ public class RpCharacterSafetyParticipantTests
     [Fact]
     public void Validate_RejectsDeadPlayerBeforeInventorySwitching()
     {
-        var player = Substitute.For<IServerPlayer>();
-        player.Entity.Returns(new EntityPlayer { Alive = false });
+        var player = new FakeServerPlayer { Entity = new EntityPlayer { Alive = false } };
         var context = new RpCharacterSwitchContext(
             player,
             new(),
@@ -66,10 +65,7 @@ public class RpCharacterSafetyParticipantTests
         var manager = Substitute.For<IPlayerInventoryManager>();
         manager.OpenedInventories.Returns([openedInventory]);
 
-        var player = Substitute.For<IPlayer>();
-        player.PlayerUID.Returns("player-1");
-        player.InventoryManager.Returns(manager);
-        return player;
+        return new FakeServerPlayer { InventoryManager = manager };
     }
 
     private sealed class TestPlayerInventory : InventoryBasePlayer

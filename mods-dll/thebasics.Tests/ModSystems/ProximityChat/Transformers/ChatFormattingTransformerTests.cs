@@ -119,7 +119,7 @@ public class ChatFormattingTransformerTests
 
         var transformer = new ICSpeechFormatTransformer(CreateChatSystem(config));
         var context = CreateSpeechContext("hello");
-        context.SendingPlayer.PlayerName.Returns("AccountName");
+        ((FakeServerPlayer)context.SendingPlayer).PlayerName = "AccountName";
         context.SetMetadata(MessageContext.FORMATTED_NAME, "Alice");
         context.SetMetadata(MessageContext.LANGUAGE, config.Languages[0]);
         context.SetMetadata(MessageContext.CHAT_MODE, ProximityChatMode.Normal);
@@ -143,10 +143,8 @@ public class ChatFormattingTransformerTests
             CreateChatSystem(config),
             distanceObfuscationSystem: CreateDistanceObfuscationSystem(config));
         var context = CreateSpeechContext("walks over \"hello there!\"");
-        context.SendingPlayer.Entity.Returns(CreateEntityPlayer(1, x: 0));
-        context.ReceivingPlayer = Substitute.For<IServerPlayer>();
-        context.ReceivingPlayer.GetModdata(Arg.Any<string>()).Returns((byte[])null!);
-        context.ReceivingPlayer.Entity.Returns(CreateEntityPlayer(2, x: 10));
+        ((FakeServerPlayer)context.SendingPlayer).Entity = CreateEntityPlayer(1, x: 0);
+        context.ReceivingPlayer = new FakeServerPlayer { Entity = CreateEntityPlayer(2, x: 10) };
         context.SetMetadata(MessageContext.FORMATTED_NAME, "Alice");
         context.SetMetadata(MessageContext.LANGUAGE, config.Languages[0]);
         context.SetMetadata(MessageContext.CHAT_MODE, ProximityChatMode.Normal);
@@ -164,7 +162,7 @@ public class ChatFormattingTransformerTests
 
         var transformer = new EnvironmentMessageTransformer(CreateChatSystem(config));
         var context = CreateEnvironmentalContext("door creaks");
-        context.SendingPlayer.PlayerName.Returns("AccountName");
+        ((FakeServerPlayer)context.SendingPlayer).PlayerName = "AccountName";
 
         transformer.Transform(context);
 
@@ -179,7 +177,7 @@ public class ChatFormattingTransformerTests
 
         var transformer = new EnvironmentMessageTransformer(CreateChatSystem(config));
         var context = CreateEnvironmentalContext("door creaks");
-        context.SendingPlayer.PlayerName.Returns("AccountName");
+        ((FakeServerPlayer)context.SendingPlayer).PlayerName = "AccountName";
 
         transformer.Transform(context);
 
@@ -197,8 +195,8 @@ public class ChatFormattingTransformerTests
 
         var transformer = new SpeechBubbleClientDataTransformer(CreateChatSystem(config));
         var context = CreateSpeechContext("walks over \"hello\"");
-        context.SendingPlayer.PlayerName.Returns("AccountName");
-        context.SendingPlayer.Entity.Returns(CreateEntityPlayer(42));
+        ((FakeServerPlayer)context.SendingPlayer).PlayerName = "AccountName";
+        ((FakeServerPlayer)context.SendingPlayer).Entity = CreateEntityPlayer(42);
         context.SetMetadata(MessageContext.FORMATTED_NAME, "Alice");
         context.SetMetadata(MessageContext.LANGUAGE, config.Languages[0]);
         context.SetMetadata(MessageContext.CHAT_MODE, ProximityChatMode.Normal);
@@ -226,9 +224,8 @@ public class ChatFormattingTransformerTests
             CreateChatSystem(config),
             distanceObfuscationSystem: CreateDistanceObfuscationSystem(config));
         var context = CreateSpeechContext("walks over \"hello there!\"");
-        context.SendingPlayer.Entity.Returns(CreateEntityPlayer(1, x: 0));
-        context.ReceivingPlayer = Substitute.For<IServerPlayer>();
-        context.ReceivingPlayer.Entity.Returns(CreateEntityPlayer(2, x: 10));
+        ((FakeServerPlayer)context.SendingPlayer).Entity = CreateEntityPlayer(1, x: 0);
+        context.ReceivingPlayer = new FakeServerPlayer { Entity = CreateEntityPlayer(2, x: 10) };
         context.SetMetadata(MessageContext.FORMATTED_NAME, "Alice");
         context.SetMetadata(MessageContext.LANGUAGE, config.Languages[0]);
         context.SetMetadata(MessageContext.CHAT_MODE, ProximityChatMode.Normal);
@@ -249,7 +246,7 @@ public class ChatFormattingTransformerTests
 
         var transformer = new SpeechBubbleClientDataTransformer(CreateChatSystem(config));
         var context = CreateEnvironmentalContext("[AccountName] <i>door creaks</i>");
-        context.SendingPlayer.Entity.Returns(CreateEntityPlayer(42));
+        ((FakeServerPlayer)context.SendingPlayer).Entity = CreateEntityPlayer(42);
         context.SetMetadata(MessageContext.BUBBLE_TEXT_BASE, "<i>door creaks</i>");
 
         transformer.Transform(context);
@@ -268,7 +265,7 @@ public class ChatFormattingTransformerTests
             OverheadChatBubbleMode = OverheadChatBubbleModes.Vanilla
         }));
         var context = CreateSpeechContext("<font color=\"#00AAFF\">hello</font>");
-        context.SendingPlayer.Entity.Returns(CreateEntityPlayer(42));
+        ((FakeServerPlayer)context.SendingPlayer).Entity = CreateEntityPlayer(42);
 
         transformer.ShouldTransform(context).Should().BeTrue();
         transformer.Transform(context);
@@ -319,8 +316,7 @@ public class ChatFormattingTransformerTests
 
     private static MessageContext CreateSpeechContext(string message)
     {
-        var player = Substitute.For<IServerPlayer>();
-        player.GetModdata(Arg.Any<string>()).Returns((byte[])null!);
+        var player = new FakeServerPlayer();
 
         var context = new MessageContext
         {
@@ -333,7 +329,7 @@ public class ChatFormattingTransformerTests
 
     private static MessageContext CreateEnvironmentalContext(string message)
     {
-        var player = Substitute.For<IServerPlayer>();
+        var player = new FakeServerPlayer();
 
         var context = new MessageContext
         {

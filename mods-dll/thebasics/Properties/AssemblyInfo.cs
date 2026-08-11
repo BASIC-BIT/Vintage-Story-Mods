@@ -42,7 +42,10 @@ using Vintagestory.API.Common;
 
 [assembly: ModDependency("game")]
 
-[assembly: InternalsVisibleTo("thebasics.Tests")]
+// The test project builds as VSTests, not thebasics.Tests. VintagestoryAPI grants
+// InternalsVisibleTo("VSTests"), and from 1.22.6 that is the only way to implement IPlayer,
+// which declares an internal abstract member. See thebasics.Tests.csproj for the full reason.
+[assembly: InternalsVisibleTo("VSTests")]
 
 
 
