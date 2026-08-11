@@ -2,7 +2,7 @@
 
 ## Objective
 
-Deliver Flywheel Power as a complete 0.5.0 initial-feedback implementation without publishing it.
+Deliver Flywheel Power as a complete 0.5.0 initial-feedback implementation without publishing a GitHub or ModDB release.
 
 ## Reconstructed history
 
@@ -75,7 +75,7 @@ flywheel uses it for its axle and inventory overlay. Renaming it would add churn
 
 Automated:
 
-- Build Flywheel Power and its focused test project on .NET 10 against Vintage Story 1.22.2.
+- Build Flywheel Power and its focused test project on .NET 10 against Vintage Story 1.22.6.
 - Run all repository test projects.
 - Verify formatting and repository complexity checks.
 - Package `flywheelpower_0_5_0.zip`.
@@ -446,3 +446,28 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   timbers. Compact stands retain the simpler plank-and-nail recipe. Curved plate segments on the anvil and multi-stage
   in-world construction remain follow-ups because plate-only smithing is not enforceable through vanilla JSON and partial
   stand states would add serialization and model scope.
+
+## Final 1.22.6 release-candidate checkpoint, August 11, 2026
+
+- The released surface now contains 68 wheel-and-hub combinations: 22 full-size and 46 compact. Player-facing intermediate
+  names consistently use "wheel." Compact assembly uses its wheel plus a bearing set; only full-size assembly retains a
+  separate timber web.
+- A forged bearing fitting is one open saddle, not a complete ring. Its anvil target is a 7-by-6 open U using 27 voxels,
+  comfortably within one ingot, and yields four fittings. Compact bearing sets consume four fittings; full-size sets
+  consume 16.
+- Normal placed blocks no longer show Flywheel-specific telemetry. `ShowDebugBlockInfo` defaults off and restores the full
+  diagnostic panel when deliberately enabled. Overspeed sparks and smoke remain visible gameplay feedback.
+- Flywheel Power targets Vintage Story 1.22.6. All six configured projects build with zero errors; the only build warnings
+  are four pre-existing The BASICs analyzer findings. Flywheel Power tests pass 67/67 and DimensionLib tests pass 58/58.
+  The all-repository The BASICs test lane is temporarily dependent on PR #219: current `main` lacks the 1.22.6
+  `IServerPlayer.IsInInteractionRangeOf` test-fixture implementation and produces 123 unrelated dynamic-proxy failures.
+- All six configured whitespace checks, the agent-tooling check, generated-content drift checks, the Lizard gate, and 47/47
+  renderer regression tests pass. The exact model sweep covers 74 manifests and 1,776 primary images with zero unresolved
+  textures, zero coplanar overlaps, and exactly 24 images per manifest.
+- The exact package contains 31 allowlisted entries, is 82,548 bytes, and has SHA-256
+  `E9DB7C3131AFA76D2D43755FAB3220BBBC6F762885DA5401307F015A37AA03BD`. Archive inspection finds no disabled content,
+  compact-web residue, or obsolete player-facing tyre, rim, or blank labels.
+- Runtime/model manual QA remains applicable because the final post-deployment delta changes recipes, localization, docs,
+  and generated content registration only. Before merge, the exact final package still needs the bounded anvil/handbook
+  observation: forge the 7-by-6 saddle from one ingot, confirm four fittings, confirm compact assembly omits a timber web,
+  and confirm full-size assembly still requires one.
