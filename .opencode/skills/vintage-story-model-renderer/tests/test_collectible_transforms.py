@@ -6,6 +6,7 @@ from unittest import mock
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 
 SCRIPTS = Path(__file__).parents[1] / "scripts"
 if str(SCRIPTS) not in sys.path:
@@ -388,13 +389,16 @@ class SeraphHeldSceneTests(unittest.TestCase):
             assets = root / "assets"
             seraph = assets / "fixture" / "shapes" / "entity" / "seraph.json"
             seraph.parent.mkdir(parents=True)
+            seraph_texture = assets / "fixture" / "textures" / "entity" / "seraph.png"
+            seraph_texture.parent.mkdir(parents=True)
+            Image.new("RGBA", (1, 1), (12, 34, 56, 255)).save(seraph_texture)
             seraph.write_text(json.dumps({
-                "textures": {"skin": "fixture:entity/skin"},
+                "textures": {"seraph": "fixture:entity/ignored"},
                 "elements": [{
                     "name": "root",
                     "from": [0, 0, 0],
                     "to": [2, 4, 2],
-                    "faces": {"north": {"texture": "#skin"}},
+                    "faces": {"north": {"texture": "#seraph"}},
                     "children": [{
                         "name": "ItemAnchor",
                         "from": [2, 2, 0],
@@ -441,6 +445,7 @@ class SeraphHeldSceneTests(unittest.TestCase):
                     "collectibleDefinition": "item.json",
                     "transformProperty": "tpHandTransform",
                     "seraphShape": "fixture:entity/seraph",
+                    "seraphTexture": "fixture:entity/seraph",
                     "attachment": "RightHand",
                 },
             }), encoding="utf-8")
@@ -459,6 +464,7 @@ class SeraphHeldSceneTests(unittest.TestCase):
             self.assertEqual("root/ItemAnchor", metadata["heldScene"]["attachmentElementPath"])
             self.assertEqual("idle1", metadata["heldScene"]["animation"])
             self.assertEqual("player-default-idle", metadata["heldScene"]["animationSelection"])
+            self.assertEqual(str(seraph_texture), metadata["resolvedTextures"]["seraph"])
             self.assertEqual("single-animation geometry and attachment matrix", metadata["heldScene"]["runtimeParity"])
             self.assertGreater(metadata["seraphFaceCount"], 0)
             self.assertEqual(1, metadata["itemFaceCount"])

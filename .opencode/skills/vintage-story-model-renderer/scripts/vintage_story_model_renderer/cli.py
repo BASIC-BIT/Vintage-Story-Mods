@@ -140,7 +140,11 @@ def main(argv: list[str] | None = None) -> None:
         )
         textures.update(seraph_textures)
         if "seraphTexture" in spec:
-            textures["seraph"] = spec["seraphTexture"]
+            seraph_texture = spec["seraphTexture"]
+            textures["seraph"] = seraph_texture
+            for face in faces[:seraph_face_count]:
+                if face.material == "seraph":
+                    textures[face.texture_key or face.material] = seraph_texture
         inputs.extend([definition_path, seraph_shape_path])
         held_scene_metadata = {
             "type": "seraph-held-item",

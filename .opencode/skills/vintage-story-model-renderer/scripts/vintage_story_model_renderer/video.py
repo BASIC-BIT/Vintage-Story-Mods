@@ -37,6 +37,15 @@ def turntable_frame_count(fps: int, duration_seconds: float) -> int:
     return total_frames
 
 
+def prepare_frame_directory(output: Path) -> Path:
+    frame_directory = output.parent / f"{output.stem}-frames"
+    frame_directory.mkdir(parents=True, exist_ok=True)
+    for existing in frame_directory.glob("*.png"):
+        if existing.stem.isdecimal():
+            existing.unlink()
+    return frame_directory
+
+
 def render_animation(
     shape_path: Path,
     animation_code: str,
@@ -84,8 +93,7 @@ def render_animation(
         frame_faces = sampled_cycle_faces
         views = [VIEWS[view_name][0]] * samples_per_cycle
     projections = fixed_animation_projections(frame_faces, views, size)
-    frame_directory = output.parent / f"{output.stem}-frames"
-    frame_directory.mkdir(parents=True, exist_ok=True)
+    frame_directory = prepare_frame_directory(output)
     for frame, (faces, frame_projection) in enumerate(zip(frame_faces, projections)):
         camera_label = f"ORBIT {360 * frame / total_frames:06.2f} DEG" if orbit else view_name.upper()
         source_position = source_positions[frame % samples_per_cycle]
@@ -195,8 +203,7 @@ def render_seraph_held_animation(
         else [base_view] * samples_per_cycle
     )
     projections = fixed_animation_projections(frame_faces, views, size)
-    frame_directory = output.parent / f"{output.stem}-frames"
-    frame_directory.mkdir(parents=True, exist_ok=True)
+    frame_directory = prepare_frame_directory(output)
     for frame, (faces, frame_projection) in enumerate(zip(frame_faces, projections)):
         camera_label = f"ORBIT {360 * frame / total_frames:06.2f} DEG" if orbit else view_name.upper()
         source_position = source_positions[frame % samples_per_cycle]
@@ -261,8 +268,7 @@ def render_turntable(
         for frame in range(total_frames)
     ]
     projections = fixed_animation_projections(frame_faces, views, size)
-    frame_directory = output.parent / f"{output.stem}-frames"
-    frame_directory.mkdir(parents=True, exist_ok=True)
+    frame_directory = prepare_frame_directory(output)
     for frame, frame_projection in enumerate(projections):
         angle = 360 * frame / total_frames
         render(

@@ -11,7 +11,7 @@ from .core import FACE_INDICES, Face, Vec2, Vec3, cuboid, rotate
 
 def constants(path: Path) -> dict[str, float]:
     matches = re.findall(
-        r"internal const float\s+(\w+)\s*=\s*([0-9.]+)f?;",
+        r"internal const (?:float|int)\s+(\w+)\s*=\s*([0-9.]+)f?;",
         path.read_text(encoding="utf-8"),
     )
     return {name: float(value) for name, value in matches}
@@ -131,18 +131,21 @@ def load_flywheel(path: Path, size: str) -> list[Face]:
     if size == "compact":
         add_annulus(faces, wheel_min, wheel_max, wheel_inner, wheel_radius, "wheel", "RuntimeWheel")
     else:
+        spoke_count = int(values["SpokeCount"])
+        if spoke_count <= 0:
+            raise ValueError("SpokeCount must be positive.")
         spoke_half = value("SpokeHalfWidth")
         spoke_inset = value("SpokeDepthInset")
         spoke_inner = value("HubOuterRadius") * 0.92
         spoke_outer = value("FelloeInnerRadius") + 0.02 * 16
-        for index in range(8):
+        for index in range(spoke_count):
             add_rotated_cuboid(
                 faces,
                 (wheel_min + spoke_inset, 8 - spoke_half, 8 + spoke_inner),
                 (wheel_max - spoke_inset, 8 + spoke_half, 8 + spoke_outer),
                 "wood",
                 f"RuntimeWoodSpoke{index}",
-                index * 45,
+                index * 360 / spoke_count,
             )
         add_annulus(
             faces,

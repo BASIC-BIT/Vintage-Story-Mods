@@ -66,6 +66,7 @@ from .shapes import (
 from .video import (
     animation_sample_positions,
     contact_sheet,
+    prepare_frame_directory,
     render_animation,
     render_seraph_held_animation,
     render_turntable,
@@ -118,6 +119,7 @@ __all__ = [
     "projected_face",
     "projection",
     "projection_for_view",
+    "prepare_frame_directory",
     "rasterize_edge",
     "rasterize_triangle",
     "render",

@@ -182,6 +182,7 @@ def rasterize_triangle(
     uvs: list[Vec2] | None = None,
     brightness: float = 1,
     opacity: float = 1,
+    write_depth: bool = True,
 ) -> None:
     min_x = max(0, math.floor(min(point[0] for point in points)))
     min_y = max(0, math.floor(min(point[1] for point in points)))
@@ -256,7 +257,19 @@ def rasterize_triangle(
             target[visible] = blended_fill[visible]
         else:
             target[visible] = fill
-    current_depth[visible] = interpolated_depth[visible]
+    if write_depth:
+        current_depth[visible] = interpolated_depth[visible]
+
+
+def texture_alpha_profile(texture: Image.Image | None) -> tuple[bool, bool]:
+    """Return whether a texture has any transparency and any partial alpha."""
+
+    if texture is None:
+        return False, False
+    alpha = np.asarray(texture.convert("RGBA"))[..., 3]
+    has_transparency = bool(np.any(alpha < 255))
+    has_partial_alpha = bool(np.any((alpha > 0) & (alpha < 255)))
+    return has_transparency, has_partial_alpha
 
 
 def rasterize_edge(
@@ -322,6 +335,7 @@ def render(
         pixels = np.asarray(image).copy()
         depths = np.full((size, size), -np.inf)
         visible_faces = []
+        prepared_faces = []
         for face in faces:
             normal = face_normal(face)
             if dot(normal, view) <= 0.001:
@@ -335,6 +349,39 @@ def render(
             fill = base if mode == "material" else tuple(round(channel * 0.72) for channel in base)
             opacity = 0.28 if face.source == "representation-reference" else 1
             face_uv_coordinates = face.uvs or [(0, 1), (0, 0), (1, 0), (1, 1)]
+            texture_has_transparency, texture_has_partial_alpha = texture_alpha_profile(texture)
+            prepared_faces.append((
+                sum(vertex_depths) / len(vertex_depths),
+                opacity < 1 or texture_has_partial_alpha,
+                texture_has_transparency,
+                points,
+                vertex_depths,
+                texture,
+                brightness,
+                fill,
+                opacity,
+                face_uv_coordinates,
+                face.source == "representation-reference",
+            ))
+
+        opaque_faces = [face for face in prepared_faces if not face[1]]
+        transparent_faces = sorted(
+            (face for face in prepared_faces if face[1]),
+            key=lambda face: face[0],
+        )
+        for (
+            _,
+            is_translucent,
+            texture_has_transparency,
+            points,
+            vertex_depths,
+            texture,
+            brightness,
+            fill,
+            opacity,
+            face_uv_coordinates,
+            is_reference,
+        ) in [*opaque_faces, *transparent_faces]:
             for index in range(1, len(points) - 1):
                 triangle = [points[0], points[index], points[index + 1]]
                 triangle_depths = [vertex_depths[0], vertex_depths[index], vertex_depths[index + 1]]
@@ -353,13 +400,10 @@ def render(
                     triangle_uvs,
                     brightness,
                     opacity,
+                    not is_translucent,
                 )
-            texture_has_transparency = (
-                texture is not None
-                and texture.convert("RGBA").getextrema()[3][0] < 255
-            )
             if not texture_has_transparency:
-                visible_faces.append((points, vertex_depths, face.source == "representation-reference"))
+                visible_faces.append((points, vertex_depths, is_reference))
 
         for points, vertex_depths, is_reference in visible_faces:
             for index, start in enumerate(points):

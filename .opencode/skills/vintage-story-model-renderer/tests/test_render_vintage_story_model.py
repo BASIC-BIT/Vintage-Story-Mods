@@ -216,6 +216,20 @@ class RenderMatrixTests(unittest.TestCase):
     def test_static_turntable_frame_count_preserves_requested_duration(self):
         self.assertEqual(720, renderer.turntable_frame_count(60, 12))
 
+    def test_frame_directory_removes_only_stale_numbered_pngs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "walk.mp4"
+            frames = output.parent / "walk-frames"
+            frames.mkdir()
+            (frames / "0000.png").write_bytes(b"old")
+            (frames / "0099.png").write_bytes(b"old")
+            (frames / "notes.png").write_bytes(b"keep")
+
+            self.assertEqual(frames, renderer.prepare_frame_directory(output))
+            self.assertFalse((frames / "0000.png").exists())
+            self.assertFalse((frames / "0099.png").exists())
+            self.assertTrue((frames / "notes.png").exists())
+
 
 class HierarchicalShapeTests(unittest.TestCase):
     @staticmethod
@@ -454,6 +468,36 @@ class DepthBufferTests(unittest.TestCase):
             pixels = np.asarray(Image.open(output))
             self.assertTrue(np.all(pixels[45:, :, :] == (28, 31, 34)))
 
+    def test_partial_alpha_composites_over_opaque_geometry_regardless_of_face_order(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "translucent.png"
+            rear = renderer.Face(
+                [(0, 0, 0), (0, 1, 0), (0, 1, 1), (0, 0, 1)],
+                "rear",
+                "rear",
+            )
+            front = renderer.Face(
+                [(1, 0, 0), (1, 1, 0), (1, 1, 1), (1, 0, 1)],
+                "front",
+                "front",
+            )
+            renderer.render(
+                [front, rear],
+                {"front": (255, 0, 0), "rear": (0, 255, 0)},
+                {
+                    "front": Image.new("RGBA", (1, 1), (255, 0, 0, 128)),
+                    "rear": Image.new("RGBA", (1, 1), (0, 255, 0, 255)),
+                },
+                "front",
+                "textured",
+                output,
+                128,
+            )
+
+            pixels = np.asarray(Image.open(output))[45:, :, :]
+            blended = pixels[(pixels[..., 0] > 50) & (pixels[..., 1] > 50)]
+            self.assertGreater(len(blended), 0)
+
 
 class AnimationProjectionTests(unittest.TestCase):
     def test_top_and_bottom_views_use_a_nonparallel_up_vector(self):
@@ -510,6 +554,27 @@ class UvTests(unittest.TestCase):
 
 
 class RegistrationMarkWindingTests(unittest.TestCase):
+    def test_procedural_spokes_follow_the_authored_integer_count(self):
+        root = Path(__file__).parents[4]
+        dimensions = root / "mods-dll" / "flywheelpower" / "src" / "FlywheelModelDimensions.cs"
+        with tempfile.TemporaryDirectory() as directory:
+            changed = Path(directory) / "FlywheelModelDimensions.cs"
+            changed.write_text(
+                dimensions.read_text(encoding="utf-8").replace(
+                    "internal const int SpokeCount = 8;",
+                    "internal const int SpokeCount = 6;",
+                ),
+                encoding="utf-8",
+            )
+            faces = renderer.load_flywheel(changed, "full")
+
+        spoke_elements = {
+            face.element
+            for face in faces
+            if face.element.startswith("RuntimeWoodSpoke")
+        }
+        self.assertEqual(6, len(spoke_elements))
+
     def test_front_and_back_marks_face_opposite_directions(self):
         root = Path(__file__).parents[4]
         dimensions = root / "mods-dll" / "flywheelpower" / "src" / "FlywheelModelDimensions.cs"
