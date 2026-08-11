@@ -198,6 +198,7 @@ def main(argv: list[str] | None = None) -> None:
     render_faces = faces + reference_faces
 
     resolved: dict[str, str | None] = {}
+    resolved_texture_inputs: list[Path] = []
     colors: dict[str, tuple[int, int, int]] = {}
     texture_images: dict[str, Image.Image | None] = {}
     faces_by_render_key = {
@@ -219,6 +220,8 @@ def main(argv: list[str] | None = None) -> None:
         location = textures.get(render_key, "")
         texture = resolve_texture(location, roots) if location else None
         resolved[metadata_key] = str(texture) if texture else None
+        if texture:
+            resolved_texture_inputs.append(texture)
         colors[render_key] = average_color(texture, material, location)
         texture_images[render_key] = Image.open(texture).convert("RGBA") if texture else None
 
@@ -307,10 +310,11 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     vertices = [vertex for face in faces for vertex in face.vertices]
+    provenance_inputs = list(dict.fromkeys([*inputs, *resolved_texture_inputs]))
     metadata = {
         "name": manifest.get("name", manifest_path.stem),
         "representation": manifest.get("representation", "placed"),
-        "inputs": [{"path": str(path), "sha256": sha256(path)} for path in inputs],
+        "inputs": [{"path": str(path), "sha256": sha256(path)} for path in provenance_inputs],
         "faceCount": len(faces),
         "itemFaceCount": len(item_faces),
         "seraphFaceCount": seraph_face_count,

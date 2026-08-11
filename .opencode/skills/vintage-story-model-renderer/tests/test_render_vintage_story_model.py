@@ -209,6 +209,9 @@ class RenderMatrixTests(unittest.TestCase):
 
             self.assertEqual(set(metadata["resolvedTextures"].values()), {str(red), str(blue)})
             self.assertEqual([], metadata["unresolvedTextures"])
+            provenance = {entry["path"]: entry["sha256"] for entry in metadata["inputs"]}
+            self.assertEqual(renderer.sha256(red), provenance[str(red)])
+            self.assertEqual(renderer.sha256(blue), provenance[str(blue)])
 
     def test_animation_sampling_interpolates_source_frames_at_higher_output_rate(self):
         positions = renderer.animation_sample_positions(30, 60, 30)

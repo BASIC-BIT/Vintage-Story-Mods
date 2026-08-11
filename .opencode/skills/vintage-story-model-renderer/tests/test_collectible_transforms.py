@@ -468,8 +468,10 @@ class SeraphHeldSceneTests(unittest.TestCase):
             self.assertEqual("single-animation geometry and attachment matrix", metadata["heldScene"]["runtimeParity"])
             self.assertGreater(metadata["seraphFaceCount"], 0)
             self.assertEqual(1, metadata["itemFaceCount"])
-            self.assertEqual(str(definition.resolve()), metadata["inputs"][-2]["path"])
-            self.assertEqual(str(seraph.resolve()), metadata["inputs"][-1]["path"])
+            provenance = {entry["path"]: entry["sha256"] for entry in metadata["inputs"]}
+            self.assertIn(str(definition.resolve()), provenance)
+            self.assertIn(str(seraph.resolve()), provenance)
+            self.assertEqual(renderer.sha256(seraph_texture), provenance[str(seraph_texture)])
 
     def test_cli_resolves_variant_specific_two_hand_pose(self):
         with tempfile.TemporaryDirectory() as directory:
