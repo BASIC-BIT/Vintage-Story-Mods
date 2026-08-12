@@ -11,11 +11,15 @@
 [*]Any prefix still overrides for one line, so a player parked in OOC can emote with [b]*waves*[/b] without leaving OOC.
 [/list]
 
-Range and chat type are two separate things, and they combine. You can whisper in character, whisper out of character, or yell an emote, by setting each one independently. Running a range command with a message, such as [b]/say hello[/b], sends that line in character and returns you to in character speech.
+Range and chat type are separate, and they combine. A player parked in local OOC who runs [b]/whisper[/b] is whispering out of character and stays in OOC. Global OOC is the exception, because it has no range of its own: an explicit range command sends that one line as ranged speech, and the player remains in global OOC afterward.
+
+Entering a sticky type is gated. All three require RP chat and the player's own RP text to be enabled. [b]/ooc[/b] also requires [b]AllowOOCToggle[/b] and the [b]OOCTogglePermission[/b] privilege, and [b]/gooc[/b] requires [b]EnableGlobalOOC[/b]. A player who cannot enter a type is told why.
 
 [h3]Questions read as questions[/h3]
 
-A message ending in a question mark now uses a question verb, so [b]Where are you?[/b] renders as [b]Alice asks, "Where are you?"[/b] instead of [b]Alice says[/b]. This applies to whisper, say, and yell, and the verbs are configurable per mode with [b]ProximityChatModeQuestionVerbs[/b].
+In the default [b]StandardRoleplay[/b] presentation, a message ending in a question mark now uses a question verb, so [b]Where are you?[/b] renders as [b]Alice asks, "Where are you?"[/b] instead of [b]Alice says[/b]. This applies to whisper, say, and yell, and the verbs are configurable per mode with [b]ProximityChatModeQuestionVerbs[/b].
+
+The other presentation modes are unaffected, because [b]SimpleSpeech[/b] and [b]PlainProximity[/b] render [b]Alice: ...[/b] with no verb and [b]Prose[/b] renders no speech verb at all. Sign and Babble keep their own verbs regardless of punctuation.
 
 [h3]Server wide proximity chat range[/h3]
 
@@ -34,7 +38,7 @@ Sound and sight deliberately behave differently. Glass and water stop speech but
 
 [h3]Overhead speech bubbles no longer clip long words[/h3]
 
-A single long token, such as a URL or an unbroken string, is now wrapped instead of being cut off at the edge of the bubble.
+In RpText bubble mode, a single long token such as a URL is now wrapped instead of being cut off at the edge of the bubble. [b]OverheadChatBubbleMode=Vanilla[/b] still clips, which is what that mode is for.
 
 [h3]Sign language and overhead text carry through foliage[/h3]
 
@@ -48,9 +52,11 @@ The smallest distance font size is now 9 instead of 6. Text at the far edge of a
 
 Existing configurations that use the previous default font sizes are updated to the new floor the first time the server loads. Custom values are left alone.
 
-[h3]RP character inventory ownership[/h3]
+[h3]RP character switching and open inventories[/h3]
 
-Switching RP characters now carries inventories added by other mods, as long as they belong to the switching player. External inventories and other players' inventories are still left alone.
+The safety check that decides whether an RP character switch can proceed now uses Vintage Story's ownership boundary instead of a fixed list of inventory classes. An open inventory belonging to the switching player, including one added by another mod, no longer blocks the switch. An open external container or another player's inventory still does.
+
+The inventories carried across a switch are unchanged: hotbar, backpack, and character.
 
 [h3]Optional temporal gear cost for /top[/h3]
 
