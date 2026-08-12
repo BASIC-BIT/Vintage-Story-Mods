@@ -570,7 +570,7 @@ namespace thebasics.Configs
         /// players the speaker has an unobstructed <em>sound</em> path to. Glass and water block it;
         /// foliage does not.
         ///
-        /// Named for sound rather than sight deliberately. It was once RequireClearSoundPathForSpeech,
+        /// Named for sound rather than sight deliberately. It was once RequireLineOfSightForSpeech,
         /// which described neither the filter it uses nor the behaviour it produces: a sealed glass
         /// window blocks speech while a hedge does not.
         /// </summary>
