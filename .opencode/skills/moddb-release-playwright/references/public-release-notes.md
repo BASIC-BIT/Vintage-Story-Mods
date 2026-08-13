@@ -13,9 +13,10 @@ These are explicit repository or owner rules:
 5. Keep optional companions proportionate to their user impact. State plainly when a promoted capability is unavailable without an unpublished or unconfigured provider.
 6. Omit installation boilerplate. Include unusual distribution instructions only when the owner explicitly requests them or users otherwise cannot obtain the release safely.
 7. Prepare one canonical body for GitHub and ModDB. Change only platform formatting unless a platform-specific fact genuinely differs.
-8. Before posting, present each exact platform-ready body verbatim and show its rendered preview for owner approval.
-9. Never put `[AGENT]` in a public release body.
-10. Never use an em dash in public release-note copy. Use a comma, colon, parentheses, semicolon, or sentence break instead.
+8. Write the ModDB body in HTML: `<h2>`, `<h3>`, `<p>`, `<ul>` with `<li>`, `<b>`. The GitHub body stays Markdown. Confirmed at the v5.9.0 upload. Releases before 5.9.0 carry a `04-moddb-richtext.md` drafted in BBCode, which the editor does not take; those bodies were reworked by hand at upload time, so they are not evidence of a working format. Do not copy their markup.
+9. Before posting, present each exact platform-ready body verbatim and show its rendered preview for owner approval.
+10. Never put `[AGENT]` in a public release body.
+11. Never use an em dash in public release-note copy. Use a comma, colon, parentheses, semicolon, or sentence break instead.
 
 ## Attention and voice
 
