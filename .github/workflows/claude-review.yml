@@ -31,6 +31,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
 
     steps:
       - name: Upsert unavailable Claude review sticky comment
@@ -101,6 +102,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
 
     steps:
       - name: Invalidate existing Claude review sticky comment
@@ -174,6 +176,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
     outputs:
       available: ${{ steps.sticky_comment.outputs.comment_id != '' }}
       comment_id: ${{ steps.sticky_comment.outputs.comment_id }}
@@ -607,7 +610,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
 
     steps:
       - name: Publish Claude review sticky comment
