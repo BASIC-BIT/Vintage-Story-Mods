@@ -175,30 +175,16 @@ jobs:
       contents: read
       issues: write
     outputs:
-      available: ${{ steps.claude_secret.outputs.available == 'true' && steps.sticky_comment.outputs.comment_id != '' }}
+      available: ${{ steps.sticky_comment.outputs.comment_id != '' }}
       comment_id: ${{ steps.sticky_comment.outputs.comment_id }}
 
     steps:
-      - name: Check Claude OAuth token
-        id: claude_secret
-        env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        shell: bash
-        run: |
-          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-            echo "::notice::Skipping Claude review because CLAUDE_CODE_OAUTH_TOKEN is not configured."
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Upsert Claude review sticky comment
         id: sticky_comment
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          SECRET_AVAILABLE: ${{ steps.claude_secret.outputs.available }}
           STICKY_MARKER: '<!-- claude-pr-review -->'
         shell: bash
         run: |
@@ -207,13 +193,7 @@ jobs:
           body_file="${RUNNER_TEMP}/claude-review-comment.md"
           json_file="${RUNNER_TEMP}/claude-review-comment.json"
 
-          if [ "${SECRET_AVAILABLE}" = "true" ]; then
-            status="Claude review is queued for commit \`${PR_HEAD_SHA}\`."
-          else
-            status="Claude review could not start for commit \`${PR_HEAD_SHA}\` because \`CLAUDE_CODE_OAUTH_TOKEN\` is not configured for this repository.
-
-          This is a configuration failure, not an approval."
-          fi
+          status="Claude review is queued for commit \`${PR_HEAD_SHA}\`."
 
           cat > "$body_file" <<EOF
           ${STICKY_MARKER}
@@ -259,8 +239,7 @@ jobs:
             fs.writeFileSync(bodyFile, String(comment.body ?? ""));
           NODE
 
-            if [ "${SECRET_AVAILABLE}" = "true" ] &&
-              grep -qF "<!-- claude-pr-review-complete -->" "$existing_body_file"; then
+            if grep -qF "<!-- claude-pr-review-complete -->" "$existing_body_file"; then
               node - "$existing_body_file" "$body_file" "$PR_HEAD_SHA" <<'NODE'
               const fs = require("node:fs");
 
@@ -348,6 +327,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+      id-token: write
       issues: read
       pull-requests: read
     outputs:
@@ -411,12 +391,45 @@ jobs:
           git -C pr-head diff --find-renames --find-copies --no-ext-diff --stat "${BASE_SHA}...${HEAD_SHA}" > "${context_dir}/pr-stat.txt"
           git -C pr-head diff --find-renames --find-copies --no-ext-diff "${BASE_SHA}...${HEAD_SHA}" > "${context_dir}/pr-diff.patch"
 
+      - name: Assume the shared Claude review role
+        id: aws_credentials
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
+        with:
+          role-to-assume: arn:aws:iam::079358094174:role/basic-shared-claude-github-review
+          role-session-name: claude-review-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-east-2
+          allowed-account-ids: "079358094174"
+          output-credentials: true
+          output-env-credentials: false
+
+      - name: Load the shared Claude OAuth token
+        id: claude_auth
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.aws_credentials.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.aws_credentials.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.aws_credentials.outputs.aws-session-token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          token="$(aws secretsmanager get-secret-value \
+            --region us-east-2 \
+            --secret-id /basic/shared/claude-code-oauth-token \
+            --query SecretString \
+            --output text)"
+          if [ -z "$token" ] || [ "$token" = "None" ]; then
+            echo "::error::AWS Secrets Manager returned no Claude OAuth token."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          printf 'token=%s\n' "$token" >> "$GITHUB_OUTPUT"
+
       - name: Review with Claude
         id: claude_review
         # Pinned from anthropics/claude-code-action v1.0.167. Update deliberately.
         uses: anthropics/claude-code-action@0fe28cdb64e23015219b0e478100b7105fd7dfa1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_code_oauth_token: ${{ steps.claude_auth.outputs.token }}
           github_token: ${{ github.token }}
           prompt: |
             REPO: ${{ github.repository }}
