@@ -1,10 +1,11 @@
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_EVENTS = 50;
 const MAX_DEFAULT_PROPERTIES = 24;
-const MAX_CONFIG_PROPERTIES = 80;
+const MAX_CONFIG_PROPERTIES = 100;
 const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
+export const CONTRACT_REVISION = 2;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -35,7 +36,58 @@ const ALLOWED_EVENTS = new Set([
 
 const ALLOWED_CONSENT_LEVELS = new Set(["server", "personalized"]);
 
+const COUNT_BUCKET_VALUES = new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"]);
+
+const TELEPORT_BUCKET_PROPERTIES = new Set([
+  "back_cooldown_seconds_bucket",
+  "back_expires_after_seconds_bucket",
+  "back_warmup_seconds_bucket",
+  "home_cooldown_seconds_bucket",
+  "home_warmup_seconds_bucket",
+  "max_homes_bucket",
+  "spawn_cooldown_seconds_bucket",
+  "spawn_warmup_seconds_bucket",
+  "stuck_cooldown_seconds_bucket",
+  "stuck_reminder_interval_seconds_bucket",
+  "stuck_warmup_seconds_bucket",
+  "top_cooldown_seconds_bucket",
+  "top_warmup_seconds_bucket",
+  "tpa_cooldown_hours_bucket",
+  "tpa_timeout_minutes_bucket",
+  "tpa_warmup_seconds_bucket",
+]);
+
+const TELEPORT_BOOLEAN_PROPERTIES = new Set([
+  "back_custom_privilege",
+  "back_requires_temporal_gear",
+  "home_custom_privilege",
+  "home_spawn_require_temporal_gear",
+  "register_back_command",
+  "register_home_commands",
+  "register_spawn_commands",
+  "register_stuck_command",
+  "register_top_command",
+  "set_home_custom_privilege",
+  "set_spawn_custom_privilege",
+  "spawn_custom_privilege",
+  "stuck_admin_notify_custom_privilege",
+  "stuck_blocked_by_online_custom_privilege",
+  "stuck_blocks_when_privilege_online",
+  "stuck_custom_privilege",
+  "teleport_cancel_warmup_on_damage",
+  "teleport_cancel_warmup_on_interaction",
+  "top_custom_privilege",
+  "top_requires_temporal_gear",
+  "tpa_request_custom_privilege",
+]);
+
+const TELEPORT_CONFIG_PROPERTIES = new Set([
+  ...TELEPORT_BUCKET_PROPERTIES,
+  ...TELEPORT_BOOLEAN_PROPERTIES,
+]);
+
 const ALLOWED_PROPERTIES = new Set([
+  ...TELEPORT_CONFIG_PROPERTIES,
   "action",
   "allow_ooc_toggle",
   "allow_player_nickname_colors",
@@ -112,27 +164,41 @@ const ALLOWED_PROPERTIES = new Set([
   "typing_indicator_display_mode",
   "use_general_channel_as_proximity_chat",
   "use_custom_nametag_renderer",
+  "warmup_seconds_bucket",
 ]);
 
 const ALLOWED_STRING_VALUES = new Map([
+  ...[...TELEPORT_BUCKET_PROPERTIES].map((key) => [key, COUNT_BUCKET_VALUES]),
   ["action", new Set([
     "accept",
+    "accept_warmup_start",
     "add",
     "admin_add",
     "admin_list",
     "admin_remove",
+    "admin_semantic_progress",
     "admin_set",
+    "admin_set_bucket",
+    "admin_set_skill",
     "allow_incoming",
+    "back",
+    "back_warmup_start",
     "cancel",
     "clear",
     "clear_all",
+    "clear_background",
+    "clear_border",
     "clear_incoming",
     "clear_one",
+    "delete_home",
     "deny",
     "disable",
     "disallow_incoming",
     "enable",
+    "home",
+    "home_warmup_start",
     "list",
+    "list_homes",
     "place",
     "remove",
     "reload",
@@ -145,11 +211,25 @@ const ALLOWED_STRING_VALUES = new Map([
     "send_normal",
     "send_whisper",
     "send_yell",
+    "semantic_progress",
     "set",
+    "set_background",
+    "set_border",
     "set_durability",
+    "set_emote",
+    "set_globalooc",
+    "set_home",
     "set_normal",
+    "set_ooc",
+    "set_spawn",
     "set_whisper",
     "set_yell",
+    "spawn",
+    "spawn_warmup_start",
+    "stuck",
+    "stuck_warmup_start",
+    "top",
+    "top_warmup_start",
     "upload",
     "view_other",
     "view_own",
@@ -161,24 +241,37 @@ const ALLOWED_STRING_VALUES = new Map([
   ["command_name", new Set([
     "addlang",
     "adminaddlang",
+    "adminlangprogress",
     "adminlistlang",
     "adminremovelang",
+    "adminsetlangbucket",
+    "adminsetlangskill",
     "adminsetnickname",
     "adminsetnicknamecolor",
+    "back",
     "chatter",
+    "chat_tab",
+    "clearnametagbackgroundcolor",
+    "clearnametagbordercolor",
     "clearnick",
     "clearnickcolor",
     "clearstat",
     "clearstats",
     "cleartpa",
+    "delhome",
     "emotemode",
     "envhere",
     "gooc",
+    "home",
+    "homes",
     "it",
     "langcolor",
+    "langprogress",
     "listlang",
     "me",
     "nickname",
+    "nametagbackgroundcolor",
+    "nametagbordercolor",
     "nickcolor",
     "normal",
     "ooc",
@@ -187,6 +280,11 @@ const ALLOWED_STRING_VALUES = new Map([
     "removelang",
     "rptext",
     "setdurability",
+    "sethome",
+    "setspawn",
+    "spawn",
+    "stuck",
+    "top",
     "tpa",
     "tpaccept",
     "tpacancel",
@@ -206,14 +304,17 @@ const ALLOWED_STRING_VALUES = new Map([
     "character_headshot",
     "character_sheet_fields",
     "chat_mode",
+    "chat_override_mode",
     "chatter",
     "config_admin",
     "emote_mode",
     "environment_message",
     "global_ooc",
+    "home-spawn",
     "language",
     "language_colors",
     "language_config",
+    "nametag_style",
     "nickname",
     "nickname_color",
     "ooc",
@@ -232,7 +333,13 @@ const ALLOWED_STRING_VALUES = new Map([
   ["previous_session_age_bucket", new Set(["unknown", "<1m", "1-5m", "5-30m", "30-120m", "120m+"])],
   ["proximity_chat_presentation_mode", new Set(["StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose"])],
   ["result", new Set([
+    "admin_online",
     "bad-options",
+    "back_dimension_mismatch",
+    "back_expired",
+    "back_not_set",
+    "blocked",
+    "config_unreadable",
     "consume_gear_failed",
     "cooldown",
     "crop-failed",
@@ -245,15 +352,30 @@ const ALLOWED_STRING_VALUES = new Map([
     "existing_request",
     "exception",
     "failure",
+    "home-name-invalid",
+    "home-name-required",
+    "home-name-too-long",
+    "home_not_set",
     "image-failed",
     "json_string_repaired",
     "load_failed_remote_disabled",
     "load_failed_using_defaults",
+    "max_homes",
     "missing_temporal_gear",
+    "multiple_requests",
+    "no_outgoing_request",
+    "no_requests",
+    "no_safe_destination",
+    "no_transformer_system",
     "options-null",
     "output-too-large",
     "pipeline_exception",
+    "pipeline_stopped",
+    "player-required",
+    "player_unavailable",
     "previous_session_unclean",
+    "rejected",
+    "request_not_found",
     "resize-failed",
     "restore_failed",
     "rollback_failed",
@@ -262,11 +384,32 @@ const ALLOWED_STRING_VALUES = new Map([
     "target_disabled",
     "target_not_found",
     "target-zero",
+    "teleport-unavailable",
+    "teleport-warmup-active",
+    "teleport_unavailable",
+    "thebasics:chat-gooc-disabled",
+    "thebasics:chat-ooc-disabled",
+    "thebasics:chat-ooc-mode-no-privilege",
+    "thebasics:chat-override-rp-disabled",
+    "thebasics:chat-type-rptext-disabled",
+    "unknown",
     "unsupported-format",
     "update_failed",
     "validation_failed",
+    "warmup_cancelled_cancelled",
+    "warmup_cancelled_cleared",
+    "warmup_cancelled_damage",
+    "warmup_cancelled_death",
+    "warmup_cancelled_denied",
+    "warmup_cancelled_disconnect",
+    "warmup_cancelled_interaction",
+    "warmup_cancelled_movement",
+    "warmup_cancelled_playerrejoin",
+    "warmup_cancelled_timeout",
+    "warmup_failed",
     "write_failed",
   ])],
+  ["warmup_seconds_bucket", COUNT_BUCKET_VALUES],
   ["restart_required_settings_bucket", new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"])],
   ["session_duration_bucket", new Set(["<1m", "1-5m", "5-30m", "30-120m", "120m+"])],
   ["session_end_reason", new Set(["disconnect", "server_stop"])],
@@ -274,6 +417,7 @@ const ALLOWED_STRING_VALUES = new Map([
 ]);
 
 const BOOLEAN_PROPERTIES = new Set([
+  ...TELEPORT_BOOLEAN_PROPERTIES,
   "allow_ooc_toggle",
   "allow_player_nickname_colors",
   "allow_player_nicknames",
@@ -344,6 +488,7 @@ const BASE_PROPERTIES = new Set([
 
 const CONFIG_PROPERTIES = new Set([
   ...BASE_PROPERTIES,
+  ...TELEPORT_CONFIG_PROPERTIES,
   "allow_ooc_toggle",
   "allow_player_nickname_colors",
   "allow_player_nicknames",
@@ -417,6 +562,7 @@ const EVENT_PROPERTIES = new Map([
     "result",
     "restart_required_settings_bucket",
     "success",
+    "warmup_seconds_bucket",
   ])],
   ["mod failure", new Set([
     ...BASE_PROPERTIES,
@@ -455,7 +601,12 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ ok: true, service: "thebasics-analytics-relay", schema_version: 1 });
+      return json({
+        ok: true,
+        service: "thebasics-analytics-relay",
+        schema_version: 1,
+        contract_revision: CONTRACT_REVISION,
+      });
     }
 
     if (request.method !== "POST" || url.pathname !== ACCEPTED_PATH) {
@@ -526,7 +677,7 @@ export default {
   },
 };
 
-function validatePayload(payload) {
+export function validatePayload(payload) {
   if (!isPlainObject(payload)) {
     return invalid("invalid_payload");
   }
