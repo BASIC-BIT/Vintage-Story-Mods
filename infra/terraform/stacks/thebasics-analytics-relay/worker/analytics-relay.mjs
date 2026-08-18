@@ -368,6 +368,7 @@ const ALLOWED_STRING_VALUES = new Map([
     "reload",
     "request_bring",
     "request_goto",
+    "save",
     "send_chat_tab",
     "send_normal",
     "send_whisper",

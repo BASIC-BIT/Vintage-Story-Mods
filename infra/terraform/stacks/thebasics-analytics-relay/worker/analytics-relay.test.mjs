@@ -246,7 +246,7 @@ function currentProducerContracts() {
     ["AnalyticsService.TrackCommandUsed", ["command_name", 0, "commandName"], ["result", 2, "result"]],
     ["AnalyticsService.TrackFeatureUsed", ["feature_name", 0, "featureName"], ["action", 1, "action"], ["result", 3, "result"]],
     ["AnalyticsService.TrackFailure", ["area", 0, "area"], ["operation", 1, "operation"], ["severity", 2, "severity"], ["result", 3, "result"]],
-    ["TrackConfigAdminValidationFailure", ["area", 0, "featureName"], ["operation", 1, "action"]],
+    ["TrackConfigEditorFailure", ["area", 0, "featureName"], ["operation", 1, "action"]],
     ["TrackHomeSpawnFailure", ["command_name", 0, "commandName"], ["action", 1, "featureAction"], ["result", 2, "result"]],
     ["TrackTpaFailure", ["command_name", 0, "commandName"], ["action", 1, "action"], ["result", 2, "result"]],
     ["SendThroughPipeline", ["command_name", 1, "surface"], ["feature_name", 2, "featureName"], ["action", 3, "featureAction"], ["area", 2, "featureName"], ["operation", 1, "surface"]],
