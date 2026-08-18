@@ -868,6 +868,7 @@ function normalizeEvent(event, envelope) {
   const properties = {
     distinct_id: envelope.server_install_id,
     server_install_id: envelope.server_install_id,
+    "$geoip_disable": true,
     "$process_person_profile": false,
   };
 
