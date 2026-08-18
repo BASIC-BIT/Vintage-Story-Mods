@@ -221,8 +221,13 @@ function currentProducerContracts() {
       "set_globalooc", "set_normal", "set_ooc", "set_whisper", "set_yell",
       "spawn_warmup_start", "stuck_warmup_start", "top_warmup_start",
     ]),
+    area: new Set(),
     command_name: new Set(["tpa", "tpahere"]),
     feature_name: new Set(),
+    operation: new Set([
+      "enter_emote", "enter_globalooc", "enter_normal", "enter_ooc",
+      "enter_whisper", "enter_yell",
+    ]),
     result: new Set([
       "back_expired", "back_not_set", "failure", "home-name-invalid",
       "home-name-required", "home-name-too-long", "player-required", "success",
@@ -235,14 +240,16 @@ function currentProducerContracts() {
       "warmup_cancelled_movement", "warmup_cancelled_playerrejoin",
       "warmup_cancelled_timeout", "warmup_failed",
     ]),
+    severity: new Set(),
   };
   const specs = [
     ["AnalyticsService.TrackCommandUsed", ["command_name", 0, "commandName"], ["result", 2, "result"]],
     ["AnalyticsService.TrackFeatureUsed", ["feature_name", 0, "featureName"], ["action", 1, "action"], ["result", 3, "result"]],
-    ["AnalyticsService.TrackFailure", ["result", 3, "result"]],
+    ["AnalyticsService.TrackFailure", ["area", 0, "area"], ["operation", 1, "operation"], ["severity", 2, "severity"], ["result", 3, "result"]],
+    ["TrackConfigAdminValidationFailure", ["area", 0, "featureName"], ["operation", 1, "action"]],
     ["TrackHomeSpawnFailure", ["command_name", 0, "commandName"], ["action", 1, "featureAction"], ["result", 2, "result"]],
     ["TrackTpaFailure", ["command_name", 0, "commandName"], ["action", 1, "action"], ["result", 2, "result"]],
-    ["SendThroughPipeline", ["command_name", 1, "surface"], ["feature_name", 2, "featureName"], ["action", 3, "featureAction"]],
+    ["SendThroughPipeline", ["command_name", 1, "surface"], ["feature_name", 2, "featureName"], ["action", 3, "featureAction"], ["area", 2, "featureName"], ["operation", 1, "surface"]],
   ];
 
   for (const source of readSources()) {
@@ -288,6 +295,14 @@ test("relay accepts current production event contracts", () => {
       result: "success",
       success: true,
     }),
+    area: (value) => payloadForEvent("mod failure", {
+      area: value,
+      operation: "load",
+      severity: "error",
+      result: "failure",
+      recovered: true,
+      success: false,
+    }),
     command_name: (value) => payloadForEvent("command used", {
       command_name: value,
       result: "success",
@@ -299,19 +314,39 @@ test("relay accepts current production event contracts", () => {
       result: "success",
       success: true,
     }),
+    operation: (value) => payloadForEvent("mod failure", {
+      area: "config",
+      operation: value,
+      severity: "error",
+      result: "failure",
+      recovered: true,
+      success: false,
+    }),
     result: (value) => payloadForEvent("command used", {
       command_name: "tpa",
       result: value,
       success: false,
     }),
+    severity: (value) => payloadForEvent("mod failure", {
+      area: "config",
+      operation: "load",
+      severity: value,
+      result: "failure",
+      recovered: true,
+      success: false,
+    }),
   };
 
+  const failures = [];
   for (const [field, values] of Object.entries(contracts)) {
     for (const value of values) {
       const result = validatePayload(fixtures[field](value));
-      assertAccepted(result, `${field}=${value}`);
+      if (!result.ok || result.rejected.length > 0 || result.events.length === 0) {
+        failures.push(`${field}=${value}: ${result.error ?? JSON.stringify(result.rejected)}`);
+      }
     }
   }
+  assert.deepEqual(failures, []);
 
   const warmup = validatePayload(payloadForEvent("feature used", {
     action: "accept_warmup_start",
@@ -348,7 +383,7 @@ test("health exposes the relay contract required by the mod", async () => {
   assert.equal(health.contract_revision, CONTRACT_REVISION);
 });
 
-test("relay forwards every event family and safe extensible labels", async () => {
+test("relay forwards every event family and registered semantic labels", async () => {
   stubUpstream();
   captureLogs();
 
@@ -369,17 +404,17 @@ test("relay forwards every event family and safe extensible labels", async () =>
       name: "mod failure",
       properties: {
         ...common,
-        area: "future_area_2026",
-        operation: "future_operation_2026",
-        severity: "future_severity_2026",
-        result: "thebasics:future-result-2026",
+        area: "analytics",
+        operation: "startup_sentinel",
+        severity: "warning",
+        result: "update_failed",
         success: false,
         recovered: true,
         exception_type: "InvalidOperationException",
       },
       timestamp,
     },
-    commandEvent("future_command_2026"),
+    commandEvent("sethome"),
     {
       name: "config snapshot",
       properties: {
@@ -392,7 +427,7 @@ test("relay forwards every event family and safe extensible labels", async () =>
       },
       timestamp,
     },
-    featureEvent("future-feature-2026", "future_action_2026"),
+    featureEvent("home-spawn", "set_home"),
     {
       name: "player session ended",
       properties: {
@@ -446,12 +481,18 @@ test("relay forwards every event family and safe extensible labels", async () =>
   assert.equal(log.upstream_status, 200);
 });
 
-test("relay rejects unsafe labels and unknown properties without logging values", async () => {
+test("relay rejects identifying label-shaped values and unknown properties without logging them", async () => {
   stubUpstream();
   captureLogs();
 
   const response = await postBatch(runtimeEnvelope([
-    featureEvent("proximity_chat", "sent Alice's private message"),
+    featureEvent("proximity_chat", "alice"),
+    featureEvent("alice", "send_normal"),
+    commandEvent("123456789"),
+    failureEvent({ area: "alice" }),
+    failureEvent({ operation: "alice" }),
+    failureEvent({ severity: "alice" }),
+    failureEvent({ result: "alice" }),
     featureEvent("proximity_chat", "send_normal", { chat_text: "private message content" }),
   ]));
 
@@ -459,9 +500,9 @@ test("relay rejects unsafe labels and unknown properties without logging values"
   assert.equal(upstreamCalls.length, 0);
   const body = await response.json();
   assert.equal(body.error, "no_valid_events");
-  assert.equal(body.rejected_event_count, 2);
-  assert.deepEqual(body.rejection_reasons, { invalid_string_value: 1, unknown_property: 1 });
-  assert.doesNotMatch(logLines.join("\n"), /Alice|private message content/);
+  assert.equal(body.rejected_event_count, 8);
+  assert.deepEqual(body.rejection_reasons, { invalid_string_value: 7, unknown_property: 1 });
+  assert.doesNotMatch(logLines.join("\n"), /alice|123456789|private message content/);
   assert.doesNotMatch(logLines.join("\n"), new RegExp(serverInstallId));
 });
 
@@ -590,6 +631,23 @@ function commandEvent(commandName) {
       command_name: commandName,
       success: true,
       result: "success",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function failureEvent(overrides = {}) {
+  return {
+    name: "mod failure",
+    properties: {
+      ...runtimeBaseProperties(),
+      area: "config",
+      operation: "load",
+      severity: "error",
+      result: "failure",
+      success: false,
+      recovered: true,
+      ...overrides,
     },
     timestamp: new Date().toISOString(),
   };

@@ -11,7 +11,7 @@ This stack deploys the BASIC-owned intake endpoint used by The BASICs server-ins
 
 The Worker rejects unknown event names, unknown properties, oversized batches, and malformed server install IDs. It does not accept chat text, command arguments, player names, player IDs, IPs, world names, seeds, coordinates, or raw config.
 
-Closed values such as consent levels, display modes, duration buckets, and count buckets use explicit allowlists. Extensible analytics labels (`feature_name`, `action`, `command_name`, `result`, `area`, `operation`, and `severity`) must be lowercase slugs containing only letters, numbers, underscores, or hyphens, with a maximum length of 64 characters. Results may additionally contain a colon for namespaced error codes such as `thebasics:chat-ooc-disabled`. This keeps free-form or identifying text out without requiring a relay deployment for each new safe label.
+Closed values and semantic analytics labels use explicit server-side registries. This includes `feature_name`, `action`, `command_name`, `result`, `area`, `operation`, and `severity`, because string shape alone cannot distinguish a legitimate label from a player name or identifier. The contract suite derives literals from known C# analytics seams, covers dynamic labels with explicit fixtures, and fails CI when a producer emits a value that the relay does not recognize. This keeps the registries synchronized without weakening the privacy boundary.
 
 ## Batch behavior
 
