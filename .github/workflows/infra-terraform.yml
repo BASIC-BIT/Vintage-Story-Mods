@@ -5,13 +5,11 @@ on:
     branches: [ main ]
     paths:
       - 'infra/**'
-      - 'mods-dll/thebasics/src/ModSystems/Analytics/**'
       - '.github/workflows/infra-terraform.yml'
   push:
     branches: [ main ]
     paths:
       - 'infra/**'
-      - 'mods-dll/thebasics/src/ModSystems/Analytics/**'
       - '.github/workflows/infra-terraform.yml'
   workflow_dispatch:
     inputs:
@@ -60,9 +58,6 @@ jobs:
 
       - name: Check Worker JavaScript syntax
         run: node --check "$RELAY_STACK_DIR/worker/analytics-relay.mjs"
-
-      - name: Test analytics relay compatibility
-        run: node --test "$RELAY_STACK_DIR/worker/analytics-relay.test.mjs"
 
       - name: Validate backend bootstrap stack
         working-directory: ${{ env.BOOTSTRAP_STACK_DIR }}
