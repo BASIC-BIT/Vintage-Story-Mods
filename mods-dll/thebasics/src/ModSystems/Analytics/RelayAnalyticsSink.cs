@@ -14,7 +14,8 @@ namespace thebasics.ModSystems.Analytics;
 
 public sealed class RelayAnalyticsSink : IAnalyticsSink
 {
-    public const int RequiredRelayContractRevision = 2;
+    public const int RequiredRelayContractRevision = 3;
+    private const int MaxOnlinePlayerCount = 10_000;
 
     private readonly ICoreServerAPI _api;
     private readonly AnalyticsConfig _config;
@@ -159,7 +160,7 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
             ["game_version"] = GameVersion.LongGameVersion,
             ["analytics_consent_level"] = _config.ConsentLevel,
             ["server_session_id"] = _serverSessionId,
-            ["online_player_count_bucket"] = AnalyticsBuckets.Count(GetOnlinePlayerCount())
+            ["online_player_count"] = Math.Clamp(GetOnlinePlayerCount(), 0, MaxOnlinePlayerCount)
         };
 
         if (properties != null)

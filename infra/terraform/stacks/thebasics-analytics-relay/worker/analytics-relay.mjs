@@ -5,7 +5,8 @@ const MAX_CONFIG_PROPERTIES = 100;
 const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
-export const CONTRACT_REVISION = 2;
+const MAX_ONLINE_PLAYER_COUNT = 10_000;
+export const CONTRACT_REVISION = 3;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -132,6 +133,7 @@ const ALLOWED_PROPERTIES = new Set([
   "nametag_requires_line_of_sight",
   "new_consent_level",
   "normalize_proximity_chat_text",
+  "online_player_count",
   "online_player_count_bucket",
   "operation",
   "overhead_chat_bubble_mode",
@@ -539,6 +541,7 @@ const BASE_PROPERTIES = new Set([
   "game_version",
   "mod_id",
   "mod_version",
+  "online_player_count",
   "online_player_count_bucket",
   "server_session_id",
 ]);
@@ -913,6 +916,12 @@ function normalizePropertyValue(key, value) {
 
   if (key === "event_schema_version") {
     return value === 1 ? { ok: true, value } : invalid("invalid_schema_version");
+  }
+
+  if (key === "online_player_count") {
+    return Number.isInteger(value) && value >= 0 && value <= MAX_ONLINE_PLAYER_COUNT
+      ? { ok: true, value }
+      : invalid("invalid_online_player_count");
   }
 
   if (key === "server_session_id") {
