@@ -235,6 +235,22 @@ const ALLOWED_STRING_VALUES = new Map([
     "view_own",
   ])],
   ["analytics_consent_level", new Set(["server", "personalized"])],
+  ["area", new Set([
+    "analytics",
+    "character_headshot",
+    "character_sheet_fields",
+    "chat_override_mode",
+    "config",
+    "config_admin",
+    "environment_message",
+    "global_ooc",
+    "language_config",
+    "ooc",
+    "proximity_chat",
+    "proximity_emote",
+    "rp_character",
+    "server",
+  ])],
   ["chat_type", new Set(["chat_tab", "envhere", "gooc", "it", "me", "normal", "ooc", "whisper", "yell"])],
   ["character_sheet_field_count_bucket", new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"])],
   ["changed_settings_bucket", new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"])],
@@ -327,6 +343,49 @@ const ALLOWED_STRING_VALUES = new Map([
     "tpa",
   ])],
   ["online_player_count_bucket", new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"])],
+  ["operation", new Set([
+    "accept",
+    "accept_warmup_start",
+    "back",
+    "back_warmup_start",
+    "chat_tab",
+    "chat_tab_pipeline",
+    "enter_emote",
+    "enter_globalooc",
+    "enter_normal",
+    "enter_ooc",
+    "enter_whisper",
+    "enter_yell",
+    "envhere",
+    "gooc",
+    "home",
+    "home_warmup_start",
+    "it",
+    "load",
+    "me",
+    "normal",
+    "ooc",
+    "reload",
+    "request_bring",
+    "request_goto",
+    "save",
+    "send_chat_tab",
+    "send_normal",
+    "send_whisper",
+    "send_yell",
+    "spawn",
+    "spawn_warmup_start",
+    "startup",
+    "startup_sentinel",
+    "stuck",
+    "stuck_warmup_start",
+    "switch",
+    "top",
+    "top_warmup_start",
+    "upload",
+    "whisper",
+    "yell",
+  ])],
   ["overhead_chat_bubble_mode", new Set(["RpText", "Vanilla", "Off"])],
   ["previous_consent_level", new Set(["unknown", "disabled", "server", "personalized"])],
   ["new_consent_level", new Set(["disabled", "server", "personalized"])],
@@ -413,6 +472,7 @@ const ALLOWED_STRING_VALUES = new Map([
   ["restart_required_settings_bucket", new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"])],
   ["session_duration_bucket", new Set(["<1m", "1-5m", "5-30m", "30-120m", "120m+"])],
   ["session_end_reason", new Set(["disconnect", "server_stop"])],
+  ["severity", new Set(["blocked", "critical", "error", "rejected", "warning"])],
   ["typing_indicator_display_mode", new Set(["Icon", "Text", "Both"])],
 ]);
 
@@ -466,14 +526,11 @@ const BOOLEAN_PROPERTIES = new Set([
 
 const STRING_PROPERTIES = new Set([
   ...ALLOWED_STRING_VALUES.keys(),
-  "area",
   "exception_type",
   "game_version",
   "mod_version",
-  "operation",
   "pseudonymous_player_id",
   "server_session_id",
-  "severity",
 ]);
 
 const BASE_PROPERTIES = new Set([
@@ -613,40 +670,59 @@ export default {
       return json({ error: "not_found" }, 404);
     }
 
+    const startedAt = Date.now();
+
     const contentType = request.headers.get("content-type") || "";
     if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
-      return json({ error: "unsupported_media_type" }, 415);
+      return rejectRequest("unsupported_media_type", 415, startedAt);
     }
 
     if (!env.POSTHOG_PROJECT_TOKEN) {
-      return json({ error: "relay_not_configured" }, 503);
+      return rejectRequest("relay_not_configured", 503, startedAt);
     }
 
     const contentLengthHeader = request.headers.get("content-length");
     if (!contentLengthHeader || !/^\d+$/.test(contentLengthHeader)) {
-      return json({ error: "length_required" }, 411);
+      return rejectRequest("length_required", 411, startedAt);
     }
 
     const contentLength = Number(contentLengthHeader);
     if (contentLength > MAX_BODY_BYTES) {
-      return json({ error: "payload_too_large" }, 413);
+      return rejectRequest("payload_too_large", 413, startedAt);
     }
 
     let payload;
     try {
       const body = await request.text();
       if (new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES) {
-        return json({ error: "payload_too_large" }, 413);
+        return rejectRequest("payload_too_large", 413, startedAt);
       }
 
       payload = JSON.parse(body);
     } catch {
-      return json({ error: "invalid_json" }, 400);
+      return rejectRequest("invalid_json", 400, startedAt);
     }
 
     const validation = validatePayload(payload);
     if (!validation.ok) {
-      return json({ error: validation.error }, 400);
+      return rejectRequest(validation.error, 400, startedAt);
+    }
+
+    const rejectionReasons = countReasons(validation.rejected);
+    if (validation.events.length === 0) {
+      logBatchOutcome({
+        outcome: "rejected",
+        acceptedEventCount: 0,
+        rejectedEventCount: validation.rejected.length,
+        rejectionReasons,
+        requestError: "no_valid_events",
+        startedAt,
+      });
+      return json({
+        error: "no_valid_events",
+        rejected_event_count: validation.rejected.length,
+        rejection_reasons: rejectionReasons,
+      }, 400);
     }
 
     const posthogHost = (env.POSTHOG_HOST || "https://us.i.posthog.com").replace(/\/+$/, "");
@@ -664,13 +740,52 @@ export default {
         signal: controller.signal,
       });
     } catch {
+      logBatchOutcome({
+        outcome: "upstream_failed",
+        acceptedEventCount: 0,
+        rejectedEventCount: validation.rejected.length,
+        rejectionReasons,
+        forwardedEventCount: validation.events.length,
+        requestError: "upstream_failed",
+        startedAt,
+      });
       return json({ error: "upstream_failed" }, 502);
     } finally {
       clearTimeout(timeout);
     }
 
     if (!response.ok) {
+      logBatchOutcome({
+        outcome: "upstream_failed",
+        acceptedEventCount: 0,
+        rejectedEventCount: validation.rejected.length,
+        rejectionReasons,
+        forwardedEventCount: validation.events.length,
+        requestError: "upstream_rejected",
+        upstreamStatus: response.status,
+        startedAt,
+      });
       return json({ error: "upstream_rejected" }, 502);
+    }
+
+    const outcome = validation.rejected.length === 0 ? "accepted" : "partially_accepted";
+    logBatchOutcome({
+      outcome,
+      acceptedEventCount: validation.events.length,
+      rejectedEventCount: validation.rejected.length,
+      rejectionReasons,
+      forwardedEventCount: validation.events.length,
+      upstreamStatus: response.status,
+      startedAt,
+    });
+
+    if (validation.rejected.length > 0) {
+      return json({
+        ok: true,
+        accepted_event_count: validation.events.length,
+        rejected_event_count: validation.rejected.length,
+        rejection_reasons: rejectionReasons,
+      }, 202);
     }
 
     return new Response(null, { status: 204 });
@@ -707,16 +822,18 @@ export function validatePayload(payload) {
   }
 
   const events = [];
+  const rejected = [];
   for (const event of payload.events) {
     const normalized = normalizeEvent(event, payload);
     if (!normalized.ok) {
-      return normalized;
+      rejected.push(normalized.error);
+      continue;
     }
 
     events.push(normalized.event);
   }
 
-  return { ok: true, events };
+  return { ok: true, events, rejected };
 }
 
 function normalizeEvent(event, envelope) {
@@ -769,7 +886,7 @@ function normalizeEvent(event, envelope) {
 
     const normalized = normalizePropertyValue(key, value);
     if (!normalized.ok) {
-      return invalid("invalid_property_value");
+      return normalized;
     }
 
     properties[key] = normalized.value;
@@ -860,6 +977,50 @@ function isHexId(value, length) {
 
 function invalid(error) {
   return { ok: false, error };
+}
+
+function rejectRequest(error, status, startedAt) {
+  logBatchOutcome({
+    outcome: "rejected",
+    acceptedEventCount: 0,
+    rejectedEventCount: 0,
+    requestError: error,
+    startedAt,
+  });
+  return json({ error }, status);
+}
+
+function countReasons(reasons) {
+  const counts = {};
+  for (const reason of reasons) {
+    counts[reason] = (counts[reason] || 0) + 1;
+  }
+
+  return counts;
+}
+
+function logBatchOutcome({
+  outcome,
+  acceptedEventCount,
+  rejectedEventCount,
+  rejectionReasons = {},
+  forwardedEventCount = 0,
+  requestError = null,
+  upstreamStatus = null,
+  startedAt,
+}) {
+  console.log(JSON.stringify({
+    service: "thebasics-analytics-relay",
+    event: "analytics_batch_processed",
+    outcome,
+    accepted_event_count: acceptedEventCount,
+    rejected_event_count: rejectedEventCount,
+    rejection_reasons: rejectionReasons,
+    forwarded_event_count: forwardedEventCount,
+    request_error: requestError,
+    upstream_status: upstreamStatus,
+    duration_ms: Math.max(0, Date.now() - startedAt),
+  }));
 }
 
 function json(body, status = 200) {

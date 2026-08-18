@@ -6,10 +6,27 @@ This stack deploys the BASIC-owned intake endpoint used by The BASICs server-ins
 
 - Endpoint: `https://thebasics-analytics-relay.basic-bit-1001.workers.dev/v1/events/batch`
 - Client: The BASICs mod server process only, after root-admin opt-in.
-- Accepted event schema: allowlisted event names and property keys in `worker/analytics-relay.mjs`.
+- Accepted event schema: allowlisted event names and per-event property keys in `worker/analytics-relay.mjs`.
 - Forwarding target: PostHog `/batch/` with `$process_person_profile=false`.
 
 The Worker rejects unknown event names, unknown properties, oversized batches, and malformed server install IDs. It does not accept chat text, command arguments, player names, player IDs, IPs, world names, seeds, coordinates, or raw config.
+
+Closed values and semantic analytics labels use explicit server-side registries. This includes `feature_name`, `action`, `command_name`, `result`, `area`, `operation`, and `severity`, because string shape alone cannot distinguish a legitimate label from a player name or identifier. The contract suite derives literals from known C# analytics seams, covers dynamic labels with explicit fixtures, and fails CI when a producer emits a value that the relay does not recognize. This keeps the registries synchronized without weakening the privacy boundary.
+
+## Batch behavior
+
+- Fully valid batches are forwarded and return `204 No Content`.
+- Mixed batches forward valid events, drop invalid events, and return `202 Accepted` with aggregate accepted/rejected counts and rejection reasons.
+- Batches with no valid events return `400 Bad Request` and are not forwarded.
+- PostHog connection failures and upstream rejections return `502 Bad Gateway`.
+
+Every handled batch produces one structured Worker log with aggregate counts, rejection reasons, upstream status, and processing duration. Logs never include request bodies, event properties, server install IDs, player pseudonyms, or IP addresses.
+
+Run the contract suite locally with:
+
+```powershell
+node --test infra/terraform/stacks/thebasics-analytics-relay/worker/analytics-relay.test.mjs
+```
 
 ## Deploy
 
