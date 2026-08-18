@@ -5,11 +5,13 @@ on:
     branches: [ main ]
     paths:
       - 'infra/**'
+      - 'mods-dll/thebasics/src/ModSystems/Analytics/**'
       - '.github/workflows/infra-terraform.yml'
   push:
     branches: [ main ]
     paths:
       - 'infra/**'
+      - 'mods-dll/thebasics/src/ModSystems/Analytics/**'
       - '.github/workflows/infra-terraform.yml'
   workflow_dispatch:
     inputs:
