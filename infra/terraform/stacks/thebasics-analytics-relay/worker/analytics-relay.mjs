@@ -5,6 +5,7 @@ const MAX_CONFIG_PROPERTIES = 80;
 const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
+export const CONTRACT_REVISION = 2;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -455,7 +456,12 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ ok: true, service: "thebasics-analytics-relay", schema_version: 1 });
+      return json({
+        ok: true,
+        service: "thebasics-analytics-relay",
+        schema_version: 1,
+        contract_revision: CONTRACT_REVISION,
+      });
     }
 
     if (request.method !== "POST" || url.pathname !== ACCEPTED_PATH) {
@@ -526,7 +532,7 @@ export default {
   },
 };
 
-function validatePayload(payload) {
+export function validatePayload(payload) {
   if (!isPlainObject(payload)) {
     return invalid("invalid_payload");
   }
