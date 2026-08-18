@@ -470,8 +470,11 @@ test("relay forwards every event family and registered semantic labels", async (
   assert.equal(upstreamCalls.length, 1);
   const forwarded = upstreamBody();
   assert.deepEqual(forwarded.batch.map((event) => event.event), events.map((event) => event.name));
-  assert.equal(forwarded.batch[0].properties.distinct_id, serverInstallId);
-  assert.equal(forwarded.batch[0].properties.$process_person_profile, false);
+  for (const event of forwarded.batch) {
+    assert.equal(event.properties.distinct_id, serverInstallId);
+    assert.equal(event.properties.$geoip_disable, true);
+    assert.equal(event.properties.$process_person_profile, false);
+  }
 
   const log = lastLog();
   assert.equal(log.outcome, "accepted");
@@ -494,14 +497,16 @@ test("relay rejects identifying label-shaped values and unknown properties witho
     failureEvent({ severity: "alice" }),
     failureEvent({ result: "alice" }),
     featureEvent("proximity_chat", "send_normal", { chat_text: "private message content" }),
+    featureEvent("proximity_chat", "send_normal", { $geoip_disable: false }),
+    featureEvent("proximity_chat", "send_normal", { $process_person_profile: true }),
   ]));
 
   assert.equal(response.status, 400);
   assert.equal(upstreamCalls.length, 0);
   const body = await response.json();
   assert.equal(body.error, "no_valid_events");
-  assert.equal(body.rejected_event_count, 8);
-  assert.deepEqual(body.rejection_reasons, { invalid_string_value: 7, unknown_property: 1 });
+  assert.equal(body.rejected_event_count, 10);
+  assert.deepEqual(body.rejection_reasons, { invalid_string_value: 7, unknown_property: 3 });
   assert.doesNotMatch(logLines.join("\n"), /alice|123456789|private message content/);
   assert.doesNotMatch(logLines.join("\n"), new RegExp(serverInstallId));
 });
