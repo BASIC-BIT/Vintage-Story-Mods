@@ -1,0 +1,510 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "machine": "game:block/metal/tarnished/iron"
+  },
+  "elements": [
+    {
+      "name": "hub",
+      "from": [
+        5.6,
+        22.8,
+        5.1
+      ],
+      "to": [
+        10.4,
+        28.6,
+        10.9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "spoke0",
+      "from": [
+        5.9,
+        6.6423,
+        6.9
+      ],
+      "to": [
+        10.1,
+        44.7577,
+        9.1
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 0.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "spoke1",
+      "from": [
+        5.92,
+        6.6423,
+        6.9
+      ],
+      "to": [
+        10.08,
+        44.7577,
+        9.1
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 45.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "spoke2",
+      "from": [
+        5.94,
+        6.6423,
+        6.9
+      ],
+      "to": [
+        10.06,
+        44.7577,
+        9.1
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 90.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "spoke3",
+      "from": [
+        5.96,
+        6.6423,
+        6.9
+      ],
+      "to": [
+        10.04,
+        44.7577,
+        9.1
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 135.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "felloe0",
+      "from": [
+        5.5,
+        44.7577,
+        -0.391
+      ],
+      "to": [
+        10.5,
+        47.1577,
+        16.391
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 0.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "felloe1",
+      "from": [
+        5.52,
+        44.7577,
+        -0.391
+      ],
+      "to": [
+        10.48,
+        47.1577,
+        16.391
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 45.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "felloe2",
+      "from": [
+        5.5,
+        44.7577,
+        -0.391
+      ],
+      "to": [
+        10.5,
+        47.1577,
+        16.391
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 90.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "felloe3",
+      "from": [
+        5.52,
+        44.7577,
+        -0.391
+      ],
+      "to": [
+        10.48,
+        47.1577,
+        16.391
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 135.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "felloe4",
+      "from": [
+        5.5,
+        44.7577,
+        -0.391
+      ],
+      "to": [
+        10.5,
+        47.1577,
+        16.391
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 180.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "felloe5",
+      "from": [
+        5.52,
+        44.7577,
+        -0.391
+      ],
+      "to": [
+        10.48,
+        47.1577,
+        16.391
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 225.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "felloe6",
+      "from": [
+        5.5,
+        44.7577,
+        -0.391
+      ],
+      "to": [
+        10.5,
+        47.1577,
+        16.391
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 270.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "felloe7",
+      "from": [
+        5.52,
+        44.7577,
+        -0.391
+      ],
+      "to": [
+        10.48,
+        47.1577,
+        16.391
+      ],
+      "rotationOrigin": [
+        8.0,
+        25.7,
+        8.0
+      ],
+      "rotationX": 315.0,
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    }
+  ]
+}
