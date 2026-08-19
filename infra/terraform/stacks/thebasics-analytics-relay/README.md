@@ -11,7 +11,11 @@ This stack deploys the BASIC-owned intake endpoint used by The BASICs server-ins
 
 The Worker rejects unknown event names, unknown properties, oversized batches, and malformed server install IDs. It does not accept chat text, command arguments, player names, player IDs, IPs, world names, seeds, coordinates, or raw config.
 
+Current producers send the exact bounded `online_player_count` as a server-level numeric metric so PostHog can normalize activity by concurrent population. The relay continues to accept the legacy `online_player_count_bucket` property from already-released mod versions.
+
 Closed values and semantic analytics labels use explicit server-side registries. This includes `feature_name`, `action`, `command_name`, `result`, `area`, `operation`, and `severity`, because string shape alone cannot distinguish a legitimate label from a player name or identifier. The contract suite derives literals from known C# analytics seams, covers dynamic labels with explicit fixtures, and fails CI when a producer emits a value that the relay does not recognize. This keeps the registries synchronized without weakening the privacy boundary.
+
+Pull requests that change Worker behavior must also increase `CONTRACT_REVISION`. Release builds independently verify that the deployed relay revision satisfies the mod's `RequiredRelayContractRevision` before publishing.
 
 ## Batch behavior
 

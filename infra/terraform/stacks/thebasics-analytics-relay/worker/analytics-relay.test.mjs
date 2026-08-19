@@ -15,6 +15,25 @@ const sourceRoot = new URL(
   "../../../../../mods-dll/thebasics/src/",
   import.meta.url,
 );
+const knownDynamicExpressions = new Set([
+  '"send_" + modeName',
+  '"enter_" + mode.ToString().ToLowerInvariant()',
+  '"set_" + mode.ToString().ToLowerInvariant()',
+  '"tp" + commandName',
+  '"warmup_cancelled_" + reason',
+  'commandName + "_warmup_start"',
+  'refusalLangKey ?? "unknown"',
+  "action",
+  "commandName",
+  "featureAction",
+  "featureName",
+  "modeName",
+  "nameError.ErrorCode",
+  "normalizedResultCode",
+  "result",
+  "result.ErrorCode ?? \"warmup_failed\"",
+  "surface",
+]);
 
 let upstreamCalls = [];
 let logLines = [];
@@ -39,13 +58,20 @@ function baseProperties(modVersion, consentLevel, serverSessionId) {
     mod_version: modVersion,
     game_version: "1.22.6",
     analytics_consent_level: consentLevel,
-    online_player_count_bucket: "0",
+    online_player_count: 0,
   };
 
   if (serverSessionId) {
     properties.server_session_id = serverSessionId;
   }
 
+  return properties;
+}
+
+function legacyBaseProperties(modVersion, consentLevel, serverSessionId) {
+  const properties = baseProperties(modVersion, consentLevel, serverSessionId);
+  delete properties.online_player_count;
+  properties.online_player_count_bucket = "0";
   return properties;
 }
 
@@ -82,12 +108,10 @@ function configValue(key) {
   }[key] ?? false;
 }
 
-function payload(modVersion, consentLevel, serverSessionId, configSnapshot) {
-  const commonProperties = baseProperties(
-    modVersion,
-    consentLevel,
-    serverSessionId,
-  );
+function payload(modVersion, consentLevel, serverSessionId, configSnapshot, legacyPlayerCount = false) {
+  const commonProperties = legacyPlayerCount
+    ? legacyBaseProperties(modVersion, consentLevel, serverSessionId)
+    : baseProperties(modVersion, consentLevel, serverSessionId);
   const timestamp = new Date().toISOString();
   const events = [
     {
@@ -160,6 +184,13 @@ function callArguments(source, methodName) {
   let searchFrom = 0;
 
   while ((searchFrom = source.indexOf(needle, searchFrom)) >= 0) {
+    const lineStart = source.lastIndexOf("\n", searchFrom) + 1;
+    const linePrefix = source.slice(lineStart, searchFrom);
+    if (/\b(?:public|private|protected|internal)\b/.test(linePrefix)) {
+      searchFrom += needle.length;
+      continue;
+    }
+
     const args = [];
     let start = searchFrom + needle.length;
     let depth = 1;
@@ -200,17 +231,26 @@ function addLiteralValues(target, expression) {
     return;
   }
 
-  const exact = expression.match(/^"([^"]+)"$/s);
+  const normalizedExpression = expression.replace(/\s+/g, " ").trim();
+
+  const exact = normalizedExpression.match(/^"([^"]+)"$/s);
   if (exact) {
     target.add(exact[1]);
     return;
   }
 
-  if (expression.includes("?") && !expression.includes("+")) {
-    for (const match of expression.matchAll(/"([^"]+)"/g)) {
+  if (normalizedExpression.includes("?") && !normalizedExpression.includes("+")) {
+    for (const match of normalizedExpression.matchAll(/"([^"]+)"/g)) {
       target.add(match[1]);
     }
+    return;
   }
+
+  if (knownDynamicExpressions.has(normalizedExpression)) {
+    return;
+  }
+
+  throw new Error(`Unsupported analytics contract expression: ${normalizedExpression}`);
 }
 
 function currentProducerContracts() {
@@ -272,8 +312,11 @@ function currentProducerContracts() {
 }
 
 test("relay accepts phase-one 5.6 and current 5.9 payloads", () => {
-  const phaseOne = validatePayload(payload("5.6.0", "server"));
+  const phaseOne = validatePayload(payload("5.6.0", "server", undefined, undefined, true));
   assertAccepted(phaseOne, "phase-one payload");
+
+  const deployed = validatePayload(payload("5.9.0", "personalized", "b".repeat(32), undefined, true));
+  assertAccepted(deployed, "deployed payload");
 
   const current = validatePayload(
     payload(
@@ -284,6 +327,47 @@ test("relay accepts phase-one 5.6 and current 5.9 payloads", () => {
     ),
   );
   assertAccepted(current, "current payload");
+});
+
+test("producer discovery fails closed on unknown contract expressions", () => {
+  assert.throws(
+    () => addLiteralValues(new Set(), "BuildUnexpectedAnalyticsLabel()"),
+    /Unsupported analytics contract expression/,
+  );
+});
+
+test("relay accepts bounded exact online player counts and legacy buckets", () => {
+  for (const onlinePlayerCount of [0, 1, 100, 10_000]) {
+    const current = payloadForEvent("feature used", {
+      action: "send_normal",
+      feature_name: "proximity_chat",
+      online_player_count: onlinePlayerCount,
+      result: "success",
+      success: true,
+    });
+    assertAccepted(validatePayload(current), `online_player_count=${onlinePlayerCount}`);
+  }
+
+  const legacy = payloadForEvent("feature used", {
+    action: "send_normal",
+    feature_name: "proximity_chat",
+    result: "success",
+    success: true,
+  });
+  delete legacy.events[0].properties.online_player_count;
+  legacy.events[0].properties.online_player_count_bucket = "21-50";
+  assertAccepted(validatePayload(legacy), "legacy online_player_count_bucket");
+
+  for (const onlinePlayerCount of [-1, 10_001, 1.5, "5"]) {
+    const invalidCount = payloadForEvent("feature used", {
+      action: "send_normal",
+      feature_name: "proximity_chat",
+      online_player_count: onlinePlayerCount,
+      result: "success",
+      success: true,
+    });
+    assert.deepEqual(validatePayload(invalidCount).rejected, ["invalid_online_player_count"]);
+  }
 });
 
 test("relay accepts current production event contracts", () => {
@@ -372,6 +456,8 @@ test("health exposes the relay contract required by the mod", async () => {
 
   assert.ok(requiredRevision, "missing RequiredRelayContractRevision");
   assert.equal(Number(requiredRevision[1]), CONTRACT_REVISION);
+  assert.match(source, /\["online_player_count"\]\s*=\s*Math\.Clamp\(GetOnlinePlayerCount\(\), 0, MaxOnlinePlayerCount\)/);
+  assert.doesNotMatch(source, /\["online_player_count_bucket"\]/);
 
   const response = await worker.fetch(
     new Request("https://relay.example/health"),
@@ -472,6 +558,7 @@ test("relay forwards every event family and registered semantic labels", async (
   assert.deepEqual(forwarded.batch.map((event) => event.event), events.map((event) => event.name));
   for (const event of forwarded.batch) {
     assert.equal(event.properties.distinct_id, serverInstallId);
+    assert.equal(event.properties.online_player_count, 0);
     assert.equal(event.properties.$geoip_disable, true);
     assert.equal(event.properties.$process_person_profile, false);
   }
