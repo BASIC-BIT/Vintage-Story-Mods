@@ -1,0 +1,21 @@
+{
+  "name": "flywheel-bearing-compact-seraph-held",
+  "representation": "third-person-seraph-held-scene",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-bearing-compact.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/ingot/copper",
+    "bearing": "game:block/metal/ingot/copper",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "seraphHeldScene": {
+    "collectibleDefinition": "../assets/flywheelpower/itemtypes/flywheelbearing.json",
+    "transformProperty": "tpHandTransform",
+    "variantCode": "flywheelbearing-compact-copper",
+    "seraphShape": "game:entity/humanoid/seraph-hairless",
+    "seraphTexture": "game:entity/humanoid/seraph-naked-hairless",
+    "attachment": "RightHand",
+    "animationFrame": 0
+  }
+}

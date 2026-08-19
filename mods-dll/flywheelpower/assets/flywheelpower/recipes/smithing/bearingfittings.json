@@ -1,0 +1,35 @@
+[
+  {
+    "ingredient": {
+      "type": "item",
+      "code": "game:ingot-*",
+      "name": "metal",
+      "allowedVariants": [
+        "copper",
+        "tinbronze",
+        "bismuthbronze",
+        "blackbronze",
+        "iron",
+        "meteoriciron",
+        "steel"
+      ]
+    },
+    "pattern": [
+      [
+        "_#####_",
+        "##___##",
+        "##___##",
+        "##___##",
+        "##___##",
+        "###_###"
+      ]
+    ],
+    "name": "Flywheel bearing fittings",
+    "code": "bearingfittings-{metal}",
+    "output": {
+      "type": "item",
+      "code": "flywheelpower:bearingfittings-{metal}",
+      "stacksize": 4
+    }
+  }
+]

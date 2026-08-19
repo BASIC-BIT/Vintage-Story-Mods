@@ -11,6 +11,7 @@
 **/obj/
 **/output/
 **/packages/
+**/__pycache__/
 **/.vs/
 **/.idea/
 
