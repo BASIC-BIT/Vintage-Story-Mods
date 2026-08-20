@@ -483,7 +483,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         {
             // Command-level counterpart to the failure recorded inside the gate, so a refused
             // /gooc still appears in command analytics rather than vanishing.
-            AnalyticsService.TrackCommandUsed("gooc", false, "blocked", AnalyticsService.ChatProperties("gooc"));
+            AnalyticsService.TrackCommandUsed("gooc", false, "blocked", AnalyticsService.ChatProperties("gooc"), player.PlayerUID);
 
             return new TextCommandResult
             {
@@ -525,8 +525,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         preferences.LanguageColorsEnabled = (bool)args.Parsers[0].GetValue();
         player.SetChatVisualPreferences(preferences);
-        AnalyticsService.TrackCommandUsed("langcolor", true);
-        AnalyticsService.TrackFeatureUsed("language_colors", preferences.LanguageColorsEnabled ? "enable" : "disable");
+        AnalyticsService.TrackCommandUsed("langcolor", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("language_colors", preferences.LanguageColorsEnabled ? "enable" : "disable", actorPlayerUid: player.PlayerUID);
         return Success(Lang.Get("thebasics:chatprefs-langcolor-set", ChatHelper.OnOff(preferences.LanguageColorsEnabled)));
     }
 
@@ -792,7 +792,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (!TryBuildConfigAdminDraft(message, out var draft, out var errors))
         {
-            TrackConfigEditorFailure("config_admin", "save", errors.Count);
+            TrackConfigEditorFailure(player, "config_admin", "save", errors.Count);
             SendConfigAdminResult(player, false, string.Join("\n", errors), Array.Empty<string>());
             return;
         }
@@ -809,12 +809,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (!TryReloadConfigAndGetChangedKeys(out var reloadChangedKeys))
         {
-            AnalyticsService.TrackFailure("config_admin", "reload", "error", "config_unreadable");
+            AnalyticsService.TrackPlayerFailure(player.PlayerUID, "config_admin", "reload", "error", "config_unreadable");
             SendConfigAdminResult(player, false, Lang.Get("thebasics:config-reload-failed"), []);
             return true;
         }
 
-        AnalyticsService.TrackFeatureUsed("config_admin", "reload");
+        AnalyticsService.TrackFeatureUsed("config_admin", "reload", actorPlayerUid: player.PlayerUID);
         SendConfigAdminResult(player, true, $"Reloaded config from disk. Changed settings: {reloadChangedKeys.Count}.", reloadChangedKeys);
         return true;
     }
@@ -850,7 +850,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         {
             ["changed_settings_bucket"] = AnalyticsBuckets.Count(changedKeys.Count),
             ["restart_required_settings_bucket"] = AnalyticsBuckets.Count(restartRequired.Count)
-        });
+        }, actorPlayerUid: player.PlayerUID);
         SendConfigAdminResult(player, true, ConfigAdminSaveWorkflow.BuildConfigSaveMessage(changedKeys, restartRequired), changedKeys);
     }
 
@@ -870,7 +870,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var submittedLanguages = message?.Languages ?? new List<LanguageConfigEntryMessage>();
         if (!TryBuildLanguageConfigDraft(submittedLanguages, out var draft, out var errors))
         {
-            TrackConfigEditorFailure("language_config", "save", errors.Count);
+            TrackConfigEditorFailure(player, "language_config", "save", errors.Count);
             SendLanguageConfigResult(player, false, string.Join("\n", errors), submittedLanguages);
             return;
         }
@@ -887,12 +887,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (!TryReloadConfigAndGetChangedKeys(out var changedKeys))
         {
-            AnalyticsService.TrackFailure("language_config", "reload", "error", "config_unreadable");
+            AnalyticsService.TrackPlayerFailure(player.PlayerUID, "language_config", "reload", "error", "config_unreadable");
             SendLanguageConfigResult(player, false, Lang.Get("thebasics:config-reload-failed"), LanguageConfigAdmin.BuildEntries(Config));
             return true;
         }
 
-        AnalyticsService.TrackFeatureUsed("language_config", "reload");
+        AnalyticsService.TrackFeatureUsed("language_config", "reload", actorPlayerUid: player.PlayerUID);
         SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {changedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config));
         return true;
     }
@@ -925,7 +925,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         AnalyticsService.TrackFeatureUsed("language_config", "save", properties: new Dictionary<string, object>
         {
             ["language_count_bucket"] = AnalyticsBuckets.Count(Config.Languages?.Count ?? 0)
-        });
+        }, actorPlayerUid: player.PlayerUID);
         SendLanguageConfigResult(
             player,
             true,
@@ -949,7 +949,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var submittedFields = message?.Fields ?? new List<CharacterSheetFieldConfigEntryMessage>();
         if (!TryBuildCharacterSheetFieldConfigDraft(submittedFields, out var draft, out var errors))
         {
-            TrackConfigEditorFailure("character_sheet_fields", "save", errors.Count);
+            TrackConfigEditorFailure(player, "character_sheet_fields", "save", errors.Count);
             SendCharacterSheetFieldConfigResult(player, false, string.Join("\n", errors), submittedFields);
             return;
         }
@@ -966,12 +966,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (!TryReloadConfigAndGetChangedKeys(out var changedKeys))
         {
-            AnalyticsService.TrackFailure("character_sheet_fields", "reload", "error", "config_unreadable");
+            AnalyticsService.TrackPlayerFailure(player.PlayerUID, "character_sheet_fields", "reload", "error", "config_unreadable");
             SendCharacterSheetFieldConfigResult(player, false, Lang.Get("thebasics:config-reload-failed"), CharacterSheetFieldConfigAdmin.BuildEntries(Config));
             return true;
         }
 
-        AnalyticsService.TrackFeatureUsed("character_sheet_fields", "reload");
+        AnalyticsService.TrackFeatureUsed("character_sheet_fields", "reload", actorPlayerUid: player.PlayerUID);
         SendCharacterSheetFieldConfigResult(player, true, $"Reloaded character sheet fields from disk. Changed settings: {changedKeys.Count}.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
         return true;
     }
@@ -1000,19 +1000,19 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         AnalyticsService.TrackFeatureUsed("character_sheet_fields", "save", properties: new Dictionary<string, object>
         {
             ["field_count_bucket"] = AnalyticsBuckets.Count(Config.CharacterSheetFields?.Count ?? 0)
-        });
+        }, actorPlayerUid: player.PlayerUID);
         SendCharacterSheetFieldConfigResult(player, true, "Saved The BASICs character sheet field config.", CharacterSheetFieldConfigAdmin.BuildEntries(Config));
     }
 
-    private static void TrackConfigEditorFailure(string featureName, string action, int errorCount)
+    private static void TrackConfigEditorFailure(IServerPlayer player, string featureName, string action, int errorCount)
     {
         var properties = new Dictionary<string, object>
         {
             ["error_count_bucket"] = AnalyticsBuckets.Count(errorCount)
         };
 
-        AnalyticsService.TrackFeatureUsed(featureName, action, false, "validation_failed", properties);
-        AnalyticsService.TrackFailure(featureName, action, "warning", "validation_failed", properties: properties);
+        AnalyticsService.TrackFeatureUsed(featureName, action, false, "validation_failed", properties, player?.PlayerUID);
+        AnalyticsService.TrackPlayerFailure(player?.PlayerUID, featureName, action, "warning", "validation_failed", properties);
     }
 
     /// <summary>
@@ -1151,8 +1151,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         attemptTarget.SetNicknameColor(newColorHex);
 
         SwapOutNameTag(attemptTarget);
-        AnalyticsService.TrackCommandUsed("adminsetnicknamecolor", true);
-        AnalyticsService.TrackFeatureUsed("nickname_color", "admin_set");
+        AnalyticsService.TrackCommandUsed("adminsetnicknamecolor", true, actorPlayerUid: args.Caller.Player?.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("nickname_color", "admin_set", actorPlayerUid: args.Caller.Player?.PlayerUID);
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -1194,8 +1194,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
         player.SetNicknameColor(colorHex);
         SwapOutNameTag(player);
-        AnalyticsService.TrackCommandUsed("nickcolor", true);
-        AnalyticsService.TrackFeatureUsed("nickname_color", "set");
+        AnalyticsService.TrackCommandUsed("nickcolor", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("nickname_color", "set", actorPlayerUid: player.PlayerUID);
 
         return new TextCommandResult
         {
@@ -1242,8 +1242,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         SwapOutNameTag(player);
-        AnalyticsService.TrackCommandUsed(isBackground ? "nametagbackgroundcolor" : "nametagbordercolor", true);
-        AnalyticsService.TrackFeatureUsed("nametag_style", isBackground ? "set_background" : "set_border");
+        AnalyticsService.TrackCommandUsed(isBackground ? "nametagbackgroundcolor" : "nametagbordercolor", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("nametag_style", isBackground ? "set_background" : "set_border", actorPlayerUid: player.PlayerUID);
 
         return new TextCommandResult
         {
@@ -2098,8 +2098,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
             player.SetNickname(nickname, Config);
             SwapOutNameTag(player);
-            AnalyticsService.TrackCommandUsed("nickname", true);
-            AnalyticsService.TrackFeatureUsed("nickname", "set");
+            AnalyticsService.TrackCommandUsed("nickname", true, actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("nickname", "set", actorPlayerUid: player.PlayerUID);
             return new TextCommandResult
             {
                 Status = EnumCommandStatus.Success,
@@ -2159,8 +2159,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
             attemptTarget.SetNickname(newNickname, Config);
             SwapOutNameTag(attemptTarget);
-            AnalyticsService.TrackCommandUsed("adminsetnickname", true);
-            AnalyticsService.TrackFeatureUsed("nickname", "admin_set");
+            AnalyticsService.TrackCommandUsed("adminsetnickname", true, actorPlayerUid: fullArgs.Caller.Player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("nickname", "admin_set", actorPlayerUid: fullArgs.Caller.Player?.PlayerUID);
 
             string forceMessage = isForced ? Lang.Get("thebasics:chat-nick-admin-forced") : "";
             return new TextCommandResult
@@ -2256,8 +2256,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var player = (IServerPlayer)args.Caller.Player;
         player.ClearNickname(Config);
         SwapOutNameTag(player);
-        AnalyticsService.TrackCommandUsed("clearnick", true);
-        AnalyticsService.TrackFeatureUsed("nickname", "clear");
+        AnalyticsService.TrackCommandUsed("clearnick", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("nickname", "clear", actorPlayerUid: player.PlayerUID);
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -2270,8 +2270,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var player = (IServerPlayer)args.Caller.Player;
         player.ClearNicknameColor();
         SwapOutNameTag(player);
-        AnalyticsService.TrackCommandUsed("clearnickcolor", true);
-        AnalyticsService.TrackFeatureUsed("nickname_color", "clear");
+        AnalyticsService.TrackCommandUsed("clearnickcolor", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("nickname_color", "clear", actorPlayerUid: player.PlayerUID);
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -2284,8 +2284,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var player = (IServerPlayer)args.Caller.Player;
         player.ClearNametagBackgroundColor();
         SwapOutNameTag(player);
-        AnalyticsService.TrackCommandUsed("clearnametagbackgroundcolor", true);
-        AnalyticsService.TrackFeatureUsed("nametag_style", "clear_background");
+        AnalyticsService.TrackCommandUsed("clearnametagbackgroundcolor", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("nametag_style", "clear_background", actorPlayerUid: player.PlayerUID);
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -2298,8 +2298,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var player = (IServerPlayer)args.Caller.Player;
         player.ClearNametagBorderColor();
         SwapOutNameTag(player);
-        AnalyticsService.TrackCommandUsed("clearnametagbordercolor", true);
-        AnalyticsService.TrackFeatureUsed("nametag_style", "clear_border");
+        AnalyticsService.TrackCommandUsed("clearnametagbordercolor", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("nametag_style", "clear_border", actorPlayerUid: player.PlayerUID);
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -2347,7 +2347,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         // If no message provided, just set the player's chat mode
         player.SetChatMode(mode);
-        AnalyticsService.TrackFeatureUsed("chat_mode", "set_" + mode.ToString().ToLowerInvariant(), properties: AnalyticsService.ChatProperties(mode.ToString().ToLowerInvariant()));
+        AnalyticsService.TrackFeatureUsed("chat_mode", "set_" + mode.ToString().ToLowerInvariant(), properties: AnalyticsService.ChatProperties(mode.ToString().ToLowerInvariant()), actorPlayerUid: player.PlayerUID);
         return ChatModeStatus(player, ChatAxis.Mode);
     }
 
@@ -2374,7 +2374,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             commandName,
             succeeded,
             succeeded ? null : "blocked",
-            AnalyticsService.ChatProperties(commandName));
+            AnalyticsService.ChatProperties(commandName),
+            player.PlayerUID);
 
         return result;
     }
@@ -2408,7 +2409,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         player.SetChatOverrideMode(mode);
 
-        AnalyticsService.TrackFeatureUsed("chat_override_mode", "set_" + mode.ToString().ToLowerInvariant());
+        AnalyticsService.TrackFeatureUsed("chat_override_mode", "set_" + mode.ToString().ToLowerInvariant(), actorPlayerUid: player.PlayerUID);
 
         return ChatModeStatus(player, ChatAxis.Type);
     }
@@ -2430,7 +2431,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             // because this is the one seam every command-layer gate check passes through, whereas
             // IsOverrideModeAvailable is also consulted on join and on delivery, which are not
             // player-initiated attempts and would pollute the count.
-            AnalyticsService.TrackFailure(
+            AnalyticsService.TrackPlayerFailure(
+                player.PlayerUID,
                 "chat_override_mode",
                 "enter_" + mode.ToString().ToLowerInvariant(),
                 "blocked",
@@ -2636,10 +2638,10 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         // refused attempts as completed mode changes.
         var result = SetOverrideMode(player, ChatOverrideMode.Emote, emoteMode);
         var succeeded = result.Status == EnumCommandStatus.Success;
-        AnalyticsService.TrackCommandUsed("emotemode", succeeded);
+        AnalyticsService.TrackCommandUsed("emotemode", succeeded, actorPlayerUid: player.PlayerUID);
         if (succeeded)
         {
-            AnalyticsService.TrackFeatureUsed("emote_mode", emoteMode ? "enable" : "disable");
+            AnalyticsService.TrackFeatureUsed("emote_mode", emoteMode ? "enable" : "disable", actorPlayerUid: player.PlayerUID);
         }
 
         return result;
@@ -2660,8 +2662,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             player.SetChatOverrideMode(ChatOverrideMode.None);
         }
 
-        AnalyticsService.TrackCommandUsed("rptext", true);
-        AnalyticsService.TrackFeatureUsed("rp_text", rpTextEnabled ? "enable" : "disable");
+        AnalyticsService.TrackCommandUsed("rptext", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("rp_text", rpTextEnabled ? "enable" : "disable", actorPlayerUid: player.PlayerUID);
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -2678,10 +2680,10 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         // refused attempts as completed mode changes.
         var result = SetOverrideMode(player, ChatOverrideMode.Ooc, newMode);
         var succeeded = result.Status == EnumCommandStatus.Success;
-        AnalyticsService.TrackCommandUsed("ooctoggle", succeeded);
+        AnalyticsService.TrackCommandUsed("ooctoggle", succeeded, actorPlayerUid: player.PlayerUID);
         if (succeeded)
         {
-            AnalyticsService.TrackFeatureUsed("ooc_mode", newMode ? "enable" : "disable");
+            AnalyticsService.TrackFeatureUsed("ooc_mode", newMode ? "enable" : "disable", actorPlayerUid: player.PlayerUID);
         }
 
         return result;
@@ -2701,8 +2703,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         var player = API.GetPlayerByUID(args.Caller.Player.PlayerUID);
         var enabled = args.Parsers[0].IsMissing ? !player.GetChatterEnabled() : (bool)args.Parsers[0].GetValue();
         player.SetChatterEnabled(enabled);
-        AnalyticsService.TrackCommandUsed("chatter", true);
-        AnalyticsService.TrackFeatureUsed("chatter", enabled ? "enable" : "disable");
+        AnalyticsService.TrackCommandUsed("chatter", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("chatter", enabled ? "enable" : "disable", actorPlayerUid: player.PlayerUID);
         return new TextCommandResult
         {
             Status = EnumCommandStatus.Success,
@@ -2736,7 +2738,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         if (TransformerSystem == null)
         {
             // A missing pipeline is a dropped line, not a delivered one.
-            AnalyticsService.TrackFailure(featureName, surface, "error", "no_transformer_system");
+            AnalyticsService.TrackPlayerFailure(context.SendingPlayer?.PlayerUID, featureName, surface, "error", "no_transformer_system");
             return;
         }
 
@@ -2747,17 +2749,17 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         if (context.HasFlag(MessageContext.IS_FROM_COMMAND))
         {
-            AnalyticsService.TrackCommandUsed(surface, delivered, delivered ? null : "rejected", chatProperties);
+            AnalyticsService.TrackCommandUsed(surface, delivered, delivered ? null : "rejected", chatProperties, context.SendingPlayer?.PlayerUID);
         }
         else if (!delivered)
         {
             // Chat-tab lines have no command event to carry the refusal, so record it as a failure.
-            AnalyticsService.TrackFailure(featureName, surface, "rejected", "pipeline_stopped");
+            AnalyticsService.TrackPlayerFailure(context.SendingPlayer?.PlayerUID, featureName, surface, "rejected", "pipeline_stopped");
         }
 
         if (delivered)
         {
-            AnalyticsService.TrackFeatureUsed(featureName, featureAction, properties: chatProperties);
+            AnalyticsService.TrackFeatureUsed(featureName, featureAction, properties: chatProperties, actorPlayerUid: context.SendingPlayer?.PlayerUID);
         }
     }
 
@@ -2824,7 +2826,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 // Report it here too. Handling the throw locally means it never reaches the outer
                 // catch, so without this a server whose pipeline is failing would report 100% chat
                 // success and zero failures, hiding the very problem this handler exists to surface.
-                AnalyticsService.TrackFailure("proximity_chat", "chat_tab_pipeline", "error", "pipeline_exception", ex);
+                AnalyticsService.TrackPlayerFailure(byPlayer.PlayerUID, "proximity_chat", "chat_tab_pipeline", "error", "pipeline_exception", ex);
                 return;
             }
         }
@@ -2832,7 +2834,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         {
             // Never crash the server on player chat.
             API.Logger.Error($"THEBASICS - Error processing proxchat message: {e}");
-            AnalyticsService.TrackFailure("proximity_chat", "chat_tab_pipeline", "error", "pipeline_exception", e);
+            AnalyticsService.TrackPlayerFailure(byPlayer.PlayerUID, "proximity_chat", "chat_tab_pipeline", "error", "pipeline_exception", e);
         }
     }
 

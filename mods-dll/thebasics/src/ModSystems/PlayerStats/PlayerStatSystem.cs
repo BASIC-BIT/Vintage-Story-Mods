@@ -144,8 +144,8 @@ namespace thebasics.ModSystems.PlayerStats
             }
 
             targetPlayer.ClearPlayerStats();
-            AnalyticsService.TrackCommandUsed("clearstats", true);
-            AnalyticsService.TrackFeatureUsed("player_stats", "clear_all");
+            AnalyticsService.TrackCommandUsed("clearstats", true, actorPlayerUid: args.Caller.Player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("player_stats", "clear_all", actorPlayerUid: args.Caller.Player?.PlayerUID);
             return new TextCommandResult()
             {
                 Status = EnumCommandStatus.Success,
@@ -209,8 +209,8 @@ namespace thebasics.ModSystems.PlayerStats
             }
 
             targetPlayer.ClearPlayerStat(resolvedStat.Value);
-            AnalyticsService.TrackCommandUsed("clearstat", true);
-            AnalyticsService.TrackFeatureUsed("player_stats", "clear_one");
+            AnalyticsService.TrackCommandUsed("clearstat", true, actorPlayerUid: args.Caller.Player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("player_stats", "clear_one", actorPlayerUid: args.Caller.Player?.PlayerUID);
             return new TextCommandResult()
             {
                 Status = EnumCommandStatus.Success,
@@ -262,8 +262,8 @@ namespace thebasics.ModSystems.PlayerStats
                 message.Append(ChatHelper.Build("\n", statTitle, ": ", statValue.ToString()));
             }
 
-            AnalyticsService.TrackCommandUsed("playerstats", true);
-            AnalyticsService.TrackFeatureUsed("player_stats", isOtherPlayer ? "view_other" : "view_own");
+            AnalyticsService.TrackCommandUsed("playerstats", true, actorPlayerUid: player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("player_stats", isOtherPlayer ? "view_other" : "view_own", actorPlayerUid: player?.PlayerUID);
 
             return new TextCommandResult
             {

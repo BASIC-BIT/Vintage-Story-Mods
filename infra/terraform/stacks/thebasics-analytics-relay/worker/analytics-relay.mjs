@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 const MAX_ONLINE_PLAYER_COUNT = 10_000;
-export const CONTRACT_REVISION = 3;
+export const CONTRACT_REVISION = 4;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -606,6 +606,7 @@ const EVENT_PROPERTIES = new Map([
     ...BASE_PROPERTIES,
     "chat_type",
     "command_name",
+    "pseudonymous_player_id",
     "result",
     "success",
   ])],
@@ -619,6 +620,7 @@ const EVENT_PROPERTIES = new Map([
     "feature_name",
     "field_count_bucket",
     "language_count_bucket",
+    "pseudonymous_player_id",
     "result",
     "restart_required_settings_bucket",
     "success",
@@ -631,6 +633,7 @@ const EVENT_PROPERTIES = new Map([
     "exception_type",
     "operation",
     "previous_session_age_bucket",
+    "pseudonymous_player_id",
     "recovered",
     "result",
     "severity",

@@ -177,7 +177,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var nameError = ValidateHomeName("sethome", homeName);
         if (nameError != null)
         {
-            TrackHomeSpawnFailure("sethome", "set_home", nameError.ErrorCode);
+            TrackHomeSpawnFailure(player, "sethome", "set_home", nameError.ErrorCode);
             return nameError;
         }
 
@@ -186,15 +186,15 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var maxHomes = GetTeleportationConfig().MaxHomes;
         if (!registry.TrySetHome(homeName, location, maxHomes, out var normalizedName))
         {
-            AnalyticsService.TrackCommandUsed("sethome", false, "max_homes");
-            AnalyticsService.TrackFeatureUsed("home-spawn", "set_home", false, "max_homes");
+            AnalyticsService.TrackCommandUsed("sethome", false, "max_homes", actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("home-spawn", "set_home", false, "max_homes", actorPlayerUid: player.PlayerUID);
             return ErrorMessage(Lang.Get("thebasics:home-spawn-error-max-homes", maxHomes), "max-homes");
         }
 
         SaveHomeRegistry(player, registry);
 
-        AnalyticsService.TrackCommandUsed("sethome", true);
-        AnalyticsService.TrackFeatureUsed("home-spawn", "set_home");
+        AnalyticsService.TrackCommandUsed("sethome", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "set_home", actorPlayerUid: player.PlayerUID);
 
         return Success(Lang.Get("thebasics:home-spawn-success-home-set", normalizedName, location.Format()));
     }
@@ -211,7 +211,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var nameError = ValidateHomeName("home", homeName);
         if (nameError != null)
         {
-            TrackHomeSpawnFailure("home", "home", nameError.ErrorCode);
+            TrackHomeSpawnFailure(player, "home", "home", nameError.ErrorCode);
             return nameError;
         }
 
@@ -219,8 +219,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var registry = ReadHomeRegistry(player);
         if (!registry.TryGetHome(normalizedName, out var location))
         {
-            AnalyticsService.TrackCommandUsed("home", false, "home_not_set");
-            AnalyticsService.TrackFeatureUsed("home-spawn", "home", false, "home_not_set");
+            AnalyticsService.TrackCommandUsed("home", false, "home_not_set", actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("home-spawn", "home", false, "home_not_set", actorPlayerUid: player.PlayerUID);
             return ErrorMessage(MissingHomeMessage(normalizedName), "home-not-set");
         }
 
@@ -237,7 +237,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         return BeginPlayerTeleport(player, GetTeleportationConfig().HomeWarmupSeconds, "home", p => ExecuteHomeTeleport(p, location, normalizedName),
-            (p, reason) => TrackCancelledTeleport("home", "home", reason));
+            (p, reason) => TrackCancelledTeleport(p, "home", "home", reason));
     }
 
     private static TextCommandResult HandleHomes(TextCommandCallingArgs args)
@@ -251,8 +251,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var homes = ReadHomeRegistry(player).ListHomes();
         if (homes.Count == 0)
         {
-            AnalyticsService.TrackCommandUsed("homes", true, "empty");
-            AnalyticsService.TrackFeatureUsed("home-spawn", "list_homes", result: "empty");
+            AnalyticsService.TrackCommandUsed("homes", true, "empty", actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("home-spawn", "list_homes", result: "empty", actorPlayerUid: player.PlayerUID);
             return Success(Lang.Get("thebasics:home-spawn-homes-empty"));
         }
 
@@ -263,8 +263,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
             message.Append(Lang.Get("thebasics:home-spawn-homes-item", home.Name, home.Location.Format()));
         }
 
-        AnalyticsService.TrackCommandUsed("homes", true);
-        AnalyticsService.TrackFeatureUsed("home-spawn", "list_homes");
+        AnalyticsService.TrackCommandUsed("homes", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "list_homes", actorPlayerUid: player.PlayerUID);
         return Success(message.ToString());
     }
 
@@ -280,21 +280,21 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var nameError = ValidateHomeName("delhome", homeName);
         if (nameError != null)
         {
-            TrackHomeSpawnFailure("delhome", "delete_home", nameError.ErrorCode);
+            TrackHomeSpawnFailure(player, "delhome", "delete_home", nameError.ErrorCode);
             return nameError;
         }
 
         var registry = ReadHomeRegistry(player);
         if (!registry.RemoveHome(homeName, out var normalizedName))
         {
-            AnalyticsService.TrackCommandUsed("delhome", false, "home_not_set");
-            AnalyticsService.TrackFeatureUsed("home-spawn", "delete_home", false, "home_not_set");
+            AnalyticsService.TrackCommandUsed("delhome", false, "home_not_set", actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("home-spawn", "delete_home", false, "home_not_set", actorPlayerUid: player.PlayerUID);
             return ErrorMessage(MissingHomeMessage(normalizedName), "home-not-set");
         }
 
         SaveHomeRegistry(player, registry);
-        AnalyticsService.TrackCommandUsed("delhome", true);
-        AnalyticsService.TrackFeatureUsed("home-spawn", "delete_home");
+        AnalyticsService.TrackCommandUsed("delhome", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "delete_home", actorPlayerUid: player.PlayerUID);
         return Success(Lang.Get("thebasics:home-spawn-success-home-deleted", normalizedName));
     }
 
@@ -310,8 +310,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
         API.WorldManager.SaveGame.StoreData(SpawnLocationSaveDataKey, location);
         API.Logger.Audit($"Player {player.PlayerName} ({player.PlayerUID}) set The BASICs spawn to {location.Format()}.");
 
-        AnalyticsService.TrackCommandUsed("setspawn", true);
-        AnalyticsService.TrackFeatureUsed("home-spawn", "set_spawn");
+        AnalyticsService.TrackCommandUsed("setspawn", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "set_spawn", actorPlayerUid: player.PlayerUID);
 
         return Success(Lang.Get("thebasics:home-spawn-success-spawn-set", location.Format()));
     }
@@ -338,7 +338,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
         var location = GetStoredSpawnLocation() ?? GetDefaultSpawnLocation();
         return BeginPlayerTeleport(player, GetTeleportationConfig().SpawnWarmupSeconds, "spawn", p => ExecuteSpawnTeleport(p, location),
-            (p, reason) => TrackCancelledTeleport("spawn", "spawn", reason));
+            (p, reason) => TrackCancelledTeleport(p, "spawn", "spawn", reason));
     }
 
     private TextCommandResult HandleStuck(TextCommandCallingArgs args)
@@ -352,7 +352,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var adminOnlinePrivilege = GetStuckBlockedByOnlinePrivilege();
         if (!string.IsNullOrWhiteSpace(adminOnlinePrivilege) && IsOtherPlayerWithPrivilegeOnline(player, adminOnlinePrivilege))
         {
-            TrackHomeSpawnFailure("stuck", "stuck", "admin_online");
+            TrackHomeSpawnFailure(player, "stuck", "stuck", "admin_online");
             return Error("thebasics:home-spawn-error-stuck-admin-online", "admin-online");
         }
 
@@ -392,7 +392,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
 
         if (!TryFindTopLocation(player, out var location))
         {
-            TrackHomeSpawnFailure("top", "top", "no_safe_destination");
+            TrackHomeSpawnFailure(player, "top", "top", "no_safe_destination");
             return Error("thebasics:home-spawn-error-no-safe-top", "no-safe-top");
         }
 
@@ -404,7 +404,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         return BeginPlayerTeleport(player, GetTeleportationConfig().TopWarmupSeconds, "top", p => ExecuteTopTeleport(p, location, requireTemporalGear),
-            (p, reason) => TrackCancelledTeleport("top", "top", reason));
+            (p, reason) => TrackCancelledTeleport(p, "top", "top", reason));
     }
 
     private TextCommandResult HandleBack(TextCommandCallingArgs args)
@@ -418,13 +418,13 @@ public class HomeSpawnSystem : BaseBasicModSystem
         if (!TeleportBackUtil.TryGetPreviousLocation(player, GetTeleportationConfig().BackExpiresAfterSeconds, out var location, out var expired))
         {
             var result = expired ? "back_expired" : "back_not_set";
-            TrackHomeSpawnFailure("back", "back", result);
+            TrackHomeSpawnFailure(player, "back", "back", result);
             return Error(expired ? "thebasics:home-spawn-error-back-expired" : "thebasics:home-spawn-error-no-back", result);
         }
 
         if (!location.IsSameDimensionAs(player.Entity.Pos))
         {
-            TrackHomeSpawnFailure("back", "back", "back_dimension_mismatch");
+            TrackHomeSpawnFailure(player, "back", "back", "back_dimension_mismatch");
             return Error("thebasics:home-spawn-error-back-dimension-mismatch", "back-dimension-mismatch");
         }
 
@@ -441,7 +441,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         }
 
         return BeginPlayerTeleport(player, GetTeleportationConfig().BackWarmupSeconds, "back", p => ExecuteBackTeleport(p, location),
-            (p, reason) => TrackCancelledTeleport("back", "back", reason));
+            (p, reason) => TrackCancelledTeleport(p, "back", "back", reason));
     }
 
     private TextCommandResult ExecuteHomeTeleport(IServerPlayer player, HomeSpawnLocation location, string homeName)
@@ -455,8 +455,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
         Teleport(player, location);
         MarkCooldown(player, HomeCooldownModDataKey);
 
-        AnalyticsService.TrackCommandUsed("home", true);
-        AnalyticsService.TrackFeatureUsed("home-spawn", "home");
+        AnalyticsService.TrackCommandUsed("home", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "home", actorPlayerUid: player.PlayerUID);
 
         return Success(Lang.Get("thebasics:home-spawn-success-home-teleported", homeName));
     }
@@ -472,8 +472,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
         Teleport(player, location);
         MarkCooldown(player, SpawnCooldownModDataKey);
 
-        AnalyticsService.TrackCommandUsed("spawn", true);
-        AnalyticsService.TrackFeatureUsed("home-spawn", "spawn");
+        AnalyticsService.TrackCommandUsed("spawn", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "spawn", actorPlayerUid: player.PlayerUID);
 
         return Success(Lang.Get("thebasics:home-spawn-success-spawn-teleported"));
     }
@@ -485,8 +485,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
         NotifyAdmins(Lang.Get("thebasics:home-spawn-admin-stuck-completed", player.PlayerName));
         API.Logger.Audit($"Player {player.PlayerName} ({player.PlayerUID}) completed /stuck and was teleported to spawn.");
 
-        AnalyticsService.TrackCommandUsed("stuck", true);
-        AnalyticsService.TrackFeatureUsed("home-spawn", "stuck");
+        AnalyticsService.TrackCommandUsed("stuck", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "stuck", actorPlayerUid: player.PlayerUID);
 
         return Success(Lang.Get("thebasics:home-spawn-success-stuck-teleported"));
     }
@@ -502,8 +502,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
         Teleport(player, location);
         MarkCooldown(player, TopCooldownModDataKey);
 
-        AnalyticsService.TrackCommandUsed("top", true);
-        AnalyticsService.TrackFeatureUsed("home-spawn", "top");
+        AnalyticsService.TrackCommandUsed("top", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "top", actorPlayerUid: player.PlayerUID);
 
         return Success(Lang.Get("thebasics:home-spawn-success-top-teleported", location.Format()));
     }
@@ -519,15 +519,15 @@ public class HomeSpawnSystem : BaseBasicModSystem
         Teleport(player, location);
         MarkCooldown(player, BackCooldownModDataKey);
 
-        AnalyticsService.TrackCommandUsed("back", true);
-        AnalyticsService.TrackFeatureUsed("home-spawn", "back");
+        AnalyticsService.TrackCommandUsed("back", true, actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "back", actorPlayerUid: player.PlayerUID);
 
         return Success(Lang.Get("thebasics:home-spawn-success-back-teleported", location.Format()));
     }
 
     private void OnStuckCancelled(IServerPlayer player, string reason)
     {
-        TrackCancelledTeleport("stuck", "stuck", reason);
+        TrackCancelledTeleport(player, "stuck", "stuck", reason);
         NotifyAdmins(Lang.Get("thebasics:home-spawn-admin-stuck-cancelled", player.PlayerName, reason));
         API.Logger.Audit($"Player {player.PlayerName} ({player.PlayerUID}) cancelled /stuck warmup: {reason}.");
     }
@@ -542,7 +542,7 @@ public class HomeSpawnSystem : BaseBasicModSystem
         var teleportation = API.ModLoader.GetModSystem<TeleportationSystem>();
         if (teleportation == null)
         {
-            TrackHomeSpawnFailure(commandName, commandName, "teleport_unavailable");
+            TrackHomeSpawnFailure(player, commandName, commandName, "teleport_unavailable");
             return Error("thebasics:teleport-warmup-error-unavailable", "teleport-unavailable");
         }
 
@@ -564,11 +564,11 @@ public class HomeSpawnSystem : BaseBasicModSystem
             AnalyticsService.TrackFeatureUsed("home-spawn", commandName + "_warmup_start", properties: new Dictionary<string, object>
             {
                 ["warmup_seconds_bucket"] = AnalyticsBuckets.Count(warmupSeconds)
-            });
+            }, actorPlayerUid: player.PlayerUID);
         }
         else
         {
-            TrackHomeSpawnFailure(commandName, commandName, result.ErrorCode ?? "warmup_failed");
+            TrackHomeSpawnFailure(player, commandName, commandName, result.ErrorCode ?? "warmup_failed");
         }
 
         return result;
@@ -700,8 +700,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
             return null;
         }
 
-        AnalyticsService.TrackCommandUsed(commandName, false, "missing_temporal_gear");
-        AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "missing_temporal_gear");
+        AnalyticsService.TrackCommandUsed(commandName, false, "missing_temporal_gear", actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "missing_temporal_gear", actorPlayerUid: player.PlayerUID);
         return Error("thebasics:home-spawn-error-need-temporal-gear", "missing-temporal-gear");
     }
 
@@ -718,8 +718,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
             () => TemporalGearUtil.TryConsumeTemporalGear(player));
         if (!requirement.TryPayOnCompletion())
         {
-            AnalyticsService.TrackCommandUsed(commandName, false, "consume_gear_failed");
-            AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "consume_gear_failed");
+            AnalyticsService.TrackCommandUsed(commandName, false, "consume_gear_failed", actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "consume_gear_failed", actorPlayerUid: player.PlayerUID);
             return Error("thebasics:home-spawn-error-consume-gear-failed", "consume-gear-failed");
         }
 
@@ -762,8 +762,8 @@ public class HomeSpawnSystem : BaseBasicModSystem
             return null;
         }
 
-        AnalyticsService.TrackCommandUsed(commandName, false, "cooldown");
-        AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "cooldown");
+        AnalyticsService.TrackCommandUsed(commandName, false, "cooldown", actorPlayerUid: player.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, "cooldown", actorPlayerUid: player.PlayerUID);
         return ErrorMessage(Lang.Get("thebasics:home-spawn-error-cooldown", FormatDuration(remaining)), "cooldown");
     }
 
@@ -823,15 +823,15 @@ public class HomeSpawnSystem : BaseBasicModSystem
             : null;
     }
 
-    private static void TrackCancelledTeleport(string commandName, string featureAction, string reason)
+    private static void TrackCancelledTeleport(IServerPlayer player, string commandName, string featureAction, string reason)
     {
-        TrackHomeSpawnFailure(commandName, featureAction, "warmup_cancelled_" + reason);
+        TrackHomeSpawnFailure(player, commandName, featureAction, "warmup_cancelled_" + reason);
     }
 
-    private static void TrackHomeSpawnFailure(string commandName, string featureAction, string result)
+    private static void TrackHomeSpawnFailure(IServerPlayer player, string commandName, string featureAction, string result)
     {
-        AnalyticsService.TrackCommandUsed(commandName, false, result);
-        AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, result);
+        AnalyticsService.TrackCommandUsed(commandName, false, result, actorPlayerUid: player?.PlayerUID);
+        AnalyticsService.TrackFeatureUsed("home-spawn", featureAction, false, result, actorPlayerUid: player?.PlayerUID);
     }
 
     private void NotifyAdmins(string message)

@@ -11,6 +11,7 @@ public static class AnalyticsService
 {
     private const int MaxPendingFailureEvents = 25;
     private static IAnalyticsSink _sink = NoopAnalyticsSink.Instance;
+    private static Func<string, string> _playerPseudonymizer;
     private static readonly Queue<PendingAnalyticsEvent> PendingFailureEvents = new();
     private static readonly object PendingFailureLock = new();
     private static volatile bool _allowErrorTelemetry;
@@ -18,9 +19,10 @@ public static class AnalyticsService
 
     public static bool IsEnabled => _sink.IsEnabled;
 
-    public static void Configure(IAnalyticsSink sink, bool allowErrorTelemetry = false)
+    public static void Configure(IAnalyticsSink sink, bool allowErrorTelemetry = false, Func<string, string> playerPseudonymizer = null)
     {
         var next = sink ?? NoopAnalyticsSink.Instance;
+        Interlocked.Exchange(ref _playerPseudonymizer, playerPseudonymizer);
         var previous = Interlocked.Exchange(ref _sink, next);
         _allowErrorTelemetry = allowErrorTelemetry;
         _errorTelemetryConfigured = true;
@@ -51,7 +53,7 @@ public static class AnalyticsService
         }
     }
 
-    public static void TrackCommandUsed(string commandName, bool success, string result = null, IDictionary<string, object> properties = null)
+    public static void TrackCommandUsed(string commandName, bool success, string result = null, IDictionary<string, object> properties = null, string actorPlayerUid = null)
     {
         var eventProperties = new Dictionary<string, object>
         {
@@ -60,10 +62,11 @@ public static class AnalyticsService
             ["result"] = result ?? (success ? "success" : "failure")
         };
         AddProperties(eventProperties, properties);
+        AddPlayerPseudonym(eventProperties, actorPlayerUid);
         Track("command used", eventProperties);
     }
 
-    public static void TrackFeatureUsed(string featureName, string action = null, bool success = true, string result = null, IDictionary<string, object> properties = null)
+    public static void TrackFeatureUsed(string featureName, string action = null, bool success = true, string result = null, IDictionary<string, object> properties = null, string actorPlayerUid = null)
     {
         var eventProperties = new Dictionary<string, object>
         {
@@ -73,10 +76,26 @@ public static class AnalyticsService
             ["result"] = result ?? (success ? "success" : "failure")
         };
         AddProperties(eventProperties, properties);
+        AddPlayerPseudonym(eventProperties, actorPlayerUid);
         Track("feature used", eventProperties);
     }
 
     public static void TrackFailure(string area, string operation, string severity, string result, Exception exception = null, bool recovered = true, IDictionary<string, object> properties = null)
+    {
+        TrackFailure(BuildFailureProperties(area, operation, severity, result, exception, recovered, properties), null);
+    }
+
+    public static void TrackPlayerFailure(string actorPlayerUid, string area, string operation, string severity, string result, Exception exception = null, bool recovered = true)
+    {
+        TrackFailure(BuildFailureProperties(area, operation, severity, result, exception, recovered, null), actorPlayerUid);
+    }
+
+    public static void TrackPlayerFailure(string actorPlayerUid, string area, string operation, string severity, string result, IDictionary<string, object> properties)
+    {
+        TrackFailure(BuildFailureProperties(area, operation, severity, result, null, true, properties), actorPlayerUid);
+    }
+
+    private static Dictionary<string, object> BuildFailureProperties(string area, string operation, string severity, string result, Exception exception, bool recovered, IDictionary<string, object> properties)
     {
         var eventProperties = new Dictionary<string, object>
         {
@@ -94,6 +113,12 @@ public static class AnalyticsService
         }
 
         AddProperties(eventProperties, properties);
+        return eventProperties;
+    }
+
+    private static void TrackFailure(Dictionary<string, object> eventProperties, string actorPlayerUid)
+    {
+        AddPlayerPseudonym(eventProperties, actorPlayerUid);
 
         if (!_allowErrorTelemetry)
         {
@@ -119,6 +144,13 @@ public static class AnalyticsService
         {
             ["chat_type"] = chatType
         };
+    }
+
+    public static Dictionary<string, object> PlayerProperties(string playerUid)
+    {
+        var properties = new Dictionary<string, object>();
+        AddPlayerPseudonym(properties, playerUid);
+        return properties;
     }
 
     public static void TrackConfigSnapshot(ModConfig config)
@@ -237,7 +269,39 @@ public static class AnalyticsService
 
         foreach (var property in properties)
         {
+            if (string.Equals(property.Key, "pseudonymous_player_id", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             eventProperties[property.Key] = property.Value;
+        }
+    }
+
+    private static void AddPlayerPseudonym(Dictionary<string, object> eventProperties, string playerUid)
+    {
+        if (string.IsNullOrWhiteSpace(playerUid))
+        {
+            return;
+        }
+
+        var pseudonymizer = _playerPseudonymizer;
+        if (pseudonymizer == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var pseudonymousPlayerId = pseudonymizer(playerUid);
+            if (!string.IsNullOrWhiteSpace(pseudonymousPlayerId))
+            {
+                eventProperties["pseudonymous_player_id"] = pseudonymousPlayerId;
+            }
+        }
+        catch
+        {
+            // Player attribution must never affect gameplay or base analytics delivery.
         }
     }
 
