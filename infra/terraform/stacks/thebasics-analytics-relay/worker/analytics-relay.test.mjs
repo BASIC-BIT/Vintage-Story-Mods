@@ -223,7 +223,12 @@ function callArguments(source, methodName) {
 
 function argument(args, index, name) {
   const named = args.find((value) => new RegExp(`^\\s*${name}\\s*:`).test(value));
-  return (named ?? args[index])?.replace(new RegExp(`^\\s*${name}\\s*:`), "").trim();
+  if (named) {
+    return named.replace(new RegExp(`^\\s*${name}\\s*:`), "").trim();
+  }
+
+  const positional = args.filter((value) => !/^\s*\w+\s*:/.test(value));
+  return positional[index]?.trim();
 }
 
 function addLiteralValues(target, expression) {
@@ -286,9 +291,10 @@ function currentProducerContracts() {
     ["AnalyticsService.TrackCommandUsed", ["command_name", 0, "commandName"], ["result", 2, "result"]],
     ["AnalyticsService.TrackFeatureUsed", ["feature_name", 0, "featureName"], ["action", 1, "action"], ["result", 3, "result"]],
     ["AnalyticsService.TrackFailure", ["area", 0, "area"], ["operation", 1, "operation"], ["severity", 2, "severity"], ["result", 3, "result"]],
-    ["TrackConfigEditorFailure", ["area", 0, "featureName"], ["operation", 1, "action"]],
-    ["TrackHomeSpawnFailure", ["command_name", 0, "commandName"], ["action", 1, "featureAction"], ["result", 2, "result"]],
-    ["TrackTpaFailure", ["command_name", 0, "commandName"], ["action", 1, "action"], ["result", 2, "result"]],
+    ["AnalyticsService.TrackPlayerFailure", ["area", 1, "area"], ["operation", 2, "operation"], ["severity", 3, "severity"], ["result", 4, "result"]],
+    ["TrackConfigEditorFailure", ["area", 1, "featureName"], ["operation", 2, "action"]],
+    ["TrackHomeSpawnFailure", ["command_name", 1, "commandName"], ["action", 2, "featureAction"], ["result", 3, "result"]],
+    ["TrackTpaFailure", ["command_name", 1, "commandName"], ["action", 2, "action"], ["result", 3, "result"]],
     ["SendThroughPipeline", ["command_name", 1, "surface"], ["feature_name", 2, "featureName"], ["action", 3, "featureAction"], ["area", 2, "featureName"], ["operation", 1, "surface"]],
   ];
 
@@ -617,6 +623,34 @@ test("relay rejects personalized properties without personalized consent", async
   assert.deepEqual(lastLog().rejection_reasons, { personalized_property_without_consent: 1 });
 });
 
+test("relay accepts actor attribution on player-initiated event families", () => {
+  const events = [
+    commandEvent("sethome", { pseudonymous_player_id: playerPseudonym }),
+    featureEvent("home-spawn", "set_home", { pseudonymous_player_id: playerPseudonym }),
+    failureEvent({ pseudonymous_player_id: playerPseudonym }),
+  ];
+
+  const validation = validatePayload(runtimeEnvelope(events));
+
+  assertAccepted(validation, "player actor attribution");
+  for (const event of validation.events) {
+    assert.equal(event.properties.pseudonymous_player_id, playerPseudonym);
+  }
+});
+
+test("relay rejects malformed actor attribution", () => {
+  const validation = validatePayload(payloadForEvent("command used", {
+    command_name: "sethome",
+    pseudonymous_player_id: "raw-player-uid",
+    result: "success",
+    success: true,
+  }));
+
+  assert.equal(validation.ok, true);
+  assert.equal(validation.events.length, 0);
+  assert.deepEqual(validation.rejected, ["invalid_pseudonymous_player_id"]);
+});
+
 test("relay forwards valid events from a mixed batch and reports partial acceptance", async () => {
   stubUpstream();
   captureLogs();
@@ -715,7 +749,7 @@ function featureEvent(featureName, action, extraProperties = {}) {
   };
 }
 
-function commandEvent(commandName) {
+function commandEvent(commandName, extraProperties = {}) {
   return {
     name: "command used",
     properties: {
@@ -723,6 +757,7 @@ function commandEvent(commandName) {
       command_name: commandName,
       success: true,
       result: "success",
+      ...extraProperties,
     },
     timestamp: new Date().toISOString(),
   };

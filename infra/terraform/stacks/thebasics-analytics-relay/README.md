@@ -9,7 +9,7 @@ This stack deploys the BASIC-owned intake endpoint used by The BASICs server-ins
 - Accepted event schema: allowlisted event names and per-event property keys in `worker/analytics-relay.mjs`.
 - Forwarding target: PostHog `/batch/` with `$process_person_profile=false` and `$geoip_disable=true`.
 
-The Worker rejects unknown event names, unknown properties, oversized batches, and malformed server install IDs. It does not accept chat text, command arguments, player names, player IDs, IPs, world names, seeds, coordinates, or raw config.
+The Worker rejects unknown event names, unknown properties, oversized batches, and malformed server install IDs. It does not accept chat text, command arguments, player names, raw player IDs, IPs, world names, seeds, coordinates, or raw config. With personalized consent, player-initiated command, feature, failure, and session events may include a per-server HMAC pseudonym. This remains an event property: PostHog person profiles stay disabled and the server install remains the event identity.
 
 Current producers send the exact bounded `online_player_count` as a server-level numeric metric so PostHog can normalize activity by concurrent population. The relay continues to accept the legacy `online_player_count_bucket` property from already-released mod versions.
 

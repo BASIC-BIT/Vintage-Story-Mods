@@ -323,14 +323,14 @@ public class CharacterSheetSystem : BaseBasicModSystem
         var result = HeadshotPipeline.Normalize(inputBytes, options);
         if (!result.Ok)
         {
-            TrackHeadshotUploadFailure(result.ErrorCode);
+            TrackHeadshotUploadFailure(sender.PlayerUID, result.ErrorCode);
             return HeadshotUploadFail(target.PlayerUID, HeadshotPipeline.GetErrorMessage(result.ErrorCode, maxKb));
         }
 
         var characterId = target.GetActiveRpCharacterId();
         if (!_headshotStore.TryWrite(target.PlayerUID, characterId, result.PngBytes))
         {
-            TrackHeadshotUploadFailure("write_failed");
+            TrackHeadshotUploadFailure(sender.PlayerUID, "write_failed");
             return HeadshotUploadFail(target.PlayerUID, Lang.Get("thebasics:headshot-error-write"));
         }
 
@@ -347,7 +347,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
         // Hash from ComputeSha256Hex is always 64 hex chars.
         API.Logger.Audit($"{(isAdminAction ? "Admin" : "Player")} {sender.PlayerName} uploaded headshot for {target.PlayerName} ({result.PngBytes.Length} bytes, hash {result.Hash[..8]}).");
 
-        AnalyticsService.TrackFeatureUsed("character_headshot", "upload");
+        AnalyticsService.TrackFeatureUsed("character_headshot", "upload", actorPlayerUid: sender.PlayerUID);
 
         return new HeadshotUploadResult
         {
@@ -358,10 +358,10 @@ public class CharacterSheetSystem : BaseBasicModSystem
         };
     }
 
-    private static void TrackHeadshotUploadFailure(string resultCode)
+    private static void TrackHeadshotUploadFailure(string actorPlayerUid, string resultCode)
     {
         var normalizedResultCode = string.IsNullOrWhiteSpace(resultCode) ? "failure" : resultCode;
-        AnalyticsService.TrackFeatureUsed("character_headshot", "upload", false, normalizedResultCode);
+        AnalyticsService.TrackFeatureUsed("character_headshot", "upload", false, normalizedResultCode, actorPlayerUid: actorPlayerUid);
         if (normalizedResultCode == HeadshotErrorCodes.Exception || normalizedResultCode == "write_failed")
         {
             AnalyticsService.TrackFailure("character_headshot", "upload", "error", normalizedResultCode);

@@ -139,7 +139,13 @@ public class AnalyticsSystem : BaseBasicModSystem
             return;
         }
 
-        AnalyticsService.Configure(new RelayAnalyticsSink(API, _analyticsConfig, endpoint, Mod.Info.Version, _serverSessionId), _analyticsConfig.AllowErrorTelemetry);
+        System.Func<string, string> playerPseudonymizer = AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig.ConsentLevel)
+            ? BuildPseudonymousPlayerId
+            : null;
+        AnalyticsService.Configure(
+            new RelayAnalyticsSink(API, _analyticsConfig, endpoint, Mod.Info.Version, _serverSessionId),
+            _analyticsConfig.AllowErrorTelemetry,
+            playerPseudonymizer);
     }
 
     private void TrackServerSessionStartup()
@@ -487,26 +493,19 @@ public class AnalyticsSystem : BaseBasicModSystem
 
     private Dictionary<string, object> BuildPlayerSessionProperties(IServerPlayer player)
     {
-        var properties = new Dictionary<string, object>();
-        var pseudonymousPlayerId = BuildPseudonymousPlayerId(player);
-        if (!string.IsNullOrWhiteSpace(pseudonymousPlayerId))
-        {
-            properties["pseudonymous_player_id"] = pseudonymousPlayerId;
-        }
-
-        return properties;
+        return AnalyticsService.PlayerProperties(player?.PlayerUID);
     }
 
-    private string BuildPseudonymousPlayerId(IServerPlayer player)
+    private string BuildPseudonymousPlayerId(string playerUid)
     {
-        if (!AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig?.ConsentLevel) || string.IsNullOrWhiteSpace(player?.PlayerUID))
+        if (!AnalyticsConsentLevels.AllowsPersonalizedAnalytics(_analyticsConfig?.ConsentLevel) || string.IsNullOrWhiteSpace(playerUid))
         {
             return null;
         }
 
         var salt = EnsurePlayerPseudonymSalt();
         using var hmac = new HMACSHA256(Convert.FromHexString(salt));
-        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(player.PlayerUID))).ToLowerInvariant();
+        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(playerUid))).ToLowerInvariant();
     }
 
     private bool ShouldQueueConsentPrompt(IServerPlayer player)

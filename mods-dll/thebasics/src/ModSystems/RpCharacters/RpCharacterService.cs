@@ -255,12 +255,12 @@ public class RpCharacterService
                     }
                     catch (Exception rollbackException)
                     {
-                        AnalyticsService.TrackFailure("rp_character", "switch", "critical", "rollback_failed", rollbackException, recovered: false);
+                        AnalyticsService.TrackPlayerFailure(player.PlayerUID, "rp_character", "switch", "critical", "rollback_failed", rollbackException, recovered: false);
                         return RpCharacterOperationResult.Error(Text("rpchar-error-switch-rollback-failed", Safe(rollbackException.Message)));
                     }
                 }
 
-                AnalyticsService.TrackFailure("rp_character", "switch", "error", "restore_failed", exception);
+                AnalyticsService.TrackPlayerFailure(player.PlayerUID, "rp_character", "switch", "error", "restore_failed", exception);
                 return RpCharacterOperationResult.Error(Text("rpchar-error-switch-failed", Safe(exception.Message)));
             }
 
