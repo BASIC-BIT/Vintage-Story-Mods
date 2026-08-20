@@ -90,6 +90,11 @@ public static class AnalyticsService
         TrackFailure(BuildFailureProperties(area, operation, severity, result, exception, recovered, null), actorPlayerUid);
     }
 
+    public static void TrackPlayerFailure(string actorPlayerUid, string area, string operation, string severity, string result, IDictionary<string, object> properties)
+    {
+        TrackFailure(BuildFailureProperties(area, operation, severity, result, null, true, properties), actorPlayerUid);
+    }
+
     private static Dictionary<string, object> BuildFailureProperties(string area, string operation, string severity, string result, Exception exception, bool recovered, IDictionary<string, object> properties)
     {
         var eventProperties = new Dictionary<string, object>

@@ -84,7 +84,16 @@ public class AnalyticsServiceTests : IDisposable
 
         AnalyticsService.TrackCommandUsed("sethome", true, actorPlayerUid: rawPlayerUid);
         AnalyticsService.TrackFeatureUsed("home-spawn", "set_home", actorPlayerUid: rawPlayerUid);
-        AnalyticsService.TrackPlayerFailure(rawPlayerUid, "home-spawn", "set_home", "warning", "blocked");
+        AnalyticsService.TrackPlayerFailure(
+            rawPlayerUid,
+            "home-spawn",
+            "set_home",
+            "warning",
+            "blocked",
+            new Dictionary<string, object>
+            {
+                ["error_count_bucket"] = "1"
+            });
 
         sink.Events.Should().HaveCount(3);
         foreach (var analyticsEvent in sink.Events)
@@ -94,6 +103,8 @@ public class AnalyticsServiceTests : IDisposable
         }
         sink.Events.SelectMany(analyticsEvent => analyticsEvent.Properties.Values)
             .Should().NotContain(rawPlayerUid);
+        sink.Events.Single(analyticsEvent => analyticsEvent.Name == "mod failure").Properties
+            .Should().ContainKey("error_count_bucket").WhoseValue.Should().Be("1");
     }
 
     [Fact]

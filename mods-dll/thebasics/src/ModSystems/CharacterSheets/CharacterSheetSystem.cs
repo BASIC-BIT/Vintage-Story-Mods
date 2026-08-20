@@ -364,7 +364,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
         AnalyticsService.TrackFeatureUsed("character_headshot", "upload", false, normalizedResultCode, actorPlayerUid: actorPlayerUid);
         if (normalizedResultCode == HeadshotErrorCodes.Exception || normalizedResultCode == "write_failed")
         {
-            AnalyticsService.TrackFailure("character_headshot", "upload", "error", normalizedResultCode);
+            AnalyticsService.TrackPlayerFailure(actorPlayerUid, "character_headshot", "upload", "error", normalizedResultCode);
         }
     }
 

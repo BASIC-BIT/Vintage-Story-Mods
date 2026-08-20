@@ -1012,7 +1012,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         };
 
         AnalyticsService.TrackFeatureUsed(featureName, action, false, "validation_failed", properties, player?.PlayerUID);
-        AnalyticsService.TrackFailure(featureName, action, "warning", "validation_failed", properties: properties);
+        AnalyticsService.TrackPlayerFailure(player?.PlayerUID, featureName, action, "warning", "validation_failed", properties);
     }
 
     /// <summary>
