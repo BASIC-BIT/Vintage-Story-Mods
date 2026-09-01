@@ -1057,8 +1057,18 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        state = NormalizeTypingIndicatorState(message.State, message.IsTyping);
+        state = NormalizeTypingIndicatorStateForPlayer(player, message.State, message.IsTyping);
         return true;
+    }
+
+    internal static ChatTypingIndicatorState NormalizeTypingIndicatorStateForPlayer(
+        IServerPlayer player,
+        ChatTypingIndicatorState state,
+        bool isTyping)
+    {
+        return SpectatorChatPolicy.ShouldEmitEntityAttachedCues(player)
+            ? NormalizeTypingIndicatorState(state, isTyping)
+            : ChatTypingIndicatorState.None;
     }
 
     internal static ChatTypingIndicatorState NormalizeTypingIndicatorState(ChatTypingIndicatorState state, bool isTyping)
@@ -1872,7 +1882,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         var player = context.SendingPlayer;
-        if (player?.Entity == null || context.Recipients == null)
+        if (player?.Entity == null || context.Recipients == null ||
+            !SpectatorChatPolicy.ShouldEmitEntityAttachedCues(player))
         {
             return;
         }
@@ -2467,13 +2478,19 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        // With RP text off for this player, plain lines bypass the pipeline entirely and go out as
-        // vanilla chat, so a stored type does nothing. Storing one anyway would leave it waiting to
-        // spring back to life the moment they re-enable RP text. One-off /ooc and /me still work,
-        // because those run the pipeline directly rather than through the chat event.
-        if (!player.GetRpTextEnabled())
+        // With RP text off for an ordinary player, plain lines bypass the pipeline entirely and go
+        // out as vanilla chat, so a stored type does nothing. Protected spectators are the exception:
+        // their chat-tab lines stay in the pipeline so embodied speech cannot bypass the protection,
+        // and their deliberate OOC overrides must therefore remain usable there too.
+        if (!ShouldProcessChatTabMessage(player))
         {
             refusalLangKey = "thebasics:chat-type-rptext-disabled";
+            return false;
+        }
+
+        if (mode == ChatOverrideMode.Emote && SpectatorChatPolicy.ShouldProtectRoleplayChat(player, Config))
+        {
+            refusalLangKey = "thebasics:chat-spectator-embodied-message-disabled";
             return false;
         }
 
@@ -2776,8 +2793,10 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return;
         }
 
-        // Short circuit if RP text is disabled
-        if (!byPlayer.GetRpTextEnabled())
+        // Ordinary players may opt out of RP processing. Protected spectators must still pass
+        // through the pipeline so /rptext off cannot turn the shared Proximity group into a bypass
+        // for embodied-speech rejection or proximity recipient filtering.
+        if (!ShouldProcessChatTabMessage(byPlayer))
         {
             return;
         }
@@ -2836,6 +2855,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             API.Logger.Error($"THEBASICS - Error processing proxchat message: {e}");
             AnalyticsService.TrackPlayerFailure(byPlayer.PlayerUID, "proximity_chat", "chat_tab_pipeline", "error", "pipeline_exception", e);
         }
+    }
+
+    internal bool ShouldProcessChatTabMessage(IServerPlayer player)
+    {
+        return player?.GetRpTextEnabled() == true ||
+            SpectatorChatPolicy.ShouldProtectRoleplayChat(player, Config);
     }
 
     /// <summary>

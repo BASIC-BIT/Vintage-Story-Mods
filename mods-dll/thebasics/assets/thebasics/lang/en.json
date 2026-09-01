@@ -291,6 +291,8 @@
   "chat-error-player-not-found": "Cannot find player.",
   "chat-error-invalid-color": "Invalid color.",
   "chat-env-placement-fallback": "No surface found in that direction \u2014 message placed above your head instead.",
+  "chat-spectator-env-placement-disabled": "Spectators cannot place environmental text on this server.",
+  "chat-spectator-embodied-message-disabled": "Spectator chat protection kept that message from being sent as embodied roleplay while you are invisible. Use /ooc or (...) for local OOC, /gooc or ((...)) for global OOC, /it or ! for nameless environmental narration, or /envhere or !! for placed narration. A server administrator can disable this protection with ProtectSpectatorRoleplayChat.",
 
   "chat-nick-current": "Your nickname is: {0}",
   "chat-nick-none": "You don't have a nickname!  You can set it with `/nick MyName`",

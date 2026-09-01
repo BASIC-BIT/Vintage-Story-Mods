@@ -421,6 +421,29 @@ public class ConfigAdminSettingRegistryTests
     }
 
     [Fact]
+    public void SpectatorChatSettings_AreRegisteredAsLiveSettings()
+    {
+        var config = CreateConfig();
+        var nicknameSetting = GetSetting("UseNicknameInSpectatorOOC");
+        var placementSetting = GetSetting("AllowSpectatorPlacedEnvironmentalMessages");
+        var protectionSetting = GetSetting("ProtectSpectatorRoleplayChat");
+
+        nicknameSetting.Group.Should().Be("Chat/RP");
+        nicknameSetting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        placementSetting.Group.Should().Be("Chat/RP");
+        placementSetting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        protectionSetting.Group.Should().Be("Chat/RP");
+        protectionSetting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        nicknameSetting.TrySetValue(config, "true", out var nicknameError).Should().BeTrue(nicknameError);
+        placementSetting.TrySetValue(config, "false", out var placementError).Should().BeTrue(placementError);
+        protectionSetting.TrySetValue(config, "false", out var protectionError).Should().BeTrue(protectionError);
+
+        config.UseNicknameInSpectatorOOC.Should().BeTrue();
+        config.AllowSpectatorPlacedEnvironmentalMessages.Should().BeFalse();
+        config.ProtectSpectatorRoleplayChat.Should().BeFalse();
+    }
+
+    [Fact]
     public void NametagStyleSettings_AcceptOptionalHexColors()
     {
         var config = CreateConfig();

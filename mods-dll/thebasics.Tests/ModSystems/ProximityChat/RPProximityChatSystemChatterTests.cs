@@ -3,6 +3,10 @@ using thebasics.Configs;
 using thebasics.Models;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.Tests.Support;
+using NSubstitute;
+using Vintagestory.API.Common;
+using Vintagestory.API.Server;
 
 namespace thebasics.Tests.ModSystems.ProximityChat;
 
@@ -105,6 +109,24 @@ public class RPProximityChatSystemChatterTests
         ChatTypingIndicatorState expected)
     {
         RPProximityChatSystem.NormalizeTypingIndicatorState(state, isTyping).Should().Be(expected);
+    }
+
+    [Fact]
+    public void NormalizeTypingIndicatorStateForPlayer_ClearsActiveSpectatorState()
+    {
+        var worldData = Substitute.For<IWorldPlayerData>();
+        worldData.CurrentGameMode.Returns(EnumGameMode.Spectator);
+        var player = new FakeServerPlayer
+        {
+            WorldData = worldData,
+            ConnectionState = EnumClientState.Playing
+        };
+
+        RPProximityChatSystem.NormalizeTypingIndicatorStateForPlayer(
+                player,
+                ChatTypingIndicatorState.Typing,
+                isTyping: true)
+            .Should().Be(ChatTypingIndicatorState.None);
     }
 
     private static MessageContext CreateSpeechContext(string speechText)

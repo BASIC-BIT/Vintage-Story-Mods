@@ -4,6 +4,7 @@
                               // into every saved config.
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using Newtonsoft.Json;
 using ProtoBuf;
@@ -761,6 +762,31 @@ namespace thebasics.Configs
 
         [ProtoMember(61)]
         public bool UseNicknameInOOC { get; set; } = true;
+
+        /// <summary>
+        /// Whether local OOC from an active spectator uses their RP nickname. Disabled by default
+        /// so an invisible speaker is attributed to an unambiguous account name.
+        /// </summary>
+        [ProtoMember(150)]
+        public bool UseNicknameInSpectatorOOC { get; set; } = false;
+
+        /// <summary>
+        /// Whether active spectators may deliberately place world-positioned environmental text
+        /// with !! or /envhere. This does not permit passive above-head spectator bubbles.
+        /// </summary>
+        [ProtoMember(151)]
+        [DefaultValue(true)]
+        public bool AllowSpectatorPlacedEnvironmentalMessages { get; set; } = true;
+
+        /// <summary>
+        /// Protects an active spectator from accidentally publishing embodied roleplay while
+        /// invisible. Plain or explicit speech, signing, and name-led emotes are refused, requiring
+        /// the spectator to deliberately choose OOC or narration. Disable this to retain the normal
+        /// RP chat pipeline for spectators.
+        /// </summary>
+        [ProtoMember(152)]
+        [DefaultValue(true)]
+        public bool ProtectSpectatorRoleplayChat { get; set; } = true;
 
         [ProtoMember(64)]
         public bool RemoveGrantedLanguagesOnChange { get; set; } = true;
