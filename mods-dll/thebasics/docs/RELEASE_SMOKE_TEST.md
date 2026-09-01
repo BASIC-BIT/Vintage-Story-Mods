@@ -72,11 +72,11 @@ Run this after the ModDB release is published. It verifies the player-facing ins
    - Expect: Other client sees chat-open/composing/typing states and timeout/clear behavior.
    - Watch for: stale indicator after close/disconnect, indicator above self, or indicators through walls.
 
-7. **Nametag Behavior** (P2)
-   - Config: current server nametag settings.
-   - Do: Approach, target, and move away from the other player.
-   - Expect: Nickname/account name and range behavior match config.
-   - Watch for: nametag visible beyond configured range or hidden when targeted.
+7. **Nametag Range, LOS, And Self View** (P0)
+   - Config: `NametagRequiresLineOfSight=true`; use a known `NametagRenderRange`.
+   - Do: Approach the other player, cross the configured range boundary, target them when target-only mode is enabled, then test visibility through stone, glass, foliage, a slab/door/fence, and partial eye/torso/feet exposure. Switch the observing client to F5 third-person view and check its own nametag. Repeat the long-range movement for at least one minute.
+   - Expect: The remote nametag uses the configured strict range boundary, targeting behavior, transparent-block rules, and multi-point LOS. The local player's F5 nametag matches unmodified vanilla behavior. Movement and rendering remain responsive throughout the long-range pass.
+   - Watch for: a remote nametag beyond range, different results around partial block selection boxes, a self nametag regression in F5, or any client hitch/freeze while LOS refreshes.
 
 8. **Save Notification** (P1)
    - Config: save announcement enabled.

@@ -23,11 +23,11 @@ public static class NameTagRenderRangePatches
     private static readonly Dictionary<long, (bool canSee, long nextCheckMs)> LosCache = new();
     private static long _nextPurgeMs;
 
-    public static bool Prefix(Entity ___entity)
+    public static bool Prefix(EntityBehaviorNameTag __instance, Entity ___entity)
     {
         try
         {
-            if (ShouldSuppressNametag(___entity))
+            if (ShouldSuppressNametag(__instance, ___entity))
             {
                 return false;
             }
@@ -58,26 +58,62 @@ public static class NameTagRenderRangePatches
         }
     }
 
-    private static bool ShouldSuppressNametag(Entity entity)
+    private static bool ShouldSuppressNametag(EntityBehaviorNameTag behavior, Entity entity)
     {
         if (!ChatUiSystem.DoNametagsRequireLineOfSight())
         {
             return false;
         }
 
-        if (!TryGetRemoteNametagContext(entity, out _, out var localPlayerEntity))
+        if (!TryGetNametagContext(entity, out var capi, out var localPlayerEntity))
         {
+            return false;
+        }
+
+        var isTargeted = capi.World.Player.CurrentEntitySelection?.Entity == entity;
+        var distanceSquared = localPlayerEntity.Pos.SquareDistanceTo(entity.Pos);
+        if (!ShouldEvaluateLineOfSight(
+                localPlayerEntity.EntityId,
+                entity.EntityId,
+                behavior.ShowOnlyWhenTargeted,
+                isTargeted,
+                RenderRangeFieldRef(behavior),
+                distanceSquared))
+        {
+            // Vanilla will suppress the nametag without needing an LOS result. Always delegate
+            // self-rendering too, because vanilla deliberately allows it in third person.
             return false;
         }
 
         return !CanSeeCached(entity.World, localPlayerEntity, entity);
     }
 
-    private static bool TryGetRemoteNametagContext(Entity entity, out ICoreClientAPI capi, out Entity localPlayerEntity)
+    /// <summary>
+    /// Mirrors vanilla's final target/range gate so LOS work only runs when its answer can affect
+    /// rendering. Returning false means "delegate to vanilla", not "hide the nametag".
+    /// </summary>
+    internal static bool ShouldEvaluateLineOfSight(
+        long localPlayerEntityId,
+        long targetEntityId,
+        bool showOnlyWhenTargeted,
+        bool isTargeted,
+        int renderRange,
+        double distanceSquared)
+    {
+        if (localPlayerEntityId == targetEntityId)
+        {
+            return false;
+        }
+
+        return (!showOnlyWhenTargeted || isTargeted)
+               && (double)(renderRange * renderRange) > distanceSquared;
+    }
+
+    private static bool TryGetNametagContext(Entity entity, out ICoreClientAPI capi, out Entity localPlayerEntity)
     {
         capi = entity?.World?.Api as ICoreClientAPI;
         localPlayerEntity = capi?.World?.Player?.Entity;
-        return capi != null && localPlayerEntity != null && entity != null && localPlayerEntity.EntityId != entity.EntityId;
+        return capi != null && localPlayerEntity != null && entity != null;
     }
 
     private static bool CanSeeCached(IWorldAccessor world, Entity observer, Entity target)
