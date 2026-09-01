@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
 using thebasics.Configs;
+using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
@@ -127,6 +128,44 @@ public class SpectatorMessageTypeTransformerTests
         var allowed = chatSystem.IsOverrideModeAvailable(
             context.SendingPlayer,
             ChatOverrideMode.Emote,
+            out var refusalLangKey);
+
+        allowed.Should().BeTrue();
+        refusalLangKey.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void RpTextDisabled_ChatTabPipelineFollowsSpectatorProtection(bool protectedChat, bool expected)
+    {
+        var context = CreateContext(EnumGameMode.Spectator, MessageContext.IS_SPEECH);
+        context.SendingPlayer.SetRpTextEnabled(false);
+        var chatSystem = new RPProximityChatSystem
+        {
+            Config = new ModConfig { ProtectSpectatorRoleplayChat = protectedChat }
+        };
+
+        chatSystem.ShouldProcessChatTabMessage(context.SendingPlayer).Should().Be(expected);
+    }
+
+    [Fact]
+    public void ProtectedSpectatorWithRpTextDisabled_CanStillChooseGlobalOoc()
+    {
+        var context = CreateContext(EnumGameMode.Spectator, MessageContext.IS_GLOBAL_OOC);
+        context.SendingPlayer.SetRpTextEnabled(false);
+        var chatSystem = new RPProximityChatSystem
+        {
+            Config = new ModConfig
+            {
+                EnableGlobalOOC = true,
+                ProtectSpectatorRoleplayChat = true
+            }
+        };
+
+        var allowed = chatSystem.IsOverrideModeAvailable(
+            context.SendingPlayer,
+            ChatOverrideMode.GlobalOoc,
             out var refusalLangKey);
 
         allowed.Should().BeTrue();
