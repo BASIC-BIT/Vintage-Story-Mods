@@ -1057,8 +1057,18 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
-        state = NormalizeTypingIndicatorState(message.State, message.IsTyping);
+        state = NormalizeTypingIndicatorStateForPlayer(player, message.State, message.IsTyping);
         return true;
+    }
+
+    internal static ChatTypingIndicatorState NormalizeTypingIndicatorStateForPlayer(
+        IServerPlayer player,
+        ChatTypingIndicatorState state,
+        bool isTyping)
+    {
+        return SpectatorChatPolicy.ShouldEmitEntityAttachedCues(player)
+            ? NormalizeTypingIndicatorState(state, isTyping)
+            : ChatTypingIndicatorState.None;
     }
 
     internal static ChatTypingIndicatorState NormalizeTypingIndicatorState(ChatTypingIndicatorState state, bool isTyping)
@@ -1872,7 +1882,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         var player = context.SendingPlayer;
-        if (player?.Entity == null || context.Recipients == null)
+        if (player?.Entity == null || context.Recipients == null ||
+            !SpectatorChatPolicy.ShouldEmitEntityAttachedCues(player))
         {
             return;
         }
@@ -2474,6 +2485,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         if (!player.GetRpTextEnabled())
         {
             refusalLangKey = "thebasics:chat-type-rptext-disabled";
+            return false;
+        }
+
+        if (mode == ChatOverrideMode.Emote && SpectatorChatPolicy.ShouldProtectRoleplayChat(player, Config))
+        {
+            refusalLangKey = "thebasics:chat-spectator-embodied-message-disabled";
             return false;
         }
 

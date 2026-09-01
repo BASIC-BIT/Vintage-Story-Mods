@@ -107,6 +107,21 @@ Consequences:
 
 ---
 
+## Entry 5: Spectator invisibility does not mean spectator silence
+
+A spectator is usually an administrator observing the world with their in-world body intentionally hidden. They still need to communicate, and server policy should treat communication and embodied presence as separate concerns.
+
+- Spectators may communicate through local OOC, global OOC, environmental narration, and placed casting. Local OOC still serves scene-level coordination, and global OOC still serves server-wide roleplay coordination.
+- A default-on server protection should reject ordinary or explicit speech, sign language, and name-led emotes. Do not silently reinterpret an untyped line as OOC; require the administrator to deliberately choose an allowed chat type. Frame this as protection against accidentally publishing embodied roleplay while invisible, not as a punishment or player-permission restriction. Server owners must be able to disable the protection when their staff workflow needs normal RP chat behavior.
+- Environmental narration (`!` or `/it`) is the existing nameless alternative to an emote. Placed casting (`!!` or `/envhere`) anchors that narration to a chosen world position. These are the appropriate fiction-facing tools for spectators.
+- Passive entity-attached cues must not reveal a spectator. This includes above-head speech bubbles, typing indicators, nametags, map markers, and positional chatter sounds.
+- Local spectator OOC identity is its own server choice. Account names are the unambiguous default, while servers may opt into RP nicknames. Global OOC continues to follow the existing global OOC nickname setting.
+- A deliberately placed environmental message is attached to the chosen world position, not to the spectator's hidden body. Servers may allow it independently. If a server disables it, reject the placement explicitly instead of falling back to an above-head bubble.
+
+Do not use a spectator visibility rule as a broad chat permission. A rule intended to prevent accidental location or presence leaks should not silently remove the communication tools spectators deliberately invoke.
+
+---
+
 ## Open questions worth resolving with players, not from first principles
 
 Recorded so they are not silently answered by whoever touches the code next.

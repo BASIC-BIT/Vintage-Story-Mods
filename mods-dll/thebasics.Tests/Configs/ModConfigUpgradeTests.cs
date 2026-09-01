@@ -68,6 +68,16 @@ public class ModConfigUpgradeTests
     }
 
     [Fact]
+    public void LegacyConfigGainsSpectatorChatDefaults()
+    {
+        var config = LoadLegacyConfig();
+
+        config.UseNicknameInSpectatorOOC.Should().BeFalse();
+        config.AllowSpectatorPlacedEnvironmentalMessages.Should().BeTrue();
+        config.ProtectSpectatorRoleplayChat.Should().BeTrue();
+    }
+
+    [Fact]
     public void TheRetiredFontFloorIsUpgradedOnAnExistingConfig()
     {
         // Every successful load rewrites the config, so a running server has the retired default
@@ -169,6 +179,9 @@ public class ModConfigUpgradeTests
         config.RequireClearSoundPathForSpeech[ProximityChatMode.Yell] = true;
         config.SpeechOcclusionWallPenaltyBlocks = 7;
         config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
+        config.UseNicknameInSpectatorOOC = true;
+        config.AllowSpectatorPlacedEnvironmentalMessages = false;
+        config.ProtectSpectatorRoleplayChat = false;
 
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, config);
@@ -179,6 +192,9 @@ public class ModConfigUpgradeTests
         restored.RequireClearSoundPathForSpeech[ProximityChatMode.Yell].Should().BeTrue();
         restored.SpeechOcclusionWallPenaltyBlocks.Should().Be(7);
         restored.ProximityChatModeDistances[ProximityChatMode.Normal].Should().Be(ModConfig.UnlimitedRange);
+        restored.UseNicknameInSpectatorOOC.Should().BeTrue();
+        restored.AllowSpectatorPlacedEnvironmentalMessages.Should().BeFalse();
+        restored.ProtectSpectatorRoleplayChat.Should().BeFalse();
 
         // Neighbouring fields must be untouched by the new ids.
         restored.ProximityChatModeVerbs[ProximityChatMode.Yell].Should().BeEquivalentTo(["yells", "shouts"]);

@@ -170,6 +170,9 @@ Primary config areas:
 - `GlobalOOCColor`
 - `UseNicknameInOOC`
 - `UseNicknameInGlobalOOC`
+- `UseNicknameInSpectatorOOC`
+- `AllowSpectatorPlacedEnvironmentalMessages`
+- `ProtectSpectatorRoleplayChat`
 - `RPTTS_ModeGain`
 - `RPTTS_ModeFalloff`
 - `EnableChatter`

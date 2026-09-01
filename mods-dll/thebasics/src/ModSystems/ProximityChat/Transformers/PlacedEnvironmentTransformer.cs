@@ -1,5 +1,7 @@
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.Utilities;
+using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 
 namespace thebasics.ModSystems.ProximityChat.Transformers;
@@ -23,6 +25,16 @@ public class PlacedEnvironmentTransformer : MessageTransformerBase
 
     public override MessageContext Transform(MessageContext context)
     {
+        if (!SpectatorChatPolicy.CanPlaceEnvironmentalMessage(context.SendingPlayer, _config))
+        {
+            context.SendingPlayer?.SendMessage(
+                _chatSystem.ProximityChatId,
+                Lang.Get("thebasics:chat-spectator-env-placement-disabled"),
+                EnumChatType.CommandError);
+            context.State = MessageContextState.STOP;
+            return context;
+        }
+
         var maxDistance = _config.MaxEnvironmentPlacementDistance;
         var hitPos = RaycastUtils.RaycastFromPlayerLook(context.SendingPlayer, maxDistance);
 
