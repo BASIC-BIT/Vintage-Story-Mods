@@ -66,19 +66,25 @@ Run this after the ModDB release is published. It verifies the player-facing ins
    - Expect: Text appears as a placed environmental bubble at the targeted world position.
    - Watch for: fallback to normal env when target is valid, wrong placement, no bubble.
 
-6. **Typing Indicator** (P1)
+6. **Scene Markers** (P1)
+   - Config: default production-like config; two players, with one location inside a claim the second player cannot build in.
+   - Do: Craft a marker from two loose stones. Place one on the ground and one on a wall. Shift-right-click a marker, save titled environmental text with multiple lines, and look away and back. Change it to an OOC notice. Break it, inspect and read the held item, place it again, then attempt to edit it as the player without claim access.
+   - Expect: Both placements use a small unobtrusive marker. Text appears only while directly targeting it. Environmental and OOC presentations are visibly distinct. Title, body, presentation, and author metadata survive pickup and replacement. The unauthorized edit is refused.
+   - Watch for: literal text drawn on the block, always-visible clutter, dropped data loss, raw VTML, wrong wall orientation, duplicate or empty drops, claim bypass, or client/server exceptions.
+
+7. **Typing Indicator** (P1)
    - Config: `EnableTypingIndicator=true`.
    - Do: Open chat on one client, type and pause, then close chat.
    - Expect: Other client sees chat-open/composing/typing states and timeout/clear behavior.
    - Watch for: stale indicator after close/disconnect, indicator above self, or indicators through walls.
 
-7. **Nametag Range, LOS, And Self View** (P0)
+8. **Nametag Range, LOS, And Self View** (P0)
    - Config: `NametagRequiresLineOfSight=true`; use a known `NametagRenderRange`.
    - Do: Approach the other player, cross the configured range boundary, target them when target-only mode is enabled, then test visibility through stone, glass, foliage, a slab/door/fence, and partial eye/torso/feet exposure. Switch the observing client to F5 third-person view and check its own nametag. Repeat the long-range movement for at least one minute.
    - Expect: The remote nametag uses the configured strict range boundary, targeting behavior, transparent-block rules, and multi-point LOS. The local player's own nametag remains visible in F5 third-person view even when target-only mode is enabled, while vanilla still hides it in first person. Movement and rendering remain responsive throughout the long-range pass.
    - Watch for: a remote nametag beyond range, different results around partial block selection boxes, target-only mode hiding the local player's own F5 nametag, or any client hitch/freeze while LOS refreshes.
 
-8. **Save Notification** (P1)
+9. **Save Notification** (P1)
    - Config: save announcement enabled.
    - Do: Trigger or wait for a server save.
    - Expect: Start message appears as configured; finish message appears only if enabled.

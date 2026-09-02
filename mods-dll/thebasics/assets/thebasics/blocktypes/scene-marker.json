@@ -1,0 +1,78 @@
+{
+  code: "scene-marker",
+  class: "TheBasicsSceneDescriptionBlock",
+  entityclass: "TheBasicsSceneDescription",
+  creativeinventory: {
+    "general": ["scene-marker-ground-north"],
+    "decorative": ["scene-marker-ground-north"]
+  },
+  behaviors: [{ name: "Lockable" }],
+  attributes: {
+    reinforcable: true,
+    handbook: { groupBy: ["scene-marker-*"] }
+  },
+  variantgroups: [
+    { code: "attachment", states: ["ground", "wall"] },
+    { code: "side", loadFromProperties: "abstract/horizontalorientation" }
+  ],
+  shapebytype: {
+    "*-ground-north": { base: "thebasics:block/scene-marker-ground", rotateY: 0 },
+    "*-ground-east": { base: "thebasics:block/scene-marker-ground", rotateY: 270 },
+    "*-ground-south": { base: "thebasics:block/scene-marker-ground", rotateY: 180 },
+    "*-ground-west": { base: "thebasics:block/scene-marker-ground", rotateY: 90 },
+    "*-wall-north": { base: "thebasics:block/scene-marker-wall", rotateY: 0 },
+    "*-wall-east": { base: "thebasics:block/scene-marker-wall", rotateY: 270 },
+    "*-wall-south": { base: "thebasics:block/scene-marker-wall", rotateY: 180 },
+    "*-wall-west": { base: "thebasics:block/scene-marker-wall", rotateY: 90 }
+  },
+  textures: {
+    material: { base: "game:block/stone/rock/slate1" },
+    accent: { base: "game:block/stone/rock/chalk1" }
+  },
+  blockmaterial: "Stone",
+  lightAbsorption: 0,
+  sidesolid: { all: false },
+  sideopaque: { all: false },
+  faceCullMode: "NeverCull",
+  replaceable: 500,
+  resistance: 1,
+  maxstacksize: 1,
+  selectionboxbytype: {
+    "*-wall-east": { rotateY: 270, x1: 0.1875, y1: 0.1875, z1: 0, x2: 0.8125, y2: 0.8125, z2: 0.0625 },
+    "*-wall-south": { rotateY: 180, x1: 0.1875, y1: 0.1875, z1: 0, x2: 0.8125, y2: 0.8125, z2: 0.0625 },
+    "*-wall-west": { rotateY: 90, x1: 0.1875, y1: 0.1875, z1: 0, x2: 0.8125, y2: 0.8125, z2: 0.0625 },
+    "*-wall-north": { rotateY: 0, x1: 0.1875, y1: 0.1875, z1: 0, x2: 0.8125, y2: 0.8125, z2: 0.0625 },
+    "*": { x1: 0.1875, y1: 0, z1: 0.1875, x2: 0.8125, y2: 0.0625, z2: 0.8125 }
+  },
+  collisionboxbytype: {
+    "*-wall-east": { rotateY: 270, x1: 0.1875, y1: 0.1875, z1: 0, x2: 0.8125, y2: 0.8125, z2: 0.0625 },
+    "*-wall-south": { rotateY: 180, x1: 0.1875, y1: 0.1875, z1: 0, x2: 0.8125, y2: 0.8125, z2: 0.0625 },
+    "*-wall-west": { rotateY: 90, x1: 0.1875, y1: 0.1875, z1: 0, x2: 0.8125, y2: 0.8125, z2: 0.0625 },
+    "*-wall-north": { rotateY: 0, x1: 0.1875, y1: 0.1875, z1: 0, x2: 0.8125, y2: 0.8125, z2: 0.0625 },
+    "*": { x1: 0.1875, y1: 0, z1: 0.1875, x2: 0.8125, y2: 0.0625, z2: 0.8125 }
+  },
+  sounds: {
+    place: "game:block/rock-place",
+    hit: "game:block/rock-hit-pickaxe",
+    break: "game:block/rock-break-pickaxe",
+    walk: "game:walk/stone"
+  },
+  rainPermeable: true,
+  materialDensity: 1800,
+  tpHandTransform: {
+    translation: { x: -0.75, y: -0.1, z: -0.75 },
+    rotation: { x: -44, y: 7, z: -9 },
+    origin: { x: 0.5, y: 0.1, z: 0.5 },
+    scale: 0.7
+  },
+  groundTransform: {
+    translation: { x: 0, y: 0, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    origin: { x: 0.5, y: 0, z: 0.5 },
+    scale: 3
+  },
+  guiTransform: {
+    rotation: { x: -35, y: 135, z: 0 },
+    scale: 2.4
+  }
+}

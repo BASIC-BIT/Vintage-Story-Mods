@@ -203,6 +203,7 @@
   "thebasics-handbook-title-guide": "The BASICs: Getting Started",
   "thebasics-handbook-title-character-sheets": "The BASICs: Character Sheets",
   "thebasics-handbook-title-rp-chat": "The BASICs: RP Chat",
+  "thebasics-handbook-title-scene-markers": "The BASICs: Scene Markers",
   "thebasics-handbook-title-languages": "The BASICs: Languages and Accessibility",
   "thebasics-handbook-title-notes": "The BASICs: Notes",
   "thebasics-handbook-title-tpa": "The BASICs: TPA",
@@ -785,5 +786,22 @@
   "analytics-ui-off-button": "No thanks",
   "analytics-ui-later-button": "Decide later",
   "analytics-ui-personalized-button": "Share full analytics",
-  "analytics-ui-command-fallback": "Change this later with /{0}."
+  "analytics-ui-command-fallback": "Change this later with /{0}.",
+
+  "block-scene-marker-*": "Scene Marker",
+  "scene-description-editor-title": "Edit Scene Marker",
+  "scene-description-title-label": "Title (optional)",
+  "scene-description-kind-label": "Presentation",
+  "scene-description-body-label": "Scene description",
+  "scene-description-kind-environmental": "Environmental description",
+  "scene-description-kind-ooc": "OOC notice",
+  "scene-description-authored-by": "Written by {0}",
+  "scene-description-ooc-prefix": "[OOC]",
+  "scene-description-save": "Save",
+  "scene-description-cancel": "Cancel",
+  "scene-description-edit-help": "Edit scene description",
+  "scene-description-empty-block-help": "Shift + right-click to write a scene description.",
+  "scene-description-empty-item-help": "Place this marker, then shift + right-click it to write a scene description.",
+  "scene-description-read-item-help": "Hold Shift and right-click to read the full description.",
+  "scene-description-no-access": "You do not have permission to edit this scene marker."
 }
