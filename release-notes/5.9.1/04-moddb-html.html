@@ -1,0 +1,27 @@
+<h2>The BASICs v5.9.1</h2>
+
+<h3>Nametag line-of-sight checks no longer freeze clients</h3>
+
+<p>Servers using <b>NametagRequiresLineOfSight=true</b> could cause severe client hitching or freezes, especially at long nametag ranges. Line-of-sight checks are now faster without changing what blocks visibility.</p>
+
+<p>Stone still blocks a nametag, while glass and foliage do not. The configured range boundary for other players, and the eye, torso, and feet visibility checks, are unchanged.</p>
+
+<p><b>HideNametagUnlessTargeting=true</b> now applies only to other players. Your own nametag continues to follow vanilla behavior: hidden in first person and visible in F5 third person.</p>
+
+<h3>Spectators stay invisible until they deliberately communicate</h3>
+
+<p>Active spectators no longer reveal their position through speech bubbles, stale bubble textures, typing indicators, or positional seraph chatter. With the new protection enabled, plain speech, signing, and name-led emotes are refused while the player is invisible.</p>
+
+<p>Spectators can still deliberately use local OOC, global OOC, nameless environmental narration, and placed environmental text. Local OOC uses the account name by default so an invisible speaker is identified clearly.</p>
+
+<p>The spectator protections are enabled automatically for existing and new configurations. Server owners can adjust them live without a restart:</p>
+
+<ul>
+<li><b>ProtectSpectatorRoleplayChat=false</b> allows embodied RP messages again. Spectator-attached visual and positional cues remain suppressed.</li>
+<li><b>UseNicknameInSpectatorOOC=true</b> uses the RP nickname for spectator local OOC.</li>
+<li><b>AllowSpectatorPlacedEnvironmentalMessages=false</b> blocks spectator use of <b>!!</b> and <b>/envhere</b>.</li>
+</ul>
+
+<h3>Vintage Story 1.22.7</h3>
+
+<p>This release builds and is tested against Vintage Story 1.22.7.</p>
