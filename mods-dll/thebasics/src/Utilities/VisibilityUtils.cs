@@ -72,11 +72,16 @@ public static class VisibilityUtils
             world.Logger?.Warning("THEBASICS: sight block override pattern '{0}' matched no registered blocks.", pattern);
         }
 
-        foreach (var blockCode in policy.ConflictingBlockCodes)
+        if (policy.ConflictingBlockCodeCount > 0)
         {
+            var examples = string.Join(", ", policy.ConflictingBlockCodes.Select(blockCode => $"'{blockCode}'"));
+            var omittedCount = policy.ConflictingBlockCodeCount - policy.ConflictingBlockCodes.Count;
+            var omittedText = omittedCount > 0 ? $" ({omittedCount} more omitted)" : string.Empty;
             world.Logger?.Warning(
-                "THEBASICS: block '{0}' matches both sight override lists. The blocking override takes precedence.",
-                blockCode);
+                "THEBASICS: {0} blocks match both sight override lists: {1}{2}. The blocking override takes precedence.",
+                policy.ConflictingBlockCodeCount,
+                examples,
+                omittedText);
         }
     }
 
@@ -398,7 +403,7 @@ public static class VisibilityUtils
         Vec3d targetPos,
         SightBlockPolicy policy)
     {
-        if (supplier == null || policy?.HasBlockingOverrides != true)
+        if (supplier == null || policy?.RequiresNoBoxFallback != true)
         {
             return false;
         }
@@ -424,7 +429,7 @@ public static class VisibilityUtils
         BlockPos pos,
         SightBlockPolicy policy)
     {
-        var block = supplier.blockAccessor.GetBlock(pos, 2);
+        var block = supplier.blockAccessor.GetBlock(pos, BlockLayersAccess.Solid);
         var selectionBlock = block.SideSolid.Any ? block : supplier.GetBlock(pos);
         if (!policy.IsExplicitlyBlocking(block) && !policy.IsExplicitlyBlocking(selectionBlock))
         {

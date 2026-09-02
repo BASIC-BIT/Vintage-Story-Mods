@@ -14,19 +14,25 @@ namespace thebasics.Utilities;
 /// </summary>
 internal sealed class SightBlockPolicy
 {
+    internal const int MaxConflictExamples = 10;
+
     private readonly HashSet<int> _passThroughBlockIds;
     private readonly HashSet<int> _blockingBlockIds;
 
     private SightBlockPolicy(
         HashSet<int> passThroughBlockIds,
         HashSet<int> blockingBlockIds,
+        bool requiresNoBoxFallback,
         IReadOnlyList<string> unmatchedPatterns,
-        IReadOnlyList<string> conflictingBlockCodes)
+        IReadOnlyList<string> conflictingBlockCodes,
+        int conflictingBlockCodeCount)
     {
         _passThroughBlockIds = passThroughBlockIds;
         _blockingBlockIds = blockingBlockIds;
+        RequiresNoBoxFallback = requiresNoBoxFallback;
         UnmatchedPatterns = unmatchedPatterns;
         ConflictingBlockCodes = conflictingBlockCodes;
+        ConflictingBlockCodeCount = conflictingBlockCodeCount;
         GeneralFilter = (_, block) => ShouldStop(block, foliagePasses: true);
         StrictFilter = (_, block) => ShouldStop(block, foliagePasses: false);
     }
@@ -35,7 +41,11 @@ internal sealed class SightBlockPolicy
 
     public IReadOnlyList<string> ConflictingBlockCodes { get; }
 
+    public int ConflictingBlockCodeCount { get; }
+
     public bool HasBlockingOverrides => _blockingBlockIds.Count > 0;
+
+    public bool RequiresNoBoxFallback { get; }
 
     public BlockFilter GeneralFilter { get; }
 
@@ -56,12 +66,16 @@ internal sealed class SightBlockPolicy
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        var requiresNoBoxFallback = blockArray.Any(block =>
+            blocking.Contains(block.Id) && !string.IsNullOrWhiteSpace(block.EntityClass));
 
         return new SightBlockPolicy(
             passThrough,
             blocking,
+            requiresNoBoxFallback,
             unmatched.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-            conflictingCodes);
+            conflictingCodes.Take(MaxConflictExamples).ToArray(),
+            conflictingCodes.Length);
     }
 
     public bool IsExplicitlyBlocking(Block block) => block != null && _blockingBlockIds.Contains(block.Id);

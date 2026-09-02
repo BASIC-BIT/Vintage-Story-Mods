@@ -156,6 +156,7 @@ public class BlockOnlyRaycastTests
 
         blocked.Should().BeTrue();
         invisibleBlockEntityBlock.SelectionQueryCount.Should().BePositive();
+        world.BlockLayerLookups.Should().OnlyContain(layer => layer == BlockLayersAccess.Solid);
         world.EntitySearchCount.Should().Be(0);
     }
 
@@ -191,7 +192,7 @@ public class BlockOnlyRaycastTests
     }
 
     [Fact]
-    public void NoBoxFallbackDoesNotApplyToAnOrdinaryBlock()
+    public void NoBoxFallbackSkipsTraversalForOrdinaryBlockingOverrides()
     {
         var marker = new Block
         {
@@ -211,6 +212,7 @@ public class BlockOnlyRaycastTests
             policy);
 
         blocked.Should().BeFalse();
+        world.BlockLookups.Should().BeEmpty("ordinary blocking overrides are handled by the primary raycast");
     }
 
     [Fact]
@@ -296,7 +298,7 @@ public class BlockOnlyRaycastTests
         {
             blockAccessor = Substitute.For<IBlockAccessor>();
             blockAccessor.GetBlock(Arg.Any<BlockPos>(), Arg.Any<int>())
-                .Returns(call => GetBlock(call.ArgAt<BlockPos>(0)));
+                .Returns(call => GetBlock(call.ArgAt<BlockPos>(0), call.ArgAt<int>(1)));
             blockAccessor.GetBlockEntity(Arg.Any<BlockPos>())
                 .Returns(call => GetBlockEntity(call.ArgAt<BlockPos>(0)));
             blockAccessor.GetChunkAtBlockPos(Arg.Any<BlockPos>()).Returns((IWorldChunk)null!);
@@ -305,6 +307,8 @@ public class BlockOnlyRaycastTests
         public int EntitySearchCount { get; private set; }
 
         public List<string> BlockLookups { get; } = [];
+
+        public List<int> BlockLayerLookups { get; } = [];
 
         public Vec3i MapSize { get; } = new(1024, 1024, 1024);
 
@@ -336,6 +340,12 @@ public class BlockOnlyRaycastTests
             return _blocks.TryGetValue((pos.X, pos.InternalY, pos.Z), out var entry)
                 ? entry.Block
                 : Air;
+        }
+
+        private Block GetBlock(BlockPos pos, int layer)
+        {
+            BlockLayerLookups.Add(layer);
+            return GetBlock(pos);
         }
 
         public Cuboidf[] GetBlockIntersectionBoxes(BlockPos pos)

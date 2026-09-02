@@ -493,6 +493,27 @@ public class ConfigAdminSettingRegistryTests
     }
 
     [Fact]
+    public void ValidateResolvedSightBlockPatterns_BoundsBroadWildcardOverlapErrors()
+    {
+        var config = CreateConfig();
+        config.SightPassThroughBlockCodePatterns = ["game:block-*"];
+        config.SightBlockingBlockCodePatterns = ["game:*-granite"];
+        var blocks = Enumerable.Range(0, 12)
+            .Select(index => new Block
+            {
+                BlockId = index + 1,
+                Code = new AssetLocation($"game:block-{index:D2}-granite")
+            });
+
+        var errors = ConfigAdminSettingRegistry.ValidateResolvedSightBlockPatterns(config, blocks);
+
+        errors.Should().ContainSingle();
+        errors[0].Should().Contain("12 blocks");
+        errors[0].Should().Contain("game:block-09-granite");
+        errors[0].Should().NotContain("game:block-10-granite");
+    }
+
+    [Fact]
     public void NametagStyleSettings_AcceptOptionalHexColors()
     {
         var config = CreateConfig();

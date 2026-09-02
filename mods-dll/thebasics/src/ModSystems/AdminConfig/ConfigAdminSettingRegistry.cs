@@ -86,9 +86,18 @@ public static class ConfigAdminSettingRegistry
             config.SightPassThroughBlockCodePatterns,
             config.SightBlockingBlockCodePatterns);
 
-        return policy.ConflictingBlockCodes
-            .Select(blockCode => $"Block '{blockCode}' matches both sight override lists. Adjust the patterns so each block resolves to only one list.")
-            .ToArray();
+        if (policy.ConflictingBlockCodeCount == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var examples = string.Join(", ", policy.ConflictingBlockCodes.Select(blockCode => $"'{blockCode}'"));
+        var omittedCount = policy.ConflictingBlockCodeCount - policy.ConflictingBlockCodes.Count;
+        var omittedText = omittedCount > 0 ? $" ({omittedCount} more omitted)" : string.Empty;
+        return
+        [
+            $"{policy.ConflictingBlockCodeCount} blocks match both sight override lists: {examples}{omittedText}. Adjust the patterns so each block resolves to only one list."
+        ];
     }
 
     private static void ValidateMode(ModConfig config, ProximityChatMode mode, List<string> errors)

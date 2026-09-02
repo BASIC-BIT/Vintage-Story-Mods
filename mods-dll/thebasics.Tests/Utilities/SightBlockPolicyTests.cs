@@ -1,4 +1,6 @@
 using FluentAssertions;
+using NSubstitute;
+using thebasics.Configs;
 using thebasics.Utilities;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -73,6 +75,42 @@ public class SightBlockPolicyTests
 
         action.Should().NotThrow();
         policy.UnmatchedPatterns.Should().Equal(":", "unqualified");
+    }
+
+    [Fact]
+    public void ConfigureSightBlockOverrides_BoundsAndCountsStartupConflictWarnings()
+    {
+        var blocks = Enumerable.Range(0, 12)
+            .Select(index => Block(index + 1, $"game:block-{index:D2}-granite", EnumChunkRenderPass.Transparent))
+            .ToArray();
+        var config = new ModConfig
+        {
+            SightPassThroughBlockCodePatterns = ["game:block-*"],
+            SightBlockingBlockCodePatterns = ["game:*-granite"]
+        };
+        var logger = Substitute.For<ILogger>();
+        var world = Substitute.For<IWorldAccessor>();
+        world.Blocks.Returns(blocks);
+        world.Side.Returns(EnumAppSide.Server);
+        world.Logger.Returns(logger);
+
+        VisibilityUtils.ConfigureSightBlockOverrides(world, config);
+
+        var warnings = logger.ReceivedCalls()
+            .Where(call => call.GetMethodInfo().Name == nameof(ILogger.Warning))
+            .Select(call =>
+            {
+                var arguments = call.GetArguments();
+                var format = arguments[0] as string ?? string.Empty;
+                return arguments.Length == 2 && arguments[1] is object[] formatArguments
+                    ? string.Format(format, formatArguments)
+                    : format;
+            })
+            .ToArray();
+        warnings.Should().ContainSingle();
+        warnings[0].Should().Contain("12 blocks");
+        warnings[0].Should().Contain("game:block-09-granite");
+        warnings[0].Should().NotContain("game:block-10-granite");
     }
 
     private static Block Block(int id, string code, EnumChunkRenderPass renderPass) => new()
