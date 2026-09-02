@@ -340,12 +340,12 @@ public static class VisibilityUtils
     {
         try
         {
-            // We only want to know whether any occluding block interrupts the segment.
-            // Pass-through blocks are skipped and entities are ignored as blockers.
-            BlockSelection blockSel = null;
-            EntitySelection entitySel = null;
-            world.RayTraceForSelection(fromPos, targetPos, ref blockSel, ref entitySel,
-                bfilter: filter, efilter: _ => false);
+            if (world is not IWorldIntersectionSupplier supplier)
+            {
+                return failOpen;
+            }
+
+            var blockSel = RayTraceBlocksForSelection(supplier, fromPos, targetPos, filter);
 
             return blockSel?.Block == null || blockSel.Block.Id == 0;
         }
@@ -353,5 +353,27 @@ public static class VisibilityUtils
         {
             return failOpen;
         }
+    }
+
+    /// <summary>
+    /// Runs the exact block phase used by <c>GameMain.RayTraceForSelection</c>, without its entity
+    /// broad-phase search. LOS callers have always rejected every entity, so entity enumeration
+    /// cannot change their answer and becomes pathological on long rays.
+    /// </summary>
+    internal static BlockSelection RayTraceBlocksForSelection(
+        IWorldIntersectionSupplier supplier,
+        Vec3d fromPos,
+        Vec3d targetPos,
+        BlockFilter filter)
+    {
+        var ray = Ray.FromPositions(fromPos, targetPos);
+        if (ray == null)
+        {
+            return null;
+        }
+
+        var intersectionTester = new AABBIntersectionTest(supplier);
+        intersectionTester.LoadRayAndPos(ray);
+        return intersectionTester.GetSelectedBlock((float)ray.Length, filter);
     }
 }

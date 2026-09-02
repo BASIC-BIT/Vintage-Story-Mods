@@ -224,7 +224,8 @@ Features:
 - Configurable nametag content and range.
 - Optional custom nametag background and border colors.
 - Optional player-selected nametag background and border colors, falling back to server defaults.
-- Optional hide-unless-targeting nametags.
+- Optional hide-unless-targeting nametags for other players; the local player's own nametag still
+  follows vanilla first-person/third-person camera behavior.
 - Multi-point line-of-sight gating for nametags when LOS is required.
 
 Primary config areas:
