@@ -43,8 +43,6 @@ internal sealed class SightBlockPolicy
 
     public int ConflictingBlockCodeCount { get; }
 
-    public bool HasBlockingOverrides => _blockingBlockIds.Count > 0;
-
     public bool RequiresNoBoxFallback { get; }
 
     public BlockFilter GeneralFilter { get; }
@@ -67,7 +65,8 @@ internal sealed class SightBlockPolicy
             .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var requiresNoBoxFallback = blockArray.Any(block =>
-            blocking.Contains(block.Id) && !string.IsNullOrWhiteSpace(block.EntityClass));
+            blocking.Contains(block.Id) &&
+            (!string.IsNullOrWhiteSpace(block.EntityClass) || block.SelectionBoxes is { Length: 0 }));
 
         return new SightBlockPolicy(
             passThrough,

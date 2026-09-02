@@ -192,7 +192,7 @@ public class BlockOnlyRaycastTests
     }
 
     [Fact]
-    public void NoBoxFallbackSkipsTraversalForOrdinaryBlockingOverrides()
+    public void NoBoxFallbackSkipsTraversalForOrdinaryBoxedBlockingOverrides()
     {
         var marker = new Block
         {
@@ -202,7 +202,7 @@ public class BlockOnlyRaycastTests
             RenderPass = EnumChunkRenderPass.Transparent
         };
         var world = new TrackingIntersectionSupplier();
-        world.PutBlock(2, 0, 0, marker);
+        world.PutBlock(2, 0, 0, marker, new Cuboidf(0, 0, 0, 1, 1, 1));
         var policy = SightBlockPolicy.Resolve([marker], [], ["decorplus:marker"]);
 
         var blocked = VisibilityUtils.HasExplicitBlockingBlockWithoutBoxes(
@@ -213,6 +213,29 @@ public class BlockOnlyRaycastTests
 
         blocked.Should().BeFalse();
         world.BlockLookups.Should().BeEmpty("ordinary blocking overrides are handled by the primary raycast");
+    }
+
+    [Fact]
+    public void BlockingOverrideUsesFullCellFallbackForOrdinaryBlockWithExplicitlyEmptySelectionBoxes()
+    {
+        var barrier = new Block
+        {
+            BlockId = 16,
+            Code = new AssetLocation("decorplus:barrier"),
+            BlockMaterial = EnumBlockMaterial.Other,
+            RenderPass = EnumChunkRenderPass.Transparent
+        };
+        var world = new TrackingIntersectionSupplier();
+        world.PutBlock(2, 0, 0, barrier);
+        var policy = SightBlockPolicy.Resolve([barrier], [], ["decorplus:barrier"]);
+
+        var blocked = VisibilityUtils.HasExplicitBlockingBlockWithoutBoxes(
+            world,
+            new Vec3d(0.5, 0.5, 0.5),
+            new Vec3d(4.5, 0.5, 0.5),
+            policy);
+
+        blocked.Should().BeTrue();
     }
 
     [Fact]

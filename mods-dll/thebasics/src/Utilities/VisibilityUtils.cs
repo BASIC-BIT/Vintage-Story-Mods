@@ -436,13 +436,6 @@ public static class VisibilityUtils
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(block.EntityClass) &&
-            string.IsNullOrWhiteSpace(selectionBlock.EntityClass) &&
-            supplier.blockAccessor.GetBlockEntity(pos) == null)
-        {
-            return false;
-        }
-
         if (block.SideSolid.Any)
         {
             return block.GetSelectionBoxes(supplier.blockAccessor, pos) is not { Length: > 0 };
