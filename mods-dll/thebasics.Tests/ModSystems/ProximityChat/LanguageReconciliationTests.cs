@@ -23,7 +23,7 @@ public class LanguageReconciliationTests : IDisposable
     }
 
     [Fact]
-    public void TrackLanguageStateInvariantFailure_AfterJoinReconcile_ReportsSanitizedFailureForUnknownDefault()
+    public void ReconcilePlayerLanguages_WhenDefaultWasUnknown_ReportsSanitizedRepairedFailure()
     {
         const string rawPlayerUid = "raw-player-uid";
         const string pseudonymousPlayerId = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
@@ -36,15 +36,18 @@ public class LanguageReconciliationTests : IDisposable
         player.SetLanguages(["Common"]);
         IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", "UnknownLanguage");
 
-        player.TrackLanguageStateInvariantFailure("join_reconcile");
+        var languageStateBeforeReconcile = player.ClassifyLanguageStateInvariant();
+        RPProximityChatSystem.ReconcilePlayerLanguages(player, CreateConfig(), new Dictionary<string, string>());
+        player.TrackLanguageStateInvariantOutcome("join_reconcile", languageStateBeforeReconcile);
 
+        player.GetDefaultLanguageName().Should().Be("Common");
         var analyticsEvent = sink.Events.Should().ContainSingle().Subject;
         analyticsEvent.Name.Should().Be("mod failure");
         analyticsEvent.Properties.Should().ContainKey("area").WhoseValue.Should().Be("language_state");
         analyticsEvent.Properties.Should().ContainKey("operation").WhoseValue.Should().Be("join_reconcile");
         analyticsEvent.Properties.Should().ContainKey("severity").WhoseValue.Should().Be("warning");
-        analyticsEvent.Properties.Should().ContainKey("result").WhoseValue.Should().Be("default_language_unknown");
-        analyticsEvent.Properties.Should().ContainKey("recovered").WhoseValue.Should().Be(false);
+        analyticsEvent.Properties.Should().ContainKey("result").WhoseValue.Should().Be("default_language_repaired");
+        analyticsEvent.Properties.Should().ContainKey("recovered").WhoseValue.Should().Be(true);
         analyticsEvent.Properties.Should().ContainKey("pseudonymous_player_id").WhoseValue.Should().Be(pseudonymousPlayerId);
         analyticsEvent.Properties.Values.Should().NotContain(rawPlayerUid);
         analyticsEvent.Properties.Values.Should().NotContain("UnknownLanguage");

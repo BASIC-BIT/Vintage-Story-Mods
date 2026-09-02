@@ -414,6 +414,7 @@ const ALLOWED_STRING_VALUES = new Map([
     "decode-failed",
     "decode-zero-dims",
     "dimensions-exceeded",
+    "default_language_repaired",
     "default_language_unknown",
     "empty",
     "encode-failed",

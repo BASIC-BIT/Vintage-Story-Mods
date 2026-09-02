@@ -293,7 +293,7 @@ function currentProducerContracts() {
     ["AnalyticsService.TrackFeatureUsed", ["feature_name", 0, "featureName"], ["action", 1, "action"], ["result", 3, "result"]],
     ["AnalyticsService.TrackFailure", ["area", 0, "area"], ["operation", 1, "operation"], ["severity", 2, "severity"], ["result", 3, "result"]],
     ["AnalyticsService.TrackPlayerFailure", ["area", 1, "area"], ["operation", 2, "operation"], ["severity", 3, "severity"], ["result", 4, "result"]],
-    ["TrackLanguageStateInvariantFailure", ["operation", 0, "operation"]],
+    ["TrackLanguageStateInvariantOutcome", ["operation", 0, "operation"]],
     ["TrackConfigEditorFailure", ["area", 1, "featureName"], ["operation", 2, "action"]],
     ["TrackHomeSpawnFailure", ["command_name", 1, "commandName"], ["action", 2, "featureAction"], ["result", 3, "result"]],
     ["TrackTpaFailure", ["command_name", 1, "commandName"], ["action", 2, "action"], ["result", 3, "result"]],
@@ -455,6 +455,7 @@ test("relay accepts bounded language-state reliability failures without language
     ["read_known_languages", "decode_failed", true],
     ["read_default_language", "decode_failed", true],
     ["join_reconcile", "default_language_unknown", false],
+    ["join_reconcile", "default_language_repaired", true],
     ["character_restore", "default_language_unknown", false],
   ]) {
     const validation = validatePayload(payloadForEvent("mod failure", {

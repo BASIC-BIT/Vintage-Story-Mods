@@ -20,6 +20,12 @@ using Vintagestory.API.Util;
 
 namespace thebasics.Extensions
 {
+    internal enum LanguageStateInvariant
+    {
+        Valid,
+        DefaultLanguageUnknown
+    }
+
     public static class IServerPlayerExtensions
     {
         private const string ModDataNickname = "BASIC_NICKNAME";
@@ -537,22 +543,30 @@ namespace thebasics.Extensions
             return playerData?.GetModData(ModDataLanguages, new List<string>()) ?? new List<string>();
         }
 
-        internal static void TrackLanguageStateInvariantFailure(this IServerPlayer player, string languageOperation)
+        internal static LanguageStateInvariant ClassifyLanguageStateInvariant(this IServerPlayer player)
         {
             var defaultLanguage = player.GetDefaultLanguageName();
             if (string.IsNullOrWhiteSpace(defaultLanguage))
             {
-                return;
+                return LanguageStateInvariant.Valid;
             }
 
             if (string.Equals(defaultLanguage, LanguageSystem.BabbleLang.Name, StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                return LanguageStateInvariant.Valid;
             }
 
             var hasDefaultLanguage = player.GetLanguages()?.Any(language =>
                 string.Equals(language, defaultLanguage, StringComparison.OrdinalIgnoreCase)) == true;
-            if (!hasDefaultLanguage)
+            return hasDefaultLanguage
+                ? LanguageStateInvariant.Valid
+                : LanguageStateInvariant.DefaultLanguageUnknown;
+        }
+
+        internal static void TrackLanguageStateInvariantOutcome(this IServerPlayer player, string languageOperation, LanguageStateInvariant before = LanguageStateInvariant.Valid)
+        {
+            var after = player.ClassifyLanguageStateInvariant();
+            if (after == LanguageStateInvariant.DefaultLanguageUnknown)
             {
                 AnalyticsService.TrackPlayerFailure(
                     player.PlayerUID,
@@ -561,6 +575,18 @@ namespace thebasics.Extensions
                     "warning",
                     "default_language_unknown",
                     recovered: false);
+                return;
+            }
+
+            if (before == LanguageStateInvariant.DefaultLanguageUnknown)
+            {
+                AnalyticsService.TrackPlayerFailure(
+                    player.PlayerUID,
+                    "language_state",
+                    languageOperation,
+                    "warning",
+                    "default_language_repaired",
+                    recovered: true);
             }
         }
 

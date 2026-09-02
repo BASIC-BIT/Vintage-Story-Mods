@@ -31,7 +31,7 @@ public class RpCharacterServiceTests : IDisposable
     }
 
     [Fact]
-    public void TrackLanguageStateInvariantFailure_WhenBabbleIsDefaultAndNoLanguagesAreKnown_DoesNotReportFailure()
+    public void TrackLanguageStateInvariantOutcome_WhenBabbleIsDefaultAndNoLanguagesAreKnown_DoesNotReportFailure()
     {
         var sink = new RecordingAnalyticsSink();
         AnalyticsService.Configure(sink, allowErrorTelemetry: true);
@@ -39,7 +39,7 @@ public class RpCharacterServiceTests : IDisposable
         player.SetLanguages([]);
         IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", LanguageSystem.BabbleLang.Name);
 
-        player.TrackLanguageStateInvariantFailure("character_restore");
+        player.TrackLanguageStateInvariantOutcome("character_restore");
 
         sink.Events.Should().BeEmpty();
     }

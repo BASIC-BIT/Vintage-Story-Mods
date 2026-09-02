@@ -418,7 +418,7 @@ public class RpCharacterService
         IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", projection.DefaultLanguage);
         player.SetChatMode(projection.ChatMode);
         player.SetChatterEnabled(projection.ChatterEnabled);
-        player.TrackLanguageStateInvariantFailure("character_restore");
+        player.TrackLanguageStateInvariantOutcome("character_restore");
     }
 
     public RpCharacterProjectionSnapshot CaptureProjection(IServerPlayer player)
