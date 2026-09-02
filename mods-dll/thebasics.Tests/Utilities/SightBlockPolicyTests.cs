@@ -53,7 +53,7 @@ public class SightBlockPolicyTests
 
         var policy = SightBlockPolicy.Resolve(
             [curtain],
-            passThroughPatterns: ["decorplus:privacy-curtain-*", "missingmod:ghost-*"] ,
+            passThroughPatterns: ["decorplus:privacy-curtain-*", "missingmod:ghost-*"],
             blockingPatterns: ["decorplus:*-red"]);
 
         policy.UnmatchedPatterns.Should().Equal("missingmod:ghost-*");
