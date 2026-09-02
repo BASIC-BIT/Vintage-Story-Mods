@@ -48,7 +48,11 @@ public static class NameTagRenderRangePatches
             return;
         }
 
-        behavior.ShowOnlyWhenTargeted = showOnlyWhenTargeted;
+        var localPlayerEntityId = (entity.World?.Api as ICoreClientAPI)?.World?.Player?.Entity?.EntityId;
+        behavior.ShowOnlyWhenTargeted = ResolveShowOnlyWhenTargeted(
+            showOnlyWhenTargeted,
+            localPlayerEntityId,
+            entity.EntityId);
         behavior.RenderRange = renderRange;
 
         if (renderRange >= 0)
@@ -60,12 +64,26 @@ public static class NameTagRenderRangePatches
 
     private static bool ShouldSuppressNametag(EntityBehaviorNameTag behavior, Entity entity)
     {
-        if (!ChatUiSystem.DoNametagsRequireLineOfSight())
+        if (!TryGetNametagContext(entity, out var capi, out var localPlayerEntity))
         {
             return false;
         }
 
-        if (!TryGetNametagContext(entity, out var capi, out var localPlayerEntity))
+        if (localPlayerEntity.EntityId == entity.EntityId)
+        {
+            // Target-only is a remote-player identity rule. A player cannot target themselves, so
+            // leaving the synced flag set would permanently hide their own nametag in third person.
+            // Clear it defensively here because later server-side identity refreshes can rewrite the
+            // watched attribute after the client initially applies its config.
+            if (behavior.ShowOnlyWhenTargeted)
+            {
+                behavior.ShowOnlyWhenTargeted = false;
+            }
+
+            return false;
+        }
+
+        if (!ChatUiSystem.DoNametagsRequireLineOfSight())
         {
             return false;
         }
@@ -107,6 +125,14 @@ public static class NameTagRenderRangePatches
 
         return (!showOnlyWhenTargeted || isTargeted)
                && (double)(renderRange * renderRange) > distanceSquared;
+    }
+
+    internal static bool ResolveShowOnlyWhenTargeted(
+        bool configuredShowOnlyWhenTargeted,
+        long? localPlayerEntityId,
+        long targetEntityId)
+    {
+        return configuredShowOnlyWhenTargeted && localPlayerEntityId != targetEntityId;
     }
 
     private static bool TryGetNametagContext(Entity entity, out ICoreClientAPI capi, out Entity localPlayerEntity)

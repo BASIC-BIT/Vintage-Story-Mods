@@ -6,7 +6,7 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 public class NameTagRenderRangePolicyTests
 {
     [Fact]
-    public void SelfAlwaysDelegatesToVanillaForFirstAndThirdPersonBehavior()
+    public void SelfNeverEvaluatesLineOfSight()
     {
         NameTagRenderRangePatches.ShouldEvaluateLineOfSight(
                 localPlayerEntityId: 10,
@@ -16,6 +16,34 @@ public class NameTagRenderRangePolicyTests
                 renderRange: 30,
                 distanceSquared: 0)
             .Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false, 10, 10, false)]
+    [InlineData(true, 10, 10, false)]
+    [InlineData(false, 10, 20, false)]
+    [InlineData(true, 10, 20, true)]
+    public void TargetOnlySettingAppliesOnlyToRemotePlayers(
+        bool configuredShowOnlyWhenTargeted,
+        long localPlayerEntityId,
+        long targetEntityId,
+        bool expected)
+    {
+        NameTagRenderRangePatches.ResolveShowOnlyWhenTargeted(
+                configuredShowOnlyWhenTargeted,
+                localPlayerEntityId,
+                targetEntityId)
+            .Should().Be(expected);
+    }
+
+    [Fact]
+    public void TargetOnlySettingRemainsConfiguredUntilLocalPlayerIsKnown()
+    {
+        NameTagRenderRangePatches.ResolveShowOnlyWhenTargeted(
+                configuredShowOnlyWhenTargeted: true,
+                localPlayerEntityId: null,
+                targetEntityId: 20)
+            .Should().BeTrue();
     }
 
     [Theory]
