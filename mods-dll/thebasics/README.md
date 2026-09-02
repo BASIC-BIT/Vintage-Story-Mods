@@ -149,6 +149,15 @@ Configuration keys (in `ModConfig/the_basics.json`):
 Notes:
 - The indicator uses multiple states (chat open / composing / actively typing) for a unified UX.
 
+## Sight Occlusion Overrides
+
+The BASICs normally decides whether a block obstructs roleplay sight from its render pass and material. Server admins can correct mod compatibility with two live settings in `ModConfig/the_basics.json` or the in-game config editor:
+
+- `SightPassThroughBlockCodePatterns`: blocks that never obstruct sight
+- `SightBlockingBlockCodePatterns`: blocks that always obstruct sight
+
+Entries are fully qualified `domain:path` block codes and may use `*` wildcards, such as `decorplus:brass-lattice-*`. Blocking takes precedence when both lists match. The settings apply to general and strict sight checks, including blocks whose selection shape comes from a block entity. They do not change sound occlusion or make ordinary entities obstruct sight.
+
 
 
 ## Overhead Speech Bubble Override

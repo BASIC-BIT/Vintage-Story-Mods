@@ -78,6 +78,15 @@ public class ModConfigUpgradeTests
     }
 
     [Fact]
+    public void LegacyConfigGainsEmptySightBlockOverridePatterns()
+    {
+        var config = LoadLegacyConfig();
+
+        config.SightPassThroughBlockCodePatterns.Should().BeEmpty();
+        config.SightBlockingBlockCodePatterns.Should().BeEmpty();
+    }
+
+    [Fact]
     public void TheRetiredFontFloorIsUpgradedOnAnExistingConfig()
     {
         // Every successful load rewrites the config, so a running server has the retired default
@@ -182,6 +191,8 @@ public class ModConfigUpgradeTests
         config.UseNicknameInSpectatorOOC = true;
         config.AllowSpectatorPlacedEnvironmentalMessages = false;
         config.ProtectSpectatorRoleplayChat = false;
+        config.SightPassThroughBlockCodePatterns = ["decorplus:brass-lattice-*"];
+        config.SightBlockingBlockCodePatterns = ["decorplus:privacy-curtain-*"];
 
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, config);
@@ -195,6 +206,8 @@ public class ModConfigUpgradeTests
         restored.UseNicknameInSpectatorOOC.Should().BeTrue();
         restored.AllowSpectatorPlacedEnvironmentalMessages.Should().BeFalse();
         restored.ProtectSpectatorRoleplayChat.Should().BeFalse();
+        restored.SightPassThroughBlockCodePatterns.Should().Equal("decorplus:brass-lattice-*");
+        restored.SightBlockingBlockCodePatterns.Should().Equal("decorplus:privacy-curtain-*");
 
         // Neighbouring fields must be untouched by the new ids.
         restored.ProximityChatModeVerbs[ProximityChatMode.Yell].Should().BeEquivalentTo(["yells", "shouts"]);

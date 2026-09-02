@@ -7,6 +7,8 @@ using thebasics.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.Utilities;
+using Block = Vintagestory.API.Common.Block;
 
 namespace thebasics.ModSystems.AdminConfig;
 
@@ -55,7 +57,38 @@ public static class ConfigAdminSettingRegistry
             errors.Add($"SpeechOcclusionWallPenaltyBlocks must be a whole number from 0 to {MaxWallPenaltyBlocks}.");
         }
 
+        ValidateSightBlockPatterns(config, errors);
+
         return errors;
+    }
+
+    private static void ValidateSightBlockPatterns(ModConfig config, List<string> errors)
+    {
+        var passThrough = config.SightPassThroughBlockCodePatterns ?? Array.Empty<string>();
+        var blocking = config.SightBlockingBlockCodePatterns ?? Array.Empty<string>();
+
+        foreach (var pattern in passThrough.Concat(blocking).Where(pattern => !IsFullyQualifiedBlockPattern(pattern)))
+        {
+            errors.Add($"Sight block pattern '{pattern}' must be a fully qualified domain:path pattern. Use * for wildcards.");
+        }
+
+        var exactConflicts = passThrough.Intersect(blocking, StringComparer.OrdinalIgnoreCase);
+        foreach (var pattern in exactConflicts)
+        {
+            errors.Add($"Sight block pattern '{pattern}' appears in both sight override lists. Remove it from one list; blocking would otherwise take precedence.");
+        }
+    }
+
+    internal static IReadOnlyList<string> ValidateResolvedSightBlockPatterns(ModConfig config, IEnumerable<Block> blocks)
+    {
+        var policy = SightBlockPolicy.Resolve(
+            blocks,
+            config.SightPassThroughBlockCodePatterns,
+            config.SightBlockingBlockCodePatterns);
+
+        return policy.ConflictingBlockCodes
+            .Select(blockCode => $"Block '{blockCode}' matches both sight override lists. Adjust the patterns so each block resolves to only one list.")
+            .ToArray();
     }
 
     private static void ValidateMode(ModConfig config, ProximityChatMode mode, List<string> errors)
@@ -283,6 +316,8 @@ public static class ConfigAdminSettingRegistry
 
         settings.Add(IntArray(new SettingMeta("ProximityChatClampFontSizes", "Chat/Font Sizes", "Clamp font sizes", "Comma-separated allowed distance font sizes.", ConfigAdminReloadBehavior.Live), c => c.ProximityChatClampFontSizes, (c, v) => c.ProximityChatClampFontSizes = v, (1, 128)));
         settings.Add(Int("SpeechOcclusionWallPenaltyBlocks", "Chat/Occlusion", "Wall muffling penalty", "Experimental. Blocks of extra effective distance per sound-blocking block between speaker and listener. 0 disables muffling.", ConfigAdminReloadBehavior.Live, (c => c.SpeechOcclusionWallPenaltyBlocks, (c, v) => c.SpeechOcclusionWallPenaltyBlocks = v), (0, MaxWallPenaltyBlocks)));
+        settings.Add(OptionalTextArray(new SettingMeta("SightPassThroughBlockCodePatterns", "Chat/Occlusion", "Sight pass-through blocks", "Comma-separated fully qualified block-code patterns that never obstruct roleplay sight. Use * for wildcards.", ConfigAdminReloadBehavior.Live), c => c.SightPassThroughBlockCodePatterns, (c, v) => c.SightPassThroughBlockCodePatterns = v));
+        settings.Add(OptionalTextArray(new SettingMeta("SightBlockingBlockCodePatterns", "Chat/Occlusion", "Sight-blocking blocks", "Comma-separated fully qualified block-code patterns that always obstruct roleplay sight. Blocking wins if both lists match.", ConfigAdminReloadBehavior.Live), c => c.SightBlockingBlockCodePatterns, (c, v) => c.SightBlockingBlockCodePatterns = v));
     }
 
     private static void AddAudioModeSettings(List<ConfigAdminSettingDefinition> settings)
@@ -373,6 +408,16 @@ public static class ConfigAdminSettingRegistry
             value => ParseStringArray(value).Length == 0 ? $"{meta.Key} must contain at least one value." : null);
     }
 
+    private static ConfigAdminSettingDefinition OptionalTextArray(SettingMeta meta, Func<ModConfig, string[]> get, Action<ModConfig, string[]> set)
+    {
+        return ValidatedText(meta,
+            config => FormatStringArray(get(config)),
+            (config, value) => set(config, ParseStringArray(value)),
+            value => ParseStringArray(value).FirstOrDefault(pattern => !IsFullyQualifiedBlockPattern(pattern)) is { } invalid
+                ? $"{meta.Key} contains '{invalid}', which is not a fully qualified domain:path pattern. Use * for wildcards."
+                : null);
+    }
+
     private static ConfigAdminSettingDefinition IntArray(SettingMeta meta, Func<ModConfig, int[]> get, Action<ModConfig, int[]> set, (int Min, int Max) range)
     {
         return new ConfigAdminSettingDefinition(new ConfigAdminSettingDefinitionOptions
@@ -436,6 +481,26 @@ public static class ConfigAdminSettingRegistry
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .ToArray();
+    }
+
+    private static bool IsFullyQualifiedBlockPattern(string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern) || pattern.Any(char.IsWhiteSpace))
+        {
+            return false;
+        }
+
+        var separator = pattern.IndexOf(':');
+        return separator > 0 &&
+               separator == pattern.LastIndexOf(':') &&
+               separator < pattern.Length - 1 &&
+               pattern[..separator].All(IsBlockCodePatternCharacter) &&
+               pattern[(separator + 1)..].All(character => IsBlockCodePatternCharacter(character) || character is '/' or '*');
+    }
+
+    private static bool IsBlockCodePatternCharacter(char character)
+    {
+        return char.IsLetterOrDigit(character) || character is '-' or '_' or '.';
     }
 
     private static string ValidateIntArray(string key, string value, (int Min, int Max) range, out int[] parsedValues)

@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using thebasics.Configs;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -17,6 +20,8 @@ public static class VisibilityUtils
     private const int MaxSegmentSamples = 1024;
 
     private static bool _warnedSegmentSampleCap;
+    private static readonly ConditionalWeakTable<IWorldAccessor, SightPolicyHolder> SightPolicies = new();
+    private static readonly SightBlockPolicy DefaultSightPolicy = SightBlockPolicy.Resolve([], [], []);
 
     /// <summary>
     /// Strict sight filter: anything not rendered see-through stops the ray, foliage included.
@@ -28,23 +33,7 @@ public static class VisibilityUtils
     /// wrong. Its only consumer is the character-sheet look-up, which shows one player another's
     /// written description at close range. Everything else uses <see cref="SightBlockFilter"/>.
     /// </summary>
-    internal static readonly BlockFilter StrictSightBlockFilter = (BlockPos pos, Block block) =>
-    {
-        if (block == null || block.Id == 0)
-        {
-            return false; // Air — ray continues.
-        }
-
-        // Blocks rendered in transparent/blended/liquid passes are visually see-through.
-        if (block.RenderPass is EnumChunkRenderPass.Transparent   // glass, ice
-                             or EnumChunkRenderPass.BlendNoCull   // lattices, cobweb, fallen leaves
-                             or EnumChunkRenderPass.Liquid)        // water, lava
-        {
-            return false; // Visually transparent — ray continues.
-        }
-
-        return true; // Opaque — ray stops here.
-    };
+    internal static readonly BlockFilter StrictSightBlockFilter = DefaultSightPolicy.StrictFilter;
 
     /// <summary>
     /// General sight filter. Identical to <see cref="StrictSightBlockFilter"/> except that foliage
@@ -56,15 +45,40 @@ public static class VisibilityUtils
     /// bubbles — so they cannot disagree. They used to: a signed message delivered through leaves
     /// rendered no bubble, because delivery used this rule and rendering used the strict one.
     /// </summary>
-    internal static readonly BlockFilter SightBlockFilter = (BlockPos pos, Block block) =>
+    internal static readonly BlockFilter SightBlockFilter = DefaultSightPolicy.GeneralFilter;
+
+    public static void ConfigureSightBlockOverrides(IWorldAccessor world, ModConfig config)
     {
-        if (block?.BlockMaterial is EnumBlockMaterial.Leaves or EnumBlockMaterial.Plant)
+        if (world == null || config == null)
         {
-            return false;
+            return;
         }
 
-        return StrictSightBlockFilter(pos, block);
-    };
+        var policy = SightBlockPolicy.Resolve(
+            world.Blocks,
+            config.SightPassThroughBlockCodePatterns,
+            config.SightBlockingBlockCodePatterns);
+
+        var holder = SightPolicies.GetValue(world, _ => new SightPolicyHolder());
+        Volatile.Write(ref holder.Policy, policy);
+
+        if (world.Side != EnumAppSide.Server)
+        {
+            return;
+        }
+
+        foreach (var pattern in policy.UnmatchedPatterns)
+        {
+            world.Logger?.Warning("THEBASICS: sight block override pattern '{0}' matched no registered blocks.", pattern);
+        }
+
+        foreach (var blockCode in policy.ConflictingBlockCodes)
+        {
+            world.Logger?.Warning(
+                "THEBASICS: block '{0}' matches both sight override lists. The blocking override takes precedence.",
+                blockCode);
+        }
+    }
 
     /// <summary>
     /// Block filter for sound. Sound and sight occlude differently: glass and water stop speech
@@ -111,7 +125,8 @@ public static class VisibilityUtils
         bool failOpen,
         bool useMultiPointTargets = false)
     {
-        return HasClearPath(world, observer, target, failOpen, useMultiPointTargets, SightBlockFilter);
+        var policy = GetSightPolicy(world);
+        return HasClearPath(world, observer, target, failOpen, useMultiPointTargets, policy.GeneralFilter, policy);
     }
 
     public static bool HasLineOfSight(IWorldAccessor world, Entity observer, Entity target)
@@ -130,7 +145,8 @@ public static class VisibilityUtils
     /// </summary>
     public static bool HasStrictLineOfSight(IWorldAccessor world, Entity observer, Entity target, bool failOpen = false)
     {
-        return HasClearPath(world, observer, target, failOpen, useMultiPointTargets: false, StrictSightBlockFilter);
+        var policy = GetSightPolicy(world);
+        return HasClearPath(world, observer, target, failOpen, useMultiPointTargets: false, policy.StrictFilter, policy);
     }
 
     /// <summary>
@@ -149,7 +165,8 @@ public static class VisibilityUtils
             var fromBase = observer.Pos.XYZ;
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
 
-            return IsRayClear(world, fromPos, targetPos, failOpen, SightBlockFilter);
+            var policy = GetSightPolicy(world);
+            return IsRayClear(world, fromPos, targetPos, failOpen, policy.GeneralFilter, policy);
         }
         catch (Exception ex)
         {
@@ -178,7 +195,8 @@ public static class VisibilityUtils
         Entity target,
         bool failOpen,
         bool useMultiPointTargets,
-        BlockFilter filter)
+        BlockFilter filter,
+        SightBlockPolicy sightPolicy = null)
     {
         if (world == null || observer == null || target == null)
         {
@@ -199,7 +217,7 @@ public static class VisibilityUtils
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
 
             return GetEntityLineOfSightTargetPositions(toBase, target, useMultiPointTargets)
-                .Any(targetPos => IsRayClear(world, fromPos, targetPos, failOpen, filter));
+                .Any(targetPos => IsRayClear(world, fromPos, targetPos, failOpen, filter, sightPolicy));
         }
         catch
         {
@@ -336,7 +354,13 @@ public static class VisibilityUtils
         return target.LocalEyePos?.Y * 1.2 ?? 0;
     }
 
-    private static bool IsRayClear(IWorldAccessor world, Vec3d fromPos, Vec3d targetPos, bool failOpen, BlockFilter filter)
+    private static bool IsRayClear(
+        IWorldAccessor world,
+        Vec3d fromPos,
+        Vec3d targetPos,
+        bool failOpen,
+        BlockFilter filter,
+        SightBlockPolicy sightPolicy = null)
     {
         try
         {
@@ -347,11 +371,158 @@ public static class VisibilityUtils
 
             var blockSel = RayTraceBlocksForSelection(supplier, fromPos, targetPos, filter);
 
-            return blockSel?.Block == null || blockSel.Block.Id == 0;
+            return (blockSel?.Block == null || blockSel.Block.Id == 0) &&
+                   !HasExplicitBlockingBlockWithoutBoxes(supplier, fromPos, targetPos, sightPolicy);
         }
         catch
         {
             return failOpen;
+        }
+    }
+
+    private static SightBlockPolicy GetSightPolicy(IWorldAccessor world)
+    {
+        return world != null && SightPolicies.TryGetValue(world, out var holder)
+            ? Volatile.Read(ref holder.Policy) ?? DefaultSightPolicy
+            : DefaultSightPolicy;
+    }
+
+    private sealed class SightPolicyHolder
+    {
+        public SightBlockPolicy Policy;
+    }
+
+    internal static bool HasExplicitBlockingBlockWithoutBoxes(
+        IWorldIntersectionSupplier supplier,
+        Vec3d fromPos,
+        Vec3d targetPos,
+        SightBlockPolicy policy)
+    {
+        if (supplier == null || policy?.HasBlockingOverrides != true)
+        {
+            return false;
+        }
+
+        var traversal = new VoxelTraversal(fromPos, targetPos);
+        var pos = new BlockPos(0);
+
+        do
+        {
+            pos.SetAndCorrectDimension(traversal.X, traversal.Y, traversal.Z);
+            if (IsExplicitBlockingBlockWithoutBoxesAt(supplier, pos, policy))
+            {
+                return true;
+            }
+        }
+        while (traversal.Advance());
+
+        return false;
+    }
+
+    private static bool IsExplicitBlockingBlockWithoutBoxesAt(
+        IWorldIntersectionSupplier supplier,
+        BlockPos pos,
+        SightBlockPolicy policy)
+    {
+        var block = supplier.blockAccessor.GetBlock(pos, 2);
+        var selectionBlock = block.SideSolid.Any ? block : supplier.GetBlock(pos);
+        if (!policy.IsExplicitlyBlocking(block) && !policy.IsExplicitlyBlocking(selectionBlock))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(block.EntityClass) &&
+            string.IsNullOrWhiteSpace(selectionBlock.EntityClass) &&
+            supplier.blockAccessor.GetBlockEntity(pos) == null)
+        {
+            return false;
+        }
+
+        if (block.SideSolid.Any)
+        {
+            return block.GetSelectionBoxes(supplier.blockAccessor, pos) is not { Length: > 0 };
+        }
+
+        return supplier.GetBlockIntersectionBoxes(pos) is not { Length: > 0 };
+    }
+
+    private struct VoxelTraversal
+    {
+        private readonly int _endX;
+        private readonly int _endY;
+        private readonly int _endZ;
+        private readonly int _stepX;
+        private readonly int _stepY;
+        private readonly int _stepZ;
+        private readonly double _tDeltaX;
+        private readonly double _tDeltaY;
+        private readonly double _tDeltaZ;
+        private double _tMaxX;
+        private double _tMaxY;
+        private double _tMaxZ;
+
+        public VoxelTraversal(Vec3d fromPos, Vec3d targetPos)
+        {
+            var delta = targetPos.SubCopy(fromPos);
+            X = (int)Math.Floor(fromPos.X);
+            Y = (int)Math.Floor(fromPos.Y);
+            Z = (int)Math.Floor(fromPos.Z);
+            _endX = (int)Math.Floor(targetPos.X);
+            _endY = (int)Math.Floor(targetPos.Y);
+            _endZ = (int)Math.Floor(targetPos.Z);
+            _stepX = Math.Sign(delta.X);
+            _stepY = Math.Sign(delta.Y);
+            _stepZ = Math.Sign(delta.Z);
+            _tDeltaX = _stepX == 0 ? double.PositiveInfinity : 1 / Math.Abs(delta.X);
+            _tDeltaY = _stepY == 0 ? double.PositiveInfinity : 1 / Math.Abs(delta.Y);
+            _tDeltaZ = _stepZ == 0 ? double.PositiveInfinity : 1 / Math.Abs(delta.Z);
+            _tMaxX = InitialBoundaryT(fromPos.X, delta.X, X, _stepX);
+            _tMaxY = InitialBoundaryT(fromPos.Y, delta.Y, Y, _stepY);
+            _tMaxZ = InitialBoundaryT(fromPos.Z, delta.Z, Z, _stepZ);
+        }
+
+        public int X { get; private set; }
+
+        public int Y { get; private set; }
+
+        public int Z { get; private set; }
+
+        public bool Advance()
+        {
+            if (X == _endX && Y == _endY && Z == _endZ)
+            {
+                return false;
+            }
+
+            var nextT = Math.Min(_tMaxX, Math.Min(_tMaxY, _tMaxZ));
+            if (_tMaxX <= nextT)
+            {
+                X += _stepX;
+                _tMaxX += _tDeltaX;
+            }
+            if (_tMaxY <= nextT)
+            {
+                Y += _stepY;
+                _tMaxY += _tDeltaY;
+            }
+            if (_tMaxZ <= nextT)
+            {
+                Z += _stepZ;
+                _tMaxZ += _tDeltaZ;
+            }
+
+            return true;
+        }
+
+        private static double InitialBoundaryT(double origin, double delta, int cell, int step)
+        {
+            if (step == 0)
+            {
+                return double.PositiveInfinity;
+            }
+
+            var boundary = step > 0 ? cell + 1 : cell;
+            return (boundary - origin) / delta;
         }
     }
 

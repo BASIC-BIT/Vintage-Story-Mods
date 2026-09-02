@@ -961,8 +961,7 @@ public class ChatUiSystem : ModSystem
     {
         if (message?.Config != null)
         {
-            _config = message.Config;
-            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
+            ApplyReceivedConfig(message.Config);
         }
 
         UpdateConfigAdminDraft(message?.Values, message?.ReviewedKeys, message?.StatusMessage);
@@ -973,8 +972,7 @@ public class ChatUiSystem : ModSystem
     {
         if (message?.Config != null)
         {
-            _config = message.Config;
-            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
+            ApplyReceivedConfig(message.Config);
         }
 
         if (!string.IsNullOrWhiteSpace(message?.Message))
@@ -1765,17 +1763,13 @@ public class ChatUiSystem : ModSystem
     {
         try
         {
-            // Store the received config
-            _config = configMessage.Config;
-
-            if (_config == null)
+            if (configMessage.Config == null)
             {
                 _api.Logger.Error("[THEBASICS] Received null config from server!");
                 return;
             }
 
-            // Apply debug mode to networking helpers now that we have config.
-            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
+            ApplyReceivedConfig(configMessage.Config);
 
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;
@@ -1796,6 +1790,13 @@ public class ChatUiSystem : ModSystem
         {
             _api.Logger.Error($"[THEBASICS] Error processing server config message: {e}");
         }
+    }
+
+    private static void ApplyReceivedConfig(ModConfig config)
+    {
+        _config = config;
+        VisibilityUtils.ConfigureSightBlockOverrides(_api?.World, config);
+        _safeNetworkChannel?.SetEnableDebugLogging(config.DebugMode);
     }
 
     private static void ApplyClientNametagSettingsToLoadedPlayers()
