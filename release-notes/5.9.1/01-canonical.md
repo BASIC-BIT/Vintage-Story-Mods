@@ -1,8 +1,8 @@
 # The BASICs v5.9.1
 
-## Fixes nametag line-of-sight freezes caused by entity searches
+## Nametag line-of-sight checks no longer freeze clients
 
-Servers using `NametagRequiresLineOfSight=true` could cause severe client hitching or freezes, especially at long nametag ranges. Line-of-sight checks now skip an entity search that could not affect the result while preserving Vintage Story's block-selection geometry.
+Servers using `NametagRequiresLineOfSight=true` could cause severe client hitching or freezes, especially at long nametag ranges. Line-of-sight checks are now faster without changing what blocks visibility.
 
 Stone still blocks a nametag, while glass and foliage do not. The configured range boundary for other players, and the eye, torso, and feet visibility checks, are unchanged.
 
