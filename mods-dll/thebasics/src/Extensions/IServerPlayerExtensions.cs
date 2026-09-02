@@ -7,6 +7,7 @@ using thebasics.Models;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Semantics;
@@ -72,6 +73,16 @@ namespace thebasics.Extensions
                 catch (Exception e2)
                 {
                     player.Entity.Api.Logger.Error("THEBASICS: Failed to clear mod data for key " + key + " for player " + player.PlayerName + ": " + e2.Message);
+                }
+
+                if (key == ModDataLanguages || key == ModDataDefaultLanguage)
+                {
+                    AnalyticsService.TrackPlayerFailure(
+                        player.PlayerUID,
+                        "language_state",
+                        key == ModDataLanguages ? "read_known_languages" : "read_default_language",
+                        "warning",
+                        "decode_failed");
                 }
             }
 
@@ -524,6 +535,33 @@ namespace thebasics.Extensions
         public static List<string> GetLanguages(this IWorldPlayerData playerData)
         {
             return playerData?.GetModData(ModDataLanguages, new List<string>()) ?? new List<string>();
+        }
+
+        internal static void TrackLanguageStateInvariantFailure(this IServerPlayer player, string languageOperation)
+        {
+            var defaultLanguage = player.GetDefaultLanguageName();
+            if (string.IsNullOrWhiteSpace(defaultLanguage))
+            {
+                return;
+            }
+
+            if (string.Equals(defaultLanguage, LanguageSystem.BabbleLang.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var hasDefaultLanguage = player.GetLanguages()?.Any(language =>
+                string.Equals(language, defaultLanguage, StringComparison.OrdinalIgnoreCase)) == true;
+            if (!hasDefaultLanguage)
+            {
+                AnalyticsService.TrackPlayerFailure(
+                    player.PlayerUID,
+                    "language_state",
+                    languageOperation,
+                    "warning",
+                    "default_language_unknown",
+                    recovered: false);
+            }
         }
 
         public static void SetLanguages(this IServerPlayer player, IEnumerable<string> languages)

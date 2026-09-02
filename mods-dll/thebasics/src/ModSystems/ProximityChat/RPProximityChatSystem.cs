@@ -2007,6 +2007,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         // Config will be sent when client indicates it's ready.
         ReconcilePlayerLanguages(byPlayer, Config, _languageRenameMapForJoiningPlayers);
+        byPlayer.TrackLanguageStateInvariantFailure("join_reconcile");
         SwapOutNameTag(byPlayer);
     }
 
