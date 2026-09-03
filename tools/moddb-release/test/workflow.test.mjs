@@ -51,6 +51,7 @@ test("declares the exact public inputs", () => {
   for (const name of INPUT_NAMES) {
     assert.equal(inputs[name].required, name !== "expected_file_id", `${name} required flag`);
   }
+  assert.match(inputs.expected_account.description, /username/, "expected_account is the ModDB username, not a numeric id");
 });
 
 test("runs one main-only job with minimal permissions", () => {
@@ -103,6 +104,8 @@ test("validates inputs and downloads the asset before assuming the AWS role", ()
   const download = stepIndex((step) => typeof step.run === "string" && step.run.includes("gh release download"));
   assert.notEqual(validate, -1, "validation step present");
   assert.notEqual(download, -1, "download step present");
+  assert.equal(steps[validate].run.includes("expected_account must be a positive integer"), false, "expected_account is a username");
+  assert.match(steps[validate].run, /EXPECTED_ACCOUNT -match '\^\\S\+\$'/, "expected_account must be nonblank without whitespace");
   assert.ok(validate < aws, "validation runs before AWS");
   assert.ok(download < aws, "download runs before AWS");
   assert.equal(steps[download].env.GH_TOKEN, "${{ github.token }}");
@@ -117,9 +120,11 @@ test("invokes the broker per the stable interface after AWS", () => {
   assert.ok(broker > aws, "broker runs after AWS credentials");
   const body = steps[broker].run;
   assert.equal(steps[broker].shell, "pwsh");
-  for (const flag of ["--zip", "--changelog", "--expected-sha256", "--mod-id", "--expected-mod-identifier", "--expected-version", "--compatible-version", "--expected-file-id"]) {
+  for (const flag of ["--zip", "--changelog", "--expected-sha256", "--mod-id", "--expected-mod-identifier", "--expected-version", "--compatible-version", "--expected-file-id", "--expected-account"]) {
     assert.ok(body.includes(flag), `broker step passes ${flag}`);
   }
+  assert.ok(body.includes("'--expected-account', $env:EXPECTED_ACCOUNT"), "expected account flows through env into the argument array");
+  assert.equal(steps[broker].env.EXPECTED_ACCOUNT, "${{ inputs.expected_account }}");
   assert.ok(body.includes("'release', $env:OPERATION"), "subcommand is release <validated operation>");
   assert.ok(body.includes("$env:RUNNER_TEMP"), "changelog and zip live in runner temp");
   assert.equal(body.includes("Invoke-Expression"), false);

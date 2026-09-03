@@ -35,7 +35,7 @@ on:
         type: string
         required: true
       expected_account:
-        description: ModDB account ID the session must belong to
+        description: ModDB username the session must belong to (the name shown in the ModDB account menu)
         type: string
         required: true
       compatible_versions:
@@ -105,7 +105,7 @@ jobs:
           Require ($env:MOD_ID -match '^[1-9][0-9]*$') 'mod_id must be a positive integer'
           Require ($env:EXPECTED_MOD_IDENTIFIER -match '^[a-z0-9]+$') 'expected_mod_identifier must be lowercase alphanumeric'
           Require ($env:EXPECTED_VERSION -match '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$') 'expected_version must be semver'
-          Require ($env:EXPECTED_ACCOUNT -match '^[1-9][0-9]*$') 'expected_account must be a positive integer'
+          Require ($env:EXPECTED_ACCOUNT -match '^\S+$') 'expected_account must be a username without whitespace'
           Require (-not [string]::IsNullOrWhiteSpace($env:RELEASE_NOTES)) 'release_notes must not be blank'
           Require (-not $env:RELEASE_NOTES.Contains([string][char]0x2014)) 'release_notes must not contain U+2014'
 
@@ -167,6 +167,7 @@ jobs:
           MOD_ID: ${{ inputs.mod_id }}
           EXPECTED_MOD_IDENTIFIER: ${{ inputs.expected_mod_identifier }}
           EXPECTED_VERSION: ${{ inputs.expected_version }}
+          EXPECTED_ACCOUNT: ${{ inputs.expected_account }}
           COMPATIBLE_VERSIONS: ${{ inputs.compatible_versions }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
           EXPECTED_FILE_ID: ${{ inputs.expected_file_id }}
@@ -183,7 +184,8 @@ jobs:
             '--expected-version', $env:EXPECTED_VERSION,
             '--zip', $zip,
             '--changelog', $changelog,
-            '--expected-sha256', $env:EXPECTED_SHA256
+            '--expected-sha256', $env:EXPECTED_SHA256,
+            '--expected-account', $env:EXPECTED_ACCOUNT
           )
           foreach ($version in @($env:COMPATIBLE_VERSIONS | ConvertFrom-Json -NoEnumerate)) {
             $brokerArgs += @('--compatible-version', [string]$version)

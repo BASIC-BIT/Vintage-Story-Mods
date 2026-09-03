@@ -18,7 +18,7 @@ Design: `docs/superpowers/specs/2026-09-03-moddb-aws-auth-design.md`. Research: 
 
 One pinned Node 22 ESM package. It is the only code that holds credentials in memory. Commands: `account set`, `session status`, `session renew`, `session import-wincred`, `release prepare`, `release publish`. Each prints one non-secret JSON line; exit codes 0 ok, 1 failed, 2 `renewal-required`, 3 `approval-required`. Grammar and statuses are in the implementation plan's "Stable Broker Interface" section and in the skill.
 
-`session renew` is the only place Playwright runs: installed Chrome, headed, non-persistent disposable profile, tracing and capture disabled. The human completes reCAPTCHA; the broker captures the cookie, validates the expected account, and promotes it. Renewal is allowed only on Windows with a TTY and outside GitHub Actions.
+`session renew` is the only place Playwright runs: installed Chrome, headed, non-persistent disposable profile, tracing and capture disabled. The human completes reCAPTCHA; the broker captures the cookie, completes the ModDB login bridge, validates the expected account (`--expected-account <moddb-username>`, the name shown in the ModDB account menu), and promotes it. Renewal is allowed only on Windows with a TTY and outside GitHub Actions.
 
 `session import-wincred` is the one-time migration from `TheBasics.ModDb.Session` in Windows Credential Manager, via a narrow checked-in PowerShell adapter over a private process stream, in two phases (import as `AWSPENDING`, then `--finalize-version`).
 

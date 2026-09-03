@@ -31,14 +31,14 @@
 ```text
 node tools/moddb-release/src/cli.mjs account set
 node tools/moddb-release/src/cli.mjs session status
-node tools/moddb-release/src/cli.mjs session renew --expected-account <account-id>
-node tools/moddb-release/src/cli.mjs session import-wincred --expected-account <account-id>
+node tools/moddb-release/src/cli.mjs session renew --expected-account <moddb-username>
+node tools/moddb-release/src/cli.mjs session import-wincred --expected-account <moddb-username>
 node tools/moddb-release/src/cli.mjs session import-wincred --finalize-version <aws-version-id>
-node tools/moddb-release/src/cli.mjs release prepare --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex>
-node tools/moddb-release/src/cli.mjs release publish --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> --expected-file-id <number>
+node tools/moddb-release/src/cli.mjs release prepare --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> [--expected-account <moddb-username>]
+node tools/moddb-release/src/cli.mjs release publish --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> --expected-file-id <number> [--expected-account <moddb-username>]
 ```
 
-`--compatible-version` is repeatable. The broker detects cloud execution from `GITHUB_ACTIONS=true`; interactive renewal is allowed only on Windows with TTY stdin and outside GitHub Actions. No flag overrides that decision.
+`--compatible-version` is repeatable. `<moddb-username>` is the account name shown in the ModDB account menu, not a numeric ID; release commands default it to the stored session's validated account. The broker detects cloud execution from `GITHUB_ACTIONS=true`; interactive renewal is allowed only on Windows with TTY stdin and outside GitHub Actions. No flag overrides that decision.
 
 ```js
 export const ExitCode = Object.freeze({
@@ -667,7 +667,7 @@ git diff --check
 ### Step 5: Migrate and remove WinCred
 
 - [ ] Obtain explicit owner approval to migrate `TheBasics.ModDb.Session`.
-- [ ] Through the renewal-role profile, run `session import-wincred --expected-account <owner-provided-account-id>` and record only promoted AWS version ID/status.
+- [ ] Through the renewal-role profile, run `session import-wincred --expected-account <owner-provided-moddb-username>` and record only promoted AWS version ID/status.
 - [ ] Through an independently configured publisher-role profile or trusted-main workflow, prove `AWSCURRENT` authenticates as the expected account.
 - [ ] Through renewal role, run `session import-wincred --finalize-version <recorded-version-id>`. It must revalidate exact AWS current state before deletion.
 - [ ] Prove WinCred is absent and AWS-backed status remains valid. Report that the Windows deletion is not recoverable and AWS is now canonical.

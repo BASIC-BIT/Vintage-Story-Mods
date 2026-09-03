@@ -165,7 +165,7 @@ export function createCommands(deps) {
 
     async releasePrepare(options) {
       const { artifact } = inspectLocal(options);
-      const session = await acquire("prepare");
+      const session = await acquire("prepare", options.expectedAccount);
       if (session.status !== "valid" && session.status !== "renewed") return sessionEnvelope(session);
       const { modId, expectedModIdentifier, expectedVersion, compatibleVersions } = options;
       const staged = await modDbFactory({ cookieValue: session[SESSION_COOKIE] }).prepareRelease({ modId, artifact, expectedModIdentifier, expectedVersion });
@@ -185,7 +185,7 @@ export function createCommands(deps) {
 
     async releasePublish(options) {
       const { artifact, changelogHtml } = inspectLocal(options);
-      const session = await acquire("publish");
+      const session = await acquire("publish", options.expectedAccount);
       if (session.status !== "valid" && session.status !== "renewed") return sessionEnvelope(session);
       const { modId, expectedModIdentifier, expectedVersion, expectedFileId, compatibleVersions } = options;
       const modDb = modDbFactory({ cookieValue: session[SESSION_COOKIE] });

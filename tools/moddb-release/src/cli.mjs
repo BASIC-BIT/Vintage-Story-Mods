@@ -20,13 +20,15 @@ const USAGE = `Usage: node tools/moddb-release/src/cli.mjs <command> [options]
 
   account set
   session status
-  session renew --expected-account <account-id>
-  session import-wincred --expected-account <account-id>
+  session renew --expected-account <moddb-username>
+  session import-wincred --expected-account <moddb-username>
   session import-wincred --finalize-version <aws-version-id>
-  release prepare --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex>
-  release publish --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> --expected-file-id <number>
+  release prepare --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> [--expected-account <moddb-username>]
+  release publish --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> --expected-file-id <number> [--expected-account <moddb-username>]
 
---compatible-version is repeatable. Each command writes one JSON line to stdout.
+--compatible-version is repeatable. <moddb-username> is the name shown in the ModDB account menu;
+release commands default it to the account the stored session was validated for.
+Each command writes one JSON line to stdout.
 Exit codes: 0 ok, 1 failed, 2 renewal-required, 3 approval-required.
 `;
 

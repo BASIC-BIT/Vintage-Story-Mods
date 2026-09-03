@@ -19,8 +19,8 @@ const PUBLISH = ["release", "publish", ...PREPARE.slice(2), "--expected-file-id"
 const COMMANDS = {
   "account set": ["account", "set"],
   "session status": ["session", "status"],
-  "session renew": ["session", "renew", "--expected-account", "123"],
-  "session import-wincred": ["session", "import-wincred", "--expected-account", "123"],
+  "session renew": ["session", "renew", "--expected-account", "BASICBIT"],
+  "session import-wincred": ["session", "import-wincred", "--expected-account", "BASICBIT"],
   "release prepare": PREPARE,
   "release publish": PUBLISH,
 };
@@ -43,7 +43,16 @@ test("every documented command parses", () => {
   for (const [command, argv] of Object.entries(COMMANDS)) assert.equal(parseArgs(argv).command, command);
   assert.deepEqual(parseArgs(["account", "set"]).options, {});
   assert.deepEqual(parseArgs(["session", "status"]).options, {});
-  assert.deepEqual(parseArgs(COMMANDS["session renew"]).options, { expectedAccount: "123" });
+  assert.deepEqual(parseArgs(COMMANDS["session renew"]).options, { expectedAccount: "BASICBIT" });
+});
+
+test("release prepare and publish take an optional --expected-account username", () => {
+  assert.equal(parseArgs([...PREPARE, "--expected-account", "BASICBIT"]).options.expectedAccount, "BASICBIT");
+  assert.equal(parseArgs([...PUBLISH, "--expected-account", "BASICBIT"]).options.expectedAccount, "BASICBIT");
+  assert.equal("expectedAccount" in parseArgs(PREPARE).options, false);
+  rejectsOption([...PREPARE, "--expected-account", "two words"], "--expected-account");
+  rejectsOption([...PREPARE, "--expected-account", ""], "--expected-account");
+  rejectsOption([...PREPARE, "--expected-account", "a", "--expected-account", "b"], "--expected-account");
 });
 
 test("unknown commands are rejected without echoing them", () => {

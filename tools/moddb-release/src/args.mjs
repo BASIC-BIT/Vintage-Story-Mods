@@ -27,14 +27,14 @@ const OPTIONS = {
 
 const RELEASE = ["--mod-id", "--expected-mod-identifier", "--expected-version", "--zip", "--changelog", "--compatible-version", "--expected-sha256"];
 
-// command -> { required, optional }
+// command -> { required, optional, oneOf }
 const COMMANDS = {
   "account set": { required: [] },
   "session status": { required: [] },
   "session renew": { required: ["--expected-account"] },
   "session import-wincred": { required: [], oneOf: ["--expected-account", "--finalize-version"] },
-  "release prepare": { required: RELEASE },
-  "release publish": { required: [...RELEASE, "--expected-file-id"] },
+  "release prepare": { required: RELEASE, optional: ["--expected-account"] },
+  "release publish": { required: [...RELEASE, "--expected-file-id"], optional: ["--expected-account"] },
 };
 
 export function parseArgs(argv) {
@@ -42,7 +42,7 @@ export function parseArgs(argv) {
   const command = argv.slice(0, 2).join(" ");
   const spec = COMMANDS[command];
   if (spec === undefined) throw new BrokerError("INVALID_ARGUMENTS", "invalid command");
-  const allowed = [...spec.required, ...(spec.oneOf ?? [])];
+  const allowed = [...spec.required, ...(spec.optional ?? []), ...(spec.oneOf ?? [])];
 
   const options = {};
   const rest = argv.slice(2);

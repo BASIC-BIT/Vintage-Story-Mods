@@ -32,11 +32,11 @@ For GitHub or ModDB release-note drafting, review, or platform conversion, read 
 
 ```text
 node tools/moddb-release/src/cli.mjs session status
-node tools/moddb-release/src/cli.mjs release prepare --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex>
-node tools/moddb-release/src/cli.mjs release publish --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> --expected-file-id <number>
+node tools/moddb-release/src/cli.mjs release prepare --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> [--expected-account <moddb-username>]
+node tools/moddb-release/src/cli.mjs release publish --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> --expected-file-id <number> [--expected-account <moddb-username>]
 ```
 
-`--compatible-version` is repeatable. Run from the repository root with an AWS identity that can assume the publisher role (local) or renewal role (Windows renewal).
+`--compatible-version` is repeatable. `<moddb-username>` is the account name shown in the ModDB account menu (not a numeric ID); release commands default it to the account the stored session was validated for. Run from the repository root with an AWS identity that can assume the publisher role (local) or renewal role (Windows renewal).
 
 One JSON line on stdout per command:
 
@@ -87,7 +87,7 @@ Masked prompts for email and password. Nothing is passed as an argument.
 ### One-time Windows Credential Manager import
 
 ```text
-node tools/moddb-release/src/cli.mjs session import-wincred --expected-account <account-id>
+node tools/moddb-release/src/cli.mjs session import-wincred --expected-account <moddb-username>
 node tools/moddb-release/src/cli.mjs session import-wincred --finalize-version <aws-version-id>
 ```
 
@@ -96,7 +96,7 @@ Phase one reads `TheBasics.ModDb.Session` through the checked-in Windows adapter
 ### Ordinary renewal
 
 ```text
-node tools/moddb-release/src/cli.mjs session renew --expected-account <account-id>
+node tools/moddb-release/src/cli.mjs session renew --expected-account <moddb-username>
 ```
 
 Opens visible Chrome; the human completes reCAPTCHA; the broker captures the cookie, stages it as `AWSPENDING`, validates it, and promotes it conditionally. A promotion conflict fails closed; run it again.

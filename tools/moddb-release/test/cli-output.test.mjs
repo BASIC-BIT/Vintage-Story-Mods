@@ -50,7 +50,7 @@ function session(expiry = "2026-09-17T00:00:00.000Z") {
     observedCookieExpiresAt: null,
     modDbValidUntilEstimate: expiry,
     validatedAt: "2026-09-03T00:00:00.000Z",
-    validatedAccount: "123",
+    validatedAccount: "BASICBIT",
   };
 }
 
@@ -102,6 +102,9 @@ test("help prints usage to stdout and exits 0", async () => {
     assert.equal(result.exitCode, ExitCode.ok);
     assert.match(result.stdout, /session status/);
     assert.match(result.stdout, /release publish .*--expected-file-id/);
+    assert.match(result.stdout, /session renew --expected-account <moddb-username>/);
+    assert.match(result.stdout, /release prepare .*\[--expected-account <moddb-username>\]/);
+    assert.equal(result.stdout.includes("<account-id>"), false);
     assert.equal(result.stderr, "");
   }
 });
@@ -109,7 +112,7 @@ test("help prints usage to stdout and exits 0", async () => {
 test("a valid session is one JSON line with exit 0", async () => {
   const result = await run(["session", "status"]);
   assert.equal(result.exitCode, ExitCode.ok);
-  assert.deepEqual(oneJsonLine(result.stdout), { ok: true, status: "valid", data: { versionId: "v-old", validatedAccount: "123", effectiveExpiry: "2026-09-17T00:00:00.000Z" } });
+  assert.deepEqual(oneJsonLine(result.stdout), { ok: true, status: "valid", data: { versionId: "v-old", validatedAccount: "BASICBIT", effectiveExpiry: "2026-09-17T00:00:00.000Z" } });
   assert.equal(result.stderr, "");
 });
 
@@ -131,14 +134,14 @@ test("renewal during publish exits 3 and never saves", async () => {
 });
 
 test("session renew exits 0 with renewed and one fixed stderr line", async () => {
-  const result = await run(["session", "renew", "--expected-account", "123"], { current: session("2026-09-09T00:00:00.000Z") });
+  const result = await run(["session", "renew", "--expected-account", "BASICBIT"], { current: session("2026-09-09T00:00:00.000Z") });
   assert.equal(result.exitCode, ExitCode.ok);
   assert.equal(oneJsonLine(result.stdout).status, "renewed");
   assert.equal(result.stderr, "Complete the reCAPTCHA in the Chrome window.\n");
 });
 
 test("broker errors exit 1 with the code as reason and nothing on stderr", async () => {
-  const result = await run(["session", "renew", "--expected-account", "123"], {
+  const result = await run(["session", "renew", "--expected-account", "BASICBIT"], {
     current: session("2026-09-09T00:00:00.000Z"),
     validate: async () => {
       throw new BrokerError("MODDB_ACCOUNT_MISMATCH", `not ${COOKIE}`);

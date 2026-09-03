@@ -20,7 +20,7 @@ const WINCRED_COOKIE = "fixture-cookie-wincred-never-print";
 const PASSWORD = "fixture-password-never-print";
 const EMAIL = "fixture-email@example.invalid";
 const NEVER_PRINT = [OLD_COOKIE, NEW_COOKIE, WINCRED_COOKIE, PASSWORD, EMAIL, "aws-message-never-print"];
-const ACCOUNT = "123";
+const ACCOUNT = "BASICBIT";
 const NOW = new Date("2026-09-10T12:00:00.000Z");
 const clock = () => NOW;
 
@@ -385,6 +385,17 @@ test("prepare returns exact staged evidence without the zip path", async () => {
   assert.equal(call.cookieValue, OLD_COOKIE);
   assert.deepEqual([call.modId, call.expectedModIdentifier, call.expectedVersion, call.artifact.sha256], [42, "thebasics", "5.9.1", SHA]);
   assert.equal(JSON.stringify(result).includes(tempDir), false);
+});
+
+test("prepare and publish check an explicitly expected account, else the stored one", async () => {
+  const h = harness();
+  await h.run("releasePrepare", release({ expectedAccount: "someoneElse" }));
+  await h.run("releasePublish", release({ expectedFileId: 501, expectedAccount: "someoneElse" }));
+  await h.run("releasePrepare", release());
+  assert.deepEqual(
+    h.db.calls.validate.map((call) => call.account),
+    ["someoneElse", "someoneElse", ACCOUNT],
+  );
 });
 
 test("prepare renews first on interactive Windows and reports it", async () => {
