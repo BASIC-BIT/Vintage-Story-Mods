@@ -1,105 +1,58 @@
-# ModDB Release Automation Plan
+# ModDB Release Automation
 
-## What we found
+Status as of 2026-09-03: the AWS-backed design below is implemented on branch `codex/moddb-aws-auth-plan` in this repository and on a matching `basic-infra` branch. Nothing is merged, no Terraform is applied, no secret is initialized, and the Windows Credential Manager session has not been migrated. Those steps each need their own owner approval (see "Not yet done").
 
-- Upstream feature request exists: `https://github.com/anegostudios/vsmoddb/issues/18`
-  - Title: `[Feature request] API endpoint for CD to upload new versions of the mod`
-  - Status: Open
-  - Maintainer comment indicates they would accept a PR.
-- In this repo, tracking issue exists: #84 (`Track ModDB release automation (API + Playwright paths)`).
+Design: `docs/superpowers/specs/2026-09-03-moddb-aws-auth-design.md`. Research: `docs/research/2026-09-02-moddb-aws-authentication.md`.
 
-## Recommended strategy
+## Architecture
 
-1. **Primary path (best long-term):** contribute upload endpoint support to `anegostudios/vsmoddb`.
-2. **Interim path (usable now):** Playwright-based UI automation for release upload.
+### AWS (owned by `basic-infra`, `us-east-2`)
 
-Run both in parallel if possible: immediate relief via Playwright, durable CI via API.
+- Secrets Manager `/basic/vintage-story/moddb/account-login`: email and password. Readable only by the renewal role. Value set through the broker's masked prompt, never through Terraform.
+- Secrets Manager `/basic/vintage-story/moddb/session`: `vs_websessionkey` plus capture, expiry-estimate, and validation metadata. Renewal writes `AWSPENDING`, validates live, then promotes to `AWSCURRENT` conditionally on the version it originally observed. No lock table.
+- IAM `moddb-renewal`: read both secrets, stage and promote session versions.
+- IAM `moddb-publisher`: read `AWSCURRENT` of the session secret only. Assumable by local operator identities and by GitHub OIDC restricted to `repo:BASIC-BIT/Vintage-Story-Mods:ref:refs/heads/main`.
+- AWS-managed KMS key, no resource policies, no replication.
 
----
+### Broker (owned by this repository, `tools/moddb-release`)
 
-## Upstream API implementation notes
+One pinned Node 22 ESM package. It is the only code that holds credentials in memory. Commands: `account set`, `session status`, `session renew`, `session import-wincred`, `release prepare`, `release publish`. Each prints one non-secret JSON line; exit codes 0 ok, 1 failed, 2 `renewal-required`, 3 `approval-required`. Grammar and statuses are in the implementation plan's "Stable Broker Interface" section and in the skill.
 
-### Existing clues in upstream codebase
+`session renew` is the only place Playwright runs: installed Chrome, headed, non-persistent disposable profile, tracing and capture disabled. The human completes reCAPTCHA; the broker captures the cookie, validates the expected account, and promotes it. Renewal is allowed only on Windows with a TTY and outside GitHub Actions.
 
-- Route/docs stub already exists in README:
-  - `/api/v2/mods/{modid}/releases/new` marked `auth` + `at`, currently not implemented
-- Authenticated API routing file:
-  - `lib/api/authenticated/mods.php`
-- Existing release creation logic already available:
-  - `lib/edit-release.php` -> `createNewRelease(...)`
-- Existing file upload validation/parsing pipeline:
-  - `lib/fileupload.php` -> `processFileUpload(...)`
+`session import-wincred` is the one-time migration from `TheBasics.ModDb.Session` in Windows Credential Manager, via a narrow checked-in PowerShell adapter over a private process stream, in two phases (import as `AWSPENDING`, then `--finalize-version`).
 
-### Suggested endpoint contract
+### GitHub Actions
 
-- Method: `PUT /api/v2/mods/{modid}/releases/new`
-- Auth: existing session auth + action token (`at`)
-- Content type: `multipart/form-data` (recommended over base64 for large zips)
-- Required form fields:
-  - `file`: release zip
-  - `text`: changelog HTML/text
-  - `cgvs[]`: compatible game versions (semver strings)
-  - `at`: action token
+`ModDB Release` (`.github/workflows/moddb-release.yml`): `workflow_dispatch` only, `operation=prepare` or `operation=publish`, checks out the broker from protected `main`, assumes `moddb-publisher` through OIDC. Cloud runs cannot renew; an expired session returns `renewal-required` and stops. The separate manual `publish` dispatch is the public gate. `Create Release` (`release.yml`) is unchanged and remains a separate authorization.
 
-### Suggested implementation steps
+### Skill
 
-1. In `lib/api/authenticated/mods.php`, add handling for `releases/new` under the `mods/{modid}/releases/*` branch.
-2. Validate:
-   - method
-   - action token
-   - user ban state
-   - permission to edit target mod (`canEditAsset`)
-3. Upload/inspect release file using existing `processFileUpload(...)` pipeline to preserve current limits and modinfo parsing.
-4. Validate parsed mod identifier/version collision rules and compatible versions (same rules as web form path).
-5. Call `createNewRelease(...)`.
-6. Return JSON response with release metadata and URL.
+`.opencode/skills/moddb-release-playwright/SKILL.md` is the canonical agent runbook (nine-step sequence, authorization boundaries, maintainer commands). `.codex/skills/moddb-release-playwright/SKILL.md` is a thin pointer. `scripts/check-agent-tooling.ps1` asserts the skill names every broker command and the confirmation and renewal rules.
 
-### Expected benefit
+## Guarantees
 
-- Enables first-class CI/CD upload from GitHub Actions without browser automation.
+- Password and cookie never enter agent context, arguments, environment, files, logs, workflow output, or artifacts.
+- Every public ModDB save requires immediate owner confirmation of the exact staged file ID in the current conversation. A renewal during publish stops publication and requires fresh confirmation.
+- The broker verifies parsed mod identity and version, a single staged file, and the public download hash against the GitHub asset before reporting success.
 
----
+## Not yet done
 
-## Interim Playwright automation (current website flow)
+Each item is a separate approval, in order:
 
-### Known flow from upstream templates/code
+1. Merge the `basic-infra` branch and apply Terraform (empty containers and roles only).
+2. Merge this repository's branch.
+3. `account set` on an approved Windows machine.
+4. `session import-wincred` both phases, then verify `session status` from a second approved consumer.
+5. Remove the Windows Credential Manager entry.
+6. One live `release prepare` against a real artifact, then one owner-confirmed `release publish`.
 
-- Login route: `/login` (redirects through account service)
-- Add release route: `/edit/release/?modid=<id>`
-- Release form:
-  - file input: `input[name="newfile"]`
-  - changelog: `textarea[name="text"]`
-  - compatible versions: `input[name="cgvs[]"]`
-  - save buttons trigger JS `submitForm(...)`
+## Remaining official-API work
 
-### Playwright checklist
+The bridge above exists because ModDB has no supported upload API. The durable fix is upstream:
 
-1. Navigate to `https://mods.vintagestory.at/login` and complete auth.
-2. Open mod release page (`/edit/release/?modid=<id>`).
-3. Upload zip via `input[name="newfile"]`.
-4. Wait for upload and mod parse to complete (mod id/version fields auto-populate).
-5. Set compatible versions (`cgvs[]`) as desired.
-6. Fill changelog (`textarea[name="text"]`).
-7. Click save and verify success redirect (asset id in URL or release appears in files tab).
+- `anegostudios/vsmoddb` issue `#18` (open; maintainer said a PR would be accepted). The README already stubs `/api/v2/mods/{modid}/releases/new` as `auth` + `at`, unimplemented.
+- Implementation sketch: handle `releases/new` in `lib/api/authenticated/mods.php`, reuse `processFileUpload(...)` from `lib/fileupload.php` and `createNewRelease(...)` from `lib/edit-release.php`, accept `multipart/form-data` with `file`, `text`, `cgvs[]`, `at`, return release metadata and URL.
+- Repository tracking issue #84 stays open until the upstream endpoint ships or is declined.
 
-### Caveats
-
-- Authentication currently depends on account session flow (cookies/redirect), so some manual handoff may be needed.
-- UI selector changes can break automation; keep selectors minimal and data-attribute based where possible.
-
----
-
-## New workspace bootstrap (for upstream contribution)
-
-Use a separate workspace outside this mod repo.
-
-1. Clone upstream repository:
-   - `git clone https://github.com/anegostudios/vsmoddb.git`
-2. Follow upstream local setup (`README.md`):
-   - add hosts entry for `mods.vintagestory.stage`
-   - run docker compose from upstream `docker/`
-   - configure `lib/config.php`
-3. Create feature branch for API endpoint.
-4. Implement endpoint in `lib/api/authenticated/mods.php` using existing release/file helpers.
-5. Test endpoint locally with multipart uploads.
-6. Open PR against upstream and reference issue `#18`.
+When a scoped, revocable upload token exists, retire the password secret, the renewal browser flow, and the session secret; point the publisher role and the skill at the token.

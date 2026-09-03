@@ -150,6 +150,46 @@ foreach ($SkillName in $OpenCodeSkillNames) {
     }
 }
 
+$ModDbSkillPath = ".opencode/skills/moddb-release-playwright/SKILL.md"
+$ModDbWrapperPath = ".codex/skills/moddb-release-playwright/SKILL.md"
+$ModDbSkill = Read-RepoFile $ModDbSkillPath
+$ModDbWrapper = Read-RepoFile $ModDbWrapperPath
+$ModDbBrokerCommands = @(
+    "account set",
+    "session status",
+    "session renew",
+    "session import-wincred",
+    "release prepare",
+    "release publish"
+)
+$ModDbRequiredPhrases = @(
+    "tools/moddb-release/src/cli.mjs",
+    "AWS",
+    "canonical",
+    "immediate owner confirmation",
+    "renewed-during-publish"
+)
+
+foreach ($Command in $ModDbBrokerCommands) {
+    if (-not $ModDbSkill.Contains($Command)) {
+        Add-CheckError "$ModDbSkillPath must name the broker command '$Command'."
+    }
+}
+
+foreach ($Phrase in $ModDbRequiredPhrases) {
+    if (-not $ModDbSkill.Contains($Phrase)) {
+        Add-CheckError "$ModDbSkillPath must contain '$Phrase'."
+    }
+}
+
+if (-not $ModDbWrapper.Contains($ModDbSkillPath)) {
+    Add-CheckError "$ModDbWrapperPath must point to $ModDbSkillPath."
+}
+
+if ($ModDbWrapper.Contains("release publish")) {
+    Add-CheckError "$ModDbWrapperPath must not duplicate the broker runbook (found 'release publish')."
+}
+
 $OpenCodeMcpNames = Get-OpenCodeMcpNames
 $CodexMcpNames = Get-CodexMcpNames
 

@@ -1,6 +1,6 @@
 ---
 name: moddb-release-playwright
-description: Prepare and publish Vintage Story ModDB releases, including owner-reviewed public changelog copy and Playwright browser upload when direct API upload is unavailable.
+description: Conduct Vintage Story ModDB releases through the AWS-backed broker (session status, prepare, owner-confirmed publish, human-assisted Playwright renewal) and draft owner-reviewed public release copy.
 compatibility: opencode
 metadata:
   audience: maintainers
@@ -11,65 +11,105 @@ metadata:
 
 ## Purpose
 
-Prepare owner-reviewed public release copy and automate Vintage Story ModDB publishing through browser actions when a direct upload API is not available.
+Conduct a ModDB release for The BASICs. The agent is the release conductor; the broker at `tools/moddb-release/src/cli.mjs` is the only code that touches credentials. AWS Secrets Manager is the canonical session store; nothing else durable holds the cookie.
 
 Target site: `https://mods.vintagestory.at`
 
 For GitHub or ModDB release-note drafting, review, or platform conversion, read [references/public-release-notes.md](references/public-release-notes.md) before writing copy.
 
-## Drafting inputs
+## Boundaries
 
-- Release version or merged-change range.
-- Canonical source, pull request, tag, and packaged-artifact evidence needed to verify public claims.
+- Never ask for, accept, echo, or store a password, cookie, or reCAPTCHA response in chat, arguments, environment variables, files, or logs. The broker reads secrets in-process and prints only non-secret JSON.
+- Each of these is a separate authorization and none implies another:
+  - GitHub release creation (`Create Release` workflow, unchanged)
+  - ModDB `release prepare` (stages one upload, nothing public)
+  - ModDB `release publish` (public save; requires immediate owner confirmation in the current conversation)
+  - Infrastructure apply in `basic-infra` (secret containers, IAM roles)
+  - Credential migration (`account set`, `session import-wincred`)
+- Playwright appears only inside `session renew` on an approved Windows machine, in a visible disposable Chrome profile. Do not script the ModDB website from this skill.
 
-## ModDB publication inputs
+## Broker
 
-- `modId` (numeric mod id on ModDB)
-- `zipPath` (absolute path to built mod zip)
-- `changelogHtmlOrText`
-- `compatibleVersions` (array of semver strings, e.g. `1.21.6`)
+```text
+node tools/moddb-release/src/cli.mjs session status
+node tools/moddb-release/src/cli.mjs release prepare --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex>
+node tools/moddb-release/src/cli.mjs release publish --mod-id <number> --expected-mod-identifier <id> --expected-version <semver> --zip <path> --changelog <path> --compatible-version <semver> --expected-sha256 <hex> --expected-file-id <number>
+```
 
-## ModDB publication preconditions
+`--compatible-version` is repeatable. Run from the repository root with an AWS identity that can assume the publisher role (local) or renewal role (Windows renewal).
 
-- The zip already exists locally (build/package step completed).
-- Operator can complete any interactive auth challenge (account login/2FA) if prompted.
+One JSON line on stdout per command:
 
-## Workflow
+| Exit | `ok` | `status` | Meaning |
+| --- | --- | --- | --- |
+| 0 | true | `valid`, `renewed`, `prepared`, `published`, `imported`, `finalized` | Proceed |
+| 1 | false | (error) | Failed; read the field-name-only diagnostic, do not retry blindly |
+| 2 | false | `renewal-required` | Session expired or failed live auth and this environment cannot renew (`reason`: `expired` or `authentication-failed`) |
+| 3 | false | `approval-required` | `reason: renewed-during-publish`; publication did not happen |
 
-1. Prepare one fact-checked canonical release body using `references/public-release-notes.md`, derive each platform-ready body, and present the exact bodies plus rendered previews for owner approval.
-2. Open login page: `https://mods.vintagestory.at/login`.
-3. Complete auth flow and wait until logged in.
-4. Navigate to release page:
-   - `https://mods.vintagestory.at/edit/release/?modid=<modId>`
-5. Upload file using file input selector:
-   - `input[name="newfile"]`
-6. Wait for upload/parse completion:
-   - no active upload progress
-   - auto-detected mod id/version fields populated
-7. Set compatible versions by toggling:
-   - `input[name="cgvs[]"]`
-8. Set the approved changelog text in:
-   - `textarea[name="text"]`
-9. Click save button (`Save`), then wait for navigation.
-10. Verify success:
-   - URL includes `assetid=` OR
-   - release appears in mod files tab
+The broker decides renewal eligibility itself (Windows, TTY stdin, not `GITHUB_ACTIONS`). No flag overrides it.
 
-## Safety checks
+## Release sequence
 
-- Do not submit if mod id/version did not parse from uploaded file.
-- Do not submit if no compatible versions selected for game mods.
-- Capture screenshot and page URL before final submit.
+1. Verify the exact GitHub tag and release asset: mod identifier, version, SHA-256, size, ZIP entry count, compatible Vintage Story versions, and owner-approved changelog copy (per the reference above; zero U+2014, zero `[AGENT]`).
+2. Run `session status`. Do not request raw credentials.
+3. If the broker reports renewal is possible (approved Windows run), let it open visible Chrome. Ask the user only to complete reCAPTCHA. Do not read, describe, or capture the browser session.
+4. In cloud (`GITHUB_ACTIONS`), a `renewal-required` result means stop and tell the owner a Windows renewal is needed.
+5. Run or dispatch `release prepare`. Present the exact staged evidence: staged file ID, parsed identity and version, compatibility selection, changelog, SHA-256.
+6. Obtain immediate owner confirmation for the public save. Confirmation is per staged file ID; a new prepare needs a new confirmation.
+7. Run or dispatch `release publish` with `--expected-file-id` set to the confirmed staged file ID.
+8. If the result is `approval-required` with `renewed-during-publish`, stop. Re-present the staged evidence and obtain fresh confirmation before calling publish again.
+9. Verify the public ModDB page and the downloaded artifact hash against GitHub before reporting success.
+
+## Cloud path
+
+The `ModDB Release` workflow (`.github/workflows/moddb-release.yml`, manual dispatch only, code from protected `main`) runs the same broker with `operation=prepare` or `operation=publish`. `prepare` and `publish` are separate dispatches; `publish` takes the expected staged file ID.
+
+```powershell
+gh workflow run "ModDB Release" --ref main -f operation=prepare <release identity inputs>
+gh workflow run "ModDB Release" --ref main -f operation=publish <release identity inputs> <expected staged file id>
+```
+
+Cloud never renews. On an expired session it returns `renewal-required` and stops; complete a Windows renewal, then dispatch again. The owner-authorized `publish` dispatch is the public gate; there is no GitHub environment reviewer.
+
+## Maintainer only: credentials
+
+These are not part of a release conversation. Run them on an approved Windows machine with the renewal role.
+
+### Set the account login
+
+```text
+node tools/moddb-release/src/cli.mjs account set
+```
+
+Masked prompts for email and password. Nothing is passed as an argument.
+
+### One-time Windows Credential Manager import
+
+```text
+node tools/moddb-release/src/cli.mjs session import-wincred --expected-account <account-id>
+node tools/moddb-release/src/cli.mjs session import-wincred --finalize-version <aws-version-id>
+```
+
+Phase one reads `TheBasics.ModDb.Session` through the checked-in Windows adapter, writes it as `AWSPENDING`, validates the account, and reports `imported` with the AWS version ID. Phase two promotes that version to `AWSCURRENT` and reports `finalized`. Remove the Windows Credential Manager entry only after another approved consumer has run `session status` successfully against AWS.
+
+### Ordinary renewal
+
+```text
+node tools/moddb-release/src/cli.mjs session renew --expected-account <account-id>
+```
+
+Opens visible Chrome; the human completes reCAPTCHA; the broker captures the cookie, stages it as `AWSPENDING`, validates it, and promotes it conditionally. A promotion conflict fails closed; run it again.
 
 ## Output
 
-Return:
+Report, from broker JSON only:
 
-- final release URL
-- uploaded filename
-- selected compatible versions
-- success/failure and any UI error text
+- staged file ID and public release URL
+- parsed identity, version, compatible versions
+- SHA-256 match between GitHub asset and public ModDB download
+- final status and any non-secret diagnostic
 
-## Notes
+## Retirement
 
-- If this flow becomes brittle, prefer implementing upstream API endpoint support in `anegostudios/vsmoddb` issue `#18`.
+This password-and-session bridge is interim. When `anegostudios/vsmoddb` issue `#18` ships a scoped, revocable upload token, move the publisher to it, drop the password secret and `session renew`, and update this skill.
