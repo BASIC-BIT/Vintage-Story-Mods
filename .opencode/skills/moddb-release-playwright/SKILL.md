@@ -57,7 +57,7 @@ The broker decides renewal eligibility itself (Windows, TTY stdin, not `GITHUB_A
 4. In cloud (`GITHUB_ACTIONS`), a `renewal-required` result means stop and tell the owner a Windows renewal is needed.
 5. Run or dispatch `release prepare`. Present the exact staged evidence: staged file ID, parsed identity and version, compatibility selection, changelog, SHA-256.
 6. Obtain immediate owner confirmation for the public save. Confirmation is per staged file ID; a new prepare needs a new confirmation.
-7. Run or dispatch `release publish` with `--expected-file-id` set to the confirmed staged file ID.
+7. Run or dispatch `release publish` with `--expected-file-id` set to the confirmed staged file ID. Publish re-reads the staged file list immediately before the public save and refuses anything but that one file; a concurrent prepare in that window is the operator's responsibility, so run one release at a time.
 8. If the result is `approval-required` with `renewed-during-publish`, stop. Re-present the staged evidence and obtain fresh confirmation before calling publish again.
 9. Verify the public ModDB page and the downloaded artifact hash against GitHub before reporting success.
 

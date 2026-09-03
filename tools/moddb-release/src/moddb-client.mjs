@@ -240,7 +240,7 @@ export function createModDbClient({ origin = MODDB_ORIGIN, cookieValue, fetchImp
         throw fail("MODDB_COMPATIBILITY_MISSING", "at least one nonblank compatible Vintage Story version is required");
       }
       if (!nonblank(changelogHtml)) throw fail("MODDB_CHANGELOG_EMPTY", "changelog is empty");
-      if (changelogHtml.includes("—")) throw fail("MODDB_CHANGELOG_EM_DASH", "public release notes must not contain U+2014");
+      if (changelogHtml.includes("\u2014")) throw fail("MODDB_CHANGELOG_EM_DASH", "public release notes must not contain U+2014");
       assertArtifactIdentity(artifact, expectedModIdentifier, expectedVersion);
 
       const form = await readReleaseForm(modId);

@@ -34,7 +34,7 @@ One pinned Node 22 ESM package. It is the only code that holds credentials in me
 
 - Password and cookie never enter agent context, arguments, environment, files, logs, workflow output, or artifacts.
 - Every public ModDB save requires immediate owner confirmation of the exact staged file ID in the current conversation. A renewal during publish stops publication and requires fresh confirmation.
-- The broker verifies parsed mod identity and version, a single staged file, and the public download hash against the GitHub asset before reporting success.
+- The broker verifies parsed mod identity and version, a single staged file, and the public download hash against the GitHub asset before reporting success. Publish re-reads the staged file list immediately before the public save; a concurrent prepare in that window is the operator's responsibility (one release at a time).
 
 ## Not yet done
 
