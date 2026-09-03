@@ -7,7 +7,7 @@ import { ACCOUNT_SECRET_ID, SESSION_COOKIE_NAME } from "./config.mjs";
 import { BrokerError, safeFailure, safeResult } from "./contracts.mjs";
 import { createAccountAdminStore, createPublisherStore, createRenewalStore } from "./secret-store.mjs";
 import { buildSessionCandidate, getEffectiveExpiry } from "./session-schema.mjs";
-import { SESSION_COOKIE, ensureSession } from "./session-service.mjs";
+import { SESSION_COOKIE, ensureSession, readCurrentOrNull } from "./session-service.mjs";
 
 const RECAPTCHA_LINE = "Complete the reCAPTCHA in the Chrome window.\n";
 const fail = (code, message = code) => new BrokerError(code, message);
@@ -44,15 +44,6 @@ export function readMaskedLine(prompt, { stdin, stdout }) {
     stdin.on("data", onData);
     stdin.resume();
   });
-}
-
-async function readCurrentOrNull(store) {
-  try {
-    return await store.readCurrentSession();
-  } catch (error) {
-    if (error?.code === "SESSION_SECRET_EMPTY") return null;
-    throw error;
-  }
 }
 
 // ensureSession outcome -> envelope (cookie stripped) or null when usable.

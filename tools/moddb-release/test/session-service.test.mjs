@@ -50,11 +50,14 @@ const EXPIRED = session({ modDbValidUntilEstimate: "2026-09-09T00:00:00.000Z" })
 const LOGIN = { schemaVersion: 1, email: "fixture-email@example.invalid", password: PASSWORD };
 
 // Secrets Manager fake with a session container whose AWSCURRENT can move.
-function secrets({ current = session(), currentVersionId = "v-old", promoteError = null } = {}) {
+function secrets({ current = session(), currentVersionId = "v-old", promoteError = null, loginError = null } = {}) {
   const client = new FakeSecretsManagerClient();
   const state = { current, currentVersionId };
   client.respond("GetSecretValueCommand", (input) => {
-    if (input.SecretId === ACCOUNT_SECRET_ID) return { SecretString: JSON.stringify(LOGIN), VersionId: "login-v1" };
+    if (input.SecretId === ACCOUNT_SECRET_ID) {
+      if (loginError) throw loginError;
+      return { SecretString: JSON.stringify(LOGIN), VersionId: "login-v1" };
+    }
     if (state.current === null) throw awsError("ResourceNotFoundException");
     return { SecretString: JSON.stringify(state.current), VersionId: state.currentVersionId };
   });
@@ -271,8 +274,8 @@ test("interactive Windows renews an expired session in the approved order", asyn
   assert.equal(store.state.pending.capturedAt, NOW.toISOString());
 
   assert.equal(renewal.calls.length, 1);
+  assert.deepEqual(Object.keys(renewal.calls[0]), ["accountLogin", "onHumanActionRequired"], "the browser gets the login and the prompt hook only");
   assert.deepEqual(renewal.calls[0].accountLogin, LOGIN);
-  assert.equal(renewal.calls[0].expectedAccount, ACCOUNT);
   assert.equal(typeof renewal.calls[0].onHumanActionRequired, "function");
   // bridge then validation on the candidate before promotion, AWSCURRENT validated after
   assert.deepEqual(db.calls, [
@@ -372,6 +375,23 @@ test("a reread that is not the candidate is reported as a promotion conflict and
   await rejectsWithCode(run({ store }), "SESSION_PROMOTION_CONFLICT");
   assert.equal(store.client.inputs("UpdateSecretVersionStageCommand").length, 1);
 });
+
+// Running under the publisher-only profile: the renewal store exists but
+// AWS refuses the account login. That is "cannot renew here", not a crash.
+for (const [label, loginError, reason, db] of [
+  ["access denied", awsError("AccessDeniedException"), "expired", () => modDb()],
+  ["missing login secret", awsError("ResourceNotFoundException"), "expired", () => modDb()],
+  ["access denied after a failed live check", awsError("AccessDeniedException"), "authentication-failed", () => modDb("auth")],
+]) {
+  test(`unreadable account login (${label}) returns renewal-required without a browser`, async () => {
+    const store = secrets({ current: reason === "expired" ? EXPIRED : session(), loginError });
+    const renewal = browser();
+    const result = await run({ store, db: db(), renewal });
+    assert.deepEqual(result, { status: "renewal-required", reason });
+    assert.equal(loginReads(store), 1);
+    assertCurrentUnchanged(store, renewal);
+  });
+}
 
 test("renewal without an expected account stops before reading the login", async () => {
   const store = secrets({ current: null });

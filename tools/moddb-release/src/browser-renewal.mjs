@@ -44,6 +44,22 @@ const cookieDomainMatches = (cookie, hosts) => {
   return hosts.some((host) => host === domain || host.endsWith(`.${domain}`));
 };
 
+// Best effort, as the spec says: a lingering Chrome lock file must not turn a
+// successful capture into a failure. One retry, then silence.
+export async function removeProfileDir(dir, { rm = fs.rmSync, delay = 500 } = {}) {
+  const options = { recursive: true, force: true, maxRetries: 5, retryDelay: 200 };
+  try {
+    rm(dir, options);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    try {
+      rm(dir, options);
+    } catch {
+      // still locked; the directory holds no credentials and the OS temp cleanup will take it
+    }
+  }
+}
+
 const expiresToIso = (expires) => (typeof expires === "number" && expires > 0 ? new Date(expires * 1000).toISOString() : null);
 
 // Resolves with the raw cookie once it exists on an expected host; rejects on
@@ -89,15 +105,7 @@ async function waitForBridgeLanding({ remaining, landed, offOriginNavigated, isC
   return false;
 }
 
-export async function renewInBrowser({
-  accountLogin,
-  expectedAccount, // reserved for the caller's post-capture validation; the browser never sees it
-  browserConfig = DEFAULT_BROWSER_CONFIG,
-  onHumanActionRequired = () => {},
-  onBeforeCleanup = () => {}, // test-only hook
-  timeoutMs = 600_000,
-}) {
-  void expectedAccount;
+export async function renewInBrowser({ accountLogin, browserConfig = DEFAULT_BROWSER_CONFIG, onHumanActionRequired = () => {}, timeoutMs = 600_000 }) {
   const { accountOrigin, modDbOrigin, loginPath, channel, allowedOrigins } = { ...DEFAULT_BROWSER_CONFIG, ...browserConfig };
   const allowed = new Set(allowedOrigins);
   const hosts = [new URL(accountOrigin).hostname, new URL(modDbOrigin).hostname];
@@ -106,29 +114,39 @@ export async function renewInBrowser({
   const profileDir = createProfileDir();
   let context = null;
   let closed = false;
+  let interrupted = false;
   let offOrigin = false;
   let humanStep = false; // navigations before the human step are the login page itself
   let landed = false; // main frame committed on modDbOrigin, not on its /login bridge
+  // Playwright's own SIGINT handler would exit the process before the
+  // profile is removed, so Ctrl-C is handled here for the duration: close
+  // the context, and let the normal cancellation and cleanup paths run.
+  const onSigint = () => {
+    interrupted = true;
+    context?.close().catch(() => {});
+  };
+  process.once("SIGINT", onSigint);
 
   try {
     try {
-      context = await chromium.launchPersistentContext(profileDir, { channel, headless: false, acceptDownloads: false });
+      context = await chromium.launchPersistentContext(profileDir, { channel, headless: false, acceptDownloads: false, handleSIGINT: false });
     } catch {
       throw fail("RENEWAL_BROWSER_FAILED");
     }
     context.once("close", () => {
       closed = true;
     });
+    if (interrupted) throw fail("RENEWAL_CANCELLED");
 
     await context.route("**/*", (route) => {
       const request = route.request();
       try {
-        if (allowed.has(new URL(request.url()).origin)) return route.continue();
+        if (allowed.has(new URL(request.url()).origin)) return route.continue().catch(() => {});
         if (request.isNavigationRequest() && request.frame().parentFrame() === null) offOrigin = true;
       } catch {
         // unparseable or frameless request: treat as disallowed
       }
-      return route.abort("blockedbyclient");
+      return route.abort("blockedbyclient").catch(() => {}); // the context may already be closing
     });
 
     // Redirect hops bypass route(), so the main frame's committed origin is
@@ -167,15 +185,12 @@ export async function renewInBrowser({
     if (closed) throw fail("RENEWAL_CANCELLED");
     throw fail(error?.name === "TimeoutError" ? "RENEWAL_TIMEOUT" : "RENEWAL_BROWSER_FAILED");
   } finally {
+    process.off("SIGINT", onSigint);
     try {
       await context?.close();
     } catch {
       // already closed or crashed; the profile removal below still runs
     }
-    try {
-      onBeforeCleanup(profileDir);
-    } finally {
-      fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    }
+    await removeProfileDir(profileDir);
   }
 }

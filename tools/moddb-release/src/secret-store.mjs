@@ -18,11 +18,16 @@ import { parseAccountLogin, parseSession } from "./session-schema.mjs";
 const fail = (code) => new BrokerError(code, code);
 const isNonblank = (value) => typeof value === "string" && value.trim() !== "";
 
+// Schema errors name a field only (see session-schema.mjs); that name is
+// folded into the code, so the diagnostic survives the fixed-code policy.
+const SCHEMA_FIELD = /^invalid (?:session|account-login) field: ([A-Za-z]+)$/;
+
 function validate(parse, value, code) {
   try {
     return parse(value);
-  } catch {
-    throw fail(code);
+  } catch (error) {
+    const field = SCHEMA_FIELD.exec(String(error?.message ?? ""))?.[1];
+    throw fail(field ? `${code}_${field}` : code);
   }
 }
 
@@ -54,6 +59,10 @@ async function putVersion(client, uuid, secretId, value, stage, failCode) {
 }
 
 const readSession = (client) => readCurrent(client, SESSION_SECRET_ID, parseSession, "SESSION_SECRET_EMPTY");
+
+// How Secrets Manager reports a stage move whose RemoveFromVersionId no
+// longer carries AWSCURRENT, i.e. someone else promoted first.
+const PROMOTION_CONFLICTS = new Set(["InvalidParameterException", "InvalidRequestException", "ResourceExistsException"]);
 
 export function createAccountAdminStore(client, { uuid = randomUUID } = {}) {
   return {
@@ -96,7 +105,7 @@ export function createRenewalStore(client, { uuid = randomUUID } = {}) {
       try {
         await client.send(new UpdateSecretVersionStageCommand(input));
       } catch (error) {
-        throw fail(String(error?.name).endsWith("Exception") ? "SESSION_PROMOTION_CONFLICT" : "SESSION_PROMOTION_FAILED");
+        throw fail(PROMOTION_CONFLICTS.has(error?.name) ? "SESSION_PROMOTION_CONFLICT" : "SESSION_PROMOTION_FAILED");
       }
     },
   };

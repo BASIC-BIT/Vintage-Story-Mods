@@ -106,16 +106,21 @@ test("other read failures map to a fixed code", async () => {
   await rejectsWithCode(createPublisherStore(client).readCurrentSession(), "SECRET_READ_FAILED");
 });
 
+// Schema failures name the offending field in the code itself, never a value.
 test("binary, missing, and malformed secret values are rejected safely", async () => {
+  const { cookieValue: _dropped, ...withoutCookie } = SESSION;
   const cases = [
     [{ SecretBinary: new Uint8Array([1]), VersionId: "v" }, "SECRET_MISSING"],
     [{ VersionId: "v" }, "SECRET_MISSING"],
     [{ SecretString: '{"cookieValue": "fixture-cookie-never-print"', VersionId: "v" }, "SECRET_MALFORMED"],
-    [{ SecretString: JSON.stringify({ ...SESSION, schemaVersion: 2 }), VersionId: "v" }, "SECRET_MALFORMED"],
+    [{ SecretString: JSON.stringify({ ...SESSION, schemaVersion: 2 }), VersionId: "v" }, "SECRET_MALFORMED_schemaVersion"],
+    [{ SecretString: JSON.stringify(withoutCookie), VersionId: "v" }, "SECRET_MALFORMED_cookieValue"],
+    [{ SecretString: JSON.stringify({ ...SESSION, capturedAt: "fixture-cookie-never-print" }), VersionId: "v" }, "SECRET_MALFORMED_capturedAt"],
     [{ SecretString: JSON.stringify(SESSION) }, "SECRET_MALFORMED"],
   ];
   for (const [output, code] of cases) {
-    await rejectsWithCode(createPublisherStore(sessionClient(output)).readCurrentSession(), code);
+    const error = await rejectsWithCode(createPublisherStore(sessionClient(output)).readCurrentSession(), code);
+    assert.match(error.code, /^[A-Za-z][A-Za-z0-9_-]{0,63}$/);
   }
 });
 
@@ -135,7 +140,8 @@ test("putAccountLogin writes schema version 1 as AWSCURRENT with a caller token"
 
 test("putAccountLogin rejects blank credentials without sending", async () => {
   const client = new FakeSecretsManagerClient();
-  await rejectsWithCode(createAccountAdminStore(client).putAccountLogin({ email: "", password: "x" }), "ACCOUNT_INVALID");
+  await rejectsWithCode(createAccountAdminStore(client).putAccountLogin({ email: "", password: "x" }), "ACCOUNT_INVALID_email");
+  await rejectsWithCode(createAccountAdminStore(client).putAccountLogin({ email: "x", password: " " }), "ACCOUNT_INVALID_password");
   assert.deepEqual(client.calls, []);
 });
 
@@ -155,8 +161,9 @@ test("putPendingSession validates the candidate before sending", async () => {
   const client = new FakeSecretsManagerClient();
   await rejectsWithCode(
     createRenewalStore(client).putPendingSession({ ...SESSION, cookieValue: " " }),
-    "SESSION_CANDIDATE_INVALID",
+    "SESSION_CANDIDATE_INVALID_cookieValue",
   );
+  await rejectsWithCode(createRenewalStore(client).putPendingSession("not an object"), "SESSION_CANDIDATE_INVALID");
   assert.deepEqual(client.calls, []);
 });
 
@@ -223,21 +230,18 @@ test("promotion refuses an unknown original version instead of treating it as bo
   assert.deepEqual(client.calls, []);
 });
 
-test("a lost promotion race fails closed", async () => {
-  for (const name of ["InvalidRequestException", "ResourceExistsException", "InvalidParameterException"]) {
+test("a lost promotion race fails closed; every other promotion error is a plain failure", async () => {
+  const promote = (error) => {
     const client = new FakeSecretsManagerClient().respond("UpdateSecretVersionStageCommand", () => {
-      throw awsError(name);
+      throw error;
     });
-    await rejectsWithCode(
-      createRenewalStore(client).promoteSession({ candidateVersionId: "c", originalCurrentVersionId: "o" }),
-      "SESSION_PROMOTION_CONFLICT",
-    );
+    return createRenewalStore(client).promoteSession({ candidateVersionId: "c", originalCurrentVersionId: "o" });
+  };
+  for (const name of ["InvalidRequestException", "ResourceExistsException", "InvalidParameterException"]) {
+    await rejectsWithCode(promote(awsError(name)), "SESSION_PROMOTION_CONFLICT");
   }
-  const client = new FakeSecretsManagerClient().respond("UpdateSecretVersionStageCommand", () => {
-    throw new TypeError("fetch failed: aws-message-never-print");
-  });
-  await rejectsWithCode(
-    createRenewalStore(client).promoteSession({ candidateVersionId: "c", originalCurrentVersionId: "o" }),
-    "SESSION_PROMOTION_FAILED",
-  );
+  for (const name of ["AccessDeniedException", "ResourceNotFoundException", "InternalServiceError", "ThrottlingException"]) {
+    await rejectsWithCode(promote(awsError(name)), "SESSION_PROMOTION_FAILED");
+  }
+  await rejectsWithCode(promote(new TypeError("fetch failed: aws-message-never-print")), "SESSION_PROMOTION_FAILED");
 });

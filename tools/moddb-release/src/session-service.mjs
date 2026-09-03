@@ -14,7 +14,7 @@ export const SESSION_COOKIE = Symbol("sessionCookie");
 const fail = (code) => new BrokerError(code, code);
 const nonblank = (value) => typeof value === "string" && value.trim() !== "";
 
-async function readCurrentOrNull(store) {
+export async function readCurrentOrNull(store) {
   try {
     return await store.readCurrentSession();
   } catch (error) {
@@ -75,8 +75,14 @@ export async function ensureSession({
   let captured = null;
   let candidate = null;
   try {
-    accountLogin = await renewalStore.readAccountLogin();
-    captured = await browserRenewal({ accountLogin, expectedAccount: account, onHumanActionRequired });
+    try {
+      accountLogin = await renewalStore.readAccountLogin();
+    } catch (error) {
+      // Interactive, but this identity cannot read the login (publisher-only profile): same answer as the cloud.
+      if (error?.code === "SECRET_READ_FAILED" || error?.code === "ACCOUNT_SECRET_EMPTY") return { status: "renewal-required", reason };
+      throw error;
+    }
+    captured = await browserRenewal({ accountLogin, onHumanActionRequired });
     accountLogin = null;
     candidate = buildSessionCandidate({ ...captured, validatedAccount: account, now: clock() });
     captured = null;

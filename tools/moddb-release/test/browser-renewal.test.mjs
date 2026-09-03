@@ -9,7 +9,7 @@ import test, { after, afterEach, beforeEach } from "node:test";
 
 import { SESSION_COOKIE_NAME } from "../src/config.mjs";
 import { BrokerError } from "../src/contracts.mjs";
-import { renewInBrowser } from "../src/browser-renewal.mjs";
+import { removeProfileDir, renewInBrowser } from "../src/browser-renewal.mjs";
 import { startFakeAccountServer } from "./support/fake-account-server.mjs";
 import { startFakeModDb } from "./support/fake-moddb.mjs";
 
@@ -44,7 +44,6 @@ beforeEach(async () => {
 afterEach(async () => {
   await fake.close();
   assert.deepEqual(profileDirs(), before, "disposable profile survived cleanup");
-  assert.ok(seenProfileDirs.length > 0, "the driver never created a profile directory");
   for (const request of fake.requests.filter((r) => r.server !== "account")) {
     assert.equal(JSON.stringify(request).includes(PASSWORD), false, "password reached another origin");
   }
@@ -66,14 +65,19 @@ const config = (loginPath = "/?autohuman=300") => ({
   allowedOrigins: [fake.origin],
 });
 
-// Test-only hook: inspect the profile directory right before the driver removes it.
-const onBeforeCleanup = (profileDir) => {
+// Inspect the disposable profile while Chrome is running on it: it is the one
+// new moddb-renewal-* directory in tmpdir, and it holds no capture artifacts.
+const inspectProfile = () => {
+  const created = profileDirs().filter((name) => !before.includes(name));
+  assert.equal(created.length, 1, "expected exactly one new profile directory");
+  const profileDir = path.join(os.tmpdir(), created[0]);
   seenProfileDirs.push(profileDir);
-  assert.equal(path.dirname(profileDir), os.tmpdir());
-  assert.ok(path.basename(profileDir).startsWith("moddb-renewal-"));
   const captures = walk(profileDir).filter((entry) => CAPTURE_FILE.test(entry));
   assert.deepEqual(captures, [], "profile contains capture artifacts");
 };
+
+const renew = (overrides = {}) =>
+  renewInBrowser({ accountLogin, browserConfig: config(), onHumanActionRequired: inspectProfile, timeoutMs: 30_000, ...overrides });
 
 async function rejectsWith(promise, code) {
   let error;
@@ -92,16 +96,15 @@ test("fills credentials only on the verified origin, waits for the human, and re
   fake.state.cookieMaxAge = 3600;
   const startedAt = Date.now();
   let humanPrompted = 0;
-  const result = await renewInBrowser({
-    accountLogin,
-    expectedAccount: ACCOUNT,
-    browserConfig: config(),
-    onHumanActionRequired: () => humanPrompted++,
-    onBeforeCleanup,
-    timeoutMs: 30_000,
+  const result = await renew({
+    onHumanActionRequired: () => {
+      humanPrompted++;
+      inspectProfile();
+    },
   });
 
   assert.equal(humanPrompted, 1);
+  assert.equal(seenProfileDirs.length, 1);
   assert.deepEqual(Object.keys(result), ["cookieName", "cookieValue", "observedCookieExpiresAt"]);
   assert.equal(result.cookieName, SESSION_COOKIE_NAME);
   assert.equal(result.cookieValue, COOKIE);
@@ -128,13 +131,7 @@ test("keeps the browser open until the ModDB login bridge has landed", async () 
   moddb.state.bridgeDelayMs = 1500;
   fake.state.redirectTo = `${moddb.origin}/login`;
   try {
-    const result = await renewInBrowser({
-      accountLogin,
-      expectedAccount: ACCOUNT,
-      browserConfig: { ...config(), modDbOrigin: moddb.origin, allowedOrigins: [fake.origin, moddb.origin] },
-      onBeforeCleanup,
-      timeoutMs: 30_000,
-    });
+    const result = await renew({ browserConfig: { ...config(), modDbOrigin: moddb.origin, allowedOrigins: [fake.origin, moddb.origin] } });
     assert.equal(result.cookieValue, COOKIE);
     const paths = moddb.requests.map((r) => r.path);
     assert.ok(paths.includes("/login"), "the bridge was never requested");
@@ -152,13 +149,7 @@ test("returns the captured cookie when the bridge never lands before the deadlin
   moddb.state.bridgeStalls = true;
   fake.state.redirectTo = `${moddb.origin}/login`;
   try {
-    const result = await renewInBrowser({
-      accountLogin,
-      expectedAccount: ACCOUNT,
-      browserConfig: { ...config(), modDbOrigin: moddb.origin, allowedOrigins: [fake.origin, moddb.origin] },
-      onBeforeCleanup,
-      timeoutMs: 6_000,
-    });
+    const result = await renew({ browserConfig: { ...config(), modDbOrigin: moddb.origin, allowedOrigins: [fake.origin, moddb.origin] }, timeoutMs: 6_000 });
     assert.equal(result.cookieValue, COOKIE);
     const paths = moddb.requests.map((r) => r.path);
     assert.ok(paths.includes("/login"));
@@ -169,15 +160,45 @@ test("returns the captured cookie when the bridge never lands before the deadlin
 });
 
 test("session cookies without an expiry report null", async () => {
-  const result = await renewInBrowser({ accountLogin, expectedAccount: ACCOUNT, browserConfig: config(), onBeforeCleanup, timeoutMs: 30_000 });
+  const result = await renew();
   assert.equal(result.observedCookieExpiresAt, null);
 });
 
-test("times out while the human never completes and still removes the profile", async () => {
+test("Ctrl-C closes the browser, reports RENEWAL_CANCELLED, and still removes the profile", async () => {
+  const listeners = process.listenerCount("SIGINT");
+  let during;
   await rejectsWith(
-    renewInBrowser({ accountLogin, expectedAccount: ACCOUNT, browserConfig: config("/"), onBeforeCleanup, timeoutMs: 1_500 }),
-    "RENEWAL_TIMEOUT",
+    renew({
+      browserConfig: config("/"),
+      onHumanActionRequired: () => {
+        inspectProfile();
+        during = process.listenerCount("SIGINT");
+        setTimeout(() => process.emit("SIGINT"), 100);
+      },
+    }),
+    "RENEWAL_CANCELLED",
   );
+  assert.equal(during, listeners + 1, "the renewal owns Ctrl-C while it runs");
+  assert.equal(process.listenerCount("SIGINT"), listeners, "the Ctrl-C listener was not removed");
+  assert.equal(fake.requests.some((r) => r.path === "/attemptlogin"), false);
+});
+
+test("removeProfileDir retries once, then gives up silently", async () => {
+  const calls = [];
+  const throwing = (dir, options) => {
+    calls.push({ dir, options });
+    throw new Error("EBUSY: chrome lock file");
+  };
+  await removeProfileDir("fixture-profile-dir", { rm: throwing, delay: 0 });
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0].options, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  const once = [];
+  await removeProfileDir("fixture-profile-dir", { rm: (dir) => once.push(dir), delay: 0 });
+  assert.deepEqual(once, ["fixture-profile-dir"]);
+});
+
+test("times out while the human never completes and still removes the profile", async () => {
+  await rejectsWith(renew({ browserConfig: config("/"), timeoutMs: 1_500 }), "RENEWAL_TIMEOUT");
   assert.equal(fake.requests.some((r) => r.path === "/attemptlogin"), false);
 });
 
@@ -186,10 +207,7 @@ test("times out while the human never completes and still removes the profile", 
 // and the renewal is rejected.
 test("rejects a login that redirects to an unexpected origin and leaks nothing to it", async () => {
   fake.state.redirectTo = `${fake.decoyOrigin}/landing`;
-  await rejectsWith(
-    renewInBrowser({ accountLogin, expectedAccount: ACCOUNT, browserConfig: config(), onBeforeCleanup, timeoutMs: 30_000 }),
-    "RENEWAL_ORIGIN_MISMATCH",
-  );
+  await rejectsWith(renew(), "RENEWAL_ORIGIN_MISMATCH");
   const decoyRequests = fake.requests.filter((r) => r.server === "decoy");
   assert.equal(decoyRequests.some((r) => r.method !== "GET"), false, "credentials were posted to the decoy");
   assert.equal(JSON.stringify(decoyRequests).includes(COOKIE), false, "the session cookie reached the decoy");
@@ -197,23 +215,11 @@ test("rejects a login that redirects to an unexpected origin and leaks nothing t
 
 test("refuses to fill when the login page is not on the account origin", async () => {
   fake.state.loginRedirectTo = `${fake.decoyOrigin}/login`;
-  await rejectsWith(
-    renewInBrowser({
-      accountLogin,
-      expectedAccount: ACCOUNT,
-      browserConfig: { ...config(), allowedOrigins: [fake.origin, fake.decoyOrigin] },
-      onBeforeCleanup,
-      timeoutMs: 30_000,
-    }),
-    "RENEWAL_ORIGIN_MISMATCH",
-  );
+  await rejectsWith(renew({ browserConfig: { ...config(), allowedOrigins: [fake.origin, fake.decoyOrigin] } }), "RENEWAL_ORIGIN_MISMATCH");
   assert.equal(fake.requests.some((r) => r.path === "/attemptlogin"), false, "credentials were submitted");
   assert.equal(fake.requests.some((r) => r.server === "decoy" && r.method === "POST"), false);
 });
 
 test("maps a browser that cannot launch to RENEWAL_BROWSER_FAILED", async () => {
-  await rejectsWith(
-    renewInBrowser({ accountLogin, expectedAccount: ACCOUNT, browserConfig: { ...config(), channel: "no-such-browser-channel" }, onBeforeCleanup, timeoutMs: 30_000 }),
-    "RENEWAL_BROWSER_FAILED",
-  );
+  await rejectsWith(renew({ browserConfig: { ...config(), channel: "no-such-browser-channel" } }), "RENEWAL_BROWSER_FAILED");
 });
