@@ -30,6 +30,7 @@ const knownDynamicExpressions = new Set([
   "modeName",
   "nameError.ErrorCode",
   "normalizedResultCode",
+  "languageOperation",
   "result",
   "result.ErrorCode ?? \"warmup_failed\"",
   "surface",
@@ -292,6 +293,7 @@ function currentProducerContracts() {
     ["AnalyticsService.TrackFeatureUsed", ["feature_name", 0, "featureName"], ["action", 1, "action"], ["result", 3, "result"]],
     ["AnalyticsService.TrackFailure", ["area", 0, "area"], ["operation", 1, "operation"], ["severity", 2, "severity"], ["result", 3, "result"]],
     ["AnalyticsService.TrackPlayerFailure", ["area", 1, "area"], ["operation", 2, "operation"], ["severity", 3, "severity"], ["result", 4, "result"]],
+    ["TrackLanguageStateInvariantOutcome", ["operation", 0, "operation"]],
     ["TrackConfigEditorFailure", ["area", 1, "featureName"], ["operation", 2, "action"]],
     ["TrackHomeSpawnFailure", ["command_name", 1, "commandName"], ["action", 2, "featureAction"], ["result", 3, "result"]],
     ["TrackTpaFailure", ["command_name", 1, "commandName"], ["action", 2, "action"], ["result", 3, "result"]],
@@ -446,6 +448,43 @@ test("relay accepts current production event contracts", () => {
     warmup_seconds_bucket: "1-5",
   }));
   assertAccepted(warmup, "warmup_seconds_bucket");
+});
+
+test("relay accepts bounded language-state reliability failures without language data", () => {
+  for (const [operation, result, recovered] of [
+    ["read_known_languages", "decode_failed", true],
+    ["read_default_language", "decode_failed", true],
+    ["join_reconcile", "default_language_unknown", false],
+    ["join_reconcile", "default_language_repaired", true],
+    ["character_restore", "default_language_unknown", false],
+  ]) {
+    const validation = validatePayload(payloadForEvent("mod failure", {
+      area: "language_state",
+      operation,
+      severity: "warning",
+      result,
+      recovered,
+      success: false,
+      pseudonymous_player_id: playerPseudonym,
+    }));
+
+    assertAccepted(validation, `${operation}:${result}`);
+    const properties = validation.events[0].properties;
+    assert.equal(properties.pseudonymous_player_id, playerPseudonym);
+    assert.equal(Object.hasOwn(properties, "language_name"), false);
+    assert.equal(Object.hasOwn(properties, "exception_message"), false);
+  }
+
+  const privateLanguageData = validatePayload(payloadForEvent("mod failure", {
+    area: "language_state",
+    operation: "join_reconcile",
+    severity: "warning",
+    result: "default_language_unknown",
+    recovered: false,
+    success: false,
+    language_name: "private-language-name",
+  }));
+  assert.deepEqual(privateLanguageData.rejected, ["unknown_property"]);
 });
 
 test("health exposes the relay contract required by the mod", async () => {

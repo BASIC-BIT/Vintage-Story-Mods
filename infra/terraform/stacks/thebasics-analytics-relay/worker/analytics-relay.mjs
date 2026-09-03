@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 const MAX_ONLINE_PLAYER_COUNT = 10_000;
-export const CONTRACT_REVISION = 4;
+export const CONTRACT_REVISION = 5;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -247,6 +247,7 @@ const ALLOWED_STRING_VALUES = new Map([
     "environment_message",
     "global_ooc",
     "language_config",
+    "language_state",
     "ooc",
     "proximity_chat",
     "proximity_emote",
@@ -364,12 +365,15 @@ const ALLOWED_STRING_VALUES = new Map([
     "home_warmup_start",
     "it",
     "load",
+    "join_reconcile",
     "me",
     "normal",
     "ooc",
     "reload",
     "request_bring",
     "request_goto",
+    "read_default_language",
+    "read_known_languages",
     "save",
     "send_chat_tab",
     "send_normal",
@@ -382,6 +386,7 @@ const ALLOWED_STRING_VALUES = new Map([
     "stuck",
     "stuck_warmup_start",
     "switch",
+    "character_restore",
     "top",
     "top_warmup_start",
     "upload",
@@ -403,11 +408,14 @@ const ALLOWED_STRING_VALUES = new Map([
     "config_unreadable",
     "consume_gear_failed",
     "cooldown",
+    "decode_failed",
     "crop-failed",
     "decode-create-failed",
     "decode-failed",
     "decode-zero-dims",
     "dimensions-exceeded",
+    "default_language_repaired",
+    "default_language_unknown",
     "empty",
     "encode-failed",
     "existing_request",

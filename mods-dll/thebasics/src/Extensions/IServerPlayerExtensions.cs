@@ -7,6 +7,7 @@ using thebasics.Models;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Semantics;
@@ -19,6 +20,12 @@ using Vintagestory.API.Util;
 
 namespace thebasics.Extensions
 {
+    internal enum LanguageStateInvariant
+    {
+        Valid,
+        DefaultLanguageUnknown
+    }
+
     public static class IServerPlayerExtensions
     {
         private const string ModDataNickname = "BASIC_NICKNAME";
@@ -72,6 +79,16 @@ namespace thebasics.Extensions
                 catch (Exception e2)
                 {
                     player.Entity.Api.Logger.Error("THEBASICS: Failed to clear mod data for key " + key + " for player " + player.PlayerName + ": " + e2.Message);
+                }
+
+                if (key == ModDataLanguages || key == ModDataDefaultLanguage)
+                {
+                    AnalyticsService.TrackPlayerFailure(
+                        player.PlayerUID,
+                        "language_state",
+                        key == ModDataLanguages ? "read_known_languages" : "read_default_language",
+                        "warning",
+                        "decode_failed");
                 }
             }
 
@@ -524,6 +541,53 @@ namespace thebasics.Extensions
         public static List<string> GetLanguages(this IWorldPlayerData playerData)
         {
             return playerData?.GetModData(ModDataLanguages, new List<string>()) ?? new List<string>();
+        }
+
+        internal static LanguageStateInvariant ClassifyLanguageStateInvariant(this IServerPlayer player)
+        {
+            var defaultLanguage = player.GetDefaultLanguageName();
+            if (string.IsNullOrWhiteSpace(defaultLanguage))
+            {
+                return LanguageStateInvariant.Valid;
+            }
+
+            if (string.Equals(defaultLanguage, LanguageSystem.BabbleLang.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return LanguageStateInvariant.Valid;
+            }
+
+            var hasDefaultLanguage = player.GetLanguages()?.Any(language =>
+                string.Equals(language, defaultLanguage, StringComparison.OrdinalIgnoreCase)) == true;
+            return hasDefaultLanguage
+                ? LanguageStateInvariant.Valid
+                : LanguageStateInvariant.DefaultLanguageUnknown;
+        }
+
+        internal static void TrackLanguageStateInvariantOutcome(this IServerPlayer player, string languageOperation, LanguageStateInvariant before = LanguageStateInvariant.Valid)
+        {
+            var after = player.ClassifyLanguageStateInvariant();
+            if (after == LanguageStateInvariant.DefaultLanguageUnknown)
+            {
+                AnalyticsService.TrackPlayerFailure(
+                    player.PlayerUID,
+                    "language_state",
+                    languageOperation,
+                    "warning",
+                    "default_language_unknown",
+                    recovered: false);
+                return;
+            }
+
+            if (before == LanguageStateInvariant.DefaultLanguageUnknown)
+            {
+                AnalyticsService.TrackPlayerFailure(
+                    player.PlayerUID,
+                    "language_state",
+                    languageOperation,
+                    "warning",
+                    "default_language_repaired",
+                    recovered: true);
+            }
         }
 
         public static void SetLanguages(this IServerPlayer player, IEnumerable<string> languages)

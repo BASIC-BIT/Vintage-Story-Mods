@@ -5,18 +5,144 @@ using NSubstitute;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.ModSystems.CharacterSheets.Models;
+using thebasics.ModSystems.Analytics;
+using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.RpCharacters;
 using thebasics.ModSystems.RpCharacters.Models;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 
 namespace thebasics.Tests.ModSystems.RpCharacters;
 
 [Collection(AnalyticsServiceTestCollection.Name)]
-public class RpCharacterServiceTests
+public class RpCharacterServiceTests : IDisposable
 {
+    public RpCharacterServiceTests()
+    {
+        AnalyticsService.Shutdown();
+    }
+
+    public void Dispose()
+    {
+        AnalyticsService.Shutdown();
+    }
+
+    [Fact]
+    public void TrackLanguageStateInvariantOutcome_WhenBabbleIsDefaultAndNoLanguagesAreKnown_DoesNotReportFailure()
+    {
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(sink, allowErrorTelemetry: true);
+        var player = CreatePlayer();
+        player.SetLanguages([]);
+        IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", LanguageSystem.BabbleLang.Name);
+
+        player.TrackLanguageStateInvariantOutcome("character_restore");
+
+        sink.Events.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RestoreProjection_WhenDefaultLanguageIsNotKnown_ReportsSanitizedLanguageStateFailure()
+    {
+        const string rawPlayerUid = "raw-player-uid";
+        const string pseudonymousPlayerId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(
+            sink,
+            allowErrorTelemetry: true,
+            playerPseudonymizer: playerUid => playerUid == rawPlayerUid ? pseudonymousPlayerId : null);
+        var player = CreatePlayer(rawPlayerUid);
+        var service = new RpCharacterService(CreateConfig());
+
+        service.RestoreProjection(player, new RpCharacterProjectionSnapshot
+        {
+            Languages = ["Common"],
+            DefaultLanguage = "UnknownLanguage"
+        });
+
+        var analyticsEvent = sink.Events.Should().ContainSingle().Subject;
+        analyticsEvent.Name.Should().Be("mod failure");
+        analyticsEvent.Properties.Should().ContainKey("area").WhoseValue.Should().Be("language_state");
+        analyticsEvent.Properties.Should().ContainKey("operation").WhoseValue.Should().Be("character_restore");
+        analyticsEvent.Properties.Should().ContainKey("severity").WhoseValue.Should().Be("warning");
+        analyticsEvent.Properties.Should().ContainKey("result").WhoseValue.Should().Be("default_language_unknown");
+        analyticsEvent.Properties.Should().ContainKey("recovered").WhoseValue.Should().Be(false);
+        analyticsEvent.Properties.Should().ContainKey("pseudonymous_player_id").WhoseValue.Should().Be(pseudonymousPlayerId);
+        analyticsEvent.Properties.Values.Should().NotContain(rawPlayerUid);
+        analyticsEvent.Properties.Values.Should().NotContain("UnknownLanguage");
+    }
+
+    [Fact]
+    public void GetModData_WhenKnownLanguagesCannotDeserialize_ReportsSanitizedLanguageStateFailure()
+    {
+        const string rawPlayerUid = "raw-player-uid";
+        const string pseudonymousPlayerId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(
+            sink,
+            allowErrorTelemetry: true,
+            playerPseudonymizer: playerUid => playerUid == rawPlayerUid ? pseudonymousPlayerId : null);
+        var api = Substitute.For<ICoreAPI>();
+        api.Logger.Returns(Substitute.For<ILogger>());
+        var player = new FakeServerPlayer(rawPlayerUid)
+        {
+            Entity = new EntityPlayer { Api = api }
+        };
+        player.SetModdata("BASIC_LANGUAGES", [255]);
+
+        IServerPlayerExtensions.GetModData(player, "BASIC_LANGUAGES", new List<string>()).Should().BeEmpty();
+
+        player.GetModdata("BASIC_LANGUAGES").Should().BeNull();
+        var analyticsEvent = sink.Events.Should().ContainSingle().Subject;
+        analyticsEvent.Name.Should().Be("mod failure");
+        analyticsEvent.Properties.Should().ContainKey("area").WhoseValue.Should().Be("language_state");
+        analyticsEvent.Properties.Should().ContainKey("operation").WhoseValue.Should().Be("read_known_languages");
+        analyticsEvent.Properties.Should().ContainKey("severity").WhoseValue.Should().Be("warning");
+        analyticsEvent.Properties.Should().ContainKey("result").WhoseValue.Should().Be("decode_failed");
+        analyticsEvent.Properties.Should().ContainKey("recovered").WhoseValue.Should().Be(true);
+        analyticsEvent.Properties.Should().ContainKey("pseudonymous_player_id").WhoseValue.Should().Be(pseudonymousPlayerId);
+        analyticsEvent.Properties.Should().NotContainKey("exception_message");
+        analyticsEvent.Properties.Should().NotContainKey("exception_type");
+        analyticsEvent.Properties.Values.Should().NotContain(rawPlayerUid);
+    }
+
+    [Fact]
+    public void GetModData_WhenDefaultLanguageCannotDeserialize_ReportsSanitizedLanguageStateFailure()
+    {
+        const string rawPlayerUid = "raw-player-uid";
+        const string pseudonymousPlayerId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(
+            sink,
+            allowErrorTelemetry: true,
+            playerPseudonymizer: playerUid => playerUid == rawPlayerUid ? pseudonymousPlayerId : null);
+        var api = Substitute.For<ICoreAPI>();
+        api.Logger.Returns(Substitute.For<ILogger>());
+        var player = new FakeServerPlayer(rawPlayerUid)
+        {
+            Entity = new EntityPlayer { Api = api }
+        };
+        player.SetModdata("BASIC_DEFAULT_LANGUAGE", [255]);
+
+        IServerPlayerExtensions.GetModData(player, "BASIC_DEFAULT_LANGUAGE", string.Empty).Should().BeEmpty();
+
+        player.GetModdata("BASIC_DEFAULT_LANGUAGE").Should().BeNull();
+        var analyticsEvent = sink.Events.Should().ContainSingle().Subject;
+        analyticsEvent.Name.Should().Be("mod failure");
+        analyticsEvent.Properties.Should().ContainKey("area").WhoseValue.Should().Be("language_state");
+        analyticsEvent.Properties.Should().ContainKey("operation").WhoseValue.Should().Be("read_default_language");
+        analyticsEvent.Properties.Should().ContainKey("severity").WhoseValue.Should().Be("warning");
+        analyticsEvent.Properties.Should().ContainKey("result").WhoseValue.Should().Be("decode_failed");
+        analyticsEvent.Properties.Should().ContainKey("recovered").WhoseValue.Should().Be(true);
+        analyticsEvent.Properties.Should().ContainKey("pseudonymous_player_id").WhoseValue.Should().Be(pseudonymousPlayerId);
+        analyticsEvent.Properties.Should().NotContainKey("exception_message");
+        analyticsEvent.Properties.Should().NotContainKey("exception_type");
+        analyticsEvent.Properties.Values.Should().NotContain(rawPlayerUid);
+    }
+
     [Fact]
     public void EnsureRegistry_CreatesDefaultCharacterFromCurrentProjection()
     {
@@ -455,4 +581,27 @@ public class RpCharacterServiceTests
             IServerPlayerExtensions.SetModData(context.Player, ModDataKey, value);
         }
     }
+
+    private sealed class RecordingAnalyticsSink : IAnalyticsSink
+    {
+        public List<RecordedEvent> Events { get; } = new();
+
+        public bool IsEnabled => true;
+
+        public void Track(string eventName, IDictionary<string, object> properties)
+        {
+            Events.Add(new RecordedEvent(eventName, new Dictionary<string, object>(properties)));
+        }
+
+        public Task FlushAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed record RecordedEvent(string Name, IDictionary<string, object> Properties);
 }
