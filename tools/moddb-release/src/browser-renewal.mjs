@@ -76,6 +76,19 @@ function waitForSessionCookie(context, { hosts, remaining, offOriginNavigated })
   });
 }
 
+// Resolves true once the main frame has landed on the ModDB origin past its
+// /login bridge, false at the deadline or once the context is gone. An
+// off-origin navigation rejects.
+async function waitForBridgeLanding({ remaining, landed, offOriginNavigated, isClosed }) {
+  const deadline = Date.now() + remaining();
+  while (Date.now() < deadline && !isClosed()) {
+    if (offOriginNavigated()) throw fail("RENEWAL_ORIGIN_MISMATCH");
+    if (landed()) return true;
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+  }
+  return false;
+}
+
 export async function renewInBrowser({
   accountLogin,
   expectedAccount, // reserved for the caller's post-capture validation; the browser never sees it
@@ -94,6 +107,8 @@ export async function renewInBrowser({
   let context = null;
   let closed = false;
   let offOrigin = false;
+  let humanStep = false; // navigations before the human step are the login page itself
+  let landed = false; // main frame committed on modDbOrigin, not on its /login bridge
 
   try {
     try {
@@ -120,7 +135,10 @@ export async function renewInBrowser({
     // watched as well; an off-origin landing fails the renewal.
     const page = context.pages()[0] ?? (await context.newPage());
     page.on("framenavigated", (frame) => {
-      if (frame === page.mainFrame() && !allowed.has(new URL(frame.url()).origin)) offOrigin = true;
+      if (frame !== page.mainFrame()) return;
+      const { origin, pathname } = new URL(frame.url());
+      if (!allowed.has(origin)) offOrigin = true;
+      else if (humanStep && origin === modDbOrigin && pathname !== "/login") landed = true;
     });
     await page.goto(accountOrigin + loginPath, { waitUntil: "domcontentloaded", timeout: remaining() });
     if (new URL(page.url()).origin !== accountOrigin) throw fail("RENEWAL_ORIGIN_MISMATCH");
@@ -130,11 +148,14 @@ export async function renewInBrowser({
     const redirect = page.locator('input[name="loginredir"]');
     if ((await redirect.count()) > 0) await redirect.first().evaluate((el) => (el.value = "mods"), undefined, { timeout: remaining() });
 
+    humanStep = true;
     onHumanActionRequired();
     const cookie = await waitForSessionCookie(context, { hosts, remaining, offOriginNavigated: () => offOrigin });
-    // The cookie lands on the login response; give its redirect a moment to be
-    // intercepted before trusting where the browser ended up.
-    await new Promise((resolve) => setTimeout(resolve, 2 * POLL_MS));
+    // The cookie lands on the login response, but ModDB only accepts it once
+    // the redirect has reached its /login bridge, so the window stays open
+    // until the main frame lands past it. The deadline still returns the
+    // cookie: the client's completeLoginBridge covers the rest.
+    await waitForBridgeLanding({ remaining, landed: () => landed, offOriginNavigated: () => offOrigin, isClosed: () => closed });
     if (offOrigin) throw fail("RENEWAL_ORIGIN_MISMATCH");
     const finalOrigin = new URL(page.url()).origin;
     if (finalOrigin !== accountOrigin && finalOrigin !== modDbOrigin) throw fail("RENEWAL_ORIGIN_MISMATCH");

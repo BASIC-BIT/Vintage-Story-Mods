@@ -161,6 +161,29 @@ export function createModDbClient({ origin = MODDB_ORIGIN, cookieValue, fetchImp
   }
 
   return {
+    // ModDB's /login bridge is what registers a session cookie with ModDB:
+    // it posts the token to the account service and stores it, then redirects
+    // to /. A fresh cookie is unknown to ModDB until this has run once. Same
+    // outcome shape as login.php: 302 to / (registered or already logged in),
+    // 401 (token rejected), or a bounce to the account origin (no token).
+    async completeLoginBridge() {
+      const response = await request("/login");
+      const html = await response.text();
+      if (response.status === 401 || LOGIN_REQUIRED.test(html)) throw authFailed();
+      if (response.status === 200) return;
+      if (response.status === 302 || response.status === 303) {
+        let location;
+        try {
+          location = resolve(response.headers.get("location") ?? "");
+        } catch {
+          throw authFailed(); // off-origin: the bounce to the account login page
+        }
+        if (location.pathname === "/login") throw authFailed();
+        return;
+      }
+      throw fail("MODDB_LOGIN_BRIDGE_FAILED", `ModDB login bridge returned HTTP ${response.status}`);
+    },
+
     // Uses /accountsettings: it is the only page that both requires a login
     // (401 otherwise) and needs no mod id, and its header renders the
     // logged-in username inside #account-menu.

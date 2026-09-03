@@ -47,6 +47,12 @@ export async function ensureSession({
   const current = await readCurrentOrNull(store);
   const account = expectedAccount ?? current?.session.validatedAccount;
   const validate = (cookieValue) => modDbFactory({ cookieValue }).validateAccount(account);
+  // A captured cookie is unknown to ModDB until its /login bridge has run.
+  const bridgeAndValidate = async (cookieValue) => {
+    const modDb = modDbFactory({ cookieValue });
+    await modDb.completeLoginBridge();
+    await modDb.validateAccount(account);
+  };
 
   let reason = "expired";
   if (current !== null && !isExpired(current.session, clock())) {
@@ -76,7 +82,7 @@ export async function ensureSession({
     captured = null;
 
     const { versionId: candidateVersionId } = await renewalStore.putPendingSession(candidate);
-    await validate(candidate.cookieValue);
+    await bridgeAndValidate(candidate.cookieValue);
     candidate = null;
     await renewalStore.promoteSession({ candidateVersionId, originalCurrentVersionId });
 

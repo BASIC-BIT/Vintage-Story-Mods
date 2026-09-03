@@ -29,6 +29,13 @@ export async function startFakeModDb({ cookieValue, accountName = "BASICBIT", ac
     cookieValue,
     accountName,
     actionToken,
+    // Login bridge (GET /login): the real ModDB only accepts a cookie after
+    // this page has registered it. With requireBridge the fake does the same.
+    requireBridge: false,
+    bridged: new Set(), // cookie values /login has registered
+    bridgeRedirect: null, // Location override for a registered cookie
+    bridgeDelayMs: 0, // >0: /login answers 200 and the page redirects itself to / after the delay
+    bridgeStalls: false, // /login answers 200 and never leaves
     staged: [], // { fileId, modIdentifier, version, fileName, bytes }
     releases: [], // public API rows plus bytes
     nextFileId: 501,
@@ -41,7 +48,12 @@ export async function startFakeModDb({ cookieValue, accountName = "BASICBIT", ac
     tamperDownload: false,
   };
 
-  const isAuthenticated = (req) => (req.headers.cookie ?? "").split(/;\s*/).includes(`vs_websessionkey=${cookieValue}`);
+  const sessionCookie = (req) =>
+    (req.headers.cookie ?? "")
+      .split(/;\s*/)
+      .find((pair) => pair.startsWith("vs_websessionkey="))
+      ?.slice("vs_websessionkey=".length);
+  const isAuthenticated = (req) => sessionCookie(req) === cookieValue && (!state.requireBridge || state.bridged.has(cookieValue));
 
   const record = (server, req, fields) => {
     const url = new URL(req.url, "http://fake");
@@ -67,6 +79,25 @@ export async function startFakeModDb({ cookieValue, accountName = "BASICBIT", ac
   async function handleModDb(req, res) {
     const url = new URL(req.url, "http://fake");
     const body = await readBody(req);
+
+    if (req.method === "GET" && url.pathname === "/login") {
+      record("moddb", req);
+      const cookie = sessionCookie(req);
+      if (cookie === undefined) return send(res, 302, "", { location: `${cdnOrigin}/?loginredir=mods` }); // the real bounce goes to the account origin
+      if (cookie !== cookieValue) return send(res, 401, AUTH_REQUIRED, { "content-type": "text/html" });
+      state.bridged.add(cookie);
+      if (state.bridgeRedirect) return send(res, 302, "", { location: state.bridgeRedirect });
+      if (state.bridgeStalls) return send(res, 200, "<html><body>bridging</body></html>", { "content-type": "text/html" });
+      if (state.bridgeDelayMs > 0) {
+        return send(res, 200, `<html><body>bridging<script>setTimeout(() => location.replace("/"), ${state.bridgeDelayMs});</script></body></html>`, { "content-type": "text/html" });
+      }
+      return send(res, 302, "", { location: "/" });
+    }
+
+    if (req.method === "GET" && url.pathname === "/") {
+      record("moddb", req);
+      return send(res, 200, "<html><body>Mod DB</body></html>", { "content-type": "text/html" });
+    }
 
     if (req.method === "GET" && url.pathname === "/edit/release/") {
       record("moddb", req);

@@ -11,6 +11,7 @@ import { SESSION_COOKIE_NAME } from "../src/config.mjs";
 import { BrokerError } from "../src/contracts.mjs";
 import { renewInBrowser } from "../src/browser-renewal.mjs";
 import { startFakeAccountServer } from "./support/fake-account-server.mjs";
+import { startFakeModDb } from "./support/fake-moddb.mjs";
 
 const PASSWORD = "fixture-password-never-print";
 const COOKIE = "fixture-cookie-never-print";
@@ -116,6 +117,55 @@ test("fills credentials only on the verified origin, waits for the human, and re
   assert.equal(logins[0].fields.humandone, "1");
   assert.equal(logins[0].fields.filledBeforeHuman, "1", "credentials were not in place before the human step");
   assert.equal(fake.requests.some((r) => r.server === "decoy"), false);
+});
+
+// ModDB registers the cookie only when the account login's redirect reaches
+// its /login bridge, so the window must stay open until that redirect lands
+// somewhere else on the ModDB origin. The fake bridge redirects late.
+test("keeps the browser open until the ModDB login bridge has landed", async () => {
+  const moddb = await startFakeModDb({ cookieValue: COOKIE, accountName: ACCOUNT });
+  moddb.state.requireBridge = true;
+  moddb.state.bridgeDelayMs = 1500;
+  fake.state.redirectTo = `${moddb.origin}/login`;
+  try {
+    const result = await renewInBrowser({
+      accountLogin,
+      expectedAccount: ACCOUNT,
+      browserConfig: { ...config(), modDbOrigin: moddb.origin, allowedOrigins: [fake.origin, moddb.origin] },
+      onBeforeCleanup,
+      timeoutMs: 30_000,
+    });
+    assert.equal(result.cookieValue, COOKIE);
+    const paths = moddb.requests.map((r) => r.path);
+    assert.ok(paths.includes("/login"), "the bridge was never requested");
+    assert.ok(paths.includes("/"), "the browser closed before the bridge redirect landed");
+    assert.ok(moddb.requests.find((r) => r.path === "/login").headers.cookie.includes(`vs_websessionkey=${COOKIE}`));
+    assert.ok(moddb.state.bridged.has(COOKIE));
+    assert.equal(JSON.stringify(moddb.requests).includes(PASSWORD), false);
+  } finally {
+    await moddb.close();
+  }
+});
+
+test("returns the captured cookie when the bridge never lands before the deadline", async () => {
+  const moddb = await startFakeModDb({ cookieValue: COOKIE, accountName: ACCOUNT });
+  moddb.state.bridgeStalls = true;
+  fake.state.redirectTo = `${moddb.origin}/login`;
+  try {
+    const result = await renewInBrowser({
+      accountLogin,
+      expectedAccount: ACCOUNT,
+      browserConfig: { ...config(), modDbOrigin: moddb.origin, allowedOrigins: [fake.origin, moddb.origin] },
+      onBeforeCleanup,
+      timeoutMs: 6_000,
+    });
+    assert.equal(result.cookieValue, COOKIE);
+    const paths = moddb.requests.map((r) => r.path);
+    assert.ok(paths.includes("/login"));
+    assert.equal(paths.includes("/"), false);
+  } finally {
+    await moddb.close();
+  }
 });
 
 test("session cookies without an expiry report null", async () => {

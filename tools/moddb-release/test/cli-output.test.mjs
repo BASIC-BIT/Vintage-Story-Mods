@@ -80,7 +80,7 @@ async function run(argv, { current = session(), validate = async () => ({}), env
       onHumanActionRequired();
       return { cookieName: SESSION_COOKIE_NAME, cookieValue: `${COOKIE}-renewed`, observedCookieExpiresAt: null };
     },
-    modDbFactory: () => ({ validateAccount: validate, publishRelease: async () => assert.fail("publishRelease called") }),
+    modDbFactory: () => ({ completeLoginBridge: async () => {}, validateAccount: validate, publishRelease: async () => assert.fail("publishRelease called") }),
     inspectArtifact,
     readFile: () => "Fixed the thing.",
     clock: () => NOW,

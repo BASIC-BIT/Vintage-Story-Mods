@@ -146,7 +146,9 @@ export function createCommands(deps) {
       try {
         const candidate = buildSessionCandidate({ cookieName: SESSION_COOKIE_NAME, cookieValue, observedCookieExpiresAt: null, validatedAccount: expectedAccount, now: clock() });
         const { versionId } = await store.putPendingSession(candidate);
-        await modDbFactory({ cookieValue }).validateAccount(expectedAccount);
+        const modDb = modDbFactory({ cookieValue });
+        await modDb.completeLoginBridge(); // harmless when ModDB already knows the cookie
+        await modDb.validateAccount(expectedAccount);
         await store.promoteSession({ candidateVersionId: versionId, originalCurrentVersionId });
         const promoted = await store.readCurrentSession();
         if (promoted.versionId !== versionId) throw fail("SESSION_PROMOTION_CONFLICT");

@@ -78,10 +78,15 @@ function secrets({ current = session(), currentVersionId = "v-old" } = {}) {
 
 // `validate` outcomes are consumed per validateAccount call ("ok" | "auth" | code).
 function modDb({ validate = [], publish = "ok", published = false } = {}) {
-  const calls = { validate: [], prepare: [], publish: [], publicState: [], verify: [] };
+  const calls = { bridge: [], validate: [], prepare: [], publish: [], publicState: [], verify: [], order: [] };
   const factory = ({ cookieValue }) => ({
+    async completeLoginBridge() {
+      calls.bridge.push({ cookieValue });
+      calls.order.push("bridge");
+    },
     async validateAccount(account) {
       calls.validate.push({ cookieValue, account });
+      calls.order.push("validate");
       const outcome = validate.shift() ?? "ok";
       if (outcome === "ok") return { account };
       if (outcome === "auth") throw new BrokerError("authentication-failed", "denied", { exitCode: ExitCode.renewalRequired });
@@ -292,7 +297,9 @@ test("import-wincred stages, validates, promotes, and keeps the Windows entry", 
     MoveToVersionId: "v-candidate",
     RemoveFromVersionId: "v-old",
   });
+  assert.deepEqual(h.db.calls.bridge, [{ cookieValue: WINCRED_COOKIE }]);
   assert.deepEqual(h.db.calls.validate, [{ cookieValue: WINCRED_COOKIE, account: ACCOUNT }]);
+  assert.deepEqual(h.db.calls.order, ["bridge", "validate"]);
   assert.equal(h.deps.readWinCred.calls.length, 1);
   assert.equal(h.deps.deleteWinCred.calls.length, 0);
 });
@@ -318,6 +325,7 @@ test("finalize requires the exact AWSCURRENT version before deleting the Windows
   const result = await h.run("sessionImportWincred", { finalizeVersion: "v-old" });
   assert.deepEqual(result, { ok: true, status: "finalized", data: { versionId: "v-old", validatedAccount: ACCOUNT, winCredDeleted: true } });
   assert.deepEqual(h.db.calls.validate, [{ cookieValue: OLD_COOKIE, account: ACCOUNT }]);
+  assert.deepEqual(h.db.calls.bridge, [], "an already registered session is not bridged again");
   assert.equal(h.deps.deleteWinCred.calls.length, 1);
 });
 

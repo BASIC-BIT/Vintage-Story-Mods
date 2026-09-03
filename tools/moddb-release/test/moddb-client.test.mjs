@@ -70,7 +70,7 @@ const stage = (fileId = 501) => fake.state.staged.push({ fileId, modIdentifier: 
 test("client construction requires an exact origin and a cookie", () => {
   assert.throws(() => createModDbClient({ origin: `${fake.origin}/path`, cookieValue: COOKIE }), (e) => (thrown.push(e), e.code === "MODDB_INVALID_ORIGIN"));
   assert.throws(() => createModDbClient({ origin: fake.origin, cookieValue: " " }), (e) => (thrown.push(e), e.code === "MODDB_COOKIE_MISSING"));
-  assert.deepEqual(Object.keys(client).sort(), ["prepareRelease", "publishRelease", "readPublicState", "validateAccount", "verifyPublishedArtifact"]);
+  assert.deepEqual(Object.keys(client).sort(), ["completeLoginBridge", "prepareRelease", "publishRelease", "readPublicState", "validateAccount", "verifyPublishedArtifact"]);
   assert.equal(JSON.stringify(client).includes(COOKIE), false);
 });
 
@@ -80,6 +80,30 @@ test("validateAccount reads the account menu on /accountsettings", async () => {
   assert.equal(request.headers.cookie, `vs_websessionkey=${COOKIE}`);
   const error = await rejectsWith(client.validateAccount("someoneElse"), "MODDB_ACCOUNT_MISMATCH");
   assert.equal(error.message.includes("BASICBIT"), false, "actual account name is not echoed");
+});
+
+// ModDB accepts a cookie only after its /login bridge has registered it.
+test("completeLoginBridge registers a fresh cookie before the account check can pass", async () => {
+  fake.state.requireBridge = true;
+  await rejectsWith(client.validateAccount("BASICBIT"), "authentication-failed", ExitCode.renewalRequired);
+  await client.completeLoginBridge();
+  assert.deepEqual(await client.validateAccount("BASICBIT"), { account: "BASICBIT" });
+  const [bridge] = requestsTo("/login");
+  assert.equal(bridge.headers.cookie, `vs_websessionkey=${COOKIE}`);
+  assert.deepEqual(fake.requests.map((r) => r.path), ["/accountsettings", "/login", "/accountsettings"]);
+});
+
+test("completeLoginBridge accepts 200 or a same-origin redirect and treats bounces as authentication failures", async () => {
+  fake.state.bridgeStalls = true;
+  await client.completeLoginBridge();
+  fake.state.bridgeStalls = false;
+  fake.state.bridgeRedirect = "/login";
+  await rejectsWith(client.completeLoginBridge(), "authentication-failed", ExitCode.renewalRequired);
+  fake.state.bridgeRedirect = `${fake.cdnOrigin}/?loginredir=mods`;
+  await rejectsWith(client.completeLoginBridge(), "authentication-failed", ExitCode.renewalRequired);
+  const stale = createModDbClient({ origin: fake.origin, cookieValue: "fixture-stale-cookie" });
+  await rejectsWith(stale.completeLoginBridge(), "authentication-failed", ExitCode.renewalRequired);
+  assert.equal(fake.requests.filter((r) => r.server === "cdn").length, 0, "the bounce was followed");
 });
 
 test("unauthenticated pages stop with renewal-required", async () => {

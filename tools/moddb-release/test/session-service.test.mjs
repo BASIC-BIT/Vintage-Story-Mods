@@ -3,8 +3,10 @@ import test, { after } from "node:test";
 
 import { ACCOUNT_SECRET_ID, SESSION_COOKIE_NAME, SESSION_SECRET_ID } from "../src/config.mjs";
 import { BrokerError, ExitCode, safeResult } from "../src/contracts.mjs";
+import { createModDbClient } from "../src/moddb-client.mjs";
 import { createPublisherStore, createRenewalStore } from "../src/secret-store.mjs";
 import { SESSION_COOKIE, ensureSession } from "../src/session-service.mjs";
+import { startFakeModDb } from "./support/fake-moddb.mjs";
 import { FakeSecretsManagerClient, awsError } from "./support/fake-secrets-manager.mjs";
 
 const OLD_COOKIE = "fixture-cookie-never-print";
@@ -69,17 +71,25 @@ function secrets({ current = session(), currentVersionId = "v-old", promoteError
   return { client, state, commands: () => client.calls.map((call) => call.name) };
 }
 
-// ModDB fake: `outcomes` is consumed one validateAccount call at a time; a
-// string is a BrokerError code, "auth" is the authentication-failed variant.
+// ModDB fake: `outcomes` is consumed one call at a time, in call order, by
+// completeLoginBridge and validateAccount alike; a string is a BrokerError
+// code, "auth" is the authentication-failed variant.
 function modDb(...outcomes) {
   const calls = [];
+  const next = (call) => {
+    calls.push(call);
+    const outcome = outcomes.shift() ?? "ok";
+    if (outcome === "ok") return;
+    if (outcome === "auth") throw new BrokerError("authentication-failed", "denied", { exitCode: ExitCode.renewalRequired });
+    throw new BrokerError(outcome, outcome);
+  };
   const factory = ({ cookieValue }) => ({
+    async completeLoginBridge() {
+      next({ cookieValue, bridge: true });
+    },
     async validateAccount(account) {
-      calls.push({ cookieValue, account });
-      const outcome = outcomes.shift() ?? "ok";
-      if (outcome === "ok") return { account };
-      if (outcome === "auth") throw new BrokerError("authentication-failed", "denied", { exitCode: ExitCode.renewalRequired });
-      throw new BrokerError(outcome, outcome);
+      next({ cookieValue, account });
+      return { account };
     },
   });
   return { factory, calls };
@@ -264,8 +274,28 @@ test("interactive Windows renews an expired session in the approved order", asyn
   assert.deepEqual(renewal.calls[0].accountLogin, LOGIN);
   assert.equal(renewal.calls[0].expectedAccount, ACCOUNT);
   assert.equal(typeof renewal.calls[0].onHumanActionRequired, "function");
-  // candidate validated before promotion, AWSCURRENT validated after
-  assert.deepEqual(db.calls, [{ cookieValue: NEW_COOKIE, account: ACCOUNT }, { cookieValue: NEW_COOKIE, account: ACCOUNT }]);
+  // bridge then validation on the candidate before promotion, AWSCURRENT validated after
+  assert.deepEqual(db.calls, [
+    { cookieValue: NEW_COOKIE, bridge: true },
+    { cookieValue: NEW_COOKIE, account: ACCOUNT },
+    { cookieValue: NEW_COOKIE, account: ACCOUNT },
+  ]);
+});
+
+// The real client against the fake ModDB, which refuses a cookie that never
+// went through /login: this fails without the bridge call.
+test("renewal registers the captured cookie with ModDB before validating it", async () => {
+  const fake = await startFakeModDb({ cookieValue: NEW_COOKIE, accountName: ACCOUNT });
+  fake.state.requireBridge = true;
+  try {
+    const store = secrets({ current: EXPIRED });
+    const result = await run({ store, db: { factory: ({ cookieValue }) => createModDbClient({ origin: fake.origin, cookieValue }) } });
+    assert.equal(result.status, "renewed");
+    assert.deepEqual(fake.requests.map((r) => r.path), ["/login", "/accountsettings", "/accountsettings"]);
+    assert.equal(fake.requests[0].headers.cookie, `vs_websessionkey=${NEW_COOKIE}`);
+  } finally {
+    await fake.close();
+  }
 });
 
 test("a live authentication failure on interactive Windows also renews", async () => {
@@ -293,14 +323,22 @@ test("publish caller gets approval-required after renewal and no cookie", async 
 
 test("wrong account on the candidate leaves AWSCURRENT unchanged and never promotes", async () => {
   const store = secrets({ current: EXPIRED });
-  await rejectsWithCode(run({ store, db: modDb("MODDB_ACCOUNT_MISMATCH") }), "MODDB_ACCOUNT_MISMATCH");
+  await rejectsWithCode(run({ store, db: modDb("ok", "MODDB_ACCOUNT_MISMATCH") }), "MODDB_ACCOUNT_MISMATCH");
   assert.equal(store.client.inputs("PutSecretValueCommand").length, 1, "candidate was written as pending");
   assertCurrentUnchanged(store);
 });
 
 test("candidate that ModDB rejects leaves AWSCURRENT unchanged", async () => {
   const store = secrets({ current: EXPIRED });
-  await rejectsWithCode(run({ store, db: modDb("auth") }), "authentication-failed");
+  await rejectsWithCode(run({ store, db: modDb("ok", "auth") }), "authentication-failed");
+  assertCurrentUnchanged(store);
+});
+
+test("candidate whose login bridge fails is never validated or promoted", async () => {
+  const store = secrets({ current: EXPIRED });
+  const db = modDb("auth");
+  await rejectsWithCode(run({ store, db }), "authentication-failed");
+  assert.deepEqual(db.calls, [{ cookieValue: NEW_COOKIE, bridge: true }]);
   assertCurrentUnchanged(store);
 });
 
@@ -320,7 +358,7 @@ test("promotion conflict propagates SESSION_PROMOTION_CONFLICT with no further w
   const db = modDb();
   await rejectsWithCode(run({ store, db }), "SESSION_PROMOTION_CONFLICT");
   assert.deepEqual(store.commands(), ["GetSecretValueCommand", "GetSecretValueCommand", "PutSecretValueCommand", "UpdateSecretVersionStageCommand"]);
-  assert.equal(db.calls.length, 1);
+  assert.equal(db.calls.length, 2, "bridge and one validation");
   assert.equal(store.state.currentVersionId, "v-old");
 });
 
