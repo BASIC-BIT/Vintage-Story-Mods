@@ -91,7 +91,7 @@ node tools/moddb-release/src/cli.mjs session import-wincred --expected-account <
 node tools/moddb-release/src/cli.mjs session import-wincred --finalize-version <aws-version-id>
 ```
 
-Phase one reads `TheBasics.ModDb.Session` through the checked-in Windows adapter, writes it as `AWSPENDING`, validates the account, and reports `imported` with the AWS version ID. Phase two promotes that version to `AWSCURRENT` and reports `finalized`. Remove the Windows Credential Manager entry only after another approved consumer has run `session status` successfully against AWS.
+Phase one reads `TheBasics.ModDb.Session` through the checked-in Windows adapter, writes it as `AWSPENDING`, validates the account, promotes it conditionally to `AWSCURRENT`, and reports `imported` with the promoted AWS version ID. The Windows Credential Manager entry stays in place. Phase two (`--finalize-version`) requires that exact version to still be the live-valid `AWSCURRENT`, then deletes the Windows Credential Manager entry and reports `finalized`. Run phase two only after another approved consumer has run `session status` successfully against AWS. The Windows deletion is not recoverable; AWS is canonical from then on.
 
 ### Ordinary renewal
 

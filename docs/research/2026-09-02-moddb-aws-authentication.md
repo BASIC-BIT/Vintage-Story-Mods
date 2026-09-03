@@ -222,4 +222,3 @@ If implementation is later approved:
 - [GitHub Actions OIDC for AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws)
 - [OpenAI Codex cloud environments](https://developers.openai.com/codex/cloud/environments)
 - [OpenAI Codex agent internet access](https://developers.openai.com/codex/cloud/agent-internet)
-
