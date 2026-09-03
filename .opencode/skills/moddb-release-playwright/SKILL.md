@@ -53,7 +53,7 @@ The broker decides renewal eligibility itself (Windows, TTY stdin, not `GITHUB_A
 
 1. Verify the exact GitHub tag and release asset: mod identifier, version, SHA-256, size, ZIP entry count, compatible Vintage Story versions, and owner-approved changelog copy (per the reference above; zero U+2014, zero `[AGENT]`).
 2. Run `session status`. Do not request raw credentials.
-3. If the broker reports renewal is possible (approved Windows run), let it open visible Chrome. Ask the user only to complete reCAPTCHA. Do not read, describe, or capture the browser session.
+3. If the broker reports renewal is possible (approved Windows run), let it open visible Chrome with the login form already filled. Ask the user only to complete reCAPTCHA and submit the form; the broker never clicks the login button. Do not read, describe, or capture the browser session.
 4. In cloud (`GITHUB_ACTIONS`), a `renewal-required` result means stop and tell the owner a Windows renewal is needed.
 5. Run or dispatch `release prepare`. Present the exact staged evidence: staged file ID, parsed identity and version, compatibility selection, changelog, SHA-256.
 6. Obtain immediate owner confirmation for the public save. Confirmation is per staged file ID; a new prepare needs a new confirmation.

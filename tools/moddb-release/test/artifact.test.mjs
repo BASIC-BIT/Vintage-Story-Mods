@@ -7,7 +7,7 @@ import test, { after } from "node:test";
 
 import { strToU8, zipSync } from "fflate";
 
-import { ARTIFACT_SIZE_LIMIT, inspectArtifact } from "../src/artifact.mjs";
+import { ARTIFACT_SIZE_LIMIT, MODINFO_SIZE_LIMIT, inspectArtifact } from "../src/artifact.mjs";
 import { BrokerError } from "../src/contracts.mjs";
 
 const tempDir = mkdtempSync(path.join(os.tmpdir(), "moddb-artifact-"));
@@ -105,4 +105,12 @@ test("enforces the size limit from file metadata before reading", () => {
   closeSync(fd);
   const error = rejects(() => inspectArtifact(file), "ARTIFACT_TOO_LARGE");
   assert.match(error.message, /256 MiB/);
+});
+
+test("rejects a modinfo.json whose uncompressed size exceeds the limit before extracting it", () => {
+  assert.equal(MODINFO_SIZE_LIMIT, 1024 * 1024);
+  const padded = (size) => strToU8(`{"modid":"thebasics","version":"5.9.1"${" ".repeat(size - 39)}}`);
+  assert.equal(inspectArtifact(writeFixture(zipSync({ "modinfo.json": padded(MODINFO_SIZE_LIMIT) }))).version, "5.9.1");
+  const error = rejects(() => inspectArtifact(writeFixture(zipSync({ "modinfo.json": padded(MODINFO_SIZE_LIMIT + 1) }))), "ARTIFACT_MODINFO_TOO_LARGE");
+  assert.match(error.message, /1 MiB/);
 });

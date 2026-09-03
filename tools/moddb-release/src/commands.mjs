@@ -9,11 +9,13 @@ import { createAccountAdminStore, createPublisherStore, createRenewalStore } fro
 import { buildSessionCandidate, getEffectiveExpiry } from "./session-schema.mjs";
 import { SESSION_COOKIE, ensureSession, readCurrentOrNull } from "./session-service.mjs";
 
-const RECAPTCHA_LINE = "Complete the reCAPTCHA in the Chrome window.\n";
+// The broker fills the form but never submits it; the human does both.
+const RECAPTCHA_LINE = "Complete the reCAPTCHA in the Chrome window, then press the login button.\n";
 const fail = (code, message = code) => new BrokerError(code, message);
 const CTRL_C = String.fromCharCode(3);
 const DEL = String.fromCharCode(127);
 const EM_DASH = String.fromCharCode(0x2014); // U+2014, banned from public release copy
+const AGENT_MARKER = "[AGENT]"; // also banned from public release copy
 
 // Raw-mode line reader: renders only the prompt and a final newline, never
 // the typed characters. Ctrl-C rejects. Terminal state is restored on every
@@ -86,8 +88,8 @@ export function createCommands(deps) {
     } catch {
       throw fail("CHANGELOG_NOT_FOUND", "changelog file could not be read");
     }
-    if (typeof changelogHtml !== "string" || changelogHtml.trim() === "" || changelogHtml.includes(EM_DASH)) {
-      throw fail("CHANGELOG_INVALID", "changelog must be nonblank and free of U+2014");
+    if (typeof changelogHtml !== "string" || changelogHtml.trim() === "" || changelogHtml.includes(EM_DASH) || changelogHtml.includes(AGENT_MARKER)) {
+      throw fail("CHANGELOG_INVALID", "changelog must be nonblank and free of U+2014 and the [AGENT] marker");
     }
     const artifact = deps.inspectArtifact(zip, { modIdentifier: expectedModIdentifier, version: expectedVersion, sha256: expectedSha256 });
     return { changelogHtml, artifact };
@@ -185,12 +187,13 @@ export function createCommands(deps) {
       try {
         saved = await modDb.publishRelease({ modId, artifact, expectedModIdentifier, expectedVersion, expectedFileId, changelogHtml, compatibleVersions });
       } catch (error) {
-        // The save may have landed; only continue when ModDB already serves the version publicly.
+        // The save may have landed; only continue when ModDB already serves this exact
+        // staged file publicly. An older public release of the same version is not ours.
         if (error?.code !== "MODDB_PUBLISH_INDETERMINATE") throw error;
-        const { published } = await modDb.readPublicState({ modId, expectedVersion });
-        if (!published) throw error;
+        const publicState = await modDb.readPublicState({ modId, expectedVersion });
+        if (!publicState.published || publicState.fileId !== expectedFileId) throw error;
       }
-      const verified = await modDb.verifyPublishedArtifact({ modId, expectedModIdentifier, expectedVersion, expectedSha256: artifact.sha256, compatibleVersions });
+      const verified = await modDb.verifyPublishedArtifact({ modId, expectedModIdentifier, expectedVersion, expectedFileId, expectedSha256: artifact.sha256, compatibleVersions });
       return safeResult("published", {
         fileId: expectedFileId,
         assetId: saved.assetId,
@@ -200,7 +203,7 @@ export function createCommands(deps) {
         sha256: artifact.sha256,
         verifiedSha256: verified.sha256,
         downloadUrl: verified.downloadUrl,
-        compatibleVersions: [...compatibleVersions],
+        compatibleVersions: [...verified.compatibleVersions], // what ModDB serves, verified equal to the request
         sessionVersionId: session.versionId,
       });
     },

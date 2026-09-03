@@ -77,7 +77,7 @@ function secrets({ current = session(), currentVersionId = "v-old" } = {}) {
 }
 
 // `validate` outcomes are consumed per validateAccount call ("ok" | "auth" | code).
-function modDb({ validate = [], publish = "ok", published = false } = {}) {
+function modDb({ validate = [], publish = "ok", published = false, publicFileId = 501 } = {}) {
   const calls = { bridge: [], validate: [], prepare: [], publish: [], publicState: [], verify: [], order: [] };
   const factory = ({ cookieValue }) => ({
     async completeLoginBridge() {
@@ -103,11 +103,11 @@ function modDb({ validate = [], publish = "ok", published = false } = {}) {
     },
     async readPublicState(input) {
       calls.publicState.push(input);
-      return { published, releases: [] };
+      return { published, fileId: published ? publicFileId : null, releases: [] };
     },
     async verifyPublishedArtifact(input) {
       calls.verify.push(input);
-      return { verified: true, fileId: 501, sha256: input.expectedSha256, downloadUrl: "https://mods.vintagestory.at/download/501/thebasics-v5.9.1.zip" };
+      return { verified: true, fileId: 501, sha256: input.expectedSha256, downloadUrl: "https://mods.vintagestory.at/download/501/thebasics-v5.9.1.zip", compatibleVersions: ["1.21.1", "1.21.0"] };
     },
   });
   return { factory, calls };
@@ -248,7 +248,7 @@ test("session renew renews an expired session and prompts for the reCAPTCHA once
     data: { versionId: "v-candidate", previousVersionId: "v-old", validatedAccount: ACCOUNT, effectiveExpiry: "2026-09-24T12:00:00.000Z" },
   });
   assert.equal(h.deps.browserRenewal.calls.length, 1);
-  assert.equal(h.out.stderr, "Complete the reCAPTCHA in the Chrome window.\n");
+  assert.equal(h.out.stderr, "Complete the reCAPTCHA in the Chrome window, then press the login button.\n");
   assert.equal(h.out.stdout, "");
   assert.equal(h.store.state.currentVersionId, "v-candidate");
 });
@@ -355,9 +355,10 @@ test("prepare inspects the artifact before any AWS call", async () => {
 });
 
 test("prepare validates the changelog before any AWS call", async () => {
-  const h = harness({ files: { [CHANGELOG]: "Breaking \u2014 change", "C:\\fixtures\\blank.txt": " \n" } });
+  const h = harness({ files: { [CHANGELOG]: "Breaking \u2014 change", "C:\\fixtures\\blank.txt": " \n", "C:\\fixtures\\agent.txt": "[AGENT] drafted this" } });
   await rejectsWithCode(h.run("releasePrepare", release()), "CHANGELOG_INVALID");
   await rejectsWithCode(h.run("releasePrepare", release({ changelog: "C:\\fixtures\\blank.txt" })), "CHANGELOG_INVALID");
+  await rejectsWithCode(h.run("releasePrepare", release({ changelog: "C:\\fixtures\\agent.txt" })), "CHANGELOG_INVALID");
   await rejectsWithCode(h.run("releasePrepare", release({ changelog: "C:\\fixtures\\none.txt" })), "CHANGELOG_NOT_FOUND");
   assert.deepEqual(h.commands(), []);
 });
@@ -403,7 +404,7 @@ test("prepare renews first on interactive Windows and reports it", async () => {
   const result = await h.run("releasePrepare", release());
   assert.deepEqual([result.status, result.data.sessionStatus, result.data.sessionVersionId], ["prepared", "renewed", "v-candidate"]);
   assert.equal(h.db.calls.prepare[0].cookieValue, NEW_COOKIE);
-  assert.equal(h.out.stderr, "Complete the reCAPTCHA in the Chrome window.\n");
+  assert.equal(h.out.stderr, "Complete the reCAPTCHA in the Chrome window, then press the login button.\n");
 });
 
 test("prepare in the cloud stops with renewal-required and never stages", async () => {
@@ -436,7 +437,7 @@ test("publish rechecks artifact, changelog, and file id, then saves and verifies
       sha256: SHA,
       verifiedSha256: SHA,
       downloadUrl: "https://mods.vintagestory.at/download/501/thebasics-v5.9.1.zip",
-      compatibleVersions: ["1.21.0", "1.21.1"],
+      compatibleVersions: ["1.21.1", "1.21.0"], // what ModDB serves, not the requested input
       sessionVersionId: "v-old",
     },
   });
@@ -446,12 +447,13 @@ test("publish rechecks artifact, changelog, and file id, then saves and verifies
     [call.modId, call.expectedModIdentifier, call.expectedVersion, call.expectedFileId, call.changelogHtml, call.compatibleVersions, call.artifact.sha256],
     [42, "thebasics", "5.9.1", 501, "Fixed the thing.", ["1.21.0", "1.21.1"], SHA],
   );
-  assert.deepEqual(h.db.calls.verify, [{ modId: 42, expectedModIdentifier: "thebasics", expectedVersion: "5.9.1", expectedSha256: SHA, compatibleVersions: ["1.21.0", "1.21.1"] }]);
+  assert.deepEqual(h.db.calls.verify, [{ modId: 42, expectedModIdentifier: "thebasics", expectedVersion: "5.9.1", expectedFileId: 501, expectedSha256: SHA, compatibleVersions: ["1.21.0", "1.21.1"] }]);
 });
 
 test("publish validates locally before any AWS call", async () => {
-  const h = harness({ files: { [CHANGELOG]: "em \u2014 dash", "C:\\fixtures\\ok.txt": "ok" } });
+  const h = harness({ files: { [CHANGELOG]: "em \u2014 dash", "C:\\fixtures\\ok.txt": "ok", "C:\\fixtures\\agent.txt": "notes [AGENT]" } });
   await rejectsWithCode(h.run("releasePublish", release({ expectedFileId: 501 })), "CHANGELOG_INVALID");
+  await rejectsWithCode(h.run("releasePublish", release({ expectedFileId: 501, changelog: "C:\\fixtures\\agent.txt" })), "CHANGELOG_INVALID");
   await rejectsWithCode(h.run("releasePublish", release({ expectedFileId: 501, changelog: "C:\\fixtures\\ok.txt", expectedSha256: "0".repeat(64) })), "ARTIFACT_HASH_MISMATCH");
   assert.deepEqual(h.commands(), []);
   assert.deepEqual(h.db.calls.publish, []);
@@ -478,6 +480,13 @@ test("an indeterminate save is verified through public state before continuing",
   assert.deepEqual([result.status, result.data.assetId, result.data.releaseUrl, result.data.verifiedSha256], ["published", null, null, SHA]);
   assert.deepEqual(h.db.calls.publicState, [{ modId: 42, expectedVersion: "5.9.1" }]);
   assert.equal(h.db.calls.verify.length, 1);
+});
+
+test("an indeterminate save whose public file id is not the staged one rethrows", async () => {
+  const h = harness({ db: modDb({ publish: "indeterminate", published: true, publicFileId: 499 }) });
+  await rejectsWithCode(h.run("releasePublish", release({ expectedFileId: 501 })), "MODDB_PUBLISH_INDETERMINATE");
+  assert.equal(h.db.calls.publicState.length, 1);
+  assert.deepEqual(h.db.calls.verify, []);
 });
 
 test("an indeterminate save that is not public rethrows", async () => {

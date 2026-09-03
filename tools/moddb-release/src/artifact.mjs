@@ -8,6 +8,7 @@ import { unzipSync } from "fflate";
 import { BrokerError } from "./contracts.mjs";
 
 export const ARTIFACT_SIZE_LIMIT = 256 * 1024 * 1024;
+export const MODINFO_SIZE_LIMIT = 1024 * 1024; // uncompressed; a zip bomb's modinfo.json is refused before inflation
 
 const MODINFO = /^modinfo\.json$/i;
 const nonblank = (value) => typeof value === "string" && value.trim() !== "";
@@ -40,10 +41,15 @@ export function inspectArtifact(zipPath, expected = {}) {
     extracted = unzipSync(bytes, {
       filter: (entry) => {
         names.push(entry.name);
-        return MODINFO.test(entry.name);
+        if (!MODINFO.test(entry.name)) return false;
+        if (entry.originalSize > MODINFO_SIZE_LIMIT) {
+          throw new BrokerError("ARTIFACT_MODINFO_TOO_LARGE", `modinfo.json exceeds the 1 MiB limit (${entry.originalSize} bytes uncompressed)`);
+        }
+        return true;
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof BrokerError) throw error;
     throw new BrokerError("ARTIFACT_INVALID_ZIP", `release zip could not be parsed: ${resolved}`);
   }
   const rootMatches = names.filter((name) => MODINFO.test(name));

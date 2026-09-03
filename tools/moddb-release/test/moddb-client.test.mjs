@@ -205,6 +205,7 @@ test("publish requires the owner-approved staged file and release inputs", async
   await rejectsWith(publish({ compatibleVersions: ["1.22.7", " "] }), "MODDB_COMPATIBILITY_MISSING");
   await rejectsWith(publish({ changelogHtml: " " }), "MODDB_CHANGELOG_EMPTY");
   await rejectsWith(publish({ changelogHtml: "a — b" }), "MODDB_CHANGELOG_EM_DASH");
+  await rejectsWith(publish({ changelogHtml: "notes [AGENT]" }), "MODDB_CHANGELOG_AGENT_MARKER");
   await rejectsWith(publish({ expectedFileId: 0 }), "MODDB_INVALID_FILE_ID");
   assert.equal(fake.requests.length, 0);
 
@@ -250,11 +251,12 @@ test("indeterminate save is checked against public state before any retry", asyn
   const state = await client.readPublicState({ modId: MOD_ID, expectedVersion: "5.9.1" });
   assert.deepEqual(state, {
     published: true,
+    fileId: 501,
     releases: [{ fileId: 501, fileName: "thebasics-v5.9.1.zip", modIdentifier: "thebasics", version: "5.9.1", compatibleVersions: COMPAT }],
   });
   const [api] = requestsTo("/api/mod/640");
   assert.equal("cookie" in api.headers, false, "public reads carry no cookie");
-  assert.deepEqual(await client.readPublicState({ modId: MOD_ID, expectedVersion: "5.9.2" }), { published: false, releases: [] });
+  assert.deepEqual(await client.readPublicState({ modId: MOD_ID, expectedVersion: "5.9.2" }), { published: false, fileId: null, releases: [] });
   await rejectsWith(publish(), "MODDB_STAGED_STATE_MISMATCH"); // the blind retry is refused
 });
 
@@ -262,9 +264,10 @@ test("verifyPublishedArtifact downloads without a cookie and compares the hash",
   stage(501);
   await client.publishRelease({ ...identity, expectedFileId: 501, changelogHtml: CHANGELOG, compatibleVersions: COMPAT });
   const verify = (overrides) =>
-    client.verifyPublishedArtifact({ modId: MOD_ID, expectedModIdentifier: "thebasics", expectedVersion: "5.9.1", expectedSha256: artifact.sha256.toUpperCase(), compatibleVersions: ["1.22.7"], ...overrides });
+    client.verifyPublishedArtifact({ modId: MOD_ID, expectedModIdentifier: "thebasics", expectedVersion: "5.9.1", expectedFileId: 501, expectedSha256: artifact.sha256.toUpperCase(), compatibleVersions: ["1.22.7", "1.22.6"], ...overrides });
 
-  assert.deepEqual(await verify(), { verified: true, fileId: 501, sha256: artifact.sha256, downloadUrl: `${fake.origin}/download/501/thebasics-v5.9.1.zip` });
+  // Order-insensitive exact match; the public list comes back as ModDB serves it.
+  assert.deepEqual(await verify(), { verified: true, fileId: 501, sha256: artifact.sha256, downloadUrl: `${fake.origin}/download/501/thebasics-v5.9.1.zip`, compatibleVersions: COMPAT });
   const [download] = fake.requests.filter((r) => r.path === "/download/501/thebasics-v5.9.1.zip");
   assert.equal("cookie" in download.headers, false);
   const [cdnHit] = fake.requests.filter((r) => r.server === "cdn");
@@ -275,7 +278,9 @@ test("verifyPublishedArtifact downloads without a cookie and compares the hash",
 
   await rejectsWith(verify({ expectedVersion: "5.9.0" }), "MODDB_PUBLIC_RELEASE_MISSING");
   await rejectsWith(verify({ expectedModIdentifier: "othermod" }), "MODDB_PUBLIC_IDENTITY_MISMATCH");
-  await rejectsWith(verify({ compatibleVersions: ["1.22.7", "1.23.0"] }), "MODDB_PUBLIC_COMPATIBILITY_MISMATCH");
+  await rejectsWith(verify({ expectedFileId: 502 }), "MODDB_PUBLIC_FILE_ID_MISMATCH");
+  await rejectsWith(verify({ compatibleVersions: ["1.22.7"] }), "MODDB_PUBLIC_COMPATIBILITY_MISMATCH"); // public has an extra tag
+  await rejectsWith(verify({ compatibleVersions: ["1.22.6", "1.22.7", "1.23.0"] }), "MODDB_PUBLIC_COMPATIBILITY_MISMATCH"); // public lacks a tag
   await rejectsWith(verify({ expectedSha256: createHash("sha256").update("x").digest("hex") }), "MODDB_PUBLIC_HASH_MISMATCH");
   fake.state.tamperDownload = true;
   fake.state.downloadViaCdn = true;

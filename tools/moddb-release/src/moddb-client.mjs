@@ -157,7 +157,8 @@ export function createModDbClient({ origin = MODDB_ORIGIN, cookieValue, fetchImp
         version: String(row.modversion),
         compatibleVersions: Array.isArray(row.tags) ? row.tags.map(String) : [],
       }));
-    return { published: releases.length > 0, releases };
+    // fileId is the public release's file only when the version maps to exactly one release.
+    return { published: releases.length > 0, fileId: releases.length === 1 ? releases[0].fileId : null, releases };
   }
 
   return {
@@ -241,6 +242,7 @@ export function createModDbClient({ origin = MODDB_ORIGIN, cookieValue, fetchImp
       }
       if (!nonblank(changelogHtml)) throw fail("MODDB_CHANGELOG_EMPTY", "changelog is empty");
       if (changelogHtml.includes("\u2014")) throw fail("MODDB_CHANGELOG_EM_DASH", "public release notes must not contain U+2014");
+      if (changelogHtml.includes("[AGENT]")) throw fail("MODDB_CHANGELOG_AGENT_MARKER", "public release notes must not contain the [AGENT] marker");
       assertArtifactIdentity(artifact, expectedModIdentifier, expectedVersion);
 
       const form = await readReleaseForm(modId);
@@ -280,13 +282,20 @@ export function createModDbClient({ origin = MODDB_ORIGIN, cookieValue, fetchImp
     // after an indeterminate save and before any retry.
     readPublicState,
 
-    async verifyPublishedArtifact({ modId, expectedModIdentifier, expectedVersion, expectedSha256, compatibleVersions = [] }) {
+    async verifyPublishedArtifact({ modId, expectedModIdentifier, expectedVersion, expectedFileId, expectedSha256, compatibleVersions = [] }) {
       const { releases } = await readPublicState({ modId, expectedVersion });
       if (releases.length !== 1) throw fail("MODDB_PUBLIC_RELEASE_MISSING", `ModDB lists ${releases.length} public release(s) for ${expectedModIdentifier} ${expectedVersion}, expected one`);
       const [release] = releases;
       if (release.modIdentifier !== expectedModIdentifier) throw fail("MODDB_PUBLIC_IDENTITY_MISMATCH", `public release is not ${expectedModIdentifier}`);
+      if (expectedFileId !== undefined && release.fileId !== expectedFileId) {
+        throw fail("MODDB_PUBLIC_FILE_ID_MISMATCH", `public release serves file ${release.fileId}, expected the staged file ${expectedFileId}`);
+      }
+      // Exact set equality, order-insensitive: an extra public tag is as wrong as a missing one.
       const missing = compatibleVersions.filter((version) => !release.compatibleVersions.includes(version));
-      if (missing.length > 0) throw fail("MODDB_PUBLIC_COMPATIBILITY_MISMATCH", `public release lacks compatible version(s) ${missing.join(", ")}`);
+      const extra = release.compatibleVersions.filter((version) => !compatibleVersions.includes(version));
+      if (missing.length > 0 || extra.length > 0) {
+        throw fail("MODDB_PUBLIC_COMPATIBILITY_MISMATCH", `public compatibility differs from the request (missing: ${missing.join(", ") || "none"}; extra: ${extra.join(", ") || "none"})`);
+      }
       if (!positiveInt(release.fileId) || !nonblank(release.fileName)) throw fail("MODDB_PUBLIC_RELEASE_MISSING", "public release has no downloadable file");
 
       // Same-origin tracked download link; ModDB answers with a redirect to
@@ -301,7 +310,7 @@ export function createModDbClient({ origin = MODDB_ORIGIN, cookieValue, fetchImp
       if (response.status !== 200) throw fail("MODDB_PUBLIC_DOWNLOAD_FAILED", `public download returned HTTP ${response.status}`);
       const digest = sha256(new Uint8Array(await response.arrayBuffer()));
       if (digest !== String(expectedSha256).toLowerCase()) throw fail("MODDB_PUBLIC_HASH_MISMATCH", `public artifact SHA-256 ${digest} does not match the expected hash`);
-      return { verified: true, fileId: release.fileId, sha256: digest, downloadUrl: downloadUrl.href };
+      return { verified: true, fileId: release.fileId, sha256: digest, downloadUrl: downloadUrl.href, compatibleVersions: [...release.compatibleVersions] };
     },
   };
 }

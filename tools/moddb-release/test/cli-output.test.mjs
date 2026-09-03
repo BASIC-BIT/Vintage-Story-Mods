@@ -137,7 +137,7 @@ test("session renew exits 0 with renewed and one fixed stderr line", async () =>
   const result = await run(["session", "renew", "--expected-account", "BASICBIT"], { current: session("2026-09-09T00:00:00.000Z") });
   assert.equal(result.exitCode, ExitCode.ok);
   assert.equal(oneJsonLine(result.stdout).status, "renewed");
-  assert.equal(result.stderr, "Complete the reCAPTCHA in the Chrome window.\n");
+  assert.equal(result.stderr, "Complete the reCAPTCHA in the Chrome window, then press the login button.\n");
 });
 
 test("broker errors exit 1 with the code as reason and nothing on stderr", async () => {
@@ -149,7 +149,7 @@ test("broker errors exit 1 with the code as reason and nothing on stderr", async
   });
   assert.equal(result.exitCode, ExitCode.failed);
   assert.deepEqual(oneJsonLine(result.stdout), { ok: false, status: "failed", reason: "MODDB_ACCOUNT_MISMATCH" });
-  assert.equal(result.stderr, "Complete the reCAPTCHA in the Chrome window.\n");
+  assert.equal(result.stderr, "Complete the reCAPTCHA in the Chrome window, then press the login button.\n");
 });
 
 test("unexpected errors collapse to a constant reason", async () => {
