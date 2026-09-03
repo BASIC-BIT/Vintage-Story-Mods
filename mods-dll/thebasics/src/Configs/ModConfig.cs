@@ -315,6 +315,8 @@ namespace thebasics.Configs
         private void InitializeGeneralFeatureDefaults()
         {
             ReviewedConfigSettingKeys ??= new List<string>();
+            SightPassThroughBlockCodePatterns ??= Array.Empty<string>();
+            SightBlockingBlockCodePatterns ??= Array.Empty<string>();
             MaxRpCharacterSlots = MaxRpCharacterSlots <= 0 ? 3 : MaxRpCharacterSlots;
         }
 
@@ -787,6 +789,20 @@ namespace thebasics.Configs
         [ProtoMember(152)]
         [DefaultValue(true)]
         public bool ProtectSpectatorRoleplayChat { get; set; } = true;
+
+        /// <summary>
+        /// Fully qualified block-code patterns that never obstruct roleplay sight checks.
+        /// Asterisks may be used as wildcards, for example decorplus:brass-lattice-*.
+        /// </summary>
+        [ProtoMember(153)]
+        public string[] SightPassThroughBlockCodePatterns { get; set; } = Array.Empty<string>();
+
+        /// <summary>
+        /// Fully qualified block-code patterns that always obstruct roleplay sight checks.
+        /// When a block matches both override lists, blocking takes precedence.
+        /// </summary>
+        [ProtoMember(154)]
+        public string[] SightBlockingBlockCodePatterns { get; set; } = Array.Empty<string>();
 
         [ProtoMember(64)]
         public bool RemoveGrantedLanguagesOnChange { get; set; } = true;

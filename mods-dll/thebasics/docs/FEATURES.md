@@ -160,6 +160,8 @@ Primary config areas:
 - `ProximityChatModePunctuation`
 - `RequireClearSoundPathForSpeech`
 - `SpeechOcclusionWallPenaltyBlocks`
+- `SightPassThroughBlockCodePatterns`
+- `SightBlockingBlockCodePatterns`
 - `ProximityChatName` defaults to the stable persisted group name `Proximity` when unset.
 - `ProximityChatModeBabbleVerb` is a legacy/custom override; default babble text uses lang key `thebasics:chat-babble-verb`.
 - `ChatDelimiters`
@@ -180,6 +182,8 @@ Primary config areas:
 - `ChatterModePitch`
 - `ChatterSelfVolumeMultiplier`
 - `MaxEnvironmentPlacementDistance`
+
+Sight override entries use fully qualified `domain:path` block-code patterns with optional `*` wildcards. They are resolved to block IDs when config loads, so sight raycasts use constant-time lookups. Explicit blocking wins over pass-through, then the normal render-pass and material rules apply. Block-entity-owned selection shapes remain position-aware; an explicitly blocking owning block with no selection boxes falls back to blocking its full cell. Sound occlusion remains separate, and ordinary entities are not treated as sight blockers.
 
 ## Languages And Heritage Grants
 

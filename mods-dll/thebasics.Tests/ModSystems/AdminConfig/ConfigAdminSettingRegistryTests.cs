@@ -3,6 +3,7 @@ using thebasics.Configs;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
+using Vintagestory.API.Common;
 
 namespace thebasics.Tests.ModSystems.AdminConfig;
 
@@ -441,6 +442,75 @@ public class ConfigAdminSettingRegistryTests
         config.UseNicknameInSpectatorOOC.Should().BeTrue();
         config.AllowSpectatorPlacedEnvironmentalMessages.Should().BeFalse();
         config.ProtectSpectatorRoleplayChat.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SightBlockOverrideSettings_AreOptionalLivePatternLists()
+    {
+        var config = CreateConfig();
+        var passThrough = GetSetting("SightPassThroughBlockCodePatterns");
+        var blocking = GetSetting("SightBlockingBlockCodePatterns");
+
+        passThrough.Group.Should().Be("Chat/Occlusion");
+        passThrough.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        blocking.Group.Should().Be("Chat/Occlusion");
+        blocking.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        passThrough.TrySetValue(config, " decorplus:brass-lattice-*, game:glass-* ", out var passError).Should().BeTrue(passError);
+        blocking.TrySetValue(config, string.Empty, out var blockError).Should().BeTrue(blockError);
+
+        config.SightPassThroughBlockCodePatterns.Should().Equal("decorplus:brass-lattice-*", "game:glass-*");
+        config.SightBlockingBlockCodePatterns.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsUnqualifiedSightBlockPatternsAndExactConflicts()
+    {
+        var config = CreateConfig();
+        config.SightPassThroughBlockCodePatterns = ["curtain-*", "decorplus:privacy-curtain-*"];
+        config.SightBlockingBlockCodePatterns = ["DECORPLUS:PRIVACY-CURTAIN-*"];
+
+        var errors = ConfigAdminSettingRegistry.ValidateConfig(config);
+
+        errors.Should().Contain(error => error.Contains("fully qualified"));
+        errors.Should().Contain(error => error.Contains("both sight override lists"));
+    }
+
+    [Fact]
+    public void ValidateResolvedSightBlockPatterns_RejectsWildcardOverlap()
+    {
+        var config = CreateConfig();
+        config.SightPassThroughBlockCodePatterns = ["decorplus:privacy-*"];
+        config.SightBlockingBlockCodePatterns = ["decorplus:*-red"];
+        var curtain = new Block
+        {
+            BlockId = 91,
+            Code = new AssetLocation("decorplus:privacy-curtain-red")
+        };
+
+        var errors = ConfigAdminSettingRegistry.ValidateResolvedSightBlockPatterns(config, [curtain]);
+
+        errors.Should().ContainSingle().Which.Should().Contain("decorplus:privacy-curtain-red");
+    }
+
+    [Fact]
+    public void ValidateResolvedSightBlockPatterns_BoundsBroadWildcardOverlapErrors()
+    {
+        var config = CreateConfig();
+        config.SightPassThroughBlockCodePatterns = ["game:block-*"];
+        config.SightBlockingBlockCodePatterns = ["game:*-granite"];
+        var blocks = Enumerable.Range(0, 12)
+            .Select(index => new Block
+            {
+                BlockId = index + 1,
+                Code = new AssetLocation($"game:block-{index:D2}-granite")
+            });
+
+        var errors = ConfigAdminSettingRegistry.ValidateResolvedSightBlockPatterns(config, blocks);
+
+        errors.Should().ContainSingle();
+        errors[0].Should().Contain("12 blocks");
+        errors[0].Should().Contain("game:block-09-granite");
+        errors[0].Should().NotContain("game:block-10-granite");
     }
 
     [Fact]

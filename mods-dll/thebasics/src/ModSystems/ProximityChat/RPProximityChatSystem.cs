@@ -53,6 +53,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     protected override void BasicStartServerSide()
     {
+        VisibilityUtils.ConfigureSightBlockOverrides(API.World, Config);
         HookEvents();
         RegisterCommands();
         SetupProximityGroup();
@@ -834,6 +835,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
 
         errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(draft));
+        errors.AddRange(ConfigAdminSettingRegistry.ValidateResolvedSightBlockPatterns(draft, API.World.Blocks));
         return errors.Count == 0;
     }
 
@@ -1456,6 +1458,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void ApplyConfigChangeSideEffects(IReadOnlySet<string> changedKeys)
     {
+        if (changedKeys.Contains(nameof(Config.SightPassThroughBlockCodePatterns)) ||
+            changedKeys.Contains(nameof(Config.SightBlockingBlockCodePatterns)))
+        {
+            VisibilityUtils.ConfigureSightBlockOverrides(API.World, Config);
+        }
+
         NotifyConfigReloaded(changedKeys);
 
         if (IsMapVisibilityConfigChange(changedKeys))
