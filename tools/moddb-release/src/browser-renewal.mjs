@@ -21,6 +21,8 @@ const DEFAULT_BROWSER_CONFIG = Object.freeze({
   modDbOrigin: MODDB_ORIGIN,
   loginPath: "/",
   channel: "chrome",
+  // Production renewal is headed because a human must complete reCAPTCHA; tests inject headless: true.
+  headless: false,
   allowedOrigins: [ACCOUNT_ORIGIN, MODDB_ORIGIN, "https://www.google.com", "https://www.gstatic.com", "https://www.recaptcha.net"],
 });
 const POLL_MS = 250;
@@ -106,7 +108,7 @@ async function waitForBridgeLanding({ remaining, landed, offOriginNavigated, isC
 }
 
 export async function renewInBrowser({ accountLogin, browserConfig = DEFAULT_BROWSER_CONFIG, onHumanActionRequired = () => {}, timeoutMs = 600_000 }) {
-  const { accountOrigin, modDbOrigin, loginPath, channel, allowedOrigins } = { ...DEFAULT_BROWSER_CONFIG, ...browserConfig };
+  const { accountOrigin, modDbOrigin, loginPath, channel, headless, allowedOrigins } = { ...DEFAULT_BROWSER_CONFIG, ...browserConfig };
   const allowed = new Set(allowedOrigins);
   const hosts = [new URL(accountOrigin).hostname, new URL(modDbOrigin).hostname];
   const deadline = Date.now() + timeoutMs; // one budget for launch, load, human, and capture
@@ -129,7 +131,7 @@ export async function renewInBrowser({ accountLogin, browserConfig = DEFAULT_BRO
 
   try {
     try {
-      context = await chromium.launchPersistentContext(profileDir, { channel, headless: false, acceptDownloads: false, handleSIGINT: false });
+      context = await chromium.launchPersistentContext(profileDir, { channel, headless, acceptDownloads: false, handleSIGINT: false });
     } catch {
       throw fail("RENEWAL_BROWSER_FAILED");
     }

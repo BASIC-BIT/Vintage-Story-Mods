@@ -62,6 +62,7 @@ const config = (loginPath = "/?autohuman=300") => ({
   modDbOrigin: fake.origin,
   loginPath,
   channel: "chromium",
+  headless: true,
   allowedOrigins: [fake.origin],
 });
 
