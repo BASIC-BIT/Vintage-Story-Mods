@@ -59,7 +59,7 @@ export function createAccountAdminStore(client, { uuid = randomUUID } = {}) {
   return {
     async putAccountLogin({ email, password }) {
       const login = validate(parseAccountLogin, { schemaVersion: 1, email, password }, "ACCOUNT_INVALID");
-      await putVersion(client, uuid, ACCOUNT_SECRET_ID, login, "AWSCURRENT", "ACCOUNT_WRITE_FAILED");
+      return putVersion(client, uuid, ACCOUNT_SECRET_ID, login, "AWSCURRENT", "ACCOUNT_WRITE_FAILED");
     },
   };
 }

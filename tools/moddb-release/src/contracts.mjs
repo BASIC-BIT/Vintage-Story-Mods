@@ -60,6 +60,8 @@ export function safeResult(status, data) {
   return { ok: true, status, data };
 }
 
+export const exitCodeFor = (result) => (result.ok ? ExitCode.ok : FAILURES[result.status].exitCode);
+
 export function safeFailure(status, reason) {
   if (!Object.hasOwn(FAILURES, status)) throw new Error("invalid failure status");
   const { reasons } = FAILURES[status];
