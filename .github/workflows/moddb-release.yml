@@ -1,0 +1,199 @@
+name: ModDB Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: prepare stages one upload; publish saves the exact staged file
+        type: choice
+        required: true
+        options:
+          - prepare
+          - publish
+      release_tag:
+        description: Existing GitHub release tag (for example v5.9.0)
+        type: string
+        required: true
+      asset_name:
+        description: Exact release asset file name (for example thebasics-v5.9.0.zip)
+        type: string
+        required: true
+      expected_sha256:
+        description: Lowercase SHA-256 of the release asset
+        type: string
+        required: true
+      mod_id:
+        description: ModDB numeric mod ID
+        type: string
+        required: true
+      expected_mod_identifier:
+        description: ModDB mod identifier (for example thebasics)
+        type: string
+        required: true
+      expected_version:
+        description: Version inside the ZIP modinfo.json (for example 5.9.0)
+        type: string
+        required: true
+      expected_account:
+        description: ModDB username the session must belong to (the name shown in the ModDB account menu)
+        type: string
+        required: true
+      compatible_versions:
+        description: JSON array of compatible game versions, for example ["1.21.0","1.21.1"]
+        type: string
+        required: true
+      release_notes:
+        description: Public changelog text (no U+2014)
+        type: string
+        required: true
+      expected_file_id:
+        description: Staged ModDB file ID (blank for prepare, required for publish)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: ${{ inputs.operation }} on ModDB
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout protected main
+        uses: actions/checkout@v4
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install broker
+        working-directory: tools/moddb-release
+        run: npm ci --ignore-scripts
+
+      - name: Validate public inputs
+        shell: pwsh
+        env:
+          OPERATION: ${{ inputs.operation }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ASSET_NAME: ${{ inputs.asset_name }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+          MOD_ID: ${{ inputs.mod_id }}
+          EXPECTED_MOD_IDENTIFIER: ${{ inputs.expected_mod_identifier }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          EXPECTED_ACCOUNT: ${{ inputs.expected_account }}
+          COMPATIBLE_VERSIONS: ${{ inputs.compatible_versions }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+          EXPECTED_FILE_ID: ${{ inputs.expected_file_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $errors = [System.Collections.Generic.List[string]]::new()
+          function Require([bool]$ok, [string]$message) { if (-not $ok) { $script:errors.Add($message) } }
+
+          Require ($env:OPERATION -in @('prepare', 'publish')) 'operation must be prepare or publish'
+          Require ($env:RELEASE_TAG -match '^[A-Za-z0-9][A-Za-z0-9._-]*$') 'release_tag must be a plain tag name'
+          Require ($env:ASSET_NAME -match '^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$') 'asset_name must be a plain .zip file name'
+          Require ($env:EXPECTED_SHA256 -cmatch '^[0-9a-f]{64}$') 'expected_sha256 must be 64 lowercase hex characters'
+          Require ($env:MOD_ID -match '^[1-9][0-9]*$') 'mod_id must be a positive integer'
+          Require ($env:EXPECTED_MOD_IDENTIFIER -match '^[a-z0-9]+$') 'expected_mod_identifier must be lowercase alphanumeric'
+          Require ($env:EXPECTED_VERSION -match '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$') 'expected_version must be semver'
+          Require ($env:EXPECTED_ACCOUNT -match '^\S+$') 'expected_account must be a username without whitespace'
+          Require (-not [string]::IsNullOrWhiteSpace($env:RELEASE_NOTES)) 'release_notes must not be blank'
+          Require (-not $env:RELEASE_NOTES.Contains([string][char]0x2014)) 'release_notes must not contain U+2014'
+
+          try {
+            $versions = $env:COMPATIBLE_VERSIONS | ConvertFrom-Json -NoEnumerate
+            $list = @($versions)
+            $valid = ($versions -is [System.Array]) -and ($list.Count -gt 0) -and
+              (@($list | Where-Object { -not ($_ -is [string]) -or [string]::IsNullOrWhiteSpace($_) }).Count -eq 0)
+            Require $valid 'compatible_versions must be a JSON array of nonblank strings'
+          } catch {
+            Require $false 'compatible_versions must be valid JSON'
+          }
+
+          if ($env:OPERATION -eq 'publish') {
+            Require ($env:EXPECTED_FILE_ID -match '^[1-9][0-9]*$') 'expected_file_id must be a positive integer for publish'
+          } else {
+            Require ([string]::IsNullOrWhiteSpace($env:EXPECTED_FILE_ID)) 'expected_file_id must be blank for prepare'
+          }
+
+          foreach ($message in $errors) { Write-Output "::error::$message" }
+          if ($errors.Count -gt 0) { exit 1 }
+
+      - name: Download and verify the release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ASSET_NAME: ${{ inputs.asset_name }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = Join-Path $env:RUNNER_TEMP 'moddb-asset'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern $env:ASSET_NAME --dir $dir
+          if ($LASTEXITCODE -ne 0) { Write-Output '::error::gh release download failed'; exit 1 }
+          $zip = Join-Path $dir $env:ASSET_NAME
+          if (-not (Test-Path -LiteralPath $zip)) { Write-Output "::error::asset $env:ASSET_NAME was not downloaded"; exit 1 }
+          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne $env:EXPECTED_SHA256) {
+            Write-Output "::error::asset hash $actual does not match expected_sha256"
+            exit 1
+          }
+
+      - name: Assume the ModDB publisher role
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
+        with:
+          role-to-assume: arn:aws:iam::079358094174:role/basic-vintage-story-moddb-publisher
+          role-session-name: moddb-release-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-east-2
+          allowed-account-ids: "079358094174"
+
+      - name: Run the ModDB broker
+        shell: pwsh
+        env:
+          OPERATION: ${{ inputs.operation }}
+          ASSET_NAME: ${{ inputs.asset_name }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+          MOD_ID: ${{ inputs.mod_id }}
+          EXPECTED_MOD_IDENTIFIER: ${{ inputs.expected_mod_identifier }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          EXPECTED_ACCOUNT: ${{ inputs.expected_account }}
+          COMPATIBLE_VERSIONS: ${{ inputs.compatible_versions }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+          EXPECTED_FILE_ID: ${{ inputs.expected_file_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path (Join-Path $env:RUNNER_TEMP 'moddb-asset') $env:ASSET_NAME
+          $changelog = Join-Path $env:RUNNER_TEMP 'moddb-changelog.txt'
+          [System.IO.File]::WriteAllText($changelog, $env:RELEASE_NOTES, [System.Text.UTF8Encoding]::new($false))
+
+          $brokerArgs = @(
+            'tools/moddb-release/src/cli.mjs', 'release', $env:OPERATION,
+            '--mod-id', $env:MOD_ID,
+            '--expected-mod-identifier', $env:EXPECTED_MOD_IDENTIFIER,
+            '--expected-version', $env:EXPECTED_VERSION,
+            '--zip', $zip,
+            '--changelog', $changelog,
+            '--expected-sha256', $env:EXPECTED_SHA256,
+            '--expected-account', $env:EXPECTED_ACCOUNT
+          )
+          foreach ($version in @($env:COMPATIBLE_VERSIONS | ConvertFrom-Json -NoEnumerate)) {
+            $brokerArgs += @('--compatible-version', [string]$version)
+          }
+          if ($env:OPERATION -eq 'publish') {
+            $brokerArgs += @('--expected-file-id', $env:EXPECTED_FILE_ID)
+          }
+
+          # The broker's one JSON result line stays in this job log only.
+          & node @brokerArgs
+          exit $LASTEXITCODE
