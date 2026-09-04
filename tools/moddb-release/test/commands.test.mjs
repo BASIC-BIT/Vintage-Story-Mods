@@ -55,7 +55,7 @@ const session = (overrides = {}) => ({
 });
 const EXPIRED = session({ modDbValidUntilEstimate: "2026-09-09T00:00:00.000Z" });
 
-function secrets({ current = session(), currentVersionId = "v-old" } = {}) {
+function secrets({ current = session(), currentVersionId = "v-old", labelFirstCurrent = true } = {}) {
   const client = new FakeSecretsManagerClient();
   const state = { current, currentVersionId };
   client.respond("GetSecretValueCommand", (input) => {
@@ -67,8 +67,9 @@ function secrets({ current = session(), currentVersionId = "v-old" } = {}) {
     if (input.SecretId === ACCOUNT_SECRET_ID) return { VersionId: "login-v2" };
     state.pending = JSON.parse(input.SecretString);
     // Real Secrets Manager attaches AWSCURRENT to the first version of an
-    // empty secret whatever VersionStages asked for.
-    if (state.current === null) {
+    // empty secret whatever VersionStages asked for (labelFirstCurrent=false
+    // models the documented behaviour, where it stays AWSPENDING only).
+    if (state.current === null && labelFirstCurrent) {
       state.current = state.pending;
       state.currentVersionId = "v-candidate";
     }
@@ -325,10 +326,22 @@ test("import-wincred validates, stages, promotes, and keeps the Windows entry", 
   assert.equal(h.deps.deleteWinCred.calls.length, 0);
 });
 
-test("import-wincred bootstraps an empty container", async () => {
+test("import-wincred bootstraps an empty container that AWS labels current on the first write", async () => {
   const h = harness({ store: secrets({ current: null }) });
   const result = await h.run("sessionImportWincred", { expectedAccount: ACCOUNT });
+  assert.equal(result.status, "imported");
+  assert.equal(result.data.versionId, "v-candidate");
   assert.equal(result.data.previousVersionId, null);
+  assert.equal(h.store.client.inputs("UpdateSecretVersionStageCommand").length, 0);
+});
+
+test("import-wincred bootstraps an empty container whose first write stays pending", async () => {
+  const h = harness({ store: secrets({ current: null, labelFirstCurrent: false }) });
+  const result = await h.run("sessionImportWincred", { expectedAccount: ACCOUNT });
+  assert.equal(result.status, "imported");
+  assert.equal(result.data.versionId, "v-candidate");
+  assert.equal(result.data.previousVersionId, null);
+  assert.equal(h.store.client.inputs("UpdateSecretVersionStageCommand").length, 1);
   assert.equal(Object.hasOwn(h.store.client.lastInput("UpdateSecretVersionStageCommand"), "RemoveFromVersionId"), false);
 });
 

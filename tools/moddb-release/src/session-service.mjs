@@ -23,6 +23,19 @@ export async function readCurrentOrNull(store) {
   }
 }
 
+// Writes the candidate as AWSPENDING and moves AWSCURRENT onto it. On a true
+// bootstrap AWS labels the first version AWSCURRENT itself, so the move is
+// skipped when the re-read already shows the candidate current. The caller
+// still validates the promoted session live.
+export async function stageAndPromote(store, candidate, originalCurrentVersionId) {
+  const { versionId: candidateVersionId } = await store.putPendingSession(candidate);
+  const alreadyCurrent = originalCurrentVersionId === null && (await readCurrentOrNull(store))?.versionId === candidateVersionId;
+  if (!alreadyCurrent) await store.promoteSession({ candidateVersionId, originalCurrentVersionId });
+  const promoted = await store.readCurrentSession();
+  if (promoted.versionId !== candidateVersionId) throw fail("SESSION_PROMOTION_CONFLICT");
+  return { candidateVersionId, promoted };
+}
+
 const usable = (status, { session, versionId }, extra = {}) => ({
   status,
   versionId,
@@ -90,12 +103,8 @@ export async function ensureSession({
     // Validate before AWS sees the candidate: the first version of an empty
     // secret becomes AWSCURRENT regardless of the requested stages.
     await bridgeAndValidate(candidate.cookieValue);
-    const { versionId: candidateVersionId } = await renewalStore.putPendingSession(candidate);
+    const { candidateVersionId, promoted } = await stageAndPromote(renewalStore, candidate, originalCurrentVersionId);
     candidate = null;
-    await renewalStore.promoteSession({ candidateVersionId, originalCurrentVersionId });
-
-    const promoted = await renewalStore.readCurrentSession();
-    if (promoted.versionId !== candidateVersionId) throw fail("SESSION_PROMOTION_CONFLICT");
     await validate(promoted.session.cookieValue);
 
     if (purpose === "publish") return { status: "approval-required", reason: "renewed-during-publish", versionId: candidateVersionId };

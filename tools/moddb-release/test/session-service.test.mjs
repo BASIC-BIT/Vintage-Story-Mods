@@ -50,7 +50,7 @@ const EXPIRED = session({ modDbValidUntilEstimate: "2026-09-09T00:00:00.000Z" })
 const LOGIN = { schemaVersion: 1, email: "fixture-email@example.invalid", password: PASSWORD };
 
 // Secrets Manager fake with a session container whose AWSCURRENT can move.
-function secrets({ current = session(), currentVersionId = "v-old", promoteError = null, loginError = null } = {}) {
+function secrets({ current = session(), currentVersionId = "v-old", promoteError = null, loginError = null, labelFirstCurrent = true } = {}) {
   const client = new FakeSecretsManagerClient();
   const state = { current, currentVersionId };
   client.respond("GetSecretValueCommand", (input) => {
@@ -64,8 +64,9 @@ function secrets({ current = session(), currentVersionId = "v-old", promoteError
   client.respond("PutSecretValueCommand", (input) => {
     state.pending = JSON.parse(input.SecretString);
     // Real Secrets Manager attaches AWSCURRENT to the first version of an
-    // empty secret whatever VersionStages asked for.
-    if (state.current === null) {
+    // empty secret whatever VersionStages asked for (labelFirstCurrent=false
+    // models the documented behaviour, where it stays AWSPENDING only).
+    if (state.current === null && labelFirstCurrent) {
       state.current = state.pending;
       state.currentVersionId = "v-candidate";
     }
@@ -324,11 +325,22 @@ test("a live authentication failure on interactive Windows also renews", async (
   assert.equal(store.state.currentVersionId, "v-candidate");
 });
 
-test("bootstrapping from an empty container promotes without RemoveFromVersionId", async () => {
+test("bootstrapping when AWS labels the first version current skips the stage move", async () => {
   const store = secrets({ current: null });
   const result = await run({ store });
   assert.equal(result.status, "renewed");
+  assert.equal(result.versionId, "v-candidate");
   assert.equal(result.previousVersionId, null);
+  assert.equal(store.client.inputs("UpdateSecretVersionStageCommand").length, 0);
+});
+
+test("bootstrapping when the first version stays pending promotes without RemoveFromVersionId", async () => {
+  const store = secrets({ current: null, labelFirstCurrent: false });
+  const result = await run({ store });
+  assert.equal(result.status, "renewed");
+  assert.equal(result.versionId, "v-candidate");
+  assert.equal(result.previousVersionId, null);
+  assert.equal(store.client.inputs("UpdateSecretVersionStageCommand").length, 1);
   assert.equal("RemoveFromVersionId" in store.client.lastInput("UpdateSecretVersionStageCommand"), false);
 });
 

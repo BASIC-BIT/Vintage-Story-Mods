@@ -9,7 +9,7 @@ Design: `docs/superpowers/specs/2026-09-03-moddb-aws-auth-design.md`. Research: 
 ### AWS (owned by `basic-infra`, `us-east-2`)
 
 - Secrets Manager `/basic/vintage-story/moddb/account-login`: email and password. Readable only by the renewal role. Value set through the broker's masked prompt, never through Terraform.
-- Secrets Manager `/basic/vintage-story/moddb/session`: `vs_websessionkey` plus capture, expiry-estimate, and validation metadata. Renewal validates the candidate live first, then writes `AWSPENDING`, then promotes to `AWSCURRENT` conditionally on the version it originally observed. No lock table. Validation comes before the write because Secrets Manager attaches `AWSCURRENT` to the first version of an empty secret whatever stages were requested (observed 2026-09-03).
+- Secrets Manager `/basic/vintage-story/moddb/session`: `vs_websessionkey` plus capture, expiry-estimate, and validation metadata. Renewal validates the candidate live first, then writes `AWSPENDING`, then promotes to `AWSCURRENT` conditionally on the version it originally observed. No lock table. Validation comes before the write because Secrets Manager attaches `AWSCURRENT` to the first version of an empty secret whatever stages were requested (observed 2026-09-03); the broker tolerates that by re-reading after the bootstrap write and skipping the stage move when the candidate is already current.
 - IAM `moddb-renewal`: read both secrets, stage and promote session versions.
 - IAM `moddb-publisher`: read `AWSCURRENT` of the session secret only. Assumable by local operator identities and by GitHub OIDC restricted to `repo:BASIC-BIT/Vintage-Story-Mods:ref:refs/heads/main`.
 - AWS-managed KMS key, no resource policies, no replication.
