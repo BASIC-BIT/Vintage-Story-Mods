@@ -1,0 +1,6 @@
+{
+  "pageCode": "thebasics-scene-markers",
+  "title": "thebasics:thebasics-handbook-title-scene-markers",
+  "categoryCode": "thebasics",
+  "text": "<strong>Scene markers</strong> hold persistent roleplay descriptions without filling a build with large written signs. Craft one from any two loose stones, then place the small marker flat on the ground or against a wall.\n\n<strong>Writing and reading</strong>\n- Hold Shift and right-click a placed marker to edit its optional title, body, and presentation.\n- Choose <strong>Environmental description</strong> for in-fiction narration, or <strong>OOC notice</strong> for explicit production notes.\n- Look directly at a written marker to see its description over the world. The marker itself stays visually unobtrusive.\n- Break a marker to pick it up with its title, description, presentation, and author metadata intact. Hold Shift and right-click the item to read it.\n\nEditing follows normal land-claim permissions. Scene markers are durable world content, separate from temporary /envhere and !! cast messages and separate from local or global OOC chat settings."
+}

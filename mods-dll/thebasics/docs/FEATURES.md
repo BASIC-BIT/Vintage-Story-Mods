@@ -185,6 +185,21 @@ Primary config areas:
 
 Sight override entries use fully qualified `domain:path` block-code patterns with optional `*` wildcards. They are resolved to block IDs when config loads, so sight raycasts use constant-time lookups. Explicit blocking wins over pass-through, then the normal render-pass and material rules apply. Block-entity-owned selection shapes remain position-aware; an explicitly blocking owning block with no selection boxes falls back to blocking its full cell. Sound occlusion remains separate, and ordinary entities are not treated as sight blockers.
 
+## Scene Markers
+
+Features:
+
+- Durable roleplay descriptions attached to a small physical marker, rather than literal writing rendered on a sign face.
+- A shapeless two-loose-stone recipe with no ink requirement.
+- Ground and wall placement using the same familiar placement behavior as signs.
+- Environmental narration and visibly distinct OOC notice presentations.
+- Description overlays appear only while a player deliberately targets the marker, avoiding persistent world-text clutter.
+- Shift-right-click editing with normal land-claim build permissions.
+- Title, body, presentation, and author metadata persist in the world and on the dropped item when the marker is broken and placed again.
+- Shift-right-click reading while holding a written marker.
+
+Scene markers are independent world content. They borrow visual conventions from cast environmental messages, but do not use the RP chat pipeline or the local/global OOC chat toggles.
+
 ## Languages And Heritage Grants
 
 Features:

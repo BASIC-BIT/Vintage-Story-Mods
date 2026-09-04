@@ -1,0 +1,10 @@
+{
+  ingredientPattern: "SS",
+  ingredients: {
+    "S": { type: "item", code: "game:stone-*" }
+  },
+  width: 2,
+  height: 1,
+  shapeless: true,
+  output: { type: "block", code: "thebasics:scene-marker-ground-north" }
+}
