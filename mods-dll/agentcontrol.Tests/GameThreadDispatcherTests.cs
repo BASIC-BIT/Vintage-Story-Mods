@@ -23,7 +23,7 @@ public sealed class GameThreadDispatcherTests
         dispatcher.Shutdown();
         var invoked = false;
 
-        var awaitRejected = async () => await dispatcher.Invoke(() => invoked = true);
+        var awaitRejected = async () => await dispatcher.Invoke(() => invoked = true).WaitAsync(TimeSpan.FromSeconds(5));
 
         await awaitRejected.Should().ThrowAsync<ObjectDisposedException>();
         dispatcher.Drain();

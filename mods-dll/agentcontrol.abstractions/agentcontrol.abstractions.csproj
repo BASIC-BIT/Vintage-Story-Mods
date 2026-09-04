@@ -7,10 +7,4 @@
     <AssemblyName>agentcontrol.abstractions</AssemblyName>
     <RootNamespace>AgentControl.Abstractions</RootNamespace>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="VintagestoryAPI">
-      <HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
 </Project>

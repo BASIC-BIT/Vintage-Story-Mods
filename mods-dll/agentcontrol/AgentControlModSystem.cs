@@ -80,11 +80,11 @@ public sealed class AgentControlModSystem : ModSystem
         _sessionSecret = NamedPipeRpcServer.CreateSessionSecret();
         _server = new NamedPipeRpcServer(_config.PipeName, _config.MaxRequestBytes, HandleRequest, () =>
         {
-            _ = _dispatcher?.Invoke(() =>
+            Observe(_dispatcher?.Invoke(() =>
             {
                 Kill();
                 return true;
-            });
+            }));
         }, OnServerFailed);
         _server.Start();
         _enabled = true;
@@ -95,12 +95,17 @@ public sealed class AgentControlModSystem : ModSystem
     private void OnServerFailed(Exception error)
     {
         _api?.Logger.Error("Agent Control pipe failed: {0}", error);
-        _ = _dispatcher?.Invoke(() =>
+        Observe(_dispatcher?.Invoke(() =>
         {
             Disable("pipe_failed");
             return true;
-        });
+        }));
     }
+
+    private static void Observe(Task? task) =>
+        task?.ContinueWith(
+            t => _ = t.Exception,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
 
     private void Kill()
     {
@@ -118,6 +123,10 @@ public sealed class AgentControlModSystem : ModSystem
         Kill();
         _enabled = false;
         _sessionSecret = null;
+        if (reason == "pipe_failed")
+        {
+            _api?.ShowChatMessage("Agent Control disabled: named pipe failed, see client log.");
+        }
         var server = Interlocked.Exchange(ref _server, null);
         if (server is not null)
         {
