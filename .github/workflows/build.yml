@@ -8,10 +8,50 @@ on:
   workflow_dispatch:
 
 env:
-  VS_VERSION: "1.22.6"
+  VS_VERSION: "1.22.7"
   DOTNET_VERSION: "10.0.x"
 
 jobs:
+  require-relay-contract-revision:
+    name: Require relay contract revision bump
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Require revision bump for Worker changes
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: |
+        set -euo pipefail
+
+        worker_path="infra/terraform/stacks/thebasics-analytics-relay/worker/analytics-relay.mjs"
+        if git diff --quiet "$BASE_SHA" -- "$worker_path"; then
+          echo "Analytics relay Worker is unchanged."
+          exit 0
+        fi
+
+        base_revision="$(git show "$BASE_SHA:$worker_path" | sed -nE 's/^export const CONTRACT_REVISION = ([0-9]+);$/\1/p')"
+        current_revision="$(sed -nE 's/^export const CONTRACT_REVISION = ([0-9]+);$/\1/p' "$worker_path")"
+
+        if [[ -z "$base_revision" || -z "$current_revision" ]]; then
+          echo "Could not parse analytics relay contract revisions." >&2
+          exit 1
+        fi
+
+        if (( current_revision <= base_revision )); then
+          echo "Analytics relay Worker changed without increasing CONTRACT_REVISION ($base_revision -> $current_revision)." >&2
+          exit 1
+        fi
+
+        echo "Analytics relay contract revision increased: $base_revision -> $current_revision."
+
   validate-architecture:
     runs-on: ubuntu-latest
     permissions:
@@ -99,6 +139,14 @@ jobs:
 
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Test analytics relay compatibility
+      run: node --test infra/terraform/stacks/thebasics-analytics-relay/worker/analytics-relay.test.mjs
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v4

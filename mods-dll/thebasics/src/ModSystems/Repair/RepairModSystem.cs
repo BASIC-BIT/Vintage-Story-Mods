@@ -39,8 +39,8 @@ namespace thebasics.ModSystems.Repair
 
             stack.Attributes.SetInt("durability", durability);
             activeSlot.MarkDirty();
-            AnalyticsService.TrackCommandUsed("setdurability", true);
-            AnalyticsService.TrackFeatureUsed("repair", "set_durability");
+            AnalyticsService.TrackCommandUsed("setdurability", true, actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("repair", "set_durability", actorPlayerUid: player.PlayerUID);
 
             var message = Lang.Get("thebasics:repair-success-set", durability, maxDurability);
             if (showPercentHint)

@@ -3,6 +3,7 @@ using thebasics.Configs;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
+using Vintagestory.API.Common;
 
 namespace thebasics.Tests.ModSystems.AdminConfig;
 
@@ -29,16 +30,16 @@ public class ConfigAdminSettingRegistryTests
     }
 
     [Fact]
-    public void ValidateConfig_RejectsUnlimitedRangeCombinedWithSpeechLineOfSight()
+    public void ValidateConfig_RejectsUnlimitedRangeCombinedWithClearSoundPath()
     {
         // Line of sight needs a bounded range to raycast against, so the combination is refused
         // rather than the setting being silently ignored.
         var config = CreateConfig();
         config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
-        config.RequireLineOfSightForSpeech[ProximityChatMode.Normal] = true;
+        config.RequireClearSoundPathForSpeech[ProximityChatMode.Normal] = true;
 
         ConfigAdminSettingRegistry.ValidateConfig(config)
-            .Should().ContainSingle().Which.Should().Contain("cannot combine an unlimited range with RequireLineOfSightForSpeech");
+            .Should().ContainSingle().Which.Should().Contain("cannot combine an unlimited range with RequireClearSoundPathForSpeech");
     }
 
     [Fact]
@@ -140,7 +141,7 @@ public class ConfigAdminSettingRegistryTests
 
         success.Should().BeFalse();
         error.Should().Contain("whole numbers from 1 to 128");
-        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 6);
+        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 9);
     }
 
     [Fact]
@@ -153,7 +154,7 @@ public class ConfigAdminSettingRegistryTests
 
         success.Should().BeFalse();
         error.Should().Contain("must contain at least one whole number");
-        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 6);
+        config.ProximityChatClampFontSizes.Should().Equal(30, 16, 12, 9);
     }
 
     [Theory]
@@ -418,6 +419,98 @@ public class ConfigAdminSettingRegistryTests
         config.ManageMapPlayerVisibility.Should().BeTrue();
         config.MapHideOtherPlayers.Should().BeTrue();
         config.MapPlayerRenderDistance.Should().Be(-1);
+    }
+
+    [Fact]
+    public void SpectatorChatSettings_AreRegisteredAsLiveSettings()
+    {
+        var config = CreateConfig();
+        var nicknameSetting = GetSetting("UseNicknameInSpectatorOOC");
+        var placementSetting = GetSetting("AllowSpectatorPlacedEnvironmentalMessages");
+        var protectionSetting = GetSetting("ProtectSpectatorRoleplayChat");
+
+        nicknameSetting.Group.Should().Be("Chat/RP");
+        nicknameSetting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        placementSetting.Group.Should().Be("Chat/RP");
+        placementSetting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        protectionSetting.Group.Should().Be("Chat/RP");
+        protectionSetting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        nicknameSetting.TrySetValue(config, "true", out var nicknameError).Should().BeTrue(nicknameError);
+        placementSetting.TrySetValue(config, "false", out var placementError).Should().BeTrue(placementError);
+        protectionSetting.TrySetValue(config, "false", out var protectionError).Should().BeTrue(protectionError);
+
+        config.UseNicknameInSpectatorOOC.Should().BeTrue();
+        config.AllowSpectatorPlacedEnvironmentalMessages.Should().BeFalse();
+        config.ProtectSpectatorRoleplayChat.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SightBlockOverrideSettings_AreOptionalLivePatternLists()
+    {
+        var config = CreateConfig();
+        var passThrough = GetSetting("SightPassThroughBlockCodePatterns");
+        var blocking = GetSetting("SightBlockingBlockCodePatterns");
+
+        passThrough.Group.Should().Be("Chat/Occlusion");
+        passThrough.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        blocking.Group.Should().Be("Chat/Occlusion");
+        blocking.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        passThrough.TrySetValue(config, " decorplus:brass-lattice-*, game:glass-* ", out var passError).Should().BeTrue(passError);
+        blocking.TrySetValue(config, string.Empty, out var blockError).Should().BeTrue(blockError);
+
+        config.SightPassThroughBlockCodePatterns.Should().Equal("decorplus:brass-lattice-*", "game:glass-*");
+        config.SightBlockingBlockCodePatterns.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ValidateConfig_RejectsUnqualifiedSightBlockPatternsAndExactConflicts()
+    {
+        var config = CreateConfig();
+        config.SightPassThroughBlockCodePatterns = ["curtain-*", "decorplus:privacy-curtain-*"];
+        config.SightBlockingBlockCodePatterns = ["DECORPLUS:PRIVACY-CURTAIN-*"];
+
+        var errors = ConfigAdminSettingRegistry.ValidateConfig(config);
+
+        errors.Should().Contain(error => error.Contains("fully qualified"));
+        errors.Should().Contain(error => error.Contains("both sight override lists"));
+    }
+
+    [Fact]
+    public void ValidateResolvedSightBlockPatterns_RejectsWildcardOverlap()
+    {
+        var config = CreateConfig();
+        config.SightPassThroughBlockCodePatterns = ["decorplus:privacy-*"];
+        config.SightBlockingBlockCodePatterns = ["decorplus:*-red"];
+        var curtain = new Block
+        {
+            BlockId = 91,
+            Code = new AssetLocation("decorplus:privacy-curtain-red")
+        };
+
+        var errors = ConfigAdminSettingRegistry.ValidateResolvedSightBlockPatterns(config, [curtain]);
+
+        errors.Should().ContainSingle().Which.Should().Contain("decorplus:privacy-curtain-red");
+    }
+
+    [Fact]
+    public void ValidateResolvedSightBlockPatterns_BoundsBroadWildcardOverlapErrors()
+    {
+        var config = CreateConfig();
+        config.SightPassThroughBlockCodePatterns = ["game:block-*"];
+        config.SightBlockingBlockCodePatterns = ["game:*-granite"];
+        var blocks = Enumerable.Range(0, 12)
+            .Select(index => new Block
+            {
+                BlockId = index + 1,
+                Code = new AssetLocation($"game:block-{index:D2}-granite")
+            });
+
+        var errors = ConfigAdminSettingRegistry.ValidateResolvedSightBlockPatterns(config, blocks);
+
+        errors.Should().ContainSingle();
+        errors[0].Should().Contain("12 blocks");
+        errors[0].Should().Contain("game:block-09-granite");
+        errors[0].Should().NotContain("game:block-10-granite");
     }
 
     [Fact]

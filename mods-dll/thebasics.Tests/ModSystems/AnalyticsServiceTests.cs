@@ -72,6 +72,87 @@ public class AnalyticsServiceTests : IDisposable
     }
 
     [Fact]
+    public void PlayerInitiatedEvents_WithPersonalizedConsent_IncludeOnlyPseudonymousActor()
+    {
+        const string rawPlayerUid = "raw-player-uid";
+        var playerPseudonym = new string('a', 64);
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(
+            sink,
+            allowErrorTelemetry: true,
+            playerPseudonymizer: playerUid => playerUid == rawPlayerUid ? playerPseudonym : null);
+
+        AnalyticsService.TrackCommandUsed("sethome", true, actorPlayerUid: rawPlayerUid);
+        AnalyticsService.TrackFeatureUsed("home-spawn", "set_home", actorPlayerUid: rawPlayerUid);
+        AnalyticsService.TrackPlayerFailure(
+            rawPlayerUid,
+            "home-spawn",
+            "set_home",
+            "warning",
+            "blocked",
+            new Dictionary<string, object>
+            {
+                ["error_count_bucket"] = "1"
+            });
+
+        sink.Events.Should().HaveCount(3);
+        foreach (var analyticsEvent in sink.Events)
+        {
+            analyticsEvent.Properties.Should()
+                .ContainKey("pseudonymous_player_id").WhoseValue.Should().Be(playerPseudonym);
+        }
+        sink.Events.SelectMany(analyticsEvent => analyticsEvent.Properties.Values)
+            .Should().NotContain(rawPlayerUid);
+        sink.Events.Single(analyticsEvent => analyticsEvent.Name == "mod failure").Properties
+            .Should().ContainKey("error_count_bucket").WhoseValue.Should().Be("1");
+    }
+
+    [Fact]
+    public void PlayerInitiatedEvents_WithoutPersonalizedConsent_OmitActor()
+    {
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(sink, allowErrorTelemetry: true);
+
+        AnalyticsService.TrackCommandUsed("sethome", true, actorPlayerUid: "raw-player-uid");
+
+        sink.Events.Should().ContainSingle().Which.Properties
+            .Should().NotContainKey("pseudonymous_player_id");
+    }
+
+    [Fact]
+    public void PlayerAttribution_CannotBeInjectedThroughEventProperties()
+    {
+        var expectedPseudonym = new string('b', 64);
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => expectedPseudonym);
+
+        AnalyticsService.TrackFeatureUsed(
+            "home-spawn",
+            "set_home",
+            properties: new Dictionary<string, object>
+            {
+                ["pseudonymous_player_id"] = "caller-supplied-value"
+            },
+            actorPlayerUid: "raw-player-uid");
+
+        sink.Events.Should().ContainSingle().Which.Properties
+            .Should().ContainKey("pseudonymous_player_id").WhoseValue.Should().Be(expectedPseudonym);
+    }
+
+    [Fact]
+    public void PlayerAttributionFailure_DoesNotBlockBaseEvent()
+    {
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => throw new InvalidOperationException("test"));
+
+        AnalyticsService.TrackFeatureUsed("home-spawn", "set_home", actorPlayerUid: "raw-player-uid");
+
+        var analyticsEvent = sink.Events.Should().ContainSingle().Subject;
+        analyticsEvent.Name.Should().Be("feature used");
+        analyticsEvent.Properties.Should().NotContainKey("pseudonymous_player_id");
+    }
+
+    [Fact]
     public void TrackConfigSnapshot_IncludesTeleportationSettings()
     {
         var sink = new RecordingAnalyticsSink();

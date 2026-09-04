@@ -7,6 +7,8 @@ using thebasics.Models;
 using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.Utilities;
+using Block = Vintagestory.API.Common.Block;
 
 namespace thebasics.ModSystems.AdminConfig;
 
@@ -55,7 +57,47 @@ public static class ConfigAdminSettingRegistry
             errors.Add($"SpeechOcclusionWallPenaltyBlocks must be a whole number from 0 to {MaxWallPenaltyBlocks}.");
         }
 
+        ValidateSightBlockPatterns(config, errors);
+
         return errors;
+    }
+
+    private static void ValidateSightBlockPatterns(ModConfig config, List<string> errors)
+    {
+        var passThrough = config.SightPassThroughBlockCodePatterns ?? Array.Empty<string>();
+        var blocking = config.SightBlockingBlockCodePatterns ?? Array.Empty<string>();
+
+        foreach (var pattern in passThrough.Concat(blocking).Where(pattern => !IsFullyQualifiedBlockPattern(pattern)))
+        {
+            errors.Add($"Sight block pattern '{pattern}' must be a fully qualified domain:path pattern. Use * for wildcards.");
+        }
+
+        var exactConflicts = passThrough.Intersect(blocking, StringComparer.OrdinalIgnoreCase);
+        foreach (var pattern in exactConflicts)
+        {
+            errors.Add($"Sight block pattern '{pattern}' appears in both sight override lists. Remove it from one list; blocking would otherwise take precedence.");
+        }
+    }
+
+    internal static IReadOnlyList<string> ValidateResolvedSightBlockPatterns(ModConfig config, IEnumerable<Block> blocks)
+    {
+        var policy = SightBlockPolicy.Resolve(
+            blocks,
+            config.SightPassThroughBlockCodePatterns,
+            config.SightBlockingBlockCodePatterns);
+
+        if (policy.ConflictingBlockCodeCount == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var examples = string.Join(", ", policy.ConflictingBlockCodes.Select(blockCode => $"'{blockCode}'"));
+        var omittedCount = policy.ConflictingBlockCodeCount - policy.ConflictingBlockCodes.Count;
+        var omittedText = omittedCount > 0 ? $" ({omittedCount} more omitted)" : string.Empty;
+        return
+        [
+            $"{policy.ConflictingBlockCodeCount} blocks match both sight override lists: {examples}{omittedText}. Adjust the patterns so each block resolves to only one list."
+        ];
     }
 
     private static void ValidateMode(ModConfig config, ProximityChatMode mode, List<string> errors)
@@ -75,12 +117,12 @@ public static class ConfigAdminSettingRegistry
             errors.Add($"{mode} range must be greater than its obfuscation start.");
         }
 
-        // Line of sight needs a bounded range to raycast against; at unlimited range the check
-        // is skipped rather than run against the whole map. Say so instead of ignoring it.
+        // The sound path check needs a bounded range to raycast against; at unlimited range it is
+        // skipped rather than run against the whole map. Say so instead of ignoring it.
         if (ModConfig.IsUnlimitedRange(range) &&
-            ModConfig.GetModeValue(config.RequireLineOfSightForSpeech, mode, false))
+            ModConfig.GetModeValue(config.RequireClearSoundPathForSpeech, mode, false))
         {
-            errors.Add($"{mode} cannot combine an unlimited range with RequireLineOfSightForSpeech. Set a bounded range or turn the line-of-sight requirement off.");
+            errors.Add($"{mode} cannot combine an unlimited range with RequireClearSoundPathForSpeech. Set a bounded range or turn the sound path requirement off.");
         }
     }
 
@@ -143,7 +185,7 @@ public static class ConfigAdminSettingRegistry
             Int("SpeechBubbleMinimumDisplayMilliseconds", "Client UX", "Minimum bubble time", "Minimum speech bubble lifetime in milliseconds.", ConfigAdminReloadBehavior.Live, (c => c.SpeechBubbleMinimumDisplayMilliseconds, (c, v) => c.SpeechBubbleMinimumDisplayMilliseconds = v), (0, 60000)),
             Bool("ShowNicknameInNametag", "Client UX", "Show nickname in nametag", "Include RP nickname in rendered nametags.", ConfigAdminReloadBehavior.Live, c => c.ShowNicknameInNametag, (c, v) => c.ShowNicknameInNametag = v),
             Bool("ShowPlayerNameInNametag", "Client UX", "Show account name in nametag", "Include account name in rendered nametags.", ConfigAdminReloadBehavior.Live, c => c.ShowPlayerNameInNametag, (c, v) => c.ShowPlayerNameInNametag = v),
-            Bool("HideNametagUnlessTargeting", "Client UX", "Hide nametag unless targeted", "Only show nametags when targeted.", ConfigAdminReloadBehavior.Live, c => c.HideNametagUnlessTargeting, (c, v) => c.HideNametagUnlessTargeting = v),
+            Bool("HideNametagUnlessTargeting", "Client UX", "Hide other nametags unless targeted", "Only show other players' nametags when targeted.", ConfigAdminReloadBehavior.Live, c => c.HideNametagUnlessTargeting, (c, v) => c.HideNametagUnlessTargeting = v),
             Int("NametagRenderRange", "Client UX", "Nametag render range", "Maximum nametag render range in blocks.", ConfigAdminReloadBehavior.Live, (c => c.NametagRenderRange, (c, v) => c.NametagRenderRange = v), (0, 512)),
             Bool("NametagRequiresLineOfSight", "Client UX", "Nametag requires line of sight", "Require client line-of-sight for nametag rendering.", ConfigAdminReloadBehavior.Live, c => c.NametagRequiresLineOfSight, (c, v) => c.NametagRequiresLineOfSight = v),
             OptionalHexColor("NametagBackgroundColor", "Client UX", "Nametag background color", "Optional #RRGGBB or #RRGGBBAA background color for custom nametags. Empty uses the active UI theme.", ConfigAdminReloadBehavior.Live, c => c.NametagBackgroundColor, (c, v) => c.NametagBackgroundColor = v),
@@ -155,6 +197,9 @@ public static class ConfigAdminSettingRegistry
             Bool("ApplyColorsToNicknames", "Client UX", "Color RP nicknames", "Apply nickname colors to IC nicknames.", ConfigAdminReloadBehavior.Live, c => c.ApplyColorsToNicknames, (c, v) => c.ApplyColorsToNicknames = v),
             Bool("ApplyColorsToPlayerNames", "Client UX", "Color account names", "Apply nickname colors to OOC account names.", ConfigAdminReloadBehavior.Live, c => c.ApplyColorsToPlayerNames, (c, v) => c.ApplyColorsToPlayerNames = v),
             Bool("EnableGlobalOOC", "Chat/RP", "Enable global OOC", "Allow global OOC formatting and command support.", ConfigAdminReloadBehavior.RestartRequired, c => c.EnableGlobalOOC, (c, v) => c.EnableGlobalOOC = v),
+            Bool("UseNicknameInSpectatorOOC", "Chat/RP", "Use spectator OOC nicknames", "Use RP nicknames instead of account names for local OOC sent by active spectators.", ConfigAdminReloadBehavior.Live, c => c.UseNicknameInSpectatorOOC, (c, v) => c.UseNicknameInSpectatorOOC = v),
+            Bool("AllowSpectatorPlacedEnvironmentalMessages", "Chat/RP", "Allow spectator placed text", "Allow active spectators to place world-positioned environmental text with !! and /envhere.", ConfigAdminReloadBehavior.Live, c => c.AllowSpectatorPlacedEnvironmentalMessages, (c, v) => c.AllowSpectatorPlacedEnvironmentalMessages = v),
+            Bool("ProtectSpectatorRoleplayChat", "Chat/RP", "Protect spectator RP chat", "Protect active spectators from accidentally sending embodied speech, signing, or name-led emotes while invisible. Spectators must deliberately choose OOC or narration. Disable to retain normal RP chat behavior.", ConfigAdminReloadBehavior.Live, c => c.ProtectSpectatorRoleplayChat, (c, v) => c.ProtectSpectatorRoleplayChat = v),
             Bool("TpaRequireTemporalGear", "TPA", "Require temporal gear", "Require temporal gear for /tpa requests.", ConfigAdminReloadBehavior.Live, c => c.TpaRequireTemporalGear, (c, v) => c.TpaRequireTemporalGear = v),
             Bool("TpaUseCooldown", "TPA", "Use TPA cooldown", "Apply cooldown between outgoing TPA requests.", ConfigAdminReloadBehavior.Live, c => c.TpaUseCooldown, (c, v) => c.TpaUseCooldown = v),
             Decimal("TpaCooldownInGameHours", "TPA", "TPA cooldown hours", "Cooldown length in in-game hours.", ConfigAdminReloadBehavior.Live, (c => c.TpaCooldownInGameHours, (c, v) => c.TpaCooldownInGameHours = v), (0, 720)),
@@ -275,11 +320,13 @@ public static class ConfigAdminSettingRegistry
             settings.Add(ModeText(ModeMeta("ProximityChatModePunctuation", "Chat/RP Text", mode, "punctuation", "Punctuation appended by auto-punctuation."), mode, c => c.ProximityChatModePunctuation, DefaultPunctuation(mode), maxLength: 8));
             settings.Add(ModeTextArray(ModeMeta("ProximityChatModeVerbs", "Chat/RP Text", mode, "verbs", "Comma-separated speech verbs for this mode."), mode, c => c.ProximityChatModeVerbs, DefaultVerbs(mode)));
             settings.Add(ModeTextArray(ModeMeta("ProximityChatModeQuestionVerbs", "Chat/RP Text", mode, "question verbs", "Comma-separated verbs used when a message ends in a question mark."), mode, c => c.ProximityChatModeQuestionVerbs, DefaultQuestionVerbs()));
-            settings.Add(ModeBool(ModeMeta("RequireLineOfSightForSpeech", "Chat/Occlusion", mode, "require line of sight", "Experimental. Only deliver speech in this mode to players the speaker has a clear line to."), mode, c => c.RequireLineOfSightForSpeech, defaultValue: false));
+            settings.Add(ModeBool(ModeMeta("RequireClearSoundPathForSpeech", "Chat/Occlusion", mode, "require clear sound path", "Experimental. Only deliver speech in this mode to players with an unobstructed sound path from the speaker. Glass and water block it; foliage does not."), mode, c => c.RequireClearSoundPathForSpeech, defaultValue: false));
         }
 
         settings.Add(IntArray(new SettingMeta("ProximityChatClampFontSizes", "Chat/Font Sizes", "Clamp font sizes", "Comma-separated allowed distance font sizes.", ConfigAdminReloadBehavior.Live), c => c.ProximityChatClampFontSizes, (c, v) => c.ProximityChatClampFontSizes = v, (1, 128)));
         settings.Add(Int("SpeechOcclusionWallPenaltyBlocks", "Chat/Occlusion", "Wall muffling penalty", "Experimental. Blocks of extra effective distance per sound-blocking block between speaker and listener. 0 disables muffling.", ConfigAdminReloadBehavior.Live, (c => c.SpeechOcclusionWallPenaltyBlocks, (c, v) => c.SpeechOcclusionWallPenaltyBlocks = v), (0, MaxWallPenaltyBlocks)));
+        settings.Add(OptionalTextArray(new SettingMeta("SightPassThroughBlockCodePatterns", "Chat/Occlusion", "Sight pass-through blocks", "Comma-separated fully qualified block-code patterns that never obstruct roleplay sight. Use * for wildcards.", ConfigAdminReloadBehavior.Live), c => c.SightPassThroughBlockCodePatterns, (c, v) => c.SightPassThroughBlockCodePatterns = v));
+        settings.Add(OptionalTextArray(new SettingMeta("SightBlockingBlockCodePatterns", "Chat/Occlusion", "Sight-blocking blocks", "Comma-separated fully qualified block-code patterns that always obstruct roleplay sight. Blocking wins if both lists match.", ConfigAdminReloadBehavior.Live), c => c.SightBlockingBlockCodePatterns, (c, v) => c.SightBlockingBlockCodePatterns = v));
     }
 
     private static void AddAudioModeSettings(List<ConfigAdminSettingDefinition> settings)
@@ -370,6 +417,16 @@ public static class ConfigAdminSettingRegistry
             value => ParseStringArray(value).Length == 0 ? $"{meta.Key} must contain at least one value." : null);
     }
 
+    private static ConfigAdminSettingDefinition OptionalTextArray(SettingMeta meta, Func<ModConfig, string[]> get, Action<ModConfig, string[]> set)
+    {
+        return ValidatedText(meta,
+            config => FormatStringArray(get(config)),
+            (config, value) => set(config, ParseStringArray(value)),
+            value => ParseStringArray(value).FirstOrDefault(pattern => !IsFullyQualifiedBlockPattern(pattern)) is { } invalid
+                ? $"{meta.Key} contains '{invalid}', which is not a fully qualified domain:path pattern. Use * for wildcards."
+                : null);
+    }
+
     private static ConfigAdminSettingDefinition IntArray(SettingMeta meta, Func<ModConfig, int[]> get, Action<ModConfig, int[]> set, (int Min, int Max) range)
     {
         return new ConfigAdminSettingDefinition(new ConfigAdminSettingDefinitionOptions
@@ -433,6 +490,26 @@ public static class ConfigAdminSettingRegistry
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .ToArray();
+    }
+
+    private static bool IsFullyQualifiedBlockPattern(string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern) || pattern.Any(char.IsWhiteSpace))
+        {
+            return false;
+        }
+
+        var separator = pattern.IndexOf(':');
+        return separator > 0 &&
+               separator == pattern.LastIndexOf(':') &&
+               separator < pattern.Length - 1 &&
+               pattern[..separator].All(IsBlockCodePatternCharacter) &&
+               pattern[(separator + 1)..].All(character => IsBlockCodePatternCharacter(character) || character is '/' or '*');
+    }
+
+    private static bool IsBlockCodePatternCharacter(char character)
+    {
+        return char.IsLetterOrDigit(character) || character is '-' or '_' or '.';
     }
 
     private static string ValidateIntArray(string key, string value, (int Min, int Max) range, out int[] parsedValues)

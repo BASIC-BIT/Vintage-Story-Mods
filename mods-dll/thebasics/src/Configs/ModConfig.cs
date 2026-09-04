@@ -1,6 +1,10 @@
 #pragma warning disable S1133 // Deprecated config members are retained for live config compatibility.
+#pragma warning disable S1168 // Legacy shims must getter-return null: NullValueHandling.Ignore only
+                              // skips nulls, so an empty collection would write the retired key back
+                              // into every saved config.
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using Newtonsoft.Json;
 using ProtoBuf;
@@ -142,6 +146,19 @@ namespace thebasics.Configs
 
         private const int DefaultSignLanguageRange = 60;
 
+        /// <summary>
+        /// Distance font sizes, largest to smallest. The floor is the size a listener at maximum
+        /// range reads at, so it has to stay legible: unreadable text conveys nothing while still
+        /// taking up chat.
+        /// </summary>
+        internal static readonly int[] DefaultClampFontSizes = [30, 16, 12, 9];
+
+        /// <summary>
+        /// The floor shipped before <see cref="DefaultClampFontSizes"/>. Size 6 was not
+        /// small-but-legible, it was unreadable. Retained so upgrades can recognise and replace it.
+        /// </summary>
+        internal static readonly int[] RetiredClampFontSizes = [30, 16, 12, 6];
+
         private static int DefaultModeDistance(ProximityChatMode mode) => mode switch
         {
             ProximityChatMode.Yell => 90,
@@ -186,7 +203,19 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, 12 }
             };
 
-            ProximityChatClampFontSizes ??= [30, 16, 12, 6];
+            ProximityChatClampFontSizes ??= [.. DefaultClampFontSizes];
+
+            // Every successful load rewrites the config to disk, so an already-running server has
+            // the retired default written out explicitly and the ??= above never fires for it. Left
+            // alone, the readability fix would only ever reach fresh installs.
+            //
+            // Only the exact retired array is replaced, so a genuinely custom set survives. The cost
+            // is that this one array can no longer be chosen deliberately — it is the unreadable
+            // default that prompted the change, and any other floor is still available.
+            if (ProximityChatClampFontSizes.SequenceEqual(RetiredClampFontSizes))
+            {
+                ProximityChatClampFontSizes = [.. DefaultClampFontSizes];
+            }
 
 
             InitializeProximityChatVerbDefaults();
@@ -222,7 +251,7 @@ namespace thebasics.Configs
                 { ProximityChatMode.Whisper, new[] { "asks" } }
             };
 
-            RequireLineOfSightForSpeech ??= new Dictionary<ProximityChatMode, bool>
+            RequireClearSoundPathForSpeech ??= new Dictionary<ProximityChatMode, bool>
             {
                 { ProximityChatMode.Yell, false },
                 { ProximityChatMode.Normal, false },
@@ -286,6 +315,8 @@ namespace thebasics.Configs
         private void InitializeGeneralFeatureDefaults()
         {
             ReviewedConfigSettingKeys ??= new List<string>();
+            SightPassThroughBlockCodePatterns ??= Array.Empty<string>();
+            SightBlockingBlockCodePatterns ??= Array.Empty<string>();
             MaxRpCharacterSlots = MaxRpCharacterSlots <= 0 ? 3 : MaxRpCharacterSlots;
         }
 
@@ -538,11 +569,33 @@ namespace thebasics.Configs
         public IDictionary<ProximityChatMode, string[]> ProximityChatModeQuestionVerbs { get; set; }
 
         /// <summary>
-        /// Experimental, off by default. When set for a mode, speech in that mode only reaches players
-        /// the speaker has an unobstructed line to. Glass and water block speech; foliage does not.
+        /// Experimental, off by default. When set for a mode, speech in that mode only reaches
+        /// players the speaker has an unobstructed <em>sound</em> path to. Glass and water block it;
+        /// foliage does not.
+        ///
+        /// Named for sound rather than sight deliberately. It was once RequireLineOfSightForSpeech,
+        /// which described neither the filter it uses nor the behaviour it produces: a sealed glass
+        /// window blocks speech while a hedge does not.
         /// </summary>
         [ProtoMember(148)]
-        public IDictionary<ProximityChatMode, bool> RequireLineOfSightForSpeech { get; set; }
+        public IDictionary<ProximityChatMode, bool> RequireClearSoundPathForSpeech { get; set; }
+
+        [ProtoIgnore]
+        [JsonProperty("RequireLineOfSightForSpeech", NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Use RequireClearSoundPathForSpeech. The setting models sound, not sight.")]
+        public IDictionary<ProximityChatMode, bool> RequireLineOfSightForSpeechLegacy
+        {
+            get => null;
+            set
+            {
+                // Only adopt the old key when the new one is absent, so a config carrying both does
+                // not have its current setting overwritten by the stale one.
+                if (value != null && RequireClearSoundPathForSpeech == null)
+                {
+                    RequireClearSoundPathForSpeech = value;
+                }
+            }
+        }
 
         /// <summary>
         /// Experimental, off by default (0). Blocks of effective distance added per sound-occluding
@@ -711,6 +764,45 @@ namespace thebasics.Configs
 
         [ProtoMember(61)]
         public bool UseNicknameInOOC { get; set; } = true;
+
+        /// <summary>
+        /// Whether local OOC from an active spectator uses their RP nickname. Disabled by default
+        /// so an invisible speaker is attributed to an unambiguous account name.
+        /// </summary>
+        [ProtoMember(150)]
+        public bool UseNicknameInSpectatorOOC { get; set; } = false;
+
+        /// <summary>
+        /// Whether active spectators may deliberately place world-positioned environmental text
+        /// with !! or /envhere. This does not permit passive above-head spectator bubbles.
+        /// </summary>
+        [ProtoMember(151)]
+        [DefaultValue(true)]
+        public bool AllowSpectatorPlacedEnvironmentalMessages { get; set; } = true;
+
+        /// <summary>
+        /// Protects an active spectator from accidentally publishing embodied roleplay while
+        /// invisible. Plain or explicit speech, signing, and name-led emotes are refused, requiring
+        /// the spectator to deliberately choose OOC or narration. Disable this to retain the normal
+        /// RP chat pipeline for spectators.
+        /// </summary>
+        [ProtoMember(152)]
+        [DefaultValue(true)]
+        public bool ProtectSpectatorRoleplayChat { get; set; } = true;
+
+        /// <summary>
+        /// Fully qualified block-code patterns that never obstruct roleplay sight checks.
+        /// Asterisks may be used as wildcards, for example decorplus:brass-lattice-*.
+        /// </summary>
+        [ProtoMember(153)]
+        public string[] SightPassThroughBlockCodePatterns { get; set; } = Array.Empty<string>();
+
+        /// <summary>
+        /// Fully qualified block-code patterns that always obstruct roleplay sight checks.
+        /// When a block matches both override lists, blocking takes precedence.
+        /// </summary>
+        [ProtoMember(154)]
+        public string[] SightBlockingBlockCodePatterns { get; set; } = Array.Empty<string>();
 
         [ProtoMember(64)]
         public bool RemoveGrantedLanguagesOnChange { get; set; } = true;

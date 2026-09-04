@@ -2,14 +2,57 @@ using FluentAssertions;
 using NSubstitute;
 using thebasics.Configs;
 using thebasics.Extensions;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Server;
 
 namespace thebasics.Tests.ModSystems.ProximityChat;
 
-public class LanguageReconciliationTests
+[Collection(AnalyticsServiceTestCollection.Name)]
+public class LanguageReconciliationTests : IDisposable
 {
+    public LanguageReconciliationTests()
+    {
+        AnalyticsService.Shutdown();
+    }
+
+    public void Dispose()
+    {
+        AnalyticsService.Shutdown();
+    }
+
+    [Fact]
+    public void ReconcilePlayerLanguages_WhenDefaultWasUnknown_ReportsSanitizedRepairedFailure()
+    {
+        const string rawPlayerUid = "raw-player-uid";
+        const string pseudonymousPlayerId = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(
+            sink,
+            allowErrorTelemetry: true,
+            playerPseudonymizer: playerUid => playerUid == rawPlayerUid ? pseudonymousPlayerId : null);
+        var player = new FakeServerPlayer(rawPlayerUid);
+        player.SetLanguages(["Common"]);
+        IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", "UnknownLanguage");
+
+        var languageStateBeforeReconcile = player.ClassifyLanguageStateInvariant();
+        RPProximityChatSystem.ReconcilePlayerLanguages(player, CreateConfig(), new Dictionary<string, string>());
+        player.TrackLanguageStateInvariantOutcome("join_reconcile", languageStateBeforeReconcile);
+
+        player.GetDefaultLanguageName().Should().Be("Common");
+        var analyticsEvent = sink.Events.Should().ContainSingle().Subject;
+        analyticsEvent.Name.Should().Be("mod failure");
+        analyticsEvent.Properties.Should().ContainKey("area").WhoseValue.Should().Be("language_state");
+        analyticsEvent.Properties.Should().ContainKey("operation").WhoseValue.Should().Be("join_reconcile");
+        analyticsEvent.Properties.Should().ContainKey("severity").WhoseValue.Should().Be("warning");
+        analyticsEvent.Properties.Should().ContainKey("result").WhoseValue.Should().Be("default_language_repaired");
+        analyticsEvent.Properties.Should().ContainKey("recovered").WhoseValue.Should().Be(true);
+        analyticsEvent.Properties.Should().ContainKey("pseudonymous_player_id").WhoseValue.Should().Be(pseudonymousPlayerId);
+        analyticsEvent.Properties.Values.Should().NotContain(rawPlayerUid);
+        analyticsEvent.Properties.Values.Should().NotContain("UnknownLanguage");
+    }
+
     [Fact]
     public void Catalog_IncludesBuiltInSignAndProtectsItsNameAndPrefix()
     {
@@ -183,4 +226,27 @@ public class LanguageReconciliationTests
     {
         return new FakeServerPlayer();
     }
+
+    private sealed class RecordingAnalyticsSink : IAnalyticsSink
+    {
+        public List<RecordedEvent> Events { get; } = new();
+
+        public bool IsEnabled => true;
+
+        public void Track(string eventName, IDictionary<string, object> properties)
+        {
+            Events.Add(new RecordedEvent(eventName, new Dictionary<string, object>(properties)));
+        }
+
+        public Task FlushAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed record RecordedEvent(string Name, IDictionary<string, object> Properties);
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Cairo;
 using HarmonyLib;
+using thebasics.ModSystems.ProximityChat;
 using thebasics.Utilities;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -28,6 +29,13 @@ public static class SpeechBubbleVtmlPatches
 
     public static bool Prefix(EntityShapeRenderer __instance, int groupId, string message, EnumChatType chattype, string data)
     {
+        // Vanilla deliberately hides spectator bubbles. Do not let either the custom or vanilla
+        // path retain new textures for an invisible player.
+        if (SpectatorChatPolicy.IsSpectator(__instance?.entity))
+        {
+            return false;
+        }
+
         // Feature flag is server-configured and delivered to client.
         if (!ChatUiSystem.IsSpeechBubbleVtmlEnabled())
         {
@@ -325,6 +333,12 @@ public static class SpeechBubbleRenderPatches
     {
         __state = null;
 
+        if (SpectatorChatPolicy.IsSpectator(__instance?.entity))
+        {
+            ClearMessageTextures(__instance);
+            return;
+        }
+
         if (!ChatUiSystem.IsSpeechBubbleVtmlEnabled())
         {
             return;
@@ -424,6 +438,29 @@ public static class SpeechBubbleRenderPatches
     {
         state = textures;
         SpeechBubbleVtmlPatches.MessageTexturesRef(renderer) = EmptyList;
+    }
+
+    private static void ClearMessageTextures(EntityShapeRenderer renderer)
+    {
+        var textures = renderer == null ? null : SpeechBubbleVtmlPatches.MessageTexturesRef(renderer);
+        if (textures == null || ReferenceEquals(textures, EmptyList))
+        {
+            return;
+        }
+
+        foreach (var messageTexture in textures)
+        {
+            try
+            {
+                messageTexture?.tex?.Dispose();
+            }
+            catch
+            {
+                // One failed texture disposal must not leave the remaining stale bubbles visible.
+            }
+        }
+
+        textures.Clear();
     }
 
     /// <summary>

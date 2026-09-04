@@ -24,7 +24,7 @@ public class NameTransformer : MessageTransformerBase
     {
         bool isIC = context.HasFlag(MessageContext.IS_ROLEPLAY) ||
             context.HasFlag(MessageContext.IS_EMOTE) ||
-            (context.HasFlag(MessageContext.IS_OOC) && _config.UseNicknameInOOC) ||
+            (context.HasFlag(MessageContext.IS_OOC) && SpectatorChatPolicy.UseNicknameInLocalOoc(context.SendingPlayer, _config)) ||
             (context.HasFlag(MessageContext.IS_GLOBAL_OOC) && _config.UseNicknameInGlobalOOC);
 
         context.SetMetadata(MessageContext.FORMATTED_NAME, GetFormattedName(context.SendingPlayer, isIC, _config, context.ReceivingPlayer));

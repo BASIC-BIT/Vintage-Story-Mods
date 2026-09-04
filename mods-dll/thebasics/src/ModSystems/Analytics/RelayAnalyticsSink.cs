@@ -14,6 +14,9 @@ namespace thebasics.ModSystems.Analytics;
 
 public sealed class RelayAnalyticsSink : IAnalyticsSink
 {
+    public const int RequiredRelayContractRevision = 5;
+    private const int MaxOnlinePlayerCount = 10_000;
+
     private readonly ICoreServerAPI _api;
     private readonly AnalyticsConfig _config;
     private readonly Uri _endpoint;
@@ -22,6 +25,7 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
     private readonly ConcurrentQueue<AnalyticsEvent> _queue = new();
     private readonly HttpClient _httpClient;
     private int _isFlushing;
+    private static int _hasLoggedDeliveryFailure;
     private volatile bool _disposed;
 
     public RelayAnalyticsSink(ICoreServerAPI api, AnalyticsConfig config, Uri endpoint, string modVersion, string serverSessionId)
@@ -94,26 +98,13 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
             var json = JsonConvert.SerializeObject(payload);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await _httpClient.PostAsync(_endpoint, content).ConfigureAwait(false);
-
-            if (!_config.DebugLogTelemetry)
-            {
-                return;
-            }
-
-            if (response.IsSuccessStatusCode)
-            {
-                _api.Logger.Notification($"THEBASICS analytics: sent {batch.Count} event(s), relay status {(int)response.StatusCode}.");
-            }
-            else
-            {
-                _api.Logger.Warning($"THEBASICS analytics: relay rejected {batch.Count} event(s), status {(int)response.StatusCode}; batch dropped.");
-            }
+            LogResponse(response, batch.Count);
         }
         catch (Exception e)
         {
             // Dequeued analytics batches are intentionally not requeued: telemetry must never
             // grow an unbounded retry backlog or affect gameplay if the relay is unavailable.
-            if (_config.DebugLogTelemetry)
+            if (ShouldLogDeliveryFailure())
             {
                 _api.Logger.Warning($"THEBASICS analytics: failed to send {batch.Count} event(s) ({e.GetType().Name}); batch dropped.");
             }
@@ -122,6 +113,30 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
         {
             Interlocked.Exchange(ref _isFlushing, 0);
         }
+    }
+
+    private void LogResponse(HttpResponseMessage response, int eventCount)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            if (_config.DebugLogTelemetry)
+            {
+                _api.Logger.Notification($"THEBASICS analytics: sent {eventCount} event(s), relay status {(int)response.StatusCode}.");
+            }
+
+            return;
+        }
+
+        if (ShouldLogDeliveryFailure())
+        {
+            _api.Logger.Warning($"THEBASICS analytics: relay rejected {eventCount} event(s), status {(int)response.StatusCode}; batch dropped.");
+        }
+    }
+
+    private bool ShouldLogDeliveryFailure()
+    {
+        return _config.DebugLogTelemetry
+               || Interlocked.Exchange(ref _hasLoggedDeliveryFailure, 1) == 0;
     }
 
     public void Dispose()
@@ -145,7 +160,7 @@ public sealed class RelayAnalyticsSink : IAnalyticsSink
             ["game_version"] = GameVersion.LongGameVersion,
             ["analytics_consent_level"] = _config.ConsentLevel,
             ["server_session_id"] = _serverSessionId,
-            ["online_player_count_bucket"] = AnalyticsBuckets.Count(GetOnlinePlayerCount())
+            ["online_player_count"] = Math.Clamp(GetOnlinePlayerCount(), 0, MaxOnlinePlayerCount)
         };
 
         if (properties != null)

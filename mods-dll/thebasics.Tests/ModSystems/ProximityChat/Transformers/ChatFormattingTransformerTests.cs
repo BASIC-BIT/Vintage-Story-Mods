@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
 using thebasics.Configs;
+using thebasics.Extensions;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
@@ -296,6 +297,66 @@ public class ChatFormattingTransformerTests
             .Should().Be(OverheadChatBubbleModes.Vanilla);
     }
 
+    [Theory]
+    [InlineData(false, "AccountName")]
+    [InlineData(true, "SpectatorNick")]
+    public void NameTransformer_LocalOocUsesSpectatorNicknameSetting(bool useNickname, string expectedName)
+    {
+        var config = CreateConfig();
+        config.BoldNicknames = false;
+        config.ApplyColorsToNicknames = false;
+        config.ApplyColorsToPlayerNames = false;
+        config.UseNicknameInOOC = true;
+        config.UseNicknameInSpectatorOOC = useNickname;
+        var player = CreatePlayer(EnumGameMode.Spectator, EnumClientState.Playing);
+        player.SetNickname("SpectatorNick");
+        var context = new MessageContext { SendingPlayer = player };
+        context.SetFlag(MessageContext.IS_OOC);
+
+        new NameTransformer(CreateChatSystem(config)).Transform(context);
+
+        context.GetMetadata<string>(MessageContext.FORMATTED_NAME).Should().Be(expectedName);
+    }
+
+    [Fact]
+    public void NameTransformer_GlobalOocStillUsesExistingGlobalSettingForSpectator()
+    {
+        var config = CreateConfig();
+        config.BoldNicknames = false;
+        config.ApplyColorsToNicknames = false;
+        config.UseNicknameInGlobalOOC = true;
+        config.UseNicknameInSpectatorOOC = false;
+        var player = CreatePlayer(EnumGameMode.Spectator, EnumClientState.Playing);
+        player.SetNickname("SpectatorNick");
+        var context = new MessageContext { SendingPlayer = player };
+        context.SetFlag(MessageContext.IS_GLOBAL_OOC);
+
+        new NameTransformer(CreateChatSystem(config)).Transform(context);
+
+        context.GetMetadata<string>(MessageContext.FORMATTED_NAME).Should().Be("SpectatorNick");
+    }
+
+    [Fact]
+    public void PlacedEnvironmentTransformer_RejectsDisallowedSpectatorPlacement()
+    {
+        LangTestHelper.EnsureEnglish();
+        var config = CreateConfig();
+        config.AllowSpectatorPlacedEnvironmentalMessages = false;
+        var player = CreatePlayer(EnumGameMode.Spectator, EnumClientState.Playing);
+        var chatSystem = CreateChatSystem(config);
+        chatSystem.ProximityChatId = 23;
+        var context = new MessageContext { SendingPlayer = player };
+        context.SetFlag(MessageContext.IS_PLACED_ENVIRONMENTAL);
+
+        new PlacedEnvironmentTransformer(chatSystem).Transform(context);
+
+        context.State.Should().Be(MessageContextState.STOP);
+        var sentMessage = player.SentMessages.Should().ContainSingle().Which;
+        sentMessage.GroupId.Should().Be(23);
+        sentMessage.Message.Should().Be("thebasics:chat-spectator-env-placement-disabled");
+        sentMessage.ChatType.Should().Be(EnumChatType.CommandError);
+    }
+
     private static RPProximityChatSystem CreateChatSystem(ModConfig config)
     {
         config.InitializeDefaultsIfNeeded();
@@ -347,5 +408,16 @@ public class ChatFormattingTransformerTests
         var posField = typeof(Entity).GetField("<Pos>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         posField!.SetValue(entity, new EntityPos(x, y, z));
         return entity;
+    }
+
+    private static FakeServerPlayer CreatePlayer(EnumGameMode gameMode, EnumClientState connectionState)
+    {
+        var worldData = Substitute.For<IWorldPlayerData>();
+        worldData.CurrentGameMode.Returns(gameMode);
+        return new FakeServerPlayer("player-1", "AccountName")
+        {
+            WorldData = worldData,
+            ConnectionState = connectionState
+        };
     }
 }

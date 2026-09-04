@@ -8,18 +8,20 @@ resource "cloudflare_worker" "analytics_relay" {
   name       = var.worker_name
 
   observability = {
-    enabled = true
+    enabled            = true
+    head_sampling_rate = 1
+
+    logs = {
+      enabled            = true
+      head_sampling_rate = 1
+      invocation_logs    = false
+      persist            = true
+    }
   }
 
   subdomain = {
     enabled          = true
     previews_enabled = false
-  }
-
-  lifecycle {
-    ignore_changes = [
-      observability,
-    ]
   }
 }
 

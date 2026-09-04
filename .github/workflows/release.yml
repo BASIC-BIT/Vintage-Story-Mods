@@ -23,7 +23,7 @@ on:
         type: string
 
 env:
-  VS_VERSION: "1.22.6"
+  VS_VERSION: "1.22.7"
   DOTNET_VERSION: "10.0.x"
 
 jobs:
@@ -68,6 +68,34 @@ jobs:
           exit 1
         }
         Write-Host "Version format is valid: $version" -ForegroundColor Green
+
+    - name: Verify live analytics relay compatibility
+      shell: pwsh
+      run: |
+        $sinkSource = Get-Content "mods-dll/thebasics/src/ModSystems/Analytics/RelayAnalyticsSink.cs" -Raw
+        if ($sinkSource -notmatch 'RequiredRelayContractRevision\s*=\s*(\d+)') {
+          Write-Host "Error: Could not read the required analytics relay contract revision." -ForegroundColor Red
+          exit 1
+        }
+
+        $requiredRevision = [int]$Matches[1]
+        try {
+          $health = Invoke-RestMethod `
+            -Uri "https://thebasics-analytics-relay.basic-bit-1001.workers.dev/health" `
+            -TimeoutSec 15
+        }
+        catch {
+          Write-Host "Error: Analytics relay health check failed." -ForegroundColor Red
+          exit 1
+        }
+
+        $liveRevision = [int]$health.contract_revision
+        if ($health.ok -ne $true -or $liveRevision -lt $requiredRevision) {
+          Write-Host "Error: Live analytics relay contract revision $liveRevision does not satisfy required revision $requiredRevision. Deploy the relay before releasing the mod." -ForegroundColor Red
+          exit 1
+        }
+
+        Write-Host "Analytics relay contract revision $liveRevision satisfies required revision $requiredRevision." -ForegroundColor Green
         
     - name: Get previous GitHub release version
       id: previous_release

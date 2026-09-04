@@ -43,6 +43,7 @@ public class TransformerSystem
         {
             // Validation transformers
             new PlayerChatTransformer(_chatSystem), // If player chat, process special modifiers
+            new SpectatorMessageTypeTransformer(_chatSystem), // Reject protected spectator speech and emotes
             new PlacedEnvironmentTransformer(_chatSystem), // Raycast for !! / /envhere, falls back to standard env on miss
             new UserMarkupSanitizerTransformer(_chatSystem), // Strip player-authored VTML before trusted formatting is added
             new CommandMessageEscapeTransformer(_chatSystem), // Escape XML special characters in command messages

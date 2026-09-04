@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using thebasics.Models;
+using thebasics.ModSystems.ProximityChat;
 using thebasics.Utilities;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -128,6 +129,11 @@ public sealed class TypingIndicatorRenderer : IRenderer
         renderer = null;
 
         if (entity == null || entity.EntityId == localPlayerEntity.EntityId)
+        {
+            return false;
+        }
+
+        if (SpectatorChatPolicy.IsSpectator(entity.Player))
         {
             return false;
         }

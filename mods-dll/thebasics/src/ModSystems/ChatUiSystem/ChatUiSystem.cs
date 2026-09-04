@@ -961,8 +961,7 @@ public class ChatUiSystem : ModSystem
     {
         if (message?.Config != null)
         {
-            _config = message.Config;
-            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
+            ApplyReceivedConfig(message.Config);
         }
 
         UpdateConfigAdminDraft(message?.Values, message?.ReviewedKeys, message?.StatusMessage);
@@ -973,8 +972,7 @@ public class ChatUiSystem : ModSystem
     {
         if (message?.Config != null)
         {
-            _config = message.Config;
-            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
+            ApplyReceivedConfig(message.Config);
         }
 
         if (!string.IsNullOrWhiteSpace(message?.Message))
@@ -1315,11 +1313,11 @@ public class ChatUiSystem : ModSystem
             })
         };
 
-        AddConfigAdminStatusRow(rows);
         AddConfigAdminGroupSelectorRow(rows);
         AddConfigAdminLanguageShortcutRow(rows);
         AddConfigAdminSettingRows(rows);
         AddConfigAdminActionRows(rows);
+        AddConfigAdminStatusRow(rows, CalculateConfigAdminStatusMaximumHeight(rows, _api?.Render.FrameHeight ?? 0, RuntimeEnv.GUIScale));
 
         return new JsonDialogSettings
         {
@@ -1334,20 +1332,100 @@ public class ChatUiSystem : ModSystem
         };
     }
 
-    private static void AddConfigAdminStatusRow(List<DialogRow> rows)
+    private static void AddConfigAdminStatusRow(List<DialogRow> rows, int maximumHeight)
     {
         if (!string.IsNullOrWhiteSpace(_configAdminStatusMessage))
         {
-            rows.Add(new DialogRow(new DialogElement
+            var layout = CalculateConfigAdminStatusLayout(_configAdminStatusMessage, MeasureConfigAdminStatusTextHeight, RuntimeEnv.GUIScale, maximumHeight);
+            rows.Insert(1, new DialogRow(new DialogElement
             {
                 Code = "status",
                 Type = EnumDialogElementType.Text,
-                Text = _configAdminStatusMessage,
+                Text = layout.Text,
                 Width = 720,
-                Height = 42,
+                Height = layout.Height,
                 FontSize = 13
             }));
         }
+    }
+
+    internal static int CalculateConfigAdminStatusMaximumHeight(IEnumerable<DialogRow> otherRows, double frameHeight, double guiScale)
+    {
+        const int minimumHeight = 42;
+        const int maximumHeight = 180;
+        const double dialogSizeMultiplier = 0.9;
+        const int dialogVerticalChrome = 72;
+
+        var effectiveGuiScale = Math.Max(guiScale, double.Epsilon);
+        var availableContentHeight = (frameHeight / (dialogSizeMultiplier * effectiveGuiScale)) - dialogVerticalChrome;
+        var otherRowsHeight = otherRows.Sum(row => row.TopPadding + row.Elements.Max(element => element.Height) + row.BottomPadding);
+        return Math.Clamp((int)Math.Floor(availableContentHeight - otherRowsHeight), minimumHeight, maximumHeight);
+    }
+
+    internal static (string Text, int Height) CalculateConfigAdminStatusLayout(
+        string message,
+        System.Func<string, double, EnumLinebreakBehavior, double> measureTextHeight,
+        double guiScale,
+        int maximumHeight)
+    {
+        const int minimumHeight = 42;
+        const double dialogSizeMultiplier = 0.9;
+        const double textWidth = 720;
+        const int verticalPadding = 6;
+        const string truncatedSuffix = "\n(Full details are in chat.)";
+
+        var effectiveGuiScale = Math.Max(guiScale, double.Epsilon);
+        var effectiveMaximumHeight = Math.Max(minimumHeight, maximumHeight);
+        var scaledTextWidth = textWidth * dialogSizeMultiplier * effectiveGuiScale;
+        var fullText = message ?? string.Empty;
+        var height = CalculateHeight(fullText);
+        if (height <= effectiveMaximumHeight)
+        {
+            return (fullText, height);
+        }
+
+        var low = 0;
+        var high = fullText.Length;
+        while (low < high)
+        {
+            var candidateLength = low + ((high - low + 1) / 2);
+            var candidate = BuildTruncatedText(fullText, candidateLength, truncatedSuffix);
+            if (CalculateHeight(candidate) <= effectiveMaximumHeight)
+            {
+                low = candidateLength;
+            }
+            else
+            {
+                high = candidateLength - 1;
+            }
+        }
+
+        var truncatedText = BuildTruncatedText(fullText, low, truncatedSuffix);
+        return (truncatedText, Math.Min(effectiveMaximumHeight, CalculateHeight(truncatedText)));
+
+        int CalculateHeight(string text)
+        {
+            var measuredTextHeight = measureTextHeight(text, scaledTextWidth, EnumLinebreakBehavior.AfterWord);
+            var unscaledTextHeight = measuredTextHeight / (dialogSizeMultiplier * effectiveGuiScale);
+            return Math.Max(minimumHeight, (int)Math.Ceiling(unscaledTextHeight + verticalPadding));
+        }
+    }
+
+    private static string BuildTruncatedText(string message, int prefixLength, string suffix)
+    {
+        if (prefixLength > 0 && prefixLength < message.Length && char.IsHighSurrogate(message[prefixLength - 1]))
+        {
+            prefixLength--;
+        }
+
+        var prefix = message[..prefixLength].TrimEnd();
+        return prefix.Length == 0 ? suffix.TrimStart() : prefix + suffix;
+    }
+
+    private static double MeasureConfigAdminStatusTextHeight(string message, double scaledTextWidth, EnumLinebreakBehavior linebreakBehavior)
+    {
+        var font = CairoFont.WhiteMediumText().WithFontSize(13);
+        return new TextDrawUtil().GetMultilineTextHeight(font, Lang.Get(message), scaledTextWidth, linebreakBehavior);
     }
 
     private static void AddConfigAdminGroupSelectorRow(List<DialogRow> rows)
@@ -1765,17 +1843,13 @@ public class ChatUiSystem : ModSystem
     {
         try
         {
-            // Store the received config
-            _config = configMessage.Config;
-
-            if (_config == null)
+            if (configMessage.Config == null)
             {
                 _api.Logger.Error("[THEBASICS] Received null config from server!");
                 return;
             }
 
-            // Apply debug mode to networking helpers now that we have config.
-            _safeNetworkChannel?.SetEnableDebugLogging(_config.DebugMode);
+            ApplyReceivedConfig(configMessage.Config);
 
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;
@@ -1796,6 +1870,13 @@ public class ChatUiSystem : ModSystem
         {
             _api.Logger.Error($"[THEBASICS] Error processing server config message: {e}");
         }
+    }
+
+    private static void ApplyReceivedConfig(ModConfig config)
+    {
+        _config = config;
+        VisibilityUtils.ConfigureSightBlockOverrides(_api?.World, config);
+        _safeNetworkChannel?.SetEnableDebugLogging(config.DebugMode);
     }
 
     private static void ApplyClientNametagSettingsToLoadedPlayers()

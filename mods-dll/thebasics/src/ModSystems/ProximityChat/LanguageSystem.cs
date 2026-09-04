@@ -184,8 +184,8 @@ namespace thebasics.ModSystems.ProximityChat
                 player.SetDefaultLanguage(lang);
             }
 
-            AnalyticsService.TrackCommandUsed("addlang", true);
-            AnalyticsService.TrackFeatureUsed("language", "add");
+            AnalyticsService.TrackCommandUsed("addlang", true, actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "add", actorPlayerUid: player.PlayerUID);
 
             return new TextCommandResult
             {
@@ -239,8 +239,8 @@ namespace thebasics.ModSystems.ProximityChat
                 }
             }
 
-            AnalyticsService.TrackCommandUsed("removelang", true);
-            AnalyticsService.TrackFeatureUsed("language", "remove");
+            AnalyticsService.TrackCommandUsed("removelang", true, actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "remove", actorPlayerUid: player.PlayerUID);
 
             return new TextCommandResult
             {
@@ -275,8 +275,8 @@ namespace thebasics.ModSystems.ProximityChat
                 message += "\n" + Lang.Get("thebasics:lang-list-unknown", "\n  " + unknownList);
             }
 
-            AnalyticsService.TrackCommandUsed("listlang", true);
-            AnalyticsService.TrackFeatureUsed("language", "list");
+            AnalyticsService.TrackCommandUsed("listlang", true, actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "list", actorPlayerUid: player.PlayerUID);
 
             return new TextCommandResult
             {
@@ -330,8 +330,8 @@ namespace thebasics.ModSystems.ProximityChat
                 statusMessage += "\n" + Lang.Get("thebasics:lang-warning-admin-over-max-languages", targetPlayer.PlayerName, targetPlayer.GetLanguages().Count, Config.MaxLanguagesPerPlayer);
             }
 
-            AnalyticsService.TrackCommandUsed("adminaddlang", true);
-            AnalyticsService.TrackFeatureUsed("language", "admin_add");
+            AnalyticsService.TrackCommandUsed("adminaddlang", true, actorPlayerUid: player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "admin_add", actorPlayerUid: player?.PlayerUID);
 
             return new TextCommandResult
             {
@@ -387,8 +387,8 @@ namespace thebasics.ModSystems.ProximityChat
                 }
             }
 
-            AnalyticsService.TrackCommandUsed("adminremovelang", true);
-            AnalyticsService.TrackFeatureUsed("language", "admin_remove");
+            AnalyticsService.TrackCommandUsed("adminremovelang", true, actorPlayerUid: player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "admin_remove", actorPlayerUid: player?.PlayerUID);
 
             return new TextCommandResult
             {
@@ -403,8 +403,8 @@ namespace thebasics.ModSystems.ProximityChat
             var player = GetCallerPlayer(args);
             var languages = GetPlayerLanguages(targetPlayer);
             var learning = GetPlayerLanguageSkills(targetPlayer);
-            AnalyticsService.TrackCommandUsed("adminlistlang", true);
-            AnalyticsService.TrackFeatureUsed("language", "admin_list");
+            AnalyticsService.TrackCommandUsed("adminlistlang", true, actorPlayerUid: player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "admin_list", actorPlayerUid: player?.PlayerUID);
             var message = Lang.Get("thebasics:lang-list-admin-known", targetPlayer.PlayerName, string.Join(", ", languages.Select(lang => ChatHelper.LangIdentifier(lang, player)))) +
                           "\n" +
                           Lang.Get("thebasics:lang-list-all", string.Join(", ", GetAllLanguages(true, includeHidden: true).Select(lang => ChatHelper.LangIdentifier(lang, player))));
@@ -456,8 +456,8 @@ namespace thebasics.ModSystems.ProximityChat
             }
 
             targetPlayer.SetLanguageSkill(language, skill);
-            AnalyticsService.TrackCommandUsed("adminsetlangskill", true);
-            AnalyticsService.TrackFeatureUsed("language", "admin_set_skill");
+            AnalyticsService.TrackCommandUsed("adminsetlangskill", true, actorPlayerUid: player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "admin_set_skill", actorPlayerUid: player?.PlayerUID);
 
             var message = skill <= 0
                 ? Lang.Get("thebasics:lang-success-admin-skill-cleared", ChatHelper.LangIdentifier(language, player), targetPlayer.PlayerName)
@@ -507,8 +507,8 @@ namespace thebasics.ModSystems.ProximityChat
                 };
             }
 
-            AnalyticsService.TrackCommandUsed("adminsetlangbucket", true);
-            AnalyticsService.TrackFeatureUsed("language", "admin_set_bucket");
+            AnalyticsService.TrackCommandUsed("adminsetlangbucket", true, actorPlayerUid: args.Caller.Player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "admin_set_bucket", actorPlayerUid: args.Caller.Player?.PlayerUID);
 
             var bucketName = SemanticLanguageAtlasCatalog.FormatBucket(bucket!);
             var languageName = FormatPlainLanguageIdentifier(language);
@@ -576,8 +576,8 @@ namespace thebasics.ModSystems.ProximityChat
                 };
             }
 
-            AnalyticsService.TrackCommandUsed("langprogress", true);
-            AnalyticsService.TrackFeatureUsed("language", "semantic_progress");
+            AnalyticsService.TrackCommandUsed("langprogress", true, actorPlayerUid: player.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "semantic_progress", actorPlayerUid: player.PlayerUID);
 
             return new TextCommandResult
             {
@@ -600,8 +600,8 @@ namespace thebasics.ModSystems.ProximityChat
                 };
             }
 
-            AnalyticsService.TrackCommandUsed("adminlangprogress", true);
-            AnalyticsService.TrackFeatureUsed("language", "admin_semantic_progress");
+            AnalyticsService.TrackCommandUsed("adminlangprogress", true, actorPlayerUid: args.Caller.Player?.PlayerUID);
+            AnalyticsService.TrackFeatureUsed("language", "admin_semantic_progress", actorPlayerUid: args.Caller.Player?.PlayerUID);
 
             return new TextCommandResult
             {
