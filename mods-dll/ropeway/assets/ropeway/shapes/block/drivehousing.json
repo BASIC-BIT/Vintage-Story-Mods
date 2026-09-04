@@ -1,0 +1,181 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "stone": "game:block/stone/rock/andesite1",
+    "machine": "game:block/metal/tarnished/iron",
+    "girder": "game:block/metal/riveted/iron1"
+  },
+  "elements": [
+    {
+      "name": "bed",
+      "from": [ 0.0, 0.0, 0.0 ],
+      "to": [ 16.0, 2.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#stone" },
+        "east": { "texture": "#stone" },
+        "south": { "texture": "#stone" },
+        "west": { "texture": "#stone" },
+        "up": { "texture": "#stone" },
+        "down": { "texture": "#stone" }
+      }
+    },
+    {
+      "name": "drum",
+      "from": [ 3.0, 2.0, 3.0 ],
+      "to": [ 13.0, 13.0, 13.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "name": "drumchamfer",
+      "from": [ 3.0, 2.02, 3.0 ],
+      "to": [ 13.0, 12.98, 13.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "rotationY": 45,
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "name": "cap",
+      "from": [ 4.0, 13.0, 4.0 ],
+      "to": [ 12.0, 15.0, 12.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "name": "bossnorth",
+      "from": [ 6.0, 5.0, 0.0 ],
+      "to": [ 10.0, 11.0, 3.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "name": "bosssouth",
+      "from": [ 6.0, 5.0, 13.0 ],
+      "to": [ 10.0, 11.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "name": "bosswest",
+      "from": [ 0.0, 5.0, 6.0 ],
+      "to": [ 3.0, 11.0, 10.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "name": "bosseast",
+      "from": [ 13.0, 5.0, 6.0 ],
+      "to": [ 16.0, 11.0, 10.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "//": "The drive shaft column's four corner posts stopped at this cell's top face, so the machine leg stood on nothing and the whole frame read as hovering over its own base course. They carry on down here and land ON the bed, which is the foot plate - a post run to the cell floor instead would have its foot buried in the plate rather than bearing on it. Not done by reaching driveshaft.json downward out of its own cell: two of those stack in this column and would double up.",
+      "name": "anglewn",
+      "from": [ 0.0, 2.0, 0.0 ],
+      "to": [ 2.0, 16.0, 2.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
+      }
+    },
+    {
+      "name": "anglews",
+      "from": [ 0.0, 2.0, 14.0 ],
+      "to": [ 2.0, 16.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
+      }
+    },
+    {
+      "name": "angleen",
+      "from": [ 14.0, 2.0, 0.0 ],
+      "to": [ 16.0, 16.0, 2.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
+      }
+    },
+    {
+      "name": "anglees",
+      "from": [ 14.0, 2.0, 14.0 ],
+      "to": [ 16.0, 16.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "//": "One plate drawn into eight girder sections. Yield was 4, and a 7-wide crossarm wants 6 (plus the one the pylon head eats), so a tower was TWO crafts and TWO plates - the doubled marginal cost KNOWN-ISSUES.md booked against the 5-wide passage. The width was never the problem; 4 was the wrong yield. At 8 a whole tower's braces are one craft again with one spare, the passage keeps its 45deg/30deg post-penetration gain for free, and the marginal metal per tower is back inside DECISIONS.md 3.",
+  "//name": "No 'name' on a wildcard anywhere in this folder. A named wildcard makes the loader expand the file into one recipe per metal (RecipeBase.GetNameToCodeMapping -> GenerateRecipesForAllIngredientCombinations), and not one output here uses a {name} placeholder, so all that bought was ~19,000 dead grid recipes held in RAM and serialised to every joining client. Nameless resolves to EnumRecipeMatchType.Wildcard and still matches every metal through WildcardUtil at craft time - vanilla's helvehammer and pulverizer frame ship exactly this. It also closes the drivehead bug: two ingredients sharing one name overwrite each other in the mapping, and metalbit carries three variants metalplate does not.",
+  "ingredientPattern": "SPS",
+  "ingredients": {
+    "S": { "type": "item", "code": "game:stick" },
+    "P": { "type": "item", "code": "game:metalplate-*" }
+  },
+  "width": 3,
+  "height": 1,
+  "output": { "type": "block", "code": "brace-north", "quantity": 8 }
+}

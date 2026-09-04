@@ -1,0 +1,12 @@
+{
+  "//": "One cell of lattice leg with the shaft inside it. Yield 2 against a leg of THREE cells meant two crafts and a spare, so a leg really cost 4 plates rather than 2 - QA-SCRIPT step 2 carried a whole paragraph warning testers about it instead of fixing it. Yield 3, one craft, no spare, and the whole drive leg's lattice is now ONE plate: 2 -> 0.8 ingots per cell.",
+  "ingredientPattern": "SPS,SBS",
+  "ingredients": {
+    "S": { "type": "item", "code": "game:stick" },
+    "P": { "type": "item", "code": "game:metalplate-*" },
+    "B": { "type": "item", "code": "game:metalbit-*", "quantity": 8 }
+  },
+  "width": 3,
+  "height": 2,
+  "output": { "type": "block", "code": "driveshaft", "quantity": 3 }
+}

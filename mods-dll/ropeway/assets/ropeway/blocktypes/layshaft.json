@@ -1,0 +1,110 @@
+{
+  "//": "One crossarm cell of line shaft, on bearing standards above the girder. ONE block used by BOTH stations: on a drive station it is the turning shaft between the bevel gearbox and the bullwheel's hub, and on a tension station it is the static tie rod between the head sheave and the return wheel's carriage. At 16 pixels those are the same forged bar on the same standards, and merging them saves a blocktype, a shape, a recipe, four lang keys and a handbook line for a difference nobody can see. Its shaft runs the full width of the cell so it meets its neighbour with no seam, at the bullwheel rim's own axle height.",
+  "code": "layshaft",
+  "behaviors": [
+    {
+      "name": "HorizontalOrientable"
+    }
+  ],
+  "variantgroups": [
+    {
+      "code": "side",
+      "states": [
+        "north",
+        "east",
+        "south",
+        "west"
+      ]
+    }
+  ],
+  "shapeByType": {
+    "*-north": {
+      "base": "ropeway:block/layshaft",
+      "rotateY": 0
+    },
+    "*-east": {
+      "base": "ropeway:block/layshaft",
+      "rotateY": 270
+    },
+    "*-south": {
+      "base": "ropeway:block/layshaft",
+      "rotateY": 180
+    },
+    "*-west": {
+      "base": "ropeway:block/layshaft",
+      "rotateY": 90
+    }
+  },
+  "textures": {
+    "girder": {
+      "base": "game:block/metal/riveted/iron1"
+    },
+    "shaft": {
+      "base": "game:block/metal/plate/steel"
+    }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Metal",
+  "creativeinventory": {
+    "general": [
+      "*-north"
+    ],
+    "construction": [
+      "*-north"
+    ]
+  },
+  "attributes": {
+    "handbook": {
+      "groupBy": [
+        "layshaft-*"
+      ]
+    },
+    "reinforcable": false
+  },
+  "replaceable": 500,
+  "resistance": 3.5,
+  "lightAbsorption": 0,
+  "sidesolid": {
+    "all": false
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "collisionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 1,
+    "z2": 1
+  },
+  "selectionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 1,
+    "z2": 1
+  },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/anvil",
+    "hit": "game:block/anvil",
+    "byTool": {
+      "Pickaxe": {
+        "hit": "game:block/rock-hit-pickaxe",
+        "break": "game:block/rock-break-pickaxe"
+      }
+    }
+  },
+  "guiTransform": {
+    "rotation": {
+      "x": -22.6,
+      "y": 45,
+      "z": 0
+    },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

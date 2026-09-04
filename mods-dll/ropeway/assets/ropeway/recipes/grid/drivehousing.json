@@ -1,0 +1,13 @@
+{
+  "//": "A drum on a plank bed, banded and bolted: one plate for the drum, sixteen bits for the bands and the bearings. It was three plates - 6 ingots against the old bullwheel's 4.55, a third again rather than the half again an earlier note here claimed, and that note had the direction backwards too. 2.8 ingots now, which is above every wooden vanilla mechanical block and below a water wheel: it carries the MPConsumer, so it should not be trivial, and it replaces sixteen blocks of vanilla scaffold, so it must not quietly cost sixteen blocks of anything else.",
+  "//price": "Bullwheel 1.10, drive housing 2.80. The housing being the dearer of the two is the intended order now and is stated as a number rather than as a claim.",
+  "ingredientPattern": "BMB,PPP",
+  "ingredients": {
+    "B": { "type": "item", "code": "game:metalbit-*", "quantity": 8 },
+    "M": { "type": "item", "code": "game:metalplate-*" },
+    "P": { "type": "item", "code": "game:plank-*" }
+  },
+  "width": 3,
+  "height": 2,
+  "output": { "type": "block", "code": "drivehousing", "quantity": 1 }
+}
