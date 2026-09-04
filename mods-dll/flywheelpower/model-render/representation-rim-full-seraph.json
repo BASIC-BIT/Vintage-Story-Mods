@@ -1,0 +1,19 @@
+{
+  "name": "flywheel-rim-full-seraph-held",
+  "representation": "third-person-seraph-held-scene",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-rim-full.json"
+  ],
+  "textures": {
+    "rim": "game:block/metal/ingot/meteoriciron"
+  },
+  "seraphHeldScene": {
+    "collectibleDefinition": "../assets/flywheelpower/itemtypes/flywheelrim.json",
+    "transformProperty": "tpHandTransform",
+    "variantCode": "flywheelrim-full-meteoriciron",
+    "seraphShape": "game:entity/humanoid/seraph-hairless",
+    "seraphTexture": "game:entity/humanoid/seraph-naked-hairless",
+    "attachment": "RightHand",
+    "animationFrame": 0
+  }
+}

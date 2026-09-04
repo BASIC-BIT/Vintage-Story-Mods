@@ -1,0 +1,12 @@
+{
+  "name": "flywheel-compact-bearing-item",
+  "representation": "inventory-and-held-component",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-bearing-compact.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/ingot/copper",
+    "bearing": "game:block/metal/tarnished/iron-riveted1",
+    "wood": "game:block/wood/planks/generic"
+  }
+}

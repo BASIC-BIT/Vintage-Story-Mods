@@ -1,0 +1,11 @@
+{
+  "name": "flywheel-compact-empty-stand-vertical",
+  "representation": "placed-empty-stand-vertical-axis",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/compact-flywheel-frame-vertical.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/ingot/iron",
+    "wood": "game:block/wood/planks/generic"
+  }
+}
