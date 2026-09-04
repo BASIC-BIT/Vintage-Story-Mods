@@ -356,6 +356,8 @@ jobs:
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
           "mods-dll/dimensioncavern/dimensioncavern.csproj",
+          "mods-dll/agentcontrol/agentcontrol.csproj",
+          "mods-dll/agentcontrol.abstractions/agentcontrol.abstractions.csproj",
           "mods-dll/agentcontrol.Tests/agentcontrol.Tests.csproj",
           "mods-dll/agentcontrol.sample/agentcontrol.sample.csproj",
           "tools/vsctl/vsctl.csproj"
@@ -548,7 +550,7 @@ jobs:
       if: always()
       run: |
         pip install lizard
-        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/ ./mods-dll/agentcontrol/
+        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/ ./mods-dll/agentcontrol/ ./mods-dll/agentcontrol.abstractions/
       shell: bash
 
     - name: Test Build Output

@@ -29,7 +29,7 @@ tools/vsctl/bin/Release/net10.0/publish/vsctl.exe extensions
 tools/vsctl/bin/Release/net10.0/publish/vsctl.exe observe
 ```
 
-The hello output must report protocol `1.0`, mod `0.1.0`, game `1.22.2`, exactly six methods, and a redacted secret. Extensions must include `selection.describe`.
+The hello output must report protocol `1.0`, mod `0.1.0`, game `1.22.7`, exactly six methods, and a redacted secret. Extensions must include `selection.describe`.
 
 ## Sample extension acceptance
 

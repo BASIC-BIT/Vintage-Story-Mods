@@ -4,7 +4,7 @@ Agent Control is an explicitly enabled, owner-controlled client mod for determin
 
 `hello`, `observe`, `execute`, `cancel`, `extensions.list`, and `shutdownSession`.
 
-It is tested against Vintage Story 1.22.2. It does not expose arbitrary C#, shell commands, filesystem access, an HTTP listener, screenshots, UI crawling, clicking, or pathfinding.
+It is tested against Vintage Story 1.22.7. It does not expose arbitrary C#, shell commands, filesystem access, an HTTP listener, screenshots, UI crawling, clicking, or pathfinding.
 
 ## Safety boundary
 

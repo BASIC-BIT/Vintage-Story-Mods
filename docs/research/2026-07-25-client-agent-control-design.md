@@ -6,6 +6,10 @@ Status: owner-review design; no production mod has been implemented
 
 Tested local baseline: Vintage Story 1.22.2 Stable, The BASICs 5.8.1
 
+Update 2026-09-04: this design and its early tests were done on 1.22.2. The
+supported Agent Control contract is now Vintage Story 1.22.7, matching the
+repository dependency target; the version references below are historical.
+
 ## Executive verdict
 
 A client-side control substrate is feasible. It should be designed as simple,
