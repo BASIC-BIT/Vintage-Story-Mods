@@ -803,5 +803,6 @@
   "scene-description-empty-block-help": "Shift + right-click to write a scene description.",
   "scene-description-empty-item-help": "Place this marker, then shift + right-click it to write a scene description.",
   "scene-description-read-item-help": "Hold Shift and right-click to read the full description.",
-  "scene-description-no-access": "You do not have permission to edit this scene marker."
+  "scene-description-no-access": "You do not have permission to edit this scene marker.",
+  "scene-description-too-far": "You are too far away to edit this scene marker."
 }

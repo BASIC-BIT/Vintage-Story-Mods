@@ -8,6 +8,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 {
     private const double DialogWidth = 520;
     private const double BodyHeight = 260;
+    private const double ButtonHeight = 30;
     private readonly Action<SceneDescriptionData> _onSave;
     private readonly Action _onClose;
     private bool _closing;
@@ -19,11 +20,20 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         Compose((data ?? new SceneDescriptionData()).Clone().Normalize());
     }
 
-    public override string ToggleKeyCombinationCode => "thebasicsscenedescription";
+    public override string ToggleKeyCombinationCode => null;
 
     public override bool PrefersUngrabbedMouse => true;
 
     public override bool DisableMouseGrab => true;
+
+    // A fresh dialog is built per edit, so drop it from the GUI manager and free its composers on close.
+    public override bool UnregisterOnClose => true;
+
+    public override void OnGuiClosed()
+    {
+        base.OnGuiClosed();
+        Dispose();
+    }
 
     public override bool TryClose()
     {
@@ -40,7 +50,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private void Compose(SceneDescriptionData data)
     {
         var top = GuiStyle.TitleBarHeight + 12;
-        var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth, top + BodyHeight + 150).WithFixedPadding(GuiStyle.ElementToDialogPadding);
+        var buttonY = top + BodyHeight + 170;
+        var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth, buttonY + ButtonHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
         var titleLabelBounds = ElementBounds.Fixed(0, top, DialogWidth - 20, 22);
         var titleInputBounds = ElementBounds.Fixed(0, top + 24, DialogWidth - 20, 30);
@@ -48,7 +59,6 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var kindBounds = ElementBounds.Fixed(0, top + 90, 220, 30);
         var bodyLabelBounds = ElementBounds.Fixed(0, top + 132, DialogWidth - 20, 22);
         var textAreaBounds = ElementBounds.Fixed(0, top + 156, DialogWidth - 20, BodyHeight);
-        var buttonY = top + BodyHeight + 170;
         var kindValues = new[] { "environmental", "ooc" };
         var kindNames = new[]
         {
@@ -66,8 +76,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddDropDown(kindValues, kindNames, data.Kind == SceneDescriptionKind.OocNotice ? 1 : 0, null, kindBounds, "kind")
             .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
             .AddTextArea(textAreaBounds, null, CairoFont.TextInput(), "body")
-            .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, 30))
-            .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth - 140, buttonY, 120, 30))
+            .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
+            .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth - 140, buttonY, 120, ButtonHeight))
             .EndChildElements()
             .Compose(focusFirstElement: false);
 

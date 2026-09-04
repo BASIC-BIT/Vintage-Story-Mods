@@ -50,8 +50,20 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     public override void OnReceivedClientPacket(IPlayer player, int packetId, byte[] data)
     {
-        if (packetId != SaveEditorPacketId || Api.Side != EnumAppSide.Server || !CanEdit(player) || !IsWithinEditDistance(player))
+        if (packetId != SaveEditorPacketId || Api.Side != EnumAppSide.Server)
         {
+            return;
+        }
+
+        if (!CanEdit(player))
+        {
+            (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+            return;
+        }
+
+        if (!IsWithinEditDistance(player))
+        {
+            (player as IServerPlayer)?.SendIngameError("scene-description-too-far", Lang.Get("thebasics:scene-description-too-far"));
             return;
         }
 

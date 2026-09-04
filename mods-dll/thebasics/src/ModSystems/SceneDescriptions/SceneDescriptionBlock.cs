@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using thebasics.Utilities;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -65,7 +66,7 @@ public sealed class SceneDescriptionBlock : BlockSign
         {
             var readableStack = slot.Itemstack.Clone();
             readableStack.Attributes.SetString("title", GetHeldItemName(readableStack));
-            readableStack.Attributes.SetString("text", readableStack.Attributes.GetString(SceneDescriptionData.BodyAttribute, string.Empty));
+            readableStack.Attributes.SetString("text", VtmlUtils.EscapeVtml(readableStack.Attributes.GetString(SceneDescriptionData.BodyAttribute, string.Empty)));
             new GuiDialogReadonlyBook(readableStack, capi).TryOpen();
         }
     }
@@ -83,7 +84,7 @@ public sealed class SceneDescriptionBlock : BlockSign
     public override string GetHeldItemName(ItemStack itemStack)
     {
         var title = itemStack?.Attributes?.GetString(SceneDescriptionData.TitleAttribute, string.Empty)?.Trim();
-        return string.IsNullOrWhiteSpace(title) ? base.GetHeldItemName(itemStack) : title;
+        return string.IsNullOrWhiteSpace(title) ? base.GetHeldItemName(itemStack) : VtmlUtils.StripVtmlTags(title, api?.Logger);
     }
 
     public override void GetHeldItemInfo(ItemSlot inSlot, StringBuilder description, IWorldAccessor world, bool withDebugInfo)
@@ -104,7 +105,7 @@ public sealed class SceneDescriptionBlock : BlockSign
             description.AppendLine(Lang.Get("thebasics:scene-description-authored-by", data.AuthorName));
         }
 
-        description.AppendLine(Preview(data.Body));
+        description.AppendLine(VtmlUtils.EscapeVtml(Preview(data.Body)));
         description.AppendLine(Lang.Get("thebasics:scene-description-read-item-help"));
     }
 
@@ -115,7 +116,7 @@ public sealed class SceneDescriptionBlock : BlockSign
 
     private ItemStack CreateStackFromPlacedBlock(IWorldAccessor world, BlockPos pos)
     {
-        var canonicalBlock = world.GetBlock(new AssetLocation(Code.Domain, "scene-marker-ground-north")) ?? this;
+        var canonicalBlock = world.GetBlock(CodeWithParts("ground", "north")) ?? this;
         var stack = new ItemStack(canonicalBlock);
         if (world.BlockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity blockEntity)
         {

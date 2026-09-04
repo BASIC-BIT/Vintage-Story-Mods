@@ -11,7 +11,7 @@ internal sealed class SceneDescriptionRenderer : IRenderer
 {
     private readonly ICoreClientAPI _capi;
     private LoadedTexture _texture;
-    private string _textureKey = string.Empty;
+    private SceneDescriptionData _textureData;
 
     public SceneDescriptionRenderer(ICoreClientAPI capi)
     {
@@ -70,14 +70,15 @@ internal sealed class SceneDescriptionRenderer : IRenderer
 
     private void EnsureTexture(SceneDescriptionData data)
     {
-        var key = $"{(int)data.Kind}\n{data.Title}\n{data.Body}";
-        if (_texture != null && string.Equals(_textureKey, key, StringComparison.Ordinal))
+        // The block entity swaps in a fresh data object on every change, so reference equality is a
+        // cheap version check. Keeping the reference on a failed generation stops us retrying per frame.
+        if (ReferenceEquals(_textureData, data))
         {
             return;
         }
 
         ClearTexture();
-        _textureKey = key;
+        _textureData = data;
         var border = data.Kind == SceneDescriptionKind.OocNotice ? "#A9A1B8" : "#86AEE6";
         var background = new TextBackground
         {
@@ -99,7 +100,7 @@ internal sealed class SceneDescriptionRenderer : IRenderer
     {
         _texture?.Dispose();
         _texture = null;
-        _textureKey = string.Empty;
+        _textureData = null;
     }
 
     private static float GetScale(double distance)
