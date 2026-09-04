@@ -55,7 +55,7 @@ const session = (overrides = {}) => ({
 });
 const EXPIRED = session({ modDbValidUntilEstimate: "2026-09-09T00:00:00.000Z" });
 
-function secrets({ current = session(), currentVersionId = "v-old" } = {}) {
+function secrets({ current = session(), currentVersionId = "v-old", labelFirstCurrent = true } = {}) {
   const client = new FakeSecretsManagerClient();
   const state = { current, currentVersionId };
   client.respond("GetSecretValueCommand", (input) => {
@@ -66,6 +66,13 @@ function secrets({ current = session(), currentVersionId = "v-old" } = {}) {
   client.respond("PutSecretValueCommand", (input) => {
     if (input.SecretId === ACCOUNT_SECRET_ID) return { VersionId: "login-v2" };
     state.pending = JSON.parse(input.SecretString);
+    // Real Secrets Manager attaches AWSCURRENT to the first version of an
+    // empty secret whatever VersionStages asked for (labelFirstCurrent=false
+    // models the documented behaviour, where it stays AWSPENDING only).
+    if (state.current === null && labelFirstCurrent) {
+      state.current = state.pending;
+      state.currentVersionId = "v-candidate";
+    }
     return { VersionId: "v-candidate" };
   });
   client.respond("UpdateSecretVersionStageCommand", (input) => {
@@ -77,16 +84,21 @@ function secrets({ current = session(), currentVersionId = "v-old" } = {}) {
 }
 
 // `validate` outcomes are consumed per validateAccount call ("ok" | "auth" | code).
+// Set `db.client` to the store's FakeSecretsManagerClient to record bridge and
+// validation calls in its command timeline.
 function modDb({ validate = [], publish = "ok", published = false, publicFileId = 501 } = {}) {
   const calls = { bridge: [], validate: [], prepare: [], publish: [], publicState: [], verify: [], order: [] };
+  const db = { calls, client: null };
   const factory = ({ cookieValue }) => ({
     async completeLoginBridge() {
       calls.bridge.push({ cookieValue });
       calls.order.push("bridge");
+      db.client?.calls.push({ name: "completeLoginBridge", input: {} });
     },
     async validateAccount(account) {
       calls.validate.push({ cookieValue, account });
       calls.order.push("validate");
+      db.client?.calls.push({ name: "validateAccount", input: {} });
       const outcome = validate.shift() ?? "ok";
       if (outcome === "ok") return { account };
       if (outcome === "auth") throw new BrokerError("authentication-failed", "denied", { exitCode: ExitCode.renewalRequired });
@@ -110,7 +122,8 @@ function modDb({ validate = [], publish = "ok", published = false, publicFileId 
       return { verified: true, fileId: 501, sha256: input.expectedSha256, downloadUrl: "https://mods.vintagestory.at/download/501/thebasics-v5.9.1.zip", compatibleVersions: ["1.21.1", "1.21.0"] };
     },
   });
-  return { factory, calls };
+  db.factory = factory;
+  return db;
 }
 
 const counted = (fn) => {
@@ -270,15 +283,24 @@ test("import-wincred requires Windows", async () => {
   assert.equal(h.deps.readWinCred.calls.length, 0);
 });
 
-test("import-wincred stages, validates, promotes, and keeps the Windows entry", async () => {
+test("import-wincred validates, stages, promotes, and keeps the Windows entry", async () => {
   const h = harness();
+  h.db.client = h.store.client;
   const result = await h.run("sessionImportWincred", { expectedAccount: ACCOUNT });
   assert.deepEqual(result, {
     ok: true,
     status: "imported",
     data: { versionId: "v-candidate", previousVersionId: "v-old", validatedAccount: ACCOUNT, effectiveExpiry: "2026-09-24T12:00:00.000Z" },
   });
-  assert.deepEqual(h.commands(), ["GetSecretValueCommand", "PutSecretValueCommand", "UpdateSecretVersionStageCommand", "GetSecretValueCommand"]);
+  // Validation precedes the pending write; the promoted version is reread but not revalidated here.
+  assert.deepEqual(h.commands(), [
+    "GetSecretValueCommand",
+    "completeLoginBridge",
+    "validateAccount",
+    "PutSecretValueCommand",
+    "UpdateSecretVersionStageCommand",
+    "GetSecretValueCommand",
+  ]);
   const put = h.store.client.lastInput("PutSecretValueCommand");
   assert.deepEqual(put.VersionStages, ["AWSPENDING"]);
   assert.deepEqual(JSON.parse(put.SecretString), {
@@ -304,17 +326,41 @@ test("import-wincred stages, validates, promotes, and keeps the Windows entry", 
   assert.equal(h.deps.deleteWinCred.calls.length, 0);
 });
 
-test("import-wincred bootstraps an empty container", async () => {
+test("import-wincred bootstraps an empty container that AWS labels current on the first write", async () => {
   const h = harness({ store: secrets({ current: null }) });
   const result = await h.run("sessionImportWincred", { expectedAccount: ACCOUNT });
+  assert.equal(result.status, "imported");
+  assert.equal(result.data.versionId, "v-candidate");
   assert.equal(result.data.previousVersionId, null);
+  assert.equal(h.store.client.inputs("UpdateSecretVersionStageCommand").length, 0);
+});
+
+test("import-wincred bootstraps an empty container whose first write stays pending", async () => {
+  const h = harness({ store: secrets({ current: null, labelFirstCurrent: false }) });
+  const result = await h.run("sessionImportWincred", { expectedAccount: ACCOUNT });
+  assert.equal(result.status, "imported");
+  assert.equal(result.data.versionId, "v-candidate");
+  assert.equal(result.data.previousVersionId, null);
+  assert.equal(h.store.client.inputs("UpdateSecretVersionStageCommand").length, 1);
   assert.equal(Object.hasOwn(h.store.client.lastInput("UpdateSecretVersionStageCommand"), "RemoveFromVersionId"), false);
 });
 
-test("import-wincred does not promote when the account does not match", async () => {
+test("import-wincred does not write or promote when the account does not match", async () => {
   const h = harness({ db: modDb({ validate: ["MODDB_ACCOUNT_MISMATCH"] }) });
   await rejectsWithCode(h.run("sessionImportWincred", { expectedAccount: ACCOUNT }), "MODDB_ACCOUNT_MISMATCH");
+  assert.equal(h.store.client.inputs("PutSecretValueCommand").length, 0);
   assert.equal(h.store.client.inputs("UpdateSecretVersionStageCommand").length, 0);
+  assert.equal(h.deps.deleteWinCred.calls.length, 0);
+});
+
+// Regression (seen against real AWS 2026-09-03): the first version of an
+// empty secret gets AWSCURRENT no matter what stages were requested, so a
+// dead Windows cookie written before validation became the live session.
+test("import-wincred into an empty container writes nothing when the cookie is dead", async () => {
+  const h = harness({ store: secrets({ current: null }), db: modDb({ validate: ["auth"] }) });
+  await rejectsWithCode(h.run("sessionImportWincred", { expectedAccount: ACCOUNT }), "authentication-failed");
+  assert.deepEqual(h.commands(), ["GetSecretValueCommand"]);
+  assert.equal(h.store.state.current, null, "the empty container gained a current version");
   assert.equal(h.deps.deleteWinCred.calls.length, 0);
 });
 

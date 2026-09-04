@@ -7,7 +7,7 @@ import { ACCOUNT_SECRET_ID, SESSION_COOKIE_NAME } from "./config.mjs";
 import { BrokerError, safeFailure, safeResult } from "./contracts.mjs";
 import { createAccountAdminStore, createPublisherStore, createRenewalStore } from "./secret-store.mjs";
 import { buildSessionCandidate, getEffectiveExpiry } from "./session-schema.mjs";
-import { SESSION_COOKIE, ensureSession, readCurrentOrNull } from "./session-service.mjs";
+import { SESSION_COOKIE, ensureSession, readCurrentOrNull, stageAndPromote } from "./session-service.mjs";
 
 // The broker fills the form but never submits it; the human does both.
 const RECAPTCHA_LINE = "Complete the reCAPTCHA in the Chrome window, then press the login button.\n";
@@ -138,13 +138,12 @@ export function createCommands(deps) {
       let cookieValue = await deps.readWinCred();
       try {
         const candidate = buildSessionCandidate({ cookieName: SESSION_COOKIE_NAME, cookieValue, observedCookieExpiresAt: null, validatedAccount: expectedAccount, now: clock() });
-        const { versionId } = await store.putPendingSession(candidate);
+        // Validate before AWS sees the candidate: the first version of an empty
+        // secret becomes AWSCURRENT regardless of the requested stages.
         const modDb = modDbFactory({ cookieValue });
         await modDb.completeLoginBridge(); // harmless when ModDB already knows the cookie
         await modDb.validateAccount(expectedAccount);
-        await store.promoteSession({ candidateVersionId: versionId, originalCurrentVersionId });
-        const promoted = await store.readCurrentSession();
-        if (promoted.versionId !== versionId) throw fail("SESSION_PROMOTION_CONFLICT");
+        const { candidateVersionId: versionId, promoted } = await stageAndPromote(store, candidate, originalCurrentVersionId);
         return safeResult("imported", {
           versionId,
           previousVersionId: originalCurrentVersionId,
