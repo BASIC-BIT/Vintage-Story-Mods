@@ -138,10 +138,12 @@ export function createCommands(deps) {
       let cookieValue = await deps.readWinCred();
       try {
         const candidate = buildSessionCandidate({ cookieName: SESSION_COOKIE_NAME, cookieValue, observedCookieExpiresAt: null, validatedAccount: expectedAccount, now: clock() });
-        const { versionId } = await store.putPendingSession(candidate);
+        // Validate before AWS sees the candidate: the first version of an empty
+        // secret becomes AWSCURRENT regardless of the requested stages.
         const modDb = modDbFactory({ cookieValue });
         await modDb.completeLoginBridge(); // harmless when ModDB already knows the cookie
         await modDb.validateAccount(expectedAccount);
+        const { versionId } = await store.putPendingSession(candidate);
         await store.promoteSession({ candidateVersionId: versionId, originalCurrentVersionId });
         const promoted = await store.readCurrentSession();
         if (promoted.versionId !== versionId) throw fail("SESSION_PROMOTION_CONFLICT");

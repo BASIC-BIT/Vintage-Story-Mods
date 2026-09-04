@@ -63,6 +63,12 @@ function secrets({ current = session(), currentVersionId = "v-old", promoteError
   });
   client.respond("PutSecretValueCommand", (input) => {
     state.pending = JSON.parse(input.SecretString);
+    // Real Secrets Manager attaches AWSCURRENT to the first version of an
+    // empty secret whatever VersionStages asked for.
+    if (state.current === null) {
+      state.current = state.pending;
+      state.currentVersionId = "v-candidate";
+    }
     return { VersionId: "v-candidate" };
   });
   client.respond("UpdateSecretVersionStageCommand", (input) => {
@@ -76,11 +82,14 @@ function secrets({ current = session(), currentVersionId = "v-old", promoteError
 
 // ModDB fake: `outcomes` is consumed one call at a time, in call order, by
 // completeLoginBridge and validateAccount alike; a string is a BrokerError
-// code, "auth" is the authentication-failed variant.
+// code, "auth" is the authentication-failed variant. Set `db.client` to a
+// FakeSecretsManagerClient to record ModDB calls in its command timeline.
 function modDb(...outcomes) {
   const calls = [];
+  const db = { calls, client: null };
   const next = (call) => {
     calls.push(call);
+    db.client?.calls.push({ name: call.bridge ? "completeLoginBridge" : "validateAccount", input: {} });
     const outcome = outcomes.shift() ?? "ok";
     if (outcome === "ok") return;
     if (outcome === "auth") throw new BrokerError("authentication-failed", "denied", { exitCode: ExitCode.renewalRequired });
@@ -95,7 +104,8 @@ function modDb(...outcomes) {
       return { account };
     },
   });
-  return { factory, calls };
+  db.factory = factory;
+  return db;
 }
 
 const browser = (outcome = "ok") => {
@@ -238,6 +248,7 @@ test("non-authentication live failures propagate unchanged", async () => {
 test("interactive Windows renews an expired session in the approved order", async () => {
   const store = secrets({ current: EXPIRED });
   const db = modDb();
+  db.client = store.client;
   const renewal = browser();
   const result = await run({ store, db, renewal });
 
@@ -251,12 +262,17 @@ test("interactive Windows renews an expired session in the approved order", asyn
   assert.equal(result[SESSION_COOKIE], NEW_COOKIE);
   assert.equal(JSON.stringify(result).includes(NEW_COOKIE), false);
 
+  // The candidate is proven live before AWS ever sees it: on an empty
+  // secret the first PutSecretValue becomes AWSCURRENT regardless of stage.
   assert.deepEqual(store.commands(), [
     "GetSecretValueCommand",
     "GetSecretValueCommand",
+    "completeLoginBridge",
+    "validateAccount",
     "PutSecretValueCommand",
     "UpdateSecretVersionStageCommand",
     "GetSecretValueCommand",
+    "validateAccount",
   ]);
   assert.deepEqual(
     store.client.inputs("GetSecretValueCommand").map((input) => input.SecretId),
@@ -327,14 +343,26 @@ test("publish caller gets approval-required after renewal and no cookie", async 
 test("wrong account on the candidate leaves AWSCURRENT unchanged and never promotes", async () => {
   const store = secrets({ current: EXPIRED });
   await rejectsWithCode(run({ store, db: modDb("ok", "MODDB_ACCOUNT_MISMATCH") }), "MODDB_ACCOUNT_MISMATCH");
-  assert.equal(store.client.inputs("PutSecretValueCommand").length, 1, "candidate was written as pending");
+  assert.equal(store.client.inputs("PutSecretValueCommand").length, 0, "candidate was written before validation");
   assertCurrentUnchanged(store);
 });
 
 test("candidate that ModDB rejects leaves AWSCURRENT unchanged", async () => {
   const store = secrets({ current: EXPIRED });
   await rejectsWithCode(run({ store, db: modDb("ok", "auth") }), "authentication-failed");
+  assert.equal(store.client.inputs("PutSecretValueCommand").length, 0, "candidate was written before validation");
   assertCurrentUnchanged(store);
+});
+
+// Regression (seen against real AWS 2026-09-03): the first version of an
+// empty secret gets AWSCURRENT no matter what stages were requested, so a
+// dead candidate written before validation became the live session.
+test("bootstrap candidate that fails validation is never written to the empty container", async () => {
+  const store = secrets({ current: null });
+  await rejectsWithCode(run({ store, db: modDb("ok", "auth") }), "authentication-failed");
+  assert.equal(store.client.inputs("PutSecretValueCommand").length, 0);
+  assert.equal(store.client.inputs("UpdateSecretVersionStageCommand").length, 0);
+  assert.equal(store.state.current, null, "the empty container gained a current version");
 });
 
 test("candidate whose login bridge fails is never validated or promoted", async () => {

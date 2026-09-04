@@ -91,7 +91,7 @@ node tools/moddb-release/src/cli.mjs session import-wincred --expected-account <
 node tools/moddb-release/src/cli.mjs session import-wincred --finalize-version <aws-version-id>
 ```
 
-Phase one reads `TheBasics.ModDb.Session` through the checked-in Windows adapter, writes it as `AWSPENDING`, validates the account, promotes it conditionally to `AWSCURRENT`, and reports `imported` with the promoted AWS version ID. The Windows Credential Manager entry stays in place. Phase two (`--finalize-version`) requires that exact version to still be the live-valid `AWSCURRENT`, then deletes the Windows Credential Manager entry and reports `finalized`. Run phase two only after another approved consumer has run `session status` successfully against AWS. The Windows deletion is not recoverable; AWS is canonical from then on.
+Phase one reads `TheBasics.ModDb.Session` through the checked-in Windows adapter, validates the account live, writes it as `AWSPENDING` only once validated, promotes it conditionally to `AWSCURRENT`, and reports `imported` with the promoted AWS version ID. The Windows Credential Manager entry stays in place. Phase two (`--finalize-version`) requires that exact version to still be the live-valid `AWSCURRENT`, then deletes the Windows Credential Manager entry and reports `finalized`. Run phase two only after another approved consumer has run `session status` successfully against AWS. The Windows deletion is not recoverable; AWS is canonical from then on.
 
 ### Ordinary renewal
 
@@ -99,7 +99,7 @@ Phase one reads `TheBasics.ModDb.Session` through the checked-in Windows adapter
 node tools/moddb-release/src/cli.mjs session renew --expected-account <moddb-username>
 ```
 
-Opens visible Chrome; the human completes reCAPTCHA; the broker captures the cookie, stages it as `AWSPENDING`, validates it, and promotes it conditionally. A promotion conflict fails closed; run it again.
+Opens visible Chrome; the human completes reCAPTCHA; the broker captures the cookie, validates it live, stages it as `AWSPENDING` only once validated, and promotes it conditionally. A candidate that fails validation is never written to AWS (the first version of an empty secret would become `AWSCURRENT` regardless of stage). A promotion conflict fails closed; run it again.
 
 ## Output
 

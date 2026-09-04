@@ -87,8 +87,10 @@ export async function ensureSession({
     candidate = buildSessionCandidate({ ...captured, validatedAccount: account, now: clock() });
     captured = null;
 
-    const { versionId: candidateVersionId } = await renewalStore.putPendingSession(candidate);
+    // Validate before AWS sees the candidate: the first version of an empty
+    // secret becomes AWSCURRENT regardless of the requested stages.
     await bridgeAndValidate(candidate.cookieValue);
+    const { versionId: candidateVersionId } = await renewalStore.putPendingSession(candidate);
     candidate = null;
     await renewalStore.promoteSession({ candidateVersionId, originalCurrentVersionId });
 
