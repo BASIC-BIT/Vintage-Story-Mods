@@ -30,7 +30,7 @@ public sealed class AgentControlModSystem : ModSystem
         _api = api;
         _config = api.LoadModConfig<AgentControlConfig>("agentcontrol.json") ?? new AgentControlConfig();
         api.StoreModConfig(_config, "agentcontrol.json");
-        _extensions = new ExtensionRegistry(api);
+        _extensions = new ExtensionRegistry();
         api.ObjectCache[AgentControlContract.RegistryObjectCacheKey] = _extensions;
         _game = new VintageStoryAgentGame(api, _extensions, _config);
         _engine = new ExecutionEngine(_game, new StopwatchClock(), _config);
@@ -85,11 +85,21 @@ public sealed class AgentControlModSystem : ModSystem
                 Kill();
                 return true;
             });
-        });
+        }, OnServerFailed);
         _server.Start();
         _enabled = true;
         _game?.Audit("session.enabled", new { pipe = _config.PipeName, mutationGranted = _config.GrantMutationOnEnable });
         _api.ShowChatMessage("Agent Control enabled. Ctrl+Alt+F9 cancels and releases input.");
+    }
+
+    private void OnServerFailed(Exception error)
+    {
+        _api?.Logger.Error("Agent Control pipe failed: {0}", error);
+        _ = _dispatcher?.Invoke(() =>
+        {
+            Disable("pipe_failed");
+            return true;
+        });
     }
 
     private void Kill()
@@ -228,6 +238,7 @@ public sealed class AgentControlModSystem : ModSystem
             {
                 _api.Event.UnregisterGameTickListener(_tickListener);
             }
+            _dispatcher?.Shutdown();
             if (_api.ObjectCache.TryGetValue(AgentControlContract.RegistryObjectCacheKey, out var current) &&
                 ReferenceEquals(current, _extensions))
             {

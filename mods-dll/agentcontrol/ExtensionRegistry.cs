@@ -1,22 +1,14 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using AgentControl.Abstractions;
-using Vintagestory.API.Client;
 
 namespace AgentControl;
 
 internal sealed record RegisteredExtension(AgentExtensionDescriptor Descriptor, AgentExtensionHandler Handler);
 
-public sealed class ExtensionRegistry : IAgentExtensionRegistry
+internal sealed class ExtensionRegistry : IAgentExtensionRegistry
 {
     private readonly ConcurrentDictionary<string, RegisteredExtension> _operations = new(StringComparer.Ordinal);
-
-    public ExtensionRegistry(ICoreClientAPI clientApi)
-    {
-        ClientApi = clientApi;
-    }
-
-    public ICoreClientAPI ClientApi { get; }
 
     public IDisposable Register(AgentExtensionDescriptor descriptor, AgentExtensionHandler handler)
     {
@@ -50,7 +42,7 @@ public sealed class ExtensionRegistry : IAgentExtensionRegistry
         }
 
         return registration.Handler(
-            new AgentExtensionContext(callId, ClientApi, cancellationToken),
+            new AgentExtensionContext(callId, cancellationToken),
             arguments);
     }
 

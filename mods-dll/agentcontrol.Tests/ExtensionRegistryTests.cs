@@ -9,7 +9,7 @@ public sealed class ExtensionRegistryTests
     [Fact]
     public void ThirdPartyOperation_RegistersInvokesAndUnregistersWithoutCoreChanges()
     {
-        var registry = new ExtensionRegistry(null!);
+        var registry = new ExtensionRegistry();
         using (registry.Register(
             new AgentExtensionDescriptor(
                 "agentcontrol.sample",
@@ -34,7 +34,7 @@ public sealed class ExtensionRegistryTests
     [Fact]
     public void DuplicateOperation_IsRejected()
     {
-        var registry = new ExtensionRegistry(null!);
+        var registry = new ExtensionRegistry();
         using var first = registry.Register(
             new AgentExtensionDescriptor("one", "1.0", "shared.operation", "First."),
             (_, _) => JsonSerializer.SerializeToElement(new { }));

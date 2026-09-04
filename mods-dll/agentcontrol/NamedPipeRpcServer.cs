@@ -11,6 +11,7 @@ internal sealed class NamedPipeRpcServer : IAsyncDisposable
     private readonly int _maxRequestBytes;
     private readonly Func<RpcRequest, Task<RpcResponse>> _handler;
     private readonly Action _onClientDisconnect;
+    private readonly Action<Exception> _onFailure;
     private readonly CancellationTokenSource _shutdown = new();
     private Task? _acceptLoop;
 
@@ -18,15 +19,25 @@ internal sealed class NamedPipeRpcServer : IAsyncDisposable
         string pipeName,
         int maxRequestBytes,
         Func<RpcRequest, Task<RpcResponse>> handler,
-        Action? onClientDisconnect = null)
+        Action? onClientDisconnect = null,
+        Action<Exception>? onFailure = null)
     {
         _pipeName = pipeName;
         _maxRequestBytes = maxRequestBytes;
         _handler = handler;
         _onClientDisconnect = onClientDisconnect ?? (() => { });
+        _onFailure = onFailure ?? (_ => { });
     }
 
-    public void Start() => _acceptLoop = AcceptLoop();
+    public void Start()
+    {
+        _acceptLoop = AcceptLoop();
+        _ = _acceptLoop.ContinueWith(
+            task => _onFailure(task.Exception!.GetBaseException()),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
 
     private async Task AcceptLoop()
     {
@@ -101,6 +112,7 @@ internal sealed class NamedPipeRpcServer : IAsyncDisposable
     {
         var buffer = new char[Math.Min(_maxRequestBytes, 4096)];
         var builder = new StringBuilder();
+        var byteCount = 0;
         while (true)
         {
             var read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
@@ -108,17 +120,17 @@ internal sealed class NamedPipeRpcServer : IAsyncDisposable
             {
                 break;
             }
-            for (var index = 0; index < read; index++)
+            var newline = Array.IndexOf(buffer, '\n', 0, read);
+            var take = newline < 0 ? read : newline;
+            byteCount += Encoding.UTF8.GetByteCount(buffer, 0, take);
+            if (byteCount > _maxRequestBytes)
             {
-                if (buffer[index] == '\n')
-                {
-                    return builder.ToString().TrimEnd('\r');
-                }
-                builder.Append(buffer[index]);
-                if (Encoding.UTF8.GetByteCount(builder.ToString()) > _maxRequestBytes)
-                {
-                    throw new InvalidDataException("Request exceeds maximum size.");
-                }
+                throw new InvalidDataException("Request exceeds maximum size.");
+            }
+            builder.Append(buffer, 0, take);
+            if (newline >= 0)
+            {
+                return builder.ToString().TrimEnd('\r');
             }
         }
         return builder.ToString();
@@ -133,8 +145,9 @@ internal sealed class NamedPipeRpcServer : IAsyncDisposable
             {
                 await _acceptLoop.ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (Exception)
             {
+                // Accept loop failures are reported through the failure callback.
             }
         }
         _shutdown.Dispose();

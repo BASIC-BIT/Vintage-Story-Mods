@@ -25,7 +25,7 @@ public sealed class SelectionDescribeModSystem : ModSystem
                 "0.1.0",
                 "selection.describe",
                 "Describes the client's current block or entity selection."),
-            (context, arguments) => Describe(context.ClientApi));
+            (context, arguments) => Describe(api));
     }
 
     private static JsonElement Describe(ICoreClientAPI api)

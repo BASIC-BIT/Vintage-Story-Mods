@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Vintagestory.API.Client;
 
 namespace AgentControl.Abstractions;
 
@@ -9,6 +8,7 @@ public static class AgentControlContract
     public const string ProtocolVersion = "1.0";
 }
 
+// MutatesState is self-declared by the extension and trusted when a session has no mutation grant.
 public sealed record AgentExtensionDescriptor(
     string ExtensionId,
     string ExtensionVersion,
@@ -18,7 +18,6 @@ public sealed record AgentExtensionDescriptor(
 
 public sealed record AgentExtensionContext(
     string CallId,
-    ICoreClientAPI ClientApi,
     CancellationToken CancellationToken);
 
 public delegate JsonElement AgentExtensionHandler(
@@ -27,8 +26,6 @@ public delegate JsonElement AgentExtensionHandler(
 
 public interface IAgentExtensionRegistry
 {
-    ICoreClientAPI ClientApi { get; }
-
     IDisposable Register(
         AgentExtensionDescriptor descriptor,
         AgentExtensionHandler handler);

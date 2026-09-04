@@ -44,9 +44,12 @@ internal abstract class ActionStep
         string executionId)
     {
         var type = action.GetProperty("type").GetString() ?? throw new InvalidOperationException("Action type is required.");
-        var timeoutMs = Math.Min(
-            action.TryGetProperty("timeoutMs", out var timeout) ? timeout.GetInt32() : config.MaxActionDurationMs,
-            config.MaxActionDurationMs);
+        var requestedTimeoutMs = action.TryGetProperty("timeoutMs", out var timeout)
+            ? timeout.GetInt32()
+            : config.MaxActionDurationMs;
+        var timeoutMs = requestedTimeoutMs <= 0
+            ? config.MaxActionDurationMs
+            : Math.Min(requestedTimeoutMs, config.MaxActionDurationMs);
         return type switch
         {
             "look" => new ImmediateStep(index, type, game, clock, timeoutMs, () =>

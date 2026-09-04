@@ -74,6 +74,23 @@ public sealed class ExecutionEngineTests
     }
 
     [Fact]
+    public async Task NonPositiveTimeout_FallsBackToTheConfiguredMaximum()
+    {
+        var clock = new FakeClock();
+        var game = new FakeGame();
+        using var engine = Create(game, clock, maxActionMs: 100);
+        var execution = engine.Enqueue("no-timeout", Actions(
+            """{"type":"wait","durationMs":10,"timeoutMs":-1}"""));
+        engine.Tick();
+        clock.Advance(10);
+        engine.Tick();
+        engine.Tick();
+
+        var receipt = await execution;
+        receipt.Status.Should().Be("completed");
+    }
+
+    [Fact]
     public void Queue_IsBounded()
     {
         var clock = new FakeClock();

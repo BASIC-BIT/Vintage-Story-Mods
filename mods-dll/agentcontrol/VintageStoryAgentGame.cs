@@ -9,7 +9,7 @@ namespace AgentControl;
 
 internal sealed record ChatObservation(long Sequence, int GroupId, string Type, string Message);
 
-public sealed class VintageStoryAgentGame : IAgentGame
+internal sealed class VintageStoryAgentGame : IAgentGame
 {
     private static readonly HashSet<string> SupportedControls =
     [

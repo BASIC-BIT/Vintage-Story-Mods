@@ -33,8 +33,12 @@ internal sealed class AgentControlHud : HudElement
             return;
         }
 
-        _text = $"AGENT CONTROL: {(active ? "ACTIVE" : "READY")}\nMUTATION: {(mutationGranted ? "GRANTED" : "DENIED")}\nKill: Ctrl+Alt+F9";
-        SingleComposer.GetDynamicText("text").SetNewText(_text);
+        var text = $"AGENT CONTROL: {(active ? "ACTIVE" : "READY")}\nMUTATION: {(mutationGranted ? "GRANTED" : "DENIED")}\nKill: Ctrl+Alt+F9";
+        if (text != _text)
+        {
+            _text = text;
+            SingleComposer.GetDynamicText("text").SetNewText(_text);
+        }
         if (!IsOpened())
         {
             TryOpen();
