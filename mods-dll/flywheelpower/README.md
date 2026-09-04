@@ -45,7 +45,7 @@ This mod has not had a public release, so obsolete prototype block aliases and t
 
 ## Compatibility and limitations
 
-- Targets Vintage Story 1.22.6 and requires the standard Survival mod.
+- Targets Vintage Story 1.22.7 and requires the standard Survival mod.
 - Universal mod: install the same package on the server and each connecting client.
 - Initial-feedback release with both creative discovery and staged survival recipes.
 - Balance values are provisional and require testing against real windmill and helve-hammer rigs. The current safe-speed targets assume a flywheel on the fast side of a large gear; adding sails primarily adds torque and acceleration, not a comparable increase in steady-state speed.

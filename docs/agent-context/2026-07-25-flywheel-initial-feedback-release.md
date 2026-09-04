@@ -75,7 +75,7 @@ flywheel uses it for its axle and inventory overlay. Renaming it would add churn
 
 Automated:
 
-- Build Flywheel Power and its focused test project on .NET 10 against Vintage Story 1.22.6.
+- Build Flywheel Power and its focused test project on .NET 10 against Vintage Story 1.22.7.
 - Run all repository test projects.
 - Verify formatting and repository complexity checks.
 - Package `flywheelpower_0_5_0.zip`.
@@ -495,3 +495,23 @@ Remove this packet after the initial-feedback pull request is merged or closed a
   saddle from one ingot and confirm four fittings; confirm compact/full bearing recipes consume 4/16 fittings; confirm
   handbook assembly uses wheel plus bearing for compact and wheel plus web plus bearing for full-size; confirm compact mass
   no longer counts a timber web; and confirm Sneak plus top/bottom placement selects the vertical orientation.
+
+## Vintage Story 1.22.7 integration checkpoint, September 4, 2026
+
+- BASIC decided on 2026-09-03 that the supported Vintage Story contract for this release is 1.22.7, matching The BASICs 5.9.1
+  and the repository dependency target. `origin/main` at `58416856f10cf0729548f6bf46c8e086e95ffe1b` was merged into this branch
+  (merge commit `9cdf01f`) with no textual conflicts; the merged `build.yml` keeps main's `VS_VERSION: "1.22.7"` together with
+  every Flywheel restore, build, format, test, Lizard, DLL-check, and package step. A cold-context review of the merge found no
+  semantic conflict and no Flywheel code that depended on the 1.22.6-to-1.22.7 change. `README.md` now states the 1.22.7 target.
+- Local validation against the installed 1.22.7 client on 2026-09-04: all six configured projects restored and built with zero
+  errors, all six whitespace checks plus the Flywheel project format check passed, The BASICs tests passed 706/706, DimensionLib
+  58/58, Flywheel Power 88/88, the four generated-content checks passed, the renderer regression suite passed 63/63, the Lizard
+  gate passed, `scripts/check-agent-tooling.ps1` passed, the analytics relay Node tests passed 15/15, and `git diff --check`
+  was clean.
+- The exact model sweep rendered all 74 manifests with 24 primary images each, no unresolved textures, and no coplanar overlaps.
+- The rebuilt package `flywheelpower_0_5_0.zip` contains the same 31 allowlisted entries, is 85,987 bytes, and has SHA-256
+  `152CC02D5FEE662B6B7B1A8D33242314E6FED75C8D507ABBE104BE21B72EDD9C`. Entries keep the fixed `2000-01-01` timestamp, packaged
+  JSON and Markdown contain no carriage returns, and no disabled Slip Transmission content is present. The previous 1.22.6
+  package (`7B7F47BB...2D0197`, 84,776 bytes) remains the preserved rollback artifact and was not overwritten.
+- The five bounded manual observations listed above are still open and still require explicit owner approval before any client
+  or test-server action.
