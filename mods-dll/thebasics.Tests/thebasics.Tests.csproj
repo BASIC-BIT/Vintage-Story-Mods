@@ -70,13 +70,11 @@
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
   </ItemGroup>
 
-  <!-- Real Harmony dispatch tests need the game-bundled patch runtime dependencies. -->
+  <!-- Real Harmony dispatch tests use the same MonoMod runtime as the game.
+       CI's compile-only game bundle lacks these transitive runtime assemblies. -->
   <ItemGroup>
-    <Reference Include="$(VINTAGE_STORY)\Lib\Mono.Cecil*.dll;$(VINTAGE_STORY)\Lib\MonoMod.*.dll">
-      <Private>True</Private>
-    </Reference>
+    <PackageReference Include="MonoMod.Core" Version="1.3.3" PrivateAssets="all" />
   </ItemGroup>
-
   <!-- Native SkiaSharp dependency must sit next to the managed assembly at runtime. -->
   <ItemGroup>
     <Content Include="$(VINTAGE_STORY)\Lib\libSkiaSharp.dll" Condition="Exists('$(VINTAGE_STORY)\Lib\libSkiaSharp.dll')">

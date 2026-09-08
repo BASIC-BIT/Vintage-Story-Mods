@@ -186,11 +186,7 @@ public static class DiceEvaluator
         }
         private Node Dice(decimal countValue, decimal sidesValue)
         {
-            if (countValue <= 0 || sidesValue <= 0 || countValue != decimal.Truncate(countValue) || sidesValue != decimal.Truncate(sidesValue))
-                throw Error("dimensions", "Dice counts and sides must be positive whole numbers.");
-            if (countValue > MaxDice || sidesValue > MaxSides) throw Limit();
-            int count = (int)countValue, sides = (int)sidesValue;
-            if ((declaredDice += count) > MaxDice) throw Limit();
+            var (count, sides) = ValidateDiceDimensions(countValue, sidesValue);
             Mechanics.Add("dice");
             bool explode = false, recursive = false;
             Func<int, bool> reroll = null, success = null;
@@ -216,9 +212,7 @@ public static class DiceEvaluator
                     if (selection != null) throw Syntax();
                     selection = input.Substring(position, 2).ToLowerInvariant();
                     Take(selection);
-                    var amount = ReadNumber();
-                    if (amount < 0 || amount != decimal.Truncate(amount) || amount > MaxDice) throw Error("dimensions", "Keep/drop counts must be whole numbers from 0 to 100.");
-                    selectionCount = (int)amount; Mechanics.Add("keep_drop");
+                    selectionCount = ReadSelectionCount(); Mechanics.Add("keep_drop");
                 }
                 else if (Current is '<' or '>' or '=')
                 {
@@ -231,6 +225,22 @@ public static class DiceEvaluator
             if (!explode && selection != null && selectionCount > count) throw Error("dimensions", "Keep/drop count exceeds the available dice.");
             if ((explode && sides == 1) || (recursive && MatchesAll(reroll, sides))) throw Limit();
             return context => RollPool(context, count, sides, explode, reroll, recursive, selection, selectionCount, success);
+        }
+        private (int Count, int Sides) ValidateDiceDimensions(decimal countValue, decimal sidesValue)
+        {
+            if (countValue <= 0 || sidesValue <= 0 || countValue != decimal.Truncate(countValue) || sidesValue != decimal.Truncate(sidesValue))
+                throw Error("dimensions", "Dice counts and sides must be positive whole numbers.");
+            if (countValue > MaxDice || sidesValue > MaxSides) throw Limit();
+            int count = (int)countValue, sides = (int)sidesValue;
+            if ((declaredDice += count) > MaxDice) throw Limit();
+            return (count, sides);
+        }
+        private int ReadSelectionCount()
+        {
+            var amount = ReadNumber();
+            if (amount < 0 || amount != decimal.Truncate(amount) || amount > MaxDice)
+                throw Error("dimensions", "Keep/drop counts must be whole numbers from 0 to 100.");
+            return (int)amount;
         }
         private bool ModifierAhead(string modifier)
         {
