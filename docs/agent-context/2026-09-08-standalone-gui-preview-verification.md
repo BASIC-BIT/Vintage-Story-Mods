@@ -12,3 +12,4 @@ Implemented in dice PR #245. Entrypoint: scripts/preview-gui.ps1; details: tools
 - Output includes PNGs and provenance/command/control-bounds manifests. Baselines remain explicit reviewed inputs, never automatically accepted.
 
 This evidence does not establish pixel identity to the GPU renderer or complete existing manual dice QA. Live calibration, multiplayer coexistence and actual Discord delivery remain unverified. New commits require a fresh exact-head CI/review window before merge-ready can be claimed.
+- CI exposed duplicate mod builds when the preview project reference injected different MSBuild properties. Removed that per-reference override; the exact Release build command now passes locally. Preview script commands still explicitly disable packaging.

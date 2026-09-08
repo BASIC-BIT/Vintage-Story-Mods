@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../mods-dll/thebasics/thebasics.csproj" AdditionalProperties="SkipPostBuildPackage=true" />
+    <ProjectReference Include="../../mods-dll/thebasics/thebasics.csproj" />
   </ItemGroup>
 
   <ItemGroup>
