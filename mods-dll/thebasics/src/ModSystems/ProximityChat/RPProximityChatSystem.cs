@@ -39,6 +39,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private Th3EssentialsDiscordRelay _th3EssentialsDiscordRelay;
     private readonly HashSet<string> _loggedExtensionHandlerFailures = new(StringComparer.Ordinal);
     private Harmony _serverHarmony;
+    private thebasics.ModSystems.DiceRolling.DiceRollCommands _diceRollCommands;
 
     public event EventHandler<ProximityChatMessageEventArgs> ProximityChatMessageProcessed;
 
@@ -65,6 +66,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         TransformerSystem = new TransformerSystem(this, LanguageSystem, DistanceObfuscationSystem, ProximityCheckUtils);
         _th3EssentialsDiscordRelay = new Th3EssentialsDiscordRelay(API);
         ProximityChatMessageProcessed += RelayProcessedMessageToTh3Essentials;
+        _diceRollCommands = new thebasics.ModSystems.DiceRolling.DiceRollCommands(this);
+        _diceRollCommands.Register();
         ApplyManagedMapPlayerVisibilityConfig();
         RefreshAllNameTags();
     }
@@ -94,7 +97,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void RelayProcessedMessageToTh3Essentials(object sender, ProximityChatMessageEventArgs args)
     {
-        _th3EssentialsDiscordRelay?.Relay(Config, args.RenderedMessage);
+        _th3EssentialsDiscordRelay?.Relay(Config, args.RenderedMessage, suppressMentions: args.Kind == ProximityChatMessageKind.Roll);
     }
 
     private void ApplyServerPatches()
@@ -105,6 +108,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     public override void Dispose()
     {
+        _diceRollCommands?.Dispose();
         LanguageSystem?.DisposeLanguageServices();
         ProximityLifecycleMessageFilter.Unpatch(_serverHarmony);
         _serverHarmony = null;

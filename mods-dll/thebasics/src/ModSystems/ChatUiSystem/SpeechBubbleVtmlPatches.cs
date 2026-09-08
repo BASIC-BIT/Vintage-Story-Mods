@@ -202,6 +202,8 @@ public static class SpeechBubbleVtmlPatches
 
     private static LoadedTexture CreateBubbleTexture(ICoreClientAPI capi, string bubbleVtml, string kind, CairoFont baseFont)
     {
+        if (DiceBubbleTexture.TryGetSides(kind, out var sides))
+            return DiceBubbleTexture.Create(capi, VtmlUtils.UnescapeVtml(bubbleVtml), sides, baseFont);
         var background = GetBubbleBackground(kind);
 
         var tex = RichTextTextureUtils.GenRichTextTexture(capi, bubbleVtml, baseFont, BubbleMaxTextWidthPx, background);
