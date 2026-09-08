@@ -159,6 +159,8 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     public override void GetBlockInfo(IPlayer forPlayer, StringBuilder description)
     {
         base.GetBlockInfo(forPlayer, description);
+        if (!string.IsNullOrWhiteSpace(Data.Title)) description.AppendLine(thebasics.Utilities.VtmlUtils.EscapeVtml(Data.Title));
+        if (!string.IsNullOrWhiteSpace(Data.Body)) description.AppendLine(SceneDescriptionFormatter.InspectorPreview(Data.Body));
         if (string.IsNullOrWhiteSpace(Data.Body))
         {
             description.AppendLine(Lang.Get("thebasics:scene-description-empty-block-help"));
@@ -239,6 +241,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Title = data.Title,
             Body = data.Body,
             Kind = (int)data.Kind,
+            Display = (int)data.Display,
             Appearance = (int)data.Appearance,
             Symbol = (int)data.Symbol,
             IconDistance = data.IconDistance,
@@ -255,6 +258,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Title = packet.Title,
             Body = packet.Body,
             Kind = (SceneDescriptionKind)packet.Kind,
+            Display = (SceneDescriptionDisplay)packet.Display,
             Appearance = (SceneMarkerAppearance)packet.Appearance,
             Symbol = (SceneMarkerSymbol)packet.Symbol,
             IconDistance = packet.IconDistance,

@@ -6,6 +6,45 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 public class SceneDescriptionDataTests
 {
+    [Theory]
+    [InlineData(SceneDescriptionDisplay.WhenTargeted, false, false)]
+    [InlineData(SceneDescriptionDisplay.WhenTargeted, true, true)]
+    [InlineData(SceneDescriptionDisplay.AlwaysNearby, false, true)]
+    [InlineData(SceneDescriptionDisplay.AlwaysNearby, true, true)]
+    [InlineData(SceneDescriptionDisplay.OnInteraction, false, false)]
+    [InlineData(SceneDescriptionDisplay.OnInteraction, true, false)]
+    public void DisplayModeControlsFloatingDescription(SceneDescriptionDisplay display, bool targeted, bool visible)
+    {
+        var data = new SceneDescriptionData { Display = display, Body = "A quiet clearing." };
+        data.ShouldShowDescription(targeted).Should().Be(visible);
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        SceneDescriptionData.ReadFrom(tree).Display.Should().Be(display);
+    }
+
+    [Fact]
+    public void InvalidAndMissingDisplayModesDefaultToTargeted()
+    {
+        new SceneDescriptionData { Display = (SceneDescriptionDisplay)500 }.Normalize().Display
+            .Should().Be(SceneDescriptionDisplay.WhenTargeted);
+        SceneDescriptionData.ReadFrom(new TreeAttribute()).Display.Should().Be(SceneDescriptionDisplay.WhenTargeted);
+    }
+
+    [Fact]
+    public void InspectorPreviewEscapesMarkupAndLimitsDisplayedText()
+    {
+        SceneDescriptionFormatter.InspectorPreview("<tag>\nHello").Should().Be("&lt;tag&gt; Hello");
+        SceneDescriptionFormatter.InspectorPreview(new string('a', 200)).Should().HaveLength(180).And.EndWith("...");
+    }
+
+    [Fact]
+    public void FloatingPreviewBoundsLongAndMultilineTextWithoutChangingTheBody()
+    {
+        var data = new SceneDescriptionData { Body = string.Join("\n", Enumerable.Repeat("line", 100)) };
+        SceneDescriptionFormatter.FloatingPreview(data.Body).Split('\n').Should().HaveCount(12);
+        data.Body.Split('\n').Should().HaveCount(100);
+        SceneDescriptionFormatter.FloatingPreview(new string('x', 1000)).Should().HaveLength(603).And.EndWith("...");
+    }
     [Fact]
     public void Normalize_CanonicalizesTextAndInvalidKind()
     {
@@ -58,7 +97,7 @@ public class SceneDescriptionDataTests
     }
 
     [Fact]
-    public void Formatter_EscapesPlayerTextAndStylesEnvironmentalNarration()
+    public void Formatter_EscapesPlayerTextWithUnifiedPresentation()
     {
         var formatted = SceneDescriptionFormatter.ToVtml(new SceneDescriptionData
         {
@@ -66,7 +105,7 @@ public class SceneDescriptionDataTests
             Body = "A <script> turns.\nDust hangs here.",
         });
 
-        formatted.Should().Be("<strong>&lt;b&gt;Old Mill&lt;/b&gt;</strong><br><i>A &lt;script&gt; turns.<br>Dust hangs here.</i>");
+        formatted.Should().Be("<strong>&lt;b&gt;Old Mill&lt;/b&gt;</strong><br>A &lt;script&gt; turns.<br>Dust hangs here.");
     }
 
     [Fact]
@@ -77,10 +116,9 @@ public class SceneDescriptionDataTests
             {
                 Body = "Scene paused <until tomorrow>.",
                 Kind = SceneDescriptionKind.OocNotice,
-            },
-            "[OOC]");
+            });
 
-        formatted.Should().StartWith("<strong>[OOC]</strong> ");
+        formatted.Should().NotContain("[OOC]");
         formatted.Should().Contain("Scene paused &lt;until tomorrow&gt;.");
         formatted.Should().NotContain("<i>");
     }

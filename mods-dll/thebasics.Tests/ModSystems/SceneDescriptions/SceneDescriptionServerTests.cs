@@ -126,11 +126,13 @@ public class SceneDescriptionServerTests
         {
             Body = "New appearance", Appearance = (int)SceneMarkerAppearance.Hybrid,
             Symbol = (int)SceneMarkerSymbol.Information, IconDistance = 80, UnlimitedIconDistance = true,
+            Display = (int)SceneDescriptionDisplay.OnInteraction,
         }));
         marker.Data.Symbol.Should().Be(expected);
         marker.Data.Appearance.Should().Be(SceneMarkerAppearance.Billboard);
         marker.Data.AuthorUid.Should().Be("creator");
         marker.Data.IsLocked.Should().Be(locked);
+        marker.Data.Display.Should().Be(!locked && claim ? SceneDescriptionDisplay.OnInteraction : SceneDescriptionDisplay.WhenTargeted);
         if (!locked && claim)
         {
             marker.Data.Symbol.Should().Be(SceneMarkerSymbol.Information);

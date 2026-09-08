@@ -21,4 +21,5 @@ public sealed class SceneDescriptionEditPacket
     [ProtoMember(8)] public bool IsLocked { get; set; }
     [ProtoMember(9)] public bool CanManageLock { get; set; }
     [ProtoMember(10)] public bool LockAfterSave { get; set; }
+    [ProtoMember(11)] public int Display { get; set; }
 }

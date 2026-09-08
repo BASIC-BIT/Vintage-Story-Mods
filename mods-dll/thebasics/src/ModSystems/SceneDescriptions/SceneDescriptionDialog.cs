@@ -72,11 +72,12 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var kindBounds = ElementBounds.Fixed(0, top + 90, 220, 30);
         var bodyLabelBounds = ElementBounds.Fixed(0, top + 132, DialogWidth - 20, 22);
         var textAreaBounds = ElementBounds.Fixed(0, top + 156, DialogWidth - 20, BodyHeight);
-        var kindValues = new[] { "environmental", "ooc" };
+        var kindValues = new[] { "targeted", "nearby", "interaction" };
         var kindNames = new[]
         {
-            Lang.Get("thebasics:scene-description-kind-environmental"),
-            Lang.Get("thebasics:scene-description-kind-ooc"),
+            Lang.Get("thebasics:scene-display-targeted"),
+            Lang.Get("thebasics:scene-display-nearby"),
+            Lang.Get("thebasics:scene-display-interaction"),
         };
 
         SingleComposer = capi.Gui.CreateCompo("thebasics-scene-description", dialogBounds)
@@ -85,8 +86,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .BeginChildElements(bodyBounds)
             .AddStaticText(Lang.Get("thebasics:scene-description-title-label"), CairoFont.WhiteSmallText(), titleLabelBounds)
             .AddTextInput(titleInputBounds, null, CairoFont.TextInput(), "title")
-            .AddStaticText(Lang.Get("thebasics:scene-description-kind-label"), CairoFont.WhiteSmallText(), kindLabelBounds)
-            .AddDropDown(kindValues, kindNames, data.Kind == SceneDescriptionKind.OocNotice ? 1 : 0, null, kindBounds, "kind")
+            .AddStaticText(Lang.Get("thebasics:scene-display-label"), CairoFont.WhiteSmallText(), kindLabelBounds)
+            .AddDropDown(kindValues, kindNames, (int)data.Display, null, kindBounds, "kind")
             .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
             .AddTextArea(textAreaBounds, null, CairoFont.TextInput(), "body")
             .AddDynamicCustomDraw(ElementBounds.Fixed(530, top + 12, 260, 200), DrawPreview, "preview")
@@ -176,9 +177,12 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             UnlimitedIconDistance = _appearance.UnlimitedIconDistance,
             Title = SingleComposer.GetTextInput("title").GetText(),
             Body = SingleComposer.GetTextArea("body").GetText(),
-            Kind = SingleComposer.GetDropDown("kind").SelectedValue == "ooc"
-                ? SceneDescriptionKind.OocNotice
-                : SceneDescriptionKind.Environmental,
+            Display = SingleComposer.GetDropDown("kind").SelectedValue switch
+            {
+                "nearby" => SceneDescriptionDisplay.AlwaysNearby,
+                "interaction" => SceneDescriptionDisplay.OnInteraction,
+                _ => SceneDescriptionDisplay.WhenTargeted,
+            },
         }.Normalize();
 
         _closing = true;

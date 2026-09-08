@@ -68,9 +68,9 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 
 6. **Scene Markers** (P1)
    - Config: default production-like config; two players, with one location inside a claim the second player cannot build in.
-   - Do: Craft a marker from two loose stones. Place one on the ground and one on a wall. Shift-right-click a marker, save titled environmental text with multiple lines, and look away and back. Change it to an OOC notice. Break it, inspect and read the held item, place it again, then attempt to edit it as the player without claim access.
-   - Expect: Both placements use a small unobtrusive marker. Text appears only while directly targeting it. Environmental and OOC presentations are visibly distinct. Title, body, presentation, and author metadata survive pickup and replacement. The unauthorized edit is refused.
-   - Watch for: literal text drawn on the block, always-visible clutter, dropped data loss, raw VTML, wrong wall orientation, duplicate or empty drops, claim bypass, or client/server exceptions.
+   - Do: Craft a marker from two loose stones. Place one on the ground and one on a wall. Shift-right-click to save a title and multiline description. Compare When targeted, Always nearby, and On interaction while aiming, looking away, and walking beyond the configured range. Right-click to read each mode, including as a claim visitor. Pick up and replace the marker, then attempt an unauthorized edit.
+   - Expect: The symbol bobs gently. Floating text appears only when targeted, throughout the nearby range, or never, respectively. Nearby text shares the symbol fade. Right-click always opens the complete description; the top-middle inspector shows a short preview. Content, display mode, and author metadata survive replacement. Unauthorized edits are refused.
+   - Watch for: text clipping or disappearing at steep camera angles, unreadable long descriptions, raw VTML, lost metadata, duplicate drops, claim bypass, or client/server exceptions.
 
    **Scene-marker UI lock follow-up** (P0, same batch):
    - Setup: Player A creates a marker; B has claim build access; C has `controlserver` and claim access.

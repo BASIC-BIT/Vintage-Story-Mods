@@ -6,7 +6,6 @@ namespace thebasics.ModSystems.SceneDescriptions;
 public sealed class SceneDescriptionSystem : ModSystem
 {
     private ICoreClientAPI _clientApi;
-    private SceneDescriptionRenderer _renderer;
     private SceneMarkerIconRenderer _iconRenderer;
 
     internal void Register(SceneDescriptionBlockEntity marker) => _iconRenderer?.Register(marker);
@@ -21,25 +20,16 @@ public sealed class SceneDescriptionSystem : ModSystem
     public override void StartClientSide(ICoreClientAPI api)
     {
         _clientApi = api;
-        _renderer = new SceneDescriptionRenderer(api);
-        api.Event.RegisterRenderer(_renderer, EnumRenderStage.Ortho, "thebasics-scene-descriptions");
         _iconRenderer = new SceneMarkerIconRenderer(api);
         api.Event.RegisterRenderer(_iconRenderer, EnumRenderStage.Opaque, "thebasics-scene-icons");
     }
 
     public override void Dispose()
     {
-        if (_clientApi != null && _renderer != null)
-        {
-            _clientApi.Event.UnregisterRenderer(_renderer, EnumRenderStage.Ortho);
-        }
-
-        _renderer?.Dispose();
         if (_clientApi != null && _iconRenderer != null)
             _clientApi.Event.UnregisterRenderer(_iconRenderer, EnumRenderStage.Opaque);
         _iconRenderer?.Dispose();
         _iconRenderer = null;
-        _renderer = null;
         _clientApi = null;
         base.Dispose();
     }

@@ -25,6 +25,7 @@ public sealed class SceneDescriptionBlock : BlockSign
         base.OnLoaded(api);
         _interactions =
         [
+            new WorldInteraction { ActionLangCode = "thebasics:scene-read", MouseButton = EnumMouseButton.Right },
             new WorldInteraction
             {
                 ActionLangCode = "thebasics:scene-description-edit-help",
@@ -47,11 +48,18 @@ public sealed class SceneDescriptionBlock : BlockSign
 
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSelection)
     {
-        if (byPlayer?.Entity?.Controls?.ShiftKey == true && world.BlockAccessor.GetBlockEntity(blockSelection.Position) is SceneDescriptionBlockEntity blockEntity)
+        if (world.BlockAccessor.GetBlockEntity(blockSelection.Position) is SceneDescriptionBlockEntity blockEntity)
         {
-            if (world.Side == EnumAppSide.Server)
+            if (byPlayer?.Entity?.Controls?.ShiftKey == true)
             {
-                blockEntity.OpenEditor(byPlayer);
+                if (world.Side == EnumAppSide.Server) blockEntity.OpenEditor(byPlayer);
+            }
+            else if (api is ICoreClientAPI client)
+            {
+                var stack = CreateStackFromPlacedBlock(world, blockSelection.Position);
+                stack.Attributes.SetString("title", blockEntity.Data.Title);
+                stack.Attributes.SetString("text", VtmlUtils.EscapeVtml(blockEntity.Data.Body));
+                new GuiDialogReadonlyBook(stack, client).TryOpen();
             }
 
             return true;
@@ -147,9 +155,6 @@ public sealed class SceneDescriptionBlock : BlockSign
             return;
         }
 
-        description.AppendLine(data.Kind == SceneDescriptionKind.OocNotice
-            ? Lang.Get("thebasics:scene-description-kind-ooc")
-            : Lang.Get("thebasics:scene-description-kind-environmental"));
         if (!string.IsNullOrWhiteSpace(data.AuthorName))
         {
             description.AppendLine(Lang.Get("thebasics:scene-description-authored-by", data.AuthorName));

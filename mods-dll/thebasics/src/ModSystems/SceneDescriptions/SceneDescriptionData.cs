@@ -9,6 +9,8 @@ public enum SceneDescriptionKind
     OocNotice,
 }
 
+public enum SceneDescriptionDisplay { WhenTargeted, AlwaysNearby, OnInteraction }
+
 public enum SceneMarkerAppearance { Stone, Model, Billboard, Hybrid }
 public enum SceneMarkerSymbol { Exclamation, Question, Information }
 
@@ -29,6 +31,7 @@ public sealed class SceneDescriptionData
     public string Body { get; set; } = string.Empty;
 
     public SceneDescriptionKind Kind { get; set; } = SceneDescriptionKind.Environmental;
+    public SceneDescriptionDisplay Display { get; set; }
 
     public string AuthorUid { get; set; } = string.Empty;
 
@@ -48,6 +51,9 @@ public sealed class SceneDescriptionData
         // Fade through the outer quarter of the configured radius.
         return (float)Math.Clamp((IconDistance - distance) / (IconDistance * 0.25), 0, 1);
     }
+
+    public bool ShouldShowDescription(bool targeted) => !string.IsNullOrWhiteSpace(Body) &&
+        (Display == SceneDescriptionDisplay.AlwaysNearby || (Display == SceneDescriptionDisplay.WhenTargeted && targeted));
 
     public bool IsLocked => !string.IsNullOrWhiteSpace(LockItemCode);
 
@@ -80,6 +86,7 @@ public sealed class SceneDescriptionData
         Title = edited.Title;
         Body = edited.Body;
         Kind = edited.Kind;
+        Display = edited.Display;
         Appearance = edited.Appearance;
         Symbol = edited.Symbol;
         IconDistance = edited.IconDistance;
@@ -96,6 +103,7 @@ public sealed class SceneDescriptionData
         LockItemCode = NormalizeText(LockItemCode, 256, singleLine: true);
         // Retired experimental modes migrate to the billboard without changing content or ownership.
         Appearance = SceneMarkerAppearance.Billboard;
+        if (!Enum.IsDefined(Display)) Display = SceneDescriptionDisplay.WhenTargeted;
         if (!Enum.IsDefined(Symbol)) Symbol = SceneMarkerSymbol.Exclamation;
         IconDistance = float.IsFinite(IconDistance) ? Math.Clamp(IconDistance, 1, 1024) : 24;
 
@@ -114,6 +122,7 @@ public sealed class SceneDescriptionData
             Title = Title,
             Body = Body,
             Kind = Kind,
+            Display = Display,
             AuthorUid = AuthorUid,
             AuthorName = AuthorName,
             LockItemCode = LockItemCode,
@@ -130,6 +139,7 @@ public sealed class SceneDescriptionData
         attributes.SetString(TitleAttribute, Title);
         attributes.SetString(BodyAttribute, Body);
         attributes.SetInt(KindAttribute, (int)Kind);
+        attributes.SetInt("sceneDisplay", (int)Display);
         attributes.SetString(AuthorUidAttribute, AuthorUid);
         attributes.SetString(AuthorNameAttribute, AuthorName);
         attributes.SetString(LockItemAttribute, LockItemCode);
@@ -150,6 +160,7 @@ public sealed class SceneDescriptionData
         {
             Title = attributes.GetString(TitleAttribute, string.Empty),
             Body = attributes.GetString(BodyAttribute, string.Empty),
+            Display = (SceneDescriptionDisplay)attributes.GetInt("sceneDisplay"),
             Kind = (SceneDescriptionKind)attributes.GetInt(KindAttribute, (int)SceneDescriptionKind.Environmental),
             AuthorUid = attributes.GetString(AuthorUidAttribute, string.Empty),
             AuthorName = attributes.GetString(AuthorNameAttribute, string.Empty),

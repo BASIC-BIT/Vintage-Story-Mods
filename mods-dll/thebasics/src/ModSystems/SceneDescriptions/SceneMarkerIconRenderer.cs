@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using thebasics.ModSystems.ChatUiSystem;
+using Vintagestory.API.Config;
 using Cairo;
 using Vintagestory.API.Client;
 using Vintagestory.API.MathTools;
@@ -8,10 +11,14 @@ namespace thebasics.ModSystems.SceneDescriptions;
 
 internal sealed class SceneMarkerIconRenderer : IRenderer
 {
+    private const float MaxDescriptionHeight = 6;
+    private const double DescriptionCullRadius = MaxDescriptionHeight + 2;
     private readonly ICoreClientAPI _api;
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
     private readonly Dictionary<SceneMarkerSymbol, LoadedTexture> _icons = new();
-    private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, double Distance)> _visible = new();
+    private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, double Depth)> _visible = new();
+    private readonly Dictionary<SceneDescriptionBlockEntity, (SceneDescriptionData Data, LoadedTexture Texture)> _descriptions = new();
+    private readonly HashSet<SceneDescriptionBlockEntity> _shownDescriptions = new();
     private readonly Matrixf _model = new();
     private MeshRef _quad;
 
@@ -19,7 +26,16 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     public double RenderOrder => 1.11; // After terrain and vanilla sign rendering.
     public int RenderRange => int.MaxValue;
     internal void Register(SceneDescriptionBlockEntity marker) => _markers.Add(marker);
-    internal void Unregister(SceneDescriptionBlockEntity marker) => _markers.Remove(marker);
+    internal void Unregister(SceneDescriptionBlockEntity marker)
+    {
+        _markers.Remove(marker);
+        RemoveDescription(marker);
+    }
+
+    private void RemoveDescription(SceneDescriptionBlockEntity marker)
+    {
+        if (_descriptions.Remove(marker, out var entry)) entry.Texture?.Dispose();
+    }
 
     public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
     {
@@ -27,9 +43,14 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         if (stage != EnumRenderStage.Opaque || player == null || _markers.Count == 0) return;
         var render = _api.Render;
         GatherVisibleIcons();
-        if (_visible.Count == 0) return;
+        _shownDescriptions.Clear();
+        if (_visible.Count == 0)
+        {
+            foreach (var marker in _descriptions.Keys.ToArray()) RemoveDescription(marker);
+            return;
+        }
         // Transparent symbols must blend back-to-front because they do not write terrain depth.
-        _visible.Sort((left, right) => right.Distance.CompareTo(left.Distance));
+        _visible.Sort((left, right) => right.Depth.CompareTo(left.Depth));
         var previousShader = render.CurrentActiveShader;
         previousShader?.Stop();
         try
@@ -38,7 +59,28 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             render.GLDepthMask(false);
             render.GlDisableCullFace();
             render.GlToggleBlend(true, EnumBlendMode.Standard);
-            foreach (var icon in _visible) RenderIcon(icon.Marker, icon.Position, icon.Opacity);
+            foreach (var icon in _visible)
+            {
+                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data.Symbol), icon.Position, icon.Opacity, 0.8f, 0.8f);
+                var targeted = _api.World.Player.CurrentBlockSelection?.Position?.Equals(icon.Marker.Pos) == true;
+                if (!icon.Marker.Data.ShouldShowDescription(targeted)) continue;
+                var text = GetDescription(icon.Marker);
+                if (text == null) continue;
+                var width = (float)Math.Min(3, _api.World.Player.Entity.CameraPos.DistanceTo(icon.Position) * 0.45);
+                var height = width * text.Height / text.Width;
+                if (height > MaxDescriptionHeight)
+                {
+                    width *= MaxDescriptionHeight / height;
+                    height = MaxDescriptionHeight;
+                }
+                var view = render.CameraMatrixOriginf;
+                var offset = 0.5 + height / 2;
+                var textPosition = icon.Position.AddCopy(view[1] * offset, view[5] * offset, view[9] * offset);
+                var textOpacity = icon.Marker.Data.Display == SceneDescriptionDisplay.WhenTargeted ? 1 : icon.Opacity;
+                RenderQuad(icon.Marker, text, textPosition, textOpacity, width, height);
+            }
+            foreach (var marker in _descriptions.Keys.ToArray())
+                if (!_shownDescriptions.Contains(marker)) RemoveDescription(marker);
         }
         finally
         {
@@ -62,12 +104,18 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             var opacity = marker.Data.GetIconOpacity(player.Pos.XYZ.DistanceTo(position));
             // Four-second cycle, only five centimetres either side of the resting height.
             position.Y += 0.05 * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / 4000));
-            if (opacity <= 0 || !render.DefaultFrustumCuller.SphereInFrustum(position.X, position.Y, position.Z, 1)) continue;
-            _visible.Add((marker, position, opacity, player.CameraPos.SquareDistanceTo(position)));
+            var selected = _api.World.Player.CurrentBlockSelection?.Position?.Equals(marker.Pos) == true;
+            var targeted = selected && marker.Data.Display == SceneDescriptionDisplay.WhenTargeted && marker.Data.ShouldShowDescription(true);
+            var radius = marker.Data.ShouldShowDescription(selected) ? DescriptionCullRadius : 1;
+            if ((opacity <= 0 && !targeted) || !render.DefaultFrustumCuller.SphereInFrustum(position.X, position.Y, position.Z, radius)) continue;
+            var camera = player.CameraPos;
+            var view = render.CameraMatrixOriginf;
+            var depth = -(view[2] * (position.X - camera.X) + view[6] * (position.Y - camera.Y) + view[10] * (position.Z - camera.Z));
+            _visible.Add((marker, position, opacity, depth));
         }
     }
 
-    private void RenderIcon(SceneDescriptionBlockEntity marker, Vec3d position, float opacity)
+    private void RenderQuad(SceneDescriptionBlockEntity marker, LoadedTexture texture, Vec3d position, float opacity, float width, float height)
     {
         var render = _api.Render;
         if (_quad == null)
@@ -78,13 +126,12 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             Array.Fill(mesh.Rgba, byte.MaxValue);
             _quad = render.UploadMesh(mesh);
         }
-        var icon = GetIcon(marker.Data.Symbol);
         var camera = _api.World.Player.Entity.CameraPos;
         var view = render.CameraMatrixOriginf;
         var model = _model.Identity().Values;
         // Inverse view rotation: the quad faces the camera at every pitch and yaw.
-        model[0] = view[0] * 0.4f; model[1] = view[4] * 0.4f; model[2] = view[8] * 0.4f;
-        model[4] = view[1] * 0.4f; model[5] = view[5] * 0.4f; model[6] = view[9] * 0.4f;
+        model[0] = view[0] * width / 2; model[1] = view[4] * width / 2; model[2] = view[8] * width / 2;
+        model[4] = view[1] * height / 2; model[5] = view[5] * height / 2; model[6] = view[9] * height / 2;
         model[8] = view[2]; model[9] = view[6]; model[10] = view[10];
         model[12] = (float)(position.X - camera.X);
         model[13] = (float)(position.Y - camera.Y);
@@ -94,7 +141,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         shader.ViewMatrix = view;
         shader.ProjectionMatrix = render.CurrentProjectionMatrix;
         shader.ModelMatrix = model;
-        shader.Tex2D = icon.TextureId;
+        shader.Tex2D = texture.TextureId;
         shader.NormalShaded = 0;
         shader.AlphaTest = 0.001f;
         // Straight-alpha blending also fades the standard shader's fog contribution.
@@ -107,6 +154,21 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         {
             shader.Stop();
         }
+    }
+
+    private LoadedTexture GetDescription(SceneDescriptionBlockEntity marker)
+    {
+        _shownDescriptions.Add(marker);
+        if (_descriptions.TryGetValue(marker, out var entry) && ReferenceEquals(entry.Data, marker.Data)) return entry.Texture;
+        RemoveDescription(marker);
+        var data = marker.Data.Clone();
+        data.Body = SceneDescriptionFormatter.FloatingPreview(data.Body);
+        var background = new TextBackground { FillColor = new[] { 0.08, 0.10, 0.14, 1.0 }, Padding = 8,
+            Radius = 4, BorderWidth = 1, BorderColor = new[] { 0.65, 0.69, 0.75, 1.0 } };
+        var font = new CairoFont(24, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble) { Orientation = EnumTextOrientation.Left };
+        var texture = RichTextTextureUtils.GenRichTextTexture(_api, SceneDescriptionFormatter.ToVtml(data), font, 360, background);
+        _descriptions[marker] = (marker.Data, texture);
+        return texture;
     }
 
     private LoadedTexture GetIcon(SceneMarkerSymbol symbol)
@@ -127,6 +189,9 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         _quad = null;
         foreach (var icon in _icons.Values) icon.Dispose();
         _icons.Clear();
+        foreach (var entry in _descriptions.Values) entry.Texture?.Dispose();
+        _descriptions.Clear();
+        _shownDescriptions.Clear();
         _markers.Clear();
         _visible.Clear();
     }

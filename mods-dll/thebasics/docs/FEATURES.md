@@ -192,11 +192,11 @@ Features:
 - Durable roleplay descriptions attached to a small physical marker, rather than literal writing rendered on a sign face.
 - A shapeless two-loose-stone recipe with no ink requirement.
 - Ground and wall placement using the same familiar placement behavior as signs.
-- Environmental narration and visibly distinct OOC notice presentations.
-- Description overlays appear only while a player deliberately targets the marker, avoiding persistent world-text clutter.
-- Shift-right-click editing with normal land-claim build permissions.
+- One consistent description style, with per-marker controls for when floating text appears.
+- Existing descriptions default to When targeted; On interaction relies on the inspector preview and full right-click reader.
+- Plain right-click reads the complete description in every display mode; Shift-right-click edits with normal land-claim build permissions. The inspector shows the title and a short preview.
 - Symbol picker with a live preview: camera-facing exclamation, question, and information billboards. Symbols gently bob by 0.05 blocks on a four-second cycle. Earlier experimental appearances automatically display as billboards.
-- Billboard distance is saved per marker (1-1024 blocks, default 24), with an Unlimited option bounded by loaded terrain. Icons fade through the outer quarter of the chosen distance and are obscured by walls. The description still appears only while targeted.
+- Billboard distance is saved per marker (1-1024 blocks, default 24), with an Unlimited option bounded by loaded terrain. Icons fade through the outer quarter of the chosen distance and are obscured by walls. Choose When targeted (default), Always nearby (same range/fade as the icon), or On interaction (no floating description). Long floating text is a bounded preview; the reader retains the full text.
 - Title, body, presentation, and author metadata persist in the world and on the dropped item when the marker is broken and placed again.
 - Shift-right-click reading while holding a written marker.
 - Creator-owned UI locks: Save & lock saves the creator's edits and locks the marker in one action, without an item. Locked markers open read-only.
