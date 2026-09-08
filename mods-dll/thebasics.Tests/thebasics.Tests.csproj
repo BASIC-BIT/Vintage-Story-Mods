@@ -43,6 +43,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\thebasics\thebasics.csproj" />
+    <ProjectReference Include="..\..\tools\GuiPreview\GuiPreview.csproj" />
   </ItemGroup>
 
   <!-- VS game DLLs needed for interface types used in tests.
