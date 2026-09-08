@@ -605,6 +605,11 @@ namespace thebasics.Configs
         [ProtoMember(149)]
         public int SpeechOcclusionWallPenaltyBlocks { get; set; }
 
+        /// <summary>Allow public scene rolls and self-only private rolls.</summary>
+        [ProtoMember(155)]
+        [DefaultValue(true)]
+        public bool EnableDiceRolling { get; set; } = true;
+
         [ProtoMember(17)]
         public IDictionary<ProximityChatMode, string> ProximityChatModePunctuation { get; set; }
 

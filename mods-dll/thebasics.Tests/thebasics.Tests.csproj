@@ -70,6 +70,13 @@
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
   </ItemGroup>
 
+  <!-- Real Harmony dispatch tests need the game-bundled patch runtime dependencies. -->
+  <ItemGroup>
+    <Reference Include="$(VINTAGE_STORY)\Lib\Mono.Cecil*.dll;$(VINTAGE_STORY)\Lib\MonoMod.*.dll">
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+
   <!-- Native SkiaSharp dependency must sit next to the managed assembly at runtime. -->
   <ItemGroup>
     <Content Include="$(VINTAGE_STORY)\Lib\libSkiaSharp.dll" Condition="Exists('$(VINTAGE_STORY)\Lib\libSkiaSharp.dll')">

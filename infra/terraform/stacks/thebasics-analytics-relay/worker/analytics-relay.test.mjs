@@ -31,6 +31,7 @@ const knownDynamicExpressions = new Set([
   "nameError.ErrorCode",
   "normalizedResultCode",
   "languageOperation",
+  "outcome",
   "result",
   "result.ErrorCode ?? \"warmup_failed\"",
   "surface",
@@ -275,6 +276,7 @@ function currentProducerContracts() {
       "enter_whisper", "enter_yell",
     ]),
     result: new Set([
+      "help", "disabled", "invalid_input", "rate_limited", "permission_denied",
       "back_expired", "back_not_set", "failure", "home-name-invalid",
       "home-name-required", "home-name-too-long", "player-required", "success",
       "teleport-unavailable", "teleport-warmup-active", "thebasics:chat-gooc-disabled",
@@ -867,3 +869,23 @@ function captureLogs() {
 function lastLog() {
   return JSON.parse(logLines.at(-1));
 }
+
+test("dice telemetry accepts bounded adoption data and canonical command outcomes", () => {
+  for (const command_name of ["roll", "proll"]) {
+    for (const result of ["success", "help", "disabled", "invalid_input", "rate_limited", "failure", "permission_denied"]) {
+      assertAccepted(validatePayload(payloadForEvent("command used", { command_name, success: result === "success", result })), command_name + result);
+    }
+  }
+  assertAccepted(validatePayload(payloadForEvent("feature used", {
+    feature_name: "dice", action: "send", success: true, result: "success",
+    chat_type: "whisper", dice_complexity: "advanced", dice_explode: true,
+    dice_reroll: true, dice_keep_drop: true, dice_success_pool: true,
+    dice_arithmetic: false, dice_helpers: false
+  })), "public dice adoption");
+  for (const key of ["expression", "reason", "faces", "roll_result"]) {
+    const checked = validatePayload(payloadForEvent("feature used", { feature_name: "dice", [key]: "private data" }));
+    assert.ok(checked.rejected.includes("unknown_property"), key);
+  }
+  const arbitrary = validatePayload(payloadForEvent("feature used", { feature_name: "dice", dice_complexity: "secret reason" }));
+  assert.ok(arbitrary.rejected.length > 0);
+});

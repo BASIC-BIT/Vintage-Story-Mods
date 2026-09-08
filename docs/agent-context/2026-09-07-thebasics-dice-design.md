@@ -1,6 +1,6 @@
 # The BASICs dice design interview
 
-Status: Q1-Q13 accepted. Consolidated design awaits final owner review; no implementation approval. See [design](../superpowers/specs/2026-09-08-thebasics-dice-design.md).
+Status: Q1-Q13 accepted. The owner authorized implementation, PR creation, and iteration until merge-ready; implementation is underway. The dated implementation plan supersedes this interview packet for current work. See [design](../superpowers/specs/2026-09-08-thebasics-dice-design.md).
 
 ## Objective and confirmed scope
 
@@ -49,3 +49,6 @@ Maintain a glossary in CONTEXT.md as terminology is agreed. Create ADRs only for
 ## Verification and retirement
 
 Before implementation, recheck the latest relevant source and record an agreed design plus verification plan. This packet retires when the owner confirms shared understanding and a successor implementation handoff supersedes it.
+
+
+Implementation visual refinement accepted: the owner requires a real wireframe die icon with the side count centered inside, not a rectangular badge. Put (W)/(Y) before the icon in bubbles and before the message in chat. Other expressions retain the generic wireframe icon plus result.

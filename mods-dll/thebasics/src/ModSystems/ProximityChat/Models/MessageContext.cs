@@ -70,6 +70,7 @@ public class MessageContext
         Metadata[key] = value;
     }
 
+    public static readonly string IS_ROLL = "isRoll";
     public static readonly string IS_OOC = "isOOC";
     public static readonly string IS_ENVIRONMENTAL = "isEnvironmental";
     public static readonly string IS_PLAYER_CHAT = "isPlayerChat";
