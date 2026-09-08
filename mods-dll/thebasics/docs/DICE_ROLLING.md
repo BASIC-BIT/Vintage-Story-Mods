@@ -31,13 +31,13 @@ Add a reason naturally when unambiguous, such as /r d20 climbing, or separate it
 
 Chat includes the expression, result, reason, and face breakdown. A plain dN expression gets a numbered die icon beside its result in the overhead bubble; other expressions get a wireframe die and total or success count. Private rolls and active spectators produce no entity-attached roll cue. Existing bubble mode, lifetime, visibility and line-of-sight rules still apply.
 
-Limits are 512 input characters, 256 parser tokens, 32 recursive parsing levels, 100 drawn dice including replacements/explosions, 1,000,000 sides, 2,048 evaluation work steps, and 4,096 breakdown characters. Each account can attempt five rolls per ten seconds. An exceeded limit reports an error without publishing a partial result.
+Limits are 512 input characters, 256 parser tokens, 32 recursive parsing levels, 100 drawn dice including replacements/explosions, 1,000,000 sides, 2,048 evaluation work steps, and 4,096 breakdown characters, and 1,900 characters in the complete rendered result including name and reason. This prevents truncation by the Discord bridge. Each account can attempt five rolls per ten seconds. An exceeded limit reports an error without publishing a partial result.
 
 ## Server settings and compatibility
 
 EnableDiceRolling defaults to true and controls public and private commands independently of OOC settings.
 
-Public results use the existing EnableTh3EssentialsDiscordRelay setting. A Discord relay makes a scene roll visible to that Discord destination regardless of its in-game range. There is one completed result and one relay event, with no reroll for Discord. Delivery still depends on the installed Th3Essentials bridge and Discord configuration.
+Public results use the existing EnableTh3EssentialsDiscordRelay setting. A Discord relay makes a scene roll visible to that Discord destination regardless of its in-game range. There is one completed result and one relay event, with no reroll for Discord. Roll output neutralizes Discord mention syntax. Delivery still depends on the installed Th3Essentials bridge and Discord configuration.
 
 Aggregate public telemetry reports only bounded mechanics, complexity and mode. Private rolls report normal command usage only. The updated analytics relay contract is revision 6; deploying that schema is a separate operational step.
 

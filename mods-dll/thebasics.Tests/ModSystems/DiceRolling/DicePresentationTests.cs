@@ -44,3 +44,19 @@ public class DicePresentationTests
         else Assert.StartsWith(prefix, data);
     }
 }
+
+public class DiceRelayPresentationTests
+{
+    [Fact]
+    public void RollRelayPreservesMarkerAndResultWithoutCreatingDiscordMentions()
+    {
+        var result = DiceEvaluator.EvaluateInput("d20 # <@123456789012345678> <@&123456789012345678> @everyone", _ => 12);
+        var rendered = DicePresentation.Chat(result, "Alice", ProximityChatMode.Whisper, false);
+        var relay = thebasics.ModSystems.ProximityChat.Th3EssentialsDiscordRelay.FormatRelayMessage(rendered, suppressMentions: true);
+        Assert.StartsWith("(W) Alice rolled d20 = 12", relay);
+        Assert.DoesNotContain("<@123", relay, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("<@&123", relay, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("@everyone", relay, System.StringComparison.Ordinal);
+        Assert.Contains("123456789012345678", relay);
+    }
+}

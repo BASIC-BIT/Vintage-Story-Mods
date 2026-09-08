@@ -9,6 +9,8 @@ namespace thebasics.ModSystems.DiceRolling;
 
 internal static class DicePresentation
 {
+    internal const int MaxOutputLength = 1900;
+
     internal static string Marker(ProximityChatMode mode) => mode switch
     {
         ProximityChatMode.Whisper => "(W) ",
@@ -25,9 +27,14 @@ internal static class DicePresentation
     {
         var heading = isPrivate ? "[Private Roll] " : Marker(mode) + formattedName + " rolled ";
         var reason = string.IsNullOrWhiteSpace(result.Reason) ? "" : " (" + ChatHelper.EscapeMarkup(result.Reason) + ")";
-        return heading + ChatHelper.EscapeMarkup(result.Expression) + " = "
+        var rendered = heading + ChatHelper.EscapeMarkup(result.Expression) + " = "
             + Summary(result, ProximityChatMode.Normal) + reason
             + " [" + ChatHelper.EscapeMarkup(result.Breakdown) + "]";
+        // Th3Essentials batches at 1950 characters. Check the entire escaped/decoded envelope,
+        // including attribution, reason and mention neutralization, before any recipient sees it.
+        if (Th3EssentialsDiscordRelay.FormatRelayMessage(rendered, suppressMentions: true).Length > MaxOutputLength)
+            throw new DiceRollException("limit", "Roll output is too long. Use fewer dice or a shorter reason.");
+        return rendered;
     }
 
     internal static string Bubble(DiceRollResult result, IServerPlayer player, ProximityChatMode mode, ModConfig config, bool isPrivate)

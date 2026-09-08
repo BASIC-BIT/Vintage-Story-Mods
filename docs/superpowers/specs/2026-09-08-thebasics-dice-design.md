@@ -102,7 +102,7 @@ New event labels/properties need matching analytics-relay allowlist changes and 
 
 Accepted: enabled by default, existing chat privilege, one server toggle covering public/private rolls, independent of OOC toggles. Disabled attempts should receive useful feedback and normal analytics when enabled by consent.
 
-Accepted engineering approach: fixed conservative limits for input length, nesting, generated dice, evaluation work and output size, plus a small per-account burst guard. Keep these as straightforward implementation constants initially rather than a new configuration subsystem. Errors publish no partial result. Document actual chosen limits in command help and test their boundaries.
+Accepted engineering approach: fixed conservative limits for input length, nesting, generated dice, evaluation work and output size, plus a small per-account burst guard. Keep these as straightforward implementation constants initially rather than a new configuration subsystem. Errors publish no partial result. Document actual chosen limits in command help and test their boundaries. Implementation limits the complete decoded result to 1,900 characters, below the existing bridge's 1,950-character batch envelope; oversized results fail before any publication.
 
 Evaluation work must count zero-draw operations as well as generated dice. Bound parsing before evaluation. Reject divide-by-zero, overflow and unsupported trailing expression syntax explicitly.
 

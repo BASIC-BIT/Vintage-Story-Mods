@@ -97,7 +97,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void RelayProcessedMessageToTh3Essentials(object sender, ProximityChatMessageEventArgs args)
     {
-        _th3EssentialsDiscordRelay?.Relay(Config, args.RenderedMessage);
+        _th3EssentialsDiscordRelay?.Relay(Config, args.RenderedMessage, suppressMentions: args.Kind == ProximityChatMessageKind.Roll);
     }
 
     private void ApplyServerPatches()

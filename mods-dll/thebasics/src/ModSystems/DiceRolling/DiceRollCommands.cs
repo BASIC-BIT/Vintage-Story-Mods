@@ -22,7 +22,7 @@ internal sealed class DiceRollCommands : IDisposable
         + "Fixed order: explode, reroll, keep/drop, success count. Use # or // before an ambiguous reason. "
         + "Private aliases: /proll and /privateroll. "
         + "Limits: 512 input characters, 256 tokens, 32 nesting levels, 100 generated dice, 1,000,000 sides, "
-        + "2,048 evaluation steps, 4,096 breakdown characters; 5 attempts per 10 seconds. Private rolls are self-only.";
+        + "2,048 evaluation steps, 4,096 breakdown characters and 1,900 characters in the complete rendered result; 5 attempts per 10 seconds. Private rolls are self-only.";
     private readonly RPProximityChatSystem system;
     private readonly System.Func<string, DiceRollResult> evaluate;
     private readonly DiceAttemptGuard guard = new();

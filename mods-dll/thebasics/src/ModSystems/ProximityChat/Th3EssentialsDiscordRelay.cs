@@ -23,14 +23,14 @@ internal sealed class Th3EssentialsDiscordRelay
         _api = api;
     }
 
-    public void Relay(ModConfig config, string renderedMessage)
+    public void Relay(ModConfig config, string renderedMessage, bool suppressMentions = false)
     {
         if (config?.EnableTh3EssentialsDiscordRelay != true)
         {
             return;
         }
 
-        var discordMessage = FormatRelayMessage(renderedMessage);
+        var discordMessage = FormatRelayMessage(renderedMessage, suppressMentions);
         if (string.IsNullOrWhiteSpace(discordMessage))
         {
             return;
@@ -51,7 +51,7 @@ internal sealed class Th3EssentialsDiscordRelay
         }
     }
 
-    internal static string FormatRelayMessage(string renderedMessage)
+    internal static string FormatRelayMessage(string renderedMessage, bool suppressMentions = false)
     {
         if (string.IsNullOrWhiteSpace(renderedMessage))
         {
@@ -62,7 +62,7 @@ internal sealed class Th3EssentialsDiscordRelay
         plain = VtmlUtils.UnescapeVtml(plain).Trim();
         plain = EveryoneMentionRegex.Replace(plain, "@_everyone");
         plain = HereMentionRegex.Replace(plain, "@_here");
-        return plain;
+        return suppressMentions ? plain.Replace("@", "@\u200b") : plain;
     }
 
     internal bool TryEnqueue(object discord, string message)

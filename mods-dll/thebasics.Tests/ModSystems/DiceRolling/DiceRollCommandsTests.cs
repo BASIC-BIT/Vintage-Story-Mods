@@ -10,6 +10,25 @@ using Xunit;
 namespace thebasics.Tests.ModSystems.DiceRolling;
 public class DiceRollCommandsTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OversizedCompleteResultPublishesNothing(bool isPrivate)
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
+        var published = 0;
+        system.ProximityChatMessageProcessed += (_, _) => published++;
+        var player = new FakeServerPlayer();
+        var commands = new DiceRollCommands(system, input => DiceEvaluator.EvaluateInput(input, _ => 1000000));
+        var response = commands.Handle(new TextCommandCallingArgs { Caller = new Caller { Player = player },
+            RawArgs = new CmdArgs("50d1000000ro<=1000000") }, isPrivate);
+        Assert.Equal(EnumCommandStatus.Error, response.Status);
+        Assert.Empty(player.SentMessages);
+        Assert.Equal(0, published);
+        Assert.Contains("output", response.StatusMessage);
+    }
+
     [Fact]
     public void PrivateRollEvaluatesOnceAndNeverPublishes()
     {
