@@ -35,7 +35,7 @@ Limits are 512 input characters, 256 parser tokens, 32 recursive parsing levels,
 
 ## Server settings and compatibility
 
-EnableDiceRolling defaults to true and controls public and private commands independently of OOC settings.
+EnableDiceRolling defaults to true and controls public and private commands independently of OOC settings. If private-command audit protection cannot load, the server warns and leaves private commands unregistered; public rolls remain available. Active spectators use the existing spectator OOC name setting for public roll attribution.
 
 Public results use the existing EnableTh3EssentialsDiscordRelay setting. A Discord relay makes a scene roll visible to that Discord destination regardless of its in-game range. There is one completed result and one relay event, with no reroll for Discord. Roll output neutralizes Discord mention syntax. Delivery still depends on the installed Th3Essentials bridge and Discord configuration.
 

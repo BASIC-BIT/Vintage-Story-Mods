@@ -107,6 +107,63 @@ public class DicePublicDeliveryTests
             Assert.DoesNotContain("#ff0000", recipient.SentMessages[0].Message);
         }
     }
+    [Theory]
+    [InlineData(EnumGameMode.Spectator, EnumClientState.Playing, false, "AccountName")]
+    [InlineData(EnumGameMode.Spectator, EnumClientState.Playing, true, "CharacterName")]
+    [InlineData(EnumGameMode.Survival, EnumClientState.Playing, false, "CharacterName")]
+    [InlineData(EnumGameMode.Spectator, EnumClientState.Connected, false, "CharacterName")]
+    public void PublicRollIdentityHonorsActiveSpectatorPolicyAcrossDestinations(
+        EnumGameMode gameMode, EnumClientState connectionState, bool useSpectatorNickname, string expectedName)
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var config = new ModConfig
+        {
+            EnableChatHistory = true,
+            BoldNicknames = false,
+            ApplyColorsToNicknames = false,
+            ApplyColorsToPlayerNames = false,
+            UseNicknameInOOC = true,
+            UseNicknameInGlobalOOC = true,
+            UseNicknameInSpectatorOOC = useSpectatorNickname
+        };
+        var history = new ChatHistorySystem { API = api, Config = config };
+        api.ModLoader.GetModSystem<ChatHistorySystem>().Returns(history);
+        var system = new RPProximityChatSystem { API = api, Config = config };
+        var sender = Player("s", 0);
+        sender.PlayerName = "AccountName";
+        sender.SetNickname("CharacterName");
+        sender.WorldData = Substitute.For<IWorldPlayerData>();
+        sender.WorldData.CurrentGameMode.Returns(gameMode);
+        sender.ConnectionState = connectionState;
+        sender.SetChatMode(ProximityChatMode.Whisper);
+        sender.SetChatOverrideMode(ChatOverrideMode.GlobalOoc);
+        var recipient = Player("r", 0);
+        api.World.AllOnlinePlayers.Returns(new IPlayer[] { sender, recipient });
+        var events = new List<ProximityChatMessageEventArgs>();
+        system.ProximityChatMessageProcessed += (_, message) => events.Add(message);
+        var commands = new DiceRollCommands(system, input => DiceEvaluator.EvaluateInput(input, _ => 4));
+        var outcome = commands.Handle(new TextCommandCallingArgs
+        {
+            Caller = new Caller { Player = sender },
+            RawArgs = new CmdArgs("d6")
+        }, false);
+        Assert.Equal(EnumCommandStatus.Success, outcome.Status);
+        Assert.StartsWith("(W) " + expectedName + " rolled", Assert.Single(sender.SentMessages).Message);
+        Assert.StartsWith("(W) " + expectedName + " rolled", Assert.Single(recipient.SentMessages).Message);
+        var published = Assert.Single(events);
+        Assert.StartsWith("(W) " + expectedName + " rolled", published.PlainTextMessage);
+        var entries = (List<ChatHistoryEntry>)typeof(ChatHistorySystem)
+            .GetField("_pending", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(history)!;
+        var entry = Assert.Single(entries);
+        Assert.Equal(published.RenderedMessage, entry.FormattedMessage);
+        Assert.Equal("AccountName", entry.SenderPlayerName);
+        Assert.Equal("s", entry.SenderPlayerUid);
+        if (gameMode == EnumGameMode.Spectator && connectionState == EnumClientState.Playing)
+        {
+            Assert.Null(sender.SentMessages[0].Data);
+            Assert.Null(recipient.SentMessages[0].Data);
+        }
+    }
     private static FakeServerPlayer Player(string uid, int x)
     {
         var player = new FakeServerPlayer(uid) { Entity = new EntityPlayer() };

@@ -116,4 +116,25 @@ public class PrivateDiceCommandPatchTests
         Assert.Single(player.SentMessages);
         Assert.DoesNotContain("secret", player.SentMessages[0].Message);
     }
+    [Fact]
+    public void PatchInstallationFailureLeavesPublicCommandsAvailableWithoutPrivateHandlers()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        api.Side.Returns(EnumAppSide.Server);
+        var chat = new ChatCommandApi(api);
+        api.ChatCommands.Returns(chat);
+        chat.GetOrCreate("thebasics").RequiresPrivilege(Privilege.chat);
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
+        using var commands = new DiceRollCommands(system, createPrivatePatch: _ => throw new InvalidOperationException("patch failure details"));
+        commands.Register();
+        Assert.Null(chat.Get("proll"));
+        Assert.Null(chat.Get("privateroll"));
+        Assert.False(chat.Get("thebasics").AllSubcommands.ContainsKey("proll"));
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true, Entity = new EntityPlayer() };
+        api.World.AllOnlinePlayers.Returns(new IPlayer[] { player });
+        chat.Execute("r", player, 7, "d1");
+        Assert.Single(player.SentMessages);
+        Assert.Contains("1", player.SentMessages[0].Message);
+        Assert.Contains(api.Logger.ReceivedCalls(), call => call.GetMethodInfo().Name == "Warning");
+    }
 }

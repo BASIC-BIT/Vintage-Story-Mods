@@ -27,22 +27,30 @@ internal sealed class DiceRollCommands : IDisposable
     private readonly System.Func<string, DiceRollResult> evaluate;
     private readonly DiceAttemptGuard guard = new();
     private PrivateDiceCommandPatch privatePatch;
+    private readonly System.Func<IChatCommandApi, PrivateDiceCommandPatch> createPrivatePatch;
 
-    internal DiceRollCommands(RPProximityChatSystem system, System.Func<string, DiceRollResult> evaluate = null)
+    internal DiceRollCommands(RPProximityChatSystem system, System.Func<string, DiceRollResult> evaluate = null,
+        System.Func<IChatCommandApi, PrivateDiceCommandPatch> createPrivatePatch = null)
     {
         this.system = system;
+        this.createPrivatePatch = createPrivatePatch ?? (api => new PrivateDiceCommandPatch(api));
         this.evaluate = evaluate ?? (input => DiceEvaluator.EvaluateInput(input));
     }
 
     internal void Register()
     {
         // Install first: if the audit seam changes, no private command is exposed.
-        privatePatch = new PrivateDiceCommandPatch(system.API.ChatCommands);
+        try { privatePatch = createPrivatePatch(system.API.ChatCommands); }
+        catch (Exception)
+        {
+            system.API.Logger.Warning("[The BASICs] Private dice commands are unavailable because audit protection could not be installed. Public rolls remain available.");
+        }
         var root = system.API.ChatCommands.GetOrCreate("thebasics");
         RegisterCommand(root.BeginSubCommand("roll"), false);
-        RegisterCommand(root.BeginSubCommand("proll"), true);
+        if (privatePatch != null) RegisterCommand(root.BeginSubCommand("proll"), true);
         foreach (var alias in new[] { "roll", "r", "proll", "privateroll" })
         {
+            if (privatePatch == null && (alias is "proll" or "privateroll")) continue;
             if (system.API.ChatCommands.Get(alias) != null) continue;
             RegisterCommand(system.API.ChatCommands.Create(alias), alias is "proll" or "privateroll");
         }
@@ -87,7 +95,9 @@ internal sealed class DiceRollCommands : IDisposable
     private void DeliverPublic(IServerPlayer player, DiceRollResult result, ProximityChatMode mode)
     {
         var names = new NameTransformer(system);
-        var name = names.GetFormattedName(player, true, system.Config);
+        var useRoleplayName = !SpectatorChatPolicy.IsActiveSpectator(player)
+            || SpectatorChatPolicy.UseNicknameInLocalOoc(player, system.Config);
+        var name = names.GetFormattedName(player, useRoleplayName, system.Config);
         var text = DicePresentation.Chat(result, name, mode, false);
         var range = system.Config.GetModeDistance(mode);
         var recipients = system.API.World.AllOnlinePlayers.OfType<IServerPlayer>()
@@ -101,7 +111,7 @@ internal sealed class DiceRollCommands : IDisposable
         var bubble = DicePresentation.Bubble(result, player, mode, system.Config, false);
         var deliveries = recipients.Select(recipient => (
             Player: recipient,
-            Text: DicePresentation.Chat(result, names.GetFormattedName(player, true, system.Config, recipient), mode, false)))
+            Text: DicePresentation.Chat(result, names.GetFormattedName(player, useRoleplayName, system.Config, recipient), mode, false)))
             .ToArray();
         foreach (var delivery in deliveries)
             delivery.Player.SendMessage(system.ProximityChatId, delivery.Text, EnumChatType.OthersMessage, bubble);
