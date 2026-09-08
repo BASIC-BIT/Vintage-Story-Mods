@@ -99,11 +99,12 @@ internal sealed class DiceRollCommands : IDisposable
         context.SetMetadata(MessageContext.CHAT_MODE, mode);
         context.SetMetadata(MessageContext.FORMATTED_NAME, name);
         var bubble = DicePresentation.Bubble(result, player, mode, system.Config, false);
-        foreach (var recipient in recipients)
-        {
-            var recipientName = names.GetFormattedName(player, true, system.Config, recipient);
-            recipient.SendMessage(system.ProximityChatId, DicePresentation.Chat(result, recipientName, mode, false), EnumChatType.OthersMessage, bubble);
-        }
+        var deliveries = recipients.Select(recipient => (
+            Player: recipient,
+            Text: DicePresentation.Chat(result, names.GetFormattedName(player, true, system.Config, recipient), mode, false)))
+            .ToArray();
+        foreach (var delivery in deliveries)
+            delivery.Player.SendMessage(system.ProximityChatId, delivery.Text, EnumChatType.OthersMessage, bubble);
         system.API.Logger.Chat(text);
         system.RecordChatHistory(context, text);
         system.PublishProximityChatMessageProcessed(context, text);

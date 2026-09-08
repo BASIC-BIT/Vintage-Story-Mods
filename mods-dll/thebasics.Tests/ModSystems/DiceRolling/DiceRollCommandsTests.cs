@@ -8,6 +8,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Xunit;
 namespace thebasics.Tests.ModSystems.DiceRolling;
+
 public class DiceRollCommandsTests
 {
     [Theory]
@@ -21,8 +22,11 @@ public class DiceRollCommandsTests
         system.ProximityChatMessageProcessed += (_, _) => published++;
         var player = new FakeServerPlayer();
         var commands = new DiceRollCommands(system, input => DiceEvaluator.EvaluateInput(input, _ => 1000000));
-        var response = commands.Handle(new TextCommandCallingArgs { Caller = new Caller { Player = player },
-            RawArgs = new CmdArgs("50d1000000ro<=1000000") }, isPrivate);
+        var response = commands.Handle(new TextCommandCallingArgs
+        {
+            Caller = new Caller { Player = player },
+            RawArgs = new CmdArgs("50d1000000ro<=1000000")
+        }, isPrivate);
         Assert.Equal(EnumCommandStatus.Error, response.Status);
         Assert.Empty(player.SentMessages);
         Assert.Equal(0, published);

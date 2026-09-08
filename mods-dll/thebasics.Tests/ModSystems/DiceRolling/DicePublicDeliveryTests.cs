@@ -13,6 +13,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Xunit;
 namespace thebasics.Tests.ModSystems.DiceRolling;
+
 public class DicePublicDeliveryTests
 {
     [Theory]
@@ -73,6 +74,38 @@ public class DicePublicDeliveryTests
         Assert.Equal(expected, DiceRollCommands.InRange(sender, recipient, range));
         recipient.Entity.Pos.Dimension = 1;
         Assert.False(DiceRollCommands.InRange(sender, recipient, range));
+    }
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    public void MixedNameColorsRespectCompletePlaintextLimit(int excess, bool accepted)
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var config = new ModConfig { ApplyColorsToNicknames = true };
+        var system = new RPProximityChatSystem { API = api, Config = config };
+        var sender = Player("s", 0);
+        var recipient = Player("r", 0);
+        sender.SetNicknameColor("#ff0000");
+        recipient.SetChatVisualPreferences(new ChatVisualPreferences { NicknameColorsEnabled = false });
+        api.World.AllOnlinePlayers.Returns(new IPlayer[] { recipient, sender });
+        var seed = new DiceRollResult("d6", "", 4m, false, "", 6, new[] { "dice" });
+        var name = new thebasics.ModSystems.ProximityChat.Transformers.NameTransformer(system).GetFormattedName(sender, true, config);
+        var baseLength = Th3EssentialsDiscordRelay.FormatRelayMessage(DicePresentation.Chat(seed, name, ProximityChatMode.Normal, false), true).Length;
+        var result = new DiceRollResult("d6", "", 4m, false, new string('1', DicePresentation.MaxOutputLength - baseLength + excess), 6, new[] { "dice" });
+        var published = 0;
+        system.ProximityChatMessageProcessed += (_, _) => published++;
+        var commands = new DiceRollCommands(system, _ => result);
+        var response = commands.Handle(new TextCommandCallingArgs { Caller = new Caller { Player = sender }, RawArgs = new CmdArgs("d6") }, false);
+        Assert.Equal(accepted ? EnumCommandStatus.Success : EnumCommandStatus.Error, response.Status);
+        Assert.Equal(accepted ? 1 : 0, published);
+        Assert.Equal(accepted ? 1 : 0, sender.SentMessages.Count);
+        Assert.Equal(accepted ? 1 : 0, recipient.SentMessages.Count);
+        if (accepted)
+        {
+            Assert.True(sender.SentMessages[0].Message.Length > DicePresentation.MaxOutputLength);
+            Assert.Equal(DicePresentation.MaxOutputLength, Th3EssentialsDiscordRelay.FormatRelayMessage(sender.SentMessages[0].Message, true).Length);
+            Assert.DoesNotContain("#ff0000", recipient.SentMessages[0].Message);
+        }
     }
     private static FakeServerPlayer Player(string uid, int x)
     {

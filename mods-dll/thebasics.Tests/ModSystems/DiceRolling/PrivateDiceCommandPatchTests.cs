@@ -11,6 +11,7 @@ using Vintagestory.Common;
 using Xunit;
 
 namespace thebasics.Tests.ModSystems.DiceRolling;
+
 public class PrivateDiceCommandPatchTests
 {
     public PrivateDiceCommandPatchTests() => LangTestHelper.EnsureEnglish();

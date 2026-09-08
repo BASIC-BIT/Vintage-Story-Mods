@@ -1,5 +1,6 @@
 using thebasics.ModSystems.DiceRolling;
 namespace thebasics.Tests.ModSystems.DiceRolling;
+
 public partial class DiceEvaluatorTests
 {
     [Fact]
