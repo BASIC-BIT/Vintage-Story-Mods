@@ -790,6 +790,10 @@
 
   "block-scene-marker-*": "Scene Marker",
   "scene-description-editor-title": "Edit Scene Marker",
+  "scene-description-lock-help": "Creator: sneak-right-click with a padlock to lock editing and protect pickup.",
+  "scene-description-locked-item-help": "Locked. Reading is allowed. Place it to unlock as its creator or a server admin.",
+  "scene-description-locked-help": "Locked scene marker. Creator or server admin: sneak-right-click with an empty hand to unlock. Claim permissions still apply.",
+  "scene-description-cannot-lock": "Only the creator can lock an unlocked scene marker, within reach and with claim access.",
   "scene-description-title-label": "Title (optional)",
   "scene-description-kind-label": "Presentation",
   "scene-description-body-label": "Scene description",

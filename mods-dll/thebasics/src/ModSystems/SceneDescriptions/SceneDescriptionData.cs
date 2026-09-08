@@ -19,6 +19,7 @@ public sealed class SceneDescriptionData
     internal const string KindAttribute = "sceneKind";
     internal const string AuthorUidAttribute = "sceneAuthorUid";
     internal const string AuthorNameAttribute = "sceneAuthorName";
+    internal const string LockItemAttribute = "sceneLockItem";
 
     public string Title { get; set; } = string.Empty;
 
@@ -30,12 +31,49 @@ public sealed class SceneDescriptionData
 
     public string AuthorName { get; set; } = string.Empty;
 
+    public string LockItemCode { get; set; } = string.Empty;
+
+    public bool IsLocked => !string.IsNullOrWhiteSpace(LockItemCode);
+
+    internal bool CanEdit(string playerUid, bool hasClaimAccess) =>
+        !string.IsNullOrWhiteSpace(playerUid) && hasClaimAccess && !IsLocked;
+
+    internal bool CanLock(string playerUid, bool hasClaimAccess) =>
+        CanEdit(playerUid, hasClaimAccess) && playerUid == AuthorUid;
+
+    internal bool CanUnlock(string playerUid, bool isAdmin, bool hasClaimAccess) =>
+        IsLocked && CanManage(playerUid, isAdmin, hasClaimAccess);
+
+    internal bool CanBreak(string playerUid, bool isAdmin, bool hasClaimAccess) =>
+        !string.IsNullOrWhiteSpace(playerUid) && hasClaimAccess && (!IsLocked || CanManage(playerUid, isAdmin, hasClaimAccess));
+
+    private bool CanManage(string playerUid, bool isAdmin, bool hasClaimAccess) =>
+        !string.IsNullOrWhiteSpace(playerUid) && hasClaimAccess && (isAdmin || playerUid == AuthorUid);
+
+    internal void EstablishCreator(string playerUid, string playerName)
+    {
+        if (string.IsNullOrWhiteSpace(AuthorUid) && !string.IsNullOrWhiteSpace(playerUid))
+        {
+            AuthorUid = playerUid;
+            AuthorName = playerName ?? string.Empty;
+        }
+    }
+
+    internal void ApplyText(SceneDescriptionData edited)
+    {
+        Title = edited.Title;
+        Body = edited.Body;
+        Kind = edited.Kind;
+        Normalize();
+    }
+
     public SceneDescriptionData Normalize()
     {
         Title = NormalizeText(Title, MaxTitleLength, singleLine: true);
         Body = NormalizeText(Body, MaxBodyLength, singleLine: false);
         AuthorUid = NormalizeText(AuthorUid, 128, singleLine: true);
         AuthorName = NormalizeText(AuthorName, 128, singleLine: true);
+        LockItemCode = NormalizeText(LockItemCode, 256, singleLine: true);
 
         if (!Enum.IsDefined(Kind))
         {
@@ -54,6 +92,7 @@ public sealed class SceneDescriptionData
             Kind = Kind,
             AuthorUid = AuthorUid,
             AuthorName = AuthorName,
+            LockItemCode = LockItemCode,
         };
     }
 
@@ -65,6 +104,7 @@ public sealed class SceneDescriptionData
         attributes.SetInt(KindAttribute, (int)Kind);
         attributes.SetString(AuthorUidAttribute, AuthorUid);
         attributes.SetString(AuthorNameAttribute, AuthorName);
+        attributes.SetString(LockItemAttribute, LockItemCode);
     }
 
     internal static SceneDescriptionData ReadFrom(ITreeAttribute attributes)
@@ -81,6 +121,7 @@ public sealed class SceneDescriptionData
             Kind = (SceneDescriptionKind)attributes.GetInt(KindAttribute, (int)SceneDescriptionKind.Environmental),
             AuthorUid = attributes.GetString(AuthorUidAttribute, string.Empty),
             AuthorName = attributes.GetString(AuthorNameAttribute, string.Empty),
+            LockItemCode = attributes.GetString(LockItemAttribute, string.Empty),
         }.Normalize();
     }
 

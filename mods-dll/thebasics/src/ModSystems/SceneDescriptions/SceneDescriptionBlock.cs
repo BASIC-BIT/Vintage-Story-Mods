@@ -5,6 +5,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.SceneDescriptions;
@@ -42,15 +43,33 @@ public sealed class SceneDescriptionBlock : BlockSign
     {
         if (byPlayer?.Entity?.Controls?.ShiftKey == true && world.BlockAccessor.GetBlockEntity(blockSelection.Position) is SceneDescriptionBlockEntity blockEntity)
         {
+            // The held-item handler consumes padlocks. Never open/unlock the marker as a fallback.
+            if (byPlayer.InventoryManager.ActiveHotbarSlot?.Itemstack?.Collectible is ItemPadlock)
+            {
+                return false;
+            }
+
             if (world.Side == EnumAppSide.Server)
             {
-                blockEntity.OpenEditor(byPlayer);
+                InteractWithMarker(byPlayer, blockEntity);
             }
 
             return true;
         }
 
         return false;
+    }
+
+    private static void InteractWithMarker(IPlayer player, SceneDescriptionBlockEntity marker)
+    {
+        if (!marker.Data.IsLocked)
+        {
+            marker.OpenEditor(player);
+        }
+        else if (player.InventoryManager.ActiveHotbarSlot?.Empty != true || !marker.TryUnlock(player))
+        {
+            DenyLocked(player);
+        }
     }
 
     public override void OnHeldInteractStart(ItemSlot slot, EntityAgent byEntity, BlockSelection blockSelection, EntitySelection entitySelection, bool firstEvent, ref EnumHandHandling handling)
@@ -73,8 +92,51 @@ public sealed class SceneDescriptionBlock : BlockSign
 
     public override ItemStack[] GetDrops(IWorldAccessor world, BlockPos pos, IPlayer byPlayer, float dropQuantityMultiplier = 1f)
     {
+        if (world.BlockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity marker &&
+            marker.Data.IsLocked && !marker.CanBreak(byPlayer))
+        {
+            return [];
+        }
+
         return [CreateStackFromPlacedBlock(world, pos)];
     }
+
+    public override float OnGettingBroken(IPlayer player, BlockSelection blockSel, ItemSlot itemslot, float remainingResistance, float dt, int counter)
+    {
+        if (api.World.BlockAccessor.GetBlockEntity(blockSel.Position) is SceneDescriptionBlockEntity marker && !marker.CanBreak(player))
+        {
+            return Math.Max(remainingResistance, 1);
+        }
+
+        return base.OnGettingBroken(player, blockSel, itemslot, remainingResistance, dt, counter);
+    }
+
+    public override void OnBlockBroken(IWorldAccessor world, BlockPos pos, IPlayer byPlayer, float dropQuantityMultiplier = 1f)
+    {
+        if (world.BlockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity marker &&
+            (marker.Data.IsLocked || byPlayer != null) && !marker.CanBreak(byPlayer))
+        {
+            DenyLocked(byPlayer);
+            marker.MarkDirty(redrawOnClient: true);
+            return;
+        }
+
+        base.OnBlockBroken(world, pos, byPlayer, dropQuantityMultiplier);
+    }
+
+    public override void OnBlockExploded(IWorldAccessor world, BlockPos pos, BlockPos explosionCenter, EnumBlastType blastType, string ignitedByPlayerUid)
+    {
+        // Explosions must not become an indirect way to steal/destroy a locked marker.
+        if (world.BlockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity { Data.IsLocked: true })
+        {
+            return;
+        }
+
+        base.OnBlockExploded(world, pos, explosionCenter, blastType, ignitedByPlayerUid);
+    }
+
+    private static void DenyLocked(IPlayer player) =>
+        (player as IServerPlayer)?.SendIngameError("scene-description-locked", Lang.Get("thebasics:scene-description-locked-help"));
 
     public override ItemStack OnPickBlock(IWorldAccessor world, BlockPos pos)
     {
@@ -91,6 +153,10 @@ public sealed class SceneDescriptionBlock : BlockSign
     {
         base.GetHeldItemInfo(inSlot, description, world, withDebugInfo);
         var data = SceneDescriptionData.ReadFrom(inSlot?.Itemstack?.Attributes);
+        if (data.IsLocked)
+        {
+            description.AppendLine(Lang.Get("thebasics:scene-description-locked-item-help"));
+        }
         if (string.IsNullOrWhiteSpace(data.Body))
         {
             description.AppendLine(Lang.Get("thebasics:scene-description-empty-item-help"));

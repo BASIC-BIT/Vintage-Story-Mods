@@ -72,6 +72,13 @@ Run this after the ModDB release is published. It verifies the player-facing ins
    - Expect: Both placements use a small unobtrusive marker. Text appears only while directly targeting it. Environmental and OOC presentations are visibly distinct. Title, body, presentation, and author metadata survive pickup and replacement. The unauthorized edit is refused.
    - Watch for: literal text drawn on the block, always-visible clutter, dropped data loss, raw VTML, wrong wall orientation, duplicate or empty drops, claim bypass, or client/server exceptions.
 
+   **Scene-marker padlock follow-up** (P0, same batch):
+   - Setup: Player A places an unlocked marker. Player B has build access to that location. Player C has `controlserver` and claim access. Use the same exact candidate on both server and clients.
+   - Do: B edits the unlocked marker, then tries to attach a padlock. A attaches one by sneak-right-clicking. Both players read it; B tries to edit, unlock with an empty hand, and break it (including creative breaking if available). Attempt to save an editor opened before A locked it.
+   - Expect: B's edit does not transfer creator ownership; B cannot lock, unlock, edit, or break A's locked marker. A's successful lock consumes exactly one padlock. Targeted narration and held-item reading remain available. Stale editor saves are refused.
+   - Do: A breaks and replaces the locked marker; repeat on ground and wall variants. Save/restart and reconnect. A unlocks with an empty-hand sneak-right-click; repeat with C on another locked marker. Repeat attempts without claim build access, including creator/admin attempts. Try unlocking with a full inventory.
+   - Expect: Lock and creator survive drops, replacement, and restart. Only A/C with claim access can remove or unlock it. Unlock returns exactly one padlock (to inventory or as a drop), and repeated interaction cannot duplicate it. Editing resumes after unlock. Ordinary vanilla padlocks on other block types still behave normally. Removing a marker's support or detonating an explosion must not yield its locked item to B.
+
 7. **Typing Indicator** (P1)
    - Config: `EnableTypingIndicator=true`.
    - Do: Open chat on one client, type and pause, then close chat.

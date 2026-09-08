@@ -197,6 +197,9 @@ Features:
 - Shift-right-click editing with normal land-claim build permissions.
 - Title, body, presentation, and author metadata persist in the world and on the dropped item when the marker is broken and placed again.
 - Shift-right-click reading while holding a written marker.
+- Creator-owned padlocks: the creator can sneak-right-click with a padlock to lock a marker without reinforcement. Locked markers remain readable; editing requires unlocking first.
+- Only the immutable creator or a server admin (`controlserver` privilege) can unlock or break/pick up a locked marker, and normal land-claim build permissions still apply. Sneak-right-click with an empty hand unlocks and returns the padlock.
+- Creator and lock metadata survive world reload and pickup/replacement. Editing an unlocked marker does not transfer ownership. Locked markers resist explosions.
 
 Scene markers are independent world content. They borrow visual conventions from cast environmental messages, but do not use the RP chat pipeline or the local/global OOC chat toggles.
 

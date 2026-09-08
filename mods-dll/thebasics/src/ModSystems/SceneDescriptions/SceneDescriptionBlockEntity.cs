@@ -6,6 +6,7 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.SceneDescriptions;
 
@@ -22,11 +23,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     public void InitializeFromItem(ItemStack itemStack, IPlayer player)
     {
         Data = SceneDescriptionData.ReadFrom(itemStack?.Attributes);
-        if (string.IsNullOrWhiteSpace(Data.AuthorUid) && player != null)
-        {
-            Data.AuthorUid = player.PlayerUID ?? string.Empty;
-            Data.AuthorName = player.PlayerName ?? string.Empty;
-        }
+        Data.EstablishCreator(player?.PlayerUID, player?.PlayerName);
 
         Data.Normalize();
         MarkDirty(redrawOnClient: true);
@@ -39,7 +36,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
-        if (!CanEdit(player))
+        if (!CanEdit(player) || !IsWithinEditDistance(player))
         {
             serverPlayer.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
             return;
@@ -78,10 +75,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
-        var next = FromPacket(packet);
-        next.AuthorUid = player.PlayerUID;
-        next.AuthorName = player.PlayerName;
-        Data = next.Normalize();
+        Data.ApplyText(FromPacket(packet));
         MarkDirty(redrawOnClient: true);
         Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
         Api.World.Logger.Audit("{0} edited a scene marker at {1}.", player.PlayerName, Pos);
@@ -129,6 +123,9 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     public override void GetBlockInfo(IPlayer forPlayer, StringBuilder description)
     {
         base.GetBlockInfo(forPlayer, description);
+        description.AppendLine(Lang.Get(Data.IsLocked
+            ? "thebasics:scene-description-locked-help"
+            : "thebasics:scene-description-lock-help"));
         if (string.IsNullOrWhiteSpace(Data.Body))
         {
             description.AppendLine(Lang.Get("thebasics:scene-description-empty-block-help"));
@@ -149,8 +146,67 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     private bool CanEdit(IPlayer player)
     {
-        return player != null && Api.World.Claims.TryAccess(player, Pos, EnumBlockAccessFlags.BuildOrBreak);
+        return Data.CanEdit(player?.PlayerUID, HasClaimAccess(player));
     }
+
+    internal bool CanBreak(IPlayer player)
+    {
+        return Data.CanBreak(player?.PlayerUID, IsAdmin(player), HasClaimAccess(player));
+    }
+
+    internal bool TryLock(IPlayer player, ItemSlot slot)
+    {
+        if (Api.Side != EnumAppSide.Server || !IsWithinEditDistance(player) ||
+            !Data.CanLock(player?.PlayerUID, HasClaimAccess(player)) ||
+            slot?.Itemstack?.Collectible is not ItemPadlock || slot.Itemstack.StackSize < 1)
+        {
+            return false;
+        }
+
+        Data.LockItemCode = slot.Itemstack.Collectible.Code.ToString();
+        slot.TakeOut(1);
+        slot.MarkDirty();
+        PersistLockChange(player, "locked");
+        return true;
+    }
+
+    internal bool TryUnlock(IPlayer player)
+    {
+        if (Api.Side != EnumAppSide.Server || !IsWithinEditDistance(player) ||
+            !Data.CanUnlock(player?.PlayerUID, IsAdmin(player), HasClaimAccess(player)))
+        {
+            return false;
+        }
+
+        var padlock = Api.World.GetItem(new AssetLocation(Data.LockItemCode));
+        // Fail closed if a saved lock's item is unavailable, rather than lose or duplicate it.
+        if (padlock is not ItemPadlock)
+        {
+            return false;
+        }
+
+        Data.LockItemCode = string.Empty;
+        PersistLockChange(player, "unlocked");
+        var stack = new ItemStack(padlock);
+        if (!player.InventoryManager.TryGiveItemstack(stack))
+        {
+            Api.World.SpawnItemEntity(stack, Pos.ToVec3d().Add(0.5, 0.5, 0.5));
+        }
+
+        return true;
+    }
+
+    private void PersistLockChange(IPlayer player, string action)
+    {
+        MarkDirty(redrawOnClient: true);
+        Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
+        Api.World.Logger.Audit("{0} {1} a scene marker at {2}.", player.PlayerName, action, Pos);
+    }
+
+    private bool HasClaimAccess(IPlayer player) =>
+        player != null && Api.World.Claims.TryAccess(player, Pos, EnumBlockAccessFlags.BuildOrBreak);
+
+    private static bool IsAdmin(IPlayer player) => player?.HasPrivilege(Privilege.controlserver) == true;
 
     private bool IsWithinEditDistance(IPlayer player)
     {
