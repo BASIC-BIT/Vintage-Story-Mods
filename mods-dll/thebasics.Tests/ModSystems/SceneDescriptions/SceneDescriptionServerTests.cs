@@ -16,11 +16,12 @@ public class SceneDescriptionServerTests
     {
         var (marker, player, _) = CreateMarker();
         marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
-        { Title = "Old title", Body = "Old body", Color = (int)SceneMarkerColor.Blue, HeightOffset = 3, TextDistance = 5,
+        { Title = "Old title", Body = "Old body", Color = (int)SceneMarkerColor.Blue, HeightOffset = 3, IndicatorScale = 2, TextDistance = 5,
             Display = (int)SceneDescriptionDisplay.AlwaysNearby, Symbol = (int)SceneMarkerSymbol.Information }));
         marker.InitializeFromItem(new ItemStack(new SceneDescriptionBlock()), player);
         marker.Data.Color.Should().Be(SceneMarkerColor.Blue);
         marker.Data.HeightOffset.Should().Be(3);
+        marker.Data.IndicatorScale.Should().Be(2);
         marker.Data.TextDistance.Should().Be(5);
         marker.Data.Display.Should().Be(SceneDescriptionDisplay.AlwaysNearby);
         marker.Data.Title.Should().BeEmpty();

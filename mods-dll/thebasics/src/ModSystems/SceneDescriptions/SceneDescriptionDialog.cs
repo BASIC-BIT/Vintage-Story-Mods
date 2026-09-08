@@ -63,7 +63,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private void Compose(SceneDescriptionData data)
     {
         var top = GuiStyle.TitleBarHeight + 12;
-        var buttonY = top + 550;
+        var buttonY = top + 570;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth + 290, buttonY + ButtonHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
         var titleLabelBounds = ElementBounds.Fixed(0, top, DialogWidth - 20, 22);
@@ -109,6 +109,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 434, 110, 28))
             .AddStaticText(Lang.Get("thebasics:scene-height"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 485, 150, 22))
             .AddNumberInput(ElementBounds.Fixed(690, top + 480, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
+            .AddStaticText(Lang.Get("thebasics:scene-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 525, 150, 22))
+            .AddNumberInput(ElementBounds.Fixed(690, top + 520, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
             .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth - 140, buttonY, 120, ButtonHeight), key: "save")
             .AddSmallButton(Lang.Get(data.IsLocked ? "thebasics:scene-unlock" : "thebasics:scene-save-lock"), OnLockButton, ElementBounds.Fixed(530, buttonY, 260, ButtonHeight), key: "lock")
@@ -122,6 +124,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetNumberInput("textdistance").SetValue(data.TextDistance.ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetNumberInput("height").SetValue(data.HeightOffset.ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetNumberInput("height").Enabled = !data.IsLocked;
+        SingleComposer.GetNumberInput("size").SetValue((data.IndicatorScale * 100).ToString(CultureInfo.InvariantCulture));
+        SingleComposer.GetNumberInput("size").Enabled = !data.IsLocked;
         SingleComposer.GetDropDown("color").Enabled = !data.IsLocked;
         RefreshPreview();
         SingleComposer.GetButton("lock").Enabled = _canManageLock;
@@ -164,15 +168,19 @@ internal sealed class SceneDescriptionDialog : GuiDialog
                 ? SceneDescriptionDisplay.OnInteraction : SceneDescriptionDisplay.WhenTargeted;
             if (float.TryParse(SingleComposer.GetNumberInput("height").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var offset))
                 preview.HeightOffset = offset;
+            if (float.TryParse(SingleComposer.GetNumberInput("size").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var percent))
+                preview.IndicatorScale = percent / 100;
         }
         preview.Normalize();
         using var text = preview.ShouldShowDescription(true) ? SceneMarkerVisuals.DescriptionSurface(capi, preview) : null;
         var textWidth = 3.0;
         var textHeight = text == null ? 0 : textWidth * text.Height / text.Width;
         if (textHeight > 6) { textWidth *= 6 / textHeight; textHeight = 6; }
-        var scale = Math.Min((width - 24) / 3.0, (height - 24) / (textHeight + 1.6 + Math.Max(0, preview.HeightOffset)));
-        var symbolY = height - 12 - (0.9 + preview.HeightOffset) * scale;
-        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], width / 2.0 - 0.4 * scale, symbolY, 0.8 * scale, preview.Color);
+        var scale = Math.Min((width - 24) / 3.0, (height - 24) / (textHeight + 3.2 + Math.Max(0, preview.HeightOffset)));
+        var symbolSize = 0.8 * preview.IndicatorScale;
+        var centerY = height - 12 - (1.8 + preview.HeightOffset) * scale;
+        var symbolY = centerY - symbolSize / 2 * scale;
+        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], width / 2.0 - symbolSize / 2 * scale, symbolY, symbolSize * scale, preview.Color);
         if (text != null)
         {
             ctx.Save();
@@ -203,6 +211,13 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private bool OnSave()
     {
         if (_appearance.IsLocked) return false;
+        if (!float.TryParse(SingleComposer.GetNumberInput("size").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var percent) ||
+            !float.IsFinite(percent) || percent < 25 || percent > 300)
+        {
+            capi.TriggerIngameError(this, "scene-size", Lang.Get("thebasics:scene-size-invalid"));
+            return false;
+        }
+        _appearance.IndicatorScale = percent / 100;
         if (!float.TryParse(SingleComposer.GetNumberInput("height").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var height) ||
             !float.IsFinite(height) || height < -0.5f || height > 4)
         {
@@ -239,6 +254,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             TextDistance = _appearance.TextDistance,
             UnlimitedTextDistance = _appearance.UnlimitedTextDistance,
             HeightOffset = _appearance.HeightOffset,
+            IndicatorScale = _appearance.IndicatorScale,
             Color = _appearance.Color,
             Title = SingleComposer.GetTextInput("title").GetText(),
             Body = SingleComposer.GetTextArea("body").GetText(),

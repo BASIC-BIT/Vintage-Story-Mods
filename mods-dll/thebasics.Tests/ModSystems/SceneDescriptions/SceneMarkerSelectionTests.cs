@@ -12,6 +12,18 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneMarkerSelectionTests
 {
     [Fact]
+    public void PickingExtentTracksIndicatorSizeWithoutMovingItsCenter()
+    {
+        var ray = new Ray(new Vec3d(0.9, 3, -3), new Vec3d(0, 0, 8));
+        var center = new Vec3d(0, 3, 0);
+        var small = new SceneDescriptionData { IndicatorScale = 0.25f };
+        var large = new SceneDescriptionData { IndicatorScale = 3 };
+        SceneMarkerSelection.IntersectBox(ray, center, 8, small.SelectionHalfExtent).Should().BeNull();
+        SceneMarkerSelection.IntersectBox(ray, center, 8, large.SelectionHalfExtent).Should().NotBeNull();
+        SceneMarkerSelection.IntersectBox(ray, center, 1, large.SelectionHalfExtent).Should().BeNull();
+    }
+
+    [Fact]
     public void ShippedMarkerMetadataPassesBothServerSightFilters()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -63,7 +63,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             render.GlToggleBlend(true, EnumBlendMode.Standard);
             foreach (var icon in _visible)
             {
-                var size = 0.8f * (1 + 0.10f * icon.Focus);
+                var size = 0.8f * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
                 if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data.Symbol, icon.Marker.Data.Color), icon.Position, icon.Opacity, size, size);
                 var targeted = _api.World.Player.CurrentBlockSelection?.Position?.Equals(icon.Marker.Pos) == true;
                 if (!icon.Marker.Data.ShouldShowDescription(targeted) || icon.TextOpacity <= 0) continue;
@@ -115,7 +115,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             var focus = _focus.GetValueOrDefault(marker);
             focus += ((selected ? 1 : 0) - focus) * (1 - MathF.Exp(-10 * Math.Max(0, deltaTime)));
             _focus[marker] = focus;
-            var radius = textOpacity > 0 ? DescriptionCullRadius : 1;
+            var radius = textOpacity > 0 ? DescriptionCullRadius : 2;
             if ((opacity <= 0 && textOpacity <= 0) || !render.DefaultFrustumCuller.SphereInFrustum(position.X, position.Y, position.Z, radius)) continue;
             var camera = player.CameraPos;
             var view = render.CameraMatrixOriginf;

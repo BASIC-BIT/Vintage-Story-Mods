@@ -7,6 +7,26 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneDescriptionDataTests
 {
     [Fact]
+    public void IndicatorSizePersistsIndependentlyOfHeightAndMigratesAtFullSize()
+    {
+        var data = new SceneDescriptionData { IndicatorScale = 2, HeightOffset = 3 };
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        var restored = SceneDescriptionData.ReadFrom(tree);
+        restored.IndicatorScale.Should().Be(2);
+        restored.HeightOffset.Should().Be(3);
+        restored.Clone().IndicatorScale.Should().Be(2);
+        restored.AppearanceDefaults().IndicatorScale.Should().Be(2);
+        restored.ApplyText(new SceneDescriptionData { IndicatorScale = 0.5f, HeightOffset = 3 });
+        restored.IndicatorScale.Should().Be(0.5f);
+        restored.HeightOffset.Should().Be(3);
+        SceneDescriptionData.ReadFrom(new TreeAttribute()).IndicatorScale.Should().Be(1);
+        new SceneDescriptionData { IndicatorScale = float.NaN }.Normalize().IndicatorScale.Should().Be(1);
+        new SceneDescriptionData { IndicatorScale = 0 }.Normalize().IndicatorScale.Should().Be(0.25f);
+        new SceneDescriptionData { IndicatorScale = 100 }.Normalize().IndicatorScale.Should().Be(3);
+    }
+
+    [Fact]
     public void AppearanceControlsRoundTripWithoutCopyingContentOrOwnership()
     {
         var data = new SceneDescriptionData { Title = "Private title", Body = "Scene", AuthorUid = "owner", LockItemCode = "ui",

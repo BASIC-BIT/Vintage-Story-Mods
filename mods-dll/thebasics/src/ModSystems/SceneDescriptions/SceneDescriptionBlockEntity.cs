@@ -269,6 +269,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             TextDistance = data.TextDistance,
             UnlimitedTextDistance = data.UnlimitedTextDistance,
             HeightOffset = data.HeightOffset,
+            IndicatorScale = data.IndicatorScale,
             Color = (int)data.Color,
             IsLocked = data.IsLocked,
         };
@@ -290,6 +291,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             TextDistance = packet.TextDistance,
             UnlimitedTextDistance = packet.UnlimitedTextDistance,
             HeightOffset = packet.HeightOffset,
+            IndicatorScale = packet.IndicatorScale,
             Color = (SceneMarkerColor)packet.Color,
             LockItemCode = packet.IsLocked ? "ui" : string.Empty,
         }.Normalize();

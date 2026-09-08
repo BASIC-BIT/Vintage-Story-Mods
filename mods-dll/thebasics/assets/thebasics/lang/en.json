@@ -798,6 +798,8 @@
   "scene-color-green": "Soft green",
   "scene-text-distance": "Text distance (blocks)",
   "scene-height": "Height offset",
+  "scene-size": "Indicator size (%)",
+  "scene-size-invalid": "Enter an indicator size from 25 to 300 percent.",
   "scene-height-invalid": "Enter a height offset from -0.5 to 4 blocks.",
   "scene-display-label": "Show description",
   "scene-display-targeted": "When targeted",

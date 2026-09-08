@@ -47,6 +47,8 @@ public sealed class SceneDescriptionData
     public float TextDistance { get; set; } = 8;
     public bool UnlimitedTextDistance { get; set; }
     public float HeightOffset { get; set; }
+    public float IndicatorScale { get; set; } = 1;
+    internal float SelectionHalfExtent => 0.44f * IndicatorScale + 0.05f;
     public SceneMarkerColor Color { get; set; }
 
     public float GetTextOpacity(double distance) => GetOpacity(distance, TextDistance, UnlimitedTextDistance);
@@ -104,6 +106,7 @@ public sealed class SceneDescriptionData
         TextDistance = edited.TextDistance;
         UnlimitedTextDistance = edited.UnlimitedTextDistance;
         HeightOffset = edited.HeightOffset;
+        IndicatorScale = edited.IndicatorScale;
         Color = edited.Color;
         Normalize();
     }
@@ -122,6 +125,7 @@ public sealed class SceneDescriptionData
         IconDistance = float.IsFinite(IconDistance) ? Math.Clamp(IconDistance, 1, 1024) : 24;
         TextDistance = float.IsFinite(TextDistance) ? Math.Clamp(TextDistance, 1, 1024) : 8;
         HeightOffset = float.IsFinite(HeightOffset) ? Math.Clamp(HeightOffset, -0.5f, 4) : 0;
+        IndicatorScale = float.IsFinite(IndicatorScale) ? Math.Clamp(IndicatorScale, 0.25f, 3) : 1;
         if (!Enum.IsDefined(Color)) Color = SceneMarkerColor.Gold;
 
         if (!Enum.IsDefined(Kind))
@@ -149,7 +153,7 @@ public sealed class SceneDescriptionData
             UnlimitedIconDistance = UnlimitedIconDistance,
             TextDistance = TextDistance,
             UnlimitedTextDistance = UnlimitedTextDistance,
-            HeightOffset = HeightOffset,
+            HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
             Color = Color,
         };
     }
@@ -158,7 +162,7 @@ public sealed class SceneDescriptionData
     {
         Symbol = Symbol, Color = Color, Display = Display, IconDistance = IconDistance,
         UnlimitedIconDistance = UnlimitedIconDistance, TextDistance = TextDistance,
-        UnlimitedTextDistance = UnlimitedTextDistance, HeightOffset = HeightOffset,
+        UnlimitedTextDistance = UnlimitedTextDistance, HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
     }.Normalize();
 
     internal void WriteTo(ITreeAttribute attributes)
@@ -178,6 +182,7 @@ public sealed class SceneDescriptionData
         attributes.SetFloat("sceneTextDistance", TextDistance);
         attributes.SetBool("sceneTextUnlimited", UnlimitedTextDistance);
         attributes.SetFloat("sceneHeightOffset", HeightOffset);
+        attributes.SetFloat("sceneIndicatorScale", IndicatorScale);
         attributes.SetInt("sceneColor", (int)Color);
     }
 
@@ -204,6 +209,7 @@ public sealed class SceneDescriptionData
             TextDistance = attributes.GetFloat("sceneTextDistance", attributes.GetFloat("sceneIconDistance", 24)),
             UnlimitedTextDistance = attributes.GetBool("sceneTextUnlimited", attributes.GetBool("sceneIconUnlimited")),
             HeightOffset = attributes.GetFloat("sceneHeightOffset"),
+            IndicatorScale = attributes.GetFloat("sceneIndicatorScale", 1),
             Color = (SceneMarkerColor)attributes.GetInt("sceneColor"),
         }.Normalize();
     }

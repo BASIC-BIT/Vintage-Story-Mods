@@ -55,7 +55,7 @@ internal sealed class SceneMarkerSelection : IDisposable
             if (marker.Pos.dimension != player.Pos.Dimension || (filter != null && !filter(marker.Pos, marker.Block))) continue;
             var center = marker.Pos.ToVec3d().Add(0.5, 0.65 + marker.Data.HeightOffset, 0.5);
             if (marker.Data.GetIconOpacity(player.Pos.XYZ.DistanceTo(marker.Pos.ToVec3d().Add(0.5, 0.65, 0.5))) <= 0) continue;
-            var hit = IntersectBox(ray, center, nearest);
+            var hit = IntersectBox(ray, center, nearest, marker.Data.SelectionHalfExtent);
             if (hit == null) continue;
             nearest = ray.origin.DistanceTo(hit);
             result = new BlockSelection { Position = marker.Pos.Copy(), Block = marker.Block, Face = BlockFacing.UP,
@@ -63,7 +63,7 @@ internal sealed class SceneMarkerSelection : IDisposable
         }
     }
 
-    internal static Vec3d IntersectBox(Ray ray, Vec3d center, double maxDistance)
+    internal static Vec3d IntersectBox(Ray ray, Vec3d center, double maxDistance, double halfExtent = 0.48)
     {
         var length = ray.Length;
         if (!double.IsFinite(length) || length <= 0) return null;
@@ -75,11 +75,11 @@ internal sealed class SceneMarkerSelection : IDisposable
             var direction = ray.dir[axis] / length;
             if (Math.Abs(direction) < 1e-9)
             {
-                if (Math.Abs(origin) > 0.48) return null;
+                if (Math.Abs(origin) > halfExtent) return null;
                 continue;
             }
-            var a = (-0.48 - origin) / direction;
-            var b = (0.48 - origin) / direction;
+            var a = (-halfExtent - origin) / direction;
+            var b = (halfExtent - origin) / direction;
             near = Math.Max(near, Math.Min(a, b));
             far = Math.Min(far, Math.Max(a, b));
             if (near > far) return null;

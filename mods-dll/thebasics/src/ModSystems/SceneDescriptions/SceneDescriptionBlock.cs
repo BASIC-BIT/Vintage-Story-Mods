@@ -20,8 +20,10 @@ public sealed class SceneDescriptionBlock : BlockSign
         // Terrain traversal must not stop early on boxes extending beyond this voxel.
         // Client picking supplies its own nearest-symbol hit after terrain; other sight rays ignore symbols.
         if (api?.Side == EnumAppSide.Client) return [];
-        var offset = (blockAccessor.GetBlockEntity(pos) as SceneDescriptionBlockEntity)?.Data.HeightOffset ?? 0;
-        return [new Cuboidf(0.02f, 0.17f + offset, 0.02f, 0.98f, 1.13f + offset, 0.98f)];
+        var data = (blockAccessor.GetBlockEntity(pos) as SceneDescriptionBlockEntity)?.Data ?? new SceneDescriptionData();
+        var radius = data.SelectionHalfExtent;
+        var centerY = 0.65f + data.HeightOffset;
+        return [new Cuboidf(0.5f - radius, centerY - radius, 0.5f - radius, 0.5f + radius, centerY + radius, 0.5f + radius)];
     }
 
     public override Cuboidf[] GetCollisionBoxes(IBlockAccessor blockAccessor, BlockPos pos) => [];
