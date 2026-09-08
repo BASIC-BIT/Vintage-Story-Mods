@@ -121,6 +121,30 @@ public class SceneDescriptionServerTests
         marker.Data.IsLocked.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(false, true, SceneMarkerAppearance.Hybrid)]
+    [InlineData(true, true, SceneMarkerAppearance.Stone)]
+    [InlineData(false, false, SceneMarkerAppearance.Stone)]
+    public void AppearancePacketUsesExistingEditPermissions(bool locked, bool claim, SceneMarkerAppearance expected)
+    {
+        var (marker, player, _) = CreateMarker(claim);
+        marker.Data.LockItemCode = locked ? "game:padlock-copper" : "";
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
+        {
+            Body = "New appearance", Appearance = (int)SceneMarkerAppearance.Hybrid,
+            Symbol = (int)SceneMarkerSymbol.Information, IconDistance = 80, UnlimitedIconDistance = true,
+        }));
+        marker.Data.Appearance.Should().Be(expected);
+        marker.Data.AuthorUid.Should().Be("creator");
+        marker.Data.IsLocked.Should().Be(locked);
+        if (!locked && claim)
+        {
+            marker.Data.Symbol.Should().Be(SceneMarkerSymbol.Information);
+            marker.Data.IconDistance.Should().Be(80);
+            marker.Data.UnlimitedIconDistance.Should().BeTrue();
+        }
+    }
+
     [Fact]
     public void EditPacket_StillRejectsClaimDenial()
     {

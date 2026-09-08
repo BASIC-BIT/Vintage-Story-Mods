@@ -12,7 +12,6 @@ internal sealed class SceneDescriptionRenderer : IRenderer
     private readonly ICoreClientAPI _capi;
     private LoadedTexture _texture;
     private SceneDescriptionData _textureData;
-
     public SceneDescriptionRenderer(ICoreClientAPI capi)
     {
         _capi = capi;

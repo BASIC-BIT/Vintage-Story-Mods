@@ -14,6 +14,36 @@ public sealed class SceneDescriptionBlock : BlockSign
 {
     private WorldInteraction[] _interactions;
 
+    public override Cuboidf[] GetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos)
+    {
+        if (blockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity marker &&
+            marker.Data.Appearance != SceneMarkerAppearance.Stone)
+        {
+            // Includes the floating symbol, so players can inspect and edit what they see.
+            var symbol = new Cuboidf(0.18f, 0.12f, 0.18f, 0.82f, 1f, 0.82f);
+            return marker.Data.Appearance == SceneMarkerAppearance.Hybrid
+                ? [..base.GetSelectionBoxes(blockAccessor, pos), symbol]
+                : [symbol];
+        }
+        return base.GetSelectionBoxes(blockAccessor, pos);
+    }
+
+    public override Cuboidf[] GetCollisionBoxes(IBlockAccessor blockAccessor, BlockPos pos)
+    {
+        if (blockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity marker)
+        {
+            if (marker.Data.Appearance == SceneMarkerAppearance.Billboard) return [];
+            if (marker.Data.Appearance == SceneMarkerAppearance.Model)
+            {
+                var sideways = Variant["side"] is "east" or "west";
+                return sideways
+                    ? [new Cuboidf(0.4375f, 0.125f, 0.1875f, 0.5625f, 1f, 0.8125f)]
+                    : [new Cuboidf(0.1875f, 0.125f, 0.4375f, 0.8125f, 1f, 0.5625f)];
+            }
+        }
+        return base.GetCollisionBoxes(blockAccessor, pos);
+    }
+
     public override void OnLoaded(ICoreAPI api)
     {
         base.OnLoaded(api);

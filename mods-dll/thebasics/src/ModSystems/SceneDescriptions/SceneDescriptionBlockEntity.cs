@@ -4,6 +4,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using Vintagestory.GameContent;
@@ -17,6 +18,39 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     private const double MaxEditDistance = 8;
 
     private SceneDescriptionDialog _dialog;
+    private MeshData _appearanceMesh;
+
+    public override void Initialize(ICoreAPI api)
+    {
+        base.Initialize(api);
+        if (api is ICoreClientAPI client)
+        {
+            PrepareAppearance(client);
+            client.ModLoader.GetModSystem<SceneDescriptionSystem>().Register(this);
+        }
+    }
+
+    private void PrepareAppearance(ICoreClientAPI client)
+    {
+        _appearanceMesh = null;
+        if (Data.Appearance != SceneMarkerAppearance.Model) return;
+        var shape = SceneMarkerVisuals.LoadShape(client, Data.Symbol);
+        client.Tesselator.TesselateShape(Block, shape, out var mesh, new Vec3f(0, Block.Shape.rotateY, 0));
+        for (var i = 0; i < mesh.Rgba.Length; i += 4)
+        {
+            mesh.Rgba[i + 1] = (byte)(mesh.Rgba[i + 1] * 0.82);
+            mesh.Rgba[i + 2] = (byte)(mesh.Rgba[i + 2] * 0.30);
+        }
+        _appearanceMesh = mesh;
+    }
+
+    public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tesselator)
+    {
+        if (Data.Appearance == SceneMarkerAppearance.Billboard) return true;
+        if (Data.Appearance != SceneMarkerAppearance.Model) return false;
+        if (_appearanceMesh != null) mesher.AddMeshData(_appearanceMesh);
+        return true;
+    }
 
     public SceneDescriptionData Data { get; private set; } = new();
 
@@ -118,6 +152,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     {
         base.FromTreeAttributes(tree, worldForResolving);
         Data = SceneDescriptionData.ReadFrom(tree);
+        if (Api is ICoreClientAPI client)
+        {
+            PrepareAppearance(client);
+            MarkDirty(redrawOnClient: true);
+        }
     }
 
     public override void GetBlockInfo(IPlayer forPlayer, StringBuilder description)
@@ -134,14 +173,22 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     public override void OnBlockRemoved()
     {
+        UnregisterAppearance();
         CloseDialog();
         base.OnBlockRemoved();
     }
 
     public override void OnBlockUnloaded()
     {
+        UnregisterAppearance();
         CloseDialog();
         base.OnBlockUnloaded();
+    }
+
+    private void UnregisterAppearance()
+    {
+        if (Api is ICoreClientAPI client)
+            client.ModLoader.GetModSystem<SceneDescriptionSystem>().Unregister(this);
     }
 
     private bool CanEdit(IPlayer player)
@@ -227,16 +274,25 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Title = data.Title,
             Body = data.Body,
             Kind = (int)data.Kind,
+            Appearance = (int)data.Appearance,
+            Symbol = (int)data.Symbol,
+            IconDistance = data.IconDistance,
+            UnlimitedIconDistance = data.UnlimitedIconDistance,
         };
     }
 
     private static SceneDescriptionData FromPacket(SceneDescriptionEditPacket packet)
     {
+        packet ??= new SceneDescriptionEditPacket();
         return new SceneDescriptionData
         {
-            Title = packet?.Title ?? string.Empty,
-            Body = packet?.Body ?? string.Empty,
-            Kind = (SceneDescriptionKind)(packet?.Kind ?? 0),
+            Title = packet.Title,
+            Body = packet.Body,
+            Kind = (SceneDescriptionKind)packet.Kind,
+            Appearance = (SceneMarkerAppearance)packet.Appearance,
+            Symbol = (SceneMarkerSymbol)packet.Symbol,
+            IconDistance = packet.IconDistance,
+            UnlimitedIconDistance = packet.UnlimitedIconDistance,
         }.Normalize();
     }
 }

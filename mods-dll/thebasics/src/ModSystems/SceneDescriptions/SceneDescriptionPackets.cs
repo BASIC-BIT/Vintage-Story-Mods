@@ -13,4 +13,9 @@ public sealed class SceneDescriptionEditPacket
 
     [ProtoMember(3)]
     public int Kind { get; set; }
+
+    [ProtoMember(4)] public int Appearance { get; set; }
+    [ProtoMember(5)] public int Symbol { get; set; }
+    [ProtoMember(6)] public float IconDistance { get; set; } = 24;
+    [ProtoMember(7)] public bool UnlimitedIconDistance { get; set; }
 }

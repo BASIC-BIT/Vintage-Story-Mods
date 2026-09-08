@@ -195,6 +195,8 @@ Features:
 - Environmental narration and visibly distinct OOC notice presentations.
 - Description overlays appear only while a player deliberately targets the marker, avoiding persistent world-text clutter.
 - Shift-right-click editing with normal land-claim build permissions.
+- Appearance picker with a live preview: subtle stone, a modeled 3D symbol, a camera-facing billboard, or a base plus billboard. Symbols include exclamation, question, and information.
+- Billboard distance is saved per marker (1-1024 blocks, default 24), with an Unlimited option bounded by loaded terrain. Icons fade through the outer quarter of the chosen distance and are obscured by walls. Physical models and bases do not fade. The description still appears only while targeted.
 - Title, body, presentation, and author metadata persist in the world and on the dropped item when the marker is broken and placed again.
 - Shift-right-click reading while holding a written marker.
 - Creator-owned padlocks: the creator can sneak-right-click with a padlock to lock a marker without reinforcement. Locked markers remain readable; editing requires unlocking first.

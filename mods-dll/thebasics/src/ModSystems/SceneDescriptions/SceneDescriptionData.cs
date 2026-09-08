@@ -9,6 +9,9 @@ public enum SceneDescriptionKind
     OocNotice,
 }
 
+public enum SceneMarkerAppearance { Stone, Model, Billboard, Hybrid }
+public enum SceneMarkerSymbol { Exclamation, Question, Information }
+
 public sealed class SceneDescriptionData
 {
     public const int MaxTitleLength = 80;
@@ -32,6 +35,20 @@ public sealed class SceneDescriptionData
     public string AuthorName { get; set; } = string.Empty;
 
     public string LockItemCode { get; set; } = string.Empty;
+
+    public SceneMarkerAppearance Appearance { get; set; }
+    public SceneMarkerSymbol Symbol { get; set; }
+    public float IconDistance { get; set; } = 24;
+    public bool UnlimitedIconDistance { get; set; }
+
+    public float GetIconOpacity(double distance)
+    {
+        if (Appearance is not (SceneMarkerAppearance.Billboard or SceneMarkerAppearance.Hybrid) ||
+            !double.IsFinite(distance) || distance < 0) return 0;
+        if (UnlimitedIconDistance) return 1;
+        // Fade through the outer quarter of the configured radius.
+        return (float)Math.Clamp((IconDistance - distance) / (IconDistance * 0.25), 0, 1);
+    }
 
     public bool IsLocked => !string.IsNullOrWhiteSpace(LockItemCode);
 
@@ -64,6 +81,10 @@ public sealed class SceneDescriptionData
         Title = edited.Title;
         Body = edited.Body;
         Kind = edited.Kind;
+        Appearance = edited.Appearance;
+        Symbol = edited.Symbol;
+        IconDistance = edited.IconDistance;
+        UnlimitedIconDistance = edited.UnlimitedIconDistance;
         Normalize();
     }
 
@@ -74,6 +95,9 @@ public sealed class SceneDescriptionData
         AuthorUid = NormalizeText(AuthorUid, 128, singleLine: true);
         AuthorName = NormalizeText(AuthorName, 128, singleLine: true);
         LockItemCode = NormalizeText(LockItemCode, 256, singleLine: true);
+        if (!Enum.IsDefined(Appearance)) Appearance = SceneMarkerAppearance.Stone;
+        if (!Enum.IsDefined(Symbol)) Symbol = SceneMarkerSymbol.Exclamation;
+        IconDistance = float.IsFinite(IconDistance) ? Math.Clamp(IconDistance, 1, 1024) : 24;
 
         if (!Enum.IsDefined(Kind))
         {
@@ -93,6 +117,10 @@ public sealed class SceneDescriptionData
             AuthorUid = AuthorUid,
             AuthorName = AuthorName,
             LockItemCode = LockItemCode,
+            Appearance = Appearance,
+            Symbol = Symbol,
+            IconDistance = IconDistance,
+            UnlimitedIconDistance = UnlimitedIconDistance,
         };
     }
 
@@ -105,6 +133,10 @@ public sealed class SceneDescriptionData
         attributes.SetString(AuthorUidAttribute, AuthorUid);
         attributes.SetString(AuthorNameAttribute, AuthorName);
         attributes.SetString(LockItemAttribute, LockItemCode);
+        attributes.SetInt("sceneAppearance", (int)Appearance);
+        attributes.SetInt("sceneSymbol", (int)Symbol);
+        attributes.SetFloat("sceneIconDistance", IconDistance);
+        attributes.SetBool("sceneIconUnlimited", UnlimitedIconDistance);
     }
 
     internal static SceneDescriptionData ReadFrom(ITreeAttribute attributes)
@@ -122,6 +154,10 @@ public sealed class SceneDescriptionData
             AuthorUid = attributes.GetString(AuthorUidAttribute, string.Empty),
             AuthorName = attributes.GetString(AuthorNameAttribute, string.Empty),
             LockItemCode = attributes.GetString(LockItemAttribute, string.Empty),
+            Appearance = (SceneMarkerAppearance)attributes.GetInt("sceneAppearance"),
+            Symbol = (SceneMarkerSymbol)attributes.GetInt("sceneSymbol"),
+            IconDistance = attributes.GetFloat("sceneIconDistance", 24),
+            UnlimitedIconDistance = attributes.GetBool("sceneIconUnlimited"),
         }.Normalize();
     }
 
