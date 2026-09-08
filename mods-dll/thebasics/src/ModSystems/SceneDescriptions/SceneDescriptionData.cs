@@ -12,7 +12,8 @@ public enum SceneDescriptionKind
 public enum SceneDescriptionDisplay { WhenTargeted, AlwaysNearby, OnInteraction }
 
 public enum SceneMarkerAppearance { Stone, Model, Billboard, Hybrid }
-public enum SceneMarkerSymbol { Exclamation, Question, Information }
+public enum SceneMarkerSymbol { Exclamation, Question, Information, Dot, Ring, Diamond }
+public enum SceneMarkerEffect { Plain, Hologram }
 public enum SceneMarkerColor { Gold, Parchment, Blue, Green }
 
 public sealed class SceneDescriptionData
@@ -50,6 +51,7 @@ public sealed class SceneDescriptionData
     public float IndicatorScale { get; set; } = 1;
     internal float SelectionHalfExtent => 0.44f * IndicatorScale + 0.05f;
     public SceneMarkerColor Color { get; set; }
+    public SceneMarkerEffect Effect { get; set; }
 
     public float GetTextOpacity(double distance) => GetOpacity(distance, TextDistance, UnlimitedTextDistance);
 
@@ -108,6 +110,7 @@ public sealed class SceneDescriptionData
         HeightOffset = edited.HeightOffset;
         IndicatorScale = edited.IndicatorScale;
         Color = edited.Color;
+        Effect = edited.Effect;
         Normalize();
     }
 
@@ -126,6 +129,7 @@ public sealed class SceneDescriptionData
         TextDistance = float.IsFinite(TextDistance) ? Math.Clamp(TextDistance, 1, 1024) : 8;
         HeightOffset = float.IsFinite(HeightOffset) ? Math.Clamp(HeightOffset, -0.5f, 4) : 0;
         IndicatorScale = float.IsFinite(IndicatorScale) ? Math.Clamp(IndicatorScale, 0.25f, 3) : 1;
+        if (!Enum.IsDefined(Effect)) Effect = SceneMarkerEffect.Plain;
         if (!Enum.IsDefined(Color)) Color = SceneMarkerColor.Gold;
 
         if (!Enum.IsDefined(Kind))
@@ -154,13 +158,13 @@ public sealed class SceneDescriptionData
             TextDistance = TextDistance,
             UnlimitedTextDistance = UnlimitedTextDistance,
             HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
-            Color = Color,
+            Color = Color, Effect = Effect,
         };
     }
 
     internal SceneDescriptionData AppearanceDefaults() => new SceneDescriptionData
     {
-        Symbol = Symbol, Color = Color, Display = Display, IconDistance = IconDistance,
+        Symbol = Symbol, Color = Color, Effect = Effect, Display = Display, IconDistance = IconDistance,
         UnlimitedIconDistance = UnlimitedIconDistance, TextDistance = TextDistance,
         UnlimitedTextDistance = UnlimitedTextDistance, HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
     }.Normalize();
@@ -184,6 +188,7 @@ public sealed class SceneDescriptionData
         attributes.SetFloat("sceneHeightOffset", HeightOffset);
         attributes.SetFloat("sceneIndicatorScale", IndicatorScale);
         attributes.SetInt("sceneColor", (int)Color);
+        attributes.SetInt("sceneEffect", (int)Effect);
     }
 
     internal static SceneDescriptionData ReadFrom(ITreeAttribute attributes)
@@ -211,6 +216,7 @@ public sealed class SceneDescriptionData
             HeightOffset = attributes.GetFloat("sceneHeightOffset"),
             IndicatorScale = attributes.GetFloat("sceneIndicatorScale", 1),
             Color = (SceneMarkerColor)attributes.GetInt("sceneColor"),
+            Effect = (SceneMarkerEffect)attributes.GetInt("sceneEffect"),
         }.Normalize();
     }
 

@@ -271,6 +271,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             HeightOffset = data.HeightOffset,
             IndicatorScale = data.IndicatorScale,
             Color = (int)data.Color,
+            Effect = (int)data.Effect,
             IsLocked = data.IsLocked,
         };
     }
@@ -293,6 +294,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             HeightOffset = packet.HeightOffset,
             IndicatorScale = packet.IndicatorScale,
             Color = (SceneMarkerColor)packet.Color,
+            Effect = (SceneMarkerEffect)packet.Effect,
             LockItemCode = packet.IsLocked ? "ui" : string.Empty,
         }.Normalize();
     }

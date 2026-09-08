@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using Cairo;
 using Vintagestory.API.Common;
 using Vintagestory.API.Client;
@@ -28,8 +29,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         _canManageLock = canManageLock;
         _onClose = onClose;
         _appearance = (data ?? new SceneDescriptionData()).Clone().Normalize();
-        _symbolShapes = new[] { SceneMarkerVisuals.LoadShape(capi, SceneMarkerSymbol.Exclamation),
-            SceneMarkerVisuals.LoadShape(capi, SceneMarkerSymbol.Question), SceneMarkerVisuals.LoadShape(capi, SceneMarkerSymbol.Information) };
+        _symbolShapes = Enum.GetValues<SceneMarkerSymbol>().Select(symbol => SceneMarkerVisuals.LoadShape(capi, symbol)).ToArray();
         Compose(_appearance);
     }
 
@@ -92,10 +92,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
             .AddDynamicCustomDraw(ElementBounds.Fixed(530, top + 12, 260, 200), DrawPreview, "preview")
             .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212, 260, 22))
-            .AddTextToggleButtons(new[] { "!", "?", "i" }, CairoFont.WhiteSmallText().WithFontSize(26),
+            .AddTextToggleButtons(new[] { "!", "?", "i", "●", "○", "◆" }, CairoFont.WhiteSmallText().WithFontSize(26),
                 index => { _appearance.Symbol = (SceneMarkerSymbol)index; RefreshPreview(); },
-                new[] { ElementBounds.Fixed(530, top + 236, 80, 44), ElementBounds.Fixed(620, top + 236, 80, 44),
-                    ElementBounds.Fixed(710, top + 236, 80, 44) }, "symbol")
+                Enumerable.Range(0, 6).Select(index => ElementBounds.Fixed(530 + index * 44, top + 236, 40, 44)).ToArray(), "symbol")
             .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 290, 90, 22))
             .AddDropDown(new[] { "gold", "parchment", "blue", "green" }, new[] { Lang.Get("thebasics:scene-color-gold"), Lang.Get("thebasics:scene-color-parchment"), Lang.Get("thebasics:scene-color-blue"), Lang.Get("thebasics:scene-color-green") }, (int)data.Color,
                 (value, _) => { _appearance.Color = value switch { "parchment" => SceneMarkerColor.Parchment, "blue" => SceneMarkerColor.Blue, "green" => SceneMarkerColor.Green, _ => SceneMarkerColor.Gold }; RefreshPreview(); }, ElementBounds.Fixed(620, top + 288, 170, 30), "color")
@@ -111,6 +110,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddNumberInput(ElementBounds.Fixed(690, top + 480, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
             .AddStaticText(Lang.Get("thebasics:scene-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 525, 150, 22))
             .AddNumberInput(ElementBounds.Fixed(690, top + 520, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
+            .AddStaticText(Lang.Get("thebasics:scene-effect"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 150, 22))
+            .AddDropDown(new[] { "plain", "hologram" }, new[] { Lang.Get("thebasics:scene-effect-plain"), Lang.Get("thebasics:scene-effect-hologram") }, (int)data.Effect,
+                (value, _) => { _appearance.Effect = value == "hologram" ? SceneMarkerEffect.Hologram : SceneMarkerEffect.Plain; RefreshPreview(); }, ElementBounds.Fixed(160, top + 444, 260, 30), "effect")
             .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth - 140, buttonY, 120, ButtonHeight), key: "save")
             .AddSmallButton(Lang.Get(data.IsLocked ? "thebasics:scene-unlock" : "thebasics:scene-save-lock"), OnLockButton, ElementBounds.Fixed(530, buttonY, 260, ButtonHeight), key: "lock")
@@ -127,6 +129,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetNumberInput("size").SetValue((data.IndicatorScale * 100).ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetNumberInput("size").Enabled = !data.IsLocked;
         SingleComposer.GetDropDown("color").Enabled = !data.IsLocked;
+        SingleComposer.GetDropDown("effect").Enabled = !data.IsLocked;
         RefreshPreview();
         SingleComposer.GetButton("lock").Enabled = _canManageLock;
         SingleComposer.GetButton("save").Enabled = !data.IsLocked;
@@ -134,7 +137,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetTextArea("body").Enabled = !data.IsLocked;
         SingleComposer.GetDropDown("kind").Enabled = !data.IsLocked;
         SingleComposer.GetSwitch("unlimited").Enabled = !data.IsLocked;
-        for (var i = 0; i < 3; i++) SingleComposer.GetToggleButton("symbol-" + i).Enabled = !data.IsLocked;
+        for (var i = 0; i < _symbolShapes.Length; i++) SingleComposer.GetToggleButton("symbol-" + i).Enabled = !data.IsLocked;
         SingleComposer.GetTextInput("title").SetMaxLength(SceneDescriptionData.MaxTitleLength);
         SingleComposer.GetTextInput("title").SetValue(data.Title);
         SingleComposer.GetTextArea("body").SetMaxLength(SceneDescriptionData.MaxBodyLength);
@@ -180,7 +183,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var symbolSize = 0.8 * preview.IndicatorScale;
         var centerY = height - 12 - (1.8 + preview.HeightOffset) * scale;
         var symbolY = centerY - symbolSize / 2 * scale;
-        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], width / 2.0 - symbolSize / 2 * scale, symbolY, symbolSize * scale, preview.Color);
+        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], width / 2.0 - symbolSize / 2 * scale, symbolY, symbolSize * scale,
+            preview.Color, preview.Symbol, preview.Effect, SceneMarkerVisuals.EffectOpacity(preview.Effect, 0));
         if (text != null)
         {
             ctx.Save();
@@ -256,6 +260,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             HeightOffset = _appearance.HeightOffset,
             IndicatorScale = _appearance.IndicatorScale,
             Color = _appearance.Color,
+            Effect = _appearance.Effect,
             Title = SingleComposer.GetTextInput("title").GetText(),
             Body = SingleComposer.GetTextArea("body").GetText(),
             Display = SingleComposer.GetDropDown("kind").SelectedValue switch

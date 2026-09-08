@@ -6,6 +6,38 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 public class SceneDescriptionDataTests
 {
+    [Theory]
+    [InlineData(SceneMarkerSymbol.Dot)]
+    [InlineData(SceneMarkerSymbol.Ring)]
+    [InlineData(SceneMarkerSymbol.Diamond)]
+    public void NewSymbolsAndHologramPersistAndBecomeFreshMarkerDefaults(SceneMarkerSymbol symbol)
+    {
+        var data = new SceneDescriptionData { Symbol = symbol, Effect = SceneMarkerEffect.Hologram };
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        var restored = SceneDescriptionData.ReadFrom(tree);
+        restored.Symbol.Should().Be(symbol);
+        restored.Effect.Should().Be(SceneMarkerEffect.Hologram);
+        restored.Clone().Effect.Should().Be(SceneMarkerEffect.Hologram);
+        restored.AppearanceDefaults().Effect.Should().Be(SceneMarkerEffect.Hologram);
+        var edited = new SceneDescriptionData();
+        edited.ApplyText(restored);
+        edited.Symbol.Should().Be(symbol);
+        edited.Effect.Should().Be(SceneMarkerEffect.Hologram);
+    }
+
+    [Fact]
+    public void MissingAndInvalidEffectsRemainPlainAndShimmerNeverFlashesOff()
+    {
+        SceneDescriptionData.ReadFrom(new TreeAttribute()).Effect.Should().Be(SceneMarkerEffect.Plain);
+        new SceneDescriptionData { Effect = (SceneMarkerEffect)99 }.Normalize().Effect.Should().Be(SceneMarkerEffect.Plain);
+        for (var step = 0; step < 600; step++)
+        {
+            SceneMarkerVisuals.EffectOpacity(SceneMarkerEffect.Hologram, step / 10.0).Should().BeInRange(0.5984f, 0.68f);
+            SceneMarkerVisuals.EffectOpacity(SceneMarkerEffect.Plain, step / 10.0).Should().Be(1);
+        }
+    }
+
     [Fact]
     public void IndicatorSizePersistsIndependentlyOfHeightAndMigratesAtFullSize()
     {

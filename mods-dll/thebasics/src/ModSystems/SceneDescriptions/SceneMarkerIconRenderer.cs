@@ -15,7 +15,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private const double DescriptionCullRadius = MaxDescriptionHeight + 2;
     private readonly ICoreClientAPI _api;
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
-    private readonly Dictionary<(SceneMarkerSymbol Symbol, SceneMarkerColor Color), LoadedTexture> _icons = new();
+    private readonly Dictionary<(SceneMarkerSymbol Symbol, SceneMarkerColor Color, SceneMarkerEffect Effect), LoadedTexture> _icons = new();
     private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth)> _visible = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, (SceneDescriptionData Data, LoadedTexture Texture)> _descriptions = new();
     private readonly HashSet<SceneDescriptionBlockEntity> _shownDescriptions = new();
@@ -64,7 +64,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             foreach (var icon in _visible)
             {
                 var size = 0.8f * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
-                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data.Symbol, icon.Marker.Data.Color), icon.Position, icon.Opacity, size, size);
+                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data.Symbol, icon.Marker.Data.Color, icon.Marker.Data.Effect), icon.Position, icon.Opacity * SceneMarkerVisuals.EffectOpacity(icon.Marker.Data.Effect, _api.World.ElapsedMilliseconds / 1000.0), size, size);
                 var targeted = _api.World.Player.CurrentBlockSelection?.Position?.Equals(icon.Marker.Pos) == true;
                 if (!icon.Marker.Data.ShouldShowDescription(targeted) || icon.TextOpacity <= 0) continue;
                 var text = GetDescription(icon.Marker);
@@ -178,15 +178,15 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         return texture;
     }
 
-    private LoadedTexture GetIcon(SceneMarkerSymbol symbol, SceneMarkerColor color)
+    private LoadedTexture GetIcon(SceneMarkerSymbol symbol, SceneMarkerColor color, SceneMarkerEffect effect)
     {
-        if (_icons.TryGetValue((symbol, color), out var icon)) return icon;
+        if (_icons.TryGetValue((symbol, color, effect), out var icon)) return icon;
         using var surface = new ImageSurface(Format.Argb32, 128, 128);
         using var ctx = new Context(surface);
-        SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, symbol), 0, 0, 128, color);
+        SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, symbol), 0, 0, 128, color, symbol, effect);
         icon = new LoadedTexture(_api);
         _api.Gui.LoadOrUpdateCairoTexture(surface, true, ref icon);
-        _icons.Add((symbol, color), icon);
+        _icons.Add((symbol, color, effect), icon);
         return icon;
     }
 
