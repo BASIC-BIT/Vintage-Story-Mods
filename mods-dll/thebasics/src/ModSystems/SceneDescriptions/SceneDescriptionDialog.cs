@@ -63,7 +63,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private void Compose(SceneDescriptionData data)
     {
         var top = GuiStyle.TitleBarHeight + 12;
-        var buttonY = top + BodyHeight + 170;
+        var buttonY = top + 550;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth + 290, buttonY + ButtonHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
         var titleLabelBounds = ElementBounds.Fixed(0, top, DialogWidth - 20, 22);
@@ -85,21 +85,30 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddDialogTitleBar(Lang.Get("thebasics:scene-description-editor-title"), OnTitleBarClose)
             .BeginChildElements(bodyBounds)
             .AddStaticText(Lang.Get("thebasics:scene-description-title-label"), CairoFont.WhiteSmallText(), titleLabelBounds)
-            .AddTextInput(titleInputBounds, null, CairoFont.TextInput(), "title")
+            .AddTextInput(titleInputBounds, _ => RefreshPreview(), CairoFont.TextInput(), "title")
             .AddStaticText(Lang.Get("thebasics:scene-display-label"), CairoFont.WhiteSmallText(), kindLabelBounds)
-            .AddDropDown(kindValues, kindNames, (int)data.Display, null, kindBounds, "kind")
+            .AddDropDown(kindValues, kindNames, (int)data.Display, (_, _) => RefreshPreview(), kindBounds, "kind")
             .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
-            .AddTextArea(textAreaBounds, null, CairoFont.TextInput(), "body")
+            .AddTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
             .AddDynamicCustomDraw(ElementBounds.Fixed(530, top + 12, 260, 200), DrawPreview, "preview")
-            .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 230, 260, 22))
+            .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212, 260, 22))
             .AddTextToggleButtons(new[] { "!", "?", "i" }, CairoFont.WhiteSmallText().WithFontSize(26),
                 index => { _appearance.Symbol = (SceneMarkerSymbol)index; RefreshPreview(); },
-                new[] { ElementBounds.Fixed(530, top + 260, 80, 44), ElementBounds.Fixed(620, top + 260, 80, 44),
-                    ElementBounds.Fixed(710, top + 260, 80, 44) }, "symbol")
-            .AddStaticText(Lang.Get("thebasics:scene-icon-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 330, 260, 22))
-            .AddNumberInput(ElementBounds.Fixed(530, top + 360, 100, 30), null, CairoFont.TextInput(), "distance")
-            .AddSwitch(value => { _appearance.UnlimitedIconDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 360, 30, 30), "unlimited")
-            .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 362, 110, 28))
+                new[] { ElementBounds.Fixed(530, top + 236, 80, 44), ElementBounds.Fixed(620, top + 236, 80, 44),
+                    ElementBounds.Fixed(710, top + 236, 80, 44) }, "symbol")
+            .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 290, 90, 22))
+            .AddDropDown(new[] { "gold", "parchment", "blue", "green" }, new[] { Lang.Get("thebasics:scene-color-gold"), Lang.Get("thebasics:scene-color-parchment"), Lang.Get("thebasics:scene-color-blue"), Lang.Get("thebasics:scene-color-green") }, (int)data.Color,
+                (value, _) => { _appearance.Color = value switch { "parchment" => SceneMarkerColor.Parchment, "blue" => SceneMarkerColor.Blue, "green" => SceneMarkerColor.Green, _ => SceneMarkerColor.Gold }; RefreshPreview(); }, ElementBounds.Fixed(620, top + 288, 170, 30), "color")
+            .AddStaticText(Lang.Get("thebasics:scene-icon-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 342, 260, 22))
+            .AddNumberInput(ElementBounds.Fixed(530, top + 366, 100, 30), null, CairoFont.TextInput(), "distance")
+            .AddSwitch(value => { _appearance.UnlimitedIconDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 366, 30, 30), "unlimited")
+            .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 368, 110, 28))
+            .AddStaticText(Lang.Get("thebasics:scene-text-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 408, 260, 22))
+            .AddNumberInput(ElementBounds.Fixed(530, top + 432, 100, 30), null, CairoFont.TextInput(), "textdistance")
+            .AddSwitch(value => { _appearance.UnlimitedTextDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 432, 30, 30), "textunlimited")
+            .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 434, 110, 28))
+            .AddStaticText(Lang.Get("thebasics:scene-height"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 485, 150, 22))
+            .AddNumberInput(ElementBounds.Fixed(690, top + 480, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
             .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth - 140, buttonY, 120, ButtonHeight), key: "save")
             .AddSmallButton(Lang.Get(data.IsLocked ? "thebasics:scene-unlock" : "thebasics:scene-save-lock"), OnLockButton, ElementBounds.Fixed(530, buttonY, 260, ButtonHeight), key: "lock")
@@ -109,6 +118,11 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.ToggleButtonsSetValue("symbol", (int)data.Symbol);
         SingleComposer.GetNumberInput("distance").SetValue(data.IconDistance.ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetSwitch("unlimited").SetValue(data.UnlimitedIconDistance);
+        SingleComposer.GetSwitch("textunlimited").SetValue(data.UnlimitedTextDistance);
+        SingleComposer.GetNumberInput("textdistance").SetValue(data.TextDistance.ToString(CultureInfo.InvariantCulture));
+        SingleComposer.GetNumberInput("height").SetValue(data.HeightOffset.ToString(CultureInfo.InvariantCulture));
+        SingleComposer.GetNumberInput("height").Enabled = !data.IsLocked;
+        SingleComposer.GetDropDown("color").Enabled = !data.IsLocked;
         RefreshPreview();
         SingleComposer.GetButton("lock").Enabled = _canManageLock;
         SingleComposer.GetButton("save").Enabled = !data.IsLocked;
@@ -121,6 +135,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetTextInput("title").SetValue(data.Title);
         SingleComposer.GetTextArea("body").SetMaxLength(SceneDescriptionData.MaxBodyLength);
         SingleComposer.GetTextArea("body").SetValue(data.Body, setCaretPosToEnd: false);
+        RefreshPreview();
         SingleComposer.FocusElement(SingleComposer.GetTextArea("body").TabIndex);
     }
 
@@ -128,6 +143,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     {
         if (SingleComposer?.Composed != true) return;
         SingleComposer.GetNumberInput("distance").Enabled = !_appearance.IsLocked && !_appearance.UnlimitedIconDistance;
+        var nearby = SingleComposer.GetDropDown("kind").SelectedValue == "nearby";
+        SingleComposer.GetNumberInput("textdistance").Enabled = !_appearance.IsLocked && nearby && !_appearance.UnlimitedTextDistance;
+        SingleComposer.GetSwitch("textunlimited").Enabled = !_appearance.IsLocked && nearby;
         SingleComposer.GetCustomDraw("preview").Redraw();
     }
 
@@ -137,7 +155,33 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var height = surface.Height;
         ctx.SetSourceRGBA(0.07, 0.09, 0.12, 0.9);
         ctx.Paint();
-        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)_appearance.Symbol], width / 2.0 - 64, height / 2.0 - 64, 128);
+        var preview = _appearance.Clone();
+        if (SingleComposer?.Composed == true)
+        {
+            preview.Title = SingleComposer.GetTextInput("title").GetText();
+            preview.Body = SingleComposer.GetTextArea("body").GetText();
+            preview.Display = SingleComposer.GetDropDown("kind").SelectedValue == "interaction"
+                ? SceneDescriptionDisplay.OnInteraction : SceneDescriptionDisplay.WhenTargeted;
+            if (float.TryParse(SingleComposer.GetNumberInput("height").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var offset))
+                preview.HeightOffset = offset;
+        }
+        preview.Normalize();
+        using var text = preview.ShouldShowDescription(true) ? SceneMarkerVisuals.DescriptionSurface(capi, preview) : null;
+        var textWidth = 3.0;
+        var textHeight = text == null ? 0 : textWidth * text.Height / text.Width;
+        if (textHeight > 6) { textWidth *= 6 / textHeight; textHeight = 6; }
+        var scale = Math.Min((width - 24) / 3.0, (height - 24) / (textHeight + 1.6 + Math.Max(0, preview.HeightOffset)));
+        var symbolY = height - 12 - (0.9 + preview.HeightOffset) * scale;
+        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], width / 2.0 - 0.4 * scale, symbolY, 0.8 * scale, preview.Color);
+        if (text != null)
+        {
+            ctx.Save();
+            ctx.Translate((width - textWidth * scale) / 2, symbolY - (textHeight + 0.1) * scale);
+            ctx.Scale(textWidth * scale / text.Width, textHeight * scale / text.Height);
+            ctx.SetSourceSurface(text, 0, 0);
+            ctx.Paint();
+            ctx.Restore();
+        }
     }
 
     private bool OnLockButton()
@@ -159,6 +203,23 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private bool OnSave()
     {
         if (_appearance.IsLocked) return false;
+        if (!float.TryParse(SingleComposer.GetNumberInput("height").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var height) ||
+            !float.IsFinite(height) || height < -0.5f || height > 4)
+        {
+            capi.TriggerIngameError(this, "scene-height", Lang.Get("thebasics:scene-height-invalid"));
+            return false;
+        }
+        _appearance.HeightOffset = height;
+        if (SingleComposer.GetDropDown("kind").SelectedValue == "nearby" && !_appearance.UnlimitedTextDistance)
+        {
+            if (!float.TryParse(SingleComposer.GetNumberInput("textdistance").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var textDistance) ||
+                !float.IsFinite(textDistance) || textDistance < 1 || textDistance > 1024)
+            {
+                capi.TriggerIngameError(this, "scene-distance", Lang.Get("thebasics:scene-distance-invalid"));
+                return false;
+            }
+            _appearance.TextDistance = textDistance;
+        }
         var usesDistance = !_appearance.UnlimitedIconDistance;
         if (usesDistance &&
             (!float.TryParse(SingleComposer.GetNumberInput("distance").GetText(), NumberStyles.Float,
@@ -175,6 +236,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             Symbol = _appearance.Symbol,
             IconDistance = _appearance.IconDistance,
             UnlimitedIconDistance = _appearance.UnlimitedIconDistance,
+            TextDistance = _appearance.TextDistance,
+            UnlimitedTextDistance = _appearance.UnlimitedTextDistance,
+            HeightOffset = _appearance.HeightOffset,
+            Color = _appearance.Color,
             Title = SingleComposer.GetTextInput("title").GetText(),
             Body = SingleComposer.GetTextArea("body").GetText(),
             Display = SingleComposer.GetDropDown("kind").SelectedValue switch

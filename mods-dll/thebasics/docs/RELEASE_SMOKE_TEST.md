@@ -69,7 +69,7 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 6. **Scene Markers** (P1)
    - Config: default production-like config; two players, with one location inside a claim the second player cannot build in.
    - Do: Craft a marker from two loose stones. Place one on the ground and one on a wall. Shift-right-click to save a title and multiline description. Compare When targeted, Always nearby, and On interaction while aiming, looking away, and walking beyond the configured range. Right-click to read each mode, including as a claim visitor. Pick up and replace the marker, then attempt an unauthorized edit.
-   - Expect: The symbol bobs gently. Floating text appears only when targeted, throughout the nearby range, or never, respectively. Nearby text shares the symbol fade. Right-click always opens the complete description; the top-middle inspector shows a short preview. Content, display mode, and author metadata survive replacement. Unauthorized edits are refused.
+   - Expect: The symbol bobs gently. Floating text appears only when targeted, throughout the nearby range, or never, respectively. Nearby text uses its own configured range and fade. Right-click always opens the complete description; the top-middle inspector shows a short preview. Content, display mode, and author metadata survive replacement. Unauthorized edits are refused.
    - Watch for: text clipping or disappearing at steep camera angles, unreadable long descriptions, raw VTML, lost metadata, duplicate drops, claim bypass, or client/server exceptions.
 
    **Scene-marker UI lock follow-up** (P0, same batch):

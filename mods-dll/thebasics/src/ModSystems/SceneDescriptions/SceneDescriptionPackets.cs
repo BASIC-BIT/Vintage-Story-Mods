@@ -22,4 +22,8 @@ public sealed class SceneDescriptionEditPacket
     [ProtoMember(9)] public bool CanManageLock { get; set; }
     [ProtoMember(10)] public bool LockAfterSave { get; set; }
     [ProtoMember(11)] public int Display { get; set; }
+    [ProtoMember(12)] public float TextDistance { get; set; } = 8;
+    [ProtoMember(13)] public bool UnlimitedTextDistance { get; set; }
+    [ProtoMember(14)] public float HeightOffset { get; set; }
+    [ProtoMember(15)] public int Color { get; set; }
 }

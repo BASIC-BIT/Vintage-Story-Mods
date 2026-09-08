@@ -6,6 +6,54 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 public class SceneDescriptionDataTests
 {
+    [Fact]
+    public void AppearanceControlsRoundTripWithoutCopyingContentOrOwnership()
+    {
+        var data = new SceneDescriptionData { Title = "Private title", Body = "Scene", AuthorUid = "owner", LockItemCode = "ui",
+            Symbol = SceneMarkerSymbol.Question, Color = SceneMarkerColor.Green, HeightOffset = 2,
+            Display = SceneDescriptionDisplay.AlwaysNearby, IconDistance = 40, TextDistance = 6, UnlimitedTextDistance = true };
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        SceneDescriptionData.ReadFrom(tree).Should().BeEquivalentTo(data);
+        var defaults = data.AppearanceDefaults();
+        defaults.Title.Should().BeEmpty();
+        defaults.Body.Should().BeEmpty();
+        defaults.AuthorUid.Should().BeEmpty();
+        defaults.IsLocked.Should().BeFalse();
+        defaults.Color.Should().Be(SceneMarkerColor.Green);
+        defaults.HeightOffset.Should().Be(2);
+        defaults.TextDistance.Should().Be(6);
+        defaults.UnlimitedTextDistance.Should().BeTrue();
+    }
+
+    [Fact]
+    public void TextRangeIsIndependentAndOldMarkersRetainTheirSharedRange()
+    {
+        var data = new SceneDescriptionData { IconDistance = 24, TextDistance = 8 };
+        data.GetIconOpacity(10).Should().Be(1);
+        data.GetTextOpacity(10).Should().Be(0);
+        data.GetTextOpacity(7).Should().Be(0.5f);
+        data.UnlimitedTextDistance = true;
+        data.GetTextOpacity(100).Should().Be(1);
+        data.GetIconOpacity(100).Should().Be(0);
+        var old = new TreeAttribute();
+        old.SetFloat("sceneIconDistance", 50);
+        old.SetBool("sceneIconUnlimited", true);
+        SceneDescriptionData.ReadFrom(old).TextDistance.Should().Be(50);
+        SceneDescriptionData.ReadFrom(old).UnlimitedTextDistance.Should().BeTrue();
+    }
+
+    [Fact]
+    public void MalformedAppearanceControlsAreNormalized()
+    {
+        var data = new SceneDescriptionData { Color = (SceneMarkerColor)99, TextDistance = float.NaN, HeightOffset = float.PositiveInfinity }.Normalize();
+        data.Color.Should().Be(SceneMarkerColor.Gold);
+        data.TextDistance.Should().Be(8);
+        data.HeightOffset.Should().Be(0);
+        new SceneDescriptionData { HeightOffset = 100, TextDistance = -2 }.Normalize().HeightOffset.Should().Be(4);
+        new SceneDescriptionData { HeightOffset = -100, TextDistance = -2 }.Normalize().TextDistance.Should().Be(1);
+    }
+
     [Theory]
     [InlineData(SceneDescriptionDisplay.WhenTargeted, false, false)]
     [InlineData(SceneDescriptionDisplay.WhenTargeted, true, true)]

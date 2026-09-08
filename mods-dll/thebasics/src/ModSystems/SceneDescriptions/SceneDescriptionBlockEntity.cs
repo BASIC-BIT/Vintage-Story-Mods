@@ -17,6 +17,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     private const int SaveEditorPacketId = 1002;
     private const int UnlockPacketId = 1003;
     private const double MaxEditDistance = 8;
+    private const string AppearancePreferencesKey = "thebasics-scene-appearance";
 
     private SceneDescriptionDialog _dialog;
 
@@ -36,6 +37,20 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     public void InitializeFromItem(ItemStack itemStack, IPlayer player)
     {
         Data = SceneDescriptionData.ReadFrom(itemStack?.Attributes);
+        // Only pristine crafted markers inherit defaults. Picked-up markers carry scene metadata.
+        if (itemStack?.Attributes?.HasAttribute(SceneDescriptionData.TitleAttribute) != true)
+        {
+            Data = new SceneDescriptionData();
+            if (player is IServerPlayer serverPlayer)
+            {
+                try
+                {
+                    var stored = serverPlayer.GetModData<SceneDescriptionEditPacket>(AppearancePreferencesKey);
+                    if (stored != null) Data = FromPacket(stored).AppearanceDefaults();
+                }
+                catch (Exception ex) { Api.Logger.Warning("[THEBASICS] Could not read scene appearance preferences: {0}", ex.Message); }
+            }
+        }
         Data.EstablishCreator(player?.PlayerUID, player?.PlayerName);
 
         Data.Normalize();
@@ -104,6 +119,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
         Data.ApplyText(FromPacket(packet));
+        if (player is IServerPlayer savingPlayer)
+        {
+            var defaults = ToPacket(Data.AppearanceDefaults());
+            savingPlayer.SetModData(AppearancePreferencesKey, defaults);
+        }
         if (packet?.LockAfterSave == true) Data.LockItemCode = "ui";
         MarkDirty(redrawOnClient: true);
         Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
@@ -246,6 +266,10 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Symbol = (int)data.Symbol,
             IconDistance = data.IconDistance,
             UnlimitedIconDistance = data.UnlimitedIconDistance,
+            TextDistance = data.TextDistance,
+            UnlimitedTextDistance = data.UnlimitedTextDistance,
+            HeightOffset = data.HeightOffset,
+            Color = (int)data.Color,
             IsLocked = data.IsLocked,
         };
     }
@@ -263,6 +287,10 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Symbol = (SceneMarkerSymbol)packet.Symbol,
             IconDistance = packet.IconDistance,
             UnlimitedIconDistance = packet.UnlimitedIconDistance,
+            TextDistance = packet.TextDistance,
+            UnlimitedTextDistance = packet.UnlimitedTextDistance,
+            HeightOffset = packet.HeightOffset,
+            Color = (SceneMarkerColor)packet.Color,
             LockItemCode = packet.IsLocked ? "ui" : string.Empty,
         }.Normalize();
     }

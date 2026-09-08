@@ -12,6 +12,41 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneDescriptionServerTests
 {
     [Fact]
+    public void AcceptedAppearanceIsRememberedOnlyForFreshMarkers()
+    {
+        var (marker, player, _) = CreateMarker();
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
+        { Title = "Old title", Body = "Old body", Color = (int)SceneMarkerColor.Blue, HeightOffset = 3, TextDistance = 5,
+            Display = (int)SceneDescriptionDisplay.AlwaysNearby, Symbol = (int)SceneMarkerSymbol.Information }));
+        marker.InitializeFromItem(new ItemStack(new SceneDescriptionBlock()), player);
+        marker.Data.Color.Should().Be(SceneMarkerColor.Blue);
+        marker.Data.HeightOffset.Should().Be(3);
+        marker.Data.TextDistance.Should().Be(5);
+        marker.Data.Display.Should().Be(SceneDescriptionDisplay.AlwaysNearby);
+        marker.Data.Title.Should().BeEmpty();
+        marker.Data.Body.Should().BeEmpty();
+        marker.Data.AuthorUid.Should().Be(player.PlayerUID);
+        var pickedUp = new ItemStack(new SceneDescriptionBlock());
+        new SceneDescriptionData { Title = "Existing", Color = SceneMarkerColor.Green, HeightOffset = 1 }.WriteTo(pickedUp.Attributes);
+        marker.InitializeFromItem(pickedUp, player);
+        marker.Data.Title.Should().Be("Existing");
+        marker.Data.Color.Should().Be(SceneMarkerColor.Green);
+        marker.Data.HeightOffset.Should().Be(1);
+        marker.InitializeFromItem(new ItemStack(new SceneDescriptionBlock()), new FakeServerPlayer("other"));
+        marker.Data.Color.Should().Be(SceneMarkerColor.Gold);
+        marker.Data.TextDistance.Should().Be(8);
+    }
+
+    [Fact]
+    public void DeniedSaveDoesNotChangeRememberedAppearance()
+    {
+        var (marker, player, _) = CreateMarker(claim: false);
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket { Color = (int)SceneMarkerColor.Blue }));
+        marker.InitializeFromItem(new ItemStack(new SceneDescriptionBlock()), player);
+        marker.Data.Color.Should().Be(SceneMarkerColor.Gold);
+    }
+
+    [Fact]
     public void ModStartup_RegistersSceneMarkersWithoutPadlockHooks()
     {
         var system = new SceneDescriptionSystem();

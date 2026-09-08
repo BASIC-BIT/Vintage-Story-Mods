@@ -28,6 +28,7 @@
     accent: { base: "game:block/stone/rock/chalk1" }
   },
   blockmaterial: "Stone",
+  renderpass: "Transparent",
   lightAbsorption: 0,
   sidesolid: { all: false },
   sideopaque: { all: false },

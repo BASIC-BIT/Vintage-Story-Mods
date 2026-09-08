@@ -15,8 +15,14 @@ public sealed class SceneDescriptionBlock : BlockSign
     private WorldInteraction[] _interactions;
 
     // Fixed interaction bounds include the complete idle-bob envelope without making targeting wobble.
-    public override Cuboidf[] GetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos) =>
-        [new Cuboidf(0.18f, 0.12f, 0.18f, 0.82f, 1.1f, 0.82f)];
+    public override Cuboidf[] GetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos)
+    {
+        // Terrain traversal must not stop early on boxes extending beyond this voxel.
+        // Client picking supplies its own nearest-symbol hit after terrain; other sight rays ignore symbols.
+        if (api?.Side == EnumAppSide.Client) return [];
+        var offset = (blockAccessor.GetBlockEntity(pos) as SceneDescriptionBlockEntity)?.Data.HeightOffset ?? 0;
+        return [new Cuboidf(0.02f, 0.17f + offset, 0.02f, 0.98f, 1.13f + offset, 0.98f)];
+    }
 
     public override Cuboidf[] GetCollisionBoxes(IBlockAccessor blockAccessor, BlockPos pos) => [];
 
