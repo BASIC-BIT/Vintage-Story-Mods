@@ -12,7 +12,7 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneDescriptionServerTests
 {
     [Fact]
-    public void ModStartup_InstallsAndRemovesPadlockHookAgainstGameAssembly()
+    public void ModStartup_RegistersSceneMarkersWithoutPadlockHooks()
     {
         var system = new SceneDescriptionSystem();
         try
@@ -45,23 +45,16 @@ public class SceneDescriptionServerTests
     }
 
     [Fact]
-    public void LockUnlock_ConsumesOnePadlockAndReturnsItOnlyOnce()
+    public void SaveAndLockPacketLocksWithoutAConsumable()
     {
         var (marker, player, world) = CreateMarker();
-        var padlock = new ItemPadlock { Code = new AssetLocation("game:padlock-copper") };
-        var slot = new DummySlot(new ItemStack(padlock, 2));
-        player.InventoryManager = Substitute.For<IPlayerInventoryManager>();
-        player.InventoryManager.TryGiveItemstack(Arg.Any<ItemStack>()).Returns(true);
-        world.GetItem(Arg.Any<AssetLocation>()).Returns(padlock);
-
-        marker.TryLock(player, slot).Should().BeTrue();
-        slot.StackSize.Should().Be(1);
-        marker.TryLock(player, slot).Should().BeFalse();
-        slot.StackSize.Should().Be(1);
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
+        { Body = "Saved and locked", LockAfterSave = true }));
+        marker.Data.Body.Should().Be("Saved and locked");
+        marker.Data.IsLocked.Should().BeTrue();
         marker.TryUnlock(player).Should().BeTrue();
         marker.TryUnlock(player).Should().BeFalse();
-        player.InventoryManager.Received(1).TryGiveItemstack(Arg.Is<ItemStack>(stack => stack.Item == padlock && stack.StackSize == 1));
-        marker.Data.IsLocked.Should().BeFalse();
+        world.DidNotReceive().SpawnItemEntity(Arg.Any<ItemStack>(), Arg.Any<Vec3d>(), Arg.Any<Vec3d>());
     }
 
     [Theory]
@@ -73,9 +66,9 @@ public class SceneDescriptionServerTests
         var (marker, player, _) = CreateMarker(claim);
         player.PlayerUID = uid;
         if (farAway) player.Entity.Pos.SetPos(50, 50, 50);
-        var slot = new DummySlot(new ItemStack(new ItemPadlock { Code = new AssetLocation("game:padlock-copper") }));
-        marker.TryLock(player, slot).Should().BeFalse();
-        slot.StackSize.Should().Be(1);
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
+        { Body = "Denied save", LockAfterSave = true }));
+        marker.Data.Body.Should().Be("Original text");
         marker.Data.IsLocked.Should().BeFalse();
     }
 
@@ -122,10 +115,10 @@ public class SceneDescriptionServerTests
     }
 
     [Theory]
-    [InlineData(false, true, SceneMarkerAppearance.Hybrid)]
-    [InlineData(true, true, SceneMarkerAppearance.Stone)]
-    [InlineData(false, false, SceneMarkerAppearance.Stone)]
-    public void AppearancePacketUsesExistingEditPermissions(bool locked, bool claim, SceneMarkerAppearance expected)
+    [InlineData(false, true, SceneMarkerSymbol.Information)]
+    [InlineData(true, true, SceneMarkerSymbol.Exclamation)]
+    [InlineData(false, false, SceneMarkerSymbol.Exclamation)]
+    public void AppearancePacketUsesExistingEditPermissions(bool locked, bool claim, SceneMarkerSymbol expected)
     {
         var (marker, player, _) = CreateMarker(claim);
         marker.Data.LockItemCode = locked ? "game:padlock-copper" : "";
@@ -134,7 +127,8 @@ public class SceneDescriptionServerTests
             Body = "New appearance", Appearance = (int)SceneMarkerAppearance.Hybrid,
             Symbol = (int)SceneMarkerSymbol.Information, IconDistance = 80, UnlimitedIconDistance = true,
         }));
-        marker.Data.Appearance.Should().Be(expected);
+        marker.Data.Symbol.Should().Be(expected);
+        marker.Data.Appearance.Should().Be(SceneMarkerAppearance.Billboard);
         marker.Data.AuthorUid.Should().Be("creator");
         marker.Data.IsLocked.Should().Be(locked);
         if (!locked && claim)

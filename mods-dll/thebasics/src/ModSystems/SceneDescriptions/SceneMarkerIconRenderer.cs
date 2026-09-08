@@ -60,6 +60,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             if (marker.Pos.dimension != player.Pos.Dimension) continue;
             var position = marker.Pos.ToVec3d().Add(0.5, 0.65, 0.5);
             var opacity = marker.Data.GetIconOpacity(player.Pos.XYZ.DistanceTo(position));
+            // Four-second cycle, only five centimetres either side of the resting height.
+            position.Y += 0.05 * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / 4000));
             if (opacity <= 0 || !render.DefaultFrustumCuller.SphereInFrustum(position.X, position.Y, position.Z, 1)) continue;
             _visible.Add((marker, position, opacity, player.CameraPos.SquareDistanceTo(position)));
         }

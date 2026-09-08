@@ -72,12 +72,11 @@ Run this after the ModDB release is published. It verifies the player-facing ins
    - Expect: Both placements use a small unobtrusive marker. Text appears only while directly targeting it. Environmental and OOC presentations are visibly distinct. Title, body, presentation, and author metadata survive pickup and replacement. The unauthorized edit is refused.
    - Watch for: literal text drawn on the block, always-visible clutter, dropped data loss, raw VTML, wrong wall orientation, duplicate or empty drops, claim bypass, or client/server exceptions.
 
-   **Scene-marker padlock follow-up** (P0, same batch):
-   - Setup: Player A places an unlocked marker. Player B has build access to that location. Player C has `controlserver` and claim access. Use the same exact candidate on both server and clients.
-   - Do: B edits the unlocked marker, then tries to attach a padlock. A attaches one by sneak-right-clicking. Both players read it; B tries to edit, unlock with an empty hand, and break it (including creative breaking if available). Attempt to save an editor opened before A locked it.
-   - Expect: B's edit does not transfer creator ownership; B cannot lock, unlock, edit, or break A's locked marker. A's successful lock consumes exactly one padlock. Targeted narration and held-item reading remain available. Stale editor saves are refused.
-   - Do: A breaks and replaces the locked marker; repeat on ground and wall variants. Save/restart and reconnect. A unlocks with an empty-hand sneak-right-click; repeat with C on another locked marker. Repeat attempts without claim build access, including creator/admin attempts. Try unlocking with a full inventory.
-   - Expect: Lock and creator survive drops, replacement, and restart. Only A/C with claim access can remove or unlock it. Unlock returns exactly one padlock (to inventory or as a drop), and repeated interaction cannot duplicate it. Editing resumes after unlock. Ordinary vanilla padlocks on other block types still behave normally. Removing a marker's support or detonating an explosion must not yield its locked item to B.
+   **Scene-marker UI lock follow-up** (P0, same batch):
+   - Setup: Player A creates a marker; B has claim build access; C has `controlserver` and claim access.
+   - Do: A edits title/body/symbol and chooses Save & lock. Expect edits saved and a read-only editor with Unlock. B can read but cannot edit, lock, unlock or break A's locked marker. A stale editor must not bypass the lock.
+   - Do: A or C unlocks in the editor. Expect editable fields restored, no item consumed or returned. Deny the same action outside reach or without claim access. Pick up/replace and restart: lock, content and creator must persist.
+   - Do: Observe the billboard bobbing gently; confirm no mode picker or explanatory range footer. Changing symbols, finite distance and Unlimited must still work. No physical base or 3D model should remain on old markers.
 
 7. **Typing Indicator** (P1)
    - Config: `EnableTypingIndicator=true`.

@@ -1,4 +1,3 @@
-using HarmonyLib;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
@@ -9,7 +8,6 @@ public sealed class SceneDescriptionSystem : ModSystem
     private ICoreClientAPI _clientApi;
     private SceneDescriptionRenderer _renderer;
     private SceneMarkerIconRenderer _iconRenderer;
-    private Harmony _harmony;
 
     internal void Register(SceneDescriptionBlockEntity marker) => _iconRenderer?.Register(marker);
     internal void Unregister(SceneDescriptionBlockEntity marker) => _iconRenderer?.Unregister(marker);
@@ -18,8 +16,6 @@ public sealed class SceneDescriptionSystem : ModSystem
     {
         api.RegisterBlockClass("TheBasicsSceneDescriptionBlock", typeof(SceneDescriptionBlock));
         api.RegisterBlockEntityClass("TheBasicsSceneDescription", typeof(SceneDescriptionBlockEntity));
-        _harmony = new Harmony("thebasics.scene-marker-padlocks");
-        _harmony.CreateClassProcessor(typeof(SceneDescriptionPadlockPatch)).Patch();
     }
 
     public override void StartClientSide(ICoreClientAPI api)
@@ -33,8 +29,6 @@ public sealed class SceneDescriptionSystem : ModSystem
 
     public override void Dispose()
     {
-        _harmony?.UnpatchAll("thebasics.scene-marker-padlocks");
-        _harmony = null;
         if (_clientApi != null && _renderer != null)
         {
             _clientApi.Event.UnregisterRenderer(_renderer, EnumRenderStage.Ortho);

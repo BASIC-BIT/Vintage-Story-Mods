@@ -6,9 +6,7 @@
     "general": ["scene-marker-ground-north"],
     "decorative": ["scene-marker-ground-north"]
   },
-  behaviors: [{ name: "Lockable" }],
   attributes: {
-    reinforcable: true,
     handbook: { groupBy: ["scene-marker-*"] }
   },
   variantgroups: [

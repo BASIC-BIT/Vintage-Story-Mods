@@ -10,23 +10,6 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneMarkerAppearanceTests
 {
     [Fact]
-    public void HybridKeepsItsPhysicalBaseSelectable()
-    {
-        var accessor = Substitute.For<IBlockAccessor>();
-        var pos = new BlockPos(0, 0, 0, 0);
-        var baseBox = new Cuboidf(0.1875f, 0, 0.1875f, 0.8125f, 0.0625f, 0.8125f);
-        var block = new SceneDescriptionBlock { SelectionBoxes = [baseBox] };
-        accessor.GetChunkAtBlockPos(pos).Returns((IWorldChunk)null!);
-        var marker = new SceneDescriptionBlockEntity();
-        marker.Data.Appearance = SceneMarkerAppearance.Hybrid;
-        accessor.GetBlockEntity(pos).Returns(marker);
-        var boxes = block.GetSelectionBoxes(accessor, pos);
-        boxes.Should().HaveCount(2);
-        boxes[0].Should().BeSameAs(baseBox);
-        boxes[1].Y2.Should().Be(1);
-    }
-
-    [Fact]
     public void BillboardIsSelectableWithoutAnInvisiblePhysicalObstacle()
     {
         var accessor = Substitute.For<IBlockAccessor>();
@@ -49,17 +32,18 @@ public class SceneMarkerAppearanceTests
         var data = new SceneDescriptionData { Appearance = appearance, Symbol = SceneMarkerSymbol.Question,
             IconDistance = 72, UnlimitedIconDistance = true, AuthorUid = "creator", LockItemCode = "game:padlock-copper" };
         var tree = new TreeAttribute();
+        data.Normalize();
         data.WriteTo(tree);
         SceneDescriptionData.ReadFrom(tree).Clone().Should().BeEquivalentTo(data);
     }
 
     [Fact]
-    public void OldMarkersKeepTheirStoneAppearance()
+    public void OldMarkersMigrateToBillboardAppearance()
     {
         var tree = new TreeAttribute();
         tree.SetString("sceneBody", "Old description");
         var data = SceneDescriptionData.ReadFrom(tree);
-        data.Appearance.Should().Be(SceneMarkerAppearance.Stone);
+        data.Appearance.Should().Be(SceneMarkerAppearance.Billboard);
         data.IconDistance.Should().Be(24);
         data.UnlimitedIconDistance.Should().BeFalse();
     }
@@ -74,7 +58,7 @@ public class SceneMarkerAppearanceTests
     {
         var data = new SceneDescriptionData { Appearance = (SceneMarkerAppearance)100,
             Symbol = (SceneMarkerSymbol)(-1), IconDistance = distance }.Normalize();
-        data.Appearance.Should().Be(SceneMarkerAppearance.Stone);
+        data.Appearance.Should().Be(SceneMarkerAppearance.Billboard);
         data.Symbol.Should().Be(SceneMarkerSymbol.Exclamation);
         data.IconDistance.Should().Be(expected);
     }
@@ -92,11 +76,11 @@ public class SceneMarkerAppearanceTests
     }
 
     [Theory]
-    [InlineData(SceneMarkerAppearance.Stone, 0)]
-    [InlineData(SceneMarkerAppearance.Model, 0)]
+    [InlineData(SceneMarkerAppearance.Stone, 1)]
+    [InlineData(SceneMarkerAppearance.Model, 1)]
     [InlineData(SceneMarkerAppearance.Billboard, 1)]
     [InlineData(SceneMarkerAppearance.Hybrid, 1)]
-    public void UnlimitedOnlyAppliesToBillboardModes(SceneMarkerAppearance appearance, float expected)
+    public void RetiredModesAlsoDisplayAsUnlimitedBillboards(SceneMarkerAppearance appearance, float expected)
     {
         new SceneDescriptionData { Appearance = appearance, UnlimitedIconDistance = true }
             .GetIconOpacity(100000).Should().Be(expected);

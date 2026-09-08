@@ -36,15 +36,14 @@ public sealed class SceneDescriptionData
 
     public string LockItemCode { get; set; } = string.Empty;
 
-    public SceneMarkerAppearance Appearance { get; set; }
+    public SceneMarkerAppearance Appearance { get; set; } = SceneMarkerAppearance.Billboard;
     public SceneMarkerSymbol Symbol { get; set; }
     public float IconDistance { get; set; } = 24;
     public bool UnlimitedIconDistance { get; set; }
 
     public float GetIconOpacity(double distance)
     {
-        if (Appearance is not (SceneMarkerAppearance.Billboard or SceneMarkerAppearance.Hybrid) ||
-            !double.IsFinite(distance) || distance < 0) return 0;
+        if (!double.IsFinite(distance) || distance < 0) return 0;
         if (UnlimitedIconDistance) return 1;
         // Fade through the outer quarter of the configured radius.
         return (float)Math.Clamp((IconDistance - distance) / (IconDistance * 0.25), 0, 1);
@@ -95,7 +94,8 @@ public sealed class SceneDescriptionData
         AuthorUid = NormalizeText(AuthorUid, 128, singleLine: true);
         AuthorName = NormalizeText(AuthorName, 128, singleLine: true);
         LockItemCode = NormalizeText(LockItemCode, 256, singleLine: true);
-        if (!Enum.IsDefined(Appearance)) Appearance = SceneMarkerAppearance.Stone;
+        // Retired experimental modes migrate to the billboard without changing content or ownership.
+        Appearance = SceneMarkerAppearance.Billboard;
         if (!Enum.IsDefined(Symbol)) Symbol = SceneMarkerSymbol.Exclamation;
         IconDistance = float.IsFinite(IconDistance) ? Math.Clamp(IconDistance, 1, 1024) : 24;
 

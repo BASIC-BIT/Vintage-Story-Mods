@@ -14,35 +14,11 @@ public sealed class SceneDescriptionBlock : BlockSign
 {
     private WorldInteraction[] _interactions;
 
-    public override Cuboidf[] GetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos)
-    {
-        if (blockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity marker &&
-            marker.Data.Appearance != SceneMarkerAppearance.Stone)
-        {
-            // Includes the floating symbol, so players can inspect and edit what they see.
-            var symbol = new Cuboidf(0.18f, 0.12f, 0.18f, 0.82f, 1f, 0.82f);
-            return marker.Data.Appearance == SceneMarkerAppearance.Hybrid
-                ? [..base.GetSelectionBoxes(blockAccessor, pos), symbol]
-                : [symbol];
-        }
-        return base.GetSelectionBoxes(blockAccessor, pos);
-    }
+    // Fixed interaction bounds include the complete idle-bob envelope without making targeting wobble.
+    public override Cuboidf[] GetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos) =>
+        [new Cuboidf(0.18f, 0.12f, 0.18f, 0.82f, 1.1f, 0.82f)];
 
-    public override Cuboidf[] GetCollisionBoxes(IBlockAccessor blockAccessor, BlockPos pos)
-    {
-        if (blockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity marker)
-        {
-            if (marker.Data.Appearance == SceneMarkerAppearance.Billboard) return [];
-            if (marker.Data.Appearance == SceneMarkerAppearance.Model)
-            {
-                var sideways = Variant["side"] is "east" or "west";
-                return sideways
-                    ? [new Cuboidf(0.4375f, 0.125f, 0.1875f, 0.5625f, 1f, 0.8125f)]
-                    : [new Cuboidf(0.1875f, 0.125f, 0.4375f, 0.8125f, 1f, 0.5625f)];
-            }
-        }
-        return base.GetCollisionBoxes(blockAccessor, pos);
-    }
+    public override Cuboidf[] GetCollisionBoxes(IBlockAccessor blockAccessor, BlockPos pos) => [];
 
     public override void OnLoaded(ICoreAPI api)
     {
@@ -73,33 +49,15 @@ public sealed class SceneDescriptionBlock : BlockSign
     {
         if (byPlayer?.Entity?.Controls?.ShiftKey == true && world.BlockAccessor.GetBlockEntity(blockSelection.Position) is SceneDescriptionBlockEntity blockEntity)
         {
-            // The held-item handler consumes padlocks. Never open/unlock the marker as a fallback.
-            if (byPlayer.InventoryManager.ActiveHotbarSlot?.Itemstack?.Collectible is ItemPadlock)
-            {
-                return false;
-            }
-
             if (world.Side == EnumAppSide.Server)
             {
-                InteractWithMarker(byPlayer, blockEntity);
+                blockEntity.OpenEditor(byPlayer);
             }
 
             return true;
         }
 
         return false;
-    }
-
-    private static void InteractWithMarker(IPlayer player, SceneDescriptionBlockEntity marker)
-    {
-        if (!marker.Data.IsLocked)
-        {
-            marker.OpenEditor(player);
-        }
-        else if (player.InventoryManager.ActiveHotbarSlot?.Empty != true || !marker.TryUnlock(player))
-        {
-            DenyLocked(player);
-        }
     }
 
     public override void OnHeldInteractStart(ItemSlot slot, EntityAgent byEntity, BlockSelection blockSelection, EntitySelection entitySelection, bool firstEvent, ref EnumHandHandling handling)
@@ -183,10 +141,6 @@ public sealed class SceneDescriptionBlock : BlockSign
     {
         base.GetHeldItemInfo(inSlot, description, world, withDebugInfo);
         var data = SceneDescriptionData.ReadFrom(inSlot?.Itemstack?.Attributes);
-        if (data.IsLocked)
-        {
-            description.AppendLine(Lang.Get("thebasics:scene-description-locked-item-help"));
-        }
         if (string.IsNullOrWhiteSpace(data.Body))
         {
             description.AppendLine(Lang.Get("thebasics:scene-description-empty-item-help"));

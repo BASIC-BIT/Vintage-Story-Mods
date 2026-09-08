@@ -18,19 +18,9 @@ internal static class SceneMarkerVisuals
     }
 
     // The same cuboids supply the 3D mesh, billboard artwork and picker preview.
-    internal static void Draw(Context ctx, Shape shape, double x, double y, double size, bool extruded = false)
+    internal static void Draw(Context ctx, Shape shape, double x, double y, double size)
     {
         var unit = size / 16;
-        if (extruded)
-        {
-            ctx.SetSourceRGBA(0.45, 0.29, 0.08, 1);
-            foreach (var element in shape.Elements)
-            {
-                ctx.Rectangle(x + element.From[0] * unit + 3, y + (16 - element.To[1]) * unit + 3,
-                    (element.To[0] - element.From[0]) * unit, (element.To[1] - element.From[1]) * unit);
-            }
-            ctx.Fill();
-        }
         ctx.SetSourceRGBA(1, 0.82, 0.30, 1);
         foreach (var element in shape.Elements)
         {

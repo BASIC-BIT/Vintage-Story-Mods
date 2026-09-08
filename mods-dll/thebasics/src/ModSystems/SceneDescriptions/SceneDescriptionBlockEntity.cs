@@ -15,42 +15,21 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 {
     private const int OpenEditorPacketId = 1001;
     private const int SaveEditorPacketId = 1002;
+    private const int UnlockPacketId = 1003;
     private const double MaxEditDistance = 8;
 
     private SceneDescriptionDialog _dialog;
-    private MeshData _appearanceMesh;
 
     public override void Initialize(ICoreAPI api)
     {
         base.Initialize(api);
         if (api is ICoreClientAPI client)
         {
-            PrepareAppearance(client);
             client.ModLoader.GetModSystem<SceneDescriptionSystem>().Register(this);
         }
     }
 
-    private void PrepareAppearance(ICoreClientAPI client)
-    {
-        _appearanceMesh = null;
-        if (Data.Appearance != SceneMarkerAppearance.Model) return;
-        var shape = SceneMarkerVisuals.LoadShape(client, Data.Symbol);
-        client.Tesselator.TesselateShape(Block, shape, out var mesh, new Vec3f(0, Block.Shape.rotateY, 0));
-        for (var i = 0; i < mesh.Rgba.Length; i += 4)
-        {
-            mesh.Rgba[i + 1] = (byte)(mesh.Rgba[i + 1] * 0.82);
-            mesh.Rgba[i + 2] = (byte)(mesh.Rgba[i + 2] * 0.30);
-        }
-        _appearanceMesh = mesh;
-    }
-
-    public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tesselator)
-    {
-        if (Data.Appearance == SceneMarkerAppearance.Billboard) return true;
-        if (Data.Appearance != SceneMarkerAppearance.Model) return false;
-        if (_appearanceMesh != null) mesher.AddMeshData(_appearanceMesh);
-        return true;
-    }
+    public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tesselator) => true;
 
     public SceneDescriptionData Data { get; private set; } = new();
 
@@ -70,17 +49,27 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
-        if (!CanEdit(player) || !IsWithinEditDistance(player))
+        if (!HasClaimAccess(player) || !IsWithinEditDistance(player))
         {
             serverPlayer.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
             return;
         }
 
-        serverApi.Network.SendBlockEntityPacket(serverPlayer, Pos, OpenEditorPacketId, SerializerUtil.Serialize(ToPacket(Data)));
+        var packet = ToPacket(Data);
+        packet.CanManageLock = Data.IsLocked
+            ? Data.CanUnlock(player.PlayerUID, IsAdmin(player), true)
+            : Data.CanLock(player.PlayerUID, true);
+        serverApi.Network.SendBlockEntityPacket(serverPlayer, Pos, OpenEditorPacketId, SerializerUtil.Serialize(packet));
     }
 
     public override void OnReceivedClientPacket(IPlayer player, int packetId, byte[] data)
     {
+        if (packetId == UnlockPacketId && Api.Side == EnumAppSide.Server)
+        {
+            if (TryUnlock(player)) OpenEditor(player);
+            else (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+            return;
+        }
         if (packetId != SaveEditorPacketId || Api.Side != EnumAppSide.Server)
         {
             return;
@@ -109,10 +98,17 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
+        if (packet?.LockAfterSave == true && !Data.CanLock(player.PlayerUID, HasClaimAccess(player)))
+        {
+            (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+            return;
+        }
         Data.ApplyText(FromPacket(packet));
+        if (packet?.LockAfterSave == true) Data.LockItemCode = "ui";
         MarkDirty(redrawOnClient: true);
         Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
         Api.World.Logger.Audit("{0} edited a scene marker at {1}.", player.PlayerName, Pos);
+        if (packet?.LockAfterSave == true) OpenEditor(player);
     }
 
     public override void OnReceivedServerPacket(int packetId, byte[] data)
@@ -134,11 +130,13 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         }
 
         _dialog?.TryClose();
-        _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), saved =>
+        _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), packet.CanManageLock, (saved, lockAfterSave) =>
         {
-            clientApi.Network.SendBlockEntityPacket(Pos, SaveEditorPacketId, SerializerUtil.Serialize(ToPacket(saved)));
+            var savedPacket = ToPacket(saved);
+            savedPacket.LockAfterSave = lockAfterSave;
+            clientApi.Network.SendBlockEntityPacket(Pos, SaveEditorPacketId, SerializerUtil.Serialize(savedPacket));
             _dialog = null;
-        }, () => _dialog = null);
+        }, () => clientApi.Network.SendBlockEntityPacket(Pos, UnlockPacketId), () => _dialog = null);
         _dialog.TryOpen();
     }
 
@@ -152,9 +150,8 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     {
         base.FromTreeAttributes(tree, worldForResolving);
         Data = SceneDescriptionData.ReadFrom(tree);
-        if (Api is ICoreClientAPI client)
+        if (Api is ICoreClientAPI)
         {
-            PrepareAppearance(client);
             MarkDirty(redrawOnClient: true);
         }
     }
@@ -162,9 +159,6 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     public override void GetBlockInfo(IPlayer forPlayer, StringBuilder description)
     {
         base.GetBlockInfo(forPlayer, description);
-        description.AppendLine(Lang.Get(Data.IsLocked
-            ? "thebasics:scene-description-locked-help"
-            : "thebasics:scene-description-lock-help"));
         if (string.IsNullOrWhiteSpace(Data.Body))
         {
             description.AppendLine(Lang.Get("thebasics:scene-description-empty-block-help"));
@@ -201,22 +195,6 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         return Data.CanBreak(player?.PlayerUID, IsAdmin(player), HasClaimAccess(player));
     }
 
-    internal bool TryLock(IPlayer player, ItemSlot slot)
-    {
-        if (Api.Side != EnumAppSide.Server || !IsWithinEditDistance(player) ||
-            !Data.CanLock(player?.PlayerUID, HasClaimAccess(player)) ||
-            slot?.Itemstack?.Collectible is not ItemPadlock || slot.Itemstack.StackSize < 1)
-        {
-            return false;
-        }
-
-        Data.LockItemCode = slot.Itemstack.Collectible.Code.ToString();
-        slot.TakeOut(1);
-        slot.MarkDirty();
-        PersistLockChange(player, "locked");
-        return true;
-    }
-
     internal bool TryUnlock(IPlayer player)
     {
         if (Api.Side != EnumAppSide.Server || !IsWithinEditDistance(player) ||
@@ -225,21 +203,8 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return false;
         }
 
-        var padlock = Api.World.GetItem(new AssetLocation(Data.LockItemCode));
-        // Fail closed if a saved lock's item is unavailable, rather than lose or duplicate it.
-        if (padlock is not ItemPadlock)
-        {
-            return false;
-        }
-
         Data.LockItemCode = string.Empty;
         PersistLockChange(player, "unlocked");
-        var stack = new ItemStack(padlock);
-        if (!player.InventoryManager.TryGiveItemstack(stack))
-        {
-            Api.World.SpawnItemEntity(stack, Pos.ToVec3d().Add(0.5, 0.5, 0.5));
-        }
-
         return true;
     }
 
@@ -278,6 +243,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Symbol = (int)data.Symbol,
             IconDistance = data.IconDistance,
             UnlimitedIconDistance = data.UnlimitedIconDistance,
+            IsLocked = data.IsLocked,
         };
     }
 
@@ -293,6 +259,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Symbol = (SceneMarkerSymbol)packet.Symbol,
             IconDistance = packet.IconDistance,
             UnlimitedIconDistance = packet.UnlimitedIconDistance,
+            LockItemCode = packet.IsLocked ? "ui" : string.Empty,
         }.Normalize();
     }
 }
