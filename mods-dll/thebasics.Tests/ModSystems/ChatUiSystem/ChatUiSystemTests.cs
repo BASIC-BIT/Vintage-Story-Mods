@@ -7,6 +7,34 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 
 public class ChatUiSystemTests
 {
+    [Fact]
+    public void CharacterTabRecomposition_AfterSheetDismissed_DoesNotRequestAnotherSheet()
+    {
+        var previousConfig = GetStaticField<ModConfig>("_config");
+        try
+        {
+            SetStaticField("_config", new ModConfig { EnableCharacterSheets = true });
+            ChatUiModSystem.GuiDialogCharacter_OnGuiClosed_Postfix();
+            InvokeStaticMethod("OnCharacterDialogComposed");
+            GetStaticField<bool>("_pendingCharacterSheetOpenFromCharacterDialog").Should().BeTrue();
+
+            InvokeStaticMethod("OnCharacterSheetDialogClosed");
+            InvokeStaticMethod("OnCharacterDialogComposed");
+            GetStaticField<bool>("_pendingCharacterSheetOpenFromCharacterDialog").Should().BeFalse();
+            InvokeStaticMethod("OnCharacterDialogComposed");
+            GetStaticField<bool>("_pendingCharacterSheetOpenFromCharacterDialog").Should().BeFalse();
+
+            ChatUiModSystem.GuiDialogCharacter_OnGuiClosed_Postfix();
+            InvokeStaticMethod("OnCharacterDialogComposed");
+            GetStaticField<bool>("_pendingCharacterSheetOpenFromCharacterDialog").Should().BeTrue();
+        }
+        finally
+        {
+            ChatUiModSystem.GuiDialogCharacter_OnGuiClosed_Postfix();
+            SetStaticField("_config", previousConfig);
+        }
+    }
+
     [Theory]
     [InlineData(50, 30, 50)]
     [InlineData(20, 30, 20)]

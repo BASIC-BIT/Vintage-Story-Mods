@@ -52,6 +52,7 @@ public class ChatUiSystem : ModSystem
     private static ChatHistoryDialog _chatHistoryDialog;
     private static bool _pendingCharacterSheetSave;
     private static bool _pendingCharacterSheetOpenFromCharacterDialog;
+    private static bool _characterDialogSheetAutoOpenHandled;
     private static bool _suppressNextCharacterDialogSheetOpen;
     private static bool _characterSheetOpenedFromCharacterDialog;
     private static CharacterSheetViewMessage _lastOwnCharacterSheetView;
@@ -183,11 +184,14 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        if (_config == null || !_config.EnableCharacterSheets || _characterSheetDialog?.IsOpened() == true || _pendingCharacterSheetOpenFromCharacterDialog)
+        if (_config == null || !_config.EnableCharacterSheets || _characterDialogSheetAutoOpenHandled || _characterSheetDialog?.IsOpened() == true || _pendingCharacterSheetOpenFromCharacterDialog)
         {
             return;
         }
 
+        // Tab changes also compose the character window. Dismissing the sheet must
+        // keep it dismissed until the character window is closed and opened again.
+        _characterDialogSheetAutoOpenHandled = true;
         _characterSheetOpenedFromCharacterDialog = true;
         if (_lastOwnCharacterSheetView != null)
         {
@@ -936,6 +940,7 @@ public class ChatUiSystem : ModSystem
     [HarmonyPatch(typeof(GuiDialogCharacter), "OnGuiClosed")]
     public static void GuiDialogCharacter_OnGuiClosed_Postfix()
     {
+        _characterDialogSheetAutoOpenHandled = false;
         _pendingCharacterSheetOpenFromCharacterDialog = false;
         if (_characterSheetOpenedFromCharacterDialog && _characterSheetDialog?.IsOpened() == true)
         {
@@ -2287,6 +2292,7 @@ public class ChatUiSystem : ModSystem
             _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
             _suppressNextCharacterDialogSheetOpen = false;
+            _characterDialogSheetAutoOpenHandled = false;
             _characterSheetOpenedFromCharacterDialog = false;
             _characterDialogTitleOverride = null;
             _characterDialog = null;
