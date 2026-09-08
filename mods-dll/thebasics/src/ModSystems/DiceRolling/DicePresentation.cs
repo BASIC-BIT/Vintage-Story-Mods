@@ -22,14 +22,18 @@ internal static class DicePresentation
         Marker(mode) + result.Value.ToString("G29", CultureInfo.InvariantCulture)
         + (result.IsSuccessPool ? " successes" : "");
 
+    // Plain body for history and extension consumers, which own their attribution and escaping.
+    internal static string Body(DiceRollResult result)
+    {
+        var reason = string.IsNullOrWhiteSpace(result.Reason) ? "" : " (" + result.Reason + ")";
+        return result.Expression + " = " + Summary(result, ProximityChatMode.Normal) + reason
+            + " [" + result.Breakdown + "]";
+    }
     // formattedName comes from the existing RP name resolver; all dice input is escaped here.
     internal static string Chat(DiceRollResult result, string formattedName, ProximityChatMode mode, bool isPrivate)
     {
         var heading = isPrivate ? "[Private Roll] " : Marker(mode) + formattedName + " rolled ";
-        var reason = string.IsNullOrWhiteSpace(result.Reason) ? "" : " (" + ChatHelper.EscapeMarkup(result.Reason) + ")";
-        var rendered = heading + ChatHelper.EscapeMarkup(result.Expression) + " = "
-            + Summary(result, ProximityChatMode.Normal) + reason
-            + " [" + ChatHelper.EscapeMarkup(result.Breakdown) + "]";
+        var rendered = heading + ChatHelper.EscapeMarkup(Body(result));
         // Th3Essentials batches at 1950 characters. Check the entire escaped/decoded envelope,
         // including attribution, reason and mention neutralization, before any recipient sees it.
         if (Th3EssentialsDiscordRelay.FormatRelayMessage(rendered, suppressMentions: true).Length > MaxOutputLength)

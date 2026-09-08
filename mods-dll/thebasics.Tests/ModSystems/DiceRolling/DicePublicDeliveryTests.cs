@@ -55,12 +55,16 @@ public class DicePublicDeliveryTests
         var published = Assert.Single(events);
         Assert.Equal(ProximityChatMessageKind.Roll, published.Kind);
         Assert.Equal(mode, published.Mode);
+        Assert.Equal(marker + "d6 = 4 (test) [[4 kept]]", published.ProcessedMessage);
         Assert.Equal(2, published.Recipients.Count);
         var entries = (List<ChatHistoryEntry>)typeof(ChatHistorySystem).GetField("_pending", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(history)!;
         var entry = Assert.Single(entries);
         Assert.Equal(ChatHistoryConstants.KindRoll, entry.ChatKind);
         Assert.Equal(sender.PlayerUID, entry.SenderPlayerUid);
         Assert.Equal(published.RenderedMessage, entry.FormattedMessage);
+        Assert.Equal(published.ProcessedMessage, entry.MessageText);
+        Assert.DoesNotContain("rolled", entry.MessageText);
+        Assert.DoesNotContain("<strong>", entry.MessageText);
     }
     [Theory]
     [InlineData(0, 0, false)]
@@ -156,6 +160,9 @@ public class DicePublicDeliveryTests
             .GetField("_pending", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(history)!;
         var entry = Assert.Single(entries);
         Assert.Equal(published.RenderedMessage, entry.FormattedMessage);
+        Assert.Equal(published.ProcessedMessage, entry.MessageText);
+        Assert.DoesNotContain("rolled", entry.MessageText);
+        Assert.DoesNotContain("<strong>", entry.MessageText);
         Assert.Equal("AccountName", entry.SenderPlayerName);
         Assert.Equal("s", entry.SenderPlayerUid);
         if (gameMode == EnumGameMode.Spectator && connectionState == EnumClientState.Playing)

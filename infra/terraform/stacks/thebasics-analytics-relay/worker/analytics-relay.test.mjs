@@ -276,7 +276,7 @@ function currentProducerContracts() {
       "enter_whisper", "enter_yell",
     ]),
     result: new Set([
-      "help", "disabled", "invalid_input", "rate_limited", "permission_denied",
+      "help", "disabled", "invalid_input", "rate_limited",
       "back_expired", "back_not_set", "failure", "home-name-invalid",
       "home-name-required", "home-name-too-long", "player-required", "success",
       "teleport-unavailable", "teleport-warmup-active", "thebasics:chat-gooc-disabled",
@@ -872,7 +872,7 @@ function lastLog() {
 
 test("dice telemetry accepts bounded adoption data and canonical command outcomes", () => {
   for (const command_name of ["roll", "proll"]) {
-    for (const result of ["success", "help", "disabled", "invalid_input", "rate_limited", "failure", "permission_denied"]) {
+    for (const result of ["success", "help", "disabled", "invalid_input", "rate_limited", "failure"]) {
       assertAccepted(validatePayload(payloadForEvent("command used", { command_name, success: result === "success", result })), command_name + result);
     }
   }

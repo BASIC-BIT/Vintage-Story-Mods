@@ -407,7 +407,7 @@ const ALLOWED_STRING_VALUES = new Map([
   ["previous_session_age_bucket", new Set(["unknown", "<1m", "1-5m", "5-30m", "30-120m", "120m+"])],
   ["proximity_chat_presentation_mode", new Set(["StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose"])],
   ["result", new Set([
-    "help", "disabled", "invalid_input", "rate_limited", "permission_denied",
+    "help", "disabled", "invalid_input", "rate_limited",
     "admin_online",
     "bad-options",
     "back_dimension_mismatch",

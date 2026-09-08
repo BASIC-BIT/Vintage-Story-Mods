@@ -103,7 +103,7 @@ internal sealed class DiceRollCommands : IDisposable
         var recipients = system.API.World.AllOnlinePlayers.OfType<IServerPlayer>()
             .Where(candidate => InRange(player, candidate, range)).ToList();
         if (!recipients.Contains(player)) recipients.Add(player);
-        var context = new MessageContext { SendingPlayer = player, GroupId = system.ProximityChatId, Message = text, Recipients = recipients };
+        var context = new MessageContext { SendingPlayer = player, GroupId = system.ProximityChatId, Message = DicePresentation.Marker(mode) + DicePresentation.Body(result), Recipients = recipients };
         context.SetFlag(MessageContext.IS_ROLL);
         context.SetFlag(MessageContext.IS_FROM_COMMAND);
         context.SetMetadata(MessageContext.CHAT_MODE, mode);

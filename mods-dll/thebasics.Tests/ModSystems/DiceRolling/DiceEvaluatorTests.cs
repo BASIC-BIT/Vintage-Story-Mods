@@ -61,6 +61,7 @@ public partial class DiceEvaluatorTests
 public partial class DiceEvaluatorTests
 {
     [Theory]
+    [InlineData("d20 climbing", "d20", "climbing")]
     [InlineData("2d6+3 forcing the gate", "2d6+3", "forcing the gate")]
     [InlineData("2d6 + 3 # forcing 2d20", "2d6 + 3", "forcing 2d20")]
     [InlineData("2d6+3 // + strength", "2d6+3", "+ strength")]
@@ -74,6 +75,9 @@ public partial class DiceEvaluatorTests
     }
 
     [Theory]
+    [InlineData("d20climbing")]
+    [InlineData("d20 d6")]
+    [InlineData("d20 round(2)")]
     [InlineData("2d6garbage")]
     [InlineData("2d6 +")]
     [InlineData("2d6 + strength")]
