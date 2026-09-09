@@ -18,3 +18,5 @@ QA cards:
 5. Toggle top-right lock closed then open, Save; verify correct state. Cancel a pending lock; no state change. Save a pending lock and verify authorized unlock still works; unauthorized player cannot toggle.
 Review fixes: retain visited offscreen descriptions in the zero-visible render path, and include GUI scale in texture cache validity. Both review axes clear;803tests pass after fixes. Standard build/package passed; package DLL matches tested DLL, packaged JSON parses. Candidate SHA256 6D52EF455B441E1871CB4A6C004B290E43F34511C272EB74F2DA945AD24F525E.
 QA deployment: server readback and Profile2/Profile3 packages match candidate hash. Previous packages and logs preserved under .tmp/scene-layout-qa-2026-09-09. Human visual acceptance pending.
+
+Size follow-up: 100 percent was far too large in-world, so texel density doubled from 60 to 120 GUI-scaled texels per block. A 360px panel at 100 percent is now 3 blocks wide instead of 6; the 40-200 percent range and letter-density behavior are unchanged. Preview and world share the constant.

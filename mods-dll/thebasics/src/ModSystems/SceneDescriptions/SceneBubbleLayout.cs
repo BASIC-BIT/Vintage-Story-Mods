@@ -7,7 +7,7 @@ internal static class SceneBubbleLayout
     // Fixed texel density: adding lines grows the panel instead of shrinking every letter.
     internal static (float Width, float Height) Size(int textureWidth, int textureHeight, float guiScale, float scale)
     {
-        var pixelsPerBlock = 60 * (guiScale > 0 ? guiScale : 1);
+        var pixelsPerBlock = 120 * (guiScale > 0 ? guiScale : 1);
         return (textureWidth / pixelsPerBlock * scale, textureHeight / pixelsPerBlock * scale);
     }
 

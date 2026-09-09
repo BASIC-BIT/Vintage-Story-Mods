@@ -11,8 +11,8 @@ public class SceneBubbleLayoutTests
         var shortText = SceneBubbleLayout.Size(120, 40, 1, 0.4f);
         var longText = SceneBubbleLayout.Size(360, 1200, 1, 0.4f);
         (shortText.Width / 120).Should().BeApproximately(longText.Width / 360, 0.00001f);
-        longText.Width.Should().BeApproximately(2.4f, 0.00001f);
-        longText.Height.Should().BeApproximately(8, 0.00001f);
+        longText.Width.Should().BeApproximately(1.2f, 0.00001f);
+        longText.Height.Should().BeApproximately(4, 0.00001f);
         SceneBubbleLayout.Size(720, 2400, 2, 0.4f).Should().Be(longText);
     }
 
