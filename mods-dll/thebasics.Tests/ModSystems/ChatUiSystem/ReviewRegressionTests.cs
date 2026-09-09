@@ -81,10 +81,14 @@ public class ReviewRegressionTests
     {
         var dialog = (PlayerNotesDialog)RuntimeHelpers.GetUninitializedObject(typeof(PlayerNotesDialog));
         var method = typeof(PlayerNotesDialog).GetMethod("SetDraft", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(dialog, [new TheBasicsNotesViewMessage { Success = true, TargetPlayerUid = "player" }, true]);
+        var original = new TheBasicsNotesViewMessage { Success = true, TargetPlayerUid = "player", Scope = "admin", AdminNotes = [new() { Text = "unsaved" }] };
+        method.Invoke(dialog, [original, true]);
         var stateField = typeof(PlayerNotesDialog).GetField("_draftState", BindingFlags.Instance | BindingFlags.NonPublic)!;
         ((DialogDraftState)stateField.GetValue(dialog)!).TryBeginRequest("submitted");
         method.Invoke(dialog, [new TheBasicsNotesViewMessage { Success = false }, false]);
+        typeof(PlayerNotesDialog).GetField("_view", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(dialog).Should().BeSameAs(original);
+        var notes = (List<PlayerNoteEntryMessage>)typeof(PlayerNotesDialog).GetField("_adminNotes", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(dialog)!;
+        notes.Should().ContainSingle().Which.Text.Should().Be("unsaved");
         ((DialogDraftState)stateField.GetValue(dialog)!).TryBeginRequest("retry").Should().BeTrue();
     }
 }

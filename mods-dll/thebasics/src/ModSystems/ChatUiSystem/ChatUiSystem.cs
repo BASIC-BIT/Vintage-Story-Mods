@@ -195,7 +195,8 @@ public class ChatUiSystem : ModSystem
         // keep it dismissed until the character window is closed and opened again.
         _characterDialogSheetAutoOpenHandled = true;
         _characterSheetOpenedFromCharacterDialog = true;
-        if (_lastOwnCharacterSheetView != null)
+        var showedCachedSheet = _lastOwnCharacterSheetView != null;
+        if (showedCachedSheet)
         {
             OpenCharacterSheetDialog(_lastOwnCharacterSheetView);
         }
@@ -209,6 +210,7 @@ public class ChatUiSystem : ModSystem
             if (_pendingCharacterSheetAutoOpenRequestId != requestId) return;
             _pendingCharacterSheetAutoOpenRequestId = 0;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
+            if (!showedCachedSheet) _characterDialogSheetAutoOpenHandled = false;
         });
     }
 
@@ -366,9 +368,6 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        UpdateLocalCharacterDisplayName(message);
-        CacheOwnCharacterSheetView(message);
-
         // A cached sheet can be dismissed before its refresh arrives. Correlate
         // auto-opens so an old window cannot reopen or replace a newer view.
         if (message.AutoOpenRequestId != 0)
@@ -376,6 +375,9 @@ public class ChatUiSystem : ModSystem
             if (message.AutoOpenRequestId != _pendingCharacterSheetAutoOpenRequestId) return;
             _pendingCharacterSheetAutoOpenRequestId = 0;
         }
+
+        UpdateLocalCharacterDisplayName(message);
+        CacheOwnCharacterSheetView(message);
 
         if (!message.Success || message.IsErrorResponse)
         {
@@ -692,7 +694,8 @@ public class ChatUiSystem : ModSystem
         {
             _safeNetworkChannel?.SendPacketSafely(new CharacterSheetOpenRequest
             {
-                Mode = CharacterSheetOpenRequest.ModeView,
+                Mode = _characterSheetDialog?.CurrentTargetPlayerUid == message.TargetPlayerUid && _characterSheetDialog.IsAdminView
+                    ? CharacterSheetOpenRequest.ModeAdmin : CharacterSheetOpenRequest.ModeView,
                 TargetPlayerUid = message.TargetPlayerUid
             });
         }

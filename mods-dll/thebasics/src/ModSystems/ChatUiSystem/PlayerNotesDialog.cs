@@ -107,6 +107,13 @@ public class PlayerNotesDialog : GuiDialog
 
     public void SetView(TheBasicsNotesViewMessage view)
     {
+        if (view?.Success != true && _view != null)
+        {
+            CaptureCurrentInputs();
+            SetDraft(view, updateBaseline: false);
+            ComposeDialog();
+            return;
+        }
         var sameView = IsSameNotesView(view);
         if (sameView)
         {
@@ -177,6 +184,12 @@ public class PlayerNotesDialog : GuiDialog
 
     private void SetDraft(TheBasicsNotesViewMessage view, bool updateBaseline)
     {
+        if (view?.Success != true && _view != null)
+        {
+            OnRequestFailed();
+            _localMessage = view?.Message;
+            return;
+        }
         _view = view ?? new TheBasicsNotesViewMessage { Success = false };
         _submittedNotes = null;
         _adminNotes = (_view.AdminNotes ?? new List<PlayerNoteEntryMessage>()).Select(CloneNote).ToList();
@@ -185,8 +198,7 @@ public class PlayerNotesDialog : GuiDialog
         _personalLedger = ClonePersonalLedger(_view.PersonalLedger);
         _selectedIndex = Clamp(_selectedIndex, CurrentNotes().Count);
         NormalizeListOffset();
-        // Replacing the view also ends any request owned by the old view,
-        // including targetless error responses.
+        // A successful replacement starts a new draft and ends the old request.
         _draftState = new DialogDraftState(SnapshotDraft());
         if (updateBaseline)
         {

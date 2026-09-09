@@ -3,6 +3,7 @@ using FluentAssertions;
 using NSubstitute;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 using thebasics.Configs;
 using ChatUiModSystem = thebasics.ModSystems.ChatUiSystem.ChatUiSystem;
 
@@ -10,6 +11,83 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 
 public class ChatUiSystemTests
 {
+    [Fact]
+    public void StaleAutoOpenResponse_DoesNotReplaceCachedSheetOrTitle()
+    {
+        var previousApi = GetStaticField<ICoreClientAPI>("_api");
+        var previousCache = GetStaticField<thebasics.Models.CharacterSheetViewMessage>("_lastOwnCharacterSheetView");
+        var previousTitle = GetStaticField<string>("_characterDialogTitleOverride");
+        try
+        {
+            var api = Substitute.For<ICoreClientAPI>();
+            SetStaticField("_api", api);
+            var current = new thebasics.Models.CharacterSheetViewMessage { TargetPlayerUid = "player", DisplayName = "New" };
+            SetStaticField("_lastOwnCharacterSheetView", current);
+            SetStaticField("_characterDialogTitleOverride", "New");
+            SetStaticField("_pendingCharacterSheetAutoOpenRequestId", 0L);
+            InvokeStaticMethod("OnCharacterSheetViewMessage", new thebasics.Models.CharacterSheetViewMessage { AutoOpenRequestId = 123, TargetPlayerUid = "player", DisplayName = "Old" });
+            GetStaticField<thebasics.Models.CharacterSheetViewMessage>("_lastOwnCharacterSheetView").Should().BeSameAs(current);
+            GetStaticField<string>("_characterDialogTitleOverride").Should().Be("New");
+            _ = api.DidNotReceive().World;
+        }
+        finally
+        {
+            SetStaticField("_api", previousApi);
+            SetStaticField("_lastOwnCharacterSheetView", previousCache);
+            SetStaticField("_characterDialogTitleOverride", previousTitle);
+        }
+    }
+
+    [Fact]
+    public void FailedAutoOpenWithoutCachedSheet_AllowsRetry()
+    {
+        var previousConfig = GetStaticField<ModConfig>("_config");
+        try
+        {
+            SetStaticField("_config", new ModConfig { EnableCharacterSheets = true });
+            ChatUiModSystem.GuiDialogCharacter_OnGuiClosed_Postfix();
+            InvokeStaticMethod("OnCharacterDialogComposed");
+            GetStaticField<bool>("_characterDialogSheetAutoOpenHandled").Should().BeFalse();
+        }
+        finally
+        {
+            ChatUiModSystem.GuiDialogCharacter_OnGuiClosed_Postfix();
+            SetStaticField("_config", previousConfig);
+        }
+    }
+
+    [Theory]
+    [InlineData(true, "admin")]
+    [InlineData(false, "view")]
+    public void HeadshotRefresh_PreservesCurrentMode(bool admin, string expectedMode)
+    {
+        var previousLocale = Lang.CurrentLocale;
+        var translations = Substitute.For<Vintagestory.API.Config.ITranslationService>();
+        translations.HasTranslation(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>()).Returns(true);
+        Lang.AvailableLanguages["test-headshot"] = translations;
+        Lang.ChangeLanguage("test-headshot");
+        var previousChannel = GetStaticField<SafeClientNetworkChannel>("_safeNetworkChannel");
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        using var safe = new SafeClientNetworkChannel(channel, Substitute.For<ICoreClientAPI>());
+        var dialog = (thebasics.ModSystems.ChatUiSystem.CharacterSheetDialog)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(thebasics.ModSystems.ChatUiSystem.CharacterSheetDialog));
+        typeof(thebasics.ModSystems.ChatUiSystem.CharacterSheetDialog).GetField("_view", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(dialog, new thebasics.Models.CharacterSheetViewMessage { TargetPlayerUid = "player", IsAdminView = admin });
+        try
+        {
+            SetStaticField("_characterSheetDialog", dialog);
+            SetStaticField("_safeNetworkChannel", safe);
+            InvokeStaticMethod("OnHeadshotUploadResult", new thebasics.Models.HeadshotUploadResult { Success = true, TargetPlayerUid = "player" });
+            channel.Received().SendPacket(Arg.Is<thebasics.Models.CharacterSheetOpenRequest>(request => request.Mode == expectedMode && request.TargetPlayerUid == "player"));
+        }
+        finally
+        {
+            SetStaticField<object?>("_characterSheetDialog", null);
+            SetStaticField("_safeNetworkChannel", previousChannel);
+            Lang.ChangeLanguage(previousLocale);
+            Lang.AvailableLanguages.Remove("test-headshot");
+        }
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(456)]
@@ -116,10 +194,11 @@ public class ChatUiSystemTests
             ?? throw new MissingFieldException(typeof(ChatUiModSystem).FullName, name);
     }
 
-    private static void InvokeStaticMethod(string name)
+    private static void InvokeStaticMethod(string name, params object[] arguments)
     {
         var method = typeof(ChatUiModSystem).GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic)
             ?? throw new MissingMethodException(typeof(ChatUiModSystem).FullName, name);
-        method.Invoke(null, null);
+        method.Invoke(null, arguments);
     }
 }
+
