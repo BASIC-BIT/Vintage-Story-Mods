@@ -355,10 +355,9 @@ public class ChatUiSystem : ModSystem
 
         if (message.SuppressDialogOpen)
         {
-            _pendingCharacterSheetSave = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
             RefreshCharacterDialogTitle();
-            if (_characterSheetDialog?.IsOpened() == true)
+            if (_characterSheetDialog?.IsOpened() == true && _characterSheetDialog.CurrentTargetPlayerUid == message.TargetPlayerUid && _characterSheetDialog.IsAdminView == message.IsAdminView)
             {
                 _characterSheetDialog.SetView(message);
             }
@@ -366,7 +365,7 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        if (message.IsSaveResponse || _pendingCharacterSheetSave)
+        if (message.IsSaveResponse)
         {
             _pendingCharacterSheetSave = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
@@ -380,7 +379,6 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        _pendingCharacterSheetSave = false;
         _pendingCharacterSheetOpenFromCharacterDialog = false;
 
         OpenCharacterSheetDialog(message);
@@ -388,6 +386,7 @@ public class ChatUiSystem : ModSystem
 
     private static void HandleCharacterSheetErrorMessage(CharacterSheetViewMessage message)
     {
+        if (message.IsSaveResponse || _pendingCharacterSheetSave) _characterSheetDialog?.OnSaveRejected();
         var suppressDisabledAutoOpenError = _pendingCharacterSheetOpenFromCharacterDialog &&
                                             message.ErrorCode == CharacterSheetViewMessage.ErrorCodeDisabled;
 

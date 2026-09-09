@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 using thebasics.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Client;
@@ -28,6 +29,7 @@ public class LanguageConfigDialog : GuiDialog
     private bool _success;
     private int _selectedIndex;
     private bool _closing;
+    private readonly DialogDraftState _draftState;
 
     public LanguageConfigDialog(
         ICoreClientAPI capi,
@@ -39,6 +41,7 @@ public class LanguageConfigDialog : GuiDialog
         Action onClose) : base(capi)
     {
         _languages = EnsureDraft(languages);
+        _draftState = new DialogDraftState(JsonConvert.SerializeObject(_languages));
         _message = message;
         _success = success;
         _onSave = onSave;
@@ -58,7 +61,12 @@ public class LanguageConfigDialog : GuiDialog
 
     public void SetView(List<LanguageConfigEntryMessage> languages, string message, bool success)
     {
-        _languages = EnsureDraft(languages);
+        CaptureSelectedInputToDraft();
+        var incoming = EnsureDraft(languages);
+        if (!_draftState.ApplyResponse(JsonConvert.SerializeObject(_languages), JsonConvert.SerializeObject(incoming), success))
+        {
+            _languages = incoming;
+        }
         _message = message;
         _success = success;
         _selectedIndex = ClampSelectedIndex(_selectedIndex);
@@ -339,12 +347,15 @@ public class LanguageConfigDialog : GuiDialog
     private bool OnSave()
     {
         CaptureSelectedInputToDraft();
+        if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return true;
         _onSave(_languages.Select(CloneEntry).ToList());
         return true;
     }
 
     private bool OnReload()
     {
+        CaptureSelectedInputToDraft();
+        if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return true;
         _onReload();
         return true;
     }

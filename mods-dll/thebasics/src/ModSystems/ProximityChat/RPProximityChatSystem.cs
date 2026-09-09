@@ -775,6 +775,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             Success = false,
             Message = Lang.Get("thebasics:charsheet-gui-disabled")
         };
+        response.IsSaveResponse = true;
         _serverConfigChannel.SendPacket(response, player);
     }
 

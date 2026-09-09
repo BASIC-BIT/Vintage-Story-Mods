@@ -41,7 +41,32 @@ public class PlayerNotesDialog : GuiDialog
     private PersonalNoteLedgerMessage _personalLedger = new();
     private int _selectedIndex;
     private int _listOffset;
-    private string _lastLoadedSnapshot;
+    private DialogDraftState _draftState;
+    private Dictionary<PlayerNoteEntryMessage, PlayerNoteEntryMessage> _submittedNotes;
+
+    internal static void ReconcileSavedNotes(List<PlayerNoteEntryMessage> draft, Dictionary<PlayerNoteEntryMessage, PlayerNoteEntryMessage> submitted, List<PlayerNoteEntryMessage> saved)
+    {
+        if (submitted == null || saved == null) return;
+        var remaining = saved.ToList();
+        var existingIds = submitted.Values.Where(note => !string.IsNullOrEmpty(note.Id)).Select(note => note.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var (local, sent) in submitted)
+        {
+            // New notes receive IDs on the server. Match their submitted content,
+            // consuming each reply entry once, including identical new notes.
+            var match = remaining.Find(note => !string.IsNullOrEmpty(sent.Id)
+                ? string.Equals(note.Id, sent.Id, StringComparison.OrdinalIgnoreCase)
+                : !existingIds.Contains(note.Id) && note.Title == (sent.Title ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ').Trim()
+                    && note.Text == (sent.Text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Trim());
+            if (match == null) continue;
+            remaining.Remove(match);
+            var index = draft.IndexOf(local);
+            if (index < 0) continue;
+            var reconciled = CloneNote(match);
+            reconciled.Title = local.Title;
+            reconciled.Text = local.Text;
+            draft[index] = reconciled;
+        }
+    }
     private string _localMessage;
     private GuiElementTextInput _titleInput;
     private GuiElementTextArea _bodyInput;
@@ -88,12 +113,21 @@ public class PlayerNotesDialog : GuiDialog
             _scrollFreeformToBottomAfterCompose = false;
         }
 
-        if (sameView && view?.Success == false && _view?.Success == true)
+        if (sameView)
         {
             CaptureCurrentInputs();
-            _localMessage = view.Message;
-            ComposeDialog();
-            return;
+            if (_draftState.ApplyResponse(SnapshotDraft(), SnapshotView(view), view.Success))
+            {
+                if (view.Success)
+                {
+                    ReconcileSavedNotes(CurrentNotes(), _submittedNotes, IsAdminScope() ? view.AdminNotes : view.PersonalNotes);
+                }
+                _submittedNotes = null;
+                _localMessage = view.Message;
+                if (view.Success) _view = view;
+                ComposeDialog();
+                return;
+            }
         }
 
         SetDraft(view, updateBaseline: view?.Success == true);
@@ -139,6 +173,7 @@ public class PlayerNotesDialog : GuiDialog
     private void SetDraft(TheBasicsNotesViewMessage view, bool updateBaseline)
     {
         _view = view ?? new TheBasicsNotesViewMessage { Success = false };
+        _submittedNotes = null;
         _adminNotes = (_view.AdminNotes ?? new List<PlayerNoteEntryMessage>()).Select(CloneNote).ToList();
         _personalNotes = (_view.PersonalNotes ?? new List<PlayerNoteEntryMessage>()).Select(CloneNote).ToList();
         _adminLedger = CloneLedger(_view.AdminLedger);
@@ -148,7 +183,7 @@ public class PlayerNotesDialog : GuiDialog
         if (updateBaseline)
         {
             _localMessage = null;
-            _lastLoadedSnapshot = SnapshotDraft();
+            _draftState = new DialogDraftState(SnapshotDraft());
         }
     }
 
@@ -600,6 +635,8 @@ public class PlayerNotesDialog : GuiDialog
         }
 
         _localMessage = null;
+        if (!_draftState.TryBeginRequest(SnapshotDraft())) return true;
+        _submittedNotes = CurrentNotes().ToDictionary(note => note, CloneNote);
         _onSave?.Invoke(new TheBasicsNotesSaveMessage
         {
             Scope = _view.Scope,
@@ -632,6 +669,9 @@ public class PlayerNotesDialog : GuiDialog
 
     private void SendReload()
     {
+        CaptureCurrentInputs();
+        if (!_draftState.TryBeginRequest(SnapshotDraft())) return;
+        _submittedNotes = null;
         _onReload?.Invoke(new TheBasicsNotesSaveMessage
         {
             Scope = _view.Scope,
@@ -653,7 +693,7 @@ public class PlayerNotesDialog : GuiDialog
 
     private bool HasUnsavedChanges()
     {
-        return !string.Equals(SnapshotDraft(), _lastLoadedSnapshot ?? string.Empty, StringComparison.Ordinal);
+        return _draftState.IsDirty(SnapshotDraft());
     }
 
     private void ConfirmCloseWithUnsavedChanges()
@@ -710,12 +750,21 @@ public class PlayerNotesDialog : GuiDialog
 
     private string SnapshotDraft()
     {
+        return SnapshotView(new TheBasicsNotesViewMessage
+        {
+            AdminNotes = _adminNotes, AdminLedger = _adminLedger,
+            PersonalNotes = _personalNotes, PersonalLedger = _personalLedger
+        });
+    }
+
+    private static string SnapshotView(TheBasicsNotesViewMessage view)
+    {
         return JsonConvert.SerializeObject(new
         {
-            Admin = _adminNotes.Select(NormalizeForSnapshot),
-            AdminFreeform = _adminLedger.Text ?? string.Empty,
-            Personal = _personalNotes.Select(NormalizeForSnapshot),
-            PersonalFreeform = _personalLedger.Text ?? string.Empty
+            Admin = (view.AdminNotes ?? new List<PlayerNoteEntryMessage>()).Select(NormalizeForSnapshot),
+            AdminFreeform = view.AdminLedger?.Text ?? string.Empty,
+            Personal = (view.PersonalNotes ?? new List<PlayerNoteEntryMessage>()).Select(NormalizeForSnapshot),
+            PersonalFreeform = view.PersonalLedger?.Text ?? string.Empty
         });
     }
 
