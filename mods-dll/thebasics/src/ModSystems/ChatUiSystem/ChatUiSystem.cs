@@ -216,7 +216,18 @@ public class ChatUiSystem : ModSystem
     private static void SendCharacterSheetSaveRequest(CharacterSheetSaveRequest request)
     {
         _pendingCharacterSheetSave = true;
-        _safeNetworkChannel?.SendPacketSafely(request);
+        var dialog = _characterSheetDialog;
+        SendDialogRequest(request, () =>
+        {
+            dialog?.OnRequestFailed();
+            if (ReferenceEquals(dialog, _characterSheetDialog)) _pendingCharacterSheetSave = false;
+        });
+    }
+
+    private static void SendDialogRequest<T>(T message, Action onFailure)
+    {
+        if (_safeNetworkChannel == null) onFailure();
+        else _safeNetworkChannel.SendPacketSafely(message, onFailure);
     }
 
 
@@ -1684,18 +1695,20 @@ public class ChatUiSystem : ModSystem
 
     private static void SendLanguageConfigSaveRequest(List<LanguageConfigEntryMessage> languages)
     {
-        _safeNetworkChannel?.SendPacketSafely(new TheBasicsLanguageConfigSaveMessage
+        var dialog = _languageConfigDialog;
+        SendDialogRequest(new TheBasicsLanguageConfigSaveMessage
         {
             Languages = languages ?? new List<LanguageConfigEntryMessage>()
-        });
+        }, () => dialog?.OnRequestFailed());
     }
 
     private static void SendLanguageConfigReload()
     {
-        _safeNetworkChannel?.SendPacketSafely(new TheBasicsLanguageConfigSaveMessage
+        var dialog = _languageConfigDialog;
+        SendDialogRequest(new TheBasicsLanguageConfigSaveMessage
         {
             ReloadFromDisk = true
-        });
+        }, () => dialog?.OnRequestFailed());
     }
 
     private static void SendCharacterSheetFieldConfigOpenRequest()
@@ -1721,14 +1734,16 @@ public class ChatUiSystem : ModSystem
 
     private static void SendNotesSaveRequest(TheBasicsNotesSaveMessage message)
     {
-        _safeNetworkChannel?.SendPacketSafely(message ?? new TheBasicsNotesSaveMessage());
+        var dialog = _playerNotesDialog;
+        SendDialogRequest(message ?? new TheBasicsNotesSaveMessage(), () => dialog?.OnRequestFailed());
     }
 
     private static void SendNotesReloadRequest(TheBasicsNotesSaveMessage message)
     {
         message ??= new TheBasicsNotesSaveMessage();
         message.Reload = true;
-        _safeNetworkChannel?.SendPacketSafely(message);
+        var dialog = _playerNotesDialog;
+        SendDialogRequest(message, () => dialog?.OnRequestFailed());
     }
 
     private static void SendChatHistoryQueryRequest(TheBasicsChatHistoryQueryRequest message)

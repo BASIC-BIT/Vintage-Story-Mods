@@ -159,6 +159,8 @@ public class CharacterSheetDialog : GuiDialog
         _draftState.ApplyResponse(JsonConvert.SerializeObject(CaptureInputValues()), SnapshotValues(_view), false);
     }
 
+    internal void OnRequestFailed() => _draftState.CancelRequest();
+
     private Dictionary<(string Id, int Occurrence), string> CaptureInputValues() => _view.Fields
         .Select((field, index) => (field, index)).Where(item => item.field.CanEdit)
         .OrderBy(item => item.field.FieldId, StringComparer.Ordinal)

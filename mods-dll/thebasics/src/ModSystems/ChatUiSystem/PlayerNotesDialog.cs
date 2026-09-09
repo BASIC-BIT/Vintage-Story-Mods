@@ -43,6 +43,11 @@ public class PlayerNotesDialog : GuiDialog
     private int _listOffset;
     private DialogDraftState _draftState;
     private Dictionary<PlayerNoteEntryMessage, PlayerNoteEntryMessage> _submittedNotes;
+    internal void OnRequestFailed()
+    {
+        _draftState.CancelRequest();
+        _submittedNotes = null;
+    }
 
     internal static void ReconcileSavedNotes(List<PlayerNoteEntryMessage> draft, Dictionary<PlayerNoteEntryMessage, PlayerNoteEntryMessage> submitted, List<PlayerNoteEntryMessage> saved)
     {

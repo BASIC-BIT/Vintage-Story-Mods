@@ -31,6 +31,18 @@ public class LanguageConfigDialog : GuiDialog
     private bool _closing;
     private readonly DialogDraftState _draftState;
     private Dictionary<LanguageConfigEntryMessage, string> _submittedNames;
+    internal static Dictionary<LanguageConfigEntryMessage, string> CaptureSubmittedNames(List<LanguageConfigEntryMessage> languages)
+    {
+        var submitted = new Dictionary<LanguageConfigEntryMessage, string>(ReferenceEqualityComparer.Instance);
+        foreach (var entry in languages) submitted.Add(entry, entry.Name ?? string.Empty);
+        return submitted;
+    }
+
+    internal void OnRequestFailed()
+    {
+        _draftState.CancelRequest();
+        _submittedNames = null;
+    }
     internal static void RebaseSavedNames(List<LanguageConfigEntryMessage> draft, Dictionary<LanguageConfigEntryMessage, string> submitted, List<LanguageConfigEntryMessage> saved)
     {
         if (submitted == null) return;
@@ -364,7 +376,7 @@ public class LanguageConfigDialog : GuiDialog
     {
         CaptureSelectedInputToDraft();
         if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return true;
-        _submittedNames = _languages.ToDictionary(entry => entry, entry => entry.Name ?? string.Empty);
+        _submittedNames = CaptureSubmittedNames(_languages);
         _onSave(_languages.Select(CloneEntry).ToList());
         return true;
     }

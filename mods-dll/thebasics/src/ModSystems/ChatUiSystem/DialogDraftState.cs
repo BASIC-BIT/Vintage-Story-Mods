@@ -26,4 +26,5 @@ internal sealed class DialogDraftState
     }
 
     public bool IsDirty(string current) => current != _baseline;
+    public void CancelRequest() => _submitted = null;
 }
