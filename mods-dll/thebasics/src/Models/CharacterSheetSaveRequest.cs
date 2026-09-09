@@ -14,4 +14,6 @@ public class CharacterSheetSaveRequest
 
     [ProtoMember(3)]
     public IList<CharacterSheetFieldValueMessage> Fields { get; set; } = new List<CharacterSheetFieldValueMessage>();
+    [ProtoMember(4)]
+    public long RequestId { get; set; }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 using thebasics.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Client;
@@ -28,6 +29,39 @@ public class LanguageConfigDialog : GuiDialog
     private bool _success;
     private int _selectedIndex;
     private bool _closing;
+    private readonly DialogDraftState _draftState;
+    private Dictionary<LanguageConfigEntryMessage, string> _submittedNames;
+    private bool _requiresAuthoritativeRefresh;
+    internal static Dictionary<LanguageConfigEntryMessage, string> CaptureSubmittedNames(List<LanguageConfigEntryMessage> languages)
+    {
+        var submitted = new Dictionary<LanguageConfigEntryMessage, string>(ReferenceEqualityComparer.Instance);
+        foreach (var entry in languages) submitted.Add(entry, entry.Name ?? string.Empty);
+        return submitted;
+    }
+
+    internal void OnRequestFailed()
+    {
+        _draftState.CancelRequest();
+        if (!_requiresAuthoritativeRefresh) _submittedNames = null;
+    }
+
+    internal void OnRequestTimedOut()
+    {
+        _draftState.CancelRequest();
+        if (_requiresAuthoritativeRefresh || _submittedNames == null) return;
+        _requiresAuthoritativeRefresh = true;
+        SendReload();
+    }
+    internal static void RebaseSavedNames(List<LanguageConfigEntryMessage> draft, Dictionary<LanguageConfigEntryMessage, string> submitted, List<LanguageConfigEntryMessage> saved)
+    {
+        if (submitted == null) return;
+        foreach (var entry in draft)
+        {
+            if (!submitted.TryGetValue(entry, out var submittedName)) continue;
+            var acknowledged = saved.Find(language => string.Equals(language.Name, submittedName.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (acknowledged != null) entry.OriginalName = acknowledged.OriginalName;
+        }
+    }
 
     public LanguageConfigDialog(
         ICoreClientAPI capi,
@@ -39,6 +73,7 @@ public class LanguageConfigDialog : GuiDialog
         Action onClose) : base(capi)
     {
         _languages = EnsureDraft(languages);
+        _draftState = new DialogDraftState(JsonConvert.SerializeObject(_languages));
         _message = message;
         _success = success;
         _onSave = onSave;
@@ -58,7 +93,25 @@ public class LanguageConfigDialog : GuiDialog
 
     public void SetView(List<LanguageConfigEntryMessage> languages, string message, bool success)
     {
-        _languages = EnsureDraft(languages);
+        CaptureSelectedInputToDraft();
+        var incoming = EnsureDraft(languages);
+        if (!_draftState.ApplyResponse(
+                JsonConvert.SerializeObject(_languages),
+                JsonConvert.SerializeObject(incoming),
+                success,
+                preserveCurrent: _requiresAuthoritativeRefresh))
+        {
+            _languages = incoming;
+        }
+        else if (success)
+        {
+            RebaseSavedNames(_languages, _submittedNames, incoming);
+        }
+        if (success)
+        {
+            _submittedNames = null;
+            _requiresAuthoritativeRefresh = false;
+        }
         _message = message;
         _success = success;
         _selectedIndex = ClampSelectedIndex(_selectedIndex);
@@ -339,14 +392,29 @@ public class LanguageConfigDialog : GuiDialog
     private bool OnSave()
     {
         CaptureSelectedInputToDraft();
+        if (_requiresAuthoritativeRefresh)
+        {
+            SendReload();
+            return true;
+        }
+        if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return true;
+        _submittedNames = CaptureSubmittedNames(_languages);
         _onSave(_languages.Select(CloneEntry).ToList());
         return true;
     }
 
     private bool OnReload()
     {
-        _onReload();
+        SendReload();
         return true;
+    }
+
+    private void SendReload()
+    {
+        CaptureSelectedInputToDraft();
+        if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return;
+        if (!_requiresAuthoritativeRefresh) _submittedNames = null;
+        _onReload();
     }
 
     private bool OnCancel()

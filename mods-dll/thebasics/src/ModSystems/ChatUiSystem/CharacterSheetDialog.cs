@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 using thebasics.Models;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.Utilities;
@@ -45,10 +46,13 @@ public class CharacterSheetDialog : GuiDialog
     private Action _afterDiscardConfirmed;
     private readonly Action _onClosed;
     private bool _closing;
+    private DialogDraftState _draftState;
+    private Dictionary<(string Id, int Occurrence), string> _preservedInputs;
 
     public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null, Action onClosed = null) : base(capi)
     {
         _view = view;
+        _draftState = new DialogDraftState(SnapshotValues(view));
         _onSave = onSave;
         _headshotCallbacks = headshotCallbacks;
         _onClosed = onClosed;
@@ -56,6 +60,7 @@ public class CharacterSheetDialog : GuiDialog
     }
 
     public string CurrentTargetPlayerUid => _view?.TargetPlayerUid;
+    public bool IsAdminView => _view?.IsAdminView == true;
 
     public bool CanEditHeadshot => _view?.CanEditHeadshot == true && _view?.Success == true;
 
@@ -134,9 +139,42 @@ public class CharacterSheetDialog : GuiDialog
 
     public void SetView(CharacterSheetViewMessage view)
     {
+        var sameView = _view.TargetPlayerUid == view.TargetPlayerUid && _view.IsAdminView == view.IsAdminView;
+        var inputs = CaptureInputValues();
+        if (sameView && _draftState.ApplyResponse(JsonConvert.SerializeObject(inputs), SnapshotValues(view), view.Success, view.IsSaveResponse))
+        {
+            _preservedInputs = inputs;
+        }
+        else if (!sameView)
+        {
+            _draftState = new DialogDraftState(SnapshotValues(view));
+        }
         _view = view;
-        ComposeDialog();
+        try { ComposeDialog(); }
+        finally { _preservedInputs = null; }
     }
+
+    internal void OnSaveRejected()
+    {
+        _draftState.ApplyResponse(JsonConvert.SerializeObject(CaptureInputValues()), SnapshotValues(_view), false);
+    }
+
+    internal void OnRequestFailed() => _draftState.CancelRequest();
+
+    private Dictionary<(string Id, int Occurrence), string> CaptureInputValues() => _view.Fields
+        .Select((field, index) => (field, index)).Where(item => item.field.CanEdit)
+        .OrderBy(item => item.field.FieldId, StringComparer.Ordinal)
+        .ToDictionary(item => FieldKey(_view, item.index), item => GetFieldInputValue(item.index, item.field) ?? string.Empty);
+
+    private static string SnapshotValues(CharacterSheetViewMessage view) => JsonConvert.SerializeObject(view.Fields
+        .Select((field, index) => (field, index)).Where(item => item.field.CanEdit).OrderBy(item => item.field.FieldId, StringComparer.Ordinal)
+        .ToDictionary(item => FieldKey(view, item.index), item => item.field.Value ?? string.Empty));
+
+    private static (string Id, int Occurrence) FieldKey(CharacterSheetViewMessage view, int index) =>
+        (view.Fields[index].FieldId, view.Fields.Take(index).Count(field => field.FieldId == view.Fields[index].FieldId));
+
+    private string InitialValue(CharacterSheetFieldViewMessage field) =>
+        _preservedInputs != null && _preservedInputs.TryGetValue(FieldKey(_view, _view.Fields.IndexOf(field)), out var value) ? value : field.Value ?? string.Empty;
 
     private void ComposeDialog()
     {
@@ -581,9 +619,10 @@ public class CharacterSheetDialog : GuiDialog
     {
         var values = field.Optional ? new[] { string.Empty }.Concat(field.Options).ToArray() : field.Options.ToArray();
         var displayValues = field.Optional ? new[] { Lang.Get("thebasics:charsheet-unset") }.Concat(field.Options).ToArray() : values;
-        var selectedIndex = string.IsNullOrWhiteSpace(field.Value) && field.Optional
+        var initialValue = InitialValue(field);
+        var selectedIndex = string.IsNullOrWhiteSpace(initialValue) && field.Optional
             ? 0
-            : Math.Max(0, Array.FindIndex(values, option => option.Equals(field.Value, StringComparison.OrdinalIgnoreCase)));
+            : Math.Max(0, Array.FindIndex(values, option => option.Equals(initialValue, StringComparison.OrdinalIgnoreCase)));
         var dropDown = new GuiElementDropDown(capi, values, displayValues, selectedIndex, null, inputBounds, CairoFont.WhiteSmallText(), multiSelect: false);
         _dropDowns[index] = dropDown;
         add(dropDown);
@@ -602,14 +641,14 @@ public class CharacterSheetDialog : GuiDialog
         }
 
         _textAreas[index] = textArea;
-        _textAreaInitialValues[index] = field.Value ?? string.Empty;
+        _textAreaInitialValues[index] = InitialValue(field);
         add(textArea);
     }
 
     private void AddTextField(Action<GuiElement> add, ElementBounds inputBounds, CharacterSheetFieldViewMessage field, int index)
     {
         var textInput = new ScrollClippedTextInput(capi, inputBounds, null, CairoFont.TextInput());
-        textInput.SetValue(field.Value ?? string.Empty);
+        textInput.SetValue(InitialValue(field));
         if (field.MaxLength > 0)
         {
             textInput.SetMaxLength(field.MaxLength);
@@ -637,6 +676,7 @@ public class CharacterSheetDialog : GuiDialog
 
     private bool OnSave()
     {
+        if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(CaptureInputValues()))) return true;
         var request = new CharacterSheetSaveRequest
         {
             TargetPlayerUid = _view.TargetPlayerUid,
@@ -674,21 +714,7 @@ public class CharacterSheetDialog : GuiDialog
             return false;
         }
 
-        for (var index = 0; index < _view.Fields.Count; index++)
-        {
-            var field = _view.Fields[index];
-            if (!field.CanEdit)
-            {
-                continue;
-            }
-
-            if (!string.Equals(GetFieldInputValue(index, field), field.Value ?? string.Empty, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return _draftState.IsDirty(JsonConvert.SerializeObject(CaptureInputValues()));
     }
 
     private void ConfirmCloseWithUnsavedChanges()

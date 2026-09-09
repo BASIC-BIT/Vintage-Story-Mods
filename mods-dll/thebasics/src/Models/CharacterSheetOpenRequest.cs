@@ -18,4 +18,7 @@ public class CharacterSheetOpenRequest
 
     [ProtoMember(3)]
     public string TargetPlayerName { get; set; } = string.Empty;
+
+    [ProtoMember(4)]
+    public long AutoOpenRequestId { get; set; }
 }
