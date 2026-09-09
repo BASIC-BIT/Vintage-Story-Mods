@@ -30,6 +30,17 @@ public class LanguageConfigDialog : GuiDialog
     private int _selectedIndex;
     private bool _closing;
     private readonly DialogDraftState _draftState;
+    private Dictionary<LanguageConfigEntryMessage, string> _submittedNames;
+    internal static void RebaseSavedNames(List<LanguageConfigEntryMessage> draft, Dictionary<LanguageConfigEntryMessage, string> submitted, List<LanguageConfigEntryMessage> saved)
+    {
+        if (submitted == null) return;
+        foreach (var entry in draft)
+        {
+            if (!submitted.TryGetValue(entry, out var submittedName)) continue;
+            var acknowledged = saved.Find(language => string.Equals(language.Name, submittedName.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (acknowledged != null) entry.OriginalName = acknowledged.OriginalName;
+        }
+    }
 
     public LanguageConfigDialog(
         ICoreClientAPI capi,
@@ -67,6 +78,11 @@ public class LanguageConfigDialog : GuiDialog
         {
             _languages = incoming;
         }
+        else if (success)
+        {
+            RebaseSavedNames(_languages, _submittedNames, incoming);
+        }
+        _submittedNames = null;
         _message = message;
         _success = success;
         _selectedIndex = ClampSelectedIndex(_selectedIndex);
@@ -348,6 +364,7 @@ public class LanguageConfigDialog : GuiDialog
     {
         CaptureSelectedInputToDraft();
         if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return true;
+        _submittedNames = _languages.ToDictionary(entry => entry, entry => entry.Name ?? string.Empty);
         _onSave(_languages.Select(CloneEntry).ToList());
         return true;
     }
@@ -356,6 +373,7 @@ public class LanguageConfigDialog : GuiDialog
     {
         CaptureSelectedInputToDraft();
         if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return true;
+        _submittedNames = null;
         _onReload();
         return true;
     }

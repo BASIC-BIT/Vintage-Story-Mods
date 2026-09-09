@@ -180,10 +180,12 @@ public class PlayerNotesDialog : GuiDialog
         _personalLedger = ClonePersonalLedger(_view.PersonalLedger);
         _selectedIndex = Clamp(_selectedIndex, CurrentNotes().Count);
         NormalizeListOffset();
+        // Replacing the view also ends any request owned by the old view,
+        // including targetless error responses.
+        _draftState = new DialogDraftState(SnapshotDraft());
         if (updateBaseline)
         {
             _localMessage = null;
-            _draftState = new DialogDraftState(SnapshotDraft());
         }
     }
 

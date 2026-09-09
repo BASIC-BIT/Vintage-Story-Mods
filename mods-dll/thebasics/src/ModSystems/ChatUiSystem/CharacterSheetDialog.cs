@@ -47,7 +47,7 @@ public class CharacterSheetDialog : GuiDialog
     private readonly Action _onClosed;
     private bool _closing;
     private DialogDraftState _draftState;
-    private Dictionary<string, string> _preservedInputs;
+    private Dictionary<(string Id, int Occurrence), string> _preservedInputs;
 
     public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null, Action onClosed = null) : base(capi)
     {
@@ -159,17 +159,20 @@ public class CharacterSheetDialog : GuiDialog
         _draftState.ApplyResponse(JsonConvert.SerializeObject(CaptureInputValues()), SnapshotValues(_view), false);
     }
 
-    private Dictionary<string, string> CaptureInputValues() => _view.Fields
+    private Dictionary<(string Id, int Occurrence), string> CaptureInputValues() => _view.Fields
         .Select((field, index) => (field, index)).Where(item => item.field.CanEdit)
         .OrderBy(item => item.field.FieldId, StringComparer.Ordinal)
-        .ToDictionary(item => item.field.FieldId, item => GetFieldInputValue(item.index, item.field) ?? string.Empty);
+        .ToDictionary(item => FieldKey(_view, item.index), item => GetFieldInputValue(item.index, item.field) ?? string.Empty);
 
     private static string SnapshotValues(CharacterSheetViewMessage view) => JsonConvert.SerializeObject(view.Fields
-        .Where(field => field.CanEdit).OrderBy(field => field.FieldId, StringComparer.Ordinal)
-        .ToDictionary(field => field.FieldId, field => field.Value ?? string.Empty));
+        .Select((field, index) => (field, index)).Where(item => item.field.CanEdit).OrderBy(item => item.field.FieldId, StringComparer.Ordinal)
+        .ToDictionary(item => FieldKey(view, item.index), item => item.field.Value ?? string.Empty));
+
+    private static (string Id, int Occurrence) FieldKey(CharacterSheetViewMessage view, int index) =>
+        (view.Fields[index].FieldId, view.Fields.Take(index).Count(field => field.FieldId == view.Fields[index].FieldId));
 
     private string InitialValue(CharacterSheetFieldViewMessage field) =>
-        _preservedInputs != null && _preservedInputs.TryGetValue(field.FieldId, out var value) ? value : field.Value ?? string.Empty;
+        _preservedInputs != null && _preservedInputs.TryGetValue(FieldKey(_view, _view.Fields.IndexOf(field)), out var value) ? value : field.Value ?? string.Empty;
 
     private void ComposeDialog()
     {
