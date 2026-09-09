@@ -69,6 +69,7 @@ internal static class SceneMarkerVisuals
         SceneMarkerColor.Parchment => (0.96, 0.91, 0.78),
         SceneMarkerColor.Blue => (0.55, 0.73, 0.91),
         SceneMarkerColor.Green => (0.60, 0.83, 0.62),
+        SceneMarkerColor.Red => (0.94, 0.30, 0.28),
         _ => (1, 0.82, 0.30),
     };
 

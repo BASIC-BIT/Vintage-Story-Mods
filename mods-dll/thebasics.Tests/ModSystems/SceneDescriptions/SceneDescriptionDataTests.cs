@@ -6,6 +6,18 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 public class SceneDescriptionDataTests
 {
+    [Fact]
+    public void ClearingMigratedTitleIconDoesNotRestoreLegacySelection()
+    {
+        var data = new SceneDescriptionData { TitleIcon = 6 }.Normalize();
+        data.TitleIconName.Should().Be("thebasics-scene-title-6");
+        data.TitleIconName = string.Empty;
+        data.Normalize();
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        SceneDescriptionData.ReadFrom(tree).TitleIconName.Should().BeEmpty();
+        data.AppearanceDefaults().TitleIconName.Should().BeEmpty();
+    }
     [Theory]
     [InlineData("wpHome")]
     [InlineData("svg:game:textures/icons/chat.svg")]
@@ -33,16 +45,16 @@ public class SceneDescriptionDataTests
         data.WriteTo(tree);
         var restored = SceneDescriptionData.ReadFrom(tree);
         restored.BubbleScale.Should().Be(1.5f);
-        restored.TitleIcon.Should().Be(6);
+        restored.TitleIcon.Should().Be(0);
         restored.TitleIconName.Should().Be("thebasics-scene-title-6");
         restored.IndicatorScale.Should().Be(0.5f);
-        restored.Clone().TitleIcon.Should().Be(6);
+        restored.Clone().TitleIcon.Should().Be(0);
         restored.AppearanceDefaults().BubbleScale.Should().Be(1.5f);
-        restored.AppearanceDefaults().TitleIcon.Should().Be(6);
+        restored.AppearanceDefaults().TitleIcon.Should().Be(0);
         var edited = new SceneDescriptionData();
         edited.ApplyText(restored);
         edited.BubbleScale.Should().Be(1.5f);
-        edited.TitleIcon.Should().Be(6);
+        edited.TitleIcon.Should().Be(0);
         SceneDescriptionFormatter.ToFloatingVtml(restored).Should().Be("<strong>Clue</strong>");
         restored.Title = "";
         SceneDescriptionFormatter.ToFloatingVtml(restored).Should().BeEmpty();
@@ -53,9 +65,9 @@ public class SceneDescriptionDataTests
     {
         var legacy = SceneDescriptionData.ReadFrom(new TreeAttribute());
         legacy.BubbleScale.Should().Be(1);
-        legacy.BubbleRenderScale.Should().Be(0.5f);
-        new SceneDescriptionData { BubbleScale = 0.4f }.Normalize().BubbleRenderScale.Should().Be(0.2f);
-        new SceneDescriptionData { BubbleScale = 2 }.Normalize().BubbleRenderScale.Should().Be(1);
+        legacy.BubbleRenderScale.Should().Be(1);
+        new SceneDescriptionData { BubbleScale = 0.4f }.Normalize().BubbleRenderScale.Should().Be(0.4f);
+        new SceneDescriptionData { BubbleScale = 2 }.Normalize().BubbleRenderScale.Should().Be(2);
         legacy.TitleIcon.Should().Be(0);
         var invalid = new SceneDescriptionData { BubbleScale = float.NaN, TitleIcon = 100 }.Normalize();
         invalid.BubbleScale.Should().Be(1);

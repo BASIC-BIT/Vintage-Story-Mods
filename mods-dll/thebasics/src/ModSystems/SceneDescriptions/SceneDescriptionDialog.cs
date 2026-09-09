@@ -68,8 +68,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var buttonY = top + 570;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth + 290, buttonY + ButtonHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
-        var titleLabelBounds = ElementBounds.Fixed(0, top, DialogWidth - 20, 22);
-        var titleInputBounds = ElementBounds.Fixed(0, top + 24, DialogWidth - 20, 30);
+        var titleLabelBounds = ElementBounds.Fixed(90, top, DialogWidth - 110, 22);
+        var titleInputBounds = ElementBounds.Fixed(90, top + 24, DialogWidth - 110, 30);
         var kindLabelBounds = ElementBounds.Fixed(0, top + 66, 180, 22);
         var kindBounds = ElementBounds.Fixed(0, top + 90, 220, 30);
         var bodyLabelBounds = ElementBounds.Fixed(0, top + 132, DialogWidth - 20, 22);
@@ -92,14 +92,14 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddDropDown(kindValues, kindNames, (int)data.Display, (_, _) => RefreshPreview(), kindBounds, "kind")
             .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
             .AddTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
-            .AddSceneDrawing(ElementBounds.Fixed(530, top + 12, 260, 200), DrawPreview, "preview")
+            .AddSceneDrawing(ElementBounds.Fixed(530, top + 46, 260, 166), DrawPreview, "preview")
             .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212, 260, 22))
             .AddTextToggleButtons(Enumerable.Repeat(string.Empty, _symbolShapes.Length).ToArray(), CairoFont.WhiteSmallText().WithFontSize(26),
                 index => { _appearance.Symbol = (SceneMarkerSymbol)index; RefreshPreview(); },
                 Enumerable.Range(0, 6).Select(index => ElementBounds.Fixed(530 + index * 44, top + 236, 40, 44)).ToArray(), "symbol")
             .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 290, 90, 22))
-            .AddDropDown(new[] { "gold", "parchment", "blue", "green" }, new[] { Lang.Get("thebasics:scene-color-gold"), Lang.Get("thebasics:scene-color-parchment"), Lang.Get("thebasics:scene-color-blue"), Lang.Get("thebasics:scene-color-green") }, (int)data.Color,
-                (value, _) => { _appearance.Color = value switch { "parchment" => SceneMarkerColor.Parchment, "blue" => SceneMarkerColor.Blue, "green" => SceneMarkerColor.Green, _ => SceneMarkerColor.Gold }; RefreshPreview(); }, ElementBounds.Fixed(620, top + 288, 170, 30), "color")
+            .AddDropDown(new[] { "gold", "parchment", "blue", "green", "red" }, new[] { Lang.Get("thebasics:scene-color-gold"), Lang.Get("thebasics:scene-color-parchment"), Lang.Get("thebasics:scene-color-blue"), Lang.Get("thebasics:scene-color-green"), Lang.Get("thebasics:scene-color-red") }, (int)data.Color,
+                (value, _) => { _appearance.Color = value switch { "parchment" => SceneMarkerColor.Parchment, "blue" => SceneMarkerColor.Blue, "green" => SceneMarkerColor.Green, "red" => SceneMarkerColor.Red, _ => SceneMarkerColor.Gold }; RefreshPreview(); }, ElementBounds.Fixed(620, top + 288, 170, 30), "color")
             .AddStaticText(Lang.Get("thebasics:scene-icon-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 342, 260, 22))
             .AddNumberInput(ElementBounds.Fixed(530, top + 366, 100, 30), null, CairoFont.TextInput(), "distance")
             .AddSwitch(value => { _appearance.UnlimitedIconDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 366, 30, 30), "unlimited")
@@ -114,14 +114,16 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddNumberInput(ElementBounds.Fixed(690, top + 520, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
             .AddStaticText(Lang.Get("thebasics:scene-bubble-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 180, 22))
             .AddNumberInput(ElementBounds.Fixed(185, top + 444, 80, 30), _ => RefreshPreview(), CairoFont.TextInput(), "bubblesize")
-            .AddSmallButton(Lang.Get("thebasics:scene-title-icon"), OpenIconPicker, ElementBounds.Fixed(300, top + 444, 200, 30), key: "titleicon")
+            .AddSmallButton(Lang.Get("thebasics:scene-icon-button"), OpenIconPicker, ElementBounds.Fixed(0, top + 24, 78, 30), key: "titleicon")
             .AddSwitch(value => _appearance.IdleBobbing = value, ElementBounds.Fixed(160, top + 490, 30, 30), "bobbing")
             .AddStaticText(Lang.Get("thebasics:scene-bobbing"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 494, 150, 22))
-            .AddSwitch(value => { _appearance.ShowBodyInBubble = value; RefreshPreview(); }, ElementBounds.Fixed(290, top + 532, 30, 30), "showbody")
-            .AddStaticText(Lang.Get("thebasics:scene-show-body"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 536, 280, 22))
+            .AddSwitch(value => { _appearance.ShowBodyInBubble = value; RefreshPreview(); }, ElementBounds.Fixed(250, top + 90, 30, 30), "showbody")
+            .AddStaticText(Lang.Get("thebasics:scene-show-body"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(250, top + 66, 250, 22))
             .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth - 140, buttonY, 120, ButtonHeight), key: "save")
-            .AddSmallButton(Lang.Get(data.IsLocked ? "thebasics:scene-unlock" : "thebasics:scene-save-lock"), OnLockButton, ElementBounds.Fixed(530, buttonY, 260, ButtonHeight), key: "lock")
+            .AddSmallButton("", OnLockButton, ElementBounds.Fixed(750, top, 36, 32), key: "lock")
+            .AddSceneDrawing(ElementBounds.Fixed(756, top + 4, 24, 24), DrawLock, "lockart")
+            .AddHoverText(Lang.Get(data.IsLocked ? "thebasics:scene-unlock" : "thebasics:scene-lock-on-save"), CairoFont.WhiteSmallText(), 250, ElementBounds.Fixed(750, top, 36, 32))
             ;
         for (var index = 0; index < _symbolShapes.Length; index++)
         {
@@ -198,11 +200,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         }
         preview.Normalize();
         using var text = preview.ShouldShowDescription(true) ? SceneMarkerVisuals.DescriptionSurface(capi, preview) : null;
-        var textWidth = 3.0;
-        var textHeight = text == null ? 0 : textWidth * text.Height / text.Width;
-        if (textHeight > 6) { textWidth *= 6 / textHeight; textHeight = 6; }
-        textWidth *= preview.BubbleRenderScale;
-        textHeight *= preview.BubbleRenderScale;
+        var (textWidth, textHeight) = text == null ? (0f, 0f) : SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, preview.BubbleRenderScale);
         var scale = Math.Min((width - 24) / Math.Max(3, textWidth), (height - 24) / (textHeight + 3.2 + Math.Max(0, preview.HeightOffset)));
         var symbolSize = 0.8 * preview.IndicatorScale;
         var centerY = height - 12 - (1.8 + preview.HeightOffset) * scale;
@@ -227,15 +225,25 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         return _iconPicker.TryOpen();
     }
 
+    private void DrawLock(Context ctx, ImageSurface surface, ElementBounds bounds)
+    {
+        ctx.Scale(surface.Width / 24.0, surface.Height / 24.0);
+        ctx.SetSourceRGBA(1, 1, 1, _canManageLock ? 1 : 0.4);
+        ctx.LineWidth = 2;
+        ctx.Rectangle(5, 11, 14, 11);
+        ctx.Stroke();
+        var closed = _appearance.IsLocked || _lockAfterSave;
+        ctx.Arc(closed ? 12 : 16, 10, 5, Math.PI, Math.PI * 2);
+        ctx.Stroke();
+    }
     private bool OnLockButton()
     {
         if (!_canManageLock) return false;
         if (!_appearance.IsLocked)
         {
-            _lockAfterSave = true;
-            var saved = OnSave();
-            _lockAfterSave = false;
-            return saved;
+            _lockAfterSave = !_lockAfterSave;
+            SingleComposer.GetSceneDrawing("lockart").Redraw();
+            return true;
         }
         _closing = true;
         base.TryClose();

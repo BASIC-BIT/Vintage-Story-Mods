@@ -14,7 +14,7 @@ public enum SceneDescriptionDisplay { WhenTargeted, AlwaysNearby, OnInteraction 
 public enum SceneMarkerAppearance { Stone, Model, Billboard, Hybrid }
 public enum SceneMarkerSymbol { Exclamation, Question, Information, Dot, Ring, Diamond }
 public enum SceneMarkerEffect { Plain, Hologram }
-public enum SceneMarkerColor { Gold, Parchment, Blue, Green }
+public enum SceneMarkerColor { Gold, Parchment, Blue, Green, Red }
 
 public sealed class SceneDescriptionData
 {
@@ -55,10 +55,11 @@ public sealed class SceneDescriptionData
     public bool IdleBobbing { get; set; } = true;
     public bool ShowBodyInBubble { get; set; }
     public float BubbleScale { get; set; } = 1;
-    internal float BubbleRenderScale => BubbleScale * 0.5f;
+    internal float BubbleRenderScale => BubbleScale;
     // Zero means none; 1-6 map to SceneMarkerSymbol values plus one.
     public int TitleIcon { get; set; }
     public string TitleIconName { get; set; } = string.Empty;
+    internal (string Title, string Body, bool ShowBody, string Icon) BubbleContent => (Title, Body, ShowBodyInBubble, TitleIconName);
 
     internal static string NormalizeIconName(string value)
     {
@@ -156,6 +157,7 @@ public sealed class SceneDescriptionData
         if (TitleIcon < 0 || TitleIcon > Enum.GetValues<SceneMarkerSymbol>().Length) TitleIcon = 0;
         TitleIconName = NormalizeIconName(TitleIconName);
         if (TitleIconName.Length == 0 && TitleIcon > 0) TitleIconName = "thebasics-scene-title-" + TitleIcon;
+        TitleIcon = 0; // Consume the legacy selection once so clearing the name stays cleared.
         if (!Enum.IsDefined(Color)) Color = SceneMarkerColor.Gold;
 
         if (!Enum.IsDefined(Kind))

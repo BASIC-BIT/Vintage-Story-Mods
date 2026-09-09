@@ -59,8 +59,8 @@ internal sealed class SceneTitleIconDialog : GuiDialog
         }
         SingleComposer.AddSmallButton(Lang.Get("thebasics:scene-icon-none"), () => Choose(string.Empty), ElementBounds.Fixed(8, 350, 100, 30))
             .AddSmallButton("<", () => { _page--; Compose(); return true; }, ElementBounds.Fixed(230, 350, 45, 30))
-            .AddStaticText($"{_page + 1} / {pages}", CairoFont.WhiteSmallText(), ElementBounds.Fixed(290, 355, 110, 25))
-            .AddSmallButton(">", () => { _page++; Compose(); return true; }, ElementBounds.Fixed(450, 350, 45, 30))
+            .AddStaticText($"{_page + 1} / {pages}", CairoFont.WhiteSmallText(), ElementBounds.Fixed(285, 355, 70, 25))
+            .AddSmallButton(">", () => { _page++; Compose(); return true; }, ElementBounds.Fixed(365, 350, 45, 30))
             .EndChildElements().Compose();
         SingleComposer.GetTextInput("search").SetValue(_query);
     }

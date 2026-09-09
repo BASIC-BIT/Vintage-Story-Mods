@@ -26,7 +26,7 @@ public class SceneDescriptionServerTests
         marker.Data.ShowBodyInBubble.Should().BeTrue();
         marker.Data.BubbleScale.Should().Be(1.5f);
         marker.Data.TitleIconName.Should().Be("wpHome");
-        marker.Data.TitleIcon.Should().Be(6);
+        marker.Data.TitleIcon.Should().Be(0);
         marker.Data.Symbol.Should().Be(SceneMarkerSymbol.Diamond);
         marker.Data.Effect.Should().Be(SceneMarkerEffect.Plain);
         marker.Data.TextDistance.Should().Be(5);

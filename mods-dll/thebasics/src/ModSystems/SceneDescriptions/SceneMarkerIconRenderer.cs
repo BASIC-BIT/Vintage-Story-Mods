@@ -11,13 +11,11 @@ namespace thebasics.ModSystems.SceneDescriptions;
 
 internal sealed class SceneMarkerIconRenderer : IRenderer
 {
-    private const float MaxDescriptionHeight = 6;
-    private const double DescriptionCullRadius = MaxDescriptionHeight + 2;
     private readonly ICoreClientAPI _api;
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
     private readonly Dictionary<(SceneMarkerSymbol Symbol, SceneMarkerColor Color), LoadedTexture> _icons = new();
     private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth)> _visible = new();
-    private readonly Dictionary<SceneDescriptionBlockEntity, (SceneDescriptionData Data, LoadedTexture Texture)> _descriptions = new();
+    private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, LoadedTexture Texture)> _descriptions = new();
     private readonly HashSet<SceneDescriptionBlockEntity> _shownDescriptions = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, float> _focus = new();
     private readonly Matrixf _model = new();
@@ -44,11 +42,11 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         var player = _api.World?.Player?.Entity;
         if (stage != EnumRenderStage.Opaque || player == null || _markers.Count == 0) return;
         var render = _api.Render;
-        GatherVisibleIcons(deltaTime);
         _shownDescriptions.Clear();
+        GatherVisibleIcons(deltaTime);
         if (_visible.Count == 0)
         {
-            foreach (var marker in _descriptions.Keys.ToArray()) RemoveDescription(marker);
+            foreach (var marker in _descriptions.Keys.Where(marker => !_shownDescriptions.Contains(marker)).ToArray()) RemoveDescription(marker);
             return;
         }
         // Transparent symbols must blend back-to-front because they do not write terrain depth.
@@ -70,15 +68,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
                 if (!icon.Marker.Data.ShouldShowDescription(targeted) || icon.TextOpacity <= 0) continue;
                 var text = GetDescription(icon.Marker);
                 if (text == null) continue;
-                var width = (float)Math.Min(3, _api.World.Player.Entity.CameraPos.DistanceTo(icon.Position) * 0.45);
-                var height = width * text.Height / text.Width;
-                if (height > MaxDescriptionHeight)
-                {
-                    width *= MaxDescriptionHeight / height;
-                    height = MaxDescriptionHeight;
-                }
-                width *= icon.Marker.Data.BubbleRenderScale;
-                height *= icon.Marker.Data.BubbleRenderScale;
+                var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, icon.Marker.Data.BubbleRenderScale);
                 var view = render.CameraMatrixOriginf;
                 // Reserve the full focus/bob envelope so the bubble stays still through both animations.
                 var offset = 0.8f * icon.Marker.Data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;
@@ -117,7 +107,16 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             var focus = _focus.GetValueOrDefault(marker);
             focus += ((selected ? 1 : 0) - focus) * (1 - MathF.Exp(-10 * Math.Max(0, deltaTime)));
             _focus[marker] = focus;
-            var radius = textOpacity > 0 ? DescriptionCullRadius : 2;
+            var radius = 2.0;
+            if (textOpacity > 0)
+            {
+                var text = GetDescription(marker);
+                if (text != null)
+                {
+                    var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, marker.Data.BubbleRenderScale);
+                    radius = SceneBubbleLayout.CullRadius(width, height, marker.Data.IndicatorScale);
+                }
+            }
             if ((opacity <= 0 && textOpacity <= 0) || !render.DefaultFrustumCuller.SphereInFrustum(position.X, position.Y, position.Z, radius)) continue;
             var camera = player.CameraPos;
             var view = render.CameraMatrixOriginf;
@@ -170,13 +169,13 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private LoadedTexture GetDescription(SceneDescriptionBlockEntity marker)
     {
         _shownDescriptions.Add(marker);
-        if (_descriptions.TryGetValue(marker, out var entry) && ReferenceEquals(entry.Data, marker.Data)) return entry.Texture;
+        if (_descriptions.TryGetValue(marker, out var entry) && entry.Content == marker.Data.BubbleContent && entry.GuiScale == RuntimeEnv.GUIScale) return entry.Texture;
         RemoveDescription(marker);
         using var surface = SceneMarkerVisuals.DescriptionSurface(_api, marker.Data);
         if (surface == null) return null;
         var texture = new LoadedTexture(_api);
         _api.Gui.LoadOrUpdateCairoTexture(surface, false, ref texture);
-        _descriptions[marker] = (marker.Data, texture);
+        _descriptions[marker] = (marker.Data.BubbleContent, RuntimeEnv.GUIScale, texture);
         return texture;
     }
 
