@@ -7,28 +7,64 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneDescriptionDataTests
 {
     [Fact]
-    public void FloatingBubbleDefaultsToTitleAndReadCueWithoutChangingFullText()
+    public void BubbleSizeAndTitleIconPersistIndependentlyOfIndicatorSize()
+    {
+        var data = new SceneDescriptionData { Title = "Clue", Body = "Detail", BubbleScale = 1.5f, TitleIcon = 6, IndicatorScale = 0.5f };
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        var restored = SceneDescriptionData.ReadFrom(tree);
+        restored.BubbleScale.Should().Be(1.5f);
+        restored.TitleIcon.Should().Be(6);
+        restored.IndicatorScale.Should().Be(0.5f);
+        restored.Clone().TitleIcon.Should().Be(6);
+        restored.AppearanceDefaults().BubbleScale.Should().Be(1.5f);
+        restored.AppearanceDefaults().TitleIcon.Should().Be(6);
+        var edited = new SceneDescriptionData();
+        edited.ApplyText(restored);
+        edited.BubbleScale.Should().Be(1.5f);
+        edited.TitleIcon.Should().Be(6);
+        SceneDescriptionFormatter.ToFloatingVtml(restored).Should().Be("<icon name=\"thebasics-scene-title-6\"></icon> <strong>Clue</strong>");
+        restored.Title = "";
+        SceneDescriptionFormatter.ToFloatingVtml(restored).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void InvalidAndLegacyBubbleSettingsHaveSafeDefaults()
+    {
+        var legacy = SceneDescriptionData.ReadFrom(new TreeAttribute());
+        legacy.BubbleScale.Should().Be(1);
+        legacy.TitleIcon.Should().Be(0);
+        var invalid = new SceneDescriptionData { BubbleScale = float.NaN, TitleIcon = 100 }.Normalize();
+        invalid.BubbleScale.Should().Be(1);
+        invalid.TitleIcon.Should().Be(0);
+        new SceneDescriptionData { BubbleScale = 999 }.Normalize().BubbleScale.Should().Be(2);
+        new SceneDescriptionData { BubbleScale = -1 }.Normalize().BubbleScale.Should().Be(0.5f);
+    }
+
+    [Fact]
+    public void FloatingBubbleDefaultsToTitleWithoutChangingFullText()
     {
         var data = new SceneDescriptionData { Title = "A <clue>", Body = "Hidden description" };
         data.ShowBodyInBubble.Should().BeFalse();
         SceneDescriptionData.ReadFrom(new TreeAttribute()).ShowBodyInBubble.Should().BeFalse();
-        var bubble = SceneDescriptionFormatter.ToFloatingVtml(data, "Right-click to read");
-        bubble.Should().Contain("A &lt;clue&gt;").And.Contain("Right-click to read").And.NotContain("Hidden description");
+        var bubble = SceneDescriptionFormatter.ToFloatingVtml(data);
+        bubble.Should().Be("<strong>A &lt;clue&gt;</strong>");
         SceneDescriptionFormatter.ToVtml(data).Should().Contain("Hidden description");
         data.Body.Should().Be("Hidden description");
         data.Title = "";
-        SceneDescriptionFormatter.ToFloatingVtml(data, "Right-click to read").Should().Contain("Right-click to read");
+        SceneDescriptionFormatter.ToFloatingVtml(data).Should().BeEmpty();
+        data.ShouldShowDescription(true).Should().BeFalse();
         data.Title = "Title only";
         data.Body = "";
         data.ShouldShowDescription(true).Should().BeTrue();
-        SceneDescriptionFormatter.ToFloatingVtml(data, "Right-click to read").Should().Be("<strong>Title only</strong>");
+        SceneDescriptionFormatter.ToFloatingVtml(data).Should().Be("<strong>Title only</strong>");
     }
 
     [Fact]
     public void FloatingDescriptionCanBeEnabledAndSaved()
     {
         var data = new SceneDescriptionData { Title = "Scene", Body = "First\nSecond", ShowBodyInBubble = true };
-        SceneDescriptionFormatter.ToFloatingVtml(data, "Read").Should().Be("<strong>Scene</strong><br>First<br>Second");
+        SceneDescriptionFormatter.ToFloatingVtml(data).Should().Be("<strong>Scene</strong><br>First<br>Second");
         var tree = new TreeAttribute();
         data.WriteTo(tree);
         SceneDescriptionData.ReadFrom(tree).ShowBodyInBubble.Should().BeTrue();
@@ -64,32 +100,27 @@ public class SceneDescriptionDataTests
     [InlineData(SceneMarkerSymbol.Dot)]
     [InlineData(SceneMarkerSymbol.Ring)]
     [InlineData(SceneMarkerSymbol.Diamond)]
-    public void NewSymbolsAndHologramPersistAndBecomeFreshMarkerDefaults(SceneMarkerSymbol symbol)
+    public void NewSymbolsPersistAndRetiredHologramsMigrateToPlain(SceneMarkerSymbol symbol)
     {
         var data = new SceneDescriptionData { Symbol = symbol, Effect = SceneMarkerEffect.Hologram };
         var tree = new TreeAttribute();
         data.WriteTo(tree);
         var restored = SceneDescriptionData.ReadFrom(tree);
         restored.Symbol.Should().Be(symbol);
-        restored.Effect.Should().Be(SceneMarkerEffect.Hologram);
-        restored.Clone().Effect.Should().Be(SceneMarkerEffect.Hologram);
-        restored.AppearanceDefaults().Effect.Should().Be(SceneMarkerEffect.Hologram);
+        restored.Effect.Should().Be(SceneMarkerEffect.Plain);
+        restored.Clone().Effect.Should().Be(SceneMarkerEffect.Plain);
+        restored.AppearanceDefaults().Effect.Should().Be(SceneMarkerEffect.Plain);
         var edited = new SceneDescriptionData();
         edited.ApplyText(restored);
         edited.Symbol.Should().Be(symbol);
-        edited.Effect.Should().Be(SceneMarkerEffect.Hologram);
+        edited.Effect.Should().Be(SceneMarkerEffect.Plain);
     }
 
     [Fact]
-    public void MissingAndInvalidEffectsRemainPlainAndShimmerNeverFlashesOff()
+    public void MissingAndInvalidEffectsRemainPlain()
     {
         SceneDescriptionData.ReadFrom(new TreeAttribute()).Effect.Should().Be(SceneMarkerEffect.Plain);
         new SceneDescriptionData { Effect = (SceneMarkerEffect)99 }.Normalize().Effect.Should().Be(SceneMarkerEffect.Plain);
-        for (var step = 0; step < 600; step++)
-        {
-            SceneMarkerVisuals.EffectOpacity(SceneMarkerEffect.Hologram, step / 10.0).Should().BeInRange(0.5984f, 0.68f);
-            SceneMarkerVisuals.EffectOpacity(SceneMarkerEffect.Plain, step / 10.0).Should().Be(1);
-        }
     }
 
     [Fact]
@@ -169,7 +200,7 @@ public class SceneDescriptionDataTests
     [InlineData(SceneDescriptionDisplay.OnInteraction, true, false)]
     public void DisplayModeControlsFloatingDescription(SceneDescriptionDisplay display, bool targeted, bool visible)
     {
-        var data = new SceneDescriptionData { Display = display, Body = "A quiet clearing." };
+        var data = new SceneDescriptionData { Display = display, Body = "A quiet clearing.", ShowBodyInBubble = true };
         data.ShouldShowDescription(targeted).Should().Be(visible);
         var tree = new TreeAttribute();
         data.WriteTo(tree);

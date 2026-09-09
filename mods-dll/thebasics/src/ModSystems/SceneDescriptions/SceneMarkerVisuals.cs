@@ -15,7 +15,7 @@ internal static class SceneMarkerVisuals
         var background = new TextBackground { FillColor = new[] { 0.08, 0.10, 0.14, 1.0 }, Padding = 8,
             Radius = 4, BorderWidth = 1, BorderColor = new[] { 0.65, 0.69, 0.75, 1.0 } };
         var font = new CairoFont(24, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble) { Orientation = EnumTextOrientation.Left };
-        return RichTextTextureUtils.GenRichTextSurface(api, SceneDescriptionFormatter.ToFloatingVtml(source, Lang.Get("thebasics:scene-read-prompt")), font, 360, background);
+        return RichTextTextureUtils.GenRichTextSurface(api, SceneDescriptionFormatter.ToFloatingVtml(source), font, 360, background);
     }
 
     internal static Shape LoadShape(ICoreClientAPI api, SceneMarkerSymbol symbol)
@@ -39,11 +39,10 @@ internal static class SceneMarkerVisuals
     };
 
     // Shared artwork for the billboard and editor preview.
-    internal static float EffectOpacity(SceneMarkerEffect effect, double seconds) => effect == SceneMarkerEffect.Hologram
-        ? (float)(0.68 * (0.94 + 0.06 * Math.Sin(seconds * Math.PI / 3))) : 1;
+    internal const float IndicatorOpacity = 0.68f;
 
     internal static void Draw(Context ctx, Shape shape, double x, double y, double size, SceneMarkerColor color = SceneMarkerColor.Gold,
-        SceneMarkerSymbol symbol = SceneMarkerSymbol.Exclamation, SceneMarkerEffect effect = SceneMarkerEffect.Plain, float opacity = 1)
+        SceneMarkerSymbol symbol = SceneMarkerSymbol.Exclamation, float opacity = 1)
     {
         var unit = size / 16;
         var rgb = Palette(color);
@@ -78,13 +77,6 @@ internal static class SceneMarkerVisuals
         // Opaque interiors keep Cairo's premultiplied pixels compatible with the world's straight-alpha blend.
         ctx.SetSourceRGBA(rgb.R, rgb.G, rgb.B, 1);
         ctx.Paint();
-        if (effect == SceneMarkerEffect.Hologram)
-        {
-            // Scan lines are baked once into the cached texture; the renderer supplies a slow, bounded shimmer.
-            ctx.SetSourceRGBA(0.75 + rgb.R * 0.25, 0.75 + rgb.G * 0.25, 0.75 + rgb.B * 0.25, 0.24);
-            for (var line = 0; line < 16; line++) ctx.Rectangle(x, y + line * unit, size, unit * 0.24);
-            ctx.Fill();
-        }
         if (opacity < 1)
         {
             ctx.PopGroupToSource();

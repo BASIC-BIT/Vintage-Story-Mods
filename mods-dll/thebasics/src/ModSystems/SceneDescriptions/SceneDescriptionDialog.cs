@@ -15,6 +15,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private const double ButtonHeight = 30;
     private readonly Action<SceneDescriptionData, bool> _onSave;
     private readonly Action _onClose;
+    private SceneTitleIconDialog _iconPicker;
     private bool _closing;
     private bool _lockAfterSave;
     private readonly bool _canManageLock;
@@ -44,6 +45,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 
     public override void OnGuiClosed()
     {
+        _iconPicker?.TryClose();
         base.OnGuiClosed();
         Dispose();
     }
@@ -90,9 +92,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddDropDown(kindValues, kindNames, (int)data.Display, (_, _) => RefreshPreview(), kindBounds, "kind")
             .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
             .AddTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
-            .AddDynamicCustomDraw(ElementBounds.Fixed(530, top + 12, 260, 200), DrawPreview, "preview")
+            .AddSceneDrawing(ElementBounds.Fixed(530, top + 12, 260, 200), DrawPreview, "preview")
             .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212, 260, 22))
-            .AddTextToggleButtons(new[] { "!", "?", "i", "●", "○", "◆" }, CairoFont.WhiteSmallText().WithFontSize(26),
+            .AddTextToggleButtons(Enumerable.Repeat(string.Empty, _symbolShapes.Length).ToArray(), CairoFont.WhiteSmallText().WithFontSize(26),
                 index => { _appearance.Symbol = (SceneMarkerSymbol)index; RefreshPreview(); },
                 Enumerable.Range(0, 6).Select(index => ElementBounds.Fixed(530 + index * 44, top + 236, 40, 44)).ToArray(), "symbol")
             .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 290, 90, 22))
@@ -110,9 +112,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddNumberInput(ElementBounds.Fixed(690, top + 480, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
             .AddStaticText(Lang.Get("thebasics:scene-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 525, 150, 22))
             .AddNumberInput(ElementBounds.Fixed(690, top + 520, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
-            .AddStaticText(Lang.Get("thebasics:scene-effect"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 150, 22))
-            .AddDropDown(new[] { "plain", "hologram" }, new[] { Lang.Get("thebasics:scene-effect-plain"), Lang.Get("thebasics:scene-effect-hologram") }, (int)data.Effect,
-                (value, _) => { _appearance.Effect = value == "hologram" ? SceneMarkerEffect.Hologram : SceneMarkerEffect.Plain; RefreshPreview(); }, ElementBounds.Fixed(160, top + 444, 260, 30), "effect")
+            .AddStaticText(Lang.Get("thebasics:scene-bubble-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 180, 22))
+            .AddNumberInput(ElementBounds.Fixed(185, top + 444, 80, 30), _ => RefreshPreview(), CairoFont.TextInput(), "bubblesize")
+            .AddSmallButton(Lang.Get("thebasics:scene-title-icon"), OpenIconPicker, ElementBounds.Fixed(300, top + 444, 200, 30), key: "titleicon")
             .AddSwitch(value => _appearance.IdleBobbing = value, ElementBounds.Fixed(160, top + 490, 30, 30), "bobbing")
             .AddStaticText(Lang.Get("thebasics:scene-bobbing"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 494, 150, 22))
             .AddSwitch(value => { _appearance.ShowBodyInBubble = value; RefreshPreview(); }, ElementBounds.Fixed(290, top + 532, 30, 30), "showbody")
@@ -120,8 +122,15 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth - 140, buttonY, 120, ButtonHeight), key: "save")
             .AddSmallButton(Lang.Get(data.IsLocked ? "thebasics:scene-unlock" : "thebasics:scene-save-lock"), OnLockButton, ElementBounds.Fixed(530, buttonY, 260, ButtonHeight), key: "lock")
-            .EndChildElements()
-            .Compose(focusFirstElement: false);
+            ;
+        for (var index = 0; index < _symbolShapes.Length; index++)
+        {
+            var symbolIndex = index;
+            SingleComposer.AddSceneDrawing(ElementBounds.Fixed(534 + index * 44, top + 242, 32, 32),
+                (ctx, surface, _) => SceneMarkerVisuals.Draw(ctx, _symbolShapes[symbolIndex], 0, 0, surface.Width,
+                    _appearance.Color, (SceneMarkerSymbol)symbolIndex), "symbolart-" + index);
+        }
+        SingleComposer.EndChildElements().Compose(focusFirstElement: false);
 
         SingleComposer.ToggleButtonsSetValue("symbol", (int)data.Symbol);
         SingleComposer.GetNumberInput("distance").SetValue(data.IconDistance.ToString(CultureInfo.InvariantCulture));
@@ -132,8 +141,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetNumberInput("height").Enabled = !data.IsLocked;
         SingleComposer.GetNumberInput("size").SetValue((data.IndicatorScale * 100).ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetNumberInput("size").Enabled = !data.IsLocked;
+        SingleComposer.GetNumberInput("bubblesize").SetValue((data.BubbleScale * 100).ToString(CultureInfo.InvariantCulture));
+        SingleComposer.GetNumberInput("bubblesize").Enabled = !data.IsLocked;
+        SingleComposer.GetButton("titleicon").Enabled = !data.IsLocked;
         SingleComposer.GetDropDown("color").Enabled = !data.IsLocked;
-        SingleComposer.GetDropDown("effect").Enabled = !data.IsLocked;
         SingleComposer.GetSwitch("bobbing").SetValue(data.IdleBobbing);
         SingleComposer.GetSwitch("bobbing").Enabled = !data.IsLocked;
         SingleComposer.GetSwitch("showbody").SetValue(data.ShowBodyInBubble);
@@ -161,7 +172,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var nearby = SingleComposer.GetDropDown("kind").SelectedValue == "nearby";
         SingleComposer.GetNumberInput("textdistance").Enabled = !_appearance.IsLocked && nearby && !_appearance.UnlimitedTextDistance;
         SingleComposer.GetSwitch("textunlimited").Enabled = !_appearance.IsLocked && nearby;
-        SingleComposer.GetCustomDraw("preview").Redraw();
+        SingleComposer.GetSceneDrawing("preview").Redraw();
+        for (var index = 0; index < _symbolShapes.Length; index++) SingleComposer.GetSceneDrawing("symbolart-" + index).Redraw();
     }
 
     private void DrawPreview(Context ctx, ImageSurface surface, ElementBounds bounds)
@@ -181,18 +193,22 @@ internal sealed class SceneDescriptionDialog : GuiDialog
                 preview.HeightOffset = offset;
             if (float.TryParse(SingleComposer.GetNumberInput("size").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var percent))
                 preview.IndicatorScale = percent / 100;
+            if (float.TryParse(SingleComposer.GetNumberInput("bubblesize").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var bubblePercent))
+                preview.BubbleScale = bubblePercent / 100;
         }
         preview.Normalize();
         using var text = preview.ShouldShowDescription(true) ? SceneMarkerVisuals.DescriptionSurface(capi, preview) : null;
         var textWidth = 3.0;
         var textHeight = text == null ? 0 : textWidth * text.Height / text.Width;
         if (textHeight > 6) { textWidth *= 6 / textHeight; textHeight = 6; }
-        var scale = Math.Min((width - 24) / 3.0, (height - 24) / (textHeight + 3.2 + Math.Max(0, preview.HeightOffset)));
+        textWidth *= preview.BubbleScale;
+        textHeight *= preview.BubbleScale;
+        var scale = Math.Min((width - 24) / Math.Max(3, textWidth), (height - 24) / (textHeight + 3.2 + Math.Max(0, preview.HeightOffset)));
         var symbolSize = 0.8 * preview.IndicatorScale;
         var centerY = height - 12 - (1.8 + preview.HeightOffset) * scale;
         var symbolY = centerY - symbolSize / 2 * scale;
         SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], width / 2.0 - symbolSize / 2 * scale, symbolY, symbolSize * scale,
-            preview.Color, preview.Symbol, preview.Effect, SceneMarkerVisuals.EffectOpacity(preview.Effect, 0));
+            preview.Color, preview.Symbol, SceneMarkerVisuals.IndicatorOpacity);
         if (text != null)
         {
             ctx.Save();
@@ -202,6 +218,13 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             ctx.Paint();
             ctx.Restore();
         }
+    }
+
+    private bool OpenIconPicker()
+    {
+        if (_appearance.IsLocked || _iconPicker != null) return false;
+        _iconPicker = new SceneTitleIconDialog(capi, icon => { _appearance.TitleIcon = icon; RefreshPreview(); }, () => _iconPicker = null);
+        return _iconPicker.TryOpen();
     }
 
     private bool OnLockButton()
@@ -230,6 +253,13 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             return false;
         }
         _appearance.IndicatorScale = percent / 100;
+        if (!float.TryParse(SingleComposer.GetNumberInput("bubblesize").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var bubblePercent) ||
+            !float.IsFinite(bubblePercent) || bubblePercent < 50 || bubblePercent > 200)
+        {
+            capi.TriggerIngameError(this, "scene-bubble-size", Lang.Get("thebasics:scene-bubble-size-invalid"));
+            return false;
+        }
+        _appearance.BubbleScale = bubblePercent / 100;
         if (!float.TryParse(SingleComposer.GetNumberInput("height").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var height) ||
             !float.IsFinite(height) || height < -0.5f || height > 4)
         {
@@ -268,9 +298,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             HeightOffset = _appearance.HeightOffset,
             IndicatorScale = _appearance.IndicatorScale,
             Color = _appearance.Color,
-            Effect = _appearance.Effect,
             IdleBobbing = _appearance.IdleBobbing,
             ShowBodyInBubble = _appearance.ShowBodyInBubble,
+            BubbleScale = _appearance.BubbleScale, TitleIcon = _appearance.TitleIcon,
             Title = SingleComposer.GetTextInput("title").GetText(),
             Body = SingleComposer.GetTextArea("body").GetText(),
             Display = SingleComposer.GetDropDown("kind").SelectedValue switch

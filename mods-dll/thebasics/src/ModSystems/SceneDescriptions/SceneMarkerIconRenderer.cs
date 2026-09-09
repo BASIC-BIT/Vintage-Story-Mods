@@ -12,10 +12,10 @@ namespace thebasics.ModSystems.SceneDescriptions;
 internal sealed class SceneMarkerIconRenderer : IRenderer
 {
     private const float MaxDescriptionHeight = 6;
-    private const double DescriptionCullRadius = MaxDescriptionHeight + 2;
+    private const double DescriptionCullRadius = MaxDescriptionHeight * 2 + 2;
     private readonly ICoreClientAPI _api;
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
-    private readonly Dictionary<(SceneMarkerSymbol Symbol, SceneMarkerColor Color, SceneMarkerEffect Effect), LoadedTexture> _icons = new();
+    private readonly Dictionary<(SceneMarkerSymbol Symbol, SceneMarkerColor Color), LoadedTexture> _icons = new();
     private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth)> _visible = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, (SceneDescriptionData Data, LoadedTexture Texture)> _descriptions = new();
     private readonly HashSet<SceneDescriptionBlockEntity> _shownDescriptions = new();
@@ -65,7 +65,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             {
                 var size = 0.8f * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
                 var bob = icon.Marker.Data.IdleBobbing ? 0.05 * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / 4000)) : 0;
-                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data.Symbol, icon.Marker.Data.Color, icon.Marker.Data.Effect), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.EffectOpacity(icon.Marker.Data.Effect, _api.World.ElapsedMilliseconds / 1000.0), size, size);
+                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data.Symbol, icon.Marker.Data.Color), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.IndicatorOpacity, size, size);
                 var targeted = _api.World.Player.CurrentBlockSelection?.Position?.Equals(icon.Marker.Pos) == true;
                 if (!icon.Marker.Data.ShouldShowDescription(targeted) || icon.TextOpacity <= 0) continue;
                 var text = GetDescription(icon.Marker);
@@ -77,6 +77,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
                     width *= MaxDescriptionHeight / height;
                     height = MaxDescriptionHeight;
                 }
+                width *= icon.Marker.Data.BubbleScale;
+                height *= icon.Marker.Data.BubbleScale;
                 var view = render.CameraMatrixOriginf;
                 // Reserve the full focus/bob envelope so the bubble stays still through both animations.
                 var offset = 0.8f * icon.Marker.Data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;
@@ -178,15 +180,15 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         return texture;
     }
 
-    private LoadedTexture GetIcon(SceneMarkerSymbol symbol, SceneMarkerColor color, SceneMarkerEffect effect)
+    private LoadedTexture GetIcon(SceneMarkerSymbol symbol, SceneMarkerColor color)
     {
-        if (_icons.TryGetValue((symbol, color, effect), out var icon)) return icon;
+        if (_icons.TryGetValue((symbol, color), out var icon)) return icon;
         using var surface = new ImageSurface(Format.Argb32, 128, 128);
         using var ctx = new Context(surface);
-        SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, symbol), 0, 0, 128, color, symbol, effect);
+        SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, symbol), 0, 0, 128, color, symbol);
         icon = new LoadedTexture(_api);
         _api.Gui.LoadOrUpdateCairoTexture(surface, true, ref icon);
-        _icons.Add((symbol, color, effect), icon);
+        _icons.Add((symbol, color), icon);
         return icon;
     }
 

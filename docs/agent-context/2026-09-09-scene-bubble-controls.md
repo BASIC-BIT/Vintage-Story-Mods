@@ -16,3 +16,5 @@ QA cards:
 4. Lock/reopen: both switches disabled. Pick up/replace and create a fresh marker: settings persist and fresh defaults copy appearance without content.
 
 Both review axes found no blockers. Standard package build passed, packaged DLL matches tested output, and packaged JSON parses. Package SHA256 F8AAAA0A340A25F8A73AA0D339742EFA4833A7BC50CAE4AFCF14C2B0F958CB35 was verified on server 8982de16 and both QA profiles; previous packages preserved.
+
+BASIC follow-up: removed the Right-click to read cue entirely. Hidden descriptions show only the title; untitled markers with hidden bodies show no bubble. Full reading remains available. Simplified color labels to Gold, White, Blue and Green; palette values unchanged.

@@ -274,6 +274,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Effect = (int)data.Effect,
             IdleBobbing = data.IdleBobbing,
             ShowBodyInBubble = data.ShowBodyInBubble,
+            BubbleScale = data.BubbleScale, TitleIcon = data.TitleIcon,
             IsLocked = data.IsLocked,
         };
     }
@@ -299,6 +300,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Effect = (SceneMarkerEffect)packet.Effect,
             IdleBobbing = packet.IdleBobbing,
             ShowBodyInBubble = packet.ShowBodyInBubble,
+            BubbleScale = packet.BubbleScale, TitleIcon = packet.TitleIcon,
             LockItemCode = packet.IsLocked ? "ui" : string.Empty,
         }.Normalize();
     }
