@@ -9,7 +9,6 @@ public static class SceneDescriptionFormatter
     {
         var data = (source ?? new SceneDescriptionData()).Clone().Normalize();
         var title = string.IsNullOrWhiteSpace(data.Title) ? string.Empty : $"<strong>{VtmlUtils.EscapeVtml(data.Title)}</strong>";
-        if (title.Length > 0 && data.TitleIcon > 0) title = $"<icon name=\"thebasics-scene-title-{data.TitleIcon}\"></icon> " + title;
         var body = data.ShowBodyInBubble ? VtmlUtils.EscapeVtml(FloatingPreview(data.Body)).Replace("\n", "<br>") : string.Empty;
         return string.Join("<br>", new[] { title, body }.Where(text => text.Length > 0));
     }

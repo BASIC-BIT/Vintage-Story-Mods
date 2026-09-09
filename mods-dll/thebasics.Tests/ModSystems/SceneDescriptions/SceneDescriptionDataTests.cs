@@ -6,6 +6,25 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 public class SceneDescriptionDataTests
 {
+    [Theory]
+    [InlineData("wpHome")]
+    [InlineData("svg:game:textures/icons/chat.svg")]
+    [InlineData("mod custom icon")]
+    public void NamedTitleIconsPersistAndCanBeCleared(string name)
+    {
+        var data = new SceneDescriptionData { Title = "A title", TitleIconName = name };
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        var restored = SceneDescriptionData.ReadFrom(tree);
+        restored.TitleIconName.Should().Be(name);
+        restored.AppearanceDefaults().TitleIconName.Should().Be(name);
+        var edited = new SceneDescriptionData();
+        edited.ApplyText(restored);
+        edited.TitleIconName.Should().Be(name);
+        edited.ApplyText(new SceneDescriptionData { Title = "A title", TitleIconName = "" });
+        edited.Normalize().TitleIconName.Should().BeEmpty();
+        SceneDescriptionFormatter.ToFloatingVtml(restored).Should().Be("<strong>A title</strong>");
+    }
     [Fact]
     public void BubbleSizeAndTitleIconPersistIndependentlyOfIndicatorSize()
     {
@@ -15,6 +34,7 @@ public class SceneDescriptionDataTests
         var restored = SceneDescriptionData.ReadFrom(tree);
         restored.BubbleScale.Should().Be(1.5f);
         restored.TitleIcon.Should().Be(6);
+        restored.TitleIconName.Should().Be("thebasics-scene-title-6");
         restored.IndicatorScale.Should().Be(0.5f);
         restored.Clone().TitleIcon.Should().Be(6);
         restored.AppearanceDefaults().BubbleScale.Should().Be(1.5f);
@@ -23,7 +43,7 @@ public class SceneDescriptionDataTests
         edited.ApplyText(restored);
         edited.BubbleScale.Should().Be(1.5f);
         edited.TitleIcon.Should().Be(6);
-        SceneDescriptionFormatter.ToFloatingVtml(restored).Should().Be("<icon name=\"thebasics-scene-title-6\"></icon> <strong>Clue</strong>");
+        SceneDescriptionFormatter.ToFloatingVtml(restored).Should().Be("<strong>Clue</strong>");
         restored.Title = "";
         SceneDescriptionFormatter.ToFloatingVtml(restored).Should().BeEmpty();
     }

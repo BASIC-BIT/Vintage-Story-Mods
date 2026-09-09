@@ -223,7 +223,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private bool OpenIconPicker()
     {
         if (_appearance.IsLocked || _iconPicker != null) return false;
-        _iconPicker = new SceneTitleIconDialog(capi, icon => { _appearance.TitleIcon = icon; RefreshPreview(); }, () => _iconPicker = null);
+        _iconPicker = new SceneTitleIconDialog(capi, icon => { _appearance.TitleIcon = 0; _appearance.TitleIconName = icon; RefreshPreview(); }, () => _iconPicker = null);
         return _iconPicker.TryOpen();
     }
 
@@ -300,7 +300,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             Color = _appearance.Color,
             IdleBobbing = _appearance.IdleBobbing,
             ShowBodyInBubble = _appearance.ShowBodyInBubble,
-            BubbleScale = _appearance.BubbleScale, TitleIcon = _appearance.TitleIcon,
+            BubbleScale = _appearance.BubbleScale, TitleIcon = _appearance.TitleIcon, TitleIconName = _appearance.TitleIconName,
             Title = SingleComposer.GetTextInput("title").GetText(),
             Body = SingleComposer.GetTextArea("body").GetText(),
             Display = SingleComposer.GetDropDown("kind").SelectedValue switch

@@ -15,7 +15,41 @@ internal static class SceneMarkerVisuals
         var background = new TextBackground { FillColor = new[] { 0.08, 0.10, 0.14, 1.0 }, Padding = 8,
             Radius = 4, BorderWidth = 1, BorderColor = new[] { 0.65, 0.69, 0.75, 1.0 } };
         var font = new CairoFont(24, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble) { Orientation = EnumTextOrientation.Left };
-        return RichTextTextureUtils.GenRichTextSurface(api, SceneDescriptionFormatter.ToFloatingVtml(source), font, 360, background);
+        var data = source.Clone().Normalize();
+        var vtml = SceneDescriptionFormatter.ToFloatingVtml(data);
+        if (string.IsNullOrWhiteSpace(data.Title) || data.TitleIconName.Length == 0)
+            return RichTextTextureUtils.GenRichTextSurface(api, vtml, font, 360, background);
+
+        // Reserve an icon column so wrapping cannot move the icon above the title.
+        var transparent = new TextBackground { FillColor = new double[4], Padding = 0, BorderWidth = 0, Radius = 0 };
+        using var text = RichTextTextureUtils.GenRichTextSurface(api, vtml, font, 308, transparent, centerLines: false);
+        if (text == null) return null;
+        var guiScale = Math.Max(0.1f, RuntimeEnv.GUIScale);
+        var padding = (int)Math.Ceiling(10 * guiScale);
+        var iconSize = (int)Math.Ceiling(40 * guiScale);
+        using var icon = new ImageSurface(Format.Argb32, iconSize, iconSize);
+        using (var iconContext = new Context(icon))
+        {
+            if (!SceneTitleIcons.Draw(api, iconContext, icon, data.TitleIconName))
+                return RichTextTextureUtils.GenRichTextSurface(api, vtml, font, 360, background);
+        }
+        var gap = (int)Math.Ceiling(10 * guiScale);
+        var textOffset = (int)Math.Ceiling(5 * guiScale);
+        var surface = new ImageSurface(Format.Argb32, padding * 2 + iconSize + gap + text.Width,
+            padding * 2 + Math.Max(iconSize, text.Height + textOffset));
+        using var ctx = new Context(surface);
+        GuiElement.RoundRectangle(ctx, 1, 1, surface.Width - 2, surface.Height - 2, 4 * guiScale);
+        ctx.SetSourceRGBA(background.FillColor);
+        ctx.FillPreserve();
+        ctx.LineWidth = 1;
+        ctx.SetSourceRGBA(background.BorderColor);
+        ctx.Stroke();
+
+        ctx.SetSourceSurface(icon, padding, padding);
+        ctx.Paint();
+        ctx.SetSourceSurface(text, padding + iconSize + gap, padding + textOffset);
+        ctx.Paint();
+        return surface;
     }
 
     internal static Shape LoadShape(ICoreClientAPI api, SceneMarkerSymbol symbol)

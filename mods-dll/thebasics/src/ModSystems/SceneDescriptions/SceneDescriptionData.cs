@@ -58,6 +58,16 @@ public sealed class SceneDescriptionData
     internal float BubbleRenderScale => BubbleScale * 0.5f;
     // Zero means none; 1-6 map to SceneMarkerSymbol values plus one.
     public int TitleIcon { get; set; }
+    public string TitleIconName { get; set; } = string.Empty;
+
+    internal static string NormalizeIconName(string value)
+    {
+        value = value?.Trim() ?? string.Empty;
+        if (value.Length > 256) return string.Empty;
+        foreach (var ch in value)
+            if (char.IsControl(ch)) return string.Empty;
+        return value;
+    }
 
     public float GetTextOpacity(double distance) => GetOpacity(distance, TextDistance, UnlimitedTextDistance);
 
@@ -121,6 +131,7 @@ public sealed class SceneDescriptionData
         ShowBodyInBubble = edited.ShowBodyInBubble;
         BubbleScale = edited.BubbleScale;
         TitleIcon = edited.TitleIcon;
+        TitleIconName = edited.TitleIconName;
         Normalize();
     }
 
@@ -143,6 +154,8 @@ public sealed class SceneDescriptionData
         Effect = SceneMarkerEffect.Plain;
         BubbleScale = float.IsFinite(BubbleScale) ? Math.Clamp(BubbleScale, 0.4f, 2) : 1;
         if (TitleIcon < 0 || TitleIcon > Enum.GetValues<SceneMarkerSymbol>().Length) TitleIcon = 0;
+        TitleIconName = NormalizeIconName(TitleIconName);
+        if (TitleIconName.Length == 0 && TitleIcon > 0) TitleIconName = "thebasics-scene-title-" + TitleIcon;
         if (!Enum.IsDefined(Color)) Color = SceneMarkerColor.Gold;
 
         if (!Enum.IsDefined(Kind))
@@ -171,13 +184,13 @@ public sealed class SceneDescriptionData
             TextDistance = TextDistance,
             UnlimitedTextDistance = UnlimitedTextDistance,
             HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
-            Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble, BubbleScale = BubbleScale, TitleIcon = TitleIcon,
+            Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble, BubbleScale = BubbleScale, TitleIcon = TitleIcon, TitleIconName = TitleIconName,
         };
     }
 
     internal SceneDescriptionData AppearanceDefaults() => new SceneDescriptionData
     {
-        Symbol = Symbol, Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble, BubbleScale = BubbleScale, TitleIcon = TitleIcon, Display = Display, IconDistance = IconDistance,
+        Symbol = Symbol, Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble, BubbleScale = BubbleScale, TitleIcon = TitleIcon, TitleIconName = TitleIconName, Display = Display, IconDistance = IconDistance,
         UnlimitedIconDistance = UnlimitedIconDistance, TextDistance = TextDistance,
         UnlimitedTextDistance = UnlimitedTextDistance, HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
     }.Normalize();
@@ -206,6 +219,7 @@ public sealed class SceneDescriptionData
         attributes.SetBool("sceneShowBodyInBubble", ShowBodyInBubble);
         attributes.SetFloat("sceneBubbleScale", BubbleScale);
         attributes.SetInt("sceneTitleIcon", TitleIcon);
+        attributes.SetString("sceneTitleIconName", TitleIconName);
     }
 
     internal static SceneDescriptionData ReadFrom(ITreeAttribute attributes)
@@ -238,6 +252,7 @@ public sealed class SceneDescriptionData
             ShowBodyInBubble = attributes.GetBool("sceneShowBodyInBubble"),
             BubbleScale = attributes.GetFloat("sceneBubbleScale", 1),
             TitleIcon = attributes.GetInt("sceneTitleIcon"),
+            TitleIconName = attributes.GetString("sceneTitleIconName", string.Empty),
         }.Normalize();
     }
 

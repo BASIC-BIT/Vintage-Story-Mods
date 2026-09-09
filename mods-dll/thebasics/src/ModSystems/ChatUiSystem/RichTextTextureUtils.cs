@@ -54,7 +54,7 @@ internal static class RichTextTextureUtils
     /// callers can composite the bubble alongside other Cairo content (e.g. a framed headshot
     /// in a nametag). Caller owns the returned surface and must dispose it.
     /// </summary>
-    public static ImageSurface GenRichTextSurface(ICoreClientAPI capi, string vtml, CairoFont baseFont, int maxTextWidthPx, TextBackground background, int extraBottomMarginPx = 0)
+    public static ImageSurface GenRichTextSurface(ICoreClientAPI capi, string vtml, CairoFont baseFont, int maxTextWidthPx, TextBackground background, int extraBottomMarginPx = 0, bool centerLines = true)
     {
         if (capi == null || string.IsNullOrWhiteSpace(vtml))
         {
@@ -102,7 +102,7 @@ internal static class RichTextTextureUtils
             {
                 textWidthPx = GetWrappedTextureWidthPx(renderComps, maxTextWidthAtScalePx);
             }
-            CenterVisualLines(renderComps, textWidthPx);
+            if (centerLines) CenterVisualLines(renderComps, textWidthPx);
 
             var hPad = GetScaledLengthPx(background.HorPadding, guiScale);
             var verPad = GetScaledLengthPx(background.VerPadding, guiScale);

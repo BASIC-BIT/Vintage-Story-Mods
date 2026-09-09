@@ -801,6 +801,7 @@
   "scene-show-body": "Show description in bubble",
   "scene-bubble-size": "Bubble size (%)",
   "scene-bubble-size-invalid": "Enter a bubble size from 40 to 200 percent.",
+  "scene-icon-search": "Search",
   "scene-title-icon": "Title icon...",
   "scene-icon-none": "None",
   "scene-bobbing": "Idle bobbing",

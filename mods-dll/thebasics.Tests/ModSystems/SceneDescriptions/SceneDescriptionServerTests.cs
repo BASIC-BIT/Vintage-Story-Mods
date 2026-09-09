@@ -16,7 +16,7 @@ public class SceneDescriptionServerTests
     {
         var (marker, player, _) = CreateMarker();
         marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
-        { Title = "Old title", Body = "Old body", Color = (int)SceneMarkerColor.Blue, HeightOffset = 3, IndicatorScale = 2, TextDistance = 5, IdleBobbing = false, ShowBodyInBubble = true, BubbleScale = 1.5f, TitleIcon = 6,
+        { Title = "Old title", Body = "Old body", Color = (int)SceneMarkerColor.Blue, HeightOffset = 3, IndicatorScale = 2, TextDistance = 5, IdleBobbing = false, ShowBodyInBubble = true, BubbleScale = 1.5f, TitleIcon = 6, TitleIconName = "wpHome",
             Display = (int)SceneDescriptionDisplay.AlwaysNearby, Symbol = (int)SceneMarkerSymbol.Diamond, Effect = (int)SceneMarkerEffect.Hologram }));
         marker.InitializeFromItem(new ItemStack(new SceneDescriptionBlock()), player);
         marker.Data.Color.Should().Be(SceneMarkerColor.Blue);
@@ -25,6 +25,7 @@ public class SceneDescriptionServerTests
         marker.Data.IdleBobbing.Should().BeFalse();
         marker.Data.ShowBodyInBubble.Should().BeTrue();
         marker.Data.BubbleScale.Should().Be(1.5f);
+        marker.Data.TitleIconName.Should().Be("wpHome");
         marker.Data.TitleIcon.Should().Be(6);
         marker.Data.Symbol.Should().Be(SceneMarkerSymbol.Diamond);
         marker.Data.Effect.Should().Be(SceneMarkerEffect.Plain);
