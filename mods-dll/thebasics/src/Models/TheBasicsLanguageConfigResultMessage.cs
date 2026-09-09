@@ -14,4 +14,6 @@ public class TheBasicsLanguageConfigResultMessage
 
     [ProtoMember(3)]
     public List<LanguageConfigEntryMessage> Languages { get; set; } = new();
+    [ProtoMember(4)]
+    public long RequestId { get; set; }
 }

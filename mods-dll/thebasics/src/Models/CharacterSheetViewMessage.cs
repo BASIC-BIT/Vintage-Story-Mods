@@ -67,4 +67,6 @@ public class CharacterSheetViewMessage
 
     [ProtoMember(17)]
     public long AutoOpenRequestId { get; set; }
+    [ProtoMember(18)]
+    public long RequestId { get; set; }
 }

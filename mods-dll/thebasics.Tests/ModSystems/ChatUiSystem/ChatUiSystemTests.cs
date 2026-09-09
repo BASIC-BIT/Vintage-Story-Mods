@@ -9,8 +9,41 @@ using ChatUiModSystem = thebasics.ModSystems.ChatUiSystem.ChatUiSystem;
 
 namespace thebasics.Tests.ModSystems.ChatUiSystem;
 
+[Collection(thebasics.Tests.ModSystems.AnalyticsServiceTestCollection.Name)]
 public class ChatUiSystemTests
 {
+    [Fact]
+    public void SentSaveWithoutReply_ExpiresAndIgnoresLateResponse()
+    {
+        var previousApi = GetStaticField<ICoreClientAPI>("_api");
+        var previousChannel = GetStaticField<SafeClientNetworkChannel>("_safeNetworkChannel");
+        var api = Substitute.For<ICoreClientAPI>();
+        Action<float> expire = null!;
+        api.Event.RegisterCallback(Arg.Do<Action<float>>(callback => expire = callback), 30000);
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        using var safe = new SafeClientNetworkChannel(channel, api);
+        try
+        {
+            SetStaticField("_api", api);
+            SetStaticField("_safeNetworkChannel", safe);
+            var request = new thebasics.Models.CharacterSheetSaveRequest();
+            InvokeStaticMethod("SendCharacterSheetSaveRequest", request);
+            channel.Received().SendPacket(request);
+            GetStaticField<bool>("_pendingCharacterSheetSave").Should().BeTrue();
+            expire(30);
+            GetStaticField<bool>("_pendingCharacterSheetSave").Should().BeFalse();
+            InvokeStaticMethod("OnCharacterSheetViewMessage", new thebasics.Models.CharacterSheetViewMessage { IsSaveResponse = true, RequestId = request.RequestId });
+            _ = api.DidNotReceive().World;
+        }
+        finally
+        {
+            InvokeStaticMethod("OnCharacterSheetDialogClosed");
+            SetStaticField("_api", previousApi);
+            SetStaticField("_safeNetworkChannel", previousChannel);
+        }
+    }
+
     [Fact]
     public void StaleAutoOpenResponse_DoesNotReplaceCachedSheetOrTitle()
     {
@@ -201,4 +234,3 @@ public class ChatUiSystemTests
         method.Invoke(null, arguments);
     }
 }
-
