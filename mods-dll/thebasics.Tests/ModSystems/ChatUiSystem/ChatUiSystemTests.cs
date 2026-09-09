@@ -1,5 +1,8 @@
 using System.Reflection;
 using FluentAssertions;
+using NSubstitute;
+using thebasics.Utilities.Network;
+using Vintagestory.API.Client;
 using thebasics.Configs;
 using ChatUiModSystem = thebasics.ModSystems.ChatUiSystem.ChatUiSystem;
 
@@ -7,18 +10,44 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 
 public class ChatUiSystemTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(456)]
+    public void DismissedAutoOpenResponse_DoesNotReopenSheet(long newerRequestId)
+    {
+        SetStaticField("_pendingCharacterSheetOpenFromCharacterDialog", true);
+        InvokeStaticMethod("OnCharacterSheetDialogClosed");
+        SetStaticField("_pendingCharacterSheetAutoOpenRequestId", newerRequestId);
+        var response = new thebasics.Models.CharacterSheetViewMessage { AutoOpenRequestId = 123 };
+        var handler = typeof(ChatUiModSystem).GetMethod("OnCharacterSheetViewMessage", BindingFlags.Static | BindingFlags.NonPublic)!;
+
+        var receive = () => handler.Invoke(null, new object[] { response });
+
+        receive.Should().NotThrow();
+        GetStaticField<object>("_characterSheetDialog").Should().BeNull();
+        GetStaticField<long>("_pendingCharacterSheetAutoOpenRequestId").Should().Be(newerRequestId);
+        ChatUiModSystem.GuiDialogCharacter_OnGuiClosed_Postfix();
+    }
+
     [Fact]
     public void CharacterTabRecomposition_AfterSheetDismissed_DoesNotRequestAnotherSheet()
     {
         var previousConfig = GetStaticField<ModConfig>("_config");
+        var previousChannel = GetStaticField<SafeClientNetworkChannel>("_safeNetworkChannel");
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        using var safe = new SafeClientNetworkChannel(channel, Substitute.For<ICoreClientAPI>());
         try
         {
+            SetStaticField("_safeNetworkChannel", safe);
             SetStaticField("_config", new ModConfig { EnableCharacterSheets = true });
             ChatUiModSystem.GuiDialogCharacter_OnGuiClosed_Postfix();
             InvokeStaticMethod("OnCharacterDialogComposed");
             GetStaticField<bool>("_pendingCharacterSheetOpenFromCharacterDialog").Should().BeTrue();
+            GetStaticField<long>("_pendingCharacterSheetAutoOpenRequestId").Should().BePositive();
 
             InvokeStaticMethod("OnCharacterSheetDialogClosed");
+            GetStaticField<long>("_pendingCharacterSheetAutoOpenRequestId").Should().Be(0);
             InvokeStaticMethod("OnCharacterDialogComposed");
             GetStaticField<bool>("_pendingCharacterSheetOpenFromCharacterDialog").Should().BeFalse();
             InvokeStaticMethod("OnCharacterDialogComposed");
@@ -32,6 +61,7 @@ public class ChatUiSystemTests
         {
             ChatUiModSystem.GuiDialogCharacter_OnGuiClosed_Postfix();
             SetStaticField("_config", previousConfig);
+            SetStaticField("_safeNetworkChannel", previousChannel);
         }
     }
 

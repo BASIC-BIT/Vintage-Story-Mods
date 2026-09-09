@@ -52,6 +52,8 @@ public class ChatUiSystem : ModSystem
     private static ChatHistoryDialog _chatHistoryDialog;
     private static bool _pendingCharacterSheetSave;
     private static bool _pendingCharacterSheetOpenFromCharacterDialog;
+    private static long _nextCharacterSheetAutoOpenRequestId;
+    private static long _pendingCharacterSheetAutoOpenRequestId;
     private static bool _characterDialogSheetAutoOpenHandled;
     private static bool _suppressNextCharacterDialogSheetOpen;
     private static bool _characterSheetOpenedFromCharacterDialog;
@@ -199,7 +201,15 @@ public class ChatUiSystem : ModSystem
         }
 
         _pendingCharacterSheetOpenFromCharacterDialog = true;
-        RequestOwnCharacterSheet();
+        var requestId = ++_nextCharacterSheetAutoOpenRequestId;
+        _pendingCharacterSheetAutoOpenRequestId = requestId;
+        _pendingCharacterSheetSave = false;
+        SendDialogRequest(new CharacterSheetOpenRequest { Mode = CharacterSheetOpenRequest.ModeOwn, AutoOpenRequestId = requestId }, () =>
+        {
+            if (_pendingCharacterSheetAutoOpenRequestId != requestId) return;
+            _pendingCharacterSheetAutoOpenRequestId = 0;
+            _pendingCharacterSheetOpenFromCharacterDialog = false;
+        });
     }
 
     private static void RequestOwnCharacterSheet()
@@ -209,6 +219,7 @@ public class ChatUiSystem : ModSystem
 
     private static void SendCharacterSheetRequest(CharacterSheetOpenRequest request)
     {
+        _pendingCharacterSheetAutoOpenRequestId = 0;
         _pendingCharacterSheetSave = false;
         _safeNetworkChannel?.SendPacketSafely(request);
     }
@@ -358,6 +369,14 @@ public class ChatUiSystem : ModSystem
         UpdateLocalCharacterDisplayName(message);
         CacheOwnCharacterSheetView(message);
 
+        // A cached sheet can be dismissed before its refresh arrives. Correlate
+        // auto-opens so an old window cannot reopen or replace a newer view.
+        if (message.AutoOpenRequestId != 0)
+        {
+            if (message.AutoOpenRequestId != _pendingCharacterSheetAutoOpenRequestId) return;
+            _pendingCharacterSheetAutoOpenRequestId = 0;
+        }
+
         if (!message.Success || message.IsErrorResponse)
         {
             HandleCharacterSheetErrorMessage(message);
@@ -437,6 +456,7 @@ public class ChatUiSystem : ModSystem
 
     private static void OnCharacterSheetDialogClosed()
     {
+        _pendingCharacterSheetAutoOpenRequestId = 0;
         _characterSheetDialog = null;
         _pendingCharacterSheetOpenFromCharacterDialog = false;
         _characterSheetOpenedFromCharacterDialog = false;
@@ -950,6 +970,7 @@ public class ChatUiSystem : ModSystem
     [HarmonyPatch(typeof(GuiDialogCharacter), "OnGuiClosed")]
     public static void GuiDialogCharacter_OnGuiClosed_Postfix()
     {
+        _pendingCharacterSheetAutoOpenRequestId = 0;
         _characterDialogSheetAutoOpenHandled = false;
         _pendingCharacterSheetOpenFromCharacterDialog = false;
         if (_characterSheetOpenedFromCharacterDialog && _characterSheetDialog?.IsOpened() == true)
@@ -2305,6 +2326,7 @@ public class ChatUiSystem : ModSystem
             _returnToConfigAdminAfterLanguageDialog = false;
             _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
+            _pendingCharacterSheetAutoOpenRequestId = 0;
             _suppressNextCharacterDialogSheetOpen = false;
             _characterDialogSheetAutoOpenHandled = false;
             _characterSheetOpenedFromCharacterDialog = false;
