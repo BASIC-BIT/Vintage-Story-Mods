@@ -235,6 +235,17 @@ public class ChatUiSystem : ModSystem
         _safeNetworkChannel?.SendPacketSafely(request);
     }
 
+    private static void SendTrackedCharacterSheetRefresh(CharacterSheetOpenRequest request)
+    {
+        var requestId = ++_nextCharacterSheetAutoOpenRequestId;
+        request.AutoOpenRequestId = requestId;
+        _pendingCharacterSheetAutoOpenRequestId = requestId;
+        SendDialogRequest(request, () =>
+        {
+            if (_pendingCharacterSheetAutoOpenRequestId == requestId) _pendingCharacterSheetAutoOpenRequestId = 0;
+        });
+    }
+
     private static void SendCharacterSheetSaveRequest(CharacterSheetSaveRequest request)
     {
         _pendingCharacterSheetSave = true;
@@ -247,9 +258,9 @@ public class ChatUiSystem : ModSystem
         SendDialogRequest(request, () => CharacterSheetRequests.Fail(request.RequestId));
     }
 
-    private static long BeginDialogRequest(DialogRequestTracker tracker, Action onFailure)
+    private static long BeginDialogRequest(DialogRequestTracker tracker, Action onFailure, Action onTimeout = null)
     {
-        return tracker.Begin(onFailure, (callback, delay) => _api.Event.RegisterCallback(_ => callback(), delay));
+        return tracker.Begin(onFailure, (callback, delay) => _api.Event.RegisterCallback(_ => callback(), delay), onTimeout);
     }
 
     private static void SendDialogRequest<T>(T message, Action onFailure)
@@ -702,15 +713,13 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        if (_characterSheetDialog?.CurrentTargetPlayerUid == message.TargetPlayerUid)
-        {
-            _characterSheetDialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-status-loading"));
-        }
+        if (_characterSheetDialog?.CurrentTargetPlayerUid != message.TargetPlayerUid) return;
+        _characterSheetDialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-status-loading"));
 
         // Re-request the sheet so the view reflects the new Headshot metadata (or its absence after a clear).
         if (!string.IsNullOrEmpty(message.TargetPlayerUid))
         {
-            _safeNetworkChannel?.SendPacketSafely(new CharacterSheetOpenRequest
+            SendTrackedCharacterSheetRefresh(new CharacterSheetOpenRequest
             {
                 Mode = _characterSheetDialog?.CurrentTargetPlayerUid == message.TargetPlayerUid && _characterSheetDialog.IsAdminView
                     ? CharacterSheetOpenRequest.ModeAdmin : CharacterSheetOpenRequest.ModeView,
@@ -1743,7 +1752,7 @@ public class ChatUiSystem : ModSystem
     private static void SendLanguageConfigSaveRequest(List<LanguageConfigEntryMessage> languages)
     {
         var dialog = _languageConfigDialog;
-        var requestId = BeginDialogRequest(LanguageRequests, () => dialog?.OnRequestFailed());
+        var requestId = BeginDialogRequest(LanguageRequests, () => dialog?.OnRequestFailed(), () => dialog?.OnRequestTimedOut());
         SendDialogRequest(new TheBasicsLanguageConfigSaveMessage
         {
             RequestId = requestId,
@@ -1754,7 +1763,7 @@ public class ChatUiSystem : ModSystem
     private static void SendLanguageConfigReload()
     {
         var dialog = _languageConfigDialog;
-        var requestId = BeginDialogRequest(LanguageRequests, () => dialog?.OnRequestFailed());
+        var requestId = BeginDialogRequest(LanguageRequests, () => dialog?.OnRequestFailed(), () => dialog?.OnRequestTimedOut());
         SendDialogRequest(new TheBasicsLanguageConfigSaveMessage
         {
             RequestId = requestId,
@@ -1787,7 +1796,7 @@ public class ChatUiSystem : ModSystem
     {
         var dialog = _playerNotesDialog;
         message ??= new TheBasicsNotesSaveMessage();
-        message.RequestId = BeginDialogRequest(NotesRequests, () => dialog?.OnRequestFailed());
+        message.RequestId = BeginDialogRequest(NotesRequests, () => dialog?.OnRequestFailed(), () => dialog?.OnRequestTimedOut());
         SendDialogRequest(message, () => NotesRequests.Fail(message.RequestId));
     }
 

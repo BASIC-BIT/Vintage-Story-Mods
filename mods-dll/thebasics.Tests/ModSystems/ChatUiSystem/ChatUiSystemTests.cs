@@ -156,6 +156,7 @@ public class ChatUiSystemTests
         Lang.AvailableLanguages["test-headshot"] = translations;
         Lang.ChangeLanguage("test-headshot");
         var previousChannel = GetStaticField<SafeClientNetworkChannel>("_safeNetworkChannel");
+        var previousPendingRequestId = GetStaticField<long>("_pendingCharacterSheetAutoOpenRequestId");
         var channel = Substitute.For<IClientNetworkChannel>();
         channel.Connected.Returns(true);
         using var safe = new SafeClientNetworkChannel(channel, Substitute.For<ICoreClientAPI>());
@@ -166,14 +167,85 @@ public class ChatUiSystemTests
             SetStaticField("_characterSheetDialog", dialog);
             SetStaticField("_safeNetworkChannel", safe);
             InvokeStaticMethod("OnHeadshotUploadResult", new thebasics.Models.HeadshotUploadResult { Success = true, TargetPlayerUid = "player" });
-            channel.Received().SendPacket(Arg.Is<thebasics.Models.CharacterSheetOpenRequest>(request => request.Mode == expectedMode && request.TargetPlayerUid == "player"));
+            channel.Received().SendPacket(Arg.Is<thebasics.Models.CharacterSheetOpenRequest>(request =>
+                request.Mode == expectedMode && request.TargetPlayerUid == "player" && request.AutoOpenRequestId > 0));
         }
         finally
         {
             SetStaticField<object?>("_characterSheetDialog", null);
             SetStaticField("_safeNetworkChannel", previousChannel);
+            SetStaticField("_pendingCharacterSheetAutoOpenRequestId", previousPendingRequestId);
             Lang.ChangeLanguage(previousLocale);
             Lang.AvailableLanguages.Remove("test-headshot");
+        }
+    }
+
+    [Fact]
+    public void HeadshotCompletion_AfterSheetCloses_DoesNotRequestAnotherSheet()
+    {
+        var previousDialog = GetStaticField<object>("_characterSheetDialog");
+        var previousChannel = GetStaticField<SafeClientNetworkChannel>("_safeNetworkChannel");
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        using var safe = new SafeClientNetworkChannel(channel, Substitute.For<ICoreClientAPI>());
+        try
+        {
+            SetStaticField<object?>("_characterSheetDialog", null);
+            SetStaticField("_safeNetworkChannel", safe);
+
+            InvokeStaticMethod("OnHeadshotUploadResult", new thebasics.Models.HeadshotUploadResult { Success = true, TargetPlayerUid = "player" });
+
+            channel.DidNotReceive().SendPacket(Arg.Any<thebasics.Models.CharacterSheetOpenRequest>());
+        }
+        finally
+        {
+            SetStaticField("_characterSheetDialog", previousDialog);
+            SetStaticField("_safeNetworkChannel", previousChannel);
+        }
+    }
+
+    [Fact]
+    public void HeadshotRefreshResponse_AfterSheetCloses_DoesNotReopenSheet()
+    {
+        var previousLocale = Lang.CurrentLocale;
+        var translations = Substitute.For<Vintagestory.API.Config.ITranslationService>();
+        translations.HasTranslation(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>()).Returns(true);
+        Lang.AvailableLanguages["test-headshot-close"] = translations;
+        Lang.ChangeLanguage("test-headshot-close");
+        var previousChannel = GetStaticField<SafeClientNetworkChannel>("_safeNetworkChannel");
+        var previousPendingRequestId = GetStaticField<long>("_pendingCharacterSheetAutoOpenRequestId");
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        using var safe = new SafeClientNetworkChannel(channel, Substitute.For<ICoreClientAPI>());
+        var dialog = (thebasics.ModSystems.ChatUiSystem.CharacterSheetDialog)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(thebasics.ModSystems.ChatUiSystem.CharacterSheetDialog));
+        typeof(thebasics.ModSystems.ChatUiSystem.CharacterSheetDialog).GetField("_view", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(dialog, new thebasics.Models.CharacterSheetViewMessage { TargetPlayerUid = "player" });
+        try
+        {
+            SetStaticField("_characterSheetDialog", dialog);
+            SetStaticField("_safeNetworkChannel", safe);
+            InvokeStaticMethod("OnHeadshotUploadResult", new thebasics.Models.HeadshotUploadResult { Success = true, TargetPlayerUid = "player" });
+            var request = channel.ReceivedCalls()
+                .Select(call => call.GetArguments().FirstOrDefault())
+                .OfType<thebasics.Models.CharacterSheetOpenRequest>()
+                .Single();
+
+            InvokeStaticMethod("OnCharacterSheetDialogClosed");
+            InvokeStaticMethod("OnCharacterSheetViewMessage", new thebasics.Models.CharacterSheetViewMessage
+            {
+                Success = true,
+                TargetPlayerUid = "player",
+                AutoOpenRequestId = request.AutoOpenRequestId
+            });
+
+            GetStaticField<object>("_characterSheetDialog").Should().BeNull();
+        }
+        finally
+        {
+            SetStaticField<object?>("_characterSheetDialog", null);
+            SetStaticField("_safeNetworkChannel", previousChannel);
+            SetStaticField("_pendingCharacterSheetAutoOpenRequestId", previousPendingRequestId);
+            Lang.ChangeLanguage(previousLocale);
+            Lang.AvailableLanguages.Remove("test-headshot-close");
         }
     }
 

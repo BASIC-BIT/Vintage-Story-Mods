@@ -91,4 +91,65 @@ public class ReviewRegressionTests
         notes.Should().ContainSingle().Which.Text.Should().Be("unsaved");
         ((DialogDraftState)stateField.GetValue(dialog)!).TryBeginRequest("retry").Should().BeTrue();
     }
+
+    [Fact]
+    public void TimedOutLanguageSave_RetainsRenameIdentityUntilAuthoritativeRefresh()
+    {
+        var dialog = (LanguageConfigDialog)RuntimeHelpers.GetUninitializedObject(typeof(LanguageConfigDialog));
+        var entry = new LanguageConfigEntryMessage { OriginalName = "Old", Name = "New" };
+        var reloads = 0;
+        SetField(dialog, "_languages", new List<LanguageConfigEntryMessage> { entry });
+        SetField(dialog, "_selectedIndex", -1);
+        SetField(dialog, "_draftState", new DialogDraftState("loaded"));
+        SetField(dialog, "_submittedNames", LanguageConfigDialog.CaptureSubmittedNames([entry]));
+        SetField(dialog, "_onReload", (Action)(() => reloads++));
+
+        dialog.OnRequestTimedOut();
+        dialog.OnRequestTimedOut();
+
+        reloads.Should().Be(1);
+        GetField<bool>(dialog, "_requiresAuthoritativeRefresh").Should().BeTrue();
+        GetField<Dictionary<LanguageConfigEntryMessage, string>>(dialog, "_submittedNames")
+            .Should().ContainKey(entry).WhoseValue.Should().Be("New");
+    }
+
+    [Fact]
+    public void TimedOutNotesSave_RetainsAssignedIdLookupUntilAuthoritativeRefresh()
+    {
+        var dialog = (PlayerNotesDialog)RuntimeHelpers.GetUninitializedObject(typeof(PlayerNotesDialog));
+        var note = new PlayerNoteEntryMessage { Id = string.Empty, Title = "Draft", Text = "Body" };
+        var submitted = new Dictionary<PlayerNoteEntryMessage, PlayerNoteEntryMessage> { [note] = new() { Title = note.Title, Text = note.Text } };
+        var reloads = new List<TheBasicsNotesSaveMessage>();
+        SetField(dialog, "_view", new TheBasicsNotesViewMessage { Success = true, Scope = "admin", TargetPlayerUid = "player" });
+        SetField(dialog, "_adminNotes", new List<PlayerNoteEntryMessage> { note });
+        SetField(dialog, "_personalNotes", new List<PlayerNoteEntryMessage>());
+        SetField(dialog, "_adminLedger", new AdminNoteLedgerMessage());
+        SetField(dialog, "_personalLedger", new PersonalNoteLedgerMessage());
+        SetField(dialog, "_draftState", new DialogDraftState("loaded"));
+        SetField(dialog, "_submittedNotes", submitted);
+        SetField(dialog, "_onReload", (Action<TheBasicsNotesSaveMessage>)(message => reloads.Add(message)));
+
+        dialog.OnRequestTimedOut();
+        dialog.OnRequestTimedOut();
+
+        reloads.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            Scope = "admin",
+            TargetPlayerUid = "player",
+            Reload = true
+        });
+        GetField<bool>(dialog, "_requiresAuthoritativeRefresh").Should().BeTrue();
+        GetField<Dictionary<PlayerNoteEntryMessage, PlayerNoteEntryMessage>>(dialog, "_submittedNotes")
+            .Should().BeSameAs(submitted);
+    }
+
+    private static void SetField<T>(object instance, string name, T value)
+    {
+        instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(instance, value);
+    }
+
+    private static T GetField<T>(object instance, string name)
+    {
+        return (T)instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(instance)!;
+    }
 }

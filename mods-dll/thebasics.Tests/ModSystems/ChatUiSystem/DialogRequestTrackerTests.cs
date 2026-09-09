@@ -6,6 +6,25 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 public class DialogRequestTrackerTests
 {
     [Fact]
+    public void TimeoutAndTransportFailure_UseDifferentRecoveryCallbacks()
+    {
+        var tracker = new DialogRequestTracker();
+        Action expire = null!;
+        var failures = 0;
+        var timeouts = 0;
+        tracker.Begin(() => failures++, (callback, _) => expire = callback, () => timeouts++);
+
+        expire();
+
+        failures.Should().Be(0);
+        timeouts.Should().Be(1);
+        var request = tracker.Begin(() => failures++, (_, _) => { }, () => timeouts++);
+        tracker.Fail(request);
+        failures.Should().Be(1);
+        timeouts.Should().Be(1);
+    }
+
+    [Fact]
     public void UntrackedPush_DoesNotConsumePendingRequestOrItsTimeout()
     {
         var tracker = new DialogRequestTracker();

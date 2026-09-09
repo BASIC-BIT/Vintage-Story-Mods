@@ -64,6 +64,19 @@ public class DialogDraftStateTests
     }
 
     [Fact]
+    public void RecoveryRefresh_AlwaysPreservesCurrentDraftAndUpdatesBaseline()
+    {
+        var state = new DialogDraftState("loaded");
+        state.TryBeginRequest("newer draft");
+
+        state.ApplyResponse("newer draft", "authoritative", true, preserveCurrent: true).Should().BeTrue();
+
+        state.IsDirty("newer draft").Should().BeTrue();
+        state.IsDirty("authoritative").Should().BeFalse();
+        state.TryBeginRequest("retry").Should().BeTrue();
+    }
+
+    [Fact]
     public void Failure_AllowsRetry()
     {
         var state = new DialogDraftState("loaded");

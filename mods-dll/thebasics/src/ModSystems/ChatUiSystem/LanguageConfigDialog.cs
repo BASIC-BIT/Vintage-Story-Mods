@@ -31,6 +31,7 @@ public class LanguageConfigDialog : GuiDialog
     private bool _closing;
     private readonly DialogDraftState _draftState;
     private Dictionary<LanguageConfigEntryMessage, string> _submittedNames;
+    private bool _requiresAuthoritativeRefresh;
     internal static Dictionary<LanguageConfigEntryMessage, string> CaptureSubmittedNames(List<LanguageConfigEntryMessage> languages)
     {
         var submitted = new Dictionary<LanguageConfigEntryMessage, string>(ReferenceEqualityComparer.Instance);
@@ -41,7 +42,15 @@ public class LanguageConfigDialog : GuiDialog
     internal void OnRequestFailed()
     {
         _draftState.CancelRequest();
-        _submittedNames = null;
+        if (!_requiresAuthoritativeRefresh) _submittedNames = null;
+    }
+
+    internal void OnRequestTimedOut()
+    {
+        _draftState.CancelRequest();
+        if (_requiresAuthoritativeRefresh || _submittedNames == null) return;
+        _requiresAuthoritativeRefresh = true;
+        SendReload();
     }
     internal static void RebaseSavedNames(List<LanguageConfigEntryMessage> draft, Dictionary<LanguageConfigEntryMessage, string> submitted, List<LanguageConfigEntryMessage> saved)
     {
@@ -86,7 +95,11 @@ public class LanguageConfigDialog : GuiDialog
     {
         CaptureSelectedInputToDraft();
         var incoming = EnsureDraft(languages);
-        if (!_draftState.ApplyResponse(JsonConvert.SerializeObject(_languages), JsonConvert.SerializeObject(incoming), success))
+        if (!_draftState.ApplyResponse(
+                JsonConvert.SerializeObject(_languages),
+                JsonConvert.SerializeObject(incoming),
+                success,
+                preserveCurrent: _requiresAuthoritativeRefresh))
         {
             _languages = incoming;
         }
@@ -94,7 +107,11 @@ public class LanguageConfigDialog : GuiDialog
         {
             RebaseSavedNames(_languages, _submittedNames, incoming);
         }
-        _submittedNames = null;
+        if (success)
+        {
+            _submittedNames = null;
+            _requiresAuthoritativeRefresh = false;
+        }
         _message = message;
         _success = success;
         _selectedIndex = ClampSelectedIndex(_selectedIndex);
@@ -375,6 +392,11 @@ public class LanguageConfigDialog : GuiDialog
     private bool OnSave()
     {
         CaptureSelectedInputToDraft();
+        if (_requiresAuthoritativeRefresh)
+        {
+            SendReload();
+            return true;
+        }
         if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return true;
         _submittedNames = CaptureSubmittedNames(_languages);
         _onSave(_languages.Select(CloneEntry).ToList());
@@ -383,11 +405,16 @@ public class LanguageConfigDialog : GuiDialog
 
     private bool OnReload()
     {
-        CaptureSelectedInputToDraft();
-        if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return true;
-        _submittedNames = null;
-        _onReload();
+        SendReload();
         return true;
+    }
+
+    private void SendReload()
+    {
+        CaptureSelectedInputToDraft();
+        if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(_languages))) return;
+        if (!_requiresAuthoritativeRefresh) _submittedNames = null;
+        _onReload();
     }
 
     private bool OnCancel()

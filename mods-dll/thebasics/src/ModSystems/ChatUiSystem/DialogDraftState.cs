@@ -16,10 +16,10 @@ internal sealed class DialogDraftState
 
     // Compare with the submitted draft for an acknowledgement, and the last
     // server snapshot for background refreshes. Only acknowledgements finish a request.
-    public bool ApplyResponse(string current, string incoming, bool success, bool completesRequest = true)
+    public bool ApplyResponse(string current, string incoming, bool success, bool completesRequest = true, bool preserveCurrent = false)
     {
         var reference = completesRequest && success ? _submitted ?? _baseline : _baseline;
-        var preserve = !success || current != reference;
+        var preserve = preserveCurrent || !success || current != reference;
         if (success) _baseline = incoming;
         if (completesRequest) _submitted = null;
         return preserve;

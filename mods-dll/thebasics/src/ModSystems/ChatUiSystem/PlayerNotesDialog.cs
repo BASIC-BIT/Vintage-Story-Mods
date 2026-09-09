@@ -43,10 +43,19 @@ public class PlayerNotesDialog : GuiDialog
     private int _listOffset;
     private DialogDraftState _draftState;
     private Dictionary<PlayerNoteEntryMessage, PlayerNoteEntryMessage> _submittedNotes;
+    private bool _requiresAuthoritativeRefresh;
     internal void OnRequestFailed()
     {
         _draftState.CancelRequest();
-        _submittedNotes = null;
+        if (!_requiresAuthoritativeRefresh) _submittedNotes = null;
+    }
+
+    internal void OnRequestTimedOut()
+    {
+        _draftState.CancelRequest();
+        if (_requiresAuthoritativeRefresh || _submittedNotes == null) return;
+        _requiresAuthoritativeRefresh = true;
+        SendReload();
     }
 
     internal static void ReconcileSavedNotes(List<PlayerNoteEntryMessage> draft, Dictionary<PlayerNoteEntryMessage, PlayerNoteEntryMessage> submitted, List<PlayerNoteEntryMessage> saved)
@@ -128,13 +137,21 @@ public class PlayerNotesDialog : GuiDialog
         if (sameView)
         {
             CaptureCurrentInputs();
-            if (_draftState.ApplyResponse(SnapshotDraft(), SnapshotView(view), view.Success))
+            if (_draftState.ApplyResponse(
+                    SnapshotDraft(),
+                    SnapshotView(view),
+                    view.Success,
+                    preserveCurrent: _requiresAuthoritativeRefresh))
             {
                 if (view.Success)
                 {
                     ReconcileSavedNotes(CurrentNotes(), _submittedNotes, IsAdminScope() ? view.AdminNotes : view.PersonalNotes);
                 }
-                _submittedNotes = null;
+                if (view.Success)
+                {
+                    _submittedNotes = null;
+                    _requiresAuthoritativeRefresh = false;
+                }
                 _localMessage = view.Message;
                 if (view.Success) _view = view;
                 ComposeDialog();
@@ -203,6 +220,7 @@ public class PlayerNotesDialog : GuiDialog
         if (updateBaseline)
         {
             _localMessage = null;
+            _requiresAuthoritativeRefresh = false;
         }
     }
 
@@ -654,6 +672,11 @@ public class PlayerNotesDialog : GuiDialog
         }
 
         _localMessage = null;
+        if (_requiresAuthoritativeRefresh)
+        {
+            SendReload();
+            return true;
+        }
         if (!_draftState.TryBeginRequest(SnapshotDraft())) return true;
         _submittedNotes = CurrentNotes().ToDictionary(note => note, CloneNote);
         _onSave?.Invoke(new TheBasicsNotesSaveMessage
@@ -690,7 +713,7 @@ public class PlayerNotesDialog : GuiDialog
     {
         CaptureCurrentInputs();
         if (!_draftState.TryBeginRequest(SnapshotDraft())) return;
-        _submittedNotes = null;
+        if (!_requiresAuthoritativeRefresh) _submittedNotes = null;
         _onReload?.Invoke(new TheBasicsNotesSaveMessage
         {
             Scope = _view.Scope,

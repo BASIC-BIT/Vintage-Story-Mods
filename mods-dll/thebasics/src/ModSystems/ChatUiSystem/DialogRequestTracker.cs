@@ -7,13 +7,15 @@ internal sealed class DialogRequestTracker
     private long _nextId;
     private long _pendingId;
     private Action _onFailure;
+    private Action _onTimeout;
 
-    public long Begin(Action onFailure, Action<Action, int> scheduleTimeout)
+    public long Begin(Action onFailure, Action<Action, int> scheduleTimeout, Action onTimeout = null)
     {
         var id = ++_nextId;
         _pendingId = id;
         _onFailure = onFailure;
-        scheduleTimeout(() => Fail(id), 30000);
+        _onTimeout = onTimeout ?? onFailure;
+        scheduleTimeout(() => Timeout(id), 30000);
         return id;
     }
 
@@ -34,9 +36,18 @@ internal sealed class DialogRequestTracker
         failure?.Invoke();
     }
 
+    private void Timeout(long id)
+    {
+        if (id == 0 || id != _pendingId) return;
+        var timeout = _onTimeout;
+        Reset();
+        timeout?.Invoke();
+    }
+
     public void Reset()
     {
         _pendingId = 0;
         _onFailure = null;
+        _onTimeout = null;
     }
 }
