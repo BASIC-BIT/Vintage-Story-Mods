@@ -1037,6 +1037,7 @@ public class ChatUiSystem : ModSystem
 
     private static void OnLanguageConfigOpenMessage(TheBasicsLanguageConfigOpenMessage message)
     {
+        if (!LanguageRequests.Accept(0)) return;
         if (message?.Success == false)
         {
             ShowLanguageConfigChatMessage(message.Message);

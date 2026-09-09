@@ -15,13 +15,17 @@ public class ChatUiSystemTests
     [Theory]
     [InlineData("NotesRequests", "OnNotesViewMessage")]
     [InlineData("LanguageRequests", "OnLanguageConfigResultMessage")]
+    [InlineData("LanguageRequests", "OnLanguageConfigOpenMessage")]
     public void UntrackedView_DoesNotConsumePendingEditorRequest(string trackerName, string handler)
     {
         var tracker = GetStaticField<thebasics.ModSystems.ChatUiSystem.DialogRequestTracker>(trackerName);
         var id = tracker.Begin(() => { }, (_, _) => { });
-        object message = trackerName == "NotesRequests"
-            ? new thebasics.ModSystems.Notes.Models.TheBasicsNotesViewMessage()
-            : new thebasics.Models.TheBasicsLanguageConfigResultMessage();
+        object message = handler switch
+        {
+            "OnNotesViewMessage" => new thebasics.ModSystems.Notes.Models.TheBasicsNotesViewMessage(),
+            "OnLanguageConfigOpenMessage" => new thebasics.Models.TheBasicsLanguageConfigOpenMessage(),
+            _ => new thebasics.Models.TheBasicsLanguageConfigResultMessage()
+        };
         try
         {
             InvokeStaticMethod(handler, message);
