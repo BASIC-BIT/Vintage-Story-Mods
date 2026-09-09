@@ -12,6 +12,27 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 [Collection(thebasics.Tests.ModSystems.AnalyticsServiceTestCollection.Name)]
 public class ChatUiSystemTests
 {
+    [Theory]
+    [InlineData("NotesRequests", "OnNotesViewMessage")]
+    [InlineData("LanguageRequests", "OnLanguageConfigResultMessage")]
+    public void UntrackedView_DoesNotConsumePendingEditorRequest(string trackerName, string handler)
+    {
+        var tracker = GetStaticField<thebasics.ModSystems.ChatUiSystem.DialogRequestTracker>(trackerName);
+        var id = tracker.Begin(() => { }, (_, _) => { });
+        object message = trackerName == "NotesRequests"
+            ? new thebasics.ModSystems.Notes.Models.TheBasicsNotesViewMessage()
+            : new thebasics.Models.TheBasicsLanguageConfigResultMessage();
+        try
+        {
+            InvokeStaticMethod(handler, message);
+            tracker.Accept(id).Should().BeTrue();
+        }
+        finally
+        {
+            tracker.Reset();
+        }
+    }
+
     [Fact]
     public void SentSaveWithoutReply_ExpiresAndIgnoresLateResponse()
     {

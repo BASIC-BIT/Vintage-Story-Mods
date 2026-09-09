@@ -19,8 +19,9 @@ internal sealed class DialogRequestTracker
 
     public bool Accept(long id)
     {
-        // Zero retains compatibility with peers that predate request correlation.
-        if (id != 0 && id != _pendingId) return false;
+        // Untracked opens use zero and are accepted only while idle. They must
+        // not consume a pending save/reload or prevent its timeout from firing.
+        if (id != _pendingId) return false;
         Reset();
         return true;
     }
