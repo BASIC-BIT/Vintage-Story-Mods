@@ -16,12 +16,14 @@ public class SceneDescriptionServerTests
     {
         var (marker, player, _) = CreateMarker();
         marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
-        { Title = "Old title", Body = "Old body", Color = (int)SceneMarkerColor.Blue, HeightOffset = 3, IndicatorScale = 2, TextDistance = 5,
+        { Title = "Old title", Body = "Old body", Color = (int)SceneMarkerColor.Blue, HeightOffset = 3, IndicatorScale = 2, TextDistance = 5, IdleBobbing = false, ShowBodyInBubble = true,
             Display = (int)SceneDescriptionDisplay.AlwaysNearby, Symbol = (int)SceneMarkerSymbol.Diamond, Effect = (int)SceneMarkerEffect.Hologram }));
         marker.InitializeFromItem(new ItemStack(new SceneDescriptionBlock()), player);
         marker.Data.Color.Should().Be(SceneMarkerColor.Blue);
         marker.Data.HeightOffset.Should().Be(3);
         marker.Data.IndicatorScale.Should().Be(2);
+        marker.Data.IdleBobbing.Should().BeFalse();
+        marker.Data.ShowBodyInBubble.Should().BeTrue();
         marker.Data.Symbol.Should().Be(SceneMarkerSymbol.Diamond);
         marker.Data.Effect.Should().Be(SceneMarkerEffect.Hologram);
         marker.Data.TextDistance.Should().Be(5);

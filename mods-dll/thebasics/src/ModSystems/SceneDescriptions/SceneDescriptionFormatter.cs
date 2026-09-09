@@ -5,6 +5,18 @@ namespace thebasics.ModSystems.SceneDescriptions;
 
 public static class SceneDescriptionFormatter
 {
+    internal static string ToFloatingVtml(SceneDescriptionData source, string readPrompt)
+    {
+        var data = (source ?? new SceneDescriptionData()).Clone().Normalize();
+        var title = string.IsNullOrWhiteSpace(data.Title) ? string.Empty : $"<strong>{VtmlUtils.EscapeVtml(data.Title)}</strong>";
+        var body = string.Empty;
+        if (!string.IsNullOrWhiteSpace(data.Body))
+            body = data.ShowBodyInBubble
+                ? VtmlUtils.EscapeVtml(FloatingPreview(data.Body)).Replace("\n", "<br>")
+                : $"<font size=\"16\">{VtmlUtils.EscapeVtml(readPrompt)}</font>";
+        return string.Join("<br>", new[] { title, body }.Where(text => text.Length > 0));
+    }
+
     public static string ToVtml(SceneDescriptionData data)
     {
         data = (data ?? new SceneDescriptionData()).Clone().Normalize();

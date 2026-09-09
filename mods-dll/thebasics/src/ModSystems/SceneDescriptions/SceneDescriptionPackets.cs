@@ -26,6 +26,8 @@ public sealed class SceneDescriptionEditPacket
     [ProtoMember(13)] public bool UnlimitedTextDistance { get; set; }
     [ProtoMember(14)] public float HeightOffset { get; set; }
     [ProtoMember(15)] public int Color { get; set; }
+    [ProtoMember(19)] public bool ShowBodyInBubble { get; set; }
+    [ProtoMember(18), System.ComponentModel.DefaultValue(true)] public bool IdleBobbing { get; set; } = true;
     [ProtoMember(17)] public int Effect { get; set; }
     [ProtoMember(16)] public float IndicatorScale { get; set; } = 1;
 }

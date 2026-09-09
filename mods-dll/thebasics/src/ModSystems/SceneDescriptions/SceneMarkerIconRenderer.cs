@@ -64,7 +64,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             foreach (var icon in _visible)
             {
                 var size = 0.8f * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
-                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data.Symbol, icon.Marker.Data.Color, icon.Marker.Data.Effect), icon.Position, icon.Opacity * SceneMarkerVisuals.EffectOpacity(icon.Marker.Data.Effect, _api.World.ElapsedMilliseconds / 1000.0), size, size);
+                var bob = icon.Marker.Data.IdleBobbing ? 0.05 * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / 4000)) : 0;
+                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data.Symbol, icon.Marker.Data.Color, icon.Marker.Data.Effect), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.EffectOpacity(icon.Marker.Data.Effect, _api.World.ElapsedMilliseconds / 1000.0), size, size);
                 var targeted = _api.World.Player.CurrentBlockSelection?.Position?.Equals(icon.Marker.Pos) == true;
                 if (!icon.Marker.Data.ShouldShowDescription(targeted) || icon.TextOpacity <= 0) continue;
                 var text = GetDescription(icon.Marker);
@@ -77,7 +78,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
                     height = MaxDescriptionHeight;
                 }
                 var view = render.CameraMatrixOriginf;
-                var offset = size / 2 + 0.1 + height / 2;
+                // Reserve the full focus/bob envelope so the bubble stays still through both animations.
+                var offset = 0.8f * icon.Marker.Data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;
                 var textPosition = icon.Position.AddCopy(view[1] * offset, view[5] * offset, view[9] * offset);
                 var textOpacity = icon.TextOpacity;
                 RenderQuad(icon.Marker, text, textPosition, textOpacity, width, height);
@@ -107,8 +109,6 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             var distance = player.Pos.XYZ.DistanceTo(position);
             var opacity = marker.Data.GetIconOpacity(distance);
             position.Y += marker.Data.HeightOffset;
-            // Four-second cycle, only five centimetres either side of the resting height.
-            position.Y += 0.05 * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / 4000));
             var selected = _api.World.Player.CurrentBlockSelection?.Position?.Equals(marker.Pos) == true;
             var targeted = selected && marker.Data.Display == SceneDescriptionDisplay.WhenTargeted && marker.Data.ShouldShowDescription(true);
             var textOpacity = targeted ? 1 : marker.Data.ShouldShowDescription(selected) ? marker.Data.GetTextOpacity(distance) : 0;

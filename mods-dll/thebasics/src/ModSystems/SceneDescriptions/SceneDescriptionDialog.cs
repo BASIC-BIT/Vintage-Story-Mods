@@ -113,6 +113,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddStaticText(Lang.Get("thebasics:scene-effect"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 150, 22))
             .AddDropDown(new[] { "plain", "hologram" }, new[] { Lang.Get("thebasics:scene-effect-plain"), Lang.Get("thebasics:scene-effect-hologram") }, (int)data.Effect,
                 (value, _) => { _appearance.Effect = value == "hologram" ? SceneMarkerEffect.Hologram : SceneMarkerEffect.Plain; RefreshPreview(); }, ElementBounds.Fixed(160, top + 444, 260, 30), "effect")
+            .AddSwitch(value => _appearance.IdleBobbing = value, ElementBounds.Fixed(160, top + 490, 30, 30), "bobbing")
+            .AddStaticText(Lang.Get("thebasics:scene-bobbing"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 494, 150, 22))
+            .AddSwitch(value => { _appearance.ShowBodyInBubble = value; RefreshPreview(); }, ElementBounds.Fixed(290, top + 532, 30, 30), "showbody")
+            .AddStaticText(Lang.Get("thebasics:scene-show-body"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 536, 280, 22))
             .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth - 140, buttonY, 120, ButtonHeight), key: "save")
             .AddSmallButton(Lang.Get(data.IsLocked ? "thebasics:scene-unlock" : "thebasics:scene-save-lock"), OnLockButton, ElementBounds.Fixed(530, buttonY, 260, ButtonHeight), key: "lock")
@@ -130,6 +134,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetNumberInput("size").Enabled = !data.IsLocked;
         SingleComposer.GetDropDown("color").Enabled = !data.IsLocked;
         SingleComposer.GetDropDown("effect").Enabled = !data.IsLocked;
+        SingleComposer.GetSwitch("bobbing").SetValue(data.IdleBobbing);
+        SingleComposer.GetSwitch("bobbing").Enabled = !data.IsLocked;
+        SingleComposer.GetSwitch("showbody").SetValue(data.ShowBodyInBubble);
+        SingleComposer.GetSwitch("showbody").Enabled = !data.IsLocked;
         RefreshPreview();
         SingleComposer.GetButton("lock").Enabled = _canManageLock;
         SingleComposer.GetButton("save").Enabled = !data.IsLocked;
@@ -261,6 +269,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             IndicatorScale = _appearance.IndicatorScale,
             Color = _appearance.Color,
             Effect = _appearance.Effect,
+            IdleBobbing = _appearance.IdleBobbing,
+            ShowBodyInBubble = _appearance.ShowBodyInBubble,
             Title = SingleComposer.GetTextInput("title").GetText(),
             Body = SingleComposer.GetTextArea("body").GetText(),
             Display = SingleComposer.GetDropDown("kind").SelectedValue switch

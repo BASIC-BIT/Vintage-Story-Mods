@@ -12,12 +12,10 @@ internal static class SceneMarkerVisuals
 {
     internal static ImageSurface DescriptionSurface(ICoreClientAPI api, SceneDescriptionData source)
     {
-        var data = source.Clone();
-        data.Body = SceneDescriptionFormatter.FloatingPreview(data.Body);
         var background = new TextBackground { FillColor = new[] { 0.08, 0.10, 0.14, 1.0 }, Padding = 8,
             Radius = 4, BorderWidth = 1, BorderColor = new[] { 0.65, 0.69, 0.75, 1.0 } };
         var font = new CairoFont(24, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble) { Orientation = EnumTextOrientation.Left };
-        return RichTextTextureUtils.GenRichTextSurface(api, SceneDescriptionFormatter.ToVtml(data), font, 360, background);
+        return RichTextTextureUtils.GenRichTextSurface(api, SceneDescriptionFormatter.ToFloatingVtml(source, Lang.Get("thebasics:scene-read-prompt")), font, 360, background);
     }
 
     internal static Shape LoadShape(ICoreClientAPI api, SceneMarkerSymbol symbol)

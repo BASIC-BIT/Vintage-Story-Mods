@@ -6,6 +6,60 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 public class SceneDescriptionDataTests
 {
+    [Fact]
+    public void FloatingBubbleDefaultsToTitleAndReadCueWithoutChangingFullText()
+    {
+        var data = new SceneDescriptionData { Title = "A <clue>", Body = "Hidden description" };
+        data.ShowBodyInBubble.Should().BeFalse();
+        SceneDescriptionData.ReadFrom(new TreeAttribute()).ShowBodyInBubble.Should().BeFalse();
+        var bubble = SceneDescriptionFormatter.ToFloatingVtml(data, "Right-click to read");
+        bubble.Should().Contain("A &lt;clue&gt;").And.Contain("Right-click to read").And.NotContain("Hidden description");
+        SceneDescriptionFormatter.ToVtml(data).Should().Contain("Hidden description");
+        data.Body.Should().Be("Hidden description");
+        data.Title = "";
+        SceneDescriptionFormatter.ToFloatingVtml(data, "Right-click to read").Should().Contain("Right-click to read");
+        data.Title = "Title only";
+        data.Body = "";
+        data.ShouldShowDescription(true).Should().BeTrue();
+        SceneDescriptionFormatter.ToFloatingVtml(data, "Right-click to read").Should().Be("<strong>Title only</strong>");
+    }
+
+    [Fact]
+    public void FloatingDescriptionCanBeEnabledAndSaved()
+    {
+        var data = new SceneDescriptionData { Title = "Scene", Body = "First\nSecond", ShowBodyInBubble = true };
+        SceneDescriptionFormatter.ToFloatingVtml(data, "Read").Should().Be("<strong>Scene</strong><br>First<br>Second");
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        SceneDescriptionData.ReadFrom(tree).ShowBodyInBubble.Should().BeTrue();
+        data.Clone().ShowBodyInBubble.Should().BeTrue();
+        data.AppearanceDefaults().ShowBodyInBubble.Should().BeTrue();
+        var edited = new SceneDescriptionData();
+        edited.ApplyText(data);
+        edited.ShowBodyInBubble.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void IdleBobbingRoundTripsIncludingFalseAndDefaultsOnForLegacyMarkers(bool enabled)
+    {
+        var data = new SceneDescriptionData { IdleBobbing = enabled };
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        SceneDescriptionData.ReadFrom(tree).IdleBobbing.Should().Be(enabled);
+        data.Clone().IdleBobbing.Should().Be(enabled);
+        data.AppearanceDefaults().IdleBobbing.Should().Be(enabled);
+        var edited = new SceneDescriptionData();
+        edited.ApplyText(data);
+        edited.IdleBobbing.Should().Be(enabled);
+        var packet = new SceneDescriptionEditPacket { IdleBobbing = enabled };
+        Vintagestory.API.Util.SerializerUtil.Deserialize<SceneDescriptionEditPacket>(
+            Vintagestory.API.Util.SerializerUtil.Serialize(packet)).IdleBobbing.Should().Be(enabled);
+        SceneDescriptionData.ReadFrom(new TreeAttribute()).IdleBobbing.Should().BeTrue();
+        Vintagestory.API.Util.SerializerUtil.Deserialize<SceneDescriptionEditPacket>(Array.Empty<byte>()).IdleBobbing.Should().BeTrue();
+    }
+
     [Theory]
     [InlineData(SceneMarkerSymbol.Dot)]
     [InlineData(SceneMarkerSymbol.Ring)]

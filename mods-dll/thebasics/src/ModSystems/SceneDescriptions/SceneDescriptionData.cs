@@ -52,6 +52,8 @@ public sealed class SceneDescriptionData
     internal float SelectionHalfExtent => 0.44f * IndicatorScale + 0.05f;
     public SceneMarkerColor Color { get; set; }
     public SceneMarkerEffect Effect { get; set; }
+    public bool IdleBobbing { get; set; } = true;
+    public bool ShowBodyInBubble { get; set; }
 
     public float GetTextOpacity(double distance) => GetOpacity(distance, TextDistance, UnlimitedTextDistance);
 
@@ -66,7 +68,7 @@ public sealed class SceneDescriptionData
         return (float)Math.Clamp((range - distance) / (range * 0.25), 0, 1);
     }
 
-    public bool ShouldShowDescription(bool targeted) => !string.IsNullOrWhiteSpace(Body) &&
+    public bool ShouldShowDescription(bool targeted) => (!string.IsNullOrWhiteSpace(Title) || !string.IsNullOrWhiteSpace(Body)) &&
         (Display == SceneDescriptionDisplay.AlwaysNearby || (Display == SceneDescriptionDisplay.WhenTargeted && targeted));
 
     public bool IsLocked => !string.IsNullOrWhiteSpace(LockItemCode);
@@ -111,6 +113,8 @@ public sealed class SceneDescriptionData
         IndicatorScale = edited.IndicatorScale;
         Color = edited.Color;
         Effect = edited.Effect;
+        IdleBobbing = edited.IdleBobbing;
+        ShowBodyInBubble = edited.ShowBodyInBubble;
         Normalize();
     }
 
@@ -158,13 +162,13 @@ public sealed class SceneDescriptionData
             TextDistance = TextDistance,
             UnlimitedTextDistance = UnlimitedTextDistance,
             HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
-            Color = Color, Effect = Effect,
+            Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble,
         };
     }
 
     internal SceneDescriptionData AppearanceDefaults() => new SceneDescriptionData
     {
-        Symbol = Symbol, Color = Color, Effect = Effect, Display = Display, IconDistance = IconDistance,
+        Symbol = Symbol, Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble, Display = Display, IconDistance = IconDistance,
         UnlimitedIconDistance = UnlimitedIconDistance, TextDistance = TextDistance,
         UnlimitedTextDistance = UnlimitedTextDistance, HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
     }.Normalize();
@@ -189,6 +193,8 @@ public sealed class SceneDescriptionData
         attributes.SetFloat("sceneIndicatorScale", IndicatorScale);
         attributes.SetInt("sceneColor", (int)Color);
         attributes.SetInt("sceneEffect", (int)Effect);
+        attributes.SetBool("sceneIdleBobbing", IdleBobbing);
+        attributes.SetBool("sceneShowBodyInBubble", ShowBodyInBubble);
     }
 
     internal static SceneDescriptionData ReadFrom(ITreeAttribute attributes)
@@ -217,6 +223,8 @@ public sealed class SceneDescriptionData
             IndicatorScale = attributes.GetFloat("sceneIndicatorScale", 1),
             Color = (SceneMarkerColor)attributes.GetInt("sceneColor"),
             Effect = (SceneMarkerEffect)attributes.GetInt("sceneEffect"),
+            IdleBobbing = attributes.GetBool("sceneIdleBobbing", true),
+            ShowBodyInBubble = attributes.GetBool("sceneShowBodyInBubble"),
         }.Normalize();
     }
 
