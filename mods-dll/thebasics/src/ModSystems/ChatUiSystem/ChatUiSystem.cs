@@ -224,7 +224,13 @@ public class ChatUiSystem : ModSystem
 
     private static void SendCharacterSheetRequest(CharacterSheetOpenRequest request)
     {
+        var supersedesAutoOpen = _pendingCharacterSheetAutoOpenRequestId != 0;
         _pendingCharacterSheetAutoOpenRequestId = 0;
+        _pendingCharacterSheetOpenFromCharacterDialog = false;
+        if (supersedesAutoOpen)
+        {
+            _characterSheetOpenedFromCharacterDialog = false;
+        }
         _pendingCharacterSheetSave = false;
         _safeNetworkChannel?.SendPacketSafely(request);
     }

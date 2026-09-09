@@ -114,6 +114,37 @@ public class ChatUiSystemTests
         }
     }
 
+    [Fact]
+    public void ExplicitOpen_SupersedesPendingAutoOpenState()
+    {
+        var previousChannel = GetStaticField<SafeClientNetworkChannel>("_safeNetworkChannel");
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        using var safe = new SafeClientNetworkChannel(channel, Substitute.For<ICoreClientAPI>());
+        try
+        {
+            SetStaticField("_safeNetworkChannel", safe);
+            SetStaticField("_pendingCharacterSheetAutoOpenRequestId", 123L);
+            SetStaticField("_pendingCharacterSheetOpenFromCharacterDialog", true);
+            SetStaticField("_characterDialogSheetAutoOpenHandled", true);
+            SetStaticField("_characterSheetOpenedFromCharacterDialog", true);
+
+            InvokeStaticMethod("SendCharacterSheetRequest", new thebasics.Models.CharacterSheetOpenRequest());
+
+            GetStaticField<long>("_pendingCharacterSheetAutoOpenRequestId").Should().Be(0);
+            GetStaticField<bool>("_pendingCharacterSheetOpenFromCharacterDialog").Should().BeFalse();
+            GetStaticField<bool>("_characterDialogSheetAutoOpenHandled").Should().BeTrue();
+            GetStaticField<bool>("_characterSheetOpenedFromCharacterDialog").Should().BeFalse();
+            InvokeStaticMethod("OnCharacterDialogComposed");
+            channel.Received(1).SendPacket(Arg.Any<thebasics.Models.CharacterSheetOpenRequest>());
+        }
+        finally
+        {
+            ChatUiModSystem.GuiDialogCharacter_OnGuiClosed_Postfix();
+            SetStaticField("_safeNetworkChannel", previousChannel);
+        }
+    }
+
     [Theory]
     [InlineData(true, "admin")]
     [InlineData(false, "view")]
