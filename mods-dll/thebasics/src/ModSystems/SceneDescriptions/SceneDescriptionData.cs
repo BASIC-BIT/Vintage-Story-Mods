@@ -55,6 +55,7 @@ public sealed class SceneDescriptionData
     public bool IdleBobbing { get; set; } = true;
     public bool ShowBodyInBubble { get; set; }
     public float BubbleScale { get; set; } = 1;
+    internal float BubbleRenderScale => BubbleScale * 0.5f;
     // Zero means none; 1-6 map to SceneMarkerSymbol values plus one.
     public int TitleIcon { get; set; }
 
@@ -140,7 +141,7 @@ public sealed class SceneDescriptionData
         IndicatorScale = float.IsFinite(IndicatorScale) ? Math.Clamp(IndicatorScale, 0.25f, 3) : 1;
         // Retain the retired effect field for save/wire compatibility; all indicators now use one style.
         Effect = SceneMarkerEffect.Plain;
-        BubbleScale = float.IsFinite(BubbleScale) ? Math.Clamp(BubbleScale, 0.5f, 2) : 1;
+        BubbleScale = float.IsFinite(BubbleScale) ? Math.Clamp(BubbleScale, 0.4f, 2) : 1;
         if (TitleIcon < 0 || TitleIcon > Enum.GetValues<SceneMarkerSymbol>().Length) TitleIcon = 0;
         if (!Enum.IsDefined(Color)) Color = SceneMarkerColor.Gold;
 

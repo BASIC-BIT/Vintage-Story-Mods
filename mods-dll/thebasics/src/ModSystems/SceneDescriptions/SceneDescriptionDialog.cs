@@ -201,8 +201,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var textWidth = 3.0;
         var textHeight = text == null ? 0 : textWidth * text.Height / text.Width;
         if (textHeight > 6) { textWidth *= 6 / textHeight; textHeight = 6; }
-        textWidth *= preview.BubbleScale;
-        textHeight *= preview.BubbleScale;
+        textWidth *= preview.BubbleRenderScale;
+        textHeight *= preview.BubbleRenderScale;
         var scale = Math.Min((width - 24) / Math.Max(3, textWidth), (height - 24) / (textHeight + 3.2 + Math.Max(0, preview.HeightOffset)));
         var symbolSize = 0.8 * preview.IndicatorScale;
         var centerY = height - 12 - (1.8 + preview.HeightOffset) * scale;
@@ -254,7 +254,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         }
         _appearance.IndicatorScale = percent / 100;
         if (!float.TryParse(SingleComposer.GetNumberInput("bubblesize").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var bubblePercent) ||
-            !float.IsFinite(bubblePercent) || bubblePercent < 50 || bubblePercent > 200)
+            !float.IsFinite(bubblePercent) || bubblePercent < 40 || bubblePercent > 200)
         {
             capi.TriggerIngameError(this, "scene-bubble-size", Lang.Get("thebasics:scene-bubble-size-invalid"));
             return false;

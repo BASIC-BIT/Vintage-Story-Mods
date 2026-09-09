@@ -12,7 +12,7 @@ namespace thebasics.ModSystems.SceneDescriptions;
 internal sealed class SceneMarkerIconRenderer : IRenderer
 {
     private const float MaxDescriptionHeight = 6;
-    private const double DescriptionCullRadius = MaxDescriptionHeight * 2 + 2;
+    private const double DescriptionCullRadius = MaxDescriptionHeight + 2;
     private readonly ICoreClientAPI _api;
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
     private readonly Dictionary<(SceneMarkerSymbol Symbol, SceneMarkerColor Color), LoadedTexture> _icons = new();
@@ -77,8 +77,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
                     width *= MaxDescriptionHeight / height;
                     height = MaxDescriptionHeight;
                 }
-                width *= icon.Marker.Data.BubbleScale;
-                height *= icon.Marker.Data.BubbleScale;
+                width *= icon.Marker.Data.BubbleRenderScale;
+                height *= icon.Marker.Data.BubbleRenderScale;
                 var view = render.CameraMatrixOriginf;
                 // Reserve the full focus/bob envelope so the bubble stays still through both animations.
                 var offset = 0.8f * icon.Marker.Data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;

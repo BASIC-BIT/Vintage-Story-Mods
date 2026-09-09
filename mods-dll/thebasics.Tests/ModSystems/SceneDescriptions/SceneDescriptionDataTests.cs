@@ -33,12 +33,15 @@ public class SceneDescriptionDataTests
     {
         var legacy = SceneDescriptionData.ReadFrom(new TreeAttribute());
         legacy.BubbleScale.Should().Be(1);
+        legacy.BubbleRenderScale.Should().Be(0.5f);
+        new SceneDescriptionData { BubbleScale = 0.4f }.Normalize().BubbleRenderScale.Should().Be(0.2f);
+        new SceneDescriptionData { BubbleScale = 2 }.Normalize().BubbleRenderScale.Should().Be(1);
         legacy.TitleIcon.Should().Be(0);
         var invalid = new SceneDescriptionData { BubbleScale = float.NaN, TitleIcon = 100 }.Normalize();
         invalid.BubbleScale.Should().Be(1);
         invalid.TitleIcon.Should().Be(0);
         new SceneDescriptionData { BubbleScale = 999 }.Normalize().BubbleScale.Should().Be(2);
-        new SceneDescriptionData { BubbleScale = -1 }.Normalize().BubbleScale.Should().Be(0.5f);
+        new SceneDescriptionData { BubbleScale = -1 }.Normalize().BubbleScale.Should().Be(0.4f);
     }
 
     [Fact]

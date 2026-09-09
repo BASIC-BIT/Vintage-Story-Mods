@@ -23,3 +23,6 @@ Review correction: replaced the game's leaking dynamic custom-draw helper with a
 
 QA package: thebasics_5_9_1.zip, 602233 bytes, SHA256 5B0BAE674C4AE15E85EBEDFE31D1CBEBC8C14D93E79E68E905F3A76B000018A8. Packaged DLL matches the tested DLL; packaged language and handbook JSON parse successfully. Server readback and both profile copies match this hash. Previous packages preserved under .tmp/scene-style-qa-2026-09-09. Both QA clients relaunched at their menus without auto-connect. Human visual acceptance remains pending.
 Server reached RunGame at 2026-09-09 05:57:51 UTC with SceneDescriptionSystem loaded. No scene startup exception observed; existing unrelated startup warnings remain.
+
+Bubble-size follow-up: 100 percent now renders at the previous 50 percent size. Allowed range is 40-200 percent, corresponding to 20-100 percent of the original size. Stored percentages remain relative to the current baseline; preview and world use the same half-size conversion.
+Baseline follow-up validation: 796 tests pass; standard build/package succeeded. QA server readback and both profile packages match SHA256 082614FEAF839C3C1CDD49DB385197F3B97406F4176CE3815270D9D3B5F0805B. Backup and logs: .tmp/scene-baseline-qa-2026-09-09. Visual acceptance remains pending.

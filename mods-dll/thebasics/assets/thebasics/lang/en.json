@@ -800,7 +800,7 @@
   "scene-height": "Height offset",
   "scene-show-body": "Show description in bubble",
   "scene-bubble-size": "Bubble size (%)",
-  "scene-bubble-size-invalid": "Enter a bubble size from 50 to 200 percent.",
+  "scene-bubble-size-invalid": "Enter a bubble size from 40 to 200 percent.",
   "scene-title-icon": "Title icon...",
   "scene-icon-none": "None",
   "scene-bobbing": "Idle bobbing",
