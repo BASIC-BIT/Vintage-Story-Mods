@@ -250,7 +250,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     public override void GetBlockInfo(IPlayer forPlayer, StringBuilder description)
     {
         base.GetBlockInfo(forPlayer, description);
-        if (!string.IsNullOrWhiteSpace(Data.Title)) description.AppendLine(thebasics.Utilities.VtmlUtils.EscapeVtml(Data.Title));
+        // The name line above this is already the title (see SceneDescriptionBlock.GetHeldItemName).
         if (!string.IsNullOrWhiteSpace(Data.Body)) description.AppendLine(SceneDescriptionFormatter.InspectorPreview(Data.Body));
         if (string.IsNullOrWhiteSpace(Data.Body))
         {

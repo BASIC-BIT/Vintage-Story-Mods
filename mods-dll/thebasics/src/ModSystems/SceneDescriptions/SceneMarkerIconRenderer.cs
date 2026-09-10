@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using thebasics.ModSystems.ChatUiSystem;
+using thebasics.Utilities;
 using Vintagestory.API.Config;
 using Cairo;
 using Vintagestory.API.Client;
@@ -23,9 +24,18 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private readonly Matrixf _model = new();
     private MeshRef _quad;
 
-    internal SceneMarkerIconRenderer(ICoreClientAPI api) => _api = api;
+    internal SceneMarkerIconRenderer(ICoreClientAPI api)
+    {
+        _api = api;
+        OrthoPass = new BubblePass(this);
+    }
+
     public double RenderOrder => 1.11; // After terrain and vanilla sign rendering.
     public int RenderRange => int.MaxValue;
+
+    /// <summary>Register this alongside the icon renderer on <see cref="EnumRenderStage.Ortho"/>.</summary>
+    internal IRenderer OrthoPass { get; }
+
     internal void Register(SceneDescriptionBlockEntity marker) => _markers.Add(marker);
     internal void Unregister(SceneDescriptionBlockEntity marker)
     {
@@ -41,11 +51,15 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
 
     public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
     {
+        if (stage != EnumRenderStage.Opaque) return;
         var player = _api.World?.Player?.Entity;
         // Gated here rather than at registration: the synced server config arrives after the chunks
         // around the player, so there is nothing to read yet when this renderer is registered.
-        if (stage != EnumRenderStage.Opaque || player == null || _markers.Count == 0 ||
-            !SceneDescriptionSystem.SceneMarkersEnabled(_api)) return;
+        if (player == null || _markers.Count == 0 || !SceneDescriptionSystem.SceneMarkersEnabled(_api))
+        {
+            _visible.Clear(); // The Ortho pass reads this list later in the same frame.
+            return;
+        }
         var render = _api.Render;
         _shownDescriptions.Clear();
         GatherVisibleIcons(deltaTime);
@@ -66,23 +80,15 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             render.GlToggleBlend(true, EnumBlendMode.Standard);
             foreach (var icon in _visible)
             {
+                if (icon.Opacity <= 0) continue;
                 var size = 0.8f * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
                 // A marker this player has read settles down: half the bob height at half the speed.
                 var (amplitude, period) = icon.Read ? (0.025, 8000.0) : (0.05, 4000.0);
                 var bob = icon.Marker.Data.IdleBobbing ? amplitude * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / period)) : 0;
-                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.IndicatorOpacity, size, size);
-                var targeted = _api.World.Player.CurrentBlockSelection?.Position?.Equals(icon.Marker.Pos) == true;
-                if (!icon.Marker.Data.ShouldShowDescription(targeted) || icon.TextOpacity <= 0) continue;
-                var text = GetDescription(icon.Marker);
-                if (text == null) continue;
-                var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, icon.Marker.Data.BubbleRenderScale);
-                var view = render.CameraMatrixOriginf;
-                // Reserve the full focus/bob envelope so the bubble stays still through both animations.
-                var offset = 0.8f * icon.Marker.Data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;
-                var textPosition = icon.Position.AddCopy(view[1] * offset, view[5] * offset, view[9] * offset);
-                var textOpacity = icon.TextOpacity;
-                RenderQuad(icon.Marker, text, textPosition, textOpacity, width, height);
+                RenderQuad(icon.Marker, GetIcon(icon.Marker.Data), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.IndicatorOpacity, size, size);
             }
+            // Safe to evict here even though the bubbles draw later in Ortho: GatherVisibleIcons
+            // marks every marker whose text opacity is above zero, which is the Ortho pass's gate.
             foreach (var marker in _descriptions.Keys.ToArray())
                 if (!_shownDescriptions.Contains(marker)) RemoveDescription(marker);
         }
@@ -134,6 +140,53 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             var depth = -(view[2] * (position.X - camera.X) + view[6] * (position.Y - camera.Y) + view[10] * (position.Z - camera.Z));
             _visible.Add((marker, position, opacity, textOpacity, focus, depth, read));
         }
+    }
+
+    /// <summary>
+    /// Bubbles draw flat on the screen, not as world-space quads: a quad large enough to hold the
+    /// text intersects the wall behind its marker and gets clipped diagonally. The depth test that
+    /// hid a bubble behind terrain is replaced by an explicit line-of-sight check, so it vanishes
+    /// rather than clipping.
+    /// </summary>
+    private void RenderBubbles()
+    {
+        // Non-empty only if the Opaque pass ran this frame, which is also what proves the player exists.
+        if (_visible.Count == 0) return;
+        var player = _api.World.Player;
+        foreach (var icon in _visible)
+            if (icon.TextOpacity > 0) RenderBubble(player, icon.Marker, icon.Position, icon.TextOpacity);
+    }
+
+    private void RenderBubble(IClientPlayer player, SceneDescriptionBlockEntity marker, Vec3d position, float textOpacity)
+    {
+        var targeted = player.CurrentBlockSelection?.Position?.Equals(marker.Pos) == true;
+        if (!marker.Data.ShouldShowDescription(targeted)) return;
+        var text = GetDescription(marker);
+        if (text == null) return;
+        var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, marker.Data.BubbleRenderScale);
+        if (height <= 0) return;
+        var render = _api.Render;
+        var view = render.CameraMatrixOriginf;
+        // Reserve the full focus/bob envelope so the bubble stays still through both animations.
+        var offset = 0.8f * marker.Data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;
+        var anchor = position.AddCopy(view[1] * offset, view[5] * offset, view[9] * offset);
+        var centre = Project(anchor);
+        if (centre.Z < 0) return;
+        if (!VisibilityUtils.HasLineOfSight(_api.World, player.Entity, position, failOpen: true)) return;
+        // One bubble height of world space at the anchor, in pixels: keeps the old quad's fixed
+        // texel density per block without depending on the field of view.
+        var pixelHeight = (float)Math.Abs(Project(anchor.AddCopy(view[1] * height, view[5] * height, view[9] * height)).Y - centre.Y);
+        if (pixelHeight <= 0) return;
+        var pixelWidth = pixelHeight * width / height;
+        render.Render2DTexture(text.TextureId, (float)centre.X - pixelWidth / 2,
+            render.FrameHeight - (float)centre.Y - pixelHeight / 2, pixelWidth, pixelHeight, 20f,
+            new Vec4f(1, 1, 1, textOpacity));
+    }
+
+    private Vec3d Project(Vec3d worldPosition)
+    {
+        var render = _api.Render;
+        return MatrixToolsd.Project(worldPosition, render.PerspectiveProjectionMat, render.PerspectiveViewMat, render.FrameWidth, render.FrameHeight);
     }
 
     private void RenderQuad(SceneDescriptionBlockEntity marker, LoadedTexture texture, Vec3d position, float opacity, float width, float height)
@@ -217,5 +270,22 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         _markers.Clear();
         _focus.Clear();
         _visible.Clear();
+    }
+
+    // An IRenderer carries one RenderOrder for every stage it is registered on, and the two passes
+    // need different ones: icons after vanilla sign rendering in Opaque, bubbles before the GUI
+    // draws at 1.0 in Ortho. Hence this forwarder rather than a second registration of the owner.
+    private sealed class BubblePass : IRenderer
+    {
+        private readonly SceneMarkerIconRenderer _owner;
+        internal BubblePass(SceneMarkerIconRenderer owner) => _owner = owner;
+        public double RenderOrder => 0.42; // Just after placed chat bubbles, under the HUD and dialogs.
+        public int RenderRange => int.MaxValue;
+        public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
+        {
+            if (stage == EnumRenderStage.Ortho) _owner.RenderBubbles();
+        }
+
+        public void Dispose() { }
     }
 }

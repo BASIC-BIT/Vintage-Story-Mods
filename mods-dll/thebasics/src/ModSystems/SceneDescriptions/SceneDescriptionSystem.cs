@@ -50,6 +50,7 @@ public sealed class SceneDescriptionSystem : ModSystem
         _iconRenderer = new SceneMarkerIconRenderer(api);
         _selection = new SceneMarkerSelection(api);
         api.Event.RegisterRenderer(_iconRenderer, EnumRenderStage.Opaque, "thebasics-scene-icons");
+        api.Event.RegisterRenderer(_iconRenderer.OrthoPass, EnumRenderStage.Ortho, "thebasics-scene-bubbles");
     }
 
     public override void Dispose()
@@ -58,7 +59,10 @@ public sealed class SceneDescriptionSystem : ModSystem
             foreach (var symbol in System.Enum.GetValues<SceneMarkerSymbol>())
                 _clientApi.Gui.Icons.CustomIcons.Remove("thebasics-scene-title-" + ((int)symbol + 1));
         if (_clientApi != null && _iconRenderer != null)
+        {
             _clientApi.Event.UnregisterRenderer(_iconRenderer, EnumRenderStage.Opaque);
+            _clientApi.Event.UnregisterRenderer(_iconRenderer.OrthoPass, EnumRenderStage.Ortho);
+        }
         _iconRenderer?.Dispose();
         _selection?.Dispose();
         _selection = null;
