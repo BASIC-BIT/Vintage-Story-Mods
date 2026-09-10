@@ -1,0 +1,11 @@
+# Scene read marks
+
+BASIC asked for per-player "read" marks on scene markers: a read marker shows no floating bubble in any display mode and draws its indicator at half opacity, while plain right-click still opens the full text.
+
+- `SceneDescriptionData.ReadStamp` (unix ms, 0 = never stamped) is the content version. `WriteTo` takes an opt-in `includeReadStamp`, so the block entity's tree persists and syncs it while a picked-up item stack never carries it. `Stamp()` is monotonic per marker, so a same-millisecond edit cannot collide with a stale mark.
+- Fresh stamps are issued on every placement (`InitializeFromItem`), on every accepted save, and on the Clear-read packet. Legacy markers with stamp 0 get one on the first mark-read.
+- Marks live in per-player mod data (`BASIC_SCENE_READ_MARKS`, `GetSceneReadMarks`/`SetSceneReadMarks`) as `Dictionary<string,long>` keyed `x/y/z/dimension`, capped at 4096 by dropping the smallest (oldest) stamps. `SceneReadMarks` holds the pure cap/compare helpers plus the client cache.
+- Packets: block-entity 1004 mark read, 1005 mark unread (no edit permission, server replies to that player with the authoritative stamp as 8 raw bytes), 1006 clear read (same `CanEdit` + 8-block checks as Save, then a fresh stamp and MarkDirty). `SceneReadMarksMessage` is registered last on the shared "thebasics" channel and sent right after the config on client ready.
+- UI: `SceneReadonlyBookDialog` subclasses the vanilla reader and adds one toggling button; the editor gets a Clear read button between Cancel and Save, disabled while locked, behind `GuiDialogConfirm`.
+
+Validation: 815 automated tests pass (10 new). Manual QA pending; smoke-test card 6.7 covers two players, relog, save, and clear.

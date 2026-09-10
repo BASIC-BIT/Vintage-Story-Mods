@@ -75,7 +75,7 @@ public sealed class SceneDescriptionBlock : BlockSign
                 var stack = CreateStackFromPlacedBlock(world, blockSelection.Position);
                 stack.Attributes.SetString("title", blockEntity.Data.Title);
                 stack.Attributes.SetString("text", VtmlUtils.EscapeVtml(blockEntity.Data.Body));
-                new GuiDialogReadonlyBook(stack, client).TryOpen();
+                new SceneReadonlyBookDialog(stack, client, blockSelection.Position.Copy(), blockEntity.Data.ReadStamp).TryOpen();
             }
 
             return true;

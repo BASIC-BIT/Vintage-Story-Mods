@@ -102,11 +102,15 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             if (marker.Pos.dimension != player.Pos.Dimension) continue;
             var position = marker.Pos.ToVec3d().Add(0.5, 0.65, 0.5);
             var distance = player.Pos.XYZ.DistanceTo(position);
-            var opacity = marker.Data.GetIconOpacity(distance);
+            // A marker this player has read keeps a dimmed icon and never shows a bubble.
+            var read = SceneReadMarks.IsRead(marker.Pos, marker.Data.ReadStamp);
+            var opacity = marker.Data.GetIconOpacity(distance) * (read ? 0.5f : 1f);
             position.Y += marker.Data.HeightOffset;
             var selected = _api.World.Player.CurrentBlockSelection?.Position?.Equals(marker.Pos) == true;
             var targeted = selected && marker.Data.Display == SceneDescriptionDisplay.WhenTargeted && marker.Data.ShouldShowDescription(true);
-            var textOpacity = targeted ? 1 : marker.Data.ShouldShowDescription(selected) ? marker.Data.GetTextOpacity(distance) : 0;
+            var textOpacity = marker.Data.ShouldShowDescription(selected) ? marker.Data.GetTextOpacity(distance) : 0;
+            if (targeted) textOpacity = 1;
+            if (read) textOpacity = 0;
             var focus = _focus.GetValueOrDefault(marker);
             focus += ((selected ? 1 : 0) - focus) * (1 - MathF.Exp(-10 * Math.Max(0, deltaTime)));
             _focus[marker] = focus;

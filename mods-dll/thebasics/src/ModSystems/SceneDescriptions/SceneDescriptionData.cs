@@ -27,6 +27,7 @@ public sealed class SceneDescriptionData
     internal const string AuthorUidAttribute = "sceneAuthorUid";
     internal const string AuthorNameAttribute = "sceneAuthorName";
     internal const string LockItemAttribute = "sceneLockItem";
+    internal const string ReadStampAttribute = "sceneReadStamp";
 
     public string Title { get; set; } = string.Empty;
 
@@ -40,6 +41,15 @@ public sealed class SceneDescriptionData
     public string AuthorName { get; set; } = string.Empty;
 
     public string LockItemCode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Unix milliseconds of the last content change. Read marks are recorded against it, so a
+    /// re-placed or re-edited marker reads as unread again for everyone. 0 means never stamped.
+    /// </summary>
+    public long ReadStamp { get; set; }
+
+    /// <summary>Issues a fresh stamp, never repeating one this marker already carries.</summary>
+    internal void Stamp() => ReadStamp = Math.Max(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), ReadStamp + 1);
 
     public SceneMarkerAppearance Appearance { get; set; } = SceneMarkerAppearance.Billboard;
     public SceneMarkerSymbol Symbol { get; set; }
@@ -179,6 +189,7 @@ public sealed class SceneDescriptionData
             AuthorUid = AuthorUid,
             AuthorName = AuthorName,
             LockItemCode = LockItemCode,
+            ReadStamp = ReadStamp,
             Appearance = Appearance,
             Symbol = Symbol,
             IconDistance = IconDistance,
@@ -197,7 +208,11 @@ public sealed class SceneDescriptionData
         UnlimitedTextDistance = UnlimitedTextDistance, HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
     }.Normalize();
 
-    internal void WriteTo(ITreeAttribute attributes)
+    /// <summary>
+    /// <paramref name="includeReadStamp"/> is opt-in: the block entity's own tree persists and syncs
+    /// the stamp, but a picked-up item stack must not carry it, so re-placing clears every read mark.
+    /// </summary>
+    internal void WriteTo(ITreeAttribute attributes, bool includeReadStamp = false)
     {
         Normalize();
         attributes.SetString(TitleAttribute, Title);
@@ -222,6 +237,7 @@ public sealed class SceneDescriptionData
         attributes.SetFloat("sceneBubbleScale", BubbleScale);
         attributes.SetInt("sceneTitleIcon", TitleIcon);
         attributes.SetString("sceneTitleIconName", TitleIconName);
+        if (includeReadStamp) attributes.SetLong(ReadStampAttribute, ReadStamp);
     }
 
     internal static SceneDescriptionData ReadFrom(ITreeAttribute attributes)
@@ -240,6 +256,7 @@ public sealed class SceneDescriptionData
             AuthorUid = attributes.GetString(AuthorUidAttribute, string.Empty),
             AuthorName = attributes.GetString(AuthorNameAttribute, string.Empty),
             LockItemCode = attributes.GetString(LockItemAttribute, string.Empty),
+            ReadStamp = attributes.GetLong(ReadStampAttribute, 0),
             Appearance = (SceneMarkerAppearance)attributes.GetInt("sceneAppearance"),
             Symbol = (SceneMarkerSymbol)attributes.GetInt("sceneSymbol"),
             IconDistance = attributes.GetFloat("sceneIconDistance", 24),

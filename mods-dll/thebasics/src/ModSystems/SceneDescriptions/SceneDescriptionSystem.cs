@@ -63,6 +63,7 @@ public sealed class SceneDescriptionSystem : ModSystem
         _selection = null;
         _iconRenderer = null;
         _clientApi = null;
+        SceneReadMarks.ClearClientMarks();
         base.Dispose();
     }
 }

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NSubstitute;
+using thebasics.Extensions;
 using thebasics.ModSystems.SceneDescriptions;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -215,5 +216,57 @@ public class SceneDescriptionServerTests
         player.PlayerUID = uid;
         player.PrivilegeCheck = privilege => admin && privilege == Privilege.controlserver;
         marker.CanBreak(player).Should().Be(allowed);
+    }
+    [Fact]
+    public void MarkReadPacket_RecordsTheCurrentStampWithoutEditPermission()
+    {
+        var (marker, player, _) = CreateMarker(claim: false);
+        marker.Data.Stamp();
+        var stamp = marker.Data.ReadStamp;
+        marker.OnReceivedClientPacket(player, 1004, null);
+        var key = SceneReadMarks.Key(marker.Pos);
+        SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, key, stamp).Should().BeTrue();
+
+        marker.OnReceivedClientPacket(player, 1005, null);
+        SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, key, stamp).Should().BeFalse();
+    }
+
+    [Fact]
+    public void SavingOrClearingIssuesAFreshStampThatInvalidatesExistingMarks()
+    {
+        var (marker, player, _) = CreateMarker();
+        marker.Data.Stamp();
+        var key = SceneReadMarks.Key(marker.Pos);
+        marker.OnReceivedClientPacket(player, 1004, null);
+        var marks = player.GetSceneReadMarks().Marks;
+
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket { Body = "Rewritten" }));
+        SceneReadMarks.IsRead(marks, key, marker.Data.ReadStamp).Should().BeFalse();
+
+        marker.OnReceivedClientPacket(player, 1004, null);
+        marks = player.GetSceneReadMarks().Marks;
+        SceneReadMarks.IsRead(marks, key, marker.Data.ReadStamp).Should().BeTrue();
+        marker.OnReceivedClientPacket(player, 1006, null);
+        SceneReadMarks.IsRead(marks, key, marker.Data.ReadStamp).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ClearReadPacket_RequiresEditPermission()
+    {
+        var (marker, player, _) = CreateMarker(claim: false);
+        marker.Data.Stamp();
+        var stamp = marker.Data.ReadStamp;
+        marker.OnReceivedClientPacket(player, 1006, null);
+        marker.Data.ReadStamp.Should().Be(stamp);
+    }
+
+    [Fact]
+    public void PlacingAMarkerStampsItSoPickupAndReplaceClearsReadMarks()
+    {
+        var (marker, player, _) = CreateMarker();
+        var picked = new ItemStack(new SceneDescriptionBlock());
+        new SceneDescriptionData { Title = "Existing", ReadStamp = 42 }.WriteTo(picked.Attributes);
+        marker.InitializeFromItem(picked, player);
+        marker.Data.ReadStamp.Should().NotBe(42).And.NotBe(0);
     }
 }

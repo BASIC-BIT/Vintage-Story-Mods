@@ -16,6 +16,7 @@ using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.ChatHistory.Models;
 using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.Notes.Models;
+using thebasics.ModSystems.SceneDescriptions;
 using thebasics.Utilities;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
@@ -304,6 +305,7 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsNotesViewMessage>()
             .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
+            .RegisterMessageType<SceneReadMarksMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
@@ -319,7 +321,8 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<HeadshotUploadResult>(OnHeadshotUploadResult)
             .SetMessageHandler<HeadshotFetchResult>(OnHeadshotFetchResult)
             .SetMessageHandler<TheBasicsNotesViewMessage>(OnNotesViewMessage)
-            .SetMessageHandler<TheBasicsChatHistoryResultMessage>(OnChatHistoryResultMessage);
+            .SetMessageHandler<TheBasicsChatHistoryResultMessage>(OnChatHistoryResultMessage)
+            .SetMessageHandler<SceneReadMarksMessage>(SceneReadMarks.ReplaceClientMarks);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig

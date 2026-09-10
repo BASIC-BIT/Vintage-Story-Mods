@@ -99,32 +99,37 @@ Run this after the ModDB release is published. It verifies the player-facing ins
       - Expect: Plain right-click always opens the full text in the book-style reader; Shift-right-click opens the editor only with claim build access and within 8 blocks. The held item reads in the same book view. The inspector shows the title and a short preview. Refusals are explicit localized errors.
       - Watch for: right-click opening the editor, an editor opening for an unauthorized player, a silent refusal, or claim bypass.
 
-   7. **Creator Lock** (P0)
+   7. **Read Marks** (P1)
+      - Do: With players A and B near one Always nearby marker, have A right-click it and press Mark as read, then close and reopen the reader. Walk A away and back, and rejoin the server as A. Have B check the same marker. As A, reopen and press Mark as unread. Then as A edit and save the marker, and separately open the editor and use Clear read, confirming the prompt.
+      - Expect: After A marks it read, A sees no bubble in any display mode and a visibly dimmer indicator, while B still sees the bubble at full strength. The reader button reads Mark as unread on reopen and A's state survives relog. Mark as unread restores A's bubble. Any save, and Clear read after its confirmation, make the marker unread for both players again. Clear read is disabled while the marker is locked and refused without claim build access or from beyond 8 blocks.
+      - Watch for: the bubble still drawn for a reader, the indicator hidden instead of dimmed, one player's mark affecting the other, a stale button label, a read state lost on relog or surviving a save, or a Clear read that anyone can press.
+
+   8. **Creator Lock** (P0)
       - Do: As A, edit a marker, click the top-right lock glyph, and Save. Repeat once clicking the glyph and then Cancel. As B, open, read, break, and try to lock the marker. Keep a stale editor open on B while A locks.
       - Expect: The armed glyph locks the marker on Save; Cancel discards the pending lock with no change. No padlock item is involved. A locked marker opens read-only for everyone, A included, with every field and Save disabled. B cannot lock, edit, break, or pick it up, and a stale editor's save is rejected.
       - Watch for: a Save & lock button still present, a non-creator arming the lock, a stale editor bypassing the lock, or the lock glyph showing the wrong state.
 
-   8. **Unlock** (P0)
+   9. **Unlock** (P0)
       - Do: As A, click the lock glyph on the locked marker. Repeat as C. Attempt it as B, from beyond 8 blocks, and without claim access.
       - Expect: A and C unlock and the editor reopens fully editable; nothing is consumed or returned. B, out-of-range, and no-claim attempts are refused with a localized error.
       - Watch for: an unauthorized unlock succeeding, the editor staying read-only after a successful unlock, or a lock state that does not reach other clients.
 
-   9. **Pickup And Re-Place Persistence** (P0)
-      - Do: Break and re-place a written, appearance-customized, locked marker. Restart the server and rejoin. Also place a fresh crafted marker after saving a distinctive appearance.
-      - Expect: Title, body, display mode, every appearance setting, creator, and lock survive pickup, re-place, and restart. Exactly one item drops. The fresh marker inherits your last saved appearance with empty content; the picked-up marker keeps its own.
-      - Watch for: duplicate or missing drops, reset appearance, transferred ownership, a lost lock, or a fresh marker inheriting someone else's content.
+   10. **Pickup And Re-Place Persistence** (P0)
+       - Do: Break and re-place a written, appearance-customized, locked marker. Restart the server and rejoin. Also place a fresh crafted marker after saving a distinctive appearance.
+       - Expect: Title, body, display mode, every appearance setting, creator, and lock survive pickup, re-place, and restart. Exactly one item drops. The fresh marker inherits your last saved appearance with empty content; the picked-up marker keeps its own.
+       - Watch for: duplicate or missing drops, reset appearance, transferred ownership, a lost lock, or a fresh marker inheriting someone else's content.
 
-   10. **Markup Safety** (P0)
+   11. **Markup Safety** (P0)
        - Do: Save a title and body containing `<strong>`, an anchor tag, an icon tag, an unbalanced `<`, and a very long single word. Check the bubble, reader, inspector, item name, and item tooltip.
        - Expect: Markup appears as literal text everywhere, wrapping stays inside the panel, the title truncates at 80 characters, and the body caps at 4096.
        - Watch for: rendered VTML, a broken or blank bubble texture, a link or icon tag taking effect, or a client exception on save.
 
-   11. **EnableSceneMarkers=false** (P0)
+   12. **EnableSceneMarkers=false** (P0)
        - Do: Set `EnableSceneMarkers=false`, restart the server, and rejoin near existing markers. Try to craft, place, edit, and read. Set it back to `true` and restart.
        - Expect: Existing markers remain in the world as plain blocks. Placement, editing, floating bubbles, indicators, and the crafting recipe are all unavailable, with no client errors. Flipping it back restores every marker with its saved content and appearance intact.
        - Watch for: markers disappearing or losing data, the recipe still craftable, an indicator or bubble still rendering, an editor still opening, or the change taking effect without a restart.
 
-   12. **Logs And Exceptions** (P0)
+   13. **Logs And Exceptions** (P0)
        - Do: Fetch server and client logs after the pass.
        - Expect: `SceneDescriptionSystem` loads once; audit entries record scene-marker edits and unlocks; no scene-marker exceptions or warnings.
        - Watch for: rejected-packet or malformed-edit warnings, appearance-preference read failures, renderer or texture exceptions, and ghost indicators after leaving and re-entering loaded terrain.

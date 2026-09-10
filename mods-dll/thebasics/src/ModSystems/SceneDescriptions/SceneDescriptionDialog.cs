@@ -22,13 +22,15 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private bool _nearbyLayout;
     private readonly bool _canManageLock;
     private readonly Action _onUnlock;
+    private readonly Action _onClearRead;
     private readonly SceneDescriptionData _appearance;
     private readonly Shape[] _symbolShapes;
 
-    public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, bool canManageLock, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClose) : base(capi)
+    public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, bool canManageLock, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose) : base(capi)
     {
         _onSave = onSave;
         _onUnlock = onUnlock;
+        _onClearRead = onClearRead;
         _canManageLock = canManageLock;
         _onClose = onClose;
         _appearance = (data ?? new SceneDescriptionData()).Clone().Normalize();
@@ -135,6 +137,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddSwitch(value => { _appearance.ShowBodyInBubble = value; RefreshPreview(); }, ElementBounds.Fixed(250, top + 90, 30, 30), "showbody")
             .AddStaticText(Lang.Get("thebasics:scene-show-body"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(250, top + 66, 250, 22))
             .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
+            .AddSmallButton(Lang.Get("thebasics:scene-clear-read"), OnClearRead, ElementBounds.Fixed(140, buttonY, 140, ButtonHeight), key: "clearread")
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth - 140, buttonY, 120, ButtonHeight), key: "save")
             .AddSmallButton("", OnLockButton, ElementBounds.Fixed(750, top, 36, 32), key: "lock")
             .AddSceneDrawing(ElementBounds.Fixed(756, top + 4, 24, 24), DrawLock, "lockart")
@@ -172,6 +175,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         RefreshPreview();
         SingleComposer.GetButton("lock").Enabled = _canManageLock;
         SingleComposer.GetButton("save").Enabled = !data.IsLocked;
+        SingleComposer.GetButton("clearread").Enabled = !data.IsLocked;
         SingleComposer.GetTextInput("title").Enabled = !data.IsLocked;
         SingleComposer.GetTextArea("body").Enabled = !data.IsLocked;
         SingleComposer.GetDropDown("kind").Enabled = !data.IsLocked;
@@ -281,6 +285,14 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         if (_appearance.IsLocked || _iconPicker != null) return false;
         _iconPicker = new SceneTitleIconDialog(capi, icon => { _appearance.TitleIcon = 0; _appearance.TitleIconName = icon; RefreshPreview(); }, () => _iconPicker = null);
         return _iconPicker.TryOpen();
+    }
+
+    private bool OnClearRead()
+    {
+        if (_appearance.IsLocked) return false;
+        new GuiDialogConfirm(capi, Lang.Get("thebasics:scene-clear-read-confirm"),
+            confirmed => { if (confirmed) _onClearRead?.Invoke(); }).TryOpen();
+        return true;
     }
 
     private void DrawLock(Context ctx, ImageSurface surface, ElementBounds bounds)
