@@ -18,6 +18,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private SceneTitleIconDialog _iconPicker;
     private bool _closing;
     private bool _lockAfterSave;
+    // Whether the composed layout carries the text distance row. It only applies to the nearby mode.
+    private bool _nearbyLayout;
     private readonly bool _canManageLock;
     private readonly Action _onUnlock;
     private readonly SceneDescriptionData _appearance;
@@ -74,6 +76,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var kindBounds = ElementBounds.Fixed(0, top + 90, 220, 30);
         var bodyLabelBounds = ElementBounds.Fixed(0, top + 132, DialogWidth - 20, 22);
         var textAreaBounds = ElementBounds.Fixed(0, top + 156, DialogWidth - 20, BodyHeight);
+        // The text distance only applies to the nearby mode. Any other mode drops that row and pulls
+        // the right column's remaining rows up into the space it used.
+        _nearbyLayout = data.Display == SceneDescriptionDisplay.AlwaysNearby;
+        var textRow = _nearbyLayout ? 0 : 66;
         var kindValues = new[] { "targeted", "nearby", "interaction" };
         var kindNames = new[]
         {
@@ -89,7 +95,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddStaticText(Lang.Get("thebasics:scene-description-title-label"), CairoFont.WhiteSmallText(), titleLabelBounds)
             .AddTextInput(titleInputBounds, _ => RefreshPreview(), CairoFont.TextInput(), "title")
             .AddStaticText(Lang.Get("thebasics:scene-display-label"), CairoFont.WhiteSmallText(), kindLabelBounds)
-            .AddDropDown(kindValues, kindNames, (int)data.Display, (_, _) => RefreshPreview(), kindBounds, "kind")
+            .AddDropDown(kindValues, kindNames, (int)data.Display, (_, _) => OnDisplayModeChanged(), kindBounds, "kind")
             .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
             .AddTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
             .AddSceneDrawing(ElementBounds.Fixed(530, top + 46, 260, 166), DrawPreview, "preview")
@@ -100,18 +106,26 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 290, 90, 22))
             .AddDropDown(new[] { "gold", "parchment", "blue", "green", "red" }, new[] { Lang.Get("thebasics:scene-color-gold"), Lang.Get("thebasics:scene-color-parchment"), Lang.Get("thebasics:scene-color-blue"), Lang.Get("thebasics:scene-color-green"), Lang.Get("thebasics:scene-color-red") }, (int)data.Color,
                 (value, _) => { _appearance.Color = value switch { "parchment" => SceneMarkerColor.Parchment, "blue" => SceneMarkerColor.Blue, "green" => SceneMarkerColor.Green, "red" => SceneMarkerColor.Red, _ => SceneMarkerColor.Gold }; RefreshPreview(); }, ElementBounds.Fixed(620, top + 288, 170, 30), "color")
+            // The icon distance fades the indicator in every mode, so its row is never dropped.
             .AddStaticText(Lang.Get("thebasics:scene-icon-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 342, 260, 22))
             .AddNumberInput(ElementBounds.Fixed(530, top + 366, 100, 30), null, CairoFont.TextInput(), "distance")
             .AddSwitch(value => { _appearance.UnlimitedIconDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 366, 30, 30), "unlimited")
             .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 368, 110, 28))
-            .AddStaticText(Lang.Get("thebasics:scene-text-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 408, 260, 22))
-            .AddNumberInput(ElementBounds.Fixed(530, top + 432, 100, 30), null, CairoFont.TextInput(), "textdistance")
-            .AddSwitch(value => { _appearance.UnlimitedTextDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 432, 30, 30), "textunlimited")
-            .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 434, 110, 28))
-            .AddStaticText(Lang.Get("thebasics:scene-height"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 485, 150, 22))
-            .AddNumberInput(ElementBounds.Fixed(690, top + 480, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
-            .AddStaticText(Lang.Get("thebasics:scene-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 525, 150, 22))
-            .AddNumberInput(ElementBounds.Fixed(690, top + 520, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
+            ;
+        if (_nearbyLayout)
+        {
+            SingleComposer
+                .AddStaticText(Lang.Get("thebasics:scene-text-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 408, 260, 22))
+                .AddNumberInput(ElementBounds.Fixed(530, top + 432, 100, 30), null, CairoFont.TextInput(), "textdistance")
+                .AddSwitch(value => { _appearance.UnlimitedTextDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 432, 30, 30), "textunlimited")
+                .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 434, 110, 28))
+                ;
+        }
+        SingleComposer
+            .AddStaticText(Lang.Get("thebasics:scene-height"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 485 - textRow, 150, 22))
+            .AddNumberInput(ElementBounds.Fixed(690, top + 480 - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
+            .AddStaticText(Lang.Get("thebasics:scene-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 525 - textRow, 150, 22))
+            .AddNumberInput(ElementBounds.Fixed(690, top + 520 - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
             .AddStaticText(Lang.Get("thebasics:scene-bubble-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 180, 22))
             .AddNumberInput(ElementBounds.Fixed(185, top + 444, 80, 30), _ => RefreshPreview(), CairoFont.TextInput(), "bubblesize")
             .AddSmallButton(Lang.Get("thebasics:scene-icon-button"), OpenIconPicker, ElementBounds.Fixed(0, top + 24, 78, 30), key: "titleicon")
@@ -138,8 +152,11 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.ToggleButtonsSetValue("symbol", (int)data.Symbol);
         SingleComposer.GetNumberInput("distance").SetValue(data.IconDistance.ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetSwitch("unlimited").SetValue(data.UnlimitedIconDistance);
-        SingleComposer.GetSwitch("textunlimited").SetValue(data.UnlimitedTextDistance);
-        SingleComposer.GetNumberInput("textdistance").SetValue(data.TextDistance.ToString(CultureInfo.InvariantCulture));
+        if (_nearbyLayout)
+        {
+            SingleComposer.GetSwitch("textunlimited").SetValue(data.UnlimitedTextDistance);
+            SingleComposer.GetNumberInput("textdistance").SetValue(data.TextDistance.ToString(CultureInfo.InvariantCulture));
+        }
         SingleComposer.GetNumberInput("height").SetValue(data.HeightOffset.ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetNumberInput("height").Enabled = !data.IsLocked;
         SingleComposer.GetNumberInput("size").SetValue((data.IndicatorScale * 100).ToString(CultureInfo.InvariantCulture));
@@ -172,13 +189,52 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     {
         if (SingleComposer?.Composed != true) return;
         SingleComposer.GetNumberInput("distance").Enabled = !_appearance.IsLocked && !_appearance.UnlimitedIconDistance;
-        var nearby = SingleComposer.GetDropDown("kind").SelectedValue == "nearby";
-        SingleComposer.GetNumberInput("textdistance").Enabled = !_appearance.IsLocked && nearby && !_appearance.UnlimitedTextDistance;
-        SingleComposer.GetSwitch("textunlimited").Enabled = !_appearance.IsLocked && nearby;
+        if (_nearbyLayout)
+        {
+            SingleComposer.GetNumberInput("textdistance").Enabled = !_appearance.IsLocked && !_appearance.UnlimitedTextDistance;
+            SingleComposer.GetSwitch("textunlimited").Enabled = !_appearance.IsLocked;
+        }
         SingleComposer.GetSceneDrawing("preview").Redraw();
         SingleComposer.GetSceneDrawing("titleiconart").Redraw();
         for (var index = 0; index < _symbolShapes.Length; index++) SingleComposer.GetSceneDrawing("symbolart-" + index).Redraw();
     }
+
+    // The distance rows appear and disappear with the mode, so that switch has to rebuild the
+    // layout. Everything the user has typed but not saved is carried into the new composer.
+    private void OnDisplayModeChanged()
+    {
+        var nearby = SelectedDisplay() == SceneDescriptionDisplay.AlwaysNearby;
+        if (nearby == _nearbyLayout)
+        {
+            RefreshPreview();
+            return;
+        }
+
+        var pending = _appearance.Clone();
+        pending.Display = SelectedDisplay();
+        pending.Title = SingleComposer.GetTextInput("title").GetText();
+        pending.Body = SingleComposer.GetTextArea("body").GetText();
+        if (TryReadNumber("height", out var height)) pending.HeightOffset = height;
+        if (TryReadNumber("size", out var size)) pending.IndicatorScale = size / 100;
+        if (TryReadNumber("bubblesize", out var bubble)) pending.BubbleScale = bubble / 100;
+        if (TryReadNumber("distance", out var iconDistance)) pending.IconDistance = iconDistance;
+        // Also written back to _appearance: once the row is gone, saving reads the text distance from
+        // there instead of from the input.
+        if (_nearbyLayout && TryReadNumber("textdistance", out var textDistance)) _appearance.TextDistance = pending.TextDistance = textDistance;
+        // Deferred: the dropdown keeps working on itself after this callback returns, and composing
+        // now would dispose the element out from under it.
+        capi.Event.EnqueueMainThreadTask(() => { if (IsOpened()) Compose(pending); }, "thebasics-scene-recompose");
+    }
+
+    private SceneDescriptionDisplay SelectedDisplay() => SingleComposer.GetDropDown("kind").SelectedValue switch
+    {
+        "nearby" => SceneDescriptionDisplay.AlwaysNearby,
+        "interaction" => SceneDescriptionDisplay.OnInteraction,
+        _ => SceneDescriptionDisplay.WhenTargeted,
+    };
+
+    private bool TryReadNumber(string key, out float value) =>
+        float.TryParse(SingleComposer.GetNumberInput(key).GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out value) && float.IsFinite(value);
 
     private void DrawPreview(Context ctx, ImageSurface surface, ElementBounds bounds)
     {
@@ -277,7 +333,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             return false;
         }
         _appearance.HeightOffset = height;
-        if (SingleComposer.GetDropDown("kind").SelectedValue == "nearby" && !_appearance.UnlimitedTextDistance)
+        if (_nearbyLayout && !_appearance.UnlimitedTextDistance)
         {
             if (!float.TryParse(SingleComposer.GetNumberInput("textdistance").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var textDistance) ||
                 !float.IsFinite(textDistance) || textDistance < 1 || textDistance > 1024)
