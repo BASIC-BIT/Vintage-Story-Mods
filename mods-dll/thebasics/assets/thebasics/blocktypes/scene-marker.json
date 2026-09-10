@@ -23,8 +23,15 @@
     "*-wall-south": { base: "thebasics:block/scene-marker-wall", rotateY: 180 },
     "*-wall-west": { base: "thebasics:block/scene-marker-wall", rotateY: 90 }
   },
+  // Inventory/hand/dropped renders show the exclamation glyph, not the tiny placed base plate.
+  shapeInventory: { base: "thebasics:block/scene-symbol-exclamation" },
   textures: {
     material: { base: "game:block/stone/rock/slate1" },
+    accent: { base: "game:block/stone/rock/chalk1" }
+  },
+  // scene-symbol-exclamation.json declares no textures of its own; its faces are all #accent,
+  // which must resolve out of texturesInventory for the inventory shape.
+  texturesInventory: {
     accent: { base: "game:block/stone/rock/chalk1" }
   },
   blockmaterial: "Stone",
@@ -58,20 +65,30 @@
   },
   rainPermeable: true,
   materialDensity: 1800,
+  // Transforms below are tuned for the 2x2x14px upright exclamation glyph (y 2..16, centred on x/z 8),
+  // not for the flat placed base plate.
+  fpHandTransform: {
+    translation: { x: 0, y: -0.2, z: 0.35 },
+    rotation: { x: 0, y: -20, z: 0 },
+    origin: { x: 0.5, y: 0.5, z: 0.5 },
+    scale: 1.1
+  },
   tpHandTransform: {
-    translation: { x: -0.75, y: -0.1, z: -0.75 },
-    rotation: { x: -44, y: 7, z: -9 },
+    translation: { x: -0.6, y: -0.35, z: -0.55 },
+    rotation: { x: 0, y: 12, z: -14 },
     origin: { x: 0.5, y: 0.1, z: 0.5 },
-    scale: 0.7
+    scale: 0.55
   },
   groundTransform: {
     translation: { x: 0, y: 0, z: 0 },
-    rotation: { x: 0, y: 0, z: 0 },
+    rotation: { x: 0, y: -20, z: 0 },
     origin: { x: 0.5, y: 0, z: 0.5 },
-    scale: 3
+    scale: 1.4
   },
   guiTransform: {
-    rotation: { x: -35, y: 135, z: 0 },
-    scale: 2.4
+    // Upright and facing the slot; small y turn keeps the glyph shaded instead of flat-on.
+    rotation: { x: 0, y: -18, z: 0 },
+    origin: { x: 0.5, y: 0.5, z: 0.5 },
+    scale: 1.5
   }
 }
