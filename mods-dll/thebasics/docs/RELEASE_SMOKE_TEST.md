@@ -100,7 +100,7 @@ Run this after the ModDB release is published. It verifies the player-facing ins
       - Watch for: right-click opening the editor, an editor opening for an unauthorized player, a silent refusal, or claim bypass.
 
    7. **Long Description Typing And Scrolling** (P1)
-      - Do: Shift-right-click a marker. In the description box, type "He is calmly snoozing, probably snoring. He got all tuckered out, eepy boy." so it wraps onto a second line, then keep typing until the text passes the bottom of the box. Press Backspace across a wrap, paste a long paragraph, press Up until the caret reaches the top, and scroll with the mouse wheel over the box. Repeat once at GUI scale 1.25 or 1.5.
+      - Do: Shift-right-click a marker. In the description box, type "He is calmly snoozing, probably snoring. He got all tuckered out, eepy boy." so it wraps onto a second line, then keep typing until the text passes the bottom of the box. Press Backspace across a wrap, paste a long paragraph, press Up until the caret reaches the top, and scroll with the mouse wheel over the box, then click a line that has scrolled into view. Close the editor, change GUI scale to 1.25 or 1.5, reopen it, and repeat.
       - Expect: The text reads exactly as typed at every wrap. The scrollbar is always shown beside the box and only moves once the text is taller than the box. The caret stays in view while typing, moving with arrow keys, and deleting. Clicking a scrolled line places the caret on it.
       - Watch for: characters landing out of order after a wrap, text drawn over the rows below the box, a caret that disappears below the box, or the box width changing when the scrollbar becomes useful.
 

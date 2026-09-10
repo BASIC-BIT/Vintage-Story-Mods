@@ -15,9 +15,10 @@ internal static class TextAreaScroll
 
     internal static double TargetFor(double caretTop, double caretBottom, double current, double visible, double total)
     {
-        var target = caretTop < current ? caretTop
-            : caretBottom > current + visible ? caretBottom - visible
-            : current;
+        double target;
+        if (caretTop < current) target = caretTop;
+        else if (caretBottom > current + visible) target = caretBottom - visible;
+        else target = current;
         return Math.Clamp(target, 0, Math.Max(0, total - visible));
     }
 }
@@ -33,6 +34,7 @@ internal class ScrollableTextArea : GuiElementTextArea
 
     private readonly double _visible;
 
+    // Pass onChanged; assigning OnTextChanged or OnCursorMoved afterwards replaces the wrappers and kills scrolling.
     internal ScrollableTextArea(ICoreClientAPI capi, ElementBounds bounds, Action<string> onChanged, CairoFont font)
         : base(capi, bounds, null, font)
     {
@@ -67,7 +69,11 @@ internal class ScrollableTextArea : GuiElementTextArea
         if (Scrollbar == null) return;
         Bounds.fixedHeight = TextAreaScroll.ContentHeight(lines.Count, Font.GetFontExtents().Height, RuntimeEnv.GUIScale, _visible);
         Bounds.CalcWorldBounds();
+        // SetHeights keeps the handle's pixel position, which rescales the offset with the total; hold the offset instead.
+        var y = Scrollbar.CurrentYPosition;
         Scrollbar.SetHeights((float)_visible, (float)Bounds.fixedHeight);
+        Scrollbar.CurrentYPosition = (float)Math.Clamp(y, 0, Math.Max(0, Bounds.fixedHeight - _visible));
+        Scrollbar.TriggerChanged();
     }
 
     internal void OnScroll(float value)
