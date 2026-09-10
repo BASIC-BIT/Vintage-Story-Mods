@@ -13,3 +13,5 @@ Validation: 815 automated tests pass (10 new). Manual QA pending; smoke-test car
 Retire once PR #243 merges and smoke-test card 6.7 has passed once on the test server.
 
 QA package 2026-09-10: commits 101f0f2..d0d8881, thebasics_5_9_1.zip SHA256 fa3160c3b0660368..., deployed to the test server (restart 01:53Z, RunGame reached, no mod errors) and to Profile2/Profile3. Includes the symbol catalog slice and the review fixes.
+
+QA package 2026-09-10 (second): commits eb050f3..80beee3 on top, thebasics_5_9_1.zip SHA256 f876286e0b5a5b01..., deployed to the test server (restart 02:20Z, RunGame reached, no mod errors) and to Profile2/Profile3. Adds the unsaved-changes prompt, preview zoom, Save & Close bottom-right, symbol-row spacing, dampened bobbing when read, and the reader header.
