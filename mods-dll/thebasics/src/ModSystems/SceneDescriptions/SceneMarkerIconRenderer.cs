@@ -16,7 +16,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     // ponytail: grows once per icon and colour actually used and is only freed on dispose. Bounded by the
     // catalog in practice; evict least-recently-used entries if a world ever puts thousands in view.
     private readonly Dictionary<(string Icon, SceneMarkerColor Color), LoadedTexture> _icons = new();
-    private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth)> _visible = new();
+    private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth, bool Read)> _visible = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, LoadedTexture Texture)> _descriptions = new();
     private readonly HashSet<SceneDescriptionBlockEntity> _shownDescriptions = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, float> _focus = new();
@@ -67,7 +67,9 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             foreach (var icon in _visible)
             {
                 var size = 0.8f * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
-                var bob = icon.Marker.Data.IdleBobbing ? 0.05 * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / 4000)) : 0;
+                // A marker this player has read settles down: half the bob height at half the speed.
+                var (amplitude, period) = icon.Read ? (0.025, 8000.0) : (0.05, 4000.0);
+                var bob = icon.Marker.Data.IdleBobbing ? amplitude * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / period)) : 0;
                 if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.IndicatorOpacity, size, size);
                 var targeted = _api.World.Player.CurrentBlockSelection?.Position?.Equals(icon.Marker.Pos) == true;
                 if (!icon.Marker.Data.ShouldShowDescription(targeted) || icon.TextOpacity <= 0) continue;
@@ -130,7 +132,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             var camera = player.CameraPos;
             var view = render.CameraMatrixOriginf;
             var depth = -(view[2] * (position.X - camera.X) + view[6] * (position.Y - camera.Y) + view[10] * (position.Z - camera.Z));
-            _visible.Add((marker, position, opacity, textOpacity, focus, depth));
+            _visible.Add((marker, position, opacity, textOpacity, focus, depth, read));
         }
     }
 
