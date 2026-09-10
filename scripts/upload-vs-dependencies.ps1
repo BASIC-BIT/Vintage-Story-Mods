@@ -37,6 +37,16 @@ $RequiredDlls = @{
     "cairo-sharp.dll" = "$VsInstallPath\Lib\cairo-sharp.dll"
     "protobuf-net.dll" = "$VsInstallPath\Lib\protobuf-net.dll"
     "0Harmony.dll" = "$VsInstallPath\Lib\0Harmony.dll"
+    # Harmony patches at runtime through Mono.Cecil and MonoMod; the tests exercise that path.
+    "Mono.Cecil.dll" = "$VsInstallPath\Lib\Mono.Cecil.dll"
+    "Mono.Cecil.Mdb.dll" = "$VsInstallPath\Lib\Mono.Cecil.Mdb.dll"
+    "Mono.Cecil.Pdb.dll" = "$VsInstallPath\Lib\Mono.Cecil.Pdb.dll"
+    "Mono.Cecil.Rocks.dll" = "$VsInstallPath\Lib\Mono.Cecil.Rocks.dll"
+    "MonoMod.Backports.dll" = "$VsInstallPath\Lib\MonoMod.Backports.dll"
+    "MonoMod.Core.dll" = "$VsInstallPath\Lib\MonoMod.Core.dll"
+    "MonoMod.ILHelpers.dll" = "$VsInstallPath\Lib\MonoMod.ILHelpers.dll"
+    "MonoMod.Iced.dll" = "$VsInstallPath\Lib\MonoMod.Iced.dll"
+    "MonoMod.Utils.dll" = "$VsInstallPath\Lib\MonoMod.Utils.dll"
 }
 
 # Validate all DLLs exist
@@ -116,6 +126,15 @@ try {
     Copy-Item $RequiredDlls["cairo-sharp.dll"] "$libDir\" -Force
     Copy-Item $RequiredDlls["protobuf-net.dll"] "$libDir\" -Force
     Copy-Item $RequiredDlls["0Harmony.dll"] "$libDir\" -Force
+    Copy-Item $RequiredDlls["Mono.Cecil.dll"] "$libDir\" -Force
+    Copy-Item $RequiredDlls["Mono.Cecil.Mdb.dll"] "$libDir\" -Force
+    Copy-Item $RequiredDlls["Mono.Cecil.Pdb.dll"] "$libDir\" -Force
+    Copy-Item $RequiredDlls["Mono.Cecil.Rocks.dll"] "$libDir\" -Force
+    Copy-Item $RequiredDlls["MonoMod.Backports.dll"] "$libDir\" -Force
+    Copy-Item $RequiredDlls["MonoMod.Core.dll"] "$libDir\" -Force
+    Copy-Item $RequiredDlls["MonoMod.ILHelpers.dll"] "$libDir\" -Force
+    Copy-Item $RequiredDlls["MonoMod.Iced.dll"] "$libDir\" -Force
+    Copy-Item $RequiredDlls["MonoMod.Utils.dll"] "$libDir\" -Force
     Write-Host "Copied library DLLs" -ForegroundColor Green
     
     # Create README for the version
@@ -128,7 +147,7 @@ This directory contains the necessary DLLs for building Vintage Story mods again
 
 - core/ - Core game DLLs (VintagestoryAPI.dll, VintagestoryLib.dll)
 - mods/ - Base mod DLLs (VSSurvivalMod.dll, VSEssentials.dll, VSCreativeMod.dll)  
-- lib/ - Library DLLs (cairo-sharp.dll, protobuf-net.dll, 0Harmony.dll)
+- lib/ - Library DLLs (cairo-sharp.dll, protobuf-net.dll, 0Harmony.dll, Mono.Cecil*.dll, MonoMod.*.dll)
 
 ## Legal Notice
 
@@ -153,7 +172,7 @@ From VS installation: $VsInstallPath
         "dlls" = @{
             "core" = @("VintagestoryAPI.dll", "VintagestoryLib.dll")
             "mods" = @("VSSurvivalMod.dll", "VSEssentials.dll", "VSCreativeMod.dll")
-            "lib" = @("cairo-sharp.dll", "protobuf-net.dll", "0Harmony.dll")
+            "lib" = @("cairo-sharp.dll", "protobuf-net.dll", "0Harmony.dll", "Mono.Cecil.dll", "Mono.Cecil.Mdb.dll", "Mono.Cecil.Pdb.dll", "Mono.Cecil.Rocks.dll", "MonoMod.Backports.dll", "MonoMod.Core.dll", "MonoMod.ILHelpers.dll", "MonoMod.Iced.dll", "MonoMod.Utils.dll")
         }
     } | ConvertTo-Json -Depth 3
     
