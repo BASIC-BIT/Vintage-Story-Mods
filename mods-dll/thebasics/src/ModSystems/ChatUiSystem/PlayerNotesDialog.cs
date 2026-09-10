@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json;
+using thebasics.Gui;
 using thebasics.ModSystems.Notes.Models;
 using thebasics.Utilities;
 using Vintagestory.API.Client;
@@ -325,7 +326,7 @@ public class PlayerNotesDialog : GuiDialog
         composer.AddInteractiveElement(_titleInput, "notes-title");
 
         composer.AddStaticText(Lang.Get("thebasics:notes-entry-content"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(x + 10, y + 90, width - 20, 20));
-        _bodyInput = new GuiElementTextArea(capi, ElementBounds.Fixed(x + 10, y + 110, width - 20, EntryBodyHeight), null, CairoFont.TextInput())
+        _bodyInput = new ScrollableTextArea(capi, ElementBounds.Fixed(x + 10, y + 110, width - 20, EntryBodyHeight), null, CairoFont.TextInput())
         {
             Autoheight = false
         };
@@ -340,7 +341,7 @@ public class PlayerNotesDialog : GuiDialog
         composer.AddStaticText(FreeformLabel(), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), ElementBounds.Fixed(x + 10, y + 8, width - 20, 22));
         _freeformScrollViewportHeight = FreeformViewportHeight;
         var clipBounds = ElementBounds.Fixed(x + 10, y + 36, width - 36, _freeformScrollViewportHeight);
-        _freeformInput = new GuiElementTextArea(capi, ElementBounds.Fixed(0, 0, clipBounds.fixedWidth - 6, _freeformScrollViewportHeight), OnFreeformTextChanged, CairoFont.TextInput())
+        _freeformInput = new ScrollableTextArea(capi, ElementBounds.Fixed(0, 0, clipBounds.fixedWidth - 6, _freeformScrollViewportHeight), OnFreeformTextChanged, CairoFont.TextInput())
         {
             Autoheight = false
         };
