@@ -790,7 +790,7 @@
 
   "block-scene-marker-*": "Scene Marker",
   "scene-unlock": "Unlock",
-  "scene-lock-on-save": "Toggle lock when saving",
+  "scene-lock-on-save": "Lock this marker when you save. Only you or an admin can unlock it.",
   "scene-color": "Color",
   "scene-color-gold": "Yellow",
   "scene-color-parchment": "White",
@@ -810,7 +810,7 @@
   "scene-size": "Indicator size (%)",
   "scene-size-invalid": "Enter an indicator size from 25 to 300 percent.",
   "scene-height-invalid": "Enter a height offset from -0.5 to 4 blocks.",
-  "scene-display-label": "Show description",
+  "scene-display-label": "Show bubble",
   "scene-display-targeted": "When targeted",
   "scene-display-nearby": "Always nearby",
   "scene-display-interaction": "On interaction",
