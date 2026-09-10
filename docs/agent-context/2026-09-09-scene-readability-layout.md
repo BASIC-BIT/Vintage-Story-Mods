@@ -23,3 +23,12 @@ Size follow-up: 100 percent was far too large in-world, so texel density doubled
 
 Icon follow-up: the editor now draws the selected title icon in a 22px tile above the Icon button, redrawn with the preview; empty when no icon is chosen.
 QA package (half-size bubble + icon tile): thebasics_5_9_1.zip, 600362 bytes, SHA256 476C48A3987D737D1B23FF32814F36C847E8F5CB6E0D74328025F0FF186C1E85. 803 tests pass. Server upload via SFTP (WinSCP needs Windows PowerShell 5.1, not pwsh 7) and both profile copies match this hash. Server restarted 2026-09-10 00:10 UTC. Human visual acceptance pending.
+
+## 2026-09-10 follow-up slice (approved by BASIC via the QA-gates session)
+
+- EnableSceneMarkers server toggle (ProtoMember 155, default true, restart-required). Off: recipe removed at AssetsFinalize, placement and editing refused on both sides, overlay and pick patch skipped per frame; block, entity, and handbook stay registered. Client reads the synced config and defaults to enabled until it arrives.
+- Scene marker item shows the exclamation glyph via shapeInventory with a chalk accent texture; placed block unchanged. Glyph is chalk-white, not the per-marker color, because color is applied per block entity at render time.
+- Editor hides only the text-distance row outside always-nearby mode and pulls height and size up 66px. Icon distance stays in every mode because it drives indicator fade everywhere; the original brief would have hidden a live setting.
+- FEATURES.md, smoke-test card 6, and rp-culture Entry 6 rewritten from the code. Note from that pass: a locked marker is read-only for everyone including its creator until unlocked.
+
+QA package: thebasics_5_9_1.zip, 601879 bytes, SHA256 78142B7D0D8EEC549F1A62162C30A74570182F6A8A5987094DF35A7917B9302D. 805 tests pass, tooling check passes. Server upload and both profile copies match this hash. dotnet format whitespace is red on pre-existing lines in the tests project; not touched. Human visual acceptance pending.
