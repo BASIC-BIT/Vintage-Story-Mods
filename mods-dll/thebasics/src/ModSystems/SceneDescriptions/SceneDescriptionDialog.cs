@@ -17,6 +17,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private readonly Action _onClose;
     private SceneTitleIconDialog _iconPicker;
     private SceneTitleIconDialog _symbolIconPicker;
+    private GuiDialogConfirm _clearReadConfirm;
     private bool _closing;
     private bool _lockAfterSave;
     // Whether the composed layout carries the text distance row. It only applies to the nearby mode.
@@ -52,6 +53,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     {
         _iconPicker?.TryClose();
         _symbolIconPicker?.TryClose();
+        _clearReadConfirm?.TryClose();
         base.OnGuiClosed();
         Dispose();
     }
@@ -109,7 +111,12 @@ internal sealed class SceneDescriptionDialog : GuiDialog
                 Enumerable.Range(0, 6).Select(index => ElementBounds.Fixed(530 + index * 44, top + 236, 40, 44)).ToArray(), "symbol")
             .AddSmallButton(Lang.Get("thebasics:scene-symbol-other"), OpenSymbolIconPicker, ElementBounds.Fixed(660, top + 210, 130, 26), key: "symbolicon")
             .AddSceneDrawing(ElementBounds.Fixed(630, top + 212, 22, 22),
-                (ctx, surface, _) => { if (_appearance.SymbolIconName.Length > 0) SceneTitleIcons.Draw(capi, ctx, surface, _appearance.SymbolIconName, _appearance.Color); }, "symboliconart")
+                (ctx, surface, _) =>
+                {
+                    // Mirror the billboard: a catalog icon that will not draw shows the fallback symbol instead of nothing.
+                    if (_appearance.SymbolIconName.Length > 0 && !SceneTitleIcons.Draw(capi, ctx, surface, _appearance.SymbolIconName, _appearance.Color))
+                        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)_appearance.Symbol], 0, 0, surface.Width, _appearance.Color, _appearance.Symbol);
+                }, "symboliconart")
             .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 290, 90, 22))
             .AddDropDown(new[] { "gold", "parchment", "blue", "green", "red" }, new[] { Lang.Get("thebasics:scene-color-gold"), Lang.Get("thebasics:scene-color-parchment"), Lang.Get("thebasics:scene-color-blue"), Lang.Get("thebasics:scene-color-green"), Lang.Get("thebasics:scene-color-red") }, (int)data.Color,
                 (value, _) => { _appearance.Color = value switch { "parchment" => SceneMarkerColor.Parchment, "blue" => SceneMarkerColor.Blue, "green" => SceneMarkerColor.Green, "red" => SceneMarkerColor.Red, _ => SceneMarkerColor.Gold }; RefreshPreview(); }, ElementBounds.Fixed(620, top + 288, 170, 30), "color")
@@ -329,8 +336,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private bool OnClearRead()
     {
         if (_appearance.IsLocked) return false;
-        new GuiDialogConfirm(capi, Lang.Get("thebasics:scene-clear-read-confirm"),
-            confirmed => { if (confirmed) _onClearRead?.Invoke(); }).TryOpen();
+        _clearReadConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:scene-clear-read-confirm"),
+            confirmed => { _clearReadConfirm = null; if (confirmed) _onClearRead?.Invoke(); });
+        _clearReadConfirm.TryOpen();
         return true;
     }
 

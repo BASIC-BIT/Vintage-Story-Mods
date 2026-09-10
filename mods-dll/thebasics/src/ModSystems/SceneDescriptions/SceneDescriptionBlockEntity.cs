@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text;
 using thebasics.Extensions;
 using Vintagestory.API.Client;
@@ -118,6 +119,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             {
                 Data.Stamp();
                 MarkDirty(redrawOnClient: true);
+                Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
             }
 
             SetReadMark(readingPlayer, packetId == MarkReadPacketId ? Data.ReadStamp : 0);
@@ -191,7 +193,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     {
         if (packetId is MarkReadPacketId or MarkUnreadPacketId)
         {
-            SceneReadMarks.SetClientMark(Pos, data is { Length: 8 } ? BitConverter.ToInt64(data) : 0);
+            var stamp = data is { Length: 8 } ? BitConverter.ToInt64(data) : 0;
+            SceneReadMarks.SetClientMark(Pos, stamp);
+            if (Api is ICoreClientAPI client)
+                foreach (var reader in client.Gui.OpenedGuis.OfType<SceneReadonlyBookDialog>().ToArray())
+                    if (reader.Pos.Equals(Pos)) reader.Refresh(stamp);
             return;
         }
 

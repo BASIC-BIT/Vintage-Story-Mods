@@ -9,3 +9,5 @@ BASIC asked for per-player "read" marks on scene markers: a read marker shows no
 - UI: `SceneReadonlyBookDialog` subclasses the vanilla reader and adds one toggling button; the editor gets a Clear read button between Cancel and Save, disabled while locked, behind `GuiDialogConfirm`.
 
 Validation: 815 automated tests pass (10 new). Manual QA pending; smoke-test card 6.7 covers two players, relog, save, and clear.
+
+Retire once PR #243 merges and smoke-test card 6.7 has passed once on the test server.

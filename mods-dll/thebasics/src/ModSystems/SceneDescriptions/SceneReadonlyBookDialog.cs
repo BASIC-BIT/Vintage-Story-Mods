@@ -12,8 +12,13 @@ namespace thebasics.ModSystems.SceneDescriptions;
 internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
 {
     private readonly BlockPos _pos;
-    private readonly long _stamp;
+    private long _stamp;
     private bool _read;
+
+    internal BlockPos Pos => _pos;
+
+    // A fresh reader is built per right-click, so drop it from the GUI manager and free its composers on close.
+    public override bool UnregisterOnClose => true;
 
     internal SceneReadonlyBookDialog(ItemStack bookStack, ICoreClientAPI capi, BlockPos pos, long stamp) : base(bookStack, capi)
     {
@@ -43,6 +48,8 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
         backgroundBounds.BothSizing = ElementSizing.FitToChildren;
         backgroundBounds.WithChildren(closeBounds);
 
+        // Assigning SingleComposer replaces the previous one without disposing it.
+        SingleComposer?.Dispose();
         SingleComposer = capi.Gui.CreateCompo("thebasics-scene-reader", ElementStdBounds.AutosizedMainDialog
                 .WithAlignment(EnumDialogArea.CenterMiddle).WithFixedAlignmentOffset(-GuiStyle.DialogToScreenPadding, 0))
             .AddShadedDialogBG(backgroundBounds)
@@ -72,14 +79,25 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
         return true;
     }
 
+    public override void OnGuiClosed()
+    {
+        base.OnGuiClosed();
+        Dispose();
+    }
+
     private bool OnToggleRead()
     {
-        _read = !_read;
-        capi.Network.SendBlockEntityPacket(_pos, _read ? SceneDescriptionBlockEntity.MarkReadPacketId : SceneDescriptionBlockEntity.MarkUnreadPacketId);
-        // Optimistic: the server's reply carries the authoritative stamp for the client cache.
-        SceneReadMarks.SetClientMark(_pos, _read ? _stamp : 0);
-        SingleComposer.GetButton("markread").Text = ReadButtonLabel();
-        SingleComposer.ReCompose();
+        // The button only relabels once the server confirms the mark; see Refresh.
+        capi.Network.SendBlockEntityPacket(_pos, _read ? SceneDescriptionBlockEntity.MarkUnreadPacketId : SceneDescriptionBlockEntity.MarkReadPacketId);
         return true;
+    }
+
+    /// <summary>Re-reads the client mark cache after the server replied with the marker's current stamp (0 = unread).</summary>
+    internal void Refresh(long stamp)
+    {
+        if (stamp != 0) _stamp = stamp; // A legacy marker gets its first stamp on first read.
+        _read = SceneReadMarks.IsRead(_pos, _stamp);
+        // Rebuild rather than relabel: the button bounds were fitted to the previous label.
+        Compose();
     }
 }

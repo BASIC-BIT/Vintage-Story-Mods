@@ -12,3 +12,5 @@ Known risks (human visual QA):
 - Catalog icons are antialiased; their soft edges may fringe against the billboard's straight-alpha blend, unlike the opaque enum artwork.
 - Thin-stroke icons read poorly at billboard size and at low indicator scale.
 - Third-party custom icon renderers may ignore the rgba they are given and draw in their own color.
+
+Retire once PR #243 merges and smoke-test card 6.3 has passed once on the test server.
