@@ -17,8 +17,23 @@ public class SceneDescriptionServerTests
     {
         var (marker, player, _) = CreateMarker();
         marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
-        { Title = "Old title", Body = "Old body", Color = (int)SceneMarkerColor.Blue, HeightOffset = 3, IndicatorScale = 2, TextDistance = 5, IdleBobbing = false, ShowBodyInBubble = true, BubbleScale = 1.5f, TitleIcon = 6, TitleIconName = "wpHome",
-            Display = (int)SceneDescriptionDisplay.AlwaysNearby, Symbol = (int)SceneMarkerSymbol.Diamond, SymbolIconName = "wpStar1", Effect = (int)SceneMarkerEffect.Hologram }));
+        {
+            Title = "Old title",
+            Body = "Old body",
+            Color = (int)SceneMarkerColor.Blue,
+            HeightOffset = 3,
+            IndicatorScale = 2,
+            TextDistance = 5,
+            IdleBobbing = false,
+            ShowBodyInBubble = true,
+            BubbleScale = 1.5f,
+            TitleIcon = 6,
+            TitleIconName = "wpHome",
+            Display = (int)SceneDescriptionDisplay.AlwaysNearby,
+            Symbol = (int)SceneMarkerSymbol.Diamond,
+            SymbolIconName = "wpStar1",
+            Effect = (int)SceneMarkerEffect.Hologram
+        }));
         marker.InitializeFromItem(new ItemStack(new SceneDescriptionBlock()), player);
         marker.Data.Color.Should().Be(SceneMarkerColor.Blue);
         marker.Data.HeightOffset.Should().Be(3);
@@ -169,8 +184,11 @@ public class SceneDescriptionServerTests
         marker.Data.LockItemCode = locked ? "game:padlock-copper" : "";
         marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
         {
-            Body = "New appearance", Appearance = (int)SceneMarkerAppearance.Hybrid,
-            Symbol = (int)SceneMarkerSymbol.Information, IconDistance = 80, UnlimitedIconDistance = true,
+            Body = "New appearance",
+            Appearance = (int)SceneMarkerAppearance.Hybrid,
+            Symbol = (int)SceneMarkerSymbol.Information,
+            IconDistance = 80,
+            UnlimitedIconDistance = true,
             Display = (int)SceneDescriptionDisplay.OnInteraction,
         }));
         marker.Data.Symbol.Should().Be(expected);

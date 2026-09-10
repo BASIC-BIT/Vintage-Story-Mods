@@ -216,9 +216,20 @@ public class SceneDescriptionDataTests
     [Fact]
     public void AppearanceControlsRoundTripWithoutCopyingContentOrOwnership()
     {
-        var data = new SceneDescriptionData { Title = "Private title", Body = "Scene", AuthorUid = "owner", LockItemCode = "ui",
-            Symbol = SceneMarkerSymbol.Question, Color = SceneMarkerColor.Green, HeightOffset = 2,
-            Display = SceneDescriptionDisplay.AlwaysNearby, IconDistance = 40, TextDistance = 6, UnlimitedTextDistance = true };
+        var data = new SceneDescriptionData
+        {
+            Title = "Private title",
+            Body = "Scene",
+            AuthorUid = "owner",
+            LockItemCode = "ui",
+            Symbol = SceneMarkerSymbol.Question,
+            Color = SceneMarkerColor.Green,
+            HeightOffset = 2,
+            Display = SceneDescriptionDisplay.AlwaysNearby,
+            IconDistance = 40,
+            TextDistance = 6,
+            UnlimitedTextDistance = true
+        };
         var tree = new TreeAttribute();
         data.WriteTo(tree);
         SceneDescriptionData.ReadFrom(tree).Should().BeEquivalentTo(data);

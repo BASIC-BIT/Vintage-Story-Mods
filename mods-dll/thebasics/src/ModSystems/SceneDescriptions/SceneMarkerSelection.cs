@@ -60,8 +60,14 @@ internal sealed class SceneMarkerSelection : IDisposable
             var hit = IntersectBox(ray, center, nearest, marker.Data.SelectionHalfExtent);
             if (hit == null) continue;
             nearest = ray.origin.DistanceTo(hit);
-            result = new BlockSelection { Position = marker.Pos.Copy(), Block = marker.Block, Face = BlockFacing.UP,
-                HitPosition = hit.SubCopy(marker.Pos.ToVec3d()), SelectionBoxIndex = 0 };
+            result = new BlockSelection
+            {
+                Position = marker.Pos.Copy(),
+                Block = marker.Block,
+                Face = BlockFacing.UP,
+                HitPosition = hit.SubCopy(marker.Pos.ToVec3d()),
+                SelectionBoxIndex = 0
+            };
         }
     }
 

@@ -29,8 +29,16 @@ public class SceneMarkerAppearanceTests
     [InlineData(SceneMarkerAppearance.Hybrid)]
     public void AppearanceSurvivesStorageAndClone(SceneMarkerAppearance appearance)
     {
-        var data = new SceneDescriptionData { Appearance = appearance, Symbol = SceneMarkerSymbol.Question,
-            SymbolIconName = "wpStar1", IconDistance = 72, UnlimitedIconDistance = true, AuthorUid = "creator", LockItemCode = "game:padlock-copper" };
+        var data = new SceneDescriptionData
+        {
+            Appearance = appearance,
+            Symbol = SceneMarkerSymbol.Question,
+            SymbolIconName = "wpStar1",
+            IconDistance = 72,
+            UnlimitedIconDistance = true,
+            AuthorUid = "creator",
+            LockItemCode = "game:padlock-copper"
+        };
         var tree = new TreeAttribute();
         data.Normalize();
         data.WriteTo(tree);
@@ -56,8 +64,12 @@ public class SceneMarkerAppearanceTests
     [InlineData(float.PositiveInfinity, 24)]
     public void InvalidAppearanceInputIsNormalized(float distance, float expected)
     {
-        var data = new SceneDescriptionData { Appearance = (SceneMarkerAppearance)100,
-            Symbol = (SceneMarkerSymbol)(-1), IconDistance = distance }.Normalize();
+        var data = new SceneDescriptionData
+        {
+            Appearance = (SceneMarkerAppearance)100,
+            Symbol = (SceneMarkerSymbol)(-1),
+            IconDistance = distance
+        }.Normalize();
         data.Appearance.Should().Be(SceneMarkerAppearance.Billboard);
         data.Symbol.Should().Be(SceneMarkerSymbol.Exclamation);
         data.IconDistance.Should().Be(expected);

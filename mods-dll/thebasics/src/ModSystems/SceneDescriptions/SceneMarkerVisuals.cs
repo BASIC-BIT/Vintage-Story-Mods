@@ -12,8 +12,14 @@ internal static class SceneMarkerVisuals
 {
     internal static ImageSurface DescriptionSurface(ICoreClientAPI api, SceneDescriptionData source)
     {
-        var background = new TextBackground { FillColor = new[] { 0.08, 0.10, 0.14, 1.0 }, Padding = 8,
-            Radius = 4, BorderWidth = 1, BorderColor = new[] { 0.65, 0.69, 0.75, 1.0 } };
+        var background = new TextBackground
+        {
+            FillColor = new[] { 0.08, 0.10, 0.14, 1.0 },
+            Padding = 8,
+            Radius = 4,
+            BorderWidth = 1,
+            BorderColor = new[] { 0.65, 0.69, 0.75, 1.0 }
+        };
         var font = new CairoFont(24, GuiStyle.StandardFontName, ColorUtil.WhiteArgbDouble) { Orientation = EnumTextOrientation.Left };
         var data = source.Clone().Normalize();
         var vtml = SceneDescriptionFormatter.ToFloatingVtml(data);

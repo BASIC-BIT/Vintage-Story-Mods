@@ -203,16 +203,36 @@ public sealed class SceneDescriptionData
             UnlimitedIconDistance = UnlimitedIconDistance,
             TextDistance = TextDistance,
             UnlimitedTextDistance = UnlimitedTextDistance,
-            HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
-            Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble, BubbleScale = BubbleScale, TitleIcon = TitleIcon, TitleIconName = TitleIconName,
+            HeightOffset = HeightOffset,
+            IndicatorScale = IndicatorScale,
+            Color = Color,
+            Effect = Effect,
+            IdleBobbing = IdleBobbing,
+            ShowBodyInBubble = ShowBodyInBubble,
+            BubbleScale = BubbleScale,
+            TitleIcon = TitleIcon,
+            TitleIconName = TitleIconName,
         };
     }
 
     internal SceneDescriptionData AppearanceDefaults() => new SceneDescriptionData
     {
-        Symbol = Symbol, SymbolIconName = SymbolIconName, Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble, BubbleScale = BubbleScale, TitleIcon = TitleIcon, TitleIconName = TitleIconName, Display = Display, IconDistance = IconDistance,
-        UnlimitedIconDistance = UnlimitedIconDistance, TextDistance = TextDistance,
-        UnlimitedTextDistance = UnlimitedTextDistance, HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
+        Symbol = Symbol,
+        SymbolIconName = SymbolIconName,
+        Color = Color,
+        Effect = Effect,
+        IdleBobbing = IdleBobbing,
+        ShowBodyInBubble = ShowBodyInBubble,
+        BubbleScale = BubbleScale,
+        TitleIcon = TitleIcon,
+        TitleIconName = TitleIconName,
+        Display = Display,
+        IconDistance = IconDistance,
+        UnlimitedIconDistance = UnlimitedIconDistance,
+        TextDistance = TextDistance,
+        UnlimitedTextDistance = UnlimitedTextDistance,
+        HeightOffset = HeightOffset,
+        IndicatorScale = IndicatorScale,
     }.Normalize();
 
     /// <summary>

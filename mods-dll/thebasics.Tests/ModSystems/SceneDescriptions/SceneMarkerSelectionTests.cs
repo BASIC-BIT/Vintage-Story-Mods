@@ -31,8 +31,12 @@ public class SceneMarkerSelectionTests
         directory.Should().NotBeNull();
         var json = JObject.Parse(File.ReadAllText(Path.Combine(directory!.FullName,
             "mods-dll/thebasics/assets/thebasics/blocktypes/scene-marker.json")));
-        var marker = new SceneDescriptionBlock { BlockId = 42, Code = new AssetLocation("thebasics:scene-marker-ground"),
-            RenderPass = Enum.Parse<EnumChunkRenderPass>(json.Value<string>("renderpass")!, true) };
+        var marker = new SceneDescriptionBlock
+        {
+            BlockId = 42,
+            Code = new AssetLocation("thebasics:scene-marker-ground"),
+            RenderPass = Enum.Parse<EnumChunkRenderPass>(json.Value<string>("renderpass")!, true)
+        };
         var policy = SightBlockPolicy.Resolve([marker], [], []);
         policy.GeneralFilter(new BlockPos(0), marker).Should().BeFalse();
         policy.StrictFilter(new BlockPos(0), marker).Should().BeFalse();
