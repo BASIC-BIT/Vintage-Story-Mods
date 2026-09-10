@@ -3,6 +3,7 @@ using NSubstitute;
 using thebasics.Extensions;
 using thebasics.ModSystems.SceneDescriptions;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -213,6 +214,17 @@ public class SceneDescriptionServerTests
     }
 
     [Fact]
+    public void HeldItemTooltip_DropsTheVanillaMaterialLine()
+    {
+        LangTestHelper.EnsureEnglish();
+        var block = new SceneDescriptionBlock();
+        var material = Lang.Get("Material: ") + Lang.Get("blockmaterial-" + EnumBlockMaterial.Stone);
+        block.WithoutMaterialLine("Scene marker\r\n" + material + "\r\nWeight: 1\r\n", null, null)
+            .Should().Be("Scene marker\r\nWeight: 1\r\n");
+        block.WithoutMaterialLine("Scene marker\r\n", null, null).Should().Be("Scene marker\r\n");
+    }
+
+    [Fact]
     public void BreakHandler_RejectsNonCreatorEvenWithClaimAccess()
     {
         var (marker, player, world) = CreateMarker();
@@ -224,17 +236,31 @@ public class SceneDescriptionServerTests
         marker.Data.IsLocked.Should().BeTrue();
     }
 
+    [Fact]
+    public void BreakHandler_RefusesTheCreatorAndAdminsWhileLocked()
+    {
+        var (marker, player, world) = CreateMarker();
+        marker.Data.LockItemCode = "game:padlock-copper";
+        player.PrivilegeCheck = _ => true;
+        marker.Block.OnBlockBroken(world, marker.Pos, player);
+        world.BlockAccessor.DidNotReceive().SetBlock(Arg.Any<int>(), Arg.Any<BlockPos>());
+        marker.Block.GetDrops(world, marker.Pos, player).Should().BeEmpty();
+        marker.Data.IsLocked.Should().BeTrue();
+    }
+
     [Theory]
-    [InlineData("creator", false, true)]
-    [InlineData("other", false, false)]
-    [InlineData("admin", true, true)]
-    public void PickupPolicy_UsesServerPrivilegeAndImmutableCreator(string uid, bool admin, bool allowed)
+    [InlineData("creator", false, true, false)]
+    [InlineData("other", false, true, false)]
+    [InlineData("admin", true, true, false)]
+    [InlineData("creator", false, false, true)]
+    [InlineData("other", false, false, true)]
+    public void PickupPolicy_LocksOutEveryoneAndOtherwiseUsesClaimAccess(string uid, bool admin, bool locked, bool allowed)
     {
         var (marker, player, _) = CreateMarker();
-        marker.Data.LockItemCode = "game:padlock-copper";
+        marker.Data.LockItemCode = locked ? "game:padlock-copper" : string.Empty;
         player.PlayerUID = uid;
         player.PrivilegeCheck = privilege => admin && privilege == Privilege.controlserver;
-        marker.CanBreak(player).Should().Be(allowed);
+        SceneDescriptionBlock.BreakRefused(marker, player).Should().Be(!allowed);
     }
     [Fact]
     public void MarkReadPacket_RecordsTheCurrentStampWithoutEditPermission()

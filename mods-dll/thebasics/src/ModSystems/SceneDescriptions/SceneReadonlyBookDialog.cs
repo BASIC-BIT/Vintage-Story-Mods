@@ -101,8 +101,12 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
 
     private bool OnToggleRead()
     {
-        // The button only relabels once the server confirms the mark; see Refresh.
-        capi.Network.SendBlockEntityPacket(_pos, _read ? SceneDescriptionBlockEntity.MarkUnreadPacketId : SceneDescriptionBlockEntity.MarkReadPacketId);
+        // Marking read means "done with this", so the reader closes; unmarking stays open and only
+        // relabels once the server confirms (see Refresh). Closing unregisters the dialog from
+        // OpenedGuis, so the reply finds no reader and Refresh is never called on it.
+        var marking = !_read;
+        capi.Network.SendBlockEntityPacket(_pos, marking ? SceneDescriptionBlockEntity.MarkReadPacketId : SceneDescriptionBlockEntity.MarkUnreadPacketId);
+        if (marking) TryClose();
         return true;
     }
 

@@ -7,9 +7,9 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneDescriptionLockTests
 {
     [Theory]
-    [InlineData("creator", false, true, false, true, true)]
+    [InlineData("creator", false, true, false, false, true)]
     [InlineData("other", false, true, false, false, false)]
-    [InlineData("admin", true, true, false, true, true)]
+    [InlineData("admin", true, true, false, false, true)]
     [InlineData("creator", false, false, false, false, false)]
     [InlineData("admin", true, false, false, false, false)]
     [InlineData(null, true, true, false, false, false)]

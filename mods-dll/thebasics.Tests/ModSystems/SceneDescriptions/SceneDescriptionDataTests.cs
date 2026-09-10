@@ -107,7 +107,8 @@ public class SceneDescriptionDataTests
         var invalid = new SceneDescriptionData { BubbleScale = float.NaN, TitleIcon = 100 }.Normalize();
         invalid.BubbleScale.Should().Be(1);
         invalid.TitleIcon.Should().Be(0);
-        new SceneDescriptionData { BubbleScale = 999 }.Normalize().BubbleScale.Should().Be(2);
+        new SceneDescriptionData { BubbleScale = 3.5f }.Normalize().BubbleRenderScale.Should().Be(3.5f);
+        new SceneDescriptionData { BubbleScale = 999 }.Normalize().BubbleScale.Should().Be(3.5f);
         new SceneDescriptionData { BubbleScale = -1 }.Normalize().BubbleScale.Should().Be(0.4f);
     }
 
@@ -270,6 +271,8 @@ public class SceneDescriptionDataTests
         data.HeightOffset.Should().Be(0);
         new SceneDescriptionData { HeightOffset = 100, TextDistance = -2 }.Normalize().HeightOffset.Should().Be(4);
         new SceneDescriptionData { HeightOffset = -100, TextDistance = -2 }.Normalize().TextDistance.Should().Be(1);
+        new SceneDescriptionData { HeightOffset = -100 }.Normalize().HeightOffset.Should().Be(-2);
+        new SceneDescriptionData { HeightOffset = -1.5f }.Normalize().HeightOffset.Should().Be(-1.5f);
     }
 
     [Theory]

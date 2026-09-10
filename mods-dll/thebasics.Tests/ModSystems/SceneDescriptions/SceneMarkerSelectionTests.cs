@@ -11,6 +11,21 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 public class SceneMarkerSelectionTests
 {
+    // The outline and the break decal are drawn from SymbolBox; the pick ray uses centre + half extent.
+    // They have to describe the same cube or you break a box you were not aiming at.
+    [Fact]
+    public void OutlineBoxIsTheSameCubeThePickRayHits()
+    {
+        var data = new SceneDescriptionData { IndicatorScale = 2, HeightOffset = 1.5f };
+        var box = SceneDescriptionBlock.SymbolBox(data);
+        ((box.X1 + box.X2) / 2).Should().BeApproximately(0.5f, 1e-5f);
+        ((box.Y1 + box.Y2) / 2).Should().BeApproximately(0.65f + data.HeightOffset, 1e-5f);
+        ((box.Z1 + box.Z2) / 2).Should().BeApproximately(0.5f, 1e-5f);
+        box.XSize.Should().BeApproximately(2 * data.SelectionHalfExtent, 1e-5f);
+        box.YSize.Should().BeApproximately(2 * data.SelectionHalfExtent, 1e-5f);
+        box.ZSize.Should().BeApproximately(2 * data.SelectionHalfExtent, 1e-5f);
+    }
+
     [Fact]
     public void PickingExtentTracksIndicatorSizeWithoutMovingItsCenter()
     {

@@ -201,7 +201,6 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         MarkDirty(redrawOnClient: true);
         Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
         Api.World.Logger.Audit("{0} edited a scene marker at {1}.", player.PlayerName, Pos);
-        if (packet?.LockAfterSave == true) OpenEditor(player);
     }
 
     public override void OnReceivedServerPacket(int packetId, byte[] data)

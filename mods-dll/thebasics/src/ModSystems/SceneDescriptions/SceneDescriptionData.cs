@@ -111,8 +111,9 @@ public sealed class SceneDescriptionData
     internal bool CanUnlock(string playerUid, bool isAdmin, bool hasClaimAccess) =>
         IsLocked && CanManage(playerUid, isAdmin, hasClaimAccess);
 
+    // A locked marker stays put for everyone, its creator included, until it is unlocked in the editor.
     internal bool CanBreak(string playerUid, bool isAdmin, bool hasClaimAccess) =>
-        !string.IsNullOrWhiteSpace(playerUid) && hasClaimAccess && (!IsLocked || CanManage(playerUid, isAdmin, hasClaimAccess));
+        !string.IsNullOrWhiteSpace(playerUid) && hasClaimAccess && !IsLocked;
 
     private bool CanManage(string playerUid, bool isAdmin, bool hasClaimAccess) =>
         !string.IsNullOrWhiteSpace(playerUid) && hasClaimAccess && (isAdmin || playerUid == AuthorUid);
@@ -165,11 +166,12 @@ public sealed class SceneDescriptionData
         SymbolIconName = NormalizeIconName(SymbolIconName);
         IconDistance = float.IsFinite(IconDistance) ? Math.Clamp(IconDistance, 1, 1024) : 24;
         TextDistance = float.IsFinite(TextDistance) ? Math.Clamp(TextDistance, 1, 1024) : 8;
-        HeightOffset = float.IsFinite(HeightOffset) ? Math.Clamp(HeightOffset, -0.5f, 4) : 0;
+        HeightOffset = float.IsFinite(HeightOffset) ? Math.Clamp(HeightOffset, -2, 4) : 0;
         IndicatorScale = float.IsFinite(IndicatorScale) ? Math.Clamp(IndicatorScale, 0.25f, 3) : 1;
         // Retain the retired effect field for save/wire compatibility; all indicators now use one style.
         Effect = SceneMarkerEffect.Plain;
-        BubbleScale = float.IsFinite(BubbleScale) ? Math.Clamp(BubbleScale, 0.4f, 2) : 1;
+        // 3.5 keeps the old 200%-at-120px/block maximum reachable now that a block is 200px.
+        BubbleScale = float.IsFinite(BubbleScale) ? Math.Clamp(BubbleScale, 0.4f, 3.5f) : 1;
         if (TitleIcon < 0 || TitleIcon > Enum.GetValues<SceneMarkerSymbol>().Length) TitleIcon = 0;
         TitleIconName = NormalizeIconName(TitleIconName);
         if (TitleIconName.Length == 0 && TitleIcon > 0) TitleIconName = "thebasics-scene-title-" + TitleIcon;

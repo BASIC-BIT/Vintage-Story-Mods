@@ -342,7 +342,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         // rather than the 1.8 blocks of empty air the world billboard hangs above.
         const double groundReserve = 0.4;
         var stackHeight = textHeight + 0.1 + symbolSize + groundReserve + Math.Max(0, preview.HeightOffset);
-        var scale = Math.Min((width - 24) / Math.Max(3, textWidth), (height - 24) / stackHeight);
+        // 1.8 is the old 3-block floor times the 0.6 world-size change, so the preview text keeps
+        // its pixel size wherever the width term binds.
+        var scale = Math.Min((width - 24) / Math.Max(1.8, textWidth), (height - 24) / stackHeight);
         var centerY = height - 12 - (groundReserve + symbolSize / 2 + Math.Max(0, preview.HeightOffset)) * scale;
         var symbolY = centerY - symbolSize / 2 * scale;
         var symbolX = width / 2.0 - symbolSize / 2 * scale;
@@ -450,9 +452,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         if (_appearance.IsLocked) return false;
         if (!TryReadValidated("size", 25, 300, "scene-size", out var percent)) return false;
         _appearance.IndicatorScale = percent / 100;
-        if (!TryReadValidated("bubblesize", 40, 200, "scene-bubble-size", out var bubblePercent)) return false;
+        if (!TryReadValidated("bubblesize", 40, 350, "scene-bubble-size", out var bubblePercent)) return false;
         _appearance.BubbleScale = bubblePercent / 100;
-        if (!TryReadValidated("height", -0.5f, 4, "scene-height", out var height)) return false;
+        if (!TryReadValidated("height", -2, 4, "scene-height", out var height)) return false;
         _appearance.HeightOffset = height;
         if (_nearbyLayout && !_appearance.UnlimitedTextDistance)
         {
