@@ -21,3 +21,5 @@ QA package 2026-09-10 (third): commit c24ee38, thebasics_5_9_1.zip SHA256 899aaf
 QA package 2026-09-10 (fourth, CI-green head): commit 54b51f7, thebasics_5_9_1.zip SHA256 57f1bae4cae31ec9..., deployed to the test server (restart 05:36Z, RunGame reached, no mod errors) and to Profile2/Profile3. This is the build under manual QA.
 
 QA package 2026-09-10 (fifth): commit 20d1378, thebasics_5_9_1.zip SHA256 fa99b524e0ac2bd8..., deployed to the test server (restart 06:20Z, RunGame reached, no mod errors) and to Profile2/Profile3. Addresses the first manual QA pass: reader closes on Mark as read, bubble density 200/block with size 40-350 percent and height -2..4, no reopen after a locking save, locked markers unbreakable by anyone, symbol-box outline and break decal, no Material tooltip line.
+
+QA package 2026-09-10 (sixth): commit ca3566e, thebasics_5_9_1.zip SHA256 8e0ff9dc0c975dc2..., deployed to the test server (restart 06:33Z, RunGame reached, no mod errors) and to Profile2/Profile3. Locked-break warning on the client and the rebalanced preview. BASIC reported the rest of the smoke test looking good.
