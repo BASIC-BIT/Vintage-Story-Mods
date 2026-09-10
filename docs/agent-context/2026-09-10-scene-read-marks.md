@@ -17,3 +17,5 @@ QA package 2026-09-10: commits 101f0f2..d0d8881, thebasics_5_9_1.zip SHA256 fa31
 QA package 2026-09-10 (second): commits eb050f3..80beee3 on top, thebasics_5_9_1.zip SHA256 f876286e0b5a5b01..., deployed to the test server (restart 02:20Z, RunGame reached, no mod errors) and to Profile2/Profile3. Adds the unsaved-changes prompt, preview zoom, Save & Close bottom-right, symbol-row spacing, dampened bobbing when read, and the reader header.
 
 QA package 2026-09-10 (third): commit c24ee38, thebasics_5_9_1.zip SHA256 899aaf5ac87bd6b7..., deployed to the test server (restart 03:22Z, RunGame reached, no mod errors) and to Profile2/Profile3. Bubble now rendered screen-space in the Ortho pass with a line-of-sight gate; inspector no longer repeats the title.
+
+QA package 2026-09-10 (fourth, CI-green head): commit 54b51f7, thebasics_5_9_1.zip SHA256 57f1bae4cae31ec9..., deployed to the test server (restart 05:36Z, RunGame reached, no mod errors) and to Profile2/Profile3. This is the build under manual QA.
