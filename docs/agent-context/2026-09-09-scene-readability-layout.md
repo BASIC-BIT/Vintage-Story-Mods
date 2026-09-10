@@ -32,3 +32,5 @@ QA package (half-size bubble + icon tile): thebasics_5_9_1.zip, 600362 bytes, SH
 - FEATURES.md, smoke-test card 6, and rp-culture Entry 6 rewritten from the code. Note from that pass: a locked marker is read-only for everyone including its creator until unlocked.
 
 QA package: thebasics_5_9_1.zip, 601879 bytes, SHA256 78142B7D0D8EEC549F1A62162C30A74570182F6A8A5987094DF35A7917B9302D. 805 tests pass, tooling check passes. Server upload and both profile copies match this hash. dotnet format whitespace is red on pre-existing lines in the tests project; not touched. Human visual acceptance pending.
+
+Polish 2026-09-10: placed markers register with the renderer on first server sync instead of at Initialize, removing the default-gold flash before the placer preferences arrive. Lock hover now reads "Lock this marker when you save. Only you or an admin can unlock it." Display-mode label is "Show bubble". QA package: thebasics_5_9_1.zip, 601960 bytes, SHA256 001CA1EB36D4F9789F0CFF69D65E42F693BDB8B1083768F110F7569E6FE44279; 805 tests pass; server, Profile2, Profile3 match.
