@@ -20,3 +20,6 @@ Review fixes: retain visited offscreen descriptions in the zero-visible render p
 QA deployment: server readback and Profile2/Profile3 packages match candidate hash. Previous packages and logs preserved under .tmp/scene-layout-qa-2026-09-09. Human visual acceptance pending.
 
 Size follow-up: 100 percent was far too large in-world, so texel density doubled from 60 to 120 GUI-scaled texels per block. A 360px panel at 100 percent is now 3 blocks wide instead of 6; the 40-200 percent range and letter-density behavior are unchanged. Preview and world share the constant.
+
+Icon follow-up: the editor now draws the selected title icon in a 22px tile above the Icon button, redrawn with the preview; empty when no icon is chosen.
+QA package (half-size bubble + icon tile): thebasics_5_9_1.zip, 600362 bytes, SHA256 476C48A3987D737D1B23FF32814F36C847E8F5CB6E0D74328025F0FF186C1E85. 803 tests pass. Server upload via SFTP (WinSCP needs Windows PowerShell 5.1, not pwsh 7) and both profile copies match this hash. Server restarted 2026-09-10 00:10 UTC. Human visual acceptance pending.
