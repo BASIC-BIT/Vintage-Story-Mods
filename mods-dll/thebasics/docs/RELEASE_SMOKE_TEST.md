@@ -80,7 +80,7 @@ Run this after the ModDB release is published. It verifies the player-facing ins
       - Watch for: refused placement, wrong rotation, a marker you cannot target, or the wall variant floating.
 
    3. **Symbol, Color, Size, Height, Bobbing** (P1)
-      - Do: Shift-right-click to edit. Step through all six symbols (exclamation, question, information, dot, ring, diamond) and all five colors (Yellow, White, Blue, Green, Red). Open `Other icons...`, pick a catalog icon, change color, save and reopen, then pick a symbol tile again. Set indicator size to 25, 100, and 300 percent, height offset to -0.5, 0, and 4, then toggle Idle bobbing off and on. Save and reopen each time. Target the marker and look away.
+      - Do: Shift-right-click to edit. Step through all six symbols (exclamation, question, information, dot, ring, diamond) and all five colors (Yellow, White, Blue, Green, Red). Open `Other icons...`, pick a catalog icon, change color, save and reopen, then pick a symbol tile again. Set indicator size to 25, 100, and 300 percent, height offset to -0.5, 0, and 4, then toggle Idle bobbing off and on. Save & Close and reopen each time. Target the marker and look away.
       - Expect: Selector tiles draw real artwork matching the preview and the world. A catalog icon replaces the billboard symbol in the preview and the world, takes the chosen color, shows in the tile beside the button, and leaves every symbol tile unlit until you pick one, which clears it. Every indicator uses the same steady translucent style; there is no effect or hologram picker. Size and height apply independently. Bobbing moves only the symbol, about 0.05 blocks on a four-second cycle, and the symbol grows slightly while targeted. Out-of-range size or height values are refused with a localized error.
       - Watch for: a blank or font-glyph tile, an empty billboard where a catalog icon failed to draw instead of the fallback symbol, a symbol picker left open after the editor closes, colors not repainting, the bubble drifting with the bob or the target growth, or a saved value snapping back on reopen.
 
@@ -95,8 +95,8 @@ Run this after the ModDB release is published. It verifies the player-facing ins
       - Watch for: shrinking letters in long bubbles, an icon jumping above the title, a cleared icon reappearing after save or pickup, unclickable catalog tiles, or a picker left open after the editor closes.
 
    6. **Read Versus Edit** (P0)
-      - Do: Plain right-click a written marker in every display mode, including as a claim visitor. Shift-right-click it. Shift-right-click a written marker while holding it. Try editing from more than 8 blocks away and from outside the claim.
-      - Expect: Plain right-click always opens the full text in the book-style reader; Shift-right-click opens the editor only with claim build access and within 8 blocks. The held item reads in the same book view. The inspector shows the title and a short preview. Refusals are explicit localized errors.
+      - Do: Plain right-click a written marker in every display mode, including as a claim visitor. Shift-right-click it. Shift-right-click a written marker while holding it. Try editing from more than 8 blocks away and from outside the claim. Open the editor, change the title, and try Cancel, the title-bar X, and Escape.
+      - Expect: Plain right-click always opens the full text in the book-style reader; Shift-right-click opens the editor only with claim build access and within 8 blocks. The held item reads in the same book view. The inspector shows the title and a short preview. Closing the editor with unsaved changes asks for confirmation before discarding them, and a read-only locked marker never asks. Refusals are explicit localized errors.
       - Watch for: right-click opening the editor, an editor opening for an unauthorized player, a silent refusal, or claim bypass.
 
    7. **Read Marks** (P1)
@@ -105,8 +105,8 @@ Run this after the ModDB release is published. It verifies the player-facing ins
       - Watch for: the bubble still drawn for a reader, the indicator hidden instead of dimmed, one player's mark affecting the other, a stale button label, a read state lost on relog or surviving a save, or a Clear read that anyone can press.
 
    8. **Creator Lock** (P0)
-      - Do: As A, edit a marker, click the top-right lock glyph, and Save. Repeat once clicking the glyph and then Cancel. As B, open, read, break, and try to lock the marker. Keep a stale editor open on B while A locks.
-      - Expect: The armed glyph locks the marker on Save; Cancel discards the pending lock with no change. No padlock item is involved. A locked marker opens read-only for everyone, A included, with every field and Save disabled. B cannot lock, edit, break, or pick it up, and a stale editor's save is rejected.
+      - Do: As A, edit a marker, click the top-right lock glyph, and Save & Close. Repeat once clicking the glyph and then Cancel. As B, open, read, break, and try to lock the marker. Keep a stale editor open on B while A locks.
+      - Expect: The armed glyph locks the marker on Save & Close; Cancel discards the pending lock with no change. No padlock item is involved. A locked marker opens read-only for everyone, A included, with every field and Save & Close disabled. B cannot lock, edit, break, or pick it up, and a stale editor's save is rejected.
       - Watch for: a Save & lock button still present, a non-creator arming the lock, a stale editor bypassing the lock, or the lock glyph showing the wrong state.
 
    9. **Unlock** (P0)

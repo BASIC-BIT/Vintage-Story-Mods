@@ -217,7 +217,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
-        _dialog?.TryClose();
+        _dialog?.TryCloseWithoutPrompt();
         _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), packet.CanManageLock, (saved, lockAfterSave) =>
         {
             var savedPacket = ToPacket(saved);
@@ -329,7 +329,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     private void CloseDialog()
     {
-        _dialog?.TryClose();
+        _dialog?.TryCloseWithoutPrompt();
         _dialog = null;
     }
 
