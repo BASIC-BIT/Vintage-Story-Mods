@@ -146,6 +146,23 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddDropDown(kindValues, kindNames, (int)data.Display, (_, _) => OnDisplayModeChanged(), kindBounds, "kind")
             .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
             .AddTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
+            ;
+        ComposeRightColumn(data, top, textRow);
+        ComposeBottomRows(data, top, buttonY);
+        for (var index = 0; index < _symbolShapes.Length; index++)
+        {
+            var symbolIndex = index;
+            SingleComposer.AddSceneDrawing(ElementBounds.Fixed(534 + index * 44, top + 252, 32, 32),
+                (ctx, surface, _) => SceneMarkerVisuals.Draw(ctx, _symbolShapes[symbolIndex], 0, 0, surface.Width,
+                    _appearance.Color, (SceneMarkerSymbol)symbolIndex), "symbolart-" + index);
+        }
+        SingleComposer.EndChildElements().Compose(focusFirstElement: false);
+        ApplyValues(data);
+    }
+
+    private void ComposeRightColumn(SceneDescriptionData data, double top, int textRow)
+    {
+        SingleComposer
             .AddSceneDrawing(ElementBounds.Fixed(530, top + 46, 260, 166), DrawPreview, "preview")
             .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212, 260, 22))
             .AddTextToggleButtons(Enumerable.Repeat(string.Empty, _symbolShapes.Length).ToArray(), CairoFont.WhiteSmallText().WithFontSize(26),
@@ -182,6 +199,12 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddNumberInput(ElementBounds.Fixed(690, top + 490 - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
             .AddStaticText(Lang.Get("thebasics:scene-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 535 - textRow, 150, 22))
             .AddNumberInput(ElementBounds.Fixed(690, top + 530 - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
+            ;
+    }
+
+    private void ComposeBottomRows(SceneDescriptionData data, double top, double buttonY)
+    {
+        SingleComposer
             .AddStaticText(Lang.Get("thebasics:scene-bubble-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 180, 22))
             .AddNumberInput(ElementBounds.Fixed(185, top + 444, 80, 30), _ => RefreshPreview(), CairoFont.TextInput(), "bubblesize")
             .AddSmallButton(Lang.Get("thebasics:scene-icon-button"), OpenIconPicker, ElementBounds.Fixed(0, top + 24, 78, 30), key: "titleicon")
@@ -197,15 +220,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddSceneDrawing(ElementBounds.Fixed(756, top + 4, 24, 24), DrawLock, "lockart")
             .AddHoverText(Lang.Get(data.IsLocked ? "thebasics:scene-unlock" : "thebasics:scene-lock-on-save"), CairoFont.WhiteSmallText(), 250, ElementBounds.Fixed(750, top, 36, 32))
             ;
-        for (var index = 0; index < _symbolShapes.Length; index++)
-        {
-            var symbolIndex = index;
-            SingleComposer.AddSceneDrawing(ElementBounds.Fixed(534 + index * 44, top + 252, 32, 32),
-                (ctx, surface, _) => SceneMarkerVisuals.Draw(ctx, _symbolShapes[symbolIndex], 0, 0, surface.Width,
-                    _appearance.Color, (SceneMarkerSymbol)symbolIndex), "symbolart-" + index);
-        }
-        SingleComposer.EndChildElements().Compose(focusFirstElement: false);
+    }
 
+    private void ApplyValues(SceneDescriptionData data)
+    {
         SingleComposer.ToggleButtonsSetValue("symbol", data.SymbolIconName.Length > 0 ? -1 : (int)data.Symbol);
         SingleComposer.GetNumberInput("distance").SetValue(data.IconDistance.ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetSwitch("unlimited").SetValue(data.UnlimitedIconDistance);
@@ -414,50 +432,38 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         return true;
     }
 
+    // The error key doubles as the lang key of the message that goes with it.
+    private bool TryReadValidated(string key, float min, float max, string errorKey, out float value)
+    {
+        if (float.TryParse(SingleComposer.GetNumberInput(key).GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
+            float.IsFinite(value) && value >= min && value <= max)
+        {
+            return true;
+        }
+
+        capi.TriggerIngameError(this, errorKey, Lang.Get("thebasics:" + errorKey + "-invalid"));
+        return false;
+    }
+
     private bool OnSave()
     {
         if (_appearance.IsLocked) return false;
-        if (!float.TryParse(SingleComposer.GetNumberInput("size").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var percent) ||
-            !float.IsFinite(percent) || percent < 25 || percent > 300)
-        {
-            capi.TriggerIngameError(this, "scene-size", Lang.Get("thebasics:scene-size-invalid"));
-            return false;
-        }
+        if (!TryReadValidated("size", 25, 300, "scene-size", out var percent)) return false;
         _appearance.IndicatorScale = percent / 100;
-        if (!float.TryParse(SingleComposer.GetNumberInput("bubblesize").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var bubblePercent) ||
-            !float.IsFinite(bubblePercent) || bubblePercent < 40 || bubblePercent > 200)
-        {
-            capi.TriggerIngameError(this, "scene-bubble-size", Lang.Get("thebasics:scene-bubble-size-invalid"));
-            return false;
-        }
+        if (!TryReadValidated("bubblesize", 40, 200, "scene-bubble-size", out var bubblePercent)) return false;
         _appearance.BubbleScale = bubblePercent / 100;
-        if (!float.TryParse(SingleComposer.GetNumberInput("height").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var height) ||
-            !float.IsFinite(height) || height < -0.5f || height > 4)
-        {
-            capi.TriggerIngameError(this, "scene-height", Lang.Get("thebasics:scene-height-invalid"));
-            return false;
-        }
+        if (!TryReadValidated("height", -0.5f, 4, "scene-height", out var height)) return false;
         _appearance.HeightOffset = height;
         if (_nearbyLayout && !_appearance.UnlimitedTextDistance)
         {
-            if (!float.TryParse(SingleComposer.GetNumberInput("textdistance").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var textDistance) ||
-                !float.IsFinite(textDistance) || textDistance < 1 || textDistance > 1024)
-            {
-                capi.TriggerIngameError(this, "scene-distance", Lang.Get("thebasics:scene-distance-invalid"));
-                return false;
-            }
+            if (!TryReadValidated("textdistance", 1, 1024, "scene-distance", out var textDistance)) return false;
             _appearance.TextDistance = textDistance;
         }
-        var usesDistance = !_appearance.UnlimitedIconDistance;
-        if (usesDistance &&
-            (!float.TryParse(SingleComposer.GetNumberInput("distance").GetText(), NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var distance) || !float.IsFinite(distance) || distance < 1 || distance > 1024))
+        if (!_appearance.UnlimitedIconDistance)
         {
-            capi.TriggerIngameError(this, "scene-distance", Lang.Get("thebasics:scene-distance-invalid"));
-            return false;
+            if (!TryReadValidated("distance", 1, 1024, "scene-distance", out var distance)) return false;
+            _appearance.IconDistance = distance;
         }
-        _appearance.IconDistance = !usesDistance ? _appearance.IconDistance :
-            float.Parse(SingleComposer.GetNumberInput("distance").GetText(), CultureInfo.InvariantCulture);
         var data = BuildDraft().Normalize();
 
         _closing = true;

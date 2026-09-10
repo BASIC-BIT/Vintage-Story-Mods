@@ -104,48 +104,63 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
-        if (packetId == UnlockPacketId && Api.Side == EnumAppSide.Server)
-        {
-            if (TryUnlock(player)) OpenEditor(player);
-            else (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
-            return;
-        }
-        // Marking a marker read is a personal preference, so it needs no edit permission.
-        if (packetId is MarkReadPacketId or MarkUnreadPacketId && Api.Side == EnumAppSide.Server)
-        {
-            if (player is not IServerPlayer readingPlayer) return;
-            // Markers placed before read marks existed carry no stamp; give them one on first use.
-            if (packetId == MarkReadPacketId && Data.ReadStamp == 0)
-            {
-                Data.Stamp();
-                MarkDirty(redrawOnClient: true);
-                Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
-            }
+        if (Api.Side != EnumAppSide.Server) return;
 
-            SetReadMark(readingPlayer, packetId == MarkReadPacketId ? Data.ReadStamp : 0);
-            return;
-        }
-
-        if (packetId == ClearReadPacketId && Api.Side == EnumAppSide.Server)
+        switch (packetId)
         {
-            if (!CanEdit(player) || !IsWithinEditDistance(player))
-            {
-                (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+            case UnlockPacketId:
+                HandleUnlock(player);
                 return;
-            }
+            case MarkReadPacketId:
+            case MarkUnreadPacketId:
+                HandleReadMark(player, packetId);
+                return;
+            case ClearReadPacketId:
+                HandleClearRead(player);
+                return;
+            case SaveEditorPacketId:
+                HandleSave(player, data);
+                return;
+        }
+    }
 
+    private void HandleUnlock(IPlayer player)
+    {
+        if (TryUnlock(player)) OpenEditor(player);
+        else (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+    }
+
+    // Marking a marker read is a personal preference, so it needs no edit permission.
+    private void HandleReadMark(IPlayer player, int packetId)
+    {
+        if (player is not IServerPlayer readingPlayer) return;
+        // Markers placed before read marks existed carry no stamp; give them one on first use.
+        if (packetId == MarkReadPacketId && Data.ReadStamp == 0)
+        {
             Data.Stamp();
             MarkDirty(redrawOnClient: true);
             Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
-            Api.World.Logger.Audit("{0} cleared the read marks on a scene marker at {1}.", player.PlayerName, Pos);
-            return;
         }
 
-        if (packetId != SaveEditorPacketId || Api.Side != EnumAppSide.Server)
+        SetReadMark(readingPlayer, packetId == MarkReadPacketId ? Data.ReadStamp : 0);
+    }
+
+    private void HandleClearRead(IPlayer player)
+    {
+        if (!CanEdit(player) || !IsWithinEditDistance(player))
         {
+            (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
             return;
         }
 
+        Data.Stamp();
+        MarkDirty(redrawOnClient: true);
+        Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
+        Api.World.Logger.Audit("{0} cleared the read marks on a scene marker at {1}.", player.PlayerName, Pos);
+    }
+
+    private void HandleSave(IPlayer player, byte[] data)
+    {
         if (!CanEdit(player))
         {
             (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
