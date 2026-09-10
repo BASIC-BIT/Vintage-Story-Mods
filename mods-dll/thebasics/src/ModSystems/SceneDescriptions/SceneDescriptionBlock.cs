@@ -45,6 +45,14 @@ public sealed class SceneDescriptionBlock : BlockSign
 
     public override bool TryPlaceBlock(IWorldAccessor world, IPlayer byPlayer, ItemStack itemStack, BlockSelection blockSelection, ref string failureCode)
     {
+        if (!SceneDescriptionSystem.SceneMarkersEnabled(api))
+        {
+            // Both sides run this, so the client refuses its own prediction and can say why.
+            failureCode = "__ignore__";
+            (api as ICoreClientAPI)?.TriggerIngameError(this, "scene-markers-disabled", Lang.Get("thebasics:scene-markers-disabled"));
+            return false;
+        }
+
         var placed = base.TryPlaceBlock(world, byPlayer, itemStack, blockSelection, ref failureCode);
         if (placed && world.Side == EnumAppSide.Server && world.BlockAccessor.GetBlockEntity(blockSelection.Position) is SceneDescriptionBlockEntity blockEntity)
         {

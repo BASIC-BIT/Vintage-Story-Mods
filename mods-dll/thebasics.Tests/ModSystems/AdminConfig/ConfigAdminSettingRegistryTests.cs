@@ -445,6 +445,21 @@ public class ConfigAdminSettingRegistryTests
     }
 
     [Fact]
+    public void SceneMarkerSetting_IsRegisteredAsRestartRequiredAndDefaultsOn()
+    {
+        // Restart-required on purpose: the grid recipe is dropped during asset loading and the
+        // client overlay is decided at render setup, so a live flip would not take effect.
+        var config = CreateConfig();
+        var setting = GetSetting("EnableSceneMarkers");
+
+        setting.Group.Should().Be("Chat/RP");
+        setting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.RestartRequired);
+        config.EnableSceneMarkers.Should().BeTrue();
+        setting.TrySetValue(config, "false", out var error).Should().BeTrue(error);
+        config.EnableSceneMarkers.Should().BeFalse();
+    }
+
+    [Fact]
     public void SightBlockOverrideSettings_AreOptionalLivePatternLists()
     {
         var config = CreateConfig();

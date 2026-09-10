@@ -64,6 +64,13 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
+        // The dialog only ever opens from this packet, so refusing here is also the client gate.
+        if (!SceneDescriptionSystem.SceneMarkersEnabled(Api))
+        {
+            serverPlayer.SendIngameError("scene-markers-disabled", Lang.Get("thebasics:scene-markers-disabled"));
+            return;
+        }
+
         if (!HasClaimAccess(player) || !IsWithinEditDistance(player))
         {
             serverPlayer.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
@@ -79,6 +86,12 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     public override void OnReceivedClientPacket(IPlayer player, int packetId, byte[] data)
     {
+        if (Api.Side == EnumAppSide.Server && !SceneDescriptionSystem.SceneMarkersEnabled(Api))
+        {
+            (player as IServerPlayer)?.SendIngameError("scene-markers-disabled", Lang.Get("thebasics:scene-markers-disabled"));
+            return;
+        }
+
         if (packetId == UnlockPacketId && Api.Side == EnumAppSide.Server)
         {
             if (TryUnlock(player)) OpenEditor(player);

@@ -40,7 +40,10 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
     {
         var player = _api.World?.Player?.Entity;
-        if (stage != EnumRenderStage.Opaque || player == null || _markers.Count == 0) return;
+        // Gated here rather than at registration: the synced server config arrives after the chunks
+        // around the player, so there is nothing to read yet when this renderer is registered.
+        if (stage != EnumRenderStage.Opaque || player == null || _markers.Count == 0 ||
+            !SceneDescriptionSystem.SceneMarkersEnabled(_api)) return;
         var render = _api.Render;
         _shownDescriptions.Clear();
         GatherVisibleIcons(deltaTime);

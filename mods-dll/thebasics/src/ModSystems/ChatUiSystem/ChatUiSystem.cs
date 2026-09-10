@@ -834,6 +834,10 @@ public class ChatUiSystem : ModSystem
 
     internal static bool IsCustomNametagEnabled() => _config?.UseCustomNametagRenderer != false;
 
+    // Defaults to enabled: the synced config arrives after nearby chunks, so an unknown value must
+    // not blank out markers on a server that has them on.
+    internal static bool AreSceneMarkersEnabled() => _config?.EnableSceneMarkers != false;
+
     internal static bool IsHeadshotInNametagEnabled() => _config?.EnableCharacterHeadshots == true && _config?.ShowHeadshotInNametag == true;
 
     // Cairo-pixel size — VS's distance scaling shrinks the on-screen size from here.

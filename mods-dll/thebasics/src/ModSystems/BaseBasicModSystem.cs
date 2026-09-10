@@ -123,7 +123,9 @@ namespace thebasics.ModSystems
             }
         }
 
-        private static ModConfig GetOrLoadSharedConfig(ICoreServerAPI api)
+        // Internal so a plain ModSystem can read the server config before the Normal phase, when
+        // StartServerSide has not run yet. The load is cached, so calling it early changes nothing.
+        internal static ModConfig GetOrLoadSharedConfig(ICoreServerAPI api)
         {
             if (_sharedConfig == null)
             {

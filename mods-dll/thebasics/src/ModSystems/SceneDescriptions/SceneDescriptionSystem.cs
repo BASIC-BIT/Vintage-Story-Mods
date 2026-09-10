@@ -1,10 +1,12 @@
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.SceneDescriptions;
 
 public sealed class SceneDescriptionSystem : ModSystem
 {
+    private static readonly AssetLocation SceneMarkerRecipe = new("thebasics:recipes/grid/scene-marker.json");
     private ICoreClientAPI _clientApi;
     private SceneMarkerIconRenderer _iconRenderer;
     private SceneMarkerSelection _selection;
@@ -12,10 +14,27 @@ public sealed class SceneDescriptionSystem : ModSystem
     internal void Register(SceneDescriptionBlockEntity marker) { _iconRenderer?.Register(marker); _selection?.Register(marker); }
     internal void Unregister(SceneDescriptionBlockEntity marker) { _iconRenderer?.Unregister(marker); _selection?.Unregister(marker); }
 
+    // Each side reads the config the way it already has it: the server from the shared file, the
+    // client from the config the server syncs on join.
+    internal static bool SceneMarkersEnabled(ICoreAPI api) => api is ICoreServerAPI server
+        ? BaseBasicModSystem.GetOrLoadSharedConfig(server).EnableSceneMarkers
+        : ChatUiSystem.ChatUiSystem.AreSceneMarkersEnabled();
+
     public override void Start(ICoreAPI api)
     {
+        // Registered either way: an existing placed marker must not become a missing block.
         api.RegisterBlockClass("TheBasicsSceneDescriptionBlock", typeof(SceneDescriptionBlock));
         api.RegisterBlockEntityClass("TheBasicsSceneDescription", typeof(SceneDescriptionBlockEntity));
+    }
+
+    // Grid recipes are loaded in AssetsLoaded and synced to clients on connect, so dropping ours
+    // here is enough to make the marker uncraftable without touching the block itself.
+    public override void AssetsFinalize(ICoreAPI api)
+    {
+        if (api is ICoreServerAPI server && !SceneMarkersEnabled(api))
+        {
+            server.World.GridRecipes.RemoveAll(recipe => SceneMarkerRecipe.Equals(recipe.Name));
+        }
     }
 
     public override void StartClientSide(ICoreClientAPI api)

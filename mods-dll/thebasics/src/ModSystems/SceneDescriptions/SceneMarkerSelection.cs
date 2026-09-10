@@ -46,7 +46,9 @@ internal sealed class SceneMarkerSelection : IDisposable
     private void Select(Ray ray, float range, BlockFilter filter, ref BlockSelection result)
     {
         var player = _api.World.Player?.Entity;
-        if (player == null) return;
+        // Invisible markers must not be pickable either. Gated per pick for the same reason the
+        // renderer is: the synced config is not available when this patch is installed.
+        if (player == null || !SceneDescriptionSystem.SceneMarkersEnabled(_api)) return;
         var nearest = (double)range;
         if (result != null)
             nearest = Math.Min(nearest, ray.origin.DistanceTo(result.Position.ToVec3d().Add(result.HitPosition)));
