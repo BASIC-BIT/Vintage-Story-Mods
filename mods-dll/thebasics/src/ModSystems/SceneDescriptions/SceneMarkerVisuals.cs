@@ -78,9 +78,13 @@ internal static class SceneMarkerVisuals
 
     internal static void Draw(Context ctx, Shape shape, double x, double y, double size, SceneMarkerColor color = SceneMarkerColor.Gold,
         SceneMarkerSymbol symbol = SceneMarkerSymbol.Exclamation, float opacity = 1)
+        => Draw(ctx, shape, x, y, size, Palette(color), symbol, opacity);
+
+    // Taken as an rgb triple so a caller handed a colour by the GUI icon API can pass it straight through.
+    internal static void Draw(Context ctx, Shape shape, double x, double y, double size, (double R, double G, double B) rgb,
+        SceneMarkerSymbol symbol, float opacity = 1)
     {
         var unit = size / 16;
-        var rgb = Palette(color);
         ctx.Save();
         if (opacity < 1) ctx.PushGroup();
         ctx.NewPath();

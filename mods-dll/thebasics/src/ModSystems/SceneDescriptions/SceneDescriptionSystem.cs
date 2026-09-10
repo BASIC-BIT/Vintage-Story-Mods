@@ -44,7 +44,8 @@ public sealed class SceneDescriptionSystem : ModSystem
         {
             var shape = SceneMarkerVisuals.LoadShape(api, symbol);
             api.Gui.Icons.CustomIcons["thebasics-scene-title-" + ((int)symbol + 1)] =
-                (ctx, x, y, width, height, _) => SceneMarkerVisuals.Draw(ctx, shape, x, y, System.Math.Min(width, height), SceneMarkerColor.Parchment, symbol);
+                (ctx, x, y, width, height, rgba) => SceneMarkerVisuals.Draw(ctx, shape, x, y, System.Math.Min(width, height),
+                    rgba is { Length: > 2 } ? (rgba[0], rgba[1], rgba[2]) : SceneMarkerVisuals.Palette(SceneMarkerColor.Parchment), symbol);
         }
         _iconRenderer = new SceneMarkerIconRenderer(api);
         _selection = new SceneMarkerSelection(api);

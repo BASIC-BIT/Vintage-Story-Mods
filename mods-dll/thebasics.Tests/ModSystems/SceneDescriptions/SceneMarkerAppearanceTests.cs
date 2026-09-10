@@ -30,7 +30,7 @@ public class SceneMarkerAppearanceTests
     public void AppearanceSurvivesStorageAndClone(SceneMarkerAppearance appearance)
     {
         var data = new SceneDescriptionData { Appearance = appearance, Symbol = SceneMarkerSymbol.Question,
-            IconDistance = 72, UnlimitedIconDistance = true, AuthorUid = "creator", LockItemCode = "game:padlock-copper" };
+            SymbolIconName = "wpStar1", IconDistance = 72, UnlimitedIconDistance = true, AuthorUid = "creator", LockItemCode = "game:padlock-copper" };
         var tree = new TreeAttribute();
         data.Normalize();
         data.WriteTo(tree);

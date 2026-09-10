@@ -53,6 +53,10 @@ public sealed class SceneDescriptionData
 
     public SceneMarkerAppearance Appearance { get; set; } = SceneMarkerAppearance.Billboard;
     public SceneMarkerSymbol Symbol { get; set; }
+    /// <summary>Catalog icon drawn in place of <see cref="Symbol"/>. Empty means use the enum symbol.</summary>
+    public string SymbolIconName { get; set; } = string.Empty;
+    /// <summary>Identifies the drawn artwork, so a custom icon and an enum symbol never share a texture cache entry.</summary>
+    internal string SymbolIconKey => SymbolIconName.Length > 0 ? SymbolIconName : "sym:" + (int)Symbol;
     public float IconDistance { get; set; } = 24;
     public bool UnlimitedIconDistance { get; set; }
     public float TextDistance { get; set; } = 8;
@@ -130,6 +134,7 @@ public sealed class SceneDescriptionData
         Display = edited.Display;
         Appearance = edited.Appearance;
         Symbol = edited.Symbol;
+        SymbolIconName = edited.SymbolIconName;
         IconDistance = edited.IconDistance;
         UnlimitedIconDistance = edited.UnlimitedIconDistance;
         TextDistance = edited.TextDistance;
@@ -157,6 +162,7 @@ public sealed class SceneDescriptionData
         Appearance = SceneMarkerAppearance.Billboard;
         if (!Enum.IsDefined(Display)) Display = SceneDescriptionDisplay.WhenTargeted;
         if (!Enum.IsDefined(Symbol)) Symbol = SceneMarkerSymbol.Exclamation;
+        SymbolIconName = NormalizeIconName(SymbolIconName);
         IconDistance = float.IsFinite(IconDistance) ? Math.Clamp(IconDistance, 1, 1024) : 24;
         TextDistance = float.IsFinite(TextDistance) ? Math.Clamp(TextDistance, 1, 1024) : 8;
         HeightOffset = float.IsFinite(HeightOffset) ? Math.Clamp(HeightOffset, -0.5f, 4) : 0;
@@ -192,6 +198,7 @@ public sealed class SceneDescriptionData
             ReadStamp = ReadStamp,
             Appearance = Appearance,
             Symbol = Symbol,
+            SymbolIconName = SymbolIconName,
             IconDistance = IconDistance,
             UnlimitedIconDistance = UnlimitedIconDistance,
             TextDistance = TextDistance,
@@ -203,7 +210,7 @@ public sealed class SceneDescriptionData
 
     internal SceneDescriptionData AppearanceDefaults() => new SceneDescriptionData
     {
-        Symbol = Symbol, Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble, BubbleScale = BubbleScale, TitleIcon = TitleIcon, TitleIconName = TitleIconName, Display = Display, IconDistance = IconDistance,
+        Symbol = Symbol, SymbolIconName = SymbolIconName, Color = Color, Effect = Effect, IdleBobbing = IdleBobbing, ShowBodyInBubble = ShowBodyInBubble, BubbleScale = BubbleScale, TitleIcon = TitleIcon, TitleIconName = TitleIconName, Display = Display, IconDistance = IconDistance,
         UnlimitedIconDistance = UnlimitedIconDistance, TextDistance = TextDistance,
         UnlimitedTextDistance = UnlimitedTextDistance, HeightOffset = HeightOffset, IndicatorScale = IndicatorScale,
     }.Normalize();
@@ -224,6 +231,7 @@ public sealed class SceneDescriptionData
         attributes.SetString(LockItemAttribute, LockItemCode);
         attributes.SetInt("sceneAppearance", (int)Appearance);
         attributes.SetInt("sceneSymbol", (int)Symbol);
+        attributes.SetString("sceneSymbolIconName", SymbolIconName);
         attributes.SetFloat("sceneIconDistance", IconDistance);
         attributes.SetBool("sceneIconUnlimited", UnlimitedIconDistance);
         attributes.SetFloat("sceneTextDistance", TextDistance);
@@ -259,6 +267,7 @@ public sealed class SceneDescriptionData
             ReadStamp = attributes.GetLong(ReadStampAttribute, 0),
             Appearance = (SceneMarkerAppearance)attributes.GetInt("sceneAppearance"),
             Symbol = (SceneMarkerSymbol)attributes.GetInt("sceneSymbol"),
+            SymbolIconName = attributes.GetString("sceneSymbolIconName", string.Empty),
             IconDistance = attributes.GetFloat("sceneIconDistance", 24),
             UnlimitedIconDistance = attributes.GetBool("sceneIconUnlimited"),
             TextDistance = attributes.GetFloat("sceneTextDistance", attributes.GetFloat("sceneIconDistance", 24)),

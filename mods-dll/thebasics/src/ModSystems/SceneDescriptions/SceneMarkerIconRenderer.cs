@@ -13,7 +13,9 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
 {
     private readonly ICoreClientAPI _api;
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
-    private readonly Dictionary<(SceneMarkerSymbol Symbol, SceneMarkerColor Color), LoadedTexture> _icons = new();
+    // ponytail: grows once per icon and colour actually used and is only freed on dispose. Bounded by the
+    // catalog in practice; evict least-recently-used entries if a world ever puts thousands in view.
+    private readonly Dictionary<(string Icon, SceneMarkerColor Color), LoadedTexture> _icons = new();
     private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth)> _visible = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, LoadedTexture Texture)> _descriptions = new();
     private readonly HashSet<SceneDescriptionBlockEntity> _shownDescriptions = new();
@@ -66,7 +68,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             {
                 var size = 0.8f * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
                 var bob = icon.Marker.Data.IdleBobbing ? 0.05 * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / 4000)) : 0;
-                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data.Symbol, icon.Marker.Data.Color), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.IndicatorOpacity, size, size);
+                if (icon.Opacity > 0) RenderQuad(icon.Marker, GetIcon(icon.Marker.Data), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.IndicatorOpacity, size, size);
                 var targeted = _api.World.Player.CurrentBlockSelection?.Position?.Equals(icon.Marker.Pos) == true;
                 if (!icon.Marker.Data.ShouldShowDescription(targeted) || icon.TextOpacity <= 0) continue;
                 var text = GetDescription(icon.Marker);
@@ -186,15 +188,18 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         return texture;
     }
 
-    private LoadedTexture GetIcon(SceneMarkerSymbol symbol, SceneMarkerColor color)
+    private LoadedTexture GetIcon(SceneDescriptionData data)
     {
-        if (_icons.TryGetValue((symbol, color), out var icon)) return icon;
+        var key = (data.SymbolIconKey, data.Color);
+        if (_icons.TryGetValue(key, out var icon)) return icon;
         using var surface = new ImageSurface(Format.Argb32, 128, 128);
         using var ctx = new Context(surface);
-        SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, symbol), 0, 0, 128, color, symbol);
+        // A catalog icon that will not draw falls back to the enum symbol, never to an empty billboard.
+        if (data.SymbolIconName.Length == 0 || !SceneTitleIcons.Draw(_api, ctx, surface, data.SymbolIconName, data.Color))
+            SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, data.Symbol), 0, 0, 128, data.Color, data.Symbol);
         icon = new LoadedTexture(_api);
         _api.Gui.LoadOrUpdateCairoTexture(surface, true, ref icon);
-        _icons.Add((symbol, color), icon);
+        _icons.Add(key, icon);
         return icon;
     }
 

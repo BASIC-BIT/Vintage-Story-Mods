@@ -16,6 +16,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private readonly Action<SceneDescriptionData, bool> _onSave;
     private readonly Action _onClose;
     private SceneTitleIconDialog _iconPicker;
+    private SceneTitleIconDialog _symbolIconPicker;
     private bool _closing;
     private bool _lockAfterSave;
     // Whether the composed layout carries the text distance row. It only applies to the nearby mode.
@@ -50,6 +51,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     public override void OnGuiClosed()
     {
         _iconPicker?.TryClose();
+        _symbolIconPicker?.TryClose();
         base.OnGuiClosed();
         Dispose();
     }
@@ -103,8 +105,11 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddSceneDrawing(ElementBounds.Fixed(530, top + 46, 260, 166), DrawPreview, "preview")
             .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212, 260, 22))
             .AddTextToggleButtons(Enumerable.Repeat(string.Empty, _symbolShapes.Length).ToArray(), CairoFont.WhiteSmallText().WithFontSize(26),
-                index => { _appearance.Symbol = (SceneMarkerSymbol)index; RefreshPreview(); },
+                index => { _appearance.Symbol = (SceneMarkerSymbol)index; _appearance.SymbolIconName = string.Empty; RefreshPreview(); },
                 Enumerable.Range(0, 6).Select(index => ElementBounds.Fixed(530 + index * 44, top + 236, 40, 44)).ToArray(), "symbol")
+            .AddSmallButton(Lang.Get("thebasics:scene-symbol-other"), OpenSymbolIconPicker, ElementBounds.Fixed(660, top + 210, 130, 26), key: "symbolicon")
+            .AddSceneDrawing(ElementBounds.Fixed(630, top + 212, 22, 22),
+                (ctx, surface, _) => { if (_appearance.SymbolIconName.Length > 0) SceneTitleIcons.Draw(capi, ctx, surface, _appearance.SymbolIconName, _appearance.Color); }, "symboliconart")
             .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 290, 90, 22))
             .AddDropDown(new[] { "gold", "parchment", "blue", "green", "red" }, new[] { Lang.Get("thebasics:scene-color-gold"), Lang.Get("thebasics:scene-color-parchment"), Lang.Get("thebasics:scene-color-blue"), Lang.Get("thebasics:scene-color-green"), Lang.Get("thebasics:scene-color-red") }, (int)data.Color,
                 (value, _) => { _appearance.Color = value switch { "parchment" => SceneMarkerColor.Parchment, "blue" => SceneMarkerColor.Blue, "green" => SceneMarkerColor.Green, "red" => SceneMarkerColor.Red, _ => SceneMarkerColor.Gold }; RefreshPreview(); }, ElementBounds.Fixed(620, top + 288, 170, 30), "color")
@@ -152,7 +157,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         }
         SingleComposer.EndChildElements().Compose(focusFirstElement: false);
 
-        SingleComposer.ToggleButtonsSetValue("symbol", (int)data.Symbol);
+        SingleComposer.ToggleButtonsSetValue("symbol", data.SymbolIconName.Length > 0 ? -1 : (int)data.Symbol);
         SingleComposer.GetNumberInput("distance").SetValue(data.IconDistance.ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetSwitch("unlimited").SetValue(data.UnlimitedIconDistance);
         if (_nearbyLayout)
@@ -167,6 +172,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetNumberInput("bubblesize").SetValue((data.BubbleScale * 100).ToString(CultureInfo.InvariantCulture));
         SingleComposer.GetNumberInput("bubblesize").Enabled = !data.IsLocked;
         SingleComposer.GetButton("titleicon").Enabled = !data.IsLocked;
+        SingleComposer.GetButton("symbolicon").Enabled = !data.IsLocked;
         SingleComposer.GetDropDown("color").Enabled = !data.IsLocked;
         SingleComposer.GetSwitch("bobbing").SetValue(data.IdleBobbing);
         SingleComposer.GetSwitch("bobbing").Enabled = !data.IsLocked;
@@ -200,6 +206,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         }
         SingleComposer.GetSceneDrawing("preview").Redraw();
         SingleComposer.GetSceneDrawing("titleiconart").Redraw();
+        SingleComposer.GetSceneDrawing("symboliconart").Redraw();
         for (var index = 0; index < _symbolShapes.Length; index++) SingleComposer.GetSceneDrawing("symbolart-" + index).Redraw();
     }
 
@@ -267,8 +274,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var symbolSize = 0.8 * preview.IndicatorScale;
         var centerY = height - 12 - (1.8 + preview.HeightOffset) * scale;
         var symbolY = centerY - symbolSize / 2 * scale;
-        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], width / 2.0 - symbolSize / 2 * scale, symbolY, symbolSize * scale,
-            preview.Color, preview.Symbol, SceneMarkerVisuals.IndicatorOpacity);
+        var symbolX = width / 2.0 - symbolSize / 2 * scale;
+        if (!DrawSymbolIcon(ctx, preview, symbolX, symbolY, symbolSize * scale))
+            SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], symbolX, symbolY, symbolSize * scale,
+                preview.Color, preview.Symbol, SceneMarkerVisuals.IndicatorOpacity);
         if (text != null)
         {
             ctx.Save();
@@ -278,6 +287,36 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             ctx.Paint();
             ctx.Restore();
         }
+    }
+
+    // Catalog icons only draw at a whole-pixel size, so the preview renders one and scales that tile into place.
+    private bool DrawSymbolIcon(Context ctx, SceneDescriptionData preview, double x, double y, double size)
+    {
+        if (preview.SymbolIconName.Length == 0 || !(size >= 1)) return false;
+        var pixels = (int)Math.Ceiling(size);
+        using var icon = new ImageSurface(Format.Argb32, pixels, pixels);
+        using (var iconCtx = new Context(icon))
+            if (!SceneTitleIcons.Draw(capi, iconCtx, icon, preview.SymbolIconName, preview.Color)) return false;
+        ctx.Save();
+        ctx.Translate(x, y);
+        ctx.Scale(size / pixels, size / pixels);
+        ctx.SetSourceSurface(icon, 0, 0);
+        ctx.PaintWithAlpha(SceneMarkerVisuals.IndicatorOpacity);
+        ctx.Restore();
+        return true;
+    }
+
+    private bool OpenSymbolIconPicker()
+    {
+        if (_appearance.IsLocked || _symbolIconPicker != null) return false;
+        _symbolIconPicker = new SceneTitleIconDialog(capi, icon =>
+        {
+            _appearance.SymbolIconName = SceneDescriptionData.NormalizeIconName(icon);
+            // A catalog icon replaces the six-button choice, so none of those tiles stays lit beside it.
+            SingleComposer.ToggleButtonsSetValue("symbol", _appearance.SymbolIconName.Length > 0 ? -1 : (int)_appearance.Symbol);
+            RefreshPreview();
+        }, () => _symbolIconPicker = null);
+        return _symbolIconPicker.TryOpen();
     }
 
     private bool OpenIconPicker()
@@ -369,6 +408,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         {
             Appearance = _appearance.Appearance,
             Symbol = _appearance.Symbol,
+            SymbolIconName = _appearance.SymbolIconName,
             IconDistance = _appearance.IconDistance,
             UnlimitedIconDistance = _appearance.UnlimitedIconDistance,
             TextDistance = _appearance.TextDistance,

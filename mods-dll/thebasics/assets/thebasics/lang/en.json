@@ -820,6 +820,7 @@
   "scene-clear-read": "Clear read",
   "scene-clear-read-confirm": "Clear read state? Every player who marked this marker as read will see its bubble again.",
   "scene-symbol": "Symbol",
+  "scene-symbol-other": "Other icons...",
   "scene-icon-distance": "Icon distance (blocks)",
   "scene-unlimited": "Unlimited",
   "scene-distance-invalid": "Choose a distance from 1 to 1024 blocks, or Unlimited.",

@@ -20,8 +20,10 @@ internal static class SceneTitleIcons
         .Where(name => SceneDescriptionData.NormalizeIconName(name).Length > 0)
         .Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
 
-    internal static bool Draw(ICoreClientAPI api, Context ctx, ImageSurface surface, string name)
+    /// <summary><paramref name="color"/> tints the icon from the marker palette; null keeps the white catalog look.
+    internal static bool Draw(ICoreClientAPI api, Context ctx, ImageSurface surface, string name, SceneMarkerColor? color = null)
     {
+        var rgb = color.HasValue ? SceneMarkerVisuals.Palette(color.Value) : (R: 1.0, G: 1.0, B: 1.0);
         try
         {
             if (name.StartsWith("svg:", StringComparison.Ordinal))
@@ -31,9 +33,10 @@ internal static class SceneTitleIcons
                     !location.Path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) return false;
                 var asset = api.Assets.TryGet(location);
                 if (asset == null) return false;
-                api.Gui.DrawSvg(asset, surface, 0, 0, surface.Width, surface.Height, ColorUtil.WhiteArgb);
+                api.Gui.DrawSvg(asset, surface, 0, 0, surface.Width, surface.Height,
+                    ColorUtil.ToRgba(255, (int)(rgb.R * 255), (int)(rgb.G * 255), (int)(rgb.B * 255)));
             }
-            else api.Gui.Icons.DrawIcon(ctx, name, 0, 0, surface.Width, surface.Height, ColorUtil.WhiteArgbDouble);
+            else api.Gui.Icons.DrawIcon(ctx, name, 0, 0, surface.Width, surface.Height, new[] { rgb.R, rgb.G, rgb.B, 1.0 });
             return true;
         }
         catch (Exception)

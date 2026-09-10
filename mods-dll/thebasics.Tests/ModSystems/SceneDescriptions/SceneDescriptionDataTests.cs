@@ -37,6 +37,41 @@ public class SceneDescriptionDataTests
         edited.Normalize().TitleIconName.Should().BeEmpty();
         SceneDescriptionFormatter.ToFloatingVtml(restored).Should().Be("<strong>A title</strong>");
     }
+    [Theory]
+    [InlineData("wpStar1")]
+    [InlineData("svg:game:textures/icons/chat.svg")]
+    public void SymbolIconNamePersistsAndOverridesTheEnumSymbol(string name)
+    {
+        var data = new SceneDescriptionData { Symbol = SceneMarkerSymbol.Ring, SymbolIconName = name };
+        var tree = new TreeAttribute();
+        data.WriteTo(tree);
+        var restored = SceneDescriptionData.ReadFrom(tree);
+        restored.SymbolIconName.Should().Be(name);
+        restored.Symbol.Should().Be(SceneMarkerSymbol.Ring);
+        restored.SymbolIconKey.Should().Be(name);
+        restored.Clone().SymbolIconName.Should().Be(name);
+        restored.AppearanceDefaults().SymbolIconName.Should().Be(name);
+        Vintagestory.API.Util.SerializerUtil.Deserialize<SceneDescriptionEditPacket>(
+            Vintagestory.API.Util.SerializerUtil.Serialize(new SceneDescriptionEditPacket { SymbolIconName = name }))
+            .SymbolIconName.Should().Be(name);
+        var edited = new SceneDescriptionData();
+        edited.ApplyText(restored);
+        edited.SymbolIconName.Should().Be(name);
+        edited.ApplyText(new SceneDescriptionData { Symbol = SceneMarkerSymbol.Ring });
+        edited.SymbolIconName.Should().BeEmpty();
+        edited.SymbolIconKey.Should().Be("sym:" + (int)SceneMarkerSymbol.Ring);
+    }
+
+    [Fact]
+    public void MalformedAndMissingSymbolIconNamesFallBackToTheEnumSymbol()
+    {
+        SceneDescriptionData.ReadFrom(new TreeAttribute()).SymbolIconName.Should().BeEmpty();
+        SceneDescriptionData.ReadFrom(new TreeAttribute()).SymbolIconKey.Should().Be("sym:0");
+        new SceneDescriptionData { SymbolIconName = "bad\nname" }.Normalize().SymbolIconName.Should().BeEmpty();
+        new SceneDescriptionData { SymbolIconName = new string('x', 257) }.Normalize().SymbolIconName.Should().BeEmpty();
+        new SceneDescriptionData { SymbolIconName = "  wpHome  " }.Normalize().SymbolIconName.Should().Be("wpHome");
+    }
+
     [Fact]
     public void BubbleSizeAndTitleIconPersistIndependentlyOfIndicatorSize()
     {
