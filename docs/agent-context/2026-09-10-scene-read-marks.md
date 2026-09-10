@@ -8,9 +8,9 @@ BASIC asked for per-player "read" marks on scene markers: a read marker shows no
 - Packets: block-entity 1004 mark read, 1005 mark unread (no edit permission, server replies to that player with the authoritative stamp as 8 raw bytes), 1006 clear read (same `CanEdit` + 8-block checks as Save, then a fresh stamp and MarkDirty). `SceneReadMarksMessage` is registered last on the shared "thebasics" channel and sent right after the config on client ready.
 - UI: `SceneReadonlyBookDialog` subclasses the vanilla reader and adds one toggling button; the editor gets a Clear read button between Cancel and Save, disabled while locked, behind `GuiDialogConfirm`.
 
-Validation: 815 automated tests pass (10 new). Manual QA pending; smoke-test card 6.7 covers two players, relog, save, and clear.
+Validation: 815 automated tests pass (10 new). Manual QA pending; smoke-test card 6.8 covers two players, relog, save, and clear.
 
-Retire once PR #243 merges and smoke-test card 6.7 has passed once on the test server.
+Retire once PR #243 merges and smoke-test card 6.8 has passed once on the test server.
 
 QA package 2026-09-10: commits 101f0f2..d0d8881, thebasics_5_9_1.zip SHA256 fa3160c3b0660368..., deployed to the test server (restart 01:53Z, RunGame reached, no mod errors) and to Profile2/Profile3. Includes the symbol catalog slice and the review fixes.
 
