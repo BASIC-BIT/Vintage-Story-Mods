@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Linq;
 using Cairo;
 using Newtonsoft.Json;
+using thebasics.Gui;
 using Vintagestory.API.Common;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
@@ -145,7 +146,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddStaticText(Lang.Get("thebasics:scene-display-label"), CairoFont.WhiteSmallText(), kindLabelBounds)
             .AddDropDown(kindValues, kindNames, (int)data.Display, (_, _) => OnDisplayModeChanged(), kindBounds, "kind")
             .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
-            .AddTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
+            .AddScrollableTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
             ;
         ComposeRightColumn(data, top, textRow);
         ComposeBottomRows(data, top, buttonY);
