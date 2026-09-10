@@ -115,6 +115,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddStaticText(Lang.Get("thebasics:scene-bubble-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 180, 22))
             .AddNumberInput(ElementBounds.Fixed(185, top + 444, 80, 30), _ => RefreshPreview(), CairoFont.TextInput(), "bubblesize")
             .AddSmallButton(Lang.Get("thebasics:scene-icon-button"), OpenIconPicker, ElementBounds.Fixed(0, top + 24, 78, 30), key: "titleicon")
+            .AddSceneDrawing(ElementBounds.Fixed(28, top - 1, 22, 22), (ctx, surface, _) => { if (_appearance.TitleIconName.Length > 0) SceneTitleIcons.Draw(capi, ctx, surface, _appearance.TitleIconName); }, "titleiconart")
             .AddSwitch(value => _appearance.IdleBobbing = value, ElementBounds.Fixed(160, top + 490, 30, 30), "bobbing")
             .AddStaticText(Lang.Get("thebasics:scene-bobbing"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 494, 150, 22))
             .AddSwitch(value => { _appearance.ShowBodyInBubble = value; RefreshPreview(); }, ElementBounds.Fixed(250, top + 90, 30, 30), "showbody")
@@ -175,6 +176,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetNumberInput("textdistance").Enabled = !_appearance.IsLocked && nearby && !_appearance.UnlimitedTextDistance;
         SingleComposer.GetSwitch("textunlimited").Enabled = !_appearance.IsLocked && nearby;
         SingleComposer.GetSceneDrawing("preview").Redraw();
+        SingleComposer.GetSceneDrawing("titleiconart").Redraw();
         for (var index = 0; index < _symbolShapes.Length; index++) SingleComposer.GetSceneDrawing("symbolart-" + index).Redraw();
     }
 
