@@ -20,14 +20,19 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     private const string AppearancePreferencesKey = "thebasics-scene-appearance";
 
     private SceneDescriptionDialog _dialog;
+    // A client-side placement prediction creates this entity with default data before the server's
+    // copy (with the placer's appearance preferences) arrives, so drawing is deferred until then.
+    private bool _synced;
 
     public override void Initialize(ICoreAPI api)
     {
         base.Initialize(api);
-        if (api is ICoreClientAPI client)
-        {
-            client.ModLoader.GetModSystem<SceneDescriptionSystem>().Register(this);
-        }
+        if (_synced) RegisterAppearance();
+    }
+
+    private void RegisterAppearance()
+    {
+        if (Api is ICoreClientAPI client) client.ModLoader.GetModSystem<SceneDescriptionSystem>().Register(this);
     }
 
     public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tesselator) => true;
@@ -183,8 +188,10 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     {
         base.FromTreeAttributes(tree, worldForResolving);
         Data = SceneDescriptionData.ReadFrom(tree);
+        _synced = true;
         if (Api is ICoreClientAPI)
         {
+            RegisterAppearance();
             MarkDirty(redrawOnClient: true);
         }
     }
