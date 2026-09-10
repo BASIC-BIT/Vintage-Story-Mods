@@ -130,9 +130,9 @@ This makes scene markers adjacent to placed environment messages, but not anothe
 
 - Placed environment messages are temporary cast actions sent through chat.
 - Scene descriptions persist with a block and survive being picked up and placed again.
-- Environmental descriptions and OOC notices share an item, but need distinct presentation so an OOC instruction cannot be mistaken for fiction.
-- Existing local or global OOC chat toggles do not govern placed OOC notices. Those toggles describe conversations, while this is world-authored content.
-- Show the narration when a player deliberately looks at the marker. Persistent always-visible text recreates the visual clutter the feature is intended to replace.
+- One marker carries whatever the author writes, in-fiction description or an OOC production note, and there is no separate presentation for the two. If a note must read as out of character, the author says so in the text.
+- Existing local or global OOC chat toggles do not govern what is written on a marker. Those toggles describe conversations, while this is world-authored content.
+- Default to showing the narration only when a player deliberately looks at the marker. Always-nearby text is a per-marker opt-in with its own range and fade, because persistent always-visible text recreates the visual clutter the feature is intended to replace.
 
 Keep the implementation as its own world-content system. Reuse cast-message rendering conventions where that makes the features feel related, but do not route persistence, permissions, or editing through the chat pipeline.
 

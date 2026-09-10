@@ -190,18 +190,23 @@ Sight override entries use fully qualified `domain:path` block-code patterns wit
 Features:
 
 - Durable roleplay descriptions attached to a small physical marker, rather than literal writing rendered on a sign face.
-- A shapeless two-loose-stone recipe with no ink requirement.
+- A shapeless two-loose-stone recipe with no ink requirement. In inventory, in hand, and as a dropped item the marker shows its exclamation glyph instead of the stone base.
 - Ground and wall placement using the same familiar placement behavior as signs.
-- One consistent description style, with per-marker controls for when floating text appears.
-- Existing descriptions default to When targeted; On interaction relies on the inspector preview and full right-click reader.
-- Plain right-click reads the complete description in every display mode; Shift-right-click edits with normal land-claim build permissions. The inspector shows the title and a short preview.
-- Symbol picker with a live preview: camera-facing exclamation, question, and information billboards. Symbols gently bob by 0.05 blocks on a four-second cycle. Earlier experimental appearances automatically display as billboards.
-- Billboard distance is saved per marker (1-1024 blocks, default 24), with an Unlimited option bounded by loaded terrain. Icons fade through the outer quarter of the chosen distance and are obscured by walls. Choose When targeted (default), Always nearby (independent text range, default 8, with its own Unlimited option), or On interaction (no floating description). Long floating text is a bounded preview; the reader retains the full text. A shared live preview shows wrapping and symbol color. Gold, parchment, blue and green palettes, -0.5 to 4 block height adjustment, and gentle target growth are available. Fresh markers inherit the player's last saved appearance on that server with empty content; picked-up markers preserve their own data.
-- Title, body, presentation, and author metadata persist in the world and on the dropped item when the marker is broken and placed again.
-- Shift-right-click reading while holding a written marker.
-- Creator-owned UI locks: Save & lock saves the creator's edits and locks the marker in one action, without an item. Locked markers open read-only.
-- Only the immutable creator or a server admin (`controlserver` privilege) can unlock or break/pick up a locked marker, and normal land-claim build permissions still apply. Use Unlock in the editor.
-- Creator and lock metadata survive world reload and pickup/replacement. Editing an unlocked marker does not transfer ownership. Locked markers resist explosions.
+- Plain right-click opens the complete description in a book-style read-only reader, in every display mode. Shift-right-click opens the editor, which requires normal land-claim build permissions and standing within 8 blocks. The top-middle inspector shows the title and a short preview, and Shift-right-click reads a written marker while it is held.
+- Six-symbol indicator picker with a live preview: exclamation, question, information, solid dot, hollow ring, and diamond, drawn as camera-facing billboards. Colors are Yellow, White, Blue, Green, and Red.
+- One fixed translucent indicator style (68 percent opacity before distance fade). There is no effect or hologram picker; markers saved under the retired styles display in the current style without content or ownership changes.
+- Indicator size is adjustable from 25 to 300 percent (default 100) independently of bubble size, height offset runs from -0.5 to 4 blocks, and a per-marker Idle bobbing switch (default on) moves the symbol 0.05 blocks on a four-second cycle. The symbol grows about 10 percent while targeted; the floating bubble stays still through both animations.
+- Indicator distance is saved per marker (1-1024 blocks, default 24) with an Unlimited option bounded by loaded terrain. Indicators fade through the outer quarter of the chosen distance and are obscured by walls.
+- Three display modes for the floating bubble: When targeted (default), Always nearby (its own text distance, default 8 blocks, with its own Unlimited option, fading independently of the indicator), or On interaction (no floating bubble at all; reading and the inspector still work).
+- Bubble size scales the text and its panel together from 40 to 200 percent (default 100) at constant letter density, so a longer description grows the panel instead of shrinking the letters. Floating body text is a bounded preview (first 12 lines, 600 characters); the reader keeps the full text.
+- Optional title icon drawn to the left of a non-empty title, chosen from a searchable, paginated catalog of built-in game icons, registered mod icons, and loaded SVG textures, plus None to clear it. A reserved icon column keeps wrapping from moving the icon above the title; untitled bubbles carry no icon.
+- Show description in bubble is off by default, so the bubble shows the title only. Turning it on adds the description to the bubble.
+- Title (80 characters, single line), body (4096 characters), display mode, appearance, creator, and lock state persist in the world and on the dropped item when the marker is broken and placed again. All text is VTML-escaped in the bubble, reader, inspector, and item tooltip.
+- Fresh crafted markers inherit the player's last saved appearance on that server with empty content; picked-up markers keep their own settings.
+- Creator lock via the lock glyph at the top right of the editor: only the creator can arm it, and Save applies the lock; Cancel discards a pending lock. No padlock item is involved.
+- A locked marker opens read-only for everyone, including its creator - every field and Save are disabled until it is unlocked. The creator, or a server admin with the `controlserver` privilege, clicks the same glyph to unlock and reopen the editor editable. Land-claim build access is still required for both, and locked markers cannot be broken or picked up by anyone else.
+- Creator and lock metadata survive world reload and pickup/replacement. Editing an unlocked marker does not transfer ownership. Locked markers resist explosions. Edits and unlocks are written to the server audit log.
+- `EnableSceneMarkers` (default `true`) gates the whole feature server-side. With it set to `false`, existing markers stay in the world as plain blocks, but placement, editing, floating bubbles, indicators, and the crafting recipe are all disabled. The setting is read at startup, so changing it requires a server restart.
 
 Scene markers are independent world content. They borrow visual conventions from cast environmental messages, but do not use the RP chat pipeline or the local/global OOC chat toggles.
 
