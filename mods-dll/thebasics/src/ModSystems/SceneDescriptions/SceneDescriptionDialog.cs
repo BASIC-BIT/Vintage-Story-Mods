@@ -163,13 +163,13 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private void ComposeRightColumn(SceneDescriptionData data, double top, int textRow)
     {
         SingleComposer
-            .AddSceneDrawing(ElementBounds.Fixed(530, top + 46, 260, 166), DrawPreview, "preview")
+            .AddSceneDrawing(ElementBounds.Fixed(530, top + 46, 260, 160), DrawPreview, "preview")
             .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212, 260, 22))
             .AddTextToggleButtons(Enumerable.Repeat(string.Empty, _symbolShapes.Length).ToArray(), CairoFont.WhiteSmallText().WithFontSize(26),
                 index => { _appearance.Symbol = (SceneMarkerSymbol)index; _appearance.SymbolIconName = string.Empty; RefreshPreview(); },
                 Enumerable.Range(0, 6).Select(index => ElementBounds.Fixed(530 + index * 44, top + 246, 40, 44)).ToArray(), "symbol")
-            .AddSmallButton(Lang.Get("thebasics:scene-symbol-other"), OpenSymbolIconPicker, ElementBounds.Fixed(660, top + 210, 130, 26), key: "symbolicon")
-            .AddSceneDrawing(ElementBounds.Fixed(630, top + 212, 22, 22),
+            .AddSmallButton(Lang.Get("thebasics:scene-symbol-other"), OpenSymbolIconPicker, ElementBounds.Fixed(660, top + 212, 130, 26), key: "symbolicon")
+            .AddSceneDrawing(ElementBounds.Fixed(630, top + 214, 22, 22),
                 (ctx, surface, _) =>
                 {
                     // Mirror the billboard: a catalog icon that will not draw shows the fallback symbol instead of nothing.
