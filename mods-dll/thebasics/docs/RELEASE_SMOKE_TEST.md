@@ -106,7 +106,7 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 
    8. **Creator Lock** (P0)
       - Do: As A, edit a marker, click the top-right lock glyph, and Save & Close. Repeat once clicking the glyph and then Cancel. As B, open, read, break, and try to lock the marker. Keep a stale editor open on B while A locks. Then try to break the locked marker as A and as C, holding the pickaxe until the cracks would finish.
-      - Expect: The armed glyph locks the marker on Save & Close; Cancel discards the pending lock with no change. No padlock item is involved. A locked marker opens read-only for everyone, A included, with every field and Save & Close disabled. While locked, nobody breaks or picks it up - A and C are refused with a localized error exactly like B - and a stale editor's save is rejected.
+      - Expect: The armed glyph locks the marker on Save & Close; Cancel discards the pending lock with no change. No padlock item is involved. A locked marker opens read-only for everyone, A included, with every field and Save & Close disabled. While locked, nobody breaks or picks it up - A and C are refused with a localized error exactly like B - and a stale editor's save is rejected. Attempting to break a locked marker shows the locked message on the breaker's own client while the pickaxe is held, repeating at most about once a second rather than every tick.
       - Watch for: a Save & lock button still present, a non-creator arming the lock, a stale editor bypassing the lock, the creator or an admin breaking a locked marker, the block vanishing on the breaker's client while the server keeps it, or the lock glyph showing the wrong state.
 
    9. **Unlock** (P0)

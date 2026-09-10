@@ -337,25 +337,26 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         preview.Normalize();
         using var text = preview.ShouldShowDescription(true) ? SceneMarkerVisuals.DescriptionSurface(capi, preview) : null;
         var (textWidth, textHeight) = text == null ? (0f, 0f) : SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, preview.BubbleRenderScale);
-        var symbolSize = 0.8 * preview.IndicatorScale;
-        // Fit the stack the tile actually shows - bubble, gap, icon - over a shallow strip of ground,
-        // rather than the 1.8 blocks of empty air the world billboard hangs above.
-        const double groundReserve = 0.4;
-        var stackHeight = textHeight + 0.1 + symbolSize + groundReserve + Math.Max(0, preview.HeightOffset);
-        // 1.8 is the old 3-block floor times the 0.6 world-size change, so the preview text keeps
-        // its pixel size wherever the width term binds.
-        var scale = Math.Min((width - 24) / Math.Max(1.8, textWidth), (height - 24) / stackHeight);
-        var centerY = height - 12 - (groundReserve + symbolSize / 2 + Math.Max(0, preview.HeightOffset)) * scale;
-        var symbolY = centerY - symbolSize / 2 * scale;
-        var symbolX = width / 2.0 - symbolSize / 2 * scale;
-        if (!DrawSymbolIcon(ctx, preview, symbolX, symbolY, symbolSize * scale))
-            SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], symbolX, symbolY, symbolSize * scale,
+        // The tile is a legibility check, not a scale model. Size everything from the bubble - the part
+        // that has to stay readable - and draw the symbol at a fraction of its world size beside it.
+        const double bubbleHeightShare = 0.16;
+        const double symbolShare = 0.45;
+        var gap = text == null ? 0 : 10;
+        var scale = Math.Min((width - 24) / Math.Max(1.2, textWidth), height * bubbleHeightShare / Math.Max(textHeight, 0.001));
+        var bubbleHeight = textHeight * scale;
+        var symbolPixels = Math.Min(height * 0.4, 0.8 * preview.IndicatorScale * scale * symbolShare);
+        var top = (height - (bubbleHeight + gap + symbolPixels)) / 2;
+        // Centring hides a world height offset, so let it move the symbol under the bubble instead.
+        var symbolY = Math.Clamp(top + bubbleHeight + gap - preview.HeightOffset * scale * 0.25, 0, height - symbolPixels);
+        var symbolX = width / 2.0 - symbolPixels / 2;
+        if (!DrawSymbolIcon(ctx, preview, symbolX, symbolY, symbolPixels))
+            SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], symbolX, symbolY, symbolPixels,
                 preview.Color, preview.Symbol, SceneMarkerVisuals.IndicatorOpacity);
         if (text != null)
         {
             ctx.Save();
-            ctx.Translate((width - textWidth * scale) / 2, symbolY - (textHeight + 0.1) * scale);
-            ctx.Scale(textWidth * scale / text.Width, textHeight * scale / text.Height);
+            ctx.Translate((width - textWidth * scale) / 2, top);
+            ctx.Scale(textWidth * scale / text.Width, bubbleHeight / text.Height);
             ctx.SetSourceSurface(text, 0, 0);
             ctx.Paint();
             ctx.Restore();

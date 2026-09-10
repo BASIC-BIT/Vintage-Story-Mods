@@ -14,6 +14,7 @@ namespace thebasics.ModSystems.SceneDescriptions;
 public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
 {
     private WorldInteraction[] _interactions;
+    private long _lastBreakWarningMs;
 
     // Fixed interaction bounds include the complete idle-bob envelope without making targeting wobble.
     // The box is what the player aims at, so the outline and the break cracks are drawn on it too,
@@ -151,10 +152,24 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     {
         if (api.World.BlockAccessor.GetBlockEntity(blockSel.Position) is SceneDescriptionBlockEntity marker && BreakRefused(marker, player))
         {
+            WarnBreakRefused(marker);
             return Math.Max(remainingResistance, 1);
         }
 
         return base.OnGettingBroken(player, blockSel, itemslot, remainingResistance, dt, counter);
+    }
+
+    // The client keeps the resistance above zero, so the server never sees the attempt and never gets to
+    // explain it. Say it here instead, throttled because holding the mouse re-enters this every tick.
+    private void WarnBreakRefused(SceneDescriptionBlockEntity marker)
+    {
+        if (api is not ICoreClientAPI capi) return;
+        var now = capi.World.ElapsedMilliseconds;
+        if (now - _lastBreakWarningMs < 1500) return;
+        _lastBreakWarningMs = now;
+        var locked = marker.Data.IsLocked;
+        capi.TriggerIngameError(this, locked ? "scene-description-locked" : "scene-description-no-access",
+            Lang.Get(locked ? "thebasics:scene-description-locked-help" : "thebasics:scene-description-no-access"));
     }
 
     public override void OnBlockBroken(IWorldAccessor world, BlockPos pos, IPlayer byPlayer, float dropQuantityMultiplier = 1f)
