@@ -165,7 +165,7 @@ jobs:
         path: |
           vs-dependencies
           vs-installation
-        key: vs-deps-${{ env.VS_VERSION }}
+        key: vs-deps-${{ env.VS_VERSION }}-harmony-runtime
         
     - name: Download VS Dependencies
       if: steps.cache-vs-deps.outputs.cache-hit != 'true'

@@ -1,0 +1,522 @@
+using System;
+using System.Globalization;
+using System.Linq;
+using Cairo;
+using Newtonsoft.Json;
+using thebasics.Gui;
+using Vintagestory.API.Common;
+using Vintagestory.API.Client;
+using Vintagestory.API.Config;
+
+namespace thebasics.ModSystems.SceneDescriptions;
+
+internal sealed class SceneDescriptionDialog : GuiDialog
+{
+    private const double DialogWidth = 520;
+    private const double BodyHeight = 260;
+    private const double ButtonHeight = 30;
+    private readonly Action<SceneDescriptionData, bool> _onSave;
+    private readonly Action _onClose;
+    private SceneTitleIconDialog _iconPicker;
+    private SceneTitleIconDialog _symbolIconPicker;
+    private GuiDialogConfirm _clearReadConfirm;
+    private GuiDialogConfirm _unsavedCloseConfirm;
+    private string _loadedSnapshot;
+    private bool _forceClose;
+    private bool _closing;
+    private bool _lockAfterSave;
+    // Whether the composed layout carries the text distance row. It only applies to the nearby mode.
+    private bool _nearbyLayout;
+    private readonly bool _canManageLock;
+    private readonly Action _onUnlock;
+    private readonly Action _onClearRead;
+    private readonly SceneDescriptionData _appearance;
+    private readonly Shape[] _symbolShapes;
+
+    public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, bool canManageLock, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose) : base(capi)
+    {
+        _onSave = onSave;
+        _onUnlock = onUnlock;
+        _onClearRead = onClearRead;
+        _canManageLock = canManageLock;
+        _onClose = onClose;
+        _appearance = (data ?? new SceneDescriptionData()).Clone().Normalize();
+        _symbolShapes = Enum.GetValues<SceneMarkerSymbol>().Select(symbol => SceneMarkerVisuals.LoadShape(capi, symbol)).ToArray();
+        Compose(_appearance);
+        _loadedSnapshot = Snapshot();
+    }
+
+    public override string ToggleKeyCombinationCode => null;
+
+    public override bool PrefersUngrabbedMouse => true;
+
+    public override bool DisableMouseGrab => true;
+
+    // A fresh dialog is built per edit, so drop it from the GUI manager and free its composers on close.
+    public override bool UnregisterOnClose => true;
+
+    public override void OnGuiClosed()
+    {
+        _iconPicker?.TryClose();
+        _symbolIconPicker?.TryClose();
+        _clearReadConfirm?.TryClose();
+        _unsavedCloseConfirm?.TryClose();
+        _unsavedCloseConfirm = null;
+        base.OnGuiClosed();
+        Dispose();
+    }
+
+    public override bool TryClose()
+    {
+        // A locked marker opens read-only, so nothing there can be dirty and nothing should prompt.
+        if (!_forceClose && !_appearance.IsLocked && Snapshot() != _loadedSnapshot)
+        {
+            ConfirmCloseWithUnsavedChanges();
+            return false;
+        }
+
+        var closed = base.TryClose();
+        if (closed && !_closing)
+        {
+            _closing = true;
+            _onClose?.Invoke();
+        }
+
+        return closed;
+    }
+
+    internal void TryCloseWithoutPrompt()
+    {
+        _forceClose = true;
+        try
+        {
+            TryClose();
+        }
+        finally
+        {
+            _forceClose = false;
+        }
+    }
+
+    private string Snapshot() => SingleComposer?.Composed != true
+        ? _loadedSnapshot
+        : JsonConvert.SerializeObject(BuildDraft().Normalize()) + "|" + _lockAfterSave;
+
+    private void ConfirmCloseWithUnsavedChanges()
+    {
+        if (_unsavedCloseConfirm?.IsOpened() == true) return;
+        _unsavedCloseConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:scene-close-unsaved-confirm"), ok =>
+        {
+            _unsavedCloseConfirm = null;
+            if (ok) TryCloseWithoutPrompt();
+        });
+        _unsavedCloseConfirm.TryOpen();
+    }
+
+    private void Compose(SceneDescriptionData data)
+    {
+        var top = GuiStyle.TitleBarHeight + 12;
+        var buttonY = top + 580;
+        var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth + 290, buttonY + ButtonHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
+        var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
+        var titleLabelBounds = ElementBounds.Fixed(90, top, DialogWidth - 110, 22);
+        var titleInputBounds = ElementBounds.Fixed(90, top + 24, DialogWidth - 110, 30);
+        var kindLabelBounds = ElementBounds.Fixed(0, top + 66, 180, 22);
+        var kindBounds = ElementBounds.Fixed(0, top + 90, 220, 30);
+        var bodyLabelBounds = ElementBounds.Fixed(0, top + 132, DialogWidth - 20, 22);
+        var textAreaBounds = ElementBounds.Fixed(0, top + 156, DialogWidth - 20, BodyHeight);
+        // The text distance only applies to the nearby mode. Any other mode drops that row and pulls
+        // the right column's remaining rows up into the space it used.
+        _nearbyLayout = data.Display == SceneDescriptionDisplay.AlwaysNearby;
+        var textRow = _nearbyLayout ? 0 : 66;
+        var kindValues = new[] { "targeted", "nearby", "interaction" };
+        var kindNames = new[]
+        {
+            Lang.Get("thebasics:scene-display-targeted"),
+            Lang.Get("thebasics:scene-display-nearby"),
+            Lang.Get("thebasics:scene-display-interaction"),
+        };
+
+        SingleComposer = capi.Gui.CreateCompo("thebasics-scene-description", dialogBounds)
+            .AddShadedDialogBG(bodyBounds)
+            .AddDialogTitleBar(Lang.Get("thebasics:scene-description-editor-title"), OnTitleBarClose)
+            .BeginChildElements(bodyBounds)
+            .AddStaticText(Lang.Get("thebasics:scene-description-title-label"), CairoFont.WhiteSmallText(), titleLabelBounds)
+            .AddTextInput(titleInputBounds, _ => RefreshPreview(), CairoFont.TextInput(), "title")
+            .AddStaticText(Lang.Get("thebasics:scene-display-label"), CairoFont.WhiteSmallText(), kindLabelBounds)
+            .AddDropDown(kindValues, kindNames, (int)data.Display, (_, _) => OnDisplayModeChanged(), kindBounds, "kind")
+            .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
+            .AddScrollableTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
+            ;
+        ComposeRightColumn(data, top, textRow);
+        ComposeBottomRows(data, top, buttonY);
+        for (var index = 0; index < _symbolShapes.Length; index++)
+        {
+            var symbolIndex = index;
+            SingleComposer.AddSceneDrawing(ElementBounds.Fixed(534 + index * 44, top + 252, 32, 32),
+                (ctx, surface, _) => SceneMarkerVisuals.Draw(ctx, _symbolShapes[symbolIndex], 0, 0, surface.Width,
+                    _appearance.Color, (SceneMarkerSymbol)symbolIndex), "symbolart-" + index);
+        }
+        SingleComposer.EndChildElements().Compose(focusFirstElement: false);
+        ApplyValues(data);
+    }
+
+    private void ComposeRightColumn(SceneDescriptionData data, double top, int textRow)
+    {
+        SingleComposer
+            .AddSceneDrawing(ElementBounds.Fixed(530, top + 46, 260, 160), DrawPreview, "preview")
+            .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212, 260, 22))
+            .AddTextToggleButtons(Enumerable.Repeat(string.Empty, _symbolShapes.Length).ToArray(), CairoFont.WhiteSmallText().WithFontSize(26),
+                index => { _appearance.Symbol = (SceneMarkerSymbol)index; _appearance.SymbolIconName = string.Empty; RefreshPreview(); },
+                Enumerable.Range(0, 6).Select(index => ElementBounds.Fixed(530 + index * 44, top + 246, 40, 44)).ToArray(), "symbol")
+            .AddSmallButton(Lang.Get("thebasics:scene-symbol-other"), OpenSymbolIconPicker, ElementBounds.Fixed(660, top + 212, 130, 26), key: "symbolicon")
+            .AddSceneDrawing(ElementBounds.Fixed(630, top + 214, 22, 22),
+                (ctx, surface, _) =>
+                {
+                    // Mirror the billboard: a catalog icon that will not draw shows the fallback symbol instead of nothing.
+                    if (_appearance.SymbolIconName.Length > 0 && !SceneTitleIcons.Draw(capi, ctx, surface, _appearance.SymbolIconName, _appearance.Color))
+                        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)_appearance.Symbol], 0, 0, surface.Width, _appearance.Color, _appearance.Symbol);
+                }, "symboliconart")
+            .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 300, 90, 22))
+            .AddDropDown(new[] { "gold", "parchment", "blue", "green", "red" }, new[] { Lang.Get("thebasics:scene-color-gold"), Lang.Get("thebasics:scene-color-parchment"), Lang.Get("thebasics:scene-color-blue"), Lang.Get("thebasics:scene-color-green"), Lang.Get("thebasics:scene-color-red") }, (int)data.Color,
+                (value, _) => { _appearance.Color = value switch { "parchment" => SceneMarkerColor.Parchment, "blue" => SceneMarkerColor.Blue, "green" => SceneMarkerColor.Green, "red" => SceneMarkerColor.Red, _ => SceneMarkerColor.Gold }; RefreshPreview(); }, ElementBounds.Fixed(620, top + 298, 170, 30), "color")
+            // The icon distance fades the indicator in every mode, so its row is never dropped.
+            .AddStaticText(Lang.Get("thebasics:scene-icon-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 352, 260, 22))
+            .AddNumberInput(ElementBounds.Fixed(530, top + 376, 100, 30), null, CairoFont.TextInput(), "distance")
+            .AddSwitch(value => { _appearance.UnlimitedIconDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 376, 30, 30), "unlimited")
+            .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 378, 110, 28))
+            ;
+        if (_nearbyLayout)
+        {
+            SingleComposer
+                .AddStaticText(Lang.Get("thebasics:scene-text-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 418, 260, 22))
+                .AddNumberInput(ElementBounds.Fixed(530, top + 442, 100, 30), null, CairoFont.TextInput(), "textdistance")
+                .AddSwitch(value => { _appearance.UnlimitedTextDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 442, 30, 30), "textunlimited")
+                .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 444, 110, 28))
+                ;
+        }
+        SingleComposer
+            .AddStaticText(Lang.Get("thebasics:scene-height"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 495 - textRow, 150, 22))
+            .AddNumberInput(ElementBounds.Fixed(690, top + 490 - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
+            .AddStaticText(Lang.Get("thebasics:scene-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 535 - textRow, 150, 22))
+            .AddNumberInput(ElementBounds.Fixed(690, top + 530 - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
+            ;
+    }
+
+    private void ComposeBottomRows(SceneDescriptionData data, double top, double buttonY)
+    {
+        SingleComposer
+            .AddStaticText(Lang.Get("thebasics:scene-bubble-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 180, 22))
+            .AddNumberInput(ElementBounds.Fixed(185, top + 444, 80, 30), _ => RefreshPreview(), CairoFont.TextInput(), "bubblesize")
+            .AddSmallButton(Lang.Get("thebasics:scene-icon-button"), OpenIconPicker, ElementBounds.Fixed(0, top + 24, 78, 30), key: "titleicon")
+            .AddSceneDrawing(ElementBounds.Fixed(28, top - 1, 22, 22), (ctx, surface, _) => { if (_appearance.TitleIconName.Length > 0) SceneTitleIcons.Draw(capi, ctx, surface, _appearance.TitleIconName); }, "titleiconart")
+            .AddSwitch(value => _appearance.IdleBobbing = value, ElementBounds.Fixed(160, top + 490, 30, 30), "bobbing")
+            .AddStaticText(Lang.Get("thebasics:scene-bobbing"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 494, 150, 22))
+            .AddSwitch(value => { _appearance.ShowBodyInBubble = value; RefreshPreview(); }, ElementBounds.Fixed(250, top + 90, 30, 30), "showbody")
+            .AddStaticText(Lang.Get("thebasics:scene-show-body"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(250, top + 66, 250, 22))
+            .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
+            .AddSmallButton(Lang.Get("thebasics:scene-clear-read"), OnClearRead, ElementBounds.Fixed(140, buttonY, 140, ButtonHeight), key: "clearread")
+            .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth + 290 - 150, buttonY, 150, ButtonHeight), key: "save")
+            .AddSmallButton("", OnLockButton, ElementBounds.Fixed(750, top, 36, 32), key: "lock")
+            .AddSceneDrawing(ElementBounds.Fixed(756, top + 4, 24, 24), DrawLock, "lockart")
+            .AddHoverText(Lang.Get(data.IsLocked ? "thebasics:scene-unlock" : "thebasics:scene-lock-on-save"), CairoFont.WhiteSmallText(), 250, ElementBounds.Fixed(750, top, 36, 32))
+            ;
+    }
+
+    private void ApplyValues(SceneDescriptionData data)
+    {
+        SingleComposer.ToggleButtonsSetValue("symbol", data.SymbolIconName.Length > 0 ? -1 : (int)data.Symbol);
+        SingleComposer.GetNumberInput("distance").SetValue(data.IconDistance.ToString(CultureInfo.InvariantCulture));
+        SingleComposer.GetSwitch("unlimited").SetValue(data.UnlimitedIconDistance);
+        if (_nearbyLayout)
+        {
+            SingleComposer.GetSwitch("textunlimited").SetValue(data.UnlimitedTextDistance);
+            SingleComposer.GetNumberInput("textdistance").SetValue(data.TextDistance.ToString(CultureInfo.InvariantCulture));
+        }
+        SingleComposer.GetNumberInput("height").SetValue(data.HeightOffset.ToString(CultureInfo.InvariantCulture));
+        SingleComposer.GetNumberInput("height").Enabled = !data.IsLocked;
+        SingleComposer.GetNumberInput("size").SetValue((data.IndicatorScale * 100).ToString(CultureInfo.InvariantCulture));
+        SingleComposer.GetNumberInput("size").Enabled = !data.IsLocked;
+        SingleComposer.GetNumberInput("bubblesize").SetValue((data.BubbleScale * 100).ToString(CultureInfo.InvariantCulture));
+        SingleComposer.GetNumberInput("bubblesize").Enabled = !data.IsLocked;
+        SingleComposer.GetButton("titleicon").Enabled = !data.IsLocked;
+        SingleComposer.GetButton("symbolicon").Enabled = !data.IsLocked;
+        SingleComposer.GetDropDown("color").Enabled = !data.IsLocked;
+        SingleComposer.GetSwitch("bobbing").SetValue(data.IdleBobbing);
+        SingleComposer.GetSwitch("bobbing").Enabled = !data.IsLocked;
+        SingleComposer.GetSwitch("showbody").SetValue(data.ShowBodyInBubble);
+        SingleComposer.GetSwitch("showbody").Enabled = !data.IsLocked;
+        RefreshPreview();
+        SingleComposer.GetButton("lock").Enabled = _canManageLock;
+        SingleComposer.GetButton("save").Enabled = !data.IsLocked;
+        SingleComposer.GetButton("clearread").Enabled = !data.IsLocked;
+        SingleComposer.GetTextInput("title").Enabled = !data.IsLocked;
+        SingleComposer.GetTextArea("body").Enabled = !data.IsLocked;
+        SingleComposer.GetDropDown("kind").Enabled = !data.IsLocked;
+        SingleComposer.GetSwitch("unlimited").Enabled = !data.IsLocked;
+        for (var i = 0; i < _symbolShapes.Length; i++) SingleComposer.GetToggleButton("symbol-" + i).Enabled = !data.IsLocked;
+        SingleComposer.GetTextInput("title").SetMaxLength(SceneDescriptionData.MaxTitleLength);
+        SingleComposer.GetTextInput("title").SetValue(data.Title);
+        SingleComposer.GetTextArea("body").SetMaxLength(SceneDescriptionData.MaxBodyLength);
+        SingleComposer.GetTextArea("body").SetValue(data.Body, setCaretPosToEnd: false);
+        RefreshPreview();
+        SingleComposer.FocusElement(SingleComposer.GetTextArea("body").TabIndex);
+    }
+
+    private void RefreshPreview()
+    {
+        if (SingleComposer?.Composed != true) return;
+        SingleComposer.GetNumberInput("distance").Enabled = !_appearance.IsLocked && !_appearance.UnlimitedIconDistance;
+        if (_nearbyLayout)
+        {
+            SingleComposer.GetNumberInput("textdistance").Enabled = !_appearance.IsLocked && !_appearance.UnlimitedTextDistance;
+            SingleComposer.GetSwitch("textunlimited").Enabled = !_appearance.IsLocked;
+        }
+        SingleComposer.GetSceneDrawing("preview").Redraw();
+        SingleComposer.GetSceneDrawing("titleiconart").Redraw();
+        SingleComposer.GetSceneDrawing("symboliconart").Redraw();
+        for (var index = 0; index < _symbolShapes.Length; index++) SingleComposer.GetSceneDrawing("symbolart-" + index).Redraw();
+    }
+
+    // The distance rows appear and disappear with the mode, so that switch has to rebuild the
+    // layout. Everything the user has typed but not saved is carried into the new composer.
+    private void OnDisplayModeChanged()
+    {
+        var nearby = SelectedDisplay() == SceneDescriptionDisplay.AlwaysNearby;
+        if (nearby == _nearbyLayout)
+        {
+            RefreshPreview();
+            return;
+        }
+
+        var pending = _appearance.Clone();
+        pending.Display = SelectedDisplay();
+        pending.Title = SingleComposer.GetTextInput("title").GetText();
+        pending.Body = SingleComposer.GetTextArea("body").GetText();
+        if (TryReadNumber("height", out var height)) pending.HeightOffset = height;
+        if (TryReadNumber("size", out var size)) pending.IndicatorScale = size / 100;
+        if (TryReadNumber("bubblesize", out var bubble)) pending.BubbleScale = bubble / 100;
+        if (TryReadNumber("distance", out var iconDistance)) pending.IconDistance = iconDistance;
+        // Also written back to _appearance: once the row is gone, saving reads the text distance from
+        // there instead of from the input.
+        if (_nearbyLayout && TryReadNumber("textdistance", out var textDistance)) _appearance.TextDistance = pending.TextDistance = textDistance;
+        // Deferred: the dropdown keeps working on itself after this callback returns, and composing
+        // now would dispose the element out from under it.
+        capi.Event.EnqueueMainThreadTask(() => { if (IsOpened()) Compose(pending); }, "thebasics-scene-recompose");
+    }
+
+    private SceneDescriptionDisplay SelectedDisplay() => SingleComposer.GetDropDown("kind").SelectedValue switch
+    {
+        "nearby" => SceneDescriptionDisplay.AlwaysNearby,
+        "interaction" => SceneDescriptionDisplay.OnInteraction,
+        _ => SceneDescriptionDisplay.WhenTargeted,
+    };
+
+    private bool TryReadNumber(string key, out float value) =>
+        float.TryParse(SingleComposer.GetNumberInput(key).GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out value) && float.IsFinite(value);
+
+    private void DrawPreview(Context ctx, ImageSurface surface, ElementBounds bounds)
+    {
+        var width = surface.Width;
+        var height = surface.Height;
+        ctx.SetSourceRGBA(0.07, 0.09, 0.12, 0.9);
+        ctx.Paint();
+        var preview = _appearance.Clone();
+        if (SingleComposer?.Composed == true)
+        {
+            preview.Title = SingleComposer.GetTextInput("title").GetText();
+            preview.Body = SingleComposer.GetTextArea("body").GetText();
+            preview.Display = SingleComposer.GetDropDown("kind").SelectedValue == "interaction"
+                ? SceneDescriptionDisplay.OnInteraction : SceneDescriptionDisplay.WhenTargeted;
+            if (float.TryParse(SingleComposer.GetNumberInput("height").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var offset))
+                preview.HeightOffset = offset;
+            if (float.TryParse(SingleComposer.GetNumberInput("size").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var percent))
+                preview.IndicatorScale = percent / 100;
+            if (float.TryParse(SingleComposer.GetNumberInput("bubblesize").GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out var bubblePercent))
+                preview.BubbleScale = bubblePercent / 100;
+        }
+        preview.Normalize();
+        using var text = preview.ShouldShowDescription(true) ? SceneMarkerVisuals.DescriptionSurface(capi, preview) : null;
+        var (textWidth, textHeight) = text == null ? (0f, 0f) : SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, preview.BubbleRenderScale);
+        // The tile is a legibility check, not a scale model. Size everything from the bubble - the part
+        // that has to stay readable - and draw the symbol at a fraction of its world size beside it.
+        const double bubbleHeightShare = 0.16;
+        const double symbolShare = 0.675;
+        var gap = text == null ? 0 : 10;
+        var scale = Math.Min((width - 24) / Math.Max(1.2, textWidth), height * bubbleHeightShare / Math.Max(textHeight, 0.001));
+        var bubbleHeight = textHeight * scale;
+        var symbolPixels = Math.Min(height * 0.4, SceneDescriptionData.IndicatorBlocks * preview.IndicatorScale * scale * symbolShare);
+        var stackHeight = bubbleHeight + gap + symbolPixels;
+        // Height offset raises the whole marker in the world, bubble included, so it moves the centred stack here too.
+        var top = Math.Clamp((height - stackHeight) / 2 - preview.HeightOffset * scale * 0.1, 0, Math.Max(0, height - stackHeight));
+        var symbolY = top + bubbleHeight + gap;
+        var symbolX = width / 2.0 - symbolPixels / 2;
+        if (!DrawSymbolIcon(ctx, preview, symbolX, symbolY, symbolPixels))
+            SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], symbolX, symbolY, symbolPixels,
+                preview.Color, preview.Symbol, SceneMarkerVisuals.IndicatorOpacity);
+        if (text != null)
+        {
+            ctx.Save();
+            ctx.Translate((width - textWidth * scale) / 2, top);
+            ctx.Scale(textWidth * scale / text.Width, bubbleHeight / text.Height);
+            ctx.SetSourceSurface(text, 0, 0);
+            ctx.Paint();
+            ctx.Restore();
+        }
+    }
+
+    // Catalog icons only draw at a whole-pixel size, so the preview renders one and scales that tile into place.
+    private bool DrawSymbolIcon(Context ctx, SceneDescriptionData preview, double x, double y, double size)
+    {
+        if (preview.SymbolIconName.Length == 0 || !(size >= 1)) return false;
+        var pixels = (int)Math.Ceiling(size);
+        using var icon = new ImageSurface(Format.Argb32, pixels, pixels);
+        using (var iconCtx = new Context(icon))
+            if (!SceneTitleIcons.Draw(capi, iconCtx, icon, preview.SymbolIconName, preview.Color)) return false;
+        ctx.Save();
+        ctx.Translate(x, y);
+        ctx.Scale(size / pixels, size / pixels);
+        ctx.SetSourceSurface(icon, 0, 0);
+        ctx.PaintWithAlpha(SceneMarkerVisuals.IndicatorOpacity);
+        ctx.Restore();
+        return true;
+    }
+
+    private bool OpenSymbolIconPicker()
+    {
+        if (_appearance.IsLocked || _symbolIconPicker != null) return false;
+        _symbolIconPicker = new SceneTitleIconDialog(capi, icon =>
+        {
+            _appearance.SymbolIconName = SceneDescriptionData.NormalizeIconName(icon);
+            // A catalog icon replaces the six-button choice, so none of those tiles stays lit beside it.
+            SingleComposer.ToggleButtonsSetValue("symbol", _appearance.SymbolIconName.Length > 0 ? -1 : (int)_appearance.Symbol);
+            RefreshPreview();
+        }, () => _symbolIconPicker = null);
+        return _symbolIconPicker.TryOpen();
+    }
+
+    private bool OpenIconPicker()
+    {
+        if (_appearance.IsLocked || _iconPicker != null) return false;
+        _iconPicker = new SceneTitleIconDialog(capi, icon => { _appearance.TitleIcon = 0; _appearance.TitleIconName = icon; RefreshPreview(); }, () => _iconPicker = null);
+        return _iconPicker.TryOpen();
+    }
+
+    private bool OnClearRead()
+    {
+        if (_appearance.IsLocked) return false;
+        _clearReadConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:scene-clear-read-confirm"),
+            confirmed => { _clearReadConfirm = null; if (confirmed) _onClearRead?.Invoke(); });
+        _clearReadConfirm.TryOpen();
+        return true;
+    }
+
+    private void DrawLock(Context ctx, ImageSurface surface, ElementBounds bounds)
+    {
+        ctx.Scale(surface.Width / 24.0, surface.Height / 24.0);
+        ctx.SetSourceRGBA(1, 1, 1, _canManageLock ? 1 : 0.4);
+        ctx.LineWidth = 2;
+        ctx.Rectangle(5, 11, 14, 11);
+        ctx.Stroke();
+        var closed = _appearance.IsLocked || _lockAfterSave;
+        ctx.Arc(closed ? 12 : 16, 10, 5, Math.PI, Math.PI * 2);
+        ctx.Stroke();
+    }
+    private bool OnLockButton()
+    {
+        if (!_canManageLock) return false;
+        if (!_appearance.IsLocked)
+        {
+            _lockAfterSave = !_lockAfterSave;
+            SingleComposer.GetSceneDrawing("lockart").Redraw();
+            return true;
+        }
+        _closing = true;
+        base.TryClose();
+        _onUnlock?.Invoke();
+        return true;
+    }
+
+    // The error key doubles as the lang key of the message that goes with it.
+    private bool TryReadValidated(string key, float min, float max, string errorKey, out float value)
+    {
+        if (float.TryParse(SingleComposer.GetNumberInput(key).GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
+            float.IsFinite(value) && value >= min && value <= max)
+        {
+            return true;
+        }
+
+        capi.TriggerIngameError(this, errorKey, Lang.Get("thebasics:" + errorKey + "-invalid"));
+        return false;
+    }
+
+    private bool OnSave()
+    {
+        if (_appearance.IsLocked) return false;
+        if (!TryReadValidated("size", 25, 300, "scene-size", out var percent)) return false;
+        _appearance.IndicatorScale = percent / 100;
+        if (!TryReadValidated("bubblesize", 40, 350, "scene-bubble-size", out var bubblePercent)) return false;
+        _appearance.BubbleScale = bubblePercent / 100;
+        if (!TryReadValidated("height", -2, 4, "scene-height", out var height)) return false;
+        _appearance.HeightOffset = height;
+        if (_nearbyLayout && !_appearance.UnlimitedTextDistance)
+        {
+            if (!TryReadValidated("textdistance", 1, 1024, "scene-distance", out var textDistance)) return false;
+            _appearance.TextDistance = textDistance;
+        }
+        if (!_appearance.UnlimitedIconDistance)
+        {
+            if (!TryReadValidated("distance", 1, 1024, "scene-distance", out var distance)) return false;
+            _appearance.IconDistance = distance;
+        }
+        var data = BuildDraft().Normalize();
+
+        _closing = true;
+        base.TryClose();
+        _onSave?.Invoke(data, _lockAfterSave);
+        return true;
+    }
+
+    // What the fields currently say, read the way OnSave reads them but tolerantly: an unparseable
+    // number keeps the value already in _appearance, so the dirty check never errors or throws.
+    private SceneDescriptionData BuildDraft()
+    {
+        var iconDistance = !_appearance.UnlimitedIconDistance && TryReadNumber("distance", out var distance) ? distance : _appearance.IconDistance;
+        var textDistance = _nearbyLayout && !_appearance.UnlimitedTextDistance && TryReadNumber("textdistance", out var typedText) ? typedText : _appearance.TextDistance;
+        var height = TryReadNumber("height", out var offset) ? offset : _appearance.HeightOffset;
+        var indicatorScale = TryReadNumber("size", out var percent) ? percent / 100 : _appearance.IndicatorScale;
+        var bubbleScale = TryReadNumber("bubblesize", out var bubblePercent) ? bubblePercent / 100 : _appearance.BubbleScale;
+        return new SceneDescriptionData
+        {
+            Appearance = _appearance.Appearance,
+            Symbol = _appearance.Symbol,
+            SymbolIconName = _appearance.SymbolIconName,
+            IconDistance = iconDistance,
+            UnlimitedIconDistance = _appearance.UnlimitedIconDistance,
+            TextDistance = textDistance,
+            UnlimitedTextDistance = _appearance.UnlimitedTextDistance,
+            HeightOffset = height,
+            IndicatorScale = indicatorScale,
+            Color = _appearance.Color,
+            IdleBobbing = _appearance.IdleBobbing,
+            ShowBodyInBubble = _appearance.ShowBodyInBubble,
+            BubbleScale = bubbleScale,
+            TitleIcon = _appearance.TitleIcon,
+            TitleIconName = _appearance.TitleIconName,
+            Title = SingleComposer.GetTextInput("title").GetText(),
+            Body = SingleComposer.GetTextArea("body").GetText(),
+            Display = SelectedDisplay(),
+        };
+    }
+
+    private void OnTitleBarClose()
+    {
+        TryClose();
+    }
+
+    private bool OnCancelButton()
+    {
+        TryClose();
+        return true;
+    }
+}

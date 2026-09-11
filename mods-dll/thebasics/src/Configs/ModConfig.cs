@@ -804,6 +804,15 @@ namespace thebasics.Configs
         [ProtoMember(154)]
         public string[] SightBlockingBlockCodePatterns { get; set; } = Array.Empty<string>();
 
+        /// <summary>
+        /// Whether scene markers can be crafted, placed, and edited. Turning this off leaves the
+        /// block, block entity, and handbook page registered so markers already in the world keep
+        /// loading; it only removes the recipe, placement, editing, and the client overlay.
+        /// </summary>
+        [ProtoMember(155)]
+        [DefaultValue(true)]
+        public bool EnableSceneMarkers { get; set; } = true;
+
         [ProtoMember(64)]
         public bool RemoveGrantedLanguagesOnChange { get; set; } = true;
 

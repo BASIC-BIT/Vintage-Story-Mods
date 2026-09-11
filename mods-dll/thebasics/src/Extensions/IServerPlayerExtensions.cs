@@ -9,6 +9,7 @@ using thebasics.ModSystems.PlayerStats.Definitions;
 using thebasics.ModSystems.PlayerStats.Models;
 using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.ProximityChat;
+using thebasics.ModSystems.SceneDescriptions;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Semantics;
 using thebasics.ModSystems.TPA;
@@ -62,6 +63,7 @@ namespace thebasics.Extensions
         private const string ModDataChatLanguageColorsEnabled = "BASIC_CHAT_LANGUAGE_COLORS_ENABLED";
         private const string ModDataChatLanguageLabelsEnabled = "BASIC_CHAT_LANGUAGE_LABELS_ENABLED";
         private const string ModDataChatNicknameColorsEnabled = "BASIC_CHAT_NICKNAME_COLORS_ENABLED";
+        private const string ModDataSceneReadMarks = "BASIC_SCENE_READ_MARKS";
 
         public static T GetModData<T>(this IServerPlayer player, string key, T defaultValue)
         {
@@ -404,6 +406,19 @@ namespace thebasics.Extensions
         public static bool GetRpTextEnabled(this IServerPlayer player)
         {
             return GetModData(player, ModDataRpTextEnabled, true);
+        }
+
+        /// <summary>Scene markers this player has marked as read, keyed by position.</summary>
+        public static SceneReadMarksMessage GetSceneReadMarks(this IServerPlayer player)
+        {
+            var marks = GetModData(player, ModDataSceneReadMarks, new SceneReadMarksMessage()) ?? new SceneReadMarksMessage();
+            marks.Marks ??= new Dictionary<string, long>();
+            return marks;
+        }
+
+        public static void SetSceneReadMarks(this IServerPlayer player, SceneReadMarksMessage marks)
+        {
+            SetModData(player, ModDataSceneReadMarks, marks ?? new SceneReadMarksMessage());
         }
 
         #region Chat Visual Preferences
