@@ -1,9 +1,9 @@
 {
-  ingredientPattern: "SS",
+  ingredientPattern: "S",
   ingredients: {
-    "S": { type: "item", code: "game:stone-*" }
+    "S": { type: "item", code: "game:stone-*", quantity: 2 }
   },
-  width: 2,
+  width: 1,
   height: 1,
   shapeless: true,
   output: { type: "block", code: "thebasics:scene-marker-ground-north" }
