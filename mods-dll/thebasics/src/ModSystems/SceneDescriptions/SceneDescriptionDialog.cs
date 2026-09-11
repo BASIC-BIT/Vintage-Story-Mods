@@ -346,9 +346,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var scale = Math.Min((width - 24) / Math.Max(1.2, textWidth), height * bubbleHeightShare / Math.Max(textHeight, 0.001));
         var bubbleHeight = textHeight * scale;
         var symbolPixels = Math.Min(height * 0.4, 0.8 * preview.IndicatorScale * scale * symbolShare);
-        var top = (height - (bubbleHeight + gap + symbolPixels)) / 2;
-        // Centring hides a world height offset, so let it move the symbol under the bubble instead.
-        var symbolY = Math.Clamp(top + bubbleHeight + gap - preview.HeightOffset * scale * 0.25, 0, height - symbolPixels);
+        var stackHeight = bubbleHeight + gap + symbolPixels;
+        // Height offset raises the whole marker in the world, bubble included, so it moves the centred stack here too.
+        var top = Math.Clamp((height - stackHeight) / 2 - preview.HeightOffset * scale * 0.1, 0, Math.Max(0, height - stackHeight));
+        var symbolY = top + bubbleHeight + gap;
         var symbolX = width / 2.0 - symbolPixels / 2;
         if (!DrawSymbolIcon(ctx, preview, symbolX, symbolY, symbolPixels))
             SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], symbolX, symbolY, symbolPixels,
