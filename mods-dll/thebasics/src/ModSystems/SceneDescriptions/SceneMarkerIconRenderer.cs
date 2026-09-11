@@ -81,7 +81,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             foreach (var icon in _visible)
             {
                 if (icon.Opacity <= 0) continue;
-                var size = 0.8f * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
+                var size = SceneDescriptionData.IndicatorBlocks * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
                 // A marker this player has read settles down: half the bob height at half the speed.
                 var (amplitude, period) = icon.Read ? (0.025, 8000.0) : (0.05, 4000.0);
                 var bob = icon.Marker.Data.IdleBobbing ? amplitude * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / period)) : 0;
@@ -168,7 +168,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         var render = _api.Render;
         var view = render.CameraMatrixOriginf;
         // Reserve the full focus/bob envelope so the bubble stays still through both animations.
-        var offset = 0.8f * marker.Data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;
+        var offset = SceneDescriptionData.IndicatorBlocks * marker.Data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;
         var anchor = position.AddCopy(view[1] * offset, view[5] * offset, view[9] * offset);
         var centre = Project(anchor);
         if (centre.Z < 0) return;

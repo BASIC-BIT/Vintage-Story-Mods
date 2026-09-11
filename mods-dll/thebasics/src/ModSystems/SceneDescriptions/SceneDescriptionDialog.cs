@@ -341,11 +341,11 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         // The tile is a legibility check, not a scale model. Size everything from the bubble - the part
         // that has to stay readable - and draw the symbol at a fraction of its world size beside it.
         const double bubbleHeightShare = 0.16;
-        const double symbolShare = 0.45;
+        const double symbolShare = 0.675;
         var gap = text == null ? 0 : 10;
         var scale = Math.Min((width - 24) / Math.Max(1.2, textWidth), height * bubbleHeightShare / Math.Max(textHeight, 0.001));
         var bubbleHeight = textHeight * scale;
-        var symbolPixels = Math.Min(height * 0.4, 0.8 * preview.IndicatorScale * scale * symbolShare);
+        var symbolPixels = Math.Min(height * 0.4, SceneDescriptionData.IndicatorBlocks * preview.IndicatorScale * scale * symbolShare);
         var stackHeight = bubbleHeight + gap + symbolPixels;
         // Height offset raises the whole marker in the world, bubble included, so it moves the centred stack here too.
         var top = Math.Clamp((height - stackHeight) / 2 - preview.HeightOffset * scale * 0.1, 0, Math.Max(0, height - stackHeight));

@@ -13,7 +13,7 @@ internal static class SceneBubbleLayout
 
     internal static double CullRadius(float width, float height, float indicatorScale)
     {
-        var bottom = 0.8 * indicatorScale * 1.1 / 2 + 0.15;
+        var bottom = SceneDescriptionData.IndicatorBlocks * indicatorScale * 1.1 / 2 + 0.15;
         return Math.Max(2, Math.Sqrt(width * width / 4 + (height + bottom) * (height + bottom)));
     }
 }

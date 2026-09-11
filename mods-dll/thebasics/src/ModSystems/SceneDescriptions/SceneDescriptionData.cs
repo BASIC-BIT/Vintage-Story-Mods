@@ -63,7 +63,10 @@ public sealed class SceneDescriptionData
     public bool UnlimitedTextDistance { get; set; }
     public float HeightOffset { get; set; }
     public float IndicatorScale { get; set; } = 1;
-    internal float SelectionHalfExtent => 0.44f * IndicatorScale + 0.05f;
+    /// <summary>World size in blocks of the floating indicator at 100 percent indicator size.</summary>
+    internal const float IndicatorBlocks = 0.64f;
+    // Half the indicator, plus the 10 percent it grows while targeted, plus a small margin.
+    internal float SelectionHalfExtent => IndicatorBlocks * 0.55f * IndicatorScale + 0.05f;
     public SceneMarkerColor Color { get; set; }
     public SceneMarkerEffect Effect { get; set; }
     public bool IdleBobbing { get; set; } = true;
