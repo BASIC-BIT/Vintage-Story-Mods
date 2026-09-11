@@ -29,3 +29,5 @@ QA package 2026-09-10 (seventh): commit a4410c3, thebasics_5_9_1.zip SHA256 1056
 QA package 2026-09-10 (eighth): commit 318010d, thebasics_5_9_1.zip SHA256 7855ed231f113dea..., deployed to the test server (restart 17:03Z, RunGame reached, no mod errors) and to Profile2/Profile3. Shared ScrollableTextArea: caret fix across line wraps in the scene editor, character sheet and player notes, and a scrolling scene description box.
 
 QA package 2026-09-11: commit 7311459, thebasics_5_9_1.zip SHA256 1c0970c81a98f39e..., deployed to the test server (restart 03:39Z, RunGame reached, no mod errors) and to Profile2/Profile3. Preview height offset now moves the whole stack.
+
+QA package 2026-09-11 (second): commit 817c21c, thebasics_5_9_1.zip SHA256 ce295d0507675df8..., deployed to the test server (restart 03:50Z, RunGame reached, no mod errors) and to Profile2/Profile3. Indicator base size 0.64 blocks (was 0.8); preview symbol a fifth larger.
