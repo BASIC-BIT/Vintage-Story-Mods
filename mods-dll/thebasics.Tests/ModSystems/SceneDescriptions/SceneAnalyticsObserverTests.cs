@@ -1,0 +1,98 @@
+using FluentAssertions;
+using NSubstitute;
+using thebasics.ModSystems.Analytics;
+using thebasics.ModSystems.SceneDescriptions;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
+using Vintagestory.GameContent;
+
+namespace thebasics.Tests.ModSystems.SceneDescriptions;
+
+[Collection(AnalyticsServiceTestCollection.Name)]
+public class SceneAnalyticsObserverTests
+{
+    [Fact]
+    public void ClientRequiresLivePermissionAndDedupesSuccessfulOpens()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        var channel = Substitute.For<IClientNetworkChannel>();
+        api.Network.RegisterChannel(Arg.Any<string>()).Returns(channel);
+        channel.RegisterMessageType<SceneObservationMessage>().Returns(channel);
+        channel.RegisterMessageType<SceneObservationPermission>().Returns(channel);
+        channel.Connected.Returns(true);
+        using var observer = new SceneAnalyticsObserver();
+        observer.StartClient(api);
+        var pos = new BlockPos(0, 0, 0, 0);
+        observer.ReaderOpened(pos);
+        channel.DidNotReceive().SendPacket(Arg.Any<SceneObservationMessage>());
+        observer.SetPermission(true);
+        observer.ReaderOpened(pos);
+        observer.ReaderOpened(pos);
+        channel.Received(1).SendPacket(Arg.Any<SceneObservationMessage>());
+        api.World.ElapsedMilliseconds.Returns(2500L);
+        observer.ReaderOpened(new BlockPos(1, 0, 0, 0));
+        channel.Received(1).SendPacket(Arg.Any<SceneObservationMessage>());
+        observer.SetPermission(true);
+        observer.SetPermission(false);
+        observer.ReaderOpened(new BlockPos(2, 0, 0, 0));
+        channel.Received(1).SendPacket(Arg.Any<SceneObservationMessage>());
+    }
+
+    [Fact]
+    public void ServerRejectsUnloadedWrongDimensionFarAndRevokedObservationsAndDedupesPerViewer()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var channel = Substitute.For<IServerNetworkChannel>();
+        api.Network.RegisterChannel(Arg.Any<string>()).Returns(channel);
+        channel.RegisterMessageType<SceneObservationMessage>().Returns(channel);
+        channel.RegisterMessageType<SceneObservationPermission>().Returns(channel);
+        var sink = Substitute.For<IAnalyticsSink>();
+        sink.IsEnabled.Returns(true);
+        AnalyticsService.Configure(sink);
+        try
+        {
+            using var observer = new SceneAnalyticsObserver();
+            observer.StartServer(api);
+            var pos = new BlockPos(0, 0, 0, 0);
+            var marker = new SceneDescriptionBlockEntity { Pos = pos };
+            marker.Data.Body = "private";
+            api.World.BlockAccessor.GetBlockEntity(Arg.Any<BlockPos>()).Returns(marker);
+            var one = new FakeServerPlayer("one") { Entity = new EntityPlayer() };
+            var two = new FakeServerPlayer("two") { Entity = new EntityPlayer() };
+            one.Entity.Pos.SetPos(0.5, 0.5, 0.5);
+            two.Entity.Pos.SetPos(0.5, 0.5, 0.5);
+            var message = new SceneObservationMessage();
+            api.World.BlockAccessor.GetChunkAtBlockPos(Arg.Any<BlockPos>()).Returns((IWorldChunk)null!);
+            observer.Receive(one, message);
+            sink.DidNotReceive().Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
+            api.World.BlockAccessor.GetChunkAtBlockPos(Arg.Any<BlockPos>()).Returns(Substitute.For<IWorldChunk>());
+            observer.Receive(one, new SceneObservationMessage { Dimension = 1 });
+            one.Entity.Pos.SetPos(50, 50, 50);
+            observer.Receive(one, message);
+            sink.DidNotReceive().Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
+            one.Entity.Pos.SetPos(0.5, 0.5, 0.5);
+            observer.Receive(one, message);
+            observer.Receive(one, message);
+            observer.Receive(two, message);
+            sink.Received(2).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "reader_opened" && !p.ContainsKey("player_pseudonym")));
+            // Distinct held items intentionally share a per-viewer cooldown, without content fingerprints.
+            one.InventoryManager = Substitute.For<IPlayerInventoryManager>();
+            var firstHeld = new ItemStack(new SceneDescriptionBlock());
+            new SceneDescriptionData { Body = "first" }.WriteTo(firstHeld.Attributes);
+            one.InventoryManager.ActiveHotbarSlot.Returns(new DummySlot(firstHeld));
+            observer.Receive(one, new SceneObservationMessage { Held = true });
+            var secondHeld = new ItemStack(new SceneDescriptionBlock());
+            new SceneDescriptionData { Body = "second" }.WriteTo(secondHeld.Attributes);
+            one.InventoryManager.ActiveHotbarSlot.Returns(new DummySlot(secondHeld));
+            observer.Receive(one, new SceneObservationMessage { Held = true });
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["scene_read_source"] == "held"));
+            sink.IsEnabled.Returns(false);
+            api.World.ElapsedMilliseconds.Returns(30000L);
+            observer.Receive(one, message);
+            sink.Received(3).Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
+        }
+        finally { AnalyticsService.Shutdown(); }
+    }
+}

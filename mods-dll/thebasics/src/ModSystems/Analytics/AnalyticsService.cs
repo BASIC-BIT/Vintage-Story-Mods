@@ -233,6 +233,7 @@ public static class AnalyticsService
             ["proximity_chat_presentation_mode"] = ProximityChatPresentationModes.Normalize(config.ProximityChatPresentationMode),
             ["normalize_proximity_chat_text"] = config.NormalizeProximityChatText,
             ["attribute_freeform_messages_to_player_name"] = config.AttributeFreeformMessagesToPlayerName,
+            ["enable_scene_markers"] = config.EnableSceneMarkers,
             ["enable_character_sheets"] = config.EnableCharacterSheets,
             ["enable_character_headshots"] = config.EnableCharacterHeadshots,
             ["show_headshot_in_nametag"] = config.ShowHeadshotInNametag,

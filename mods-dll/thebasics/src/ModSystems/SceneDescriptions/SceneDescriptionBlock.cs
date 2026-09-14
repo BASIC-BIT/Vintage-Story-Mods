@@ -89,6 +89,11 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         if (placed && world.Side == EnumAppSide.Server && world.BlockAccessor.GetBlockEntity(blockSelection.Position) is SceneDescriptionBlockEntity blockEntity)
         {
             blockEntity.InitializeFromItem(itemStack, byPlayer);
+            var reused = itemStack?.Attributes?.HasAttribute(SceneDescriptionData.TitleAttribute) == true;
+            SceneAnalytics.Track(blockEntity.Data, "placed", "scene_placement", reused ? "reused" : "fresh",
+                blockEntity.Block?.Variant?["attachment"] == "wall" ? "wall" : "ground");
+            if (reused && SceneAnalytics.Written(blockEntity.Data)) SceneAnalytics.Track(blockEntity.Data, "moved", "scene_placement", "reused",
+                blockEntity.Block?.Variant?["attachment"] == "wall" ? "wall" : "ground");
         }
 
         return placed;
@@ -107,7 +112,8 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
                 var stack = CreateStackFromPlacedBlock(world, blockSelection.Position);
                 stack.Attributes.SetString("title", blockEntity.Data.Title);
                 stack.Attributes.SetString("text", VtmlUtils.EscapeVtml(blockEntity.Data.Body));
-                new SceneReadonlyBookDialog(stack, client, blockSelection.Position.Copy(), blockEntity.Data.ReadStamp, blockEntity.Data.TitleIconName).TryOpen();
+                if (new SceneReadonlyBookDialog(stack, client, blockSelection.Position.Copy(), blockEntity.Data.ReadStamp, blockEntity.Data.TitleIconName).TryOpen())
+                    client.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.ReaderOpened(blockSelection.Position);
             }
 
             return true;
@@ -130,7 +136,8 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
             var readableStack = slot.Itemstack.Clone();
             readableStack.Attributes.SetString("title", GetHeldItemName(readableStack));
             readableStack.Attributes.SetString("text", VtmlUtils.EscapeVtml(readableStack.Attributes.GetString(SceneDescriptionData.BodyAttribute, string.Empty)));
-            new GuiDialogReadonlyBook(readableStack, capi).TryOpen();
+            if (new GuiDialogReadonlyBook(readableStack, capi).TryOpen())
+                capi.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.ReaderOpened();
         }
     }
 
@@ -181,7 +188,10 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
             return;
         }
 
+        var removed = (world.BlockAccessor.GetBlockEntity(pos) as SceneDescriptionBlockEntity)?.Data.Clone();
         base.OnBlockBroken(world, pos, byPlayer, dropQuantityMultiplier);
+        if (world.Side == EnumAppSide.Server && SceneDescriptionSystem.SceneMarkersEnabled(api) && byPlayer != null && removed != null && world.BlockAccessor.GetBlockEntity(pos) is not SceneDescriptionBlockEntity)
+            SceneAnalytics.Track(removed, "removed");
     }
 
     public override void OnBlockExploded(IWorldAccessor world, BlockPos pos, BlockPos explosionCenter, EnumBlastType blastType, string ignitedByPlayerUid)

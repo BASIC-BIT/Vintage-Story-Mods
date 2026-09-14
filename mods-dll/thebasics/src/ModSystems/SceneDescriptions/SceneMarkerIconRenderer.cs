@@ -181,6 +181,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         render.Render2DTexture(text.TextureId, (float)centre.X - pixelWidth / 2,
             render.FrameHeight - (float)centre.Y - pixelHeight / 2, pixelWidth, pixelHeight, 20f,
             new Vec4f(1, 1, 1, textOpacity));
+        if (SceneAnalytics.VisibleFrame(textOpacity, centre.X, centre.Y, render.FrameWidth, render.FrameHeight))
+            _api.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.BubbleRendered(marker.Pos);
     }
 
     private Vec3d Project(Vec3d worldPosition)

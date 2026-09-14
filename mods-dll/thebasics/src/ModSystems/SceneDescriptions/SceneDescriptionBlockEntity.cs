@@ -142,7 +142,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
         }
 
-        SetReadMark(readingPlayer, packetId == MarkReadPacketId ? Data.ReadStamp : 0);
+        var wasRead = SceneReadMarks.IsRead(readingPlayer.GetSceneReadMarks().Marks, SceneReadMarks.Key(Pos), Data.ReadStamp);
+        var markRead = packetId == MarkReadPacketId;
+        SetReadMark(readingPlayer, markRead ? Data.ReadStamp : 0);
+        if (wasRead != markRead && player.Entity?.Pos?.Dimension == Pos.dimension && IsWithinEditDistance(player))
+            SceneAnalytics.Track(Data, markRead ? "marked_read" : "marked_unread");
     }
 
     private void HandleClearRead(IPlayer player)
@@ -189,6 +193,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
             return;
         }
+        var previousData = Data.Clone();
         Data.ApplyText(FromPacket(packet));
         // Edited text is new content, so existing read marks no longer apply.
         Data.Stamp();
@@ -201,6 +206,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         MarkDirty(redrawOnClient: true);
         Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
         Api.World.Logger.Audit("{0} edited a scene marker at {1}.", player.PlayerName, Pos);
+        SceneAnalytics.Track(Data, "saved", "scene_save_kind", SceneAnalytics.SaveKind(previousData, Data));
     }
 
     public override void OnReceivedServerPacket(int packetId, byte[] data)

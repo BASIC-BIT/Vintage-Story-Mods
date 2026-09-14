@@ -10,6 +10,7 @@ public sealed class SceneDescriptionSystem : ModSystem
     private ICoreClientAPI _clientApi;
     private SceneMarkerIconRenderer _iconRenderer;
     private SceneMarkerSelection _selection;
+    internal SceneAnalyticsObserver Analytics { get; } = new();
 
     internal void Register(SceneDescriptionBlockEntity marker) { _iconRenderer?.Register(marker); _selection?.Register(marker); }
     internal void Unregister(SceneDescriptionBlockEntity marker) { _iconRenderer?.Unregister(marker); _selection?.Unregister(marker); }
@@ -37,9 +38,12 @@ public sealed class SceneDescriptionSystem : ModSystem
         }
     }
 
+    public override void StartServerSide(ICoreServerAPI api) => Analytics.StartServer(api);
+
     public override void StartClientSide(ICoreClientAPI api)
     {
         _clientApi = api;
+        Analytics.StartClient(api);
         foreach (var symbol in System.Enum.GetValues<SceneMarkerSymbol>())
         {
             var shape = SceneMarkerVisuals.LoadShape(api, symbol);
@@ -63,6 +67,7 @@ public sealed class SceneDescriptionSystem : ModSystem
             _clientApi.Event.UnregisterRenderer(_iconRenderer, EnumRenderStage.Opaque);
             _clientApi.Event.UnregisterRenderer(_iconRenderer.OrthoPass, EnumRenderStage.Ortho);
         }
+        Analytics.Dispose();
         _iconRenderer?.Dispose();
         _selection?.Dispose();
         _selection = null;

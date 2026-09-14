@@ -11,6 +11,7 @@ using Vintagestory.GameContent;
 
 namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
+[Collection(AnalyticsServiceTestCollection.Name)]
 public class SceneDescriptionServerTests
 {
     [Fact]
@@ -314,4 +315,38 @@ public class SceneDescriptionServerTests
         marker.InitializeFromItem(picked, player);
         marker.Data.ReadStamp.Should().NotBe(42).And.NotBe(0);
     }
-}
+    [Theory]
+    [InlineData(true, true, 1)]
+    [InlineData(false, true, 0)]
+    [InlineData(true, false, 0)]
+    public void SavesEmitOnlyAfterAcceptanceAndConsent(bool claim, bool consent, int expected)
+    {
+        var sink = Substitute.For<thebasics.ModSystems.Analytics.IAnalyticsSink>();
+        sink.IsEnabled.Returns(consent);
+        thebasics.ModSystems.Analytics.AnalyticsService.Configure(sink);
+        try
+        {
+            var (marker, player, _) = CreateMarker(claim);
+            marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket { Body = "private new text" }));
+            sink.Received(expected).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "saved" && (string)p["scene_save_kind"] == "edit" && !p.ContainsKey("player_pseudonym")));
+        }
+        finally { thebasics.ModSystems.Analytics.AnalyticsService.Shutdown(); }
+    }
+    [Fact]
+    public void DuplicateReadChangesEmitOncePerActualTransition()
+    {
+        var sink = Substitute.For<thebasics.ModSystems.Analytics.IAnalyticsSink>();
+        sink.IsEnabled.Returns(true);
+        thebasics.ModSystems.Analytics.AnalyticsService.Configure(sink);
+        try
+        {
+            var (marker, player, _) = CreateMarker();
+            marker.OnReceivedClientPacket(player, 1004, null);
+            marker.OnReceivedClientPacket(player, 1004, null);
+            marker.OnReceivedClientPacket(player, 1005, null);
+            marker.OnReceivedClientPacket(player, 1005, null);
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "marked_read"));
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "marked_unread"));
+        }
+        finally { thebasics.ModSystems.Analytics.AnalyticsService.Shutdown(); }
+    }}
