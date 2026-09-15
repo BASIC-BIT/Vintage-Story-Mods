@@ -1,6 +1,7 @@
 using FluentAssertions;
 using thebasics.ModSystems.SceneDescriptions;
 namespace thebasics.Tests.ModSystems.SceneDescriptions;
+
 public class SceneAnalyticsTests
 {
     [Fact]
@@ -59,7 +60,7 @@ public class SceneAnalyticsTests
     [InlineData(8.01, false)]
     [InlineData(double.NaN, false)]
     public void ReaderValidationRejectsOutOfReach(double distance, bool expected) =>
-        SceneAnalyticsObserver.ObservationAllowed(new(), distance, false, false).Should().Be(expected);    [Theory]
+        SceneAnalyticsObserver.ObservationAllowed(new(), distance, false, false).Should().Be(expected); [Theory]
     [InlineData(0.5f, 0, 0, true)]
     [InlineData(0.49f, 10, 10, false)]
     [InlineData(1f, -1, 10, false)]
@@ -67,4 +68,5 @@ public class SceneAnalyticsTests
     [InlineData(1f, 10, 100, false)]
     [InlineData(1f, double.NaN, 10, false)]
     public void DwellQualifiesOnlyVisibleBubbleCenters(float opacity, double x, double y, bool expected) =>
-        SceneAnalytics.VisibleFrame(opacity, x, y, 100, 100).Should().Be(expected);}
+        SceneAnalytics.VisibleFrame(opacity, x, y, 100, 100).Should().Be(expected);
+}

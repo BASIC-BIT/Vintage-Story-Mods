@@ -323,12 +323,12 @@ public class SceneDescriptionServerTests
     {
         var sink = Substitute.For<thebasics.ModSystems.Analytics.IAnalyticsSink>();
         sink.IsEnabled.Returns(consent);
-        thebasics.ModSystems.Analytics.AnalyticsService.Configure(sink);
+        thebasics.ModSystems.Analytics.AnalyticsService.Configure(sink, playerPseudonymizer: _ => new string('c', 64));
         try
         {
             var (marker, player, _) = CreateMarker(claim);
             marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket { Body = "private new text" }));
-            sink.Received(expected).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "saved" && (string)p["scene_save_kind"] == "edit" && !p.ContainsKey("player_pseudonym")));
+            sink.Received(expected).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "saved" && (string)p["scene_save_kind"] == "edit" && !p.ContainsKey("pseudonymous_player_id")));
         }
         finally { thebasics.ModSystems.Analytics.AnalyticsService.Shutdown(); }
     }
@@ -337,7 +337,7 @@ public class SceneDescriptionServerTests
     {
         var sink = Substitute.For<thebasics.ModSystems.Analytics.IAnalyticsSink>();
         sink.IsEnabled.Returns(true);
-        thebasics.ModSystems.Analytics.AnalyticsService.Configure(sink);
+        thebasics.ModSystems.Analytics.AnalyticsService.Configure(sink, playerPseudonymizer: _ => new string('c', 64));
         try
         {
             var (marker, player, _) = CreateMarker();
@@ -349,4 +349,5 @@ public class SceneDescriptionServerTests
             sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "marked_unread"));
         }
         finally { thebasics.ModSystems.Analytics.AnalyticsService.Shutdown(); }
-    }}
+    }
+}

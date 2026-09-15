@@ -50,7 +50,7 @@ public class SceneAnalyticsObserverTests
         channel.RegisterMessageType<SceneObservationPermission>().Returns(channel);
         var sink = Substitute.For<IAnalyticsSink>();
         sink.IsEnabled.Returns(true);
-        AnalyticsService.Configure(sink);
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => new string('c', 64));
         try
         {
             using var observer = new SceneAnalyticsObserver();
@@ -76,7 +76,7 @@ public class SceneAnalyticsObserverTests
             observer.Receive(one, message);
             observer.Receive(one, message);
             observer.Receive(two, message);
-            sink.Received(2).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "reader_opened" && !p.ContainsKey("player_pseudonym")));
+            sink.Received(2).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "reader_opened" && !p.ContainsKey("pseudonymous_player_id")));
             // Distinct held items intentionally share a per-viewer cooldown, without content fingerprints.
             one.InventoryManager = Substitute.For<IPlayerInventoryManager>();
             var firstHeld = new ItemStack(new SceneDescriptionBlock());

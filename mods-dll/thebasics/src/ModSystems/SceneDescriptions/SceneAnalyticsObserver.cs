@@ -77,7 +77,7 @@ internal sealed class SceneAnalyticsObserver : IDisposable
     }
     internal void Receive(IServerPlayer player, SceneObservationMessage message)
     {
-        if (!AnalyticsService.IsEnabled || !SceneDescriptionSystem.SceneMarkersEnabled(_server) || player?.Entity == null || message == null) return;
+        if (!CanReceive(player, message)) return;
         SceneDescriptionData data;
         string key;
         if (message.Held)
@@ -105,6 +105,9 @@ internal sealed class SceneAnalyticsObserver : IDisposable
         if (!_gate.Accept(player.PlayerUID + ":" + action + ":" + key, _server.World.ElapsedMilliseconds, message.Bubble ? 60000 : 30000)) return;
         SceneAnalytics.Track(data, action, message.Bubble ? null : "scene_read_source", message.Held ? "held" : "placed");
     }
+    private bool CanReceive(IServerPlayer player, SceneObservationMessage message) =>
+        AnalyticsService.IsEnabled && SceneDescriptionSystem.SceneMarkersEnabled(_server) && player?.Entity != null && message != null;
+
     internal static bool ObservationAllowed(SceneDescriptionData data, double distance, bool bubble, bool targeted)
     {
         if (!double.IsFinite(distance) || distance < 0) return false;
