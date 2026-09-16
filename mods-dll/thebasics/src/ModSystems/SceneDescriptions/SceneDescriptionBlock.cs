@@ -33,7 +33,8 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     {
         // Terrain traversal must not stop early on boxes extending beyond this voxel.
         // Client picking supplies its own nearest-symbol hit after terrain; other sight rays ignore symbols.
-        if (api?.Side == EnumAppSide.Client) return [];
+        if (api?.Side == EnumAppSide.Client)
+            return SceneDescriptionSystem.SceneMarkersEnabled(api) ? [] : base.GetSelectionBoxes(blockAccessor, pos);
         return [SymbolBox(DataAt(blockAccessor, pos))];
     }
 
@@ -43,6 +44,12 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     {
         var capi = api as ICoreClientAPI;
         if (capi == null || blockSel?.Position == null) return;
+        if (!SceneDescriptionSystem.SceneMarkersEnabled(capi))
+        {
+            foreach (var box in base.GetSelectionBoxes(capi.World.BlockAccessor, blockSel.Position))
+                renderBoxHandler(box, 1.6f * ClientSettings.Wireframethickness, GetSelectionColor(capi, blockSel.Position));
+            return;
+        }
         renderBoxHandler(SymbolBox(DataAt(capi.World.BlockAccessor, blockSel.Position)),
             1.6f * ClientSettings.Wireframethickness, GetSelectionColor(capi, blockSel.Position));
     }
@@ -53,6 +60,11 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     public override void GetDecal(IWorldAccessor world, BlockPos pos, ITexPositionSource decalTexSource, ref MeshData decalModelData, ref MeshData blockModelData)
     {
         if (blockModelData == null || blockModelData.VerticesCount < 24) return;
+        if (!SceneDescriptionSystem.SceneMarkersEnabled(api))
+        {
+            base.GetDecal(world, pos, decalTexSource, ref decalModelData, ref blockModelData);
+            return;
+        }
         var data = DataAt(world?.BlockAccessor, pos);
         var radius = data.SelectionHalfExtent;
         decalModelData = CubeMeshUtil.GetCubeOnlyScaleXyz(radius, radius, new Vec3f(0.5f, 0.65f + data.HeightOffset, 0.5f));

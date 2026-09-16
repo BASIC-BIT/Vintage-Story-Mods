@@ -46,7 +46,8 @@ internal sealed class SceneObservationGate
     {
         var found = _entries.TryGetValue(key, out var state);
         if (!found) state = (now, now, long.MinValue);
-        if (now < state.Last || now - state.Last > 250) state.Start = now;
+        if (now < state.Last) state = (now, now, long.MinValue);
+        else if (now - state.Last > 250) state.Start = now;
         state.Last = now;
         var accepted = now - state.Start >= 1000 && (state.Sent == long.MinValue || now - state.Sent >= 60000);
         if (accepted) state.Sent = now;

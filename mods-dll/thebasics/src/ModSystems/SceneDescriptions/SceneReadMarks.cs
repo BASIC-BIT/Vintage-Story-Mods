@@ -42,7 +42,7 @@ internal static class SceneReadMarks
         marks[key] = stamp;
         // Stamps are wall-clock milliseconds, so the smallest ones are the oldest reads.
         if (marks.Count <= MaxEntries) return;
-        foreach (var stale in marks.OrderBy(entry => entry.Value).Take(marks.Count - MaxEntries).Select(entry => entry.Key).ToArray())
+        foreach (var stale in marks.Where(entry => entry.Key != key).OrderBy(entry => entry.Value).Take(marks.Count - MaxEntries).Select(entry => entry.Key).ToArray())
         {
             marks.Remove(stale);
         }

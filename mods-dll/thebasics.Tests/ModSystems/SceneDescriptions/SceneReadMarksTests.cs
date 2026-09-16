@@ -9,6 +9,15 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneReadMarksTests
 {
     [Fact]
+    public void NewlyReadOldContentSurvivesAtCapacity()
+    {
+        var marks = new Dictionary<string, long>();
+        for (var index = 0; index < SceneReadMarks.MaxEntries; index++) SceneReadMarks.Set(marks, "pos-" + index, index + 100);
+        SceneReadMarks.Set(marks, "old-content", 1);
+        marks.Count.Should().Be(SceneReadMarks.MaxEntries);
+        SceneReadMarks.IsRead(marks, "old-content", 1).Should().BeTrue();
+    }
+    [Fact]
     public void PositionKeySeparatesDimensions()
     {
         SceneReadMarks.Key(new BlockPos(3, -4, 5, 0)).Should().Be("3/-4/5/0");

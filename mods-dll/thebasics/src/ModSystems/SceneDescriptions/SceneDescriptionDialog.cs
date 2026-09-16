@@ -115,6 +115,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 
     private void Compose(SceneDescriptionData data)
     {
+        SingleComposer?.Dispose();
         var top = GuiStyle.TitleBarHeight + 12;
         var buttonY = top + 580;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth + 290, buttonY + ButtonHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
@@ -488,6 +489,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var bubbleScale = TryReadNumber("bubblesize", out var bubblePercent) ? bubblePercent / 100 : _appearance.BubbleScale;
         return new SceneDescriptionData
         {
+            Kind = _appearance.Kind,
             Appearance = _appearance.Appearance,
             Symbol = _appearance.Symbol,
             SymbolIconName = _appearance.SymbolIconName,

@@ -5,6 +5,15 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneAnalyticsTests
 {
     [Fact]
+    public void ClockRollbackResetsBubbleCooldown()
+    {
+        var gate = new SceneObservationGate();
+        for (long now = 100000; now < 101000; now += 250) gate.Observe("a", now).Should().BeFalse();
+        gate.Observe("a", 101000).Should().BeTrue();
+        for (long now = 0; now < 1000; now += 250) gate.Observe("a", now).Should().BeFalse();
+        gate.Observe("a", 1000).Should().BeTrue();
+    }
+    [Fact]
     public void PropertiesExcludeAuthoredContentAndIdentity()
     {
         var props = SceneAnalytics.Properties(new SceneDescriptionData { Title = "secret", Body = "private", AuthorUid = "uid", AuthorName = "name", Display = SceneDescriptionDisplay.AlwaysNearby, LockItemCode = "lock", ShowBodyInBubble = true });

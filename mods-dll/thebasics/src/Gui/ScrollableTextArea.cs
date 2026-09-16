@@ -78,7 +78,7 @@ internal class ScrollableTextArea : GuiElementTextArea
 
     internal void OnScroll(float value)
     {
-        Bounds.fixedY = -value;
+        Bounds.fixedY = float.IsFinite(value) ? -value : 0;
         Bounds.CalcWorldBounds();
     }
 
