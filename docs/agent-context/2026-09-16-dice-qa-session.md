@@ -16,3 +16,8 @@ Boot findings: duplicate flywheelpower ID; three saved TheBasicsSceneDescription
 Discord bridge is configured and enabled, but delivery is not yet human-verified.
 
 All manual cards remain pending. Private command arguments in vanilla audit logs are expected, not a failure. Private results must remain absent from other clients, bubbles, shared history and Discord.
+
+## First owner observations
+
+Owner reported redundant nested brackets and kept labels on ordinary rolls, and unexpected constant evaluation for /r 20. Requested bold numerical totals. Other observations were broadly positive, without enough detail to check off complex range/privacy/relay cards.
+Changes for focused retest: bare unsigned integer expressions roll dN; ordinary dice omit kept labels unless a drop actually occurred; plain dN omits redundant face list; chat totals are bold. Arithmetic constants remain unchanged. All 892 tests pass.

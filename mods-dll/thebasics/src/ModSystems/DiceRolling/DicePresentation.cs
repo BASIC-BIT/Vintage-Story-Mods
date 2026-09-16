@@ -23,17 +23,23 @@ internal static class DicePresentation
         + (result.IsSuccessPool ? " successes" : "");
 
     // Plain body for history and extension consumers, which own their attribution and escaping.
-    internal static string Body(DiceRollResult result)
+    internal static string Body(DiceRollResult result) => FormatBody(result, false);
+
+    private static string FormatBody(DiceRollResult result, bool richText)
     {
+        string Text(string value) => richText ? ChatHelper.EscapeMarkup(value) : value;
+        var total = result.Value.ToString("G29", CultureInfo.InvariantCulture);
+        var displayedTotal = richText ? "<strong>" + total + "</strong>" : total;
         var reason = string.IsNullOrWhiteSpace(result.Reason) ? "" : " (" + result.Reason + ")";
-        return result.Expression + " = " + Summary(result, ProximityChatMode.Normal) + reason
-            + " [" + result.Breakdown + "]";
+        var breakdown = result.SimpleSides != null || result.Breakdown == total ? "" : " " + result.Breakdown;
+        return Text(result.Expression) + " = " + displayedTotal
+            + (result.IsSuccessPool ? " successes" : "") + Text(reason + breakdown);
     }
     // formattedName comes from the existing RP name resolver; all dice input is escaped here.
     internal static string Chat(DiceRollResult result, string formattedName, ProximityChatMode mode, bool isPrivate)
     {
         var heading = isPrivate ? "[Private Roll] " : Marker(mode) + formattedName + " rolled ";
-        var rendered = heading + ChatHelper.EscapeMarkup(Body(result));
+        var rendered = heading + FormatBody(result, true);
         // Th3Essentials batches at 1950 characters. Check the entire escaped/decoded envelope,
         // including attribution, reason and mention neutralization, before any recipient sees it.
         if (Th3EssentialsDiscordRelay.FormatRelayMessage(rendered, suppressMentions: true).Length > MaxOutputLength)

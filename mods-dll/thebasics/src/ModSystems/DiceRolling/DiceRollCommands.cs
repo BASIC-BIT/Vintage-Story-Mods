@@ -16,7 +16,7 @@ internal sealed class DiceRollCommands : IDisposable
 {
     internal const string Help = "Examples: /roll d20; /r 2d6+3 # forcing the gate; /proll 4d6kh3; /r 5d10!>=8. "
         + "Use /thebasics roll or /thebasics proll if a short command belongs to another mod. "
-        + "Syntax: dN or NdN; + - * / and parentheses; floor(...), ceil(...), round(...) (halves away from zero). "
+        + "Syntax: a bare N rolls dN; dN or NdN; + - * / and parentheses; floor(...), ceil(...), round(...) (halves away from zero). "
         + "Modifiers: ! explodes maximum faces; r<3 or ro<3 rerolls each matching die once; rr<3 repeats. "
         + "kh3/kl3 keep highest/lowest 3; dh1/dl1 drop highest/lowest 1; >=8 counts successes (also > < <= =). "
         + "Fixed order: explode, reroll, keep/drop, success count. Use # or // before an ambiguous reason. "

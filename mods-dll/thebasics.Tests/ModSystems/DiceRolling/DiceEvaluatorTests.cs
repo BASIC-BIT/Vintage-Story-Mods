@@ -65,11 +65,11 @@ public partial class DiceEvaluatorTests
     [InlineData("2d6+3 forcing the gate", "2d6+3", "forcing the gate")]
     [InlineData("2d6 + 3 # forcing 2d20", "2d6 + 3", "forcing 2d20")]
     [InlineData("2d6+3 // + strength", "2d6+3", "+ strength")]
-    [InlineData("2 defend", "2", "defend")]
+    [InlineData("2 defend", "d2", "defend")]
     [InlineData("floor( 2d6 / 3 ) reason", "floor( 2d6 / 3 )", "reason")]
     public void Reasons_have_explicit_or_unambiguous_boundaries(string input, string expression, string reason)
     {
-        var result = DiceEvaluator.EvaluateInput(input, _ => 4);
+        var result = DiceEvaluator.EvaluateInput(input, sides => System.Math.Min(4, sides));
         Assert.Equal(expression, result.Expression);
         Assert.Equal(reason, result.Reason);
     }

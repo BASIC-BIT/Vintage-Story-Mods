@@ -6,11 +6,13 @@ Use /proll or /privateroll for a result visible only to you, labelled [Private R
 
 If another mod owns a short command, use /thebasics roll or /thebasics proll. A bare command shows help. Dice commands require the existing chat privilege.
 
+Chat bolds the final number. Plain single-die rolls omit the redundant face list; pools list their faces without kept labels unless some dice were dropped. Arithmetic constants remain constants, so 20+2 evaluates to 22.
+
 ## Expressions
 
 | Example | Meaning |
 | --- | --- |
-| d20 | One twenty-sided die |
+| d20 or 20 | One twenty-sided die |
 | 2d6+3 | Two six-sided dice plus three |
 | 4d6kh3 | Keep the highest three |
 | 2d20kl1 | Keep the lowest one |

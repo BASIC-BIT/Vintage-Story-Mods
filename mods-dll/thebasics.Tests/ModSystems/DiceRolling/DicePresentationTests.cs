@@ -28,7 +28,7 @@ public class DicePresentationTests
     public void BodyIsPlainUnattributedTextAndChatEscapesItOnce()
     {
         var result = new DiceRollResult("d6", "<b>luck</b> & chance", 4m, false, "4 kept", 6, new[] { "dice" });
-        Assert.Equal("d6 = 4 (<b>luck</b> & chance) [4 kept]", DicePresentation.Body(result));
+        Assert.Equal("d6 = 4 (<b>luck</b> & chance)", DicePresentation.Body(result));
         var rendered = DicePresentation.Chat(result, "<strong>Alice</strong>", ProximityChatMode.Normal, false);
         Assert.StartsWith("<strong>Alice</strong> rolled ", rendered);
         Assert.DoesNotContain("<b>luck</b>", rendered);

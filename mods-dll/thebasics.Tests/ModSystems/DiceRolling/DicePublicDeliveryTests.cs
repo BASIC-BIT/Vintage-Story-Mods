@@ -55,7 +55,7 @@ public class DicePublicDeliveryTests
         var published = Assert.Single(events);
         Assert.Equal(ProximityChatMessageKind.Roll, published.Kind);
         Assert.Equal(mode, published.Mode);
-        Assert.Equal(marker + "d6 = 4 (test) [[4 kept]]", published.ProcessedMessage);
+        Assert.Equal(marker + "d6 = 4 (test)", published.ProcessedMessage);
         Assert.Equal(2, published.Recipients.Count);
         var entries = (List<ChatHistoryEntry>)typeof(ChatHistorySystem).GetField("_pending", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(history)!;
         var entry = Assert.Single(entries);
@@ -92,10 +92,10 @@ public class DicePublicDeliveryTests
         sender.SetNicknameColor("#ff0000");
         recipient.SetChatVisualPreferences(new ChatVisualPreferences { NicknameColorsEnabled = false });
         api.World.AllOnlinePlayers.Returns(new IPlayer[] { recipient, sender });
-        var seed = new DiceRollResult("d6", "", 4m, false, "", 6, new[] { "dice" });
+        var seed = new DiceRollResult("2d6", "", 4m, false, "x", null, new[] { "dice" });
         var name = new thebasics.ModSystems.ProximityChat.Transformers.NameTransformer(system).GetFormattedName(sender, true, config);
         var baseLength = Th3EssentialsDiscordRelay.FormatRelayMessage(DicePresentation.Chat(seed, name, ProximityChatMode.Normal, false), true).Length;
-        var result = new DiceRollResult("d6", "", 4m, false, new string('1', DicePresentation.MaxOutputLength - baseLength + excess), 6, new[] { "dice" });
+        var result = new DiceRollResult("2d6", "", 4m, false, new string('1', DicePresentation.MaxOutputLength - baseLength + excess + 1), null, new[] { "dice" });
         var published = 0;
         system.ProximityChatMessageProcessed += (_, _) => published++;
         var commands = new DiceRollCommands(system, _ => result);

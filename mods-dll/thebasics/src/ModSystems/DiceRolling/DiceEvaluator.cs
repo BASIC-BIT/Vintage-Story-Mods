@@ -25,6 +25,12 @@ public static class DiceEvaluator
         {
             var parser = new Parser(input);
             var node = parser.Parse();
+            // Only a whole unsigned integer expression is shorthand. Arithmetic keeps its constants.
+            if (Regex.IsMatch(parser.Expression, @"^[0-9]+$"))
+            {
+                parser = new Parser("d" + input.TrimStart());
+                node = parser.Parse();
+            }
             var context = new Evaluation(rollDie ?? (sides => Random.Shared.Next(1, sides + 1)));
             var value = node(context);
             if (value.Text.Length > MaxBreakdownLength) throw Limit();
@@ -311,6 +317,7 @@ public static class DiceEvaluator
                     face.Dropped = selection.StartsWith("k", StringComparison.Ordinal) ? !selected.Contains(face) : selected.Contains(face);
                 }
             }
+            bool hasDropped = faces.Any(face => face.Dropped);
             decimal total = 0;
             var descriptions = new List<string>();
             foreach (var face in faces)
@@ -322,7 +329,7 @@ public static class DiceEvaluator
                 else
                 {
                     total += success == null ? face.Number : success(face.Number) ? 1 : 0;
-                    flags += success == null ? " kept" : success(face.Number) ? " success" : " miss";
+                    flags += success == null ? (hasDropped ? " kept" : "") : success(face.Number) ? " success" : " miss";
                 }
                 descriptions.Add(face.Number.ToString(CultureInfo.InvariantCulture) + flags);
             }

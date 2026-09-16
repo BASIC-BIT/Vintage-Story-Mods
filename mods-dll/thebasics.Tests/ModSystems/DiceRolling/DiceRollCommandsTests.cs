@@ -25,7 +25,7 @@ public class DiceRollCommandsTests
         var response = commands.Handle(new TextCommandCallingArgs
         {
             Caller = new Caller { Player = player },
-            RawArgs = new CmdArgs("50d1000000ro<=1000000")
+            RawArgs = new CmdArgs("50d1000000ro<=1000000kh49")
         }, isPrivate);
         Assert.Equal(EnumCommandStatus.Error, response.Status);
         Assert.Empty(player.SentMessages);
