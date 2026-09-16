@@ -606,6 +606,7 @@ namespace thebasics.Configs
         public int SpeechOcclusionWallPenaltyBlocks { get; set; }
 
         /// <summary>Allow public scene rolls and self-only private rolls.</summary>
+        // Field 155 shipped with Scene Markers in V5.10.0-pre.1 before dice was released.
         [ProtoMember(156)]
         [DefaultValue(true)]
         public bool EnableDiceRolling { get; set; } = true;

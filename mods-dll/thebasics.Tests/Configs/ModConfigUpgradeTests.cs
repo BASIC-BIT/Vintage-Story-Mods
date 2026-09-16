@@ -188,6 +188,40 @@ public class ModConfigUpgradeTests
         verb.Should().BeOneOf("whispers", "mumbles", "mutters");
     }
 
+    [ProtoContract]
+    public sealed class PublishedSceneMarkerConfig
+    {
+        // V5.10.0-pre.1 shipped this field before dice was merged or released.
+        [ProtoMember(155)]
+        [System.ComponentModel.DefaultValue(true)]
+        public bool EnableSceneMarkers { get; set; } = true;
+    }
+
+    [Fact]
+    public void PublishedSceneMarkerWireFieldDoesNotChangeDiceSetting()
+    {
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, new PublishedSceneMarkerConfig { EnableSceneMarkers = false });
+        stream.Position = 0;
+        var restored = Serializer.Deserialize<ModConfig>(stream);
+
+        restored.EnableSceneMarkers.Should().BeFalse();
+        restored.EnableDiceRolling.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CurrentSceneMarkerSettingRetainsPublishedWireField()
+    {
+        var config = LoadLegacyConfig();
+        config.EnableSceneMarkers = false;
+        config.EnableDiceRolling = true;
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, config);
+        stream.Position = 0;
+        var restored = Serializer.Deserialize<PublishedSceneMarkerConfig>(stream);
+
+        restored.EnableSceneMarkers.Should().BeFalse();
+    }
     [Fact]
     public void NewFieldsSurviveProtobufRoundTripToClients()
     {
