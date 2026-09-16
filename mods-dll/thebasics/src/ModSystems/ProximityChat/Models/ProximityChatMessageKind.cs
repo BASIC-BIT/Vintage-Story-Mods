@@ -8,4 +8,5 @@ public enum ProximityChatMessageKind
     PlacedEnvironmental,
     LocalOoc,
     GlobalOoc,
+    Roll,
 }

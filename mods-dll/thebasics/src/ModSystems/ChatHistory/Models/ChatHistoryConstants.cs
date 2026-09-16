@@ -5,6 +5,7 @@ public static class ChatHistoryConstants
     public const string SourceTheBasics = "thebasics";
     public const string SourcePlayerChatEvent = "player-chat-event";
 
+    public const string KindRoll = "roll";
     public const string KindSpeech = "speech";
     public const string KindEmote = "emote";
     public const string KindOoc = "ooc";

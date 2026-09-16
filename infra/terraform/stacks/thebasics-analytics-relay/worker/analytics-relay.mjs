@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 const MAX_ONLINE_PLAYER_COUNT = 10_000;
-export const CONTRACT_REVISION = 6;
+export const CONTRACT_REVISION = 7;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -103,7 +103,12 @@ const SCENE_PROPERTIES = new Set([
   ...SCENE_COMMON_PROPERTIES, ...[...SCENE_ACTION_PROPERTIES.values()].flatMap((keys) => [...keys]),
 ]);
 
+const DICE_BOOLEAN_PROPERTIES = new Set([
+  "dice_explode", "dice_reroll", "dice_keep_drop", "dice_success_pool", "dice_arithmetic", "dice_helpers",
+]);
 const ALLOWED_PROPERTIES = new Set([
+  ...DICE_BOOLEAN_PROPERTIES,
+  "dice_complexity",
   ...TELEPORT_CONFIG_PROPERTIES,
   ...SCENE_PROPERTIES,
   "enable_scene_markers",
@@ -276,7 +281,9 @@ const ALLOWED_STRING_VALUES = new Map([
   ["chat_type", new Set(["chat_tab", "envhere", "gooc", "it", "me", "normal", "ooc", "whisper", "yell"])],
   ["character_sheet_field_count_bucket", new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"])],
   ["changed_settings_bucket", new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"])],
+  ["dice_complexity", new Set(["simple", "advanced"])],
   ["command_name", new Set([
+    "roll", "proll",
     "addlang",
     "adminaddlang",
     "adminlangprogress",
@@ -340,6 +347,7 @@ const ALLOWED_STRING_VALUES = new Map([
   ["mod_id", new Set(["thebasics"])],
   ["feature_name", new Set([
     "scene_markers",
+    "dice",
     "character_headshot",
     "character_sheet_fields",
     "chat_mode",
@@ -419,6 +427,7 @@ const ALLOWED_STRING_VALUES = new Map([
   ["previous_session_age_bucket", new Set(["unknown", "<1m", "1-5m", "5-30m", "30-120m", "120m+"])],
   ["proximity_chat_presentation_mode", new Set(["StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose"])],
   ["result", new Set([
+    "help", "disabled", "invalid_input", "rate_limited",
     "admin_online",
     "bad-options",
     "back_dimension_mismatch",
@@ -513,6 +522,7 @@ const ALLOWED_STRING_VALUES = new Map([
 ]);
 
 const BOOLEAN_PROPERTIES = new Set([
+  ...DICE_BOOLEAN_PROPERTIES,
   ...TELEPORT_BOOLEAN_PROPERTIES,
   "enable_scene_markers",
   "scene_locked",
@@ -650,6 +660,8 @@ const EVENT_PROPERTIES = new Map([
   ])],
   ["config snapshot", CONFIG_PROPERTIES],
   ["feature used", new Set([
+    ...DICE_BOOLEAN_PROPERTIES,
+    "dice_complexity",
     ...BASE_PROPERTIES,
     ...SCENE_PROPERTIES,
     "action",

@@ -24,7 +24,7 @@ All charts are limited to consenting installations with the new build. Telemetry
 
 ## Simple QA cards
 
-Run after owner approval on the QA server, with the matching client build and relay contract 6 active. Inspect emitted events through the QA installation's private PostHog filter. Allow the configured flush interval and ingestion delay.
+Run after owner approval on the QA server, with the matching client build and relay contract 7 active. Inspect emitted events through the QA installation's private PostHog filter. Allow the configured flush interval and ingestion delay.
 
 1. **Place, write, save.** Place a fresh marker, give it a title/body, save, then edit and save again. Expect `placed` with `scene_placement=fresh`, then `saved` with `first_content`, then `edit`. Change display mode, lock and body visibility and verify only bounded values appear. No title/body, author, coordinates or pseudonym may appear in the payload.
 2. **Open and toggle.** Open its reader twice within 30 seconds. Expect one `reader_opened`. Mark read, then unread. Expect one of each state change. Repeating an unchanged read-state request must not create another event. Have player two open the same marker within that window and expect their own open to count.
@@ -35,7 +35,7 @@ Run after owner approval on the QA server, with the matching client build and re
 ## Rollout order
 
 1. Finish automated tests and review both producer and relay changes.
-2. After approval, deploy the `thebasics-analytics-relay` Worker and verify its health endpoint reports `contract_revision >= 6`. The existing release workflow refuses a lower revision.
+2. After approval, deploy the `thebasics-analytics-relay` Worker and verify its health endpoint reports `contract_revision >= 7`. The existing release workflow refuses a lower revision.
 3. After QA deployment approval, upload the new mod build to the test server, restart it and use matching local client builds. Run the cards above. Manual QA is complete only when the owner confirms the observed results.
 4. Merge and publish only with owner approval. Save the prepared insights/dashboard in the analytics project during rollout, with the private QA exclusion and an annotation marking the first instrumented release.
 5. Confirm the first live `scene_markers` events have the released mod version, inspect rejection counts in Worker logs, and then begin the usage readout. A zero before deployment means uninstrumented, not unused.

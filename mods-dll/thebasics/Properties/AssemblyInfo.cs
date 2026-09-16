@@ -52,3 +52,4 @@ using Vintagestory.API.Common;
 
 
 
+[assembly: InternalsVisibleTo("TheBasics.GuiPreview")]

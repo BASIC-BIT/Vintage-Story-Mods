@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>TheBasics.GuiPreview</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../mods-dll/thebasics/thebasics.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="VintagestoryAPI">
+      <HintPath>$(VINTAGE_STORY)/VintagestoryAPI.dll</HintPath>
+    </Reference>
+    <Reference Include="VintagestoryLib">
+      <HintPath>$(VINTAGE_STORY)/VintagestoryLib.dll</HintPath>
+    </Reference>
+    <Reference Include="cairo-sharp">
+      <HintPath>$(VINTAGE_STORY)/Lib/cairo-sharp.dll</HintPath>
+    </Reference>
+    <Reference Include="SkiaSharp" Condition="Exists('$(VINTAGE_STORY)/Lib/SkiaSharp.dll')">
+      <HintPath>$(VINTAGE_STORY)/Lib/SkiaSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(VINTAGE_STORY)/Lib/libcairo-2.dll" Condition="Exists('$(VINTAGE_STORY)/Lib/libcairo-2.dll')"
+          Link="libcairo-2.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(VINTAGE_STORY)/Lib/libSkiaSharp.dll" Condition="Exists('$(VINTAGE_STORY)/Lib/libSkiaSharp.dll')"
+          Link="libSkiaSharp.dll" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="SkiaSharp" Version="3.119.1" Condition="!Exists('$(VINTAGE_STORY)/Lib/SkiaSharp.dll')" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.1"
+                      Condition="!Exists('$(VINTAGE_STORY)/Lib/SkiaSharp.dll')" />
+  </ItemGroup>
+</Project>

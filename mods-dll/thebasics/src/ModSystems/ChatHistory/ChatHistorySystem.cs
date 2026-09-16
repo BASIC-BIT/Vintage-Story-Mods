@@ -754,6 +754,7 @@ public class ChatHistorySystem : BaseBasicModSystem
     {
         if (context.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL)) return ChatHistoryConstants.KindPlacedEnvironmental;
         if (context.HasFlag(MessageContext.IS_ENVIRONMENTAL)) return ChatHistoryConstants.KindEnvironmental;
+        if (context.HasFlag(MessageContext.IS_ROLL)) return ChatHistoryConstants.KindRoll;
         if (context.HasFlag(MessageContext.IS_GLOBAL_OOC)) return ChatHistoryConstants.KindGlobalOoc;
         if (context.HasFlag(MessageContext.IS_OOC)) return ChatHistoryConstants.KindOoc;
         if (context.HasFlag(MessageContext.IS_EMOTE)) return ChatHistoryConstants.KindEmote;

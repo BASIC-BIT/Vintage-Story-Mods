@@ -4,7 +4,7 @@ User approved implementing all proposed usage measurements together on September
 
 ## Event contract
 
-Use the existing consent-controlled `feature used` event with `feature_name=scene_markers`. Never supply an actor pseudonym. The relay contract revision becomes 6, and remains compatible with previous producers.
+Use the existing consent-controlled `feature used` event with `feature_name=scene_markers`. Never supply an actor pseudonym. The relay contract revision becomes 7, and remains compatible with previous producers.
 
 | Action | Meaning |
 | --- | --- |
@@ -24,4 +24,4 @@ Never export marker title/body, author names, player IDs or pseudonyms, position
 
 Report weekly reporting installations with placement, save, explicit read, and bubble visibility separately; total actions; week-over-week return usage; display-mode preference on saved markers. Installation identity is the unit, not unique players. `moved` is already included in `placed` and must never be added to placement totals. No historic backfill is possible.
 
-Ship the Worker contract before distributing the mod. Health must advertise revision 6 before mod upload. Deploy, manual QA, merge and publication remain separate owner-approved steps. QA covers accepted/denied edits, opt-out, two viewers, bubble dwell/cooldown, read toggles, and pickup/replacement. Retire this kickoff after the update is published and its first live scene events are verified.
+Ship the Worker contract before distributing the mod. Health must advertise revision 7 before mod upload. Deploy, manual QA, merge and publication remain separate owner-approved steps. QA covers accepted/denied edits, opt-out, two viewers, bubble dwell/cooldown, read toggles, and pickup/replacement. Retire this kickoff after the update is published and its first live scene events are verified.

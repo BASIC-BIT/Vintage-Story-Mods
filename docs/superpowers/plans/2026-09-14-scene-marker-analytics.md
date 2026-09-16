@@ -15,7 +15,7 @@
 - No marker text, player identifiers, coordinates, or marker identifiers in exported events.
 - Preserve existing consent behavior and existing gameplay.
 - Client observations use SafeClientNetworkChannel and are never queued while disconnected.
-- Relay revision 6 must be deployed before distributing the mod. Deployment and publication are outside implementation approval.
+- Relay revision 7 must be deployed before distributing the mod. Deployment and publication are outside implementation approval.
 
 ## Task 1: Producer and interaction validation
 
@@ -23,7 +23,7 @@ Files: `mods-dll/thebasics/src/ModSystems/SceneDescriptions/`, `Analytics/Analyt
 
 - [x] Write and run failing tests for accepted saves, denied saves, actual read-state transitions, reuse, opt-out, client dwell/cooldown, server distance validation, and bounded state.
 - [x] Add successful action hooks and safe observation networking. Use `AnalyticsService.TrackFeatureUsed("scene_markers", action, properties: properties)` without `actorPlayerUid`.
-- [x] Add `enable_scene_markers` to config snapshots and raise `RequiredRelayContractRevision` to 6.
+- [x] Add `enable_scene_markers` to config snapshots and raise `RequiredRelayContractRevision` to 7.
 - [x] Run `dotnet test mods-dll/thebasics.Tests/thebasics.Tests.csproj -c Release -p:SkipPostBuildPackage=true` with `VINTAGE_STORY=D:/Games/Vintagestory`.
 
 ## Task 2: Relay contract
@@ -32,7 +32,7 @@ Files: `infra/terraform/stacks/thebasics-analytics-relay/worker/analytics-relay.
 
 - [x] Add failing tests that submit every action with its scene properties through `validatePayload(payloadForEvent("feature used", properties))`, asserting no rejections and preserved bounded values.
 - [x] Add rejection tests for marker text/coordinates, invalid enum values, wrong boolean types, scene properties on other features, and scene pseudonyms.
-- [x] Extend property/action/feature allowlists and event-specific sets, enforce the scene-only contract, raise `CONTRACT_REVISION` to 6.
+- [x] Extend property/action/feature allowlists and event-specific sets, enforce the scene-only contract, raise `CONTRACT_REVISION` to 7.
 - [x] Run `node --test infra/terraform/stacks/thebasics-analytics-relay/worker/analytics-relay.test.mjs`, including source-derived producer compatibility tests.
 
 ## Task 3: Reporting, integration and review
