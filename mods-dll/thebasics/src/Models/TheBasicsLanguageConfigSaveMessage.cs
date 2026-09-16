@@ -11,4 +11,6 @@ public class TheBasicsLanguageConfigSaveMessage
 
     [ProtoMember(2)]
     public bool ReloadFromDisk { get; set; }
+    [ProtoMember(3)]
+    public long RequestId { get; set; }
 }

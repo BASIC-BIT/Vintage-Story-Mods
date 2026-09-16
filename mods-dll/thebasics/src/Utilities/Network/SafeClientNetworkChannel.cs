@@ -14,7 +14,7 @@ namespace thebasics.Utilities.Network
     {
         private readonly IClientNetworkChannel _channel;
         private readonly ICoreClientAPI _api;
-        private readonly Queue<Action> _pendingPacketActions;
+        private readonly Queue<(Action Run, Action OnFailure)> _pendingPacketActions;
         private readonly SafeNetworkChannelConfig _config;
 
         private bool _connectionRetryInProgress;
@@ -58,7 +58,7 @@ namespace thebasics.Utilities.Network
             _channel = channel ?? throw new ArgumentNullException(nameof(channel));
             _api = api ?? throw new ArgumentNullException(nameof(api));
             _config = config ?? new SafeNetworkChannelConfig();
-            _pendingPacketActions = new Queue<Action>();
+            _pendingPacketActions = new Queue<(Action Run, Action OnFailure)>();
             _connectionRetryInProgress = false;
             _connectionRetryCount = 0;
         }
@@ -109,7 +109,7 @@ namespace thebasics.Utilities.Network
         /// </summary>
         /// <typeparam name="T">The type of message to send</typeparam>
         /// <param name="message">The message to send</param>
-        public void SendPacketSafely<T>(T message)
+        public void SendPacketSafely<T>(T message, Action onFailure = null)
         {
             QueuePacketAction(() =>
             {
@@ -124,18 +124,24 @@ namespace thebasics.Utilities.Network
                 else
                 {
                     _api.Logger.Warning($"{_config.LogPrefix} Cannot send packet {typeof(T).Name} - channel not connected");
+                    NotifyFailure(onFailure);
                 }
-            });
+            }, onFailure);
         }
 
         /// <summary>
         /// Executes an action immediately if connected, or queues it for retry if not
         /// </summary>
         /// <param name="action">The action to execute</param>
-        public void QueuePacketAction(Action action)
+        public void QueuePacketAction(Action action, Action onFailure = null)
         {
+            if (_disposed)
+            {
+                NotifyFailure(onFailure);
+                return;
+            }
             // Always queue the action first to ensure consistent behavior
-            _pendingPacketActions.Enqueue(action);
+            _pendingPacketActions.Enqueue((action, onFailure));
 
             if (IsConnected)
             {
@@ -172,11 +178,12 @@ namespace thebasics.Utilities.Network
                 var action = _pendingPacketActions.Dequeue();
                 try
                 {
-                    action();
+                    action.Run();
                 }
                 catch (Exception e)
                 {
                     _api.Logger.Error($"{_config.LogPrefix} Error executing queued packet action: {e}");
+                    NotifyFailure(action.OnFailure);
                 }
             }
         }
@@ -242,7 +249,10 @@ namespace thebasics.Utilities.Network
         public void ClearPendingActions()
         {
             var clearedCount = _pendingPacketActions.Count;
-            _pendingPacketActions.Clear();
+            while (_pendingPacketActions.Count > 0)
+            {
+                NotifyFailure(_pendingPacketActions.Dequeue().OnFailure);
+            }
             if (clearedCount > 0 && _config.EnableDebugLogging)
             {
                 _api.Logger.Debug($"{_config.LogPrefix} Cleared {clearedCount} pending packet actions");
@@ -260,6 +270,12 @@ namespace thebasics.Utilities.Network
             {
                 _api.Logger.Debug($"{_config.LogPrefix} Retry state reset");
             }
+        }
+
+        private void NotifyFailure(Action onFailure)
+        {
+            try { onFailure?.Invoke(); }
+            catch (Exception e) { _api.Logger.Error($"{_config.LogPrefix} Error notifying packet failure: {e}"); }
         }
 
         /// <summary>
