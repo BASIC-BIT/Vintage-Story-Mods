@@ -48,6 +48,7 @@ public sealed class ProximityChatMessageEventArgs : EventArgs
 
     private static ProximityChatMessageKind ResolveKind(MessageContext context)
     {
+        if (context.HasFlag(MessageContext.IS_ROLL)) return ProximityChatMessageKind.Roll;
         if (context.HasFlag(MessageContext.IS_GLOBAL_OOC)) return ProximityChatMessageKind.GlobalOoc;
         if (context.HasFlag(MessageContext.IS_OOC)) return ProximityChatMessageKind.LocalOoc;
         if (context.HasFlag(MessageContext.IS_PLACED_ENVIRONMENTAL)) return ProximityChatMessageKind.PlacedEnvironmental;

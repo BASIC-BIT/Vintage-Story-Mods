@@ -155,6 +155,7 @@ public static class ConfigAdminSettingRegistry
     {
         settings.AddRange(new[]
         {
+            Bool("EnableDiceRolling", "Chat/RP", "Enable dice rolling", "Allow public and self-only private dice rolls.", ConfigAdminReloadBehavior.Live, c => c.EnableDiceRolling, (c, v) => c.EnableDiceRolling = v),
             Bool("EnableChatter", "Chat/RP", "Enable chatter sounds", "Play seraph voice chatter for speech messages.", ConfigAdminReloadBehavior.Live, c => c.EnableChatter, (c, v) => c.EnableChatter = v),
             Select("ProximityChatPresentationMode", "Chat/RP", "Chat presentation mode", "Controls how proximity speech appears in chat.", ConfigAdminReloadBehavior.Live, (c => ProximityChatPresentationModes.Normalize(c.ProximityChatPresentationMode), (c, v) => c.ProximityChatPresentationMode = v), new[] { "StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose" }),
             Bool("NormalizeProximityChatText", "Chat/RP", "Normalize proximity text", "Automatically capitalize and punctuate RP speech, emotes, and environmental messages.", ConfigAdminReloadBehavior.Live, c => c.NormalizeProximityChatText, (c, v) => c.NormalizeProximityChatText = v),

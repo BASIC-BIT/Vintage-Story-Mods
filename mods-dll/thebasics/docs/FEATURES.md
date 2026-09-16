@@ -15,6 +15,16 @@ The mod currently loads these server-side systems:
 
 It also loads the client-side `ChatUiSystem` for config sync, chat UI patches, speech bubbles, typing indicators, placed environmental bubbles, RPTTS dispatch, and chatter playback.
 
+## Dice Rolling
+
+- Public /roll and /r; self-only /proll and /privateroll; namespaced fallbacks preserve other mods' short-command ownership.
+- Standard dice, arithmetic, keep/drop, exploding dice, per-die rerolls, success pools and optional reasons.
+- Current speech range with (W)/(Y) markers; explicit roll history/event kind and existing Th3Essentials relay.
+- Single-row drawn dice bubbles, existing bubble policies, and spectator suppression.
+- EnableDiceRolling (default true), chat privilege, fixed evaluation limits and a small account burst guard.
+- Private command contents bypass vanilla's audited command wrapper and all shared output paths.
+- See [syntax, semantics and compatibility](DICE_ROLLING.md).
+
 ## Chat History Search
 
 Features:

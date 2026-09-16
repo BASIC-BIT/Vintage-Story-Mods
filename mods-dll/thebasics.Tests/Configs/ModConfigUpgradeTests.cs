@@ -72,6 +72,7 @@ public class ModConfigUpgradeTests
     {
         var config = LoadLegacyConfig();
 
+        config.EnableDiceRolling.Should().BeTrue();
         config.UseNicknameInSpectatorOOC.Should().BeFalse();
         config.AllowSpectatorPlacedEnvironmentalMessages.Should().BeTrue();
         config.ProtectSpectatorRoleplayChat.Should().BeTrue();
@@ -188,6 +189,7 @@ public class ModConfigUpgradeTests
         config.RequireClearSoundPathForSpeech[ProximityChatMode.Yell] = true;
         config.SpeechOcclusionWallPenaltyBlocks = 7;
         config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
+        config.EnableDiceRolling = false;
         config.UseNicknameInSpectatorOOC = true;
         config.AllowSpectatorPlacedEnvironmentalMessages = false;
         config.ProtectSpectatorRoleplayChat = false;
@@ -203,6 +205,7 @@ public class ModConfigUpgradeTests
         restored.RequireClearSoundPathForSpeech[ProximityChatMode.Yell].Should().BeTrue();
         restored.SpeechOcclusionWallPenaltyBlocks.Should().Be(7);
         restored.ProximityChatModeDistances[ProximityChatMode.Normal].Should().Be(ModConfig.UnlimitedRange);
+        restored.EnableDiceRolling.Should().BeFalse();
         restored.UseNicknameInSpectatorOOC.Should().BeTrue();
         restored.AllowSpectatorPlacedEnvironmentalMessages.Should().BeFalse();
         restored.ProtectSpectatorRoleplayChat.Should().BeFalse();
