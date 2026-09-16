@@ -13,11 +13,21 @@ Session config: EnableDiceRolling=true, EnableTh3EssentialsDiscordRelay=true, En
 Original config, logs and previous client packages are preserved under .superpowers/sdd/dice-qa. Restore original config after the QA session.
 
 Boot findings: duplicate flywheelpower ID; three saved TheBasicsSceneDescription blockentity load failures. No dice startup exception observed. These world/mod-set findings are not silently treated as a clean boot; follow up separately from dice observations.
-Discord bridge is configured and enabled, but delivery is not yet human-verified.
+Discord bridge was configured and enabled during QA. No separate Discord observation was recorded in the conversation.
 
-All manual cards remain pending. Private command arguments in vanilla audit logs are expected, not a failure. Private results must remain absent from other clients, bubbles, shared history and Discord.
+Owner explicitly confirmed "qa passed" after the readability retest. Manual QA is accepted as complete for tested code d4451ea; this records owner acceptance without inventing individual card observations. Private command arguments in vanilla audit logs are expected, not a failure. Private results must remain absent from other clients, bubbles, shared history and Discord.
 
 ## First owner observations
 
 Owner reported redundant nested brackets and kept labels on ordinary rolls, and unexpected constant evaluation for /r 20. Requested bold numerical totals. Other observations were broadly positive, without enough detail to check off complex range/privacy/relay cards.
 Changes for focused retest: bare unsigned integer expressions roll dN; ordinary dice omit kept labels unless a drop actually occurred; plain dN omits redundant face list; chat totals are bold. Arithmetic constants remain unchanged. All 892 tests pass.
+
+
+## Owner acceptance
+
+Owner described the revised output as "much much better" and "this is good", then explicitly confirmed "qa passed".
+Accepted code: d4451ea16dfecdd9c8756f161052232ee9abd8e9.
+Accepted package SHA256: CC65CA86A69819B1DAED3BF1632CDA32A6E11EFF8F76C035C585F08DB298E19A.
+Automated verification: 892 tests passed. The server and both client copies matched this package.
+The session-only dice/relay config overrides are being restored to their pre-QA values. The accepted package remains installed.
+This does not merge the PR or complete the independent exact-head review gate.

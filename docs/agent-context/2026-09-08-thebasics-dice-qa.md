@@ -1,6 +1,6 @@
 # Dice implementation QA cards
 
-Status: owner authorized deployment and manual QA on 2026-09-16. Setup in progress. Owner approval is required before deployment/client launch and before marking manual QA complete. Automated tests and static PNG previews do not substitute for these observations.
+Status: owner explicitly confirmed "qa passed" on 2026-09-16 after testing d4451ea. See 2026-09-16-dice-qa-session.md for observed feedback and acceptance. Cards below remain the test plan, not a fabricated per-card observation log. Owner approval is required before deployment/client launch and before marking manual QA complete. Automated tests and static PNG previews do not substitute for these observations.
 
 ## Batch A: enabled, RpText, real relay
 
