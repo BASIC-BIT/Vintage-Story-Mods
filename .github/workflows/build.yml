@@ -311,7 +311,10 @@ jobs:
           "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
-          "mods-dll/dimensioncavern/dimensioncavern.csproj"
+          "mods-dll/dimensioncavern/dimensioncavern.csproj",
+          "mods-dll/agentcontrol.Tests/agentcontrol.Tests.csproj",
+          "mods-dll/agentcontrol.sample/agentcontrol.sample.csproj",
+          "tools/vsctl/vsctl.csproj"
         )
 
         foreach ($project in $projects) {
@@ -331,7 +334,10 @@ jobs:
           "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
-          "mods-dll/dimensioncavern/dimensioncavern.csproj"
+          "mods-dll/dimensioncavern/dimensioncavern.csproj",
+          "mods-dll/agentcontrol.Tests/agentcontrol.Tests.csproj",
+          "mods-dll/agentcontrol.sample/agentcontrol.sample.csproj",
+          "tools/vsctl/vsctl.csproj"
         )
 
         foreach ($project in $projects) {
@@ -349,7 +355,12 @@ jobs:
           "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
-          "mods-dll/dimensioncavern/dimensioncavern.csproj"
+          "mods-dll/dimensioncavern/dimensioncavern.csproj",
+          "mods-dll/agentcontrol/agentcontrol.csproj",
+          "mods-dll/agentcontrol.abstractions/agentcontrol.abstractions.csproj",
+          "mods-dll/agentcontrol.Tests/agentcontrol.Tests.csproj",
+          "mods-dll/agentcontrol.sample/agentcontrol.sample.csproj",
+          "tools/vsctl/vsctl.csproj"
         )
 
         foreach ($project in $projects) {
@@ -375,6 +386,16 @@ jobs:
     - name: Run DimensionLib Tests
       run: |
         dotnet test mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj `
+          --configuration Release `
+          --no-build `
+          --verbosity normal `
+          --collect:"XPlat Code Coverage" `
+          --results-directory TestResults
+      shell: pwsh
+
+    - name: Run Agent Control Tests
+      run: |
+        dotnet test mods-dll/agentcontrol.Tests/agentcontrol.Tests.csproj `
           --configuration Release `
           --no-build `
           --verbosity normal `
@@ -529,7 +550,7 @@ jobs:
       if: always()
       run: |
         pip install lizard
-        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/
+        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/ ./mods-dll/agentcontrol/ ./mods-dll/agentcontrol.abstractions/
       shell: bash
 
     - name: Test Build Output
@@ -541,7 +562,10 @@ jobs:
           "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll",
           "mods-dll\dimensionlib\bin\Release\net10.0\dimensionlib.dll",
           "mods-dll\dimensionpockets\bin\Release\net10.0\pocketdimensions.dll",
-          "mods-dll\dimensioncavern\bin\Release\net10.0\dimensioncavern.dll"
+          "mods-dll\dimensioncavern\bin\Release\net10.0\dimensioncavern.dll",
+          "mods-dll\agentcontrol\bin\Release\net10.0\agentcontrol.dll",
+          "mods-dll\agentcontrol.sample\bin\Release\net10.0\agentcontrol.sample.dll",
+          "tools\vsctl\bin\Release\net10.0\vsctl.dll"
         )
 
         foreach ($dllPath in $dllPaths) {
@@ -567,7 +591,9 @@ jobs:
           "mods-dll\thebasics",
           "mods-dll\dimensionlib",
           "mods-dll\dimensionpockets",
-          "mods-dll\dimensioncavern"
+          "mods-dll\dimensioncavern",
+          "mods-dll\agentcontrol",
+          "mods-dll\agentcontrol.sample"
         )
 
         foreach ($modDir in $modDirs) {
