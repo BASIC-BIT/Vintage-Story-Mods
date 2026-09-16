@@ -1,0 +1,82 @@
+{
+  "//": "One cell of a tension station's machine leg: the same lattice column as ropeway:driveshaft, carrying the tower, with the counterweight's two guide rails and its rope in place of the drive shaft. Three of these are what give the mass its headroom, and because they are cells the multiblock check requires, that headroom is checked by construction. No side variant - 4-fold symmetric.",
+  "code": "tensionguide",
+  "shape": {
+    "base": "ropeway:block/tensionguide"
+  },
+  "textures": {
+    "girder": {
+      "base": "game:block/metal/riveted/iron1"
+    },
+    "shaft": {
+      "base": "game:block/metal/plate/steel"
+    },
+    "rope": {
+      "base": "game:block/cloth/reedrope"
+    }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Metal",
+  "creativeinventory": {
+    "general": [
+      "*"
+    ],
+    "construction": [
+      "*"
+    ]
+  },
+  "attributes": {
+    "handbook": {
+      "groupBy": [
+        "tensionguide"
+      ]
+    },
+    "reinforcable": false
+  },
+  "replaceable": 500,
+  "resistance": 3.5,
+  "lightAbsorption": 0,
+  "sidesolid": {
+    "all": false
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "collisionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 1,
+    "z2": 1
+  },
+  "selectionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 1,
+    "z2": 1
+  },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/anvil",
+    "hit": "game:block/anvil",
+    "byTool": {
+      "Pickaxe": {
+        "hit": "game:block/rock-hit-pickaxe",
+        "break": "game:block/rock-break-pickaxe"
+      }
+    }
+  },
+  "guiTransform": {
+    "rotation": {
+      "x": -22.6,
+      "y": 45,
+      "z": 0
+    },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

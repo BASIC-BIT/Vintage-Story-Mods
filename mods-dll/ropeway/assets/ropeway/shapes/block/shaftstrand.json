@@ -1,0 +1,42 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "rope": "game:block/cloth/reedrope"
+  },
+  "elements": [
+    {
+      "name": "strand",
+      "from": [
+        7.04,
+        0,
+        7.04
+      ],
+      "to": [
+        8.96,
+        16,
+        8.96
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rope"
+        },
+        "east": {
+          "texture": "#rope"
+        },
+        "south": {
+          "texture": "#rope"
+        },
+        "west": {
+          "texture": "#rope"
+        },
+        "up": {
+          "texture": "#rope"
+        },
+        "down": {
+          "texture": "#rope"
+        }
+      }
+    }
+  ]
+}

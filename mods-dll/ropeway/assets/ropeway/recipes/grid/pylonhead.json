@@ -1,0 +1,12 @@
+{
+  "//": "Pattern and quantities UNCHANGED - only the wildcard names are gone (see brace.json). Checked, not skipped: it is a MARGINAL block, one per tower, so it is exempt from the eight-bit fastener rule the station machinery now follows. One bit, not eight. Its price falls anyway, 0.55 -> 0.30 ingot, because the brace inside it got cheaper.",
+  "ingredientPattern": "R,B,M",
+  "ingredients": {
+    "R": { "type": "item", "code": "game:rope" },
+    "B": { "type": "block", "code": "ropeway:brace-*" },
+    "M": { "type": "item", "code": "game:metalbit-*" }
+  },
+  "width": 1,
+  "height": 3,
+  "output": { "type": "block", "code": "pylonhead-north", "quantity": 1 }
+}
