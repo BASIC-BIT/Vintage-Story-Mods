@@ -309,6 +309,7 @@ jobs:
         $projects = @(
           "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
           "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
+          "mods-dll/flywheelpower.Tests/flywheelpower.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
           "mods-dll/dimensioncavern/dimensioncavern.csproj"
@@ -329,6 +330,7 @@ jobs:
         $projects = @(
           "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
           "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
+          "mods-dll/flywheelpower.Tests/flywheelpower.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
           "mods-dll/dimensioncavern/dimensioncavern.csproj"
@@ -347,6 +349,7 @@ jobs:
         $projects = @(
           "mods-dll/thebasics.Tests/thebasics.Tests.csproj",
           "mods-dll/dimensionlib.Tests/dimensionlib.Tests.csproj",
+          "mods-dll/flywheelpower.Tests/flywheelpower.Tests.csproj",
           "mods-dll/dimensionlib/dimensionlib.csproj",
           "mods-dll/dimensionpockets/dimensionpockets.csproj",
           "mods-dll/dimensioncavern/dimensioncavern.csproj"
@@ -380,6 +383,14 @@ jobs:
           --verbosity normal `
           --collect:"XPlat Code Coverage" `
           --results-directory TestResults
+      shell: pwsh
+
+    - name: Run Flywheel Power Tests
+      run: |
+        dotnet test mods-dll/flywheelpower.Tests/flywheelpower.Tests.csproj `
+          --configuration Release `
+          --no-build `
+          --verbosity normal
       shell: pwsh
 
     - name: Generate Coverage Report
@@ -529,7 +540,7 @@ jobs:
       if: always()
       run: |
         pip install lizard
-        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/
+        lizard -l csharp -C 25 -L 100 -a 8 -w --whitelist whitelizard.txt ./mods-dll/thebasics/src/ ./mods-dll/dimensionlib/src/ ./mods-dll/dimensionpockets/src/ ./mods-dll/dimensioncavern/src/ ./mods-dll/flywheelpower/src/
       shell: bash
 
     - name: Test Build Output
@@ -541,7 +552,8 @@ jobs:
           "mods-dll\thebasics\bin\Release\net10.0\thebasics.dll",
           "mods-dll\dimensionlib\bin\Release\net10.0\dimensionlib.dll",
           "mods-dll\dimensionpockets\bin\Release\net10.0\pocketdimensions.dll",
-          "mods-dll\dimensioncavern\bin\Release\net10.0\dimensioncavern.dll"
+          "mods-dll\dimensioncavern\bin\Release\net10.0\dimensioncavern.dll",
+          "mods-dll\flywheelpower\bin\Release\net10.0\flywheelpower.dll"
         )
 
         foreach ($dllPath in $dllPaths) {
@@ -567,7 +579,8 @@ jobs:
           "mods-dll\thebasics",
           "mods-dll\dimensionlib",
           "mods-dll\dimensionpockets",
-          "mods-dll\dimensioncavern"
+          "mods-dll\dimensioncavern",
+          "mods-dll\flywheelpower"
         )
 
         foreach ($modDir in $modDirs) {
