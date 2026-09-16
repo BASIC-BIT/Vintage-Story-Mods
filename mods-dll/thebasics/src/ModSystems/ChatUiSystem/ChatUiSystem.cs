@@ -51,7 +51,13 @@ public class ChatUiSystem : ModSystem
     private static PlayerNotesDialog _playerNotesDialog;
     private static ChatHistoryDialog _chatHistoryDialog;
     private static bool _pendingCharacterSheetSave;
+    private static readonly DialogRequestTracker CharacterSheetRequests = new();
+    private static readonly DialogRequestTracker NotesRequests = new();
+    private static readonly DialogRequestTracker LanguageRequests = new();
     private static bool _pendingCharacterSheetOpenFromCharacterDialog;
+    private static long _nextCharacterSheetAutoOpenRequestId;
+    private static long _pendingCharacterSheetAutoOpenRequestId;
+    private static bool _characterDialogSheetAutoOpenHandled;
     private static bool _suppressNextCharacterDialogSheetOpen;
     private static bool _characterSheetOpenedFromCharacterDialog;
     private static CharacterSheetViewMessage _lastOwnCharacterSheetView;
@@ -183,19 +189,32 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        if (_config == null || !_config.EnableCharacterSheets || _characterSheetDialog?.IsOpened() == true || _pendingCharacterSheetOpenFromCharacterDialog)
+        if (_config == null || !_config.EnableCharacterSheets || _characterDialogSheetAutoOpenHandled || _characterSheetDialog?.IsOpened() == true || _pendingCharacterSheetOpenFromCharacterDialog)
         {
             return;
         }
 
+        // Tab changes also compose the character window. Dismissing the sheet must
+        // keep it dismissed until the character window is closed and opened again.
+        _characterDialogSheetAutoOpenHandled = true;
         _characterSheetOpenedFromCharacterDialog = true;
-        if (_lastOwnCharacterSheetView != null)
+        var showedCachedSheet = _lastOwnCharacterSheetView != null;
+        if (showedCachedSheet)
         {
             OpenCharacterSheetDialog(_lastOwnCharacterSheetView);
         }
 
         _pendingCharacterSheetOpenFromCharacterDialog = true;
-        RequestOwnCharacterSheet();
+        var requestId = ++_nextCharacterSheetAutoOpenRequestId;
+        _pendingCharacterSheetAutoOpenRequestId = requestId;
+        _pendingCharacterSheetSave = false;
+        SendDialogRequest(new CharacterSheetOpenRequest { Mode = CharacterSheetOpenRequest.ModeOwn, AutoOpenRequestId = requestId }, () =>
+        {
+            if (_pendingCharacterSheetAutoOpenRequestId != requestId) return;
+            _pendingCharacterSheetAutoOpenRequestId = 0;
+            _pendingCharacterSheetOpenFromCharacterDialog = false;
+            if (!showedCachedSheet) _characterDialogSheetAutoOpenHandled = false;
+        });
     }
 
     private static void RequestOwnCharacterSheet()
@@ -205,14 +224,49 @@ public class ChatUiSystem : ModSystem
 
     private static void SendCharacterSheetRequest(CharacterSheetOpenRequest request)
     {
+        var supersedesAutoOpen = _pendingCharacterSheetAutoOpenRequestId != 0;
+        _pendingCharacterSheetAutoOpenRequestId = 0;
+        _pendingCharacterSheetOpenFromCharacterDialog = false;
+        if (supersedesAutoOpen)
+        {
+            _characterSheetOpenedFromCharacterDialog = false;
+        }
         _pendingCharacterSheetSave = false;
         _safeNetworkChannel?.SendPacketSafely(request);
+    }
+
+    private static void SendTrackedCharacterSheetRefresh(CharacterSheetOpenRequest request)
+    {
+        var requestId = ++_nextCharacterSheetAutoOpenRequestId;
+        request.AutoOpenRequestId = requestId;
+        _pendingCharacterSheetAutoOpenRequestId = requestId;
+        SendDialogRequest(request, () =>
+        {
+            if (_pendingCharacterSheetAutoOpenRequestId == requestId) _pendingCharacterSheetAutoOpenRequestId = 0;
+        });
     }
 
     private static void SendCharacterSheetSaveRequest(CharacterSheetSaveRequest request)
     {
         _pendingCharacterSheetSave = true;
-        _safeNetworkChannel?.SendPacketSafely(request);
+        var dialog = _characterSheetDialog;
+        request.RequestId = BeginDialogRequest(CharacterSheetRequests, () =>
+        {
+            dialog?.OnRequestFailed();
+            if (ReferenceEquals(dialog, _characterSheetDialog)) _pendingCharacterSheetSave = false;
+        });
+        SendDialogRequest(request, () => CharacterSheetRequests.Fail(request.RequestId));
+    }
+
+    private static long BeginDialogRequest(DialogRequestTracker tracker, Action onFailure, Action onTimeout = null)
+    {
+        return tracker.Begin(onFailure, (callback, delay) => _api.Event.RegisterCallback(_ => callback(), delay), onTimeout);
+    }
+
+    private static void SendDialogRequest<T>(T message, Action onFailure)
+    {
+        if (_safeNetworkChannel == null) onFailure();
+        else _safeNetworkChannel.SendPacketSafely(message, onFailure);
     }
 
 
@@ -340,6 +394,16 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
+        if (message.IsSaveResponse && !CharacterSheetRequests.Accept(message.RequestId)) return;
+
+        // A cached sheet can be dismissed before its refresh arrives. Correlate
+        // auto-opens so an old window cannot reopen or replace a newer view.
+        if (message.AutoOpenRequestId != 0)
+        {
+            if (message.AutoOpenRequestId != _pendingCharacterSheetAutoOpenRequestId) return;
+            _pendingCharacterSheetAutoOpenRequestId = 0;
+        }
+
         UpdateLocalCharacterDisplayName(message);
         CacheOwnCharacterSheetView(message);
 
@@ -351,10 +415,9 @@ public class ChatUiSystem : ModSystem
 
         if (message.SuppressDialogOpen)
         {
-            _pendingCharacterSheetSave = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
             RefreshCharacterDialogTitle();
-            if (_characterSheetDialog?.IsOpened() == true)
+            if (_characterSheetDialog?.IsOpened() == true && _characterSheetDialog.CurrentTargetPlayerUid == message.TargetPlayerUid && _characterSheetDialog.IsAdminView == message.IsAdminView)
             {
                 _characterSheetDialog.SetView(message);
             }
@@ -362,7 +425,7 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        if (message.IsSaveResponse || _pendingCharacterSheetSave)
+        if (message.IsSaveResponse)
         {
             _pendingCharacterSheetSave = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
@@ -376,7 +439,6 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        _pendingCharacterSheetSave = false;
         _pendingCharacterSheetOpenFromCharacterDialog = false;
 
         OpenCharacterSheetDialog(message);
@@ -384,6 +446,7 @@ public class ChatUiSystem : ModSystem
 
     private static void HandleCharacterSheetErrorMessage(CharacterSheetViewMessage message)
     {
+        if (message.IsSaveResponse || _pendingCharacterSheetSave) _characterSheetDialog?.OnSaveRejected();
         var suppressDisabledAutoOpenError = _pendingCharacterSheetOpenFromCharacterDialog &&
                                             message.ErrorCode == CharacterSheetViewMessage.ErrorCodeDisabled;
 
@@ -423,6 +486,8 @@ public class ChatUiSystem : ModSystem
 
     private static void OnCharacterSheetDialogClosed()
     {
+        CharacterSheetRequests.Reset();
+        _pendingCharacterSheetAutoOpenRequestId = 0;
         _characterSheetDialog = null;
         _pendingCharacterSheetOpenFromCharacterDialog = false;
         _characterSheetOpenedFromCharacterDialog = false;
@@ -648,17 +713,16 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        if (_characterSheetDialog?.CurrentTargetPlayerUid == message.TargetPlayerUid)
-        {
-            _characterSheetDialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-status-loading"));
-        }
+        if (_characterSheetDialog?.CurrentTargetPlayerUid != message.TargetPlayerUid) return;
+        _characterSheetDialog.SetHeadshotStatus(Lang.Get("thebasics:headshot-status-loading"));
 
         // Re-request the sheet so the view reflects the new Headshot metadata (or its absence after a clear).
         if (!string.IsNullOrEmpty(message.TargetPlayerUid))
         {
-            _safeNetworkChannel?.SendPacketSafely(new CharacterSheetOpenRequest
+            SendTrackedCharacterSheetRefresh(new CharacterSheetOpenRequest
             {
-                Mode = CharacterSheetOpenRequest.ModeView,
+                Mode = _characterSheetDialog?.CurrentTargetPlayerUid == message.TargetPlayerUid && _characterSheetDialog.IsAdminView
+                    ? CharacterSheetOpenRequest.ModeAdmin : CharacterSheetOpenRequest.ModeView,
                 TargetPlayerUid = message.TargetPlayerUid
             });
         }
@@ -936,6 +1000,8 @@ public class ChatUiSystem : ModSystem
     [HarmonyPatch(typeof(GuiDialogCharacter), "OnGuiClosed")]
     public static void GuiDialogCharacter_OnGuiClosed_Postfix()
     {
+        _pendingCharacterSheetAutoOpenRequestId = 0;
+        _characterDialogSheetAutoOpenHandled = false;
         _pendingCharacterSheetOpenFromCharacterDialog = false;
         if (_characterSheetOpenedFromCharacterDialog && _characterSheetDialog?.IsOpened() == true)
         {
@@ -986,6 +1052,7 @@ public class ChatUiSystem : ModSystem
 
     private static void OnLanguageConfigOpenMessage(TheBasicsLanguageConfigOpenMessage message)
     {
+        if (!LanguageRequests.Accept(0)) return;
         if (message?.Success == false)
         {
             ShowLanguageConfigChatMessage(message.Message);
@@ -998,6 +1065,7 @@ public class ChatUiSystem : ModSystem
 
     private static void OnLanguageConfigResultMessage(TheBasicsLanguageConfigResultMessage message)
     {
+        if (!LanguageRequests.Accept(message?.RequestId ?? 0)) return;
         if (_languageConfigDialog == null)
         {
             ShowLanguageConfigChatMessage(message?.Message);
@@ -1032,6 +1100,7 @@ public class ChatUiSystem : ModSystem
 
     private static void OnNotesViewMessage(TheBasicsNotesViewMessage message)
     {
+        if (!NotesRequests.Accept(message?.RequestId ?? 0)) return;
         if (message?.Success == false && _playerNotesDialog == null)
         {
             ShowConfigAdminChatMessage(message.Message);
@@ -1093,6 +1162,7 @@ public class ChatUiSystem : ModSystem
 
     private static void OnLanguageConfigClosed()
     {
+        LanguageRequests.Reset();
         _languageConfigDialog = null;
         if (!_returnToConfigAdminAfterLanguageDialog)
         {
@@ -1167,6 +1237,7 @@ public class ChatUiSystem : ModSystem
 
     private static void OnPlayerNotesClosed()
     {
+        NotesRequests.Reset();
         _playerNotesDialog = null;
     }
 
@@ -1680,18 +1751,24 @@ public class ChatUiSystem : ModSystem
 
     private static void SendLanguageConfigSaveRequest(List<LanguageConfigEntryMessage> languages)
     {
-        _safeNetworkChannel?.SendPacketSafely(new TheBasicsLanguageConfigSaveMessage
+        var dialog = _languageConfigDialog;
+        var requestId = BeginDialogRequest(LanguageRequests, () => dialog?.OnRequestFailed(), () => dialog?.OnRequestTimedOut());
+        SendDialogRequest(new TheBasicsLanguageConfigSaveMessage
         {
+            RequestId = requestId,
             Languages = languages ?? new List<LanguageConfigEntryMessage>()
-        });
+        }, () => LanguageRequests.Fail(requestId));
     }
 
     private static void SendLanguageConfigReload()
     {
-        _safeNetworkChannel?.SendPacketSafely(new TheBasicsLanguageConfigSaveMessage
+        var dialog = _languageConfigDialog;
+        var requestId = BeginDialogRequest(LanguageRequests, () => dialog?.OnRequestFailed(), () => dialog?.OnRequestTimedOut());
+        SendDialogRequest(new TheBasicsLanguageConfigSaveMessage
         {
+            RequestId = requestId,
             ReloadFromDisk = true
-        });
+        }, () => LanguageRequests.Fail(requestId));
     }
 
     private static void SendCharacterSheetFieldConfigOpenRequest()
@@ -1717,14 +1794,17 @@ public class ChatUiSystem : ModSystem
 
     private static void SendNotesSaveRequest(TheBasicsNotesSaveMessage message)
     {
-        _safeNetworkChannel?.SendPacketSafely(message ?? new TheBasicsNotesSaveMessage());
+        var dialog = _playerNotesDialog;
+        message ??= new TheBasicsNotesSaveMessage();
+        message.RequestId = BeginDialogRequest(NotesRequests, () => dialog?.OnRequestFailed(), () => dialog?.OnRequestTimedOut());
+        SendDialogRequest(message, () => NotesRequests.Fail(message.RequestId));
     }
 
     private static void SendNotesReloadRequest(TheBasicsNotesSaveMessage message)
     {
         message ??= new TheBasicsNotesSaveMessage();
         message.Reload = true;
-        _safeNetworkChannel?.SendPacketSafely(message);
+        SendNotesSaveRequest(message);
     }
 
     private static void SendChatHistoryQueryRequest(TheBasicsChatHistoryQueryRequest message)
@@ -2286,7 +2366,12 @@ public class ChatUiSystem : ModSystem
             _returnToConfigAdminAfterLanguageDialog = false;
             _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
+            _pendingCharacterSheetAutoOpenRequestId = 0;
             _suppressNextCharacterDialogSheetOpen = false;
+            CharacterSheetRequests.Reset();
+            NotesRequests.Reset();
+            LanguageRequests.Reset();
+            _characterDialogSheetAutoOpenHandled = false;
             _characterSheetOpenedFromCharacterDialog = false;
             _characterDialogTitleOverride = null;
             _characterDialog = null;

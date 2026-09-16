@@ -686,6 +686,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             Success = false,
             Message = Lang.Get("thebasics:notes-error-disabled")
         };
+        response.RequestId = message?.RequestId ?? 0;
         _serverConfigChannel.SendPacket(response, player);
     }
 
@@ -764,6 +765,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             Success = false,
             Message = Lang.Get("thebasics:charsheet-gui-disabled")
         };
+        response.AutoOpenRequestId = message?.AutoOpenRequestId ?? 0;
         _serverConfigChannel.SendPacket(response, player);
     }
 
@@ -775,6 +777,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             Success = false,
             Message = Lang.Get("thebasics:charsheet-gui-disabled")
         };
+        response.IsSaveResponse = true;
+        response.RequestId = message?.RequestId ?? 0;
         _serverConfigChannel.SendPacket(response, player);
     }
 
@@ -860,7 +864,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         if (player?.HasPrivilege(Privilege.root) != true)
         {
-            SendLanguageConfigResult(player, false, "You do not have permission to edit The BASICs languages.", message?.Languages ?? LanguageConfigAdmin.BuildEntries(Config));
+            SendLanguageConfigResult(player, false, "You do not have permission to edit The BASICs languages.", message?.Languages ?? LanguageConfigAdmin.BuildEntries(Config), message?.RequestId ?? 0);
             return;
         }
 
@@ -873,11 +877,11 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         if (!TryBuildLanguageConfigDraft(submittedLanguages, out var draft, out var errors))
         {
             TrackConfigEditorFailure(player, "language_config", "save", errors.Count);
-            SendLanguageConfigResult(player, false, string.Join("\n", errors), submittedLanguages);
+            SendLanguageConfigResult(player, false, string.Join("\n", errors), submittedLanguages, message?.RequestId ?? 0);
             return;
         }
 
-        SaveLanguageConfigDraft(player, draft, submittedLanguages);
+        SaveLanguageConfigDraft(player, draft, submittedLanguages, message?.RequestId ?? 0);
     }
 
     private bool TryHandleLanguageConfigReload(IServerPlayer player, TheBasicsLanguageConfigSaveMessage message)
@@ -890,12 +894,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         if (!TryReloadConfigAndGetChangedKeys(out var changedKeys))
         {
             AnalyticsService.TrackPlayerFailure(player.PlayerUID, "language_config", "reload", "error", "config_unreadable");
-            SendLanguageConfigResult(player, false, Lang.Get("thebasics:config-reload-failed"), LanguageConfigAdmin.BuildEntries(Config));
+            SendLanguageConfigResult(player, false, Lang.Get("thebasics:config-reload-failed"), LanguageConfigAdmin.BuildEntries(Config), message?.RequestId ?? 0);
             return true;
         }
 
         AnalyticsService.TrackFeatureUsed("language_config", "reload", actorPlayerUid: player.PlayerUID);
-        SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {changedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config));
+        SendLanguageConfigResult(player, true, $"Reloaded language config from disk. Changed settings: {changedKeys.Count}.", LanguageConfigAdmin.BuildEntries(Config), message?.RequestId ?? 0);
         return true;
     }
 
@@ -911,7 +915,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         return errors.Count == 0;
     }
 
-    private void SaveLanguageConfigDraft(IServerPlayer player, ModConfig draft, List<LanguageConfigEntryMessage> submittedLanguages)
+    private void SaveLanguageConfigDraft(IServerPlayer player, ModConfig draft, List<LanguageConfigEntryMessage> submittedLanguages, long requestId)
     {
         var renameMap = LanguageConfigAdmin.BuildRenameMap(submittedLanguages);
         TrackLanguageRenamesForJoiningPlayers(renameMap);
@@ -932,7 +936,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             player,
             true,
             "Saved The BASICs language config. Online players were reconciled; renamed languages also reconcile for later joins until the next server restart.",
-            LanguageConfigAdmin.BuildEntries(Config));
+            LanguageConfigAdmin.BuildEntries(Config), requestId);
     }
 
     private void OnCharacterSheetFieldConfigSaveMessage(IServerPlayer player, TheBasicsCharacterSheetFieldConfigSaveMessage message)
@@ -1340,7 +1344,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }, player);
     }
 
-    private void SendLanguageConfigResult(IServerPlayer player, bool success, string message, IEnumerable<LanguageConfigEntryMessage> languages)
+    private void SendLanguageConfigResult(IServerPlayer player, bool success, string message, IEnumerable<LanguageConfigEntryMessage> languages, long requestId = 0)
     {
         if (player == null)
         {
@@ -1349,6 +1353,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
         _serverConfigChannel?.SendPacket(new TheBasicsLanguageConfigResultMessage
         {
+            RequestId = requestId,
             Success = success,
             Message = message,
             Languages = (languages ?? LanguageConfigAdmin.BuildEntries(Config)).ToList()
