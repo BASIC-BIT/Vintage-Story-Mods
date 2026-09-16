@@ -2,7 +2,7 @@
 
 Use /roll or /r followed by an expression. A public roll follows your current whisper, normal, or yell range in the same dimension, even while OOC or global OOC is selected. Whispered results start with (W), yelled results with (Y). Numbers are never scrambled by languages or speech effects.
 
-Use /proll or /privateroll for a result visible only to you, labelled [Private Roll]. Private roll contents do not enter The BASICs shared history, chat/audit logs, bubbles, processed-message events, or Discord. Normal command-use analytics may count the attempt when analytics is enabled.
+Use /proll or /privateroll for a result visible only to you, labelled [Private Roll]. Private results do not enter The BASICs shared history, chat log, bubbles, processed-message events, or Discord. Commands use normal vanilla dispatch, so server audit logs may contain the expression and reason. Normal command-use analytics may count the attempt when analytics is enabled.
 
 If another mod owns a short command, use /thebasics roll or /thebasics proll. A bare command shows help. Dice commands require the existing chat privilege.
 
@@ -35,7 +35,7 @@ Limits are 512 input characters, 256 parser tokens, 32 recursive parsing levels,
 
 ## Server settings and compatibility
 
-EnableDiceRolling defaults to true and controls public and private commands independently of OOC settings. If private-command audit protection cannot load, the server warns and leaves private commands unregistered; public rolls remain available. Active spectators use the existing spectator OOC name setting for public roll attribution.
+EnableDiceRolling defaults to true and controls public and private commands independently of OOC settings. Active spectators use the existing spectator OOC name setting for public roll attribution.
 
 Public results use the existing EnableTh3EssentialsDiscordRelay setting. A Discord relay makes a scene roll visible to that Discord destination regardless of its in-game range. There is one completed result and one relay event, with no reroll for Discord. Roll output neutralizes Discord mention syntax. Delivery still depends on the installed Th3Essentials bridge and Discord configuration.
 

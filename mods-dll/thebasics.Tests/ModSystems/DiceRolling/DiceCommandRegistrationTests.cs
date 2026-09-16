@@ -12,16 +12,16 @@ using Xunit;
 
 namespace thebasics.Tests.ModSystems.DiceRolling;
 
-public class PrivateDiceCommandPatchTests
+public class DiceCommandRegistrationTests
 {
-    public PrivateDiceCommandPatchTests() => LangTestHelper.EnsureEnglish();
+    public DiceCommandRegistrationTests() => LangTestHelper.EnsureEnglish();
     [Theory]
     [InlineData("proll", "d6 # secret")]
     [InlineData("privateroll", "d6 # secret")]
     [InlineData("thebasics", "proll d6 # secret")]
     [InlineData("tb", "PROLL d6 # secret")]
     [InlineData("basic", "proll d6 # secret")]
-    public void RealAuditedOverloadBypassesAuditOnlyForOwnedPrivateCommand(string name, string input)
+    public void PrivateAliasesUseNormalAuditedDispatch(string name, string input)
     {
         var api = Substitute.For<ICoreServerAPI>();
         api.Side.Returns(EnumAppSide.Server);
@@ -38,7 +38,7 @@ public class PrivateDiceCommandPatchTests
         Assert.Equal(1, evaluated);
         Assert.Single(player.SentMessages);
         Assert.Contains("secret", player.SentMessages[0].Message);
-        Assert.Empty(api.Logger.ReceivedCalls());
+        Assert.Contains(api.Logger.ReceivedCalls(), call => call.GetMethodInfo().Name == "Audit");
     }
     [Theory]
     [InlineData("roll", "d6 # scene")]
@@ -83,7 +83,7 @@ public class PrivateDiceCommandPatchTests
         Assert.Contains(api.Logger.ReceivedCalls(), call => call.GetMethodInfo().Name == "Audit");
     }
     [Fact]
-    public void PrivatePrivilegeFailureNeverEvaluatesOrAudits()
+    public void PrivatePrivilegeFailureNeverEvaluates()
     {
         var api = Substitute.For<ICoreServerAPI>();
         api.Side.Returns(EnumAppSide.Server);
@@ -96,45 +96,6 @@ public class PrivateDiceCommandPatchTests
         TextCommandResult? result = null;
         chat.Execute("proll", new FakeServerPlayer(), 7, "secret", value => result = value);
         Assert.Equal("noprivilege", result?.ErrorCode);
-        Assert.Empty(api.Logger.ReceivedCalls());
-    }
-    [Fact]
-    public void PrivateThrowingPreconditionFailsClosedWithoutExceptionContents()
-    {
-        var api = Substitute.For<ICoreServerAPI>();
-        api.Side.Returns(EnumAppSide.Server);
-        var chat = new ChatCommandApi(api);
-        api.ChatCommands.Returns(chat);
-        chat.GetOrCreate("thebasics").RequiresPrivilege(Privilege.chat);
-        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
-        using var commands = new DiceRollCommands(system);
-        commands.Register();
-        chat.Get("proll").WithPreCondition(_ => throw new InvalidOperationException("secret"));
-        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
-        chat.Execute("proll", player, 7, "d6 # secret");
-        Assert.Empty(api.Logger.ReceivedCalls());
-        Assert.Single(player.SentMessages);
-        Assert.DoesNotContain("secret", player.SentMessages[0].Message);
-    }
-    [Fact]
-    public void PatchInstallationFailureLeavesPublicCommandsAvailableWithoutPrivateHandlers()
-    {
-        var api = Substitute.For<ICoreServerAPI>();
-        api.Side.Returns(EnumAppSide.Server);
-        var chat = new ChatCommandApi(api);
-        api.ChatCommands.Returns(chat);
-        chat.GetOrCreate("thebasics").RequiresPrivilege(Privilege.chat);
-        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
-        using var commands = new DiceRollCommands(system, createPrivatePatch: _ => throw new InvalidOperationException("patch failure details"));
-        commands.Register();
-        Assert.Null(chat.Get("proll"));
-        Assert.Null(chat.Get("privateroll"));
-        Assert.False(chat.Get("thebasics").AllSubcommands.ContainsKey("proll"));
-        var player = new FakeServerPlayer { PrivilegeCheck = _ => true, Entity = new EntityPlayer() };
-        api.World.AllOnlinePlayers.Returns(new IPlayer[] { player });
-        chat.Execute("r", player, 7, "d1");
-        Assert.Single(player.SentMessages);
-        Assert.Contains("1", player.SentMessages[0].Message);
-        Assert.Contains(api.Logger.ReceivedCalls(), call => call.GetMethodInfo().Name == "Warning");
+        Assert.Contains(api.Logger.ReceivedCalls(), call => call.GetMethodInfo().Name == "Audit");
     }
 }

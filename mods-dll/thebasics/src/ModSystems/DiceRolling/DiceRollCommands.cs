@@ -26,31 +26,20 @@ internal sealed class DiceRollCommands : IDisposable
     private readonly RPProximityChatSystem system;
     private readonly System.Func<string, DiceRollResult> evaluate;
     private readonly DiceAttemptGuard guard = new();
-    private PrivateDiceCommandPatch privatePatch;
-    private readonly System.Func<IChatCommandApi, PrivateDiceCommandPatch> createPrivatePatch;
 
-    internal DiceRollCommands(RPProximityChatSystem system, System.Func<string, DiceRollResult> evaluate = null,
-        System.Func<IChatCommandApi, PrivateDiceCommandPatch> createPrivatePatch = null)
+    internal DiceRollCommands(RPProximityChatSystem system, System.Func<string, DiceRollResult> evaluate = null)
     {
         this.system = system;
-        this.createPrivatePatch = createPrivatePatch ?? (api => new PrivateDiceCommandPatch(api));
         this.evaluate = evaluate ?? (input => DiceEvaluator.EvaluateInput(input));
     }
 
     internal void Register()
     {
-        // Install first: if the audit seam changes, no private command is exposed.
-        try { privatePatch = createPrivatePatch(system.API.ChatCommands); }
-        catch (Exception)
-        {
-            system.API.Logger.Warning("[The BASICs] Private dice commands are unavailable because audit protection could not be installed. Public rolls remain available.");
-        }
         var root = system.API.ChatCommands.GetOrCreate("thebasics");
         RegisterCommand(root.BeginSubCommand("roll"), false);
-        if (privatePatch != null) RegisterCommand(root.BeginSubCommand("proll"), true);
+        RegisterCommand(root.BeginSubCommand("proll"), true);
         foreach (var alias in new[] { "roll", "r", "proll", "privateroll" })
         {
-            if (privatePatch == null && (alias is "proll" or "privateroll")) continue;
             if (system.API.ChatCommands.Get(alias) != null) continue;
             RegisterCommand(system.API.ChatCommands.Create(alias), alias is "proll" or "privateroll");
         }
@@ -61,7 +50,6 @@ internal sealed class DiceRollCommands : IDisposable
     {
         command.RequiresPrivilege(Privilege.chat).RequiresPlayer().WithArgs(system.API.ChatCommands.Parsers.Unparsed("dice expression and optional reason")).WithDescription(isPrivate ? "Roll dice privately." : "Roll dice for your scene.")
             .HandleWith(args => Handle(args, isPrivate));
-        if (isPrivate) privatePatch.Own(command);
     }
 
     internal TextCommandResult Handle(TextCommandCallingArgs args, bool isPrivate)
@@ -138,7 +126,6 @@ internal sealed class DiceRollCommands : IDisposable
     public void Dispose()
     {
         system.API.Event.PlayerDisconnect -= OnDisconnect;
-        privatePatch?.Dispose();
         guard.Clear();
     }
 }

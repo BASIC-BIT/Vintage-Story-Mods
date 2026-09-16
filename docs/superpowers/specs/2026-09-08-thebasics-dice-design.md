@@ -68,7 +68,7 @@ One accepted request produces one completed result, reused for chat, history, bu
 
 Only the requesting player receives a private result. Use [Private Roll], without W/Y markers.
 
-Private expressions, reasons, faces and results do not enter shared chat logs, staff chat history, ordinary processed-chat relays or Discord. Audit/error paths must not accidentally include the raw command. Normal command-use analytics remain allowed without roll contents.
+Private expressions, reasons, faces and results do not enter shared chat logs, staff chat history, ordinary processed-chat relays or Discord. Owner revision on 2026-09-16: use normal vanilla command dispatch without an audit-bypass Harmony patch. Vanilla server audit logs may contain command arguments. The BASICs must not add raw input to its own error messages. Normal command-use analytics remain allowed without roll contents.
 
 Private rolls produce no shared entity bubble, roll notification or chatter. There is no selected-recipient or GM mode in this release.
 

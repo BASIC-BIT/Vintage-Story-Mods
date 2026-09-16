@@ -1,6 +1,6 @@
 # Dice implementation QA cards
 
-Status: prepared, not started. Owner approval is required before deployment/client launch and before marking manual QA complete. Automated tests and static PNG previews do not substitute for these observations.
+Status: owner authorized deployment and manual QA on 2026-09-16. Setup in progress. Owner approval is required before deployment/client launch and before marking manual QA complete. Automated tests and static PNG previews do not substitute for these observations.
 
 ## Batch A: enabled, RpText, real relay
 
@@ -18,8 +18,8 @@ Setup after approval: use test server 8982de16 and profiles2/3, preserve the cur
 
 3. **Private output and logs (P0)**
    - Do: A uses /proll d20 # qa-private-sentinel, /privateroll d6, and /thebasics proll d6. Inspect B, staff history, server-chat/server-audit logs, and Discord. Also enter malformed /proll d6+ # qa-private-error.
-   - Expect: Only A receives [Private Roll] or a safe error. No bubble, Discord line, or private contents on shared surfaces, including the malformed input.
-   - Watch for: Raw command arguments in audit/error logs or public history.
+   - Expect: Only A receives [Private Roll] or a safe error. No bubble, Discord line, or private contents in shared player history, including the malformed input. Vanilla command audit entries may contain the input.
+   - Watch for: Private results reaching other players, shared history, bubbles or Discord. Vanilla audit logging is expected and is not a failure.
 
 4. **Single history/Discord publication (P0)**
    - Do: Find qa-public in staff history and the configured Discord channel.
