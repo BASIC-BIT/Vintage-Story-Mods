@@ -29,4 +29,6 @@ public class TheBasicsNotesSaveMessage
 
     [ProtoMember(8)]
     public PersonalNoteLedgerMessage PersonalLedger { get; set; } = new();
+    [ProtoMember(9)]
+    public long RequestId { get; set; }
 }

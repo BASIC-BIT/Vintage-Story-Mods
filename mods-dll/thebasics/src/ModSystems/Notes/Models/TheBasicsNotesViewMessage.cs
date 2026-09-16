@@ -56,4 +56,6 @@ public class TheBasicsNotesViewMessage
 
     [ProtoMember(17)]
     public int MaxFreeformNoteLength { get; set; }
+    [ProtoMember(18)]
+    public long RequestId { get; set; }
 }

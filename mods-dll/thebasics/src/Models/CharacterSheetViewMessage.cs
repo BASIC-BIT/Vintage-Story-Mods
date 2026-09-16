@@ -64,4 +64,9 @@ public class CharacterSheetViewMessage
 
     [ProtoMember(16)]
     public string ErrorCode { get; set; } = string.Empty;
+
+    [ProtoMember(17)]
+    public long AutoOpenRequestId { get; set; }
+    [ProtoMember(18)]
+    public long RequestId { get; set; }
 }
