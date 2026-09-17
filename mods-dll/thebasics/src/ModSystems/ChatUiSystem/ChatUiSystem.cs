@@ -16,6 +16,7 @@ using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.ChatHistory.Models;
 using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.Notes.Models;
+using thebasics.ModSystems.SceneDescriptions;
 using thebasics.Utilities;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
@@ -358,6 +359,7 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsNotesViewMessage>()
             .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
+            .RegisterMessageType<SceneReadMarksMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
@@ -373,7 +375,8 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<HeadshotUploadResult>(OnHeadshotUploadResult)
             .SetMessageHandler<HeadshotFetchResult>(OnHeadshotFetchResult)
             .SetMessageHandler<TheBasicsNotesViewMessage>(OnNotesViewMessage)
-            .SetMessageHandler<TheBasicsChatHistoryResultMessage>(OnChatHistoryResultMessage);
+            .SetMessageHandler<TheBasicsChatHistoryResultMessage>(OnChatHistoryResultMessage)
+            .SetMessageHandler<SceneReadMarksMessage>(SceneReadMarks.ReplaceClientMarks);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
@@ -897,6 +900,10 @@ public class ChatUiSystem : ModSystem
     }
 
     internal static bool IsCustomNametagEnabled() => _config?.UseCustomNametagRenderer != false;
+
+    // Defaults to enabled: the synced config arrives after nearby chunks, so an unknown value must
+    // not blank out markers on a server that has them on.
+    internal static bool AreSceneMarkersEnabled() => _config?.EnableSceneMarkers != false;
 
     internal static bool IsHeadshotInNametagEnabled() => _config?.EnableCharacterHeadshots == true && _config?.ShowHeadshotInNametag == true;
 
@@ -1930,6 +1937,8 @@ public class ChatUiSystem : ModSystem
             }
 
             ApplyReceivedConfig(configMessage.Config);
+            _api.ModLoader.GetModSystem<SceneDescriptionSystem>()?.SetRuntimeEnabled(
+                configMessage.SceneMarkersRuntimeEnabled ?? configMessage.Config.EnableSceneMarkers);
 
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;

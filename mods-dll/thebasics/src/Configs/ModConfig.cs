@@ -606,7 +606,8 @@ namespace thebasics.Configs
         public int SpeechOcclusionWallPenaltyBlocks { get; set; }
 
         /// <summary>Allow public scene rolls and self-only private rolls.</summary>
-        [ProtoMember(155)]
+        // Field 155 shipped with Scene Markers in V5.10.0-pre.1 before dice was released.
+        [ProtoMember(156)]
         [DefaultValue(true)]
         public bool EnableDiceRolling { get; set; } = true;
 
@@ -808,6 +809,15 @@ namespace thebasics.Configs
         /// </summary>
         [ProtoMember(154)]
         public string[] SightBlockingBlockCodePatterns { get; set; } = Array.Empty<string>();
+
+        /// <summary>
+        /// Whether scene markers can be crafted, placed, and edited. Turning this off leaves the
+        /// block, block entity, and handbook page registered so markers already in the world keep
+        /// loading; it only removes the recipe, placement, editing, and the client overlay.
+        /// </summary>
+        [ProtoMember(155)]
+        [DefaultValue(true)]
+        public bool EnableSceneMarkers { get; set; } = true;
 
         [ProtoMember(64)]
         public bool RemoveGrantedLanguagesOnChange { get; set; } = true;

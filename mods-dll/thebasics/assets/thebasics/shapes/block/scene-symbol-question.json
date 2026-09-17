@@ -1,0 +1,627 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "elements": [
+    {
+      "name": "pixel1-0",
+      "from": [
+        5,
+        14,
+        7
+      ],
+      "to": [
+        7,
+        16,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "pixel2-0",
+      "from": [
+        7,
+        14,
+        7
+      ],
+      "to": [
+        9,
+        16,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "pixel3-0",
+      "from": [
+        9,
+        14,
+        7
+      ],
+      "to": [
+        11,
+        16,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "pixel0-1",
+      "from": [
+        3,
+        12,
+        7
+      ],
+      "to": [
+        5,
+        14,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "pixel4-1",
+      "from": [
+        11,
+        12,
+        7
+      ],
+      "to": [
+        13,
+        14,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "pixel4-2",
+      "from": [
+        11,
+        10,
+        7
+      ],
+      "to": [
+        13,
+        12,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "pixel3-3",
+      "from": [
+        9,
+        8,
+        7
+      ],
+      "to": [
+        11,
+        10,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "pixel2-4",
+      "from": [
+        7,
+        6,
+        7
+      ],
+      "to": [
+        9,
+        8,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "pixel2-6",
+      "from": [
+        7,
+        2,
+        7
+      ],
+      "to": [
+        9,
+        4,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#accent",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    }
+  ]
+}

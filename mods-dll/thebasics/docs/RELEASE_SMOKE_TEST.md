@@ -66,19 +66,92 @@ Run this after the ModDB release is published. It verifies the player-facing ins
    - Expect: Text appears as a placed environmental bubble at the targeted world position.
    - Watch for: fallback to normal env when target is valid, wrong placement, no bubble.
 
-6. **Typing Indicator** (P1)
+6. **Scene Markers** (P1)
+   - Setup: default production-like config with `EnableSceneMarkers=true`. Player A (creator), player B with claim build access, player C with `controlserver` and claim access. Have one marker location inside a claim B cannot build in.
+
+   1. **Craft And Item Glyph** (P1)
+      - Do: Craft a marker from two loose stones. Look at it in inventory, in hand, and dropped on the ground.
+      - Expect: Shapeless two-stone recipe yields one marker. All three views show the exclamation glyph, not a stone base. An unwritten marker's tooltip tells you to place it and Shift-right-click, and carries no `Material: Stone` line.
+      - Watch for: recipe missing, stone base still rendered in any of the three views, a `Material:` line back in the tooltip, or a wrong held-item transform.
+
+   2. **Ground And Wall Placement** (P1)
+      - Do: Place one marker flat on the ground and one against a wall, trying each of the four facings. Aim at each and start breaking it, at height offset 0 and at 4.
+      - Expect: Both attachments place and orient like a sign, with no collision box and no light blocking. Aiming at either draws the selection outline as a cube around the floating symbol, and the break cracks appear on that same cube, never on the ground plate or the wall plaque.
+      - Watch for: refused placement, wrong rotation, a marker you cannot target, no outline at all, an outline or cracks on the flat plate/plaque, or the wall variant floating.
+
+   3. **Symbol, Color, Size, Height, Bobbing** (P1)
+      - Do: Shift-right-click to edit. Step through all six symbols (exclamation, question, information, dot, ring, diamond) and all five colors (Yellow, White, Blue, Green, Red). Open `Other icons...`, pick a catalog icon, change color, save and reopen, then pick a symbol tile again. Set indicator size to 25, 100, and 300 percent, height offset to -2, 0, and 4, then toggle Idle bobbing off and on. Save & Close and reopen each time. Target the marker and look away.
+      - Expect: Selector tiles draw real artwork matching the preview and the world. A catalog icon replaces the billboard symbol in the preview and the world, takes the chosen color, shows in the tile beside the button, and leaves every symbol tile unlit until you pick one, which clears it. Every indicator uses the same steady translucent style; there is no effect or hologram picker. Size and height apply independently. Bobbing moves only the symbol, about 0.05 blocks on a four-second cycle, and the symbol grows slightly while targeted. Out-of-range size or height values are refused with a localized error.
+      - Watch for: a blank or font-glyph tile, an empty billboard where a catalog icon failed to draw instead of the fallback symbol, a symbol picker left open after the editor closes, colors not repainting, the bubble drifting with the bob or the target growth, or a saved value snapping back on reopen.
+
+   4. **Display Modes And Distance Fade** (P1)
+      - Do: Compare When targeted, Always nearby, and On interaction. Set indicator distance to a short finite value, then Unlimited; set a separate nearby text distance. Walk in and out of both radii, aim at and away from each marker, and check occlusion behind a wall, including a marker placed flat against a wall viewed from a steep angle.
+      - Expect: When targeted shows the bubble only while aimed at it. Always nearby shows it throughout its own text distance and fades independently of the indicator. On interaction shows no bubble at all. Indicators fade through the outer quarter of their distance, Unlimited stays visible within loaded terrain, and walls obscure the indicator. The bubble stays upright and screen-aligned above the indicator at every camera angle, is never cut by the wall behind it, and disappears entirely once a wall blocks the line of sight to the marker.
+      - Watch for: the text distance field enabled in the wrong mode, a bubble in On interaction mode, indicators visible through terrain, a bubble diagonally clipped by or sunk into a wall instead of vanishing, a bubble drawn over an open dialog or the chat box, or flicker at the fade boundary.
+
+   5. **Bubble Size, Title Icon, Show Description** (P1)
+      - Do: With Show description in bubble off, then on, compare a short and a long multiline description at bubble size 40, 100, and 350 percent. Open the Icon picker, search a name, page through the catalog, choose an icon, then choose None. View from screen edges and steep camera angles.
+      - Expect: Off shows the title only; on adds the description, bounded to a preview while the reader keeps the full text. Letters stay the same size at a given percentage and the panel grows with the text. The chosen icon draws to the left of the title without overlapping wrapped text, appears in the editor tile and in the world, and None clears it for good.
+      - Watch for: shrinking letters in long bubbles, an icon jumping above the title, a cleared icon reappearing after save or pickup, unclickable catalog tiles, or a picker left open after the editor closes.
+
+   6. **Read Versus Edit** (P0)
+      - Do: Plain right-click a written marker in every display mode, including as a claim visitor. Shift-right-click it. Shift-right-click a written marker while holding it. Try editing from more than 8 blocks away and from outside the claim. Open the editor, change the title, and try Cancel, the title-bar X, and Escape.
+      - Expect: Plain right-click always opens the full text in the book-style reader, headed by the marker's title icon and its title in bold above the page; Shift-right-click opens the editor only with claim build access and within 8 blocks. The held item reads in the same book view. The inspector shows the title once, as the block name, with a short preview under it. Closing the editor with unsaved changes asks for confirmation before discarding them, and a read-only locked marker never asks. Refusals are explicit localized errors.
+      - Watch for: right-click opening the editor, an editor opening for an unauthorized player, a silent refusal, or claim bypass.
+
+   7. **Long Description Typing And Scrolling** (P1)
+      - Do: Shift-right-click a marker. In the description box, type "He is calmly snoozing, probably snoring. He got all tuckered out, eepy boy." so it wraps onto a second line, then keep typing until the text passes the bottom of the box. Press Backspace across a wrap, paste a long paragraph, press Up until the caret reaches the top, and scroll with the mouse wheel over the box, then click a line that has scrolled into view. Close the editor, change GUI scale to 1.25 or 1.5, reopen it, and repeat.
+      - Expect: The text reads exactly as typed at every wrap. The scrollbar is always shown beside the box and only moves once the text is taller than the box. The caret stays in view while typing, moving with arrow keys, and deleting. Clicking a scrolled line places the caret on it.
+      - Watch for: characters landing out of order after a wrap, text drawn over the rows below the box, a caret that disappears below the box, or the box width changing when the scrollbar becomes useful.
+
+   8. **Read Marks** (P1)
+      - Do: With players A and B near one Always nearby marker, have A right-click it and press Mark as read, which closes the reader, then reopen it. Walk A away and back, and rejoin the server as A. Have B check the same marker. As A, reopen and press Mark as unread. Then as A edit and save the marker, and separately open the editor and use Clear read, confirming the prompt.
+      - Expect: After A marks it read, A sees no bubble in any display mode and a visibly dimmer indicator bobbing at half height and half speed, while B still sees the bubble at full strength. The reader button reads Mark as unread on reopen and A's state survives relog. Mark as unread restores A's bubble. Any save, and Clear read after its confirmation, make the marker unread for both players again. Clear read is disabled while the marker is locked and refused without claim build access or from beyond 8 blocks.
+      - Watch for: the bubble still drawn for a reader, the indicator hidden instead of dimmed, one player's mark affecting the other, a stale button label, a read state lost on relog or surviving a save, or a Clear read that anyone can press.
+
+   9. **Creator Lock** (P0)
+      - Do: As A, edit a marker, click the top-right lock glyph, and Save & Close. Repeat once clicking the glyph and then Cancel. As B, open, read, break, and try to lock the marker. Keep a stale editor open on B while A locks. Then try to break the locked marker as A and as C, holding the pickaxe until the cracks would finish.
+      - Expect: The armed glyph locks the marker on Save & Close; Cancel discards the pending lock with no change. No padlock item is involved. A locked marker opens read-only for everyone, A included, with every field and Save & Close disabled. While locked, nobody breaks or picks it up - A and C are refused with a localized error exactly like B - and a stale editor's save is rejected. Attempting to break a locked marker shows the locked message on the breaker's own client while the pickaxe is held, repeating at most about once a second rather than every tick.
+      - Watch for: a Save & lock button still present, a non-creator arming the lock, a stale editor bypassing the lock, the creator or an admin breaking a locked marker, the block vanishing on the breaker's client while the server keeps it, or the lock glyph showing the wrong state.
+
+   10. **Unlock** (P0)
+       - Do: As A, click the lock glyph on the locked marker. Repeat as C. Attempt it as B, from beyond 8 blocks, and without claim access.
+       - Expect: A and C unlock and the editor reopens fully editable; nothing is consumed or returned. B, out-of-range, and no-claim attempts are refused with a localized error.
+       - Watch for: an unauthorized unlock succeeding, the editor staying read-only after a successful unlock, or a lock state that does not reach other clients.
+
+   11. **Pickup And Re-Place Persistence** (P0)
+       - Do: Unlock a written, appearance-customized, locked marker, then break and re-place it. Restart the server and rejoin. Also place a fresh crafted marker after saving a distinctive appearance.
+       - Expect: Title, body, display mode, every appearance setting, and creator survive pickup, re-place, and restart, and a marker locked again after re-placing stays locked across the restart. Exactly one item drops. The fresh marker inherits your last saved appearance with empty content; the picked-up marker keeps its own.
+       - Watch for: duplicate or missing drops, reset appearance, transferred ownership, a lost lock, or a fresh marker inheriting someone else's content.
+
+   12. **Markup Safety** (P0)
+       - Do: Save a title and body containing `<strong>`, an anchor tag, an icon tag, an unbalanced `<`, and a very long single word. Check the bubble, reader, inspector, item name, and item tooltip.
+       - Expect: Markup appears as literal text everywhere, wrapping stays inside the panel, the title truncates at 80 characters, and the body caps at 4096.
+       - Watch for: rendered VTML, a broken or blank bubble texture, a link or icon tag taking effect, or a client exception on save.
+
+   13. **EnableSceneMarkers=false** (P0)
+       - Do: Set `EnableSceneMarkers=false`, restart the server, and rejoin near existing markers. Try to craft, place, edit, and read. Set it back to `true` and restart.
+       - Expect: Existing markers remain in the world as plain blocks. Placement, editing, floating bubbles, indicators, and the crafting recipe are all unavailable, with no client errors. Flipping it back restores every marker with its saved content and appearance intact.
+       - Watch for: markers disappearing or losing data, the recipe still craftable, an indicator or bubble still rendering, an editor still opening, or the change taking effect without a restart.
+
+   14. **Logs And Exceptions** (P0)
+       - Do: Fetch server and client logs after the pass.
+       - Expect: `SceneDescriptionSystem` loads once; audit entries record scene-marker edits and unlocks; no scene-marker exceptions or warnings.
+       - Watch for: rejected-packet or malformed-edit warnings, appearance-preference read failures, renderer or texture exceptions, and ghost indicators after leaving and re-entering loaded terrain.
+
+7. **Typing Indicator** (P1)
    - Config: `EnableTypingIndicator=true`.
    - Do: Open chat on one client, type and pause, then close chat.
    - Expect: Other client sees chat-open/composing/typing states and timeout/clear behavior.
    - Watch for: stale indicator after close/disconnect, indicator above self, or indicators through walls.
 
-7. **Nametag Range, LOS, And Self View** (P0)
+8. **Nametag Range, LOS, And Self View** (P0)
    - Config: `NametagRequiresLineOfSight=true`; use a known `NametagRenderRange`.
    - Do: Approach the other player, cross the configured range boundary, target them when target-only mode is enabled, then test visibility through stone, glass, foliage, a slab/door/fence, and partial eye/torso/feet exposure. Switch the observing client to F5 third-person view and check its own nametag. Repeat the long-range movement for at least one minute.
    - Expect: The remote nametag uses the configured strict range boundary, targeting behavior, transparent-block rules, and multi-point LOS. The local player's own nametag remains visible in F5 third-person view even when target-only mode is enabled, while vanilla still hides it in first person. Movement and rendering remain responsive throughout the long-range pass.
    - Watch for: a remote nametag beyond range, different results around partial block selection boxes, target-only mode hiding the local player's own F5 nametag, or any client hitch/freeze while LOS refreshes.
 
-8. **Save Notification** (P1)
+9. **Save Notification** (P1)
    - Config: save announcement enabled.
    - Do: Trigger or wait for a server save.
    - Expect: Start message appears as configured; finish message appears only if enabled.

@@ -122,6 +122,22 @@ Do not use a spectator visibility rule as a broad chat permission. A rule intend
 
 ---
 
+## Entry 6: Placed scene descriptions are narration, not signs or chat
+
+A scene marker attaches durable narration to a place. Its text describes what a character would notice there, or leaves an explicit OOC production note. The physical marker is only the interaction anchor. It is not meant to display literal writing on its block face.
+
+This makes scene markers adjacent to placed environment messages, but not another chat type:
+
+- Placed environment messages are temporary cast actions sent through chat.
+- Scene descriptions persist with a block and survive being picked up and placed again.
+- One marker carries whatever the author writes, in-fiction description or an OOC production note, and there is no separate presentation for the two. If a note must read as out of character, the author says so in the text.
+- Existing local or global OOC chat toggles do not govern what is written on a marker. Those toggles describe conversations, while this is world-authored content.
+- Default to showing the narration only when a player deliberately looks at the marker. Always-nearby text is a per-marker opt-in with its own range and fade, because persistent always-visible text recreates the visual clutter the feature is intended to replace.
+
+Keep the implementation as its own world-content system. Reuse cast-message rendering conventions where that makes the features feel related, but do not route persistence, permissions, or editing through the chat pipeline.
+
+---
+
 ## Open questions worth resolving with players, not from first principles
 
 Recorded so they are not silently answered by whoever touches the code next.

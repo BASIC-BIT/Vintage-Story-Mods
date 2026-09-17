@@ -1,0 +1,353 @@
+{
+  "project_id": 438227,
+  "timezone": "UTC",
+  "status": "prepared, not published or live-validated",
+  "charts": [
+    {
+      "name": "Scene markers: weekly reporting installations by action",
+      "query": {
+        "kind": "TrendsQuery",
+        "dateRange": {
+          "date_from": "-56d"
+        },
+        "interval": "week",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "placed",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "placed"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "saved",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "saved"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "reader_opened",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "reader_opened"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "marked_read",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "marked_read"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "marked_unread",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "marked_unread"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "moved",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "moved"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "removed",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "removed"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "bubble_viewed",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "bubble_viewed"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Scene markers: action counts",
+      "query": {
+        "kind": "TrendsQuery",
+        "dateRange": {
+          "date_from": "-28d"
+        },
+        "interval": "day",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "Actions",
+            "math": "total",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "placed",
+                  "saved",
+                  "reader_opened",
+                  "marked_read",
+                  "marked_unread",
+                  "moved",
+                  "removed",
+                  "bubble_viewed"
+                ]
+              }
+            ]
+          }
+        ],
+        "breakdownFilter": {
+          "breakdowns": [
+            {
+              "property": "action",
+              "type": "event"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Scene markers: saved display modes",
+      "query": {
+        "kind": "TrendsQuery",
+        "dateRange": {
+          "date_from": "-28d"
+        },
+        "interval": "week",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "feature used",
+            "name": "Saves",
+            "math": "total",
+            "properties": [
+              {
+                "key": "feature_name",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "scene_markers"
+                ]
+              },
+              {
+                "key": "action",
+                "type": "event",
+                "operator": "exact",
+                "value": [
+                  "saved"
+                ]
+              }
+            ]
+          }
+        ],
+        "breakdownFilter": {
+          "breakdowns": [
+            {
+              "property": "scene_display_mode",
+              "type": "event"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Scene markers: observed config snapshot coverage",
+      "query": {
+        "kind": "TrendsQuery",
+        "dateRange": {
+          "date_from": "-56d"
+        },
+        "interval": "week",
+        "series": [
+          {
+            "kind": "EventsNode",
+            "event": "config snapshot",
+            "name": "Enabled snapshot",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "enable_scene_markers",
+                "type": "event",
+                "operator": "exact",
+                "value": true
+              }
+            ]
+          },
+          {
+            "kind": "EventsNode",
+            "event": "config snapshot",
+            "name": "Disabled snapshot",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "enable_scene_markers",
+                "type": "event",
+                "operator": "exact",
+                "value": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Scene markers: consecutive complete weeks of explicit usage",
+      "query": {
+        "kind": "HogQLQuery",
+        "query": "WITH active AS (\n  SELECT toStartOfWeek(timestamp, 1) AS week, distinct_id\n  FROM events\n  WHERE timestamp >= toStartOfWeek(now(), 1) - INTERVAL 8 WEEK\n    AND timestamp < toStartOfWeek(now(), 1)\n    AND event = 'feature used'\n    AND properties.feature_name = 'scene_markers'\n    AND properties.action IN ('placed', 'saved', 'reader_opened', 'marked_read', 'marked_unread', 'removed')\n  GROUP BY week, distinct_id\n)\nSELECT previous.week + INTERVAL 1 WEEK AS week,\n  count(DISTINCT previous.distinct_id) AS prior_week_installations,\n  count(DISTINCT nullIf(current.distinct_id, '')) AS returning_installations,\n  100.0 * count(DISTINCT nullIf(current.distinct_id, '')) / count(DISTINCT previous.distinct_id) AS returning_percent\nFROM active AS previous\nLEFT JOIN active AS current ON current.distinct_id = previous.distinct_id\n  AND current.week = previous.week + INTERVAL 1 WEEK\nWHERE previous.week + INTERVAL 1 WEEK < toStartOfWeek(now(), 1)\nGROUP BY previous.week\nORDER BY week"
+      }
+    }
+  ]
+}

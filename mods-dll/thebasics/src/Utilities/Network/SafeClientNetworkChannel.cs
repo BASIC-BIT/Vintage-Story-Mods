@@ -87,6 +87,23 @@ namespace thebasics.Utilities.Network
         /// </summary>
         public int RetryCount => _connectionRetryCount;
 
+
+        /// <summary>Sends an ephemeral packet only while connected, without queueing or retry.</summary>
+        internal bool TrySendPacketWithoutQueue<T>(T message)
+        {
+            if (_disposed || !IsConnected) return false;
+            try
+            {
+                _channel.SendPacket(message);
+                return true;
+            }
+            catch
+            {
+                // Ephemeral observations are dropped, never retried after their consent or context changes.
+                return false;
+            }
+        }
+
         /// <summary>
         /// Safely sends a packet, handling connection checking and retry logic
         /// </summary>

@@ -16,6 +16,7 @@ using thebasics.ModSystems.Notes.Models;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Semantics;
 using thebasics.ModSystems.ProximityChat.Transformers;
+using thebasics.ModSystems.SceneDescriptions;
 using thebasics.Utilities;
 using thebasics.Utilities.Parsers;
 using Vintagestory.API.Common;
@@ -626,6 +627,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .RegisterMessageType<TheBasicsNotesViewMessage>()
             .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
+            .RegisterMessageType<SceneReadMarksMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
@@ -1122,6 +1124,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             API.Logger.Debug($"THEBASICS - Received ready message from {player.PlayerName}, sending config");
         }
         SendClientConfig(player);
+        _serverConfigChannel.SendPacket(player.GetSceneReadMarks(), player);
     }
 
     private TextCommandResult SetNicknameColorAdmin(TextCommandCallingArgs args)
@@ -1297,6 +1300,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         {
             ProximityGroupId = ProximityChatId,
             Config = Config,
+            SceneMarkersRuntimeEnabled = SceneDescriptionSystem.SceneMarkersEnabled(API),
             LastSelectedGroupId = byPlayer.GetLastSelectedGroupId()
         }, byPlayer);
 
