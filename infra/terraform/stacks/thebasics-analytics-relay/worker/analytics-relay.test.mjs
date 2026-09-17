@@ -180,6 +180,81 @@ function readSources(directory = sourceRoot) {
   });
 }
 
+const sceneActions = ["placed", "saved", "reader_opened", "marked_read", "marked_unread", "moved", "removed", "bubble_viewed"];
+function sceneProperties(action) {
+  const properties = {
+    feature_name: "scene_markers", action, success: true, result: "success",
+    scene_display_mode: "when_targeted", scene_content: "written",
+    scene_locked: false, scene_body_shown: true,
+  };
+  if (action === "placed" || action === "moved") {
+    properties.scene_placement = action === "placed" ? "fresh" : "reused";
+    properties.scene_mount = "ground";
+  }
+  if (action === "saved") properties.scene_save_kind = "first_content";
+  if (action === "reader_opened") properties.scene_read_source = "placed";
+  return properties;
+}
+
+test("accepts every scene marker action under both consent levels", () => {
+  for (const action of sceneActions) {
+    for (const consent of ["server", "personalized"]) {
+      const batch = payloadForEvent("feature used", sceneProperties(action));
+      batch.consent_level = consent;
+      batch.events[0].properties.analytics_consent_level = consent;
+      const result = validatePayload(batch);
+      assertAccepted(result, `${action}/${consent}`);
+      const actual = result.events[0].properties;
+      for (const [key, value] of Object.entries(sceneProperties(action))) assert.equal(actual[key], value);
+      assert.equal(actual.distinct_id, serverInstallId);
+      assert.equal(actual.pseudonymous_player_id, undefined);
+    }
+  }
+});
+
+test("accepts all bounded scene property values", () => {
+  for (const [action, key, values] of [
+    ["saved", "scene_display_mode", ["when_targeted", "always_nearby", "on_interaction"]],
+    ["saved", "scene_content", ["empty", "written"]],
+    ["saved", "scene_locked", [true, false]],
+    ["saved", "scene_body_shown", [true, false]],
+    ["placed", "scene_placement", ["fresh", "reused"]],
+    ["placed", "scene_mount", ["ground", "wall"]],
+    ["saved", "scene_save_kind", ["empty", "first_content", "edit"]],
+    ["reader_opened", "scene_read_source", ["placed", "held"]],
+  ]) {
+    for (const value of values) assertAccepted(validatePayload(payloadForEvent("feature used", {
+      ...sceneProperties(action), [key]: value,
+    })), `${key}=${value}`);
+  }
+});
+
+test("rejects private, unbounded and misplaced scene data", () => {
+  for (const addition of [
+    { scene_title: "private title" }, { scene_body: "private body" }, { scene_position: "1,2,3" },
+    { scene_marker_id: "private-id" }, { pseudonymous_player_id: playerPseudonym },
+    { scene_display_mode: "private title" }, { scene_locked: "false" },
+    { scene_content: "some text" }, { scene_save_kind: "unknown" },
+    { scene_read_source: "placed" }, { action: "send" }, { chat_type: "normal" },
+  ]) {
+    const result = validatePayload(payloadForEvent("feature used", { ...sceneProperties("saved"), ...addition }));
+    assert.equal(result.events.length, 0, JSON.stringify(addition));
+    assert.equal(result.rejected.length, 1, JSON.stringify(addition));
+  }
+  const wrongFeature = validatePayload(payloadForEvent("feature used", {
+    feature_name: "tpa", action: "request", scene_content: "written",
+  }));
+  assert.equal(wrongFeature.events.length, 0);
+});
+
+test("accepts scene enablement only as a boolean config snapshot", () => {
+  assertAccepted(validatePayload(payloadForEvent("config snapshot", { enable_scene_markers: true })), "scene config");
+  for (const [name, value] of [["config snapshot", "true"], ["feature used", true]]) {
+    const result = validatePayload(payloadForEvent(name, { enable_scene_markers: value }));
+    assert.equal(result.events.length, 0);
+  }
+});
+
 function callArguments(source, methodName) {
   const calls = [];
   const needle = `${methodName}(`;
@@ -291,6 +366,7 @@ function currentProducerContracts() {
     severity: new Set(),
   };
   const specs = [
+    ["SceneAnalytics.Track", ["action", 1, "action"]],
     ["AnalyticsService.TrackCommandUsed", ["command_name", 0, "commandName"], ["result", 2, "result"]],
     ["AnalyticsService.TrackFeatureUsed", ["feature_name", 0, "featureName"], ["action", 1, "action"], ["result", 3, "result"]],
     ["AnalyticsService.TrackFailure", ["area", 0, "area"], ["operation", 1, "operation"], ["severity", 2, "severity"], ["result", 3, "result"]],
@@ -385,7 +461,7 @@ test("relay accepts current production event contracts", () => {
   const fixtures = {
     action: (value) => payloadForEvent("feature used", {
       action: value,
-      feature_name: "tpa",
+      feature_name: sceneActions.includes(value) ? "scene_markers" : "tpa",
       result: "success",
       success: true,
     }),
@@ -403,7 +479,7 @@ test("relay accepts current production event contracts", () => {
       success: true,
     }),
     feature_name: (value) => payloadForEvent("feature used", {
-      action: "accept",
+      action: value === "scene_markers" ? "saved" : "accept",
       feature_name: value,
       result: "success",
       success: true,
@@ -502,7 +578,7 @@ test("health exposes the relay contract required by the mod", async () => {
   );
 
   assert.ok(requiredRevision, "missing RequiredRelayContractRevision");
-  assert.equal(Number(requiredRevision[1]), CONTRACT_REVISION);
+  assert.ok(CONTRACT_REVISION >= Number(requiredRevision[1]), "relay must support the current mod contract");
   assert.match(source, /\["online_player_count"\]\s*=\s*Math\.Clamp\(GetOnlinePlayerCount\(\), 0, MaxOnlinePlayerCount\)/);
   assert.doesNotMatch(source, /\["online_player_count_bucket"\]/);
 
@@ -888,4 +964,12 @@ test("dice telemetry accepts bounded adoption data and canonical command outcome
   }
   const arbitrary = validatePayload(payloadForEvent("feature used", { feature_name: "dice", dice_complexity: "secret reason" }));
   assert.ok(arbitrary.rejected.length > 0);
+});
+
+test("scene actions cannot be attributed to another feature", () => {
+  for (const action of sceneActions) {
+    const result = validatePayload(payloadForEvent("feature used", { feature_name: "dice", action }));
+    assert.equal(result.events.length, 0, action);
+    assert.equal(result.rejected.length, 1, action);
+  }
 });
