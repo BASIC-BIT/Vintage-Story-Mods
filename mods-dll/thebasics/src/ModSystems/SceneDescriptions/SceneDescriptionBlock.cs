@@ -222,7 +222,11 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
 
     public override ItemStack OnPickBlock(IWorldAccessor world, BlockPos pos)
     {
-        return CreateStackFromPlacedBlock(world, pos);
+        var stack = CreateStackFromPlacedBlock(world, pos);
+        var copy = SceneDescriptionData.ReadFrom(stack.Attributes);
+        copy.LockItemCode = string.Empty;
+        copy.WriteTo(stack.Attributes);
+        return stack;
     }
 
     public override string GetHeldItemName(ItemStack itemStack)

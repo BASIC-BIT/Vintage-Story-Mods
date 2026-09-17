@@ -15,6 +15,20 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneDescriptionServerTests
 {
     [Fact]
+    public void CreativePickCopiesContentWithoutTheOriginalLock()
+    {
+        var (marker, player, world) = CreateMarker();
+        marker.Block.Code = new AssetLocation("thebasics:scene-marker-ground-north");
+        marker.Data.LockItemCode = "ui";
+        var copied = marker.Block.OnPickBlock(world, marker.Pos);
+        var data = SceneDescriptionData.ReadFrom(copied.Attributes);
+        data.IsLocked.Should().BeFalse();
+        data.Body.Should().Be(marker.Data.Body);
+        marker.Data.IsLocked.Should().BeTrue();
+        marker.InitializeFromItem(copied, player);
+        marker.CanBreak(player).Should().BeTrue();
+    }
+    [Fact]
     public void OtherDimensionCannotSaveClearReadOrUnlock()
     {
         var (marker, player, _) = CreateMarker();

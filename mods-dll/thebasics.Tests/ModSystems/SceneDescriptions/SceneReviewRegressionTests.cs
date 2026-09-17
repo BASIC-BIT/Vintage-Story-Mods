@@ -13,6 +13,22 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneReviewRegressionTests
 {
     [Fact]
+    public void ClientOverlaysWaitForAuthoritativeRuntimeState()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        var system = new SceneDescriptionSystem();
+        api.ModLoader.GetModSystem<SceneDescriptionSystem>().Returns(system);
+        var marker = new SceneDescriptionBlockEntity { Api = api, Pos = new BlockPos(0) };
+        system.Register(marker);
+        SceneDescriptionSystem.SceneMarkersEnabled(api).Should().BeFalse();
+        marker.OnTesselation(null, null).Should().BeFalse();
+        system.SetRuntimeEnabled(true);
+        SceneDescriptionSystem.SceneMarkersEnabled(api).Should().BeTrue();
+        ((ICoreAPI)api).World.BlockAccessor.Received(1).MarkBlockDirty(marker.Pos, (IPlayer)null!);
+        system.SetRuntimeEnabled(false);
+        SceneDescriptionSystem.SceneMarkersEnabled(api).Should().BeFalse();
+    }
+    [Fact]
     public void VisibleIconWorkingSetSurvivesCacheLimitAcrossFrames()
     {
         var api = Substitute.For<ICoreClientAPI>();

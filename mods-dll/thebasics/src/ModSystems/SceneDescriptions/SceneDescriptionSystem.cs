@@ -17,9 +17,8 @@ public sealed class SceneDescriptionSystem : ModSystem
     internal void Register(SceneDescriptionBlockEntity marker) { _registered.Add(marker); _iconRenderer?.Register(marker); _selection?.Register(marker); }
     internal void Unregister(SceneDescriptionBlockEntity marker) { _registered.Remove(marker); _iconRenderer?.Unregister(marker); _selection?.Unregister(marker); }
 
-    // Each side reads the config the way it already has it: the server from the shared file, the
-    // client from the config the server syncs on join.
-    internal static bool SceneMarkersEnabled(ICoreAPI api) => api?.ModLoader?.GetModSystem<SceneDescriptionSystem>()?._runtimeEnabled ?? (api is ICoreServerAPI server
+    // Clients must wait for the authoritative startup state, even if chunks arrive first.
+    internal static bool SceneMarkersEnabled(ICoreAPI api) => api?.ModLoader?.GetModSystem<SceneDescriptionSystem>()?._runtimeEnabled ?? (api is ICoreClientAPI ? false : api is ICoreServerAPI server
         ? BaseBasicModSystem.GetOrLoadSharedConfig(server).EnableSceneMarkers
         : ChatUiSystem.ChatUiSystem.AreSceneMarkersEnabled());
 
