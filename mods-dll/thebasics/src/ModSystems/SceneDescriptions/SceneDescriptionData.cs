@@ -56,7 +56,7 @@ public sealed class SceneDescriptionData
     /// <summary>Catalog icon drawn in place of <see cref="Symbol"/>. Empty means use the enum symbol.</summary>
     public string SymbolIconName { get; set; } = string.Empty;
     /// <summary>Identifies the drawn artwork, so a custom icon and an enum symbol never share a texture cache entry.</summary>
-    internal string SymbolIconKey => SymbolIconName.Length > 0 ? SymbolIconName : "sym:" + (int)Symbol;
+    internal string SymbolIconKey => SymbolIconName.Length > 0 ? SymbolIconName + ":fallback:" + (int)Symbol : "sym:" + (int)Symbol;
     public float IconDistance { get; set; } = 24;
     public bool UnlimitedIconDistance { get; set; }
     public float TextDistance { get; set; } = 8;

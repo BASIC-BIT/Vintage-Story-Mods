@@ -13,6 +13,31 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneReviewRegressionTests
 {
     [Fact]
+    public void CullingDimensionsSurviveTextureEvictionWithoutRemeasuring()
+    {
+        using var renderer = new SceneMarkerIconRenderer(Substitute.For<ICoreClientAPI>());
+        var markers = Enumerable.Range(0, 40).Select(_ => new SceneDescriptionBlockEntity()).ToArray();
+        var measures = 0;
+        (int, int) Measure() { measures++; return (360, 120); }
+        for (var frame = 0; frame < 3; frame++)
+            foreach (var marker in markers) renderer.DescriptionSize(marker, Measure).Should().Be((360, 120));
+        measures.Should().Be(40);
+        markers[0].Data.Title = "Changed";
+        renderer.DescriptionSize(markers[0], Measure);
+        measures.Should().Be(41);
+        renderer.Unregister(markers[0]);
+        renderer.DescriptionSize(markers[0], Measure);
+        measures.Should().Be(42);
+    }
+    [Fact]
+    public void CustomIconCacheKeyIncludesTheFallbackSymbol()
+    {
+        var first = new SceneDescriptionData { SymbolIconName = "missing", Symbol = SceneMarkerSymbol.Diamond };
+        var second = first.Clone();
+        second.Symbol = SceneMarkerSymbol.Information;
+        first.SymbolIconKey.Should().NotBe(second.SymbolIconKey);
+    }
+    [Fact]
     public void DescriptionCacheRemainsBoundedAcrossDistinctMarkers()
     {
         var api = Substitute.For<ICoreClientAPI>();

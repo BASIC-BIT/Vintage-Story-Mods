@@ -345,7 +345,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     private bool IsWithinEditDistance(IPlayer player)
     {
-        return player?.Entity?.Pos?.XYZ != null && player.Entity.Pos.XYZ.SquareDistanceTo(Pos.ToVec3d().Add(0.5, 0.5, 0.5)) <= MaxEditDistance * MaxEditDistance;
+        return player?.Entity?.Pos?.XYZ != null && player.Entity.Pos.Dimension == Pos.dimension && player.Entity.Pos.XYZ.SquareDistanceTo(Pos.ToVec3d().Add(0.5, 0.5, 0.5)) <= MaxEditDistance * MaxEditDistance;
     }
 
     private void CloseDialog()

@@ -15,6 +15,21 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneDescriptionServerTests
 {
     [Fact]
+    public void OtherDimensionCannotSaveClearReadOrUnlock()
+    {
+        var (marker, player, _) = CreateMarker();
+        player.Entity.Pos.Dimension = 1;
+        marker.Data.Stamp();
+        var stamp = marker.Data.ReadStamp;
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket { Body = "Remote edit" }));
+        marker.Data.Body.Should().Be("Original text");
+        marker.OnReceivedClientPacket(player, 1006, null);
+        marker.Data.ReadStamp.Should().Be(stamp);
+        marker.Data.LockItemCode = "locked";
+        marker.TryUnlock(player).Should().BeFalse();
+        marker.Data.IsLocked.Should().BeTrue();
+    }
+    [Fact]
     public void AcceptedAppearanceIsRememberedOnlyForFreshMarkers()
     {
         var (marker, player, _) = CreateMarker();

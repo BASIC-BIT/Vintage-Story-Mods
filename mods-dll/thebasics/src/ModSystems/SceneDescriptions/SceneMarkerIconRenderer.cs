@@ -20,6 +20,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private readonly Dictionary<(string Icon, SceneMarkerColor Color), LoadedTexture> _icons = new();
     private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth, bool Read)> _visible = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, LoadedTexture Texture)> _descriptions = new();
+    private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, int Width, int Height)> _descriptionSizes = new();
     private readonly HashSet<SceneDescriptionBlockEntity> _shownDescriptions = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, float> _focus = new();
     private readonly Matrixf _model = new();
@@ -42,6 +43,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     {
         _markers.Remove(marker);
         _focus.Remove(marker);
+        _descriptionSizes.Remove(marker);
         RemoveDescription(marker);
     }
 
@@ -128,14 +130,15 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             var radius = 2.0;
             if (textOpacity > 0)
             {
-                var text = GetDescription(marker);
-                if (text != null)
+                var text = DescriptionSize(marker);
+                if (text.Height > 0)
                 {
                     var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, marker.Data.BubbleRenderScale);
                     radius = SceneBubbleLayout.CullRadius(width, height, marker.Data.IndicatorScale);
                 }
             }
             if ((opacity <= 0 && textOpacity <= 0) || !render.DefaultFrustumCuller.SphereInFrustum(position.X, position.Y, position.Z, radius)) continue;
+            if (textOpacity > 0) _shownDescriptions.Add(marker);
             var camera = player.CameraPos;
             var view = render.CameraMatrixOriginf;
             var depth = -(view[2] * (position.X - camera.X) + view[6] * (position.Y - camera.Y) + view[10] * (position.Z - camera.Z));
@@ -233,6 +236,23 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         }
     }
 
+    private (int Width, int Height) DescriptionSize(SceneDescriptionBlockEntity marker) =>
+        DescriptionSize(marker, () =>
+        {
+            using var surface = SceneMarkerVisuals.DescriptionSurface(_api, marker.Data);
+            return surface == null ? (0, 0) : (surface.Width, surface.Height);
+        });
+
+    // Keep layout dimensions until the marker unloads or its content/GUI scale changes.
+    // Culling therefore never needs a GPU texture, even after texture-cache eviction.
+    internal (int Width, int Height) DescriptionSize(SceneDescriptionBlockEntity marker, Func<(int Width, int Height)> measure)
+    {
+        if (_descriptionSizes.TryGetValue(marker, out var entry) && entry.Content == marker.Data.BubbleContent && entry.GuiScale == RuntimeEnv.GUIScale)
+            return (entry.Width, entry.Height);
+        var size = measure();
+        _descriptionSizes[marker] = (marker.Data.BubbleContent, RuntimeEnv.GUIScale, size.Width, size.Height);
+        return size;
+    }
     private LoadedTexture GetDescription(SceneDescriptionBlockEntity marker)
     {
         _shownDescriptions.Add(marker);
@@ -288,6 +308,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         _iconOrder.Clear();
         foreach (var entry in _descriptions.Values) entry.Texture?.Dispose();
         _descriptions.Clear();
+        _descriptionSizes.Clear();
         _shownDescriptions.Clear();
         _markers.Clear();
         _focus.Clear();

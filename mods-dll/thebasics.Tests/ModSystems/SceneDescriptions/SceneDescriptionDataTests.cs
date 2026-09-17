@@ -48,7 +48,7 @@ public class SceneDescriptionDataTests
         var restored = SceneDescriptionData.ReadFrom(tree);
         restored.SymbolIconName.Should().Be(name);
         restored.Symbol.Should().Be(SceneMarkerSymbol.Ring);
-        restored.SymbolIconKey.Should().Be(name);
+        restored.SymbolIconKey.Should().Be(name + ":fallback:" + (int)restored.Symbol);
         restored.Clone().SymbolIconName.Should().Be(name);
         restored.AppearanceDefaults().SymbolIconName.Should().Be(name);
         Vintagestory.API.Util.SerializerUtil.Deserialize<SceneDescriptionEditPacket>(

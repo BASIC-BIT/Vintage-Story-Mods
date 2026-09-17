@@ -40,7 +40,7 @@
   sidesolid: { all: false },
   sideopaque: { all: false },
   faceCullMode: "NeverCull",
-  replaceable: 500,
+  replaceable: 0,
   resistance: 1,
   maxstacksize: 1,
   selectionboxbytype: {
