@@ -32,9 +32,9 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     public override Cuboidf[] GetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos)
     {
         // Terrain traversal must not stop early on boxes extending beyond this voxel.
-        // Client picking supplies its own nearest-symbol hit after terrain; other sight rays ignore symbols.
+        // Keep the in-voxel plate selectable when an offset buries the symbol. The supplemental picker handles symbols.
         if (api?.Side == EnumAppSide.Client)
-            return SceneDescriptionSystem.SceneMarkersEnabled(api) ? [] : base.GetSelectionBoxes(blockAccessor, pos);
+            return SelectionBoxes ?? [];
         return [SymbolBox(DataAt(blockAccessor, pos))];
     }
 
@@ -46,7 +46,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         if (capi == null || blockSel?.Position == null) return;
         if (!SceneDescriptionSystem.SceneMarkersEnabled(capi))
         {
-            foreach (var box in base.GetSelectionBoxes(capi.World.BlockAccessor, blockSel.Position))
+            foreach (var box in SelectionBoxes ?? [])
                 renderBoxHandler(box, 1.6f * ClientSettings.Wireframethickness, GetSelectionColor(capi, blockSel.Position));
             return;
         }
@@ -228,7 +228,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     public override string GetHeldItemName(ItemStack itemStack)
     {
         var title = itemStack?.Attributes?.GetString(SceneDescriptionData.TitleAttribute, string.Empty)?.Trim();
-        return string.IsNullOrWhiteSpace(title) ? base.GetHeldItemName(itemStack) : VtmlUtils.StripVtmlTags(title, api?.Logger);
+        return string.IsNullOrWhiteSpace(title) ? base.GetHeldItemName(itemStack) : VtmlUtils.EscapeVtml(title);
     }
 
     public override void GetHeldItemInfo(ItemSlot inSlot, StringBuilder description, IWorldAccessor world, bool withDebugInfo)

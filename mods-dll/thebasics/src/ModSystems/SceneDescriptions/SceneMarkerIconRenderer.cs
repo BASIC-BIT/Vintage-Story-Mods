@@ -14,8 +14,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
 {
     private readonly ICoreClientAPI _api;
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
-    // ponytail: grows once per icon and colour actually used and is only freed on dispose. Bounded by the
-    // catalog in practice; evict least-recently-used entries if a world ever puts thousands in view.
+    internal const int MaxCachedIcons = 128;
+    private readonly Queue<(string Icon, SceneMarkerColor Color)> _iconOrder = new();
     private readonly Dictionary<(string Icon, SceneMarkerColor Color), LoadedTexture> _icons = new();
     private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth, bool Read)> _visible = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, LoadedTexture Texture)> _descriptions = new();
@@ -256,16 +256,28 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, data.Symbol), 0, 0, 128, data.Color, data.Symbol);
         icon = new LoadedTexture(_api);
         _api.Gui.LoadOrUpdateCairoTexture(surface, true, ref icon);
-        _icons.Add(key, icon);
+        CacheIcon(key, icon);
         return icon;
     }
 
+    internal void CacheIcon((string Icon, SceneMarkerColor Color) key, LoadedTexture icon)
+    {
+        if (_icons.Count >= MaxCachedIcons)
+        {
+            var oldest = _iconOrder.Dequeue();
+            _icons[oldest].Dispose();
+            _icons.Remove(oldest);
+        }
+        _icons.Add(key, icon);
+        _iconOrder.Enqueue(key);
+    }
     public void Dispose()
     {
         _quad?.Dispose();
         _quad = null;
         foreach (var icon in _icons.Values) icon.Dispose();
         _icons.Clear();
+        _iconOrder.Clear();
         foreach (var entry in _descriptions.Values) entry.Texture?.Dispose();
         _descriptions.Clear();
         _shownDescriptions.Clear();

@@ -264,6 +264,27 @@ public class SceneDescriptionServerTests
         SceneDescriptionBlock.BreakRefused(marker, player).Should().Be(!allowed);
     }
     [Fact]
+    public void DisabledMarkersStillAllowPersonalReadStateButRejectEdits()
+    {
+        var configField = typeof(thebasics.ModSystems.ChatUiSystem.ChatUiSystem)
+            .GetField("_config", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        var previous = configField.GetValue(null);
+        try
+        {
+            configField.SetValue(null, new thebasics.Configs.ModConfig { EnableSceneMarkers = false });
+            var (marker, player, _) = CreateMarker();
+            marker.Data.Stamp();
+            marker.OnReceivedClientPacket(player, 1004, null);
+            var key = SceneReadMarks.Key(marker.Pos);
+            SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, key, marker.Data.ReadStamp).Should().BeTrue();
+            marker.OnReceivedClientPacket(player, 1005, null);
+            player.GetSceneReadMarks().Marks.Should().NotContainKey(key);
+            marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket { Body = "Changed" }));
+            marker.Data.Body.Should().Be("Original text");
+        }
+        finally { configField.SetValue(null, previous); }
+    }
+    [Fact]
     public void MarkReadPacket_RecordsTheCurrentStampWithoutEditPermission()
     {
         var (marker, player, _) = CreateMarker(claim: false);

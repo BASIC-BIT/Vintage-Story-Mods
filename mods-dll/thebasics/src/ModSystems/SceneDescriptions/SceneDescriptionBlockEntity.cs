@@ -98,7 +98,8 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     public override void OnReceivedClientPacket(IPlayer player, int packetId, byte[] data)
     {
-        if (Api.Side == EnumAppSide.Server && !SceneDescriptionSystem.SceneMarkersEnabled(Api))
+        if (Api.Side == EnumAppSide.Server && !SceneDescriptionSystem.SceneMarkersEnabled(Api)
+            && packetId != MarkReadPacketId && packetId != MarkUnreadPacketId)
         {
             (player as IServerPlayer)?.SendIngameError("scene-markers-disabled", Lang.Get("thebasics:scene-markers-disabled"));
             return;
@@ -145,7 +146,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         var wasRead = SceneReadMarks.IsRead(readingPlayer.GetSceneReadMarks().Marks, SceneReadMarks.Key(Pos), Data.ReadStamp);
         var markRead = packetId == MarkReadPacketId;
         SetReadMark(readingPlayer, markRead ? Data.ReadStamp : 0);
-        if (wasRead != markRead && player.Entity?.Pos?.Dimension == Pos.dimension && IsWithinEditDistance(player))
+        if (SceneDescriptionSystem.SceneMarkersEnabled(Api) && wasRead != markRead && player.Entity?.Pos?.Dimension == Pos.dimension && IsWithinEditDistance(player))
             SceneAnalytics.Track(Data, markRead ? "marked_read" : "marked_unread");
     }
 
