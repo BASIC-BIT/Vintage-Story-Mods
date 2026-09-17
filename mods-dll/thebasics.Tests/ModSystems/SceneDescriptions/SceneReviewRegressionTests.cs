@@ -13,6 +13,25 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneReviewRegressionTests
 {
     [Fact]
+    public void VisibleIconWorkingSetSurvivesCacheLimitAcrossFrames()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        using var renderer = new SceneMarkerIconRenderer(api);
+        var styles = Enumerable.Range(0, SceneMarkerIconRenderer.MaxCachedIcons + 1)
+            .Select(i => new SceneDescriptionData { SymbolIconName = "style-" + i }).ToArray();
+        var uploads = 0;
+        LoadedTexture Upload() { uploads++; return new LoadedTexture(api); }
+        for (var frame = 0; frame < 4; frame++)
+        {
+            renderer.BeginIconFrame(styles);
+            foreach (var style in styles) renderer.GetIcon(style, Upload);
+        }
+        uploads.Should().Be(styles.Length);
+        renderer.BeginIconFrame([]);
+        var field = typeof(SceneMarkerIconRenderer).GetField("_icons", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        ((System.Collections.IDictionary)field.GetValue(renderer)!).Count.Should().Be(SceneMarkerIconRenderer.MaxCachedIcons);
+    }
+    [Fact]
     public void CullingDimensionsSurviveTextureEvictionWithoutRemeasuring()
     {
         using var renderer = new SceneMarkerIconRenderer(Substitute.For<ICoreClientAPI>());
@@ -28,6 +47,25 @@ public class SceneReviewRegressionTests
         renderer.Unregister(markers[0]);
         renderer.DescriptionSize(markers[0], Measure);
         measures.Should().Be(42);
+    }
+
+    [Fact]
+    public void VisibleDescriptionWorkingSetSurvivesCacheLimit()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        using var renderer = new SceneMarkerIconRenderer(api);
+        var markers = Enumerable.Range(0, SceneMarkerIconRenderer.MaxCachedDescriptions + 1)
+            .Select(_ => new SceneDescriptionBlockEntity()).ToArray();
+        var shownField = typeof(SceneMarkerIconRenderer).GetField("_shownDescriptions", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var shown = (HashSet<SceneDescriptionBlockEntity>)shownField.GetValue(renderer)!;
+        shown.UnionWith(markers);
+        foreach (var marker in markers) renderer.CacheDescription(marker, new LoadedTexture(api));
+        var field = typeof(SceneMarkerIconRenderer).GetField("_descriptions", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var cache = (System.Collections.IDictionary)field.GetValue(renderer)!;
+        cache.Count.Should().Be(markers.Length);
+        foreach (var marker in markers) cache.Contains(marker).Should().BeTrue();
+        foreach (var marker in markers) renderer.Unregister(marker);
+        cache.Count.Should().Be(0);
     }
     [Fact]
     public void CustomIconCacheKeyIncludesTheFallbackSymbol()

@@ -289,7 +289,7 @@ public class SceneDescriptionServerTests
             configField.SetValue(null, new thebasics.Configs.ModConfig { EnableSceneMarkers = false });
             var (marker, player, _) = CreateMarker();
             marker.Data.Stamp();
-            marker.OnReceivedClientPacket(player, 1004, null);
+            marker.OnReceivedClientPacket(player, 1004, BitConverter.GetBytes(marker.Data.ReadStamp));
             var key = SceneReadMarks.Key(marker.Pos);
             SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, key, marker.Data.ReadStamp).Should().BeTrue();
             marker.OnReceivedClientPacket(player, 1005, null);
@@ -305,7 +305,7 @@ public class SceneDescriptionServerTests
         var (marker, player, _) = CreateMarker(claim: false);
         marker.Data.Stamp();
         var stamp = marker.Data.ReadStamp;
-        marker.OnReceivedClientPacket(player, 1004, null);
+        marker.OnReceivedClientPacket(player, 1004, BitConverter.GetBytes(marker.Data.ReadStamp));
         var key = SceneReadMarks.Key(marker.Pos);
         SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, key, stamp).Should().BeTrue();
 
@@ -319,13 +319,13 @@ public class SceneDescriptionServerTests
         var (marker, player, _) = CreateMarker();
         marker.Data.Stamp();
         var key = SceneReadMarks.Key(marker.Pos);
-        marker.OnReceivedClientPacket(player, 1004, null);
+        marker.OnReceivedClientPacket(player, 1004, BitConverter.GetBytes(marker.Data.ReadStamp));
         var marks = player.GetSceneReadMarks().Marks;
 
         marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket { Body = "Rewritten" }));
         SceneReadMarks.IsRead(marks, key, marker.Data.ReadStamp).Should().BeFalse();
 
-        marker.OnReceivedClientPacket(player, 1004, null);
+        marker.OnReceivedClientPacket(player, 1004, BitConverter.GetBytes(marker.Data.ReadStamp));
         marks = player.GetSceneReadMarks().Marks;
         SceneReadMarks.IsRead(marks, key, marker.Data.ReadStamp).Should().BeTrue();
         marker.OnReceivedClientPacket(player, 1006, null);
@@ -340,6 +340,31 @@ public class SceneDescriptionServerTests
         var stamp = marker.Data.ReadStamp;
         marker.OnReceivedClientPacket(player, 1006, null);
         marker.Data.ReadStamp.Should().Be(stamp);
+    }
+
+    [Theory]
+    [InlineData(1002)]
+    [InlineData(1006)]
+    public void ReadMarkRejectsContentChangedSinceTheReaderOpened(int changePacket)
+    {
+        var (marker, player, _) = CreateMarker();
+        marker.Data.Stamp();
+        var displayedStamp = marker.Data.ReadStamp;
+        marker.OnReceivedClientPacket(player, changePacket, SerializerUtil.Serialize(new SceneDescriptionEditPacket { Body = "Replacement" }));
+        marker.OnReceivedClientPacket(player, 1004, BitConverter.GetBytes(displayedStamp));
+        player.GetSceneReadMarks().Marks.Should().NotContainKey(SceneReadMarks.Key(marker.Pos));
+        marker.OnReceivedClientPacket(player, 1004, BitConverter.GetBytes(marker.Data.ReadStamp));
+        SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, SceneReadMarks.Key(marker.Pos), marker.Data.ReadStamp).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ReadMarkRejectsMissingOrMalformedDisplayedStamp()
+    {
+        var (marker, player, _) = CreateMarker();
+        marker.Data.Stamp();
+        marker.OnReceivedClientPacket(player, 1004, null);
+        marker.OnReceivedClientPacket(player, 1004, new byte[7]);
+        player.GetSceneReadMarks().Marks.Should().NotContainKey(SceneReadMarks.Key(marker.Pos));
     }
 
     [Fact]
@@ -377,8 +402,8 @@ public class SceneDescriptionServerTests
         try
         {
             var (marker, player, _) = CreateMarker();
-            marker.OnReceivedClientPacket(player, 1004, null);
-            marker.OnReceivedClientPacket(player, 1004, null);
+            marker.OnReceivedClientPacket(player, 1004, BitConverter.GetBytes(marker.Data.ReadStamp));
+            marker.OnReceivedClientPacket(player, 1004, BitConverter.GetBytes(marker.Data.ReadStamp));
             marker.OnReceivedClientPacket(player, 1005, null);
             marker.OnReceivedClientPacket(player, 1005, null);
             sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "marked_read"));

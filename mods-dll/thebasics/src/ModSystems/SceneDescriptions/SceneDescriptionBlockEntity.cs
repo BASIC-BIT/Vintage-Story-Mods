@@ -114,7 +114,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
                 return;
             case MarkReadPacketId:
             case MarkUnreadPacketId:
-                HandleReadMark(player, packetId);
+                HandleReadMark(player, packetId, data);
                 return;
             case ClearReadPacketId:
                 HandleClearRead(player);
@@ -132,9 +132,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     }
 
     // Marking a marker read is a personal preference, so it needs no edit permission.
-    private void HandleReadMark(IPlayer player, int packetId)
+    private void HandleReadMark(IPlayer player, int packetId, byte[] data)
     {
         if (player is not IServerPlayer readingPlayer) return;
+        // The reader is a snapshot. Never mark replacement content the player has not opened.
+        if (packetId == MarkReadPacketId && (data is not { Length: 8 } || BitConverter.ToInt64(data) != Data.ReadStamp)) return;
         // Markers placed before read marks existed carry no stamp; give them one on first use.
         if (packetId == MarkReadPacketId && Data.ReadStamp == 0)
         {

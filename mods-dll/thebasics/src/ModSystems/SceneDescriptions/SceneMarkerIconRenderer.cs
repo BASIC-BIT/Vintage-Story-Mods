@@ -16,7 +16,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
     internal const int MaxCachedIcons = 128;
     internal const int MaxCachedDescriptions = 32;
-    private readonly Queue<(string Icon, SceneMarkerColor Color)> _iconOrder = new();
+    private readonly HashSet<(string Icon, SceneMarkerColor Color)> _shownIcons = new();
     private readonly Dictionary<(string Icon, SceneMarkerColor Color), LoadedTexture> _icons = new();
     private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth, bool Read)> _visible = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, LoadedTexture Texture)> _descriptions = new();
@@ -43,6 +43,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     {
         _markers.Remove(marker);
         _focus.Remove(marker);
+        _shownDescriptions.Remove(marker);
         _descriptionSizes.Remove(marker);
         RemoveDescription(marker);
     }
@@ -61,11 +62,15 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         if (player == null || _markers.Count == 0 || !SceneDescriptionSystem.SceneMarkersEnabled(_api))
         {
             _visible.Clear(); // The Ortho pass reads this list later in the same frame.
+            BeginIconFrame([]);
+            _shownDescriptions.Clear();
+            foreach (var marker in _descriptions.Keys.ToArray()) RemoveDescription(marker);
             return;
         }
         var render = _api.Render;
         _shownDescriptions.Clear();
         GatherVisibleIcons(deltaTime);
+        BeginIconFrame(_visible.Where(icon => icon.Opacity > 0).Select(icon => icon.Marker.Data));
         if (_visible.Count == 0)
         {
             foreach (var marker in _descriptions.Keys.Where(marker => !_shownDescriptions.Contains(marker)).ToArray()) RemoveDescription(marker);
@@ -269,35 +274,54 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     internal void CacheDescription(SceneDescriptionBlockEntity marker, LoadedTexture texture)
     {
         RemoveDescription(marker);
-        if (_descriptions.Count >= MaxCachedDescriptions) RemoveDescription(_descriptions.Keys.First());
+        foreach (var unused in _descriptions.Keys.Where(key => !_shownDescriptions.Contains(key))
+            .Take(Math.Max(0, _descriptions.Count - MaxCachedDescriptions + 1)).ToArray()) RemoveDescription(unused);
         _descriptions[marker] = (marker.Data.BubbleContent, RuntimeEnv.GUIScale, texture);
     }
 
-    private LoadedTexture GetIcon(SceneDescriptionData data)
+    internal LoadedTexture GetIcon(SceneDescriptionData data, Func<LoadedTexture> create = null)
     {
         var key = (data.SymbolIconKey, data.Color);
         if (_icons.TryGetValue(key, out var icon)) return icon;
+        icon = create == null ? CreateIcon(data) : create();
+        CacheIcon(key, icon);
+        return icon;
+    }
+
+    private LoadedTexture CreateIcon(SceneDescriptionData data)
+    {
         using var surface = new ImageSurface(Format.Argb32, 128, 128);
         using var ctx = new Context(surface);
         // A catalog icon that will not draw falls back to the enum symbol, never to an empty billboard.
         if (data.SymbolIconName.Length == 0 || !SceneTitleIcons.Draw(_api, ctx, surface, data.SymbolIconName, data.Color))
             SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, data.Symbol), 0, 0, 128, data.Color, data.Symbol);
-        icon = new LoadedTexture(_api);
+        var icon = new LoadedTexture(_api);
         _api.Gui.LoadOrUpdateCairoTexture(surface, true, ref icon);
-        CacheIcon(key, icon);
         return icon;
+    }
+
+    internal void BeginIconFrame(IEnumerable<SceneDescriptionData> visibleStyles)
+    {
+        _shownIcons.Clear();
+        foreach (var data in visibleStyles) _shownIcons.Add((data.SymbolIconKey, data.Color));
+        TrimIcons(MaxCachedIcons);
+    }
+
+    // The limit applies to retained textures, not the current frame's working set. Evicting
+    // visible keys would re-upload every texture every frame when there are limit + 1 styles.
+    private void TrimIcons(int limit)
+    {
+        foreach (var key in _icons.Keys.Where(key => !_shownIcons.Contains(key)).Take(Math.Max(0, _icons.Count - limit)).ToArray())
+        {
+            _icons[key].Dispose();
+            _icons.Remove(key);
+        }
     }
 
     internal void CacheIcon((string Icon, SceneMarkerColor Color) key, LoadedTexture icon)
     {
-        if (_icons.Count >= MaxCachedIcons)
-        {
-            var oldest = _iconOrder.Dequeue();
-            _icons[oldest].Dispose();
-            _icons.Remove(oldest);
-        }
+        TrimIcons(MaxCachedIcons - 1);
         _icons.Add(key, icon);
-        _iconOrder.Enqueue(key);
     }
     public void Dispose()
     {
@@ -305,7 +329,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         _quad = null;
         foreach (var icon in _icons.Values) icon.Dispose();
         _icons.Clear();
-        _iconOrder.Clear();
+        _shownIcons.Clear();
         foreach (var entry in _descriptions.Values) entry.Texture?.Dispose();
         _descriptions.Clear();
         _descriptionSizes.Clear();

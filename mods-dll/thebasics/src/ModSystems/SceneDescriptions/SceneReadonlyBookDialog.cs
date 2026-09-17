@@ -14,7 +14,7 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
 {
     private readonly BlockPos _pos;
     private readonly string _titleIconName;
-    private long _stamp;
+    private readonly long _stamp;
     private bool _read;
 
     internal BlockPos Pos => _pos;
@@ -105,7 +105,8 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
         // relabels once the server confirms (see Refresh). Closing unregisters the dialog from
         // OpenedGuis, so the reply finds no reader and Refresh is never called on it.
         var marking = !_read;
-        capi.Network.SendBlockEntityPacket(_pos, marking ? SceneDescriptionBlockEntity.MarkReadPacketId : SceneDescriptionBlockEntity.MarkUnreadPacketId);
+        capi.Network.SendBlockEntityPacket(_pos, marking ? SceneDescriptionBlockEntity.MarkReadPacketId : SceneDescriptionBlockEntity.MarkUnreadPacketId,
+            System.BitConverter.GetBytes(_stamp));
         if (marking) TryClose();
         return true;
     }
@@ -113,7 +114,6 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
     /// <summary>Re-reads the client mark cache after the server replied with the marker's current stamp (0 = unread).</summary>
     internal void Refresh(long stamp)
     {
-        if (stamp != 0) _stamp = stamp; // A legacy marker gets its first stamp on first read.
         _read = SceneReadMarks.IsRead(_pos, _stamp);
         // Rebuild rather than relabel: the button bounds were fitted to the previous label.
         Compose();
