@@ -123,7 +123,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
             {
                 var stack = CreateStackFromPlacedBlock(world, blockSelection.Position);
                 stack.Attributes.SetString("title", blockEntity.Data.Title);
-                stack.Attributes.SetString("text", VtmlUtils.EscapeVtml(blockEntity.Data.Body));
+                stack.Attributes.SetString("text", SceneDescriptionFormatter.EscapeLiteral(blockEntity.Data.Body));
                 if (new SceneReadonlyBookDialog(stack, client, blockSelection.Position.Copy(), blockEntity.Data.ReadStamp, blockEntity.Data.TitleIconName).TryOpen())
                     client.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.ReaderOpened(blockSelection.Position);
             }
@@ -136,7 +136,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
 
     public override void OnHeldInteractStart(ItemSlot slot, EntityAgent byEntity, BlockSelection blockSelection, EntitySelection entitySelection, bool firstEvent, ref EnumHandHandling handling)
     {
-        if (byEntity?.Controls?.ShiftKey != true || string.IsNullOrWhiteSpace(slot?.Itemstack?.Attributes?.GetString(SceneDescriptionData.BodyAttribute)))
+        if (byEntity?.Controls?.ShiftKey != true || !SceneAnalytics.Written(SceneDescriptionData.ReadFrom(slot?.Itemstack?.Attributes)))
         {
             base.OnHeldInteractStart(slot, byEntity, blockSelection, entitySelection, firstEvent, ref handling);
             return;
@@ -146,8 +146,8 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         if (api is ICoreClientAPI capi)
         {
             var readableStack = slot.Itemstack.Clone();
-            readableStack.Attributes.SetString("title", GetHeldItemName(readableStack));
-            readableStack.Attributes.SetString("text", VtmlUtils.EscapeVtml(readableStack.Attributes.GetString(SceneDescriptionData.BodyAttribute, string.Empty)));
+            readableStack.Attributes.SetString("title", readableStack.Attributes.GetString(SceneDescriptionData.TitleAttribute, string.Empty));
+            readableStack.Attributes.SetString("text", SceneDescriptionFormatter.EscapeLiteral(readableStack.Attributes.GetString(SceneDescriptionData.BodyAttribute, string.Empty)));
             if (new GuiDialogReadonlyBook(readableStack, capi).TryOpen())
                 capi.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.ReaderOpened();
         }
@@ -228,7 +228,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     public override string GetHeldItemName(ItemStack itemStack)
     {
         var title = itemStack?.Attributes?.GetString(SceneDescriptionData.TitleAttribute, string.Empty)?.Trim();
-        return string.IsNullOrWhiteSpace(title) ? base.GetHeldItemName(itemStack) : VtmlUtils.EscapeVtml(title);
+        return string.IsNullOrWhiteSpace(title) ? base.GetHeldItemName(itemStack) : SceneDescriptionFormatter.EscapeLiteral(title);
     }
 
     public override void GetHeldItemInfo(ItemSlot inSlot, StringBuilder description, IWorldAccessor world, bool withDebugInfo)
@@ -237,7 +237,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         base.GetHeldItemInfo(inSlot, vanilla, world, withDebugInfo);
         description.Append(WithoutMaterialLine(vanilla.ToString(), world, inSlot?.Itemstack));
         var data = SceneDescriptionData.ReadFrom(inSlot?.Itemstack?.Attributes);
-        if (string.IsNullOrWhiteSpace(data.Body))
+        if (!SceneAnalytics.Written(data))
         {
             description.AppendLine(Lang.Get("thebasics:scene-description-empty-item-help"));
             return;
@@ -248,7 +248,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
             description.AppendLine(Lang.Get("thebasics:scene-description-authored-by", data.AuthorName));
         }
 
-        description.AppendLine(VtmlUtils.EscapeVtml(Preview(data.Body)));
+        description.AppendLine(SceneDescriptionFormatter.EscapeLiteral(Preview(data.Body)));
         description.AppendLine(Lang.Get("thebasics:scene-description-read-item-help"));
     }
 

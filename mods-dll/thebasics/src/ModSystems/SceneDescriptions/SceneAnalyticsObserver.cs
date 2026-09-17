@@ -86,7 +86,7 @@ internal sealed class SceneAnalyticsObserver : IDisposable
             var stack = player.InventoryManager?.ActiveHotbarSlot?.Itemstack;
             if (stack?.Block is not SceneDescriptionBlock) return;
             data = SceneDescriptionData.ReadFrom(stack.Attributes);
-            if (string.IsNullOrWhiteSpace(data.Body)) return;
+            if (!SceneAnalytics.Written(data)) return;
             key = "held";
         }
         else

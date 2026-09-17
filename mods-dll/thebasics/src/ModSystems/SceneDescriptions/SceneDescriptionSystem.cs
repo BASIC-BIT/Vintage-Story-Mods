@@ -8,19 +8,27 @@ public sealed class SceneDescriptionSystem : ModSystem
 {
     private static readonly AssetLocation SceneMarkerRecipe = new("thebasics:recipes/grid/scene-marker.json");
     private ICoreClientAPI _clientApi;
+    private bool? _runtimeEnabled;
+    private readonly System.Collections.Generic.HashSet<SceneDescriptionBlockEntity> _registered = new();
     private SceneMarkerIconRenderer _iconRenderer;
     private SceneMarkerSelection _selection;
     internal SceneAnalyticsObserver Analytics { get; } = new();
 
-    internal void Register(SceneDescriptionBlockEntity marker) { _iconRenderer?.Register(marker); _selection?.Register(marker); }
-    internal void Unregister(SceneDescriptionBlockEntity marker) { _iconRenderer?.Unregister(marker); _selection?.Unregister(marker); }
+    internal void Register(SceneDescriptionBlockEntity marker) { _registered.Add(marker); _iconRenderer?.Register(marker); _selection?.Register(marker); }
+    internal void Unregister(SceneDescriptionBlockEntity marker) { _registered.Remove(marker); _iconRenderer?.Unregister(marker); _selection?.Unregister(marker); }
 
     // Each side reads the config the way it already has it: the server from the shared file, the
     // client from the config the server syncs on join.
-    internal static bool SceneMarkersEnabled(ICoreAPI api) => api is ICoreServerAPI server
+    internal static bool SceneMarkersEnabled(ICoreAPI api) => api?.ModLoader?.GetModSystem<SceneDescriptionSystem>()?._runtimeEnabled ?? (api is ICoreServerAPI server
         ? BaseBasicModSystem.GetOrLoadSharedConfig(server).EnableSceneMarkers
-        : ChatUiSystem.ChatUiSystem.AreSceneMarkersEnabled();
+        : ChatUiSystem.ChatUiSystem.AreSceneMarkersEnabled());
 
+    internal void SetRuntimeEnabled(bool enabled)
+    {
+        if (_runtimeEnabled == enabled) return;
+        _runtimeEnabled = enabled;
+        foreach (var marker in _registered) marker.MarkDirty(redrawOnClient: true);
+    }
     public override void Start(ICoreAPI api)
     {
         // Registered either way: an existing placed marker must not become a missing block.
@@ -32,7 +40,9 @@ public sealed class SceneDescriptionSystem : ModSystem
     // here is enough to make the marker uncraftable without touching the block itself.
     public override void AssetsFinalize(ICoreAPI api)
     {
-        if (api is ICoreServerAPI server && !SceneMarkersEnabled(api))
+        if (api is not ICoreServerAPI server) return;
+        SetRuntimeEnabled(BaseBasicModSystem.GetOrLoadSharedConfig(server).EnableSceneMarkers);
+        if (_runtimeEnabled == false)
         {
             server.World.GridRecipes.RemoveAll(recipe => SceneMarkerRecipe.Equals(recipe.Name));
         }
@@ -67,6 +77,8 @@ public sealed class SceneDescriptionSystem : ModSystem
             _clientApi.Event.UnregisterRenderer(_iconRenderer, EnumRenderStage.Opaque);
             _clientApi.Event.UnregisterRenderer(_iconRenderer.OrthoPass, EnumRenderStage.Ortho);
         }
+        _registered.Clear();
+        _runtimeEnabled = null;
         Analytics.Dispose();
         _iconRenderer?.Dispose();
         _selection?.Dispose();

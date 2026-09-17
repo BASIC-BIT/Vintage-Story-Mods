@@ -15,6 +15,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private readonly ICoreClientAPI _api;
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
     internal const int MaxCachedIcons = 128;
+    internal const int MaxCachedDescriptions = 32;
     private readonly Queue<(string Icon, SceneMarkerColor Color)> _iconOrder = new();
     private readonly Dictionary<(string Icon, SceneMarkerColor Color), LoadedTexture> _icons = new();
     private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth, bool Read)> _visible = new();
@@ -241,8 +242,15 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         if (surface == null) return null;
         var texture = new LoadedTexture(_api);
         _api.Gui.LoadOrUpdateCairoTexture(surface, false, ref texture);
-        _descriptions[marker] = (marker.Data.BubbleContent, RuntimeEnv.GUIScale, texture);
+        CacheDescription(marker, texture);
         return texture;
+    }
+
+    internal void CacheDescription(SceneDescriptionBlockEntity marker, LoadedTexture texture)
+    {
+        RemoveDescription(marker);
+        if (_descriptions.Count >= MaxCachedDescriptions) RemoveDescription(_descriptions.Keys.First());
+        _descriptions[marker] = (marker.Data.BubbleContent, RuntimeEnv.GUIScale, texture);
     }
 
     private LoadedTexture GetIcon(SceneDescriptionData data)

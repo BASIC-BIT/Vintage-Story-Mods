@@ -926,6 +926,7 @@ function normalizeEvent(event, envelope) {
   // Keep optional fields tied to their action instead of admitting a generic property bag.
   const isScene = event.name === "feature used" && event.properties.feature_name === "scene_markers";
   if (isScene && !SCENE_ACTIONS.has(event.properties.action)) return invalid("invalid_scene_action");
+  if (!isScene && SCENE_ACTIONS.has(event.properties.action)) return invalid("scene_action_without_scene_feature");
   for (const key of Object.keys(event.properties)) {
     if (isScene) {
       if (!BASE_PROPERTIES.has(key) && !["feature_name", "action", "success", "result"].includes(key)

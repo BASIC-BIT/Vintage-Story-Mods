@@ -978,3 +978,11 @@ test("dice telemetry accepts bounded adoption data and canonical command outcome
   const arbitrary = validatePayload(payloadForEvent("feature used", { feature_name: "dice", dice_complexity: "secret reason" }));
   assert.ok(arbitrary.rejected.length > 0);
 });
+
+test("scene actions cannot be attributed to another feature", () => {
+  for (const action of sceneActions) {
+    const result = validatePayload(payloadForEvent("feature used", { feature_name: "dice", action }));
+    assert.equal(result.events.length, 0, action);
+    assert.equal(result.rejected.length, 1, action);
+  }
+});

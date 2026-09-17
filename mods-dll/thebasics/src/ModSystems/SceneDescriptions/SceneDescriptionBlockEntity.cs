@@ -40,7 +40,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         if (Api is ICoreClientAPI client) client.ModLoader.GetModSystem<SceneDescriptionSystem>().Register(this);
     }
 
-    public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tesselator) => true;
+    public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tesselator) => SceneDescriptionSystem.SceneMarkersEnabled(Api);
 
     public SceneDescriptionData Data { get; private set; } = new();
 

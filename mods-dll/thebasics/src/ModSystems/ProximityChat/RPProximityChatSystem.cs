@@ -1300,6 +1300,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         {
             ProximityGroupId = ProximityChatId,
             Config = Config,
+            SceneMarkersRuntimeEnabled = SceneDescriptionSystem.SceneMarkersEnabled(API),
             LastSelectedGroupId = byPlayer.GetLastSelectedGroupId()
         }, byPlayer);
 

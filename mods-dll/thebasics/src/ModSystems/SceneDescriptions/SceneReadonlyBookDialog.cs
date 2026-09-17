@@ -67,7 +67,7 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
             .AddSceneDrawing(iconBounds, (ctx, surface, _) => SceneTitleIcons.Draw(capi, ctx, surface, _titleIconName))
             .EndIf()
             .AddIf(hasHeader)
-            .AddRichtext("<strong>" + VtmlUtils.EscapeVtml(Title ?? "") + "</strong>", font, titleBounds)
+            .AddRichtext("<strong>" + SceneDescriptionFormatter.EscapeLiteral(Title ?? "") + "</strong>", font, titleBounds)
             .EndIf()
             .AddRichtext("", font, textBounds, "text")
             .AddIf(Pages.Count > 1)

@@ -1937,6 +1937,8 @@ public class ChatUiSystem : ModSystem
             }
 
             ApplyReceivedConfig(configMessage.Config);
+            _api.ModLoader.GetModSystem<SceneDescriptionSystem>()?.SetRuntimeEnabled(
+                configMessage.SceneMarkersRuntimeEnabled ?? configMessage.Config.EnableSceneMarkers);
 
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;

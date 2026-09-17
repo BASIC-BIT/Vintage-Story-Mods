@@ -80,7 +80,7 @@ public class SceneAnalyticsObserverTests
             // Distinct held items intentionally share a per-viewer cooldown, without content fingerprints.
             one.InventoryManager = Substitute.For<IPlayerInventoryManager>();
             var firstHeld = new ItemStack(new SceneDescriptionBlock());
-            new SceneDescriptionData { Body = "first" }.WriteTo(firstHeld.Attributes);
+            new SceneDescriptionData { Title = "Title only" }.WriteTo(firstHeld.Attributes);
             one.InventoryManager.ActiveHotbarSlot.Returns(new DummySlot(firstHeld));
             observer.Receive(one, new SceneObservationMessage { Held = true });
             var secondHeld = new ItemStack(new SceneDescriptionBlock());

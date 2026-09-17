@@ -13,6 +13,58 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneReviewRegressionTests
 {
     [Fact]
+    public void DescriptionCacheRemainsBoundedAcrossDistinctMarkers()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        using var renderer = new SceneMarkerIconRenderer(api);
+        var markers = Enumerable.Range(0, SceneMarkerIconRenderer.MaxCachedDescriptions + 3)
+            .Select(_ => new SceneDescriptionBlockEntity()).ToArray();
+        foreach (var marker in markers) renderer.CacheDescription(marker, new LoadedTexture(api));
+        var field = typeof(SceneMarkerIconRenderer).GetField("_descriptions", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var cache = (System.Collections.IDictionary)field.GetValue(renderer)!;
+        cache.Count.Should().Be(SceneMarkerIconRenderer.MaxCachedDescriptions);
+        cache.Contains(markers[0]).Should().BeFalse();
+        cache.Contains(markers[^1]).Should().BeTrue();
+    }
+    [Theory]
+    [InlineData("&lt; &gt; &nbsp; &amp;")]
+    [InlineData("<strong>literal</strong> && &lt;icon&gt;")]
+    public void LiteralEntitiesSurviveTheGameParser(string authored)
+    {
+        var escaped = SceneDescriptionFormatter.EscapeLiteral(authored);
+        thebasics.Utilities.VtmlUtils.StripVtmlTags(escaped, Substitute.For<ILogger>()).Should().Be(authored);
+        var rendered = SceneDescriptionFormatter.ToFloatingVtml(new SceneDescriptionData { Title = authored });
+        thebasics.Utilities.VtmlUtils.StripVtmlTags(rendered, Substitute.For<ILogger>()).Should().Be(authored);
+    }
+
+    [Fact]
+    public void RuntimeSettingIgnoresPendingConfigAndRebuildsAlreadyLoadedMeshes()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        var system = new SceneDescriptionSystem();
+        api.ModLoader.GetModSystem<SceneDescriptionSystem>().Returns(system);
+        var marker = new SceneDescriptionBlockEntity { Api = api, Pos = new BlockPos(0, 0, 0, 0) };
+        system.Register(marker);
+        system.SetRuntimeEnabled(false);
+        ((ICoreAPI)api).World.BlockAccessor.Received(1).MarkBlockDirty(marker.Pos, (IPlayer)null!);
+        marker.Api = api;
+        marker.OnTesselation(null, null).Should().BeFalse();
+        var configField = typeof(thebasics.ModSystems.ChatUiSystem.ChatUiSystem)
+            .GetField("_config", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var previous = configField.GetValue(null);
+        try
+        {
+            configField.SetValue(null, new ModConfig { EnableSceneMarkers = true });
+            SceneDescriptionSystem.SceneMarkersEnabled(api).Should().BeFalse();
+            system.SetRuntimeEnabled(false);
+            ((ICoreAPI)api).World.BlockAccessor.Received(1).MarkBlockDirty(marker.Pos, (IPlayer)null!);
+            system.SetRuntimeEnabled(true);
+            ((ICoreAPI)api).World.BlockAccessor.Received(2).MarkBlockDirty(marker.Pos, (IPlayer)null!);
+            marker.OnTesselation(null, null).Should().BeTrue();
+        }
+        finally { configField.SetValue(null, previous); }
+    }
+    [Fact]
     public void AuthoredMarkupIsEscapedRatherThanDeletedFromItemName()
     {
         var block = new SceneDescriptionBlock();
