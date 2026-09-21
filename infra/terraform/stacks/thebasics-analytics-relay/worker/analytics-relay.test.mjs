@@ -335,6 +335,46 @@ function addLiteralValues(target, expression) {
   throw new Error(`Unsupported analytics contract expression: ${normalizedExpression}`);
 }
 
+function featureActionContracts(sources) {
+  const pairs = [];
+  const specs = [
+    ["AnalyticsService.TrackFeatureUsed", 0, "featureName", 1, "action"],
+    ["SendThroughPipeline", 2, "featureName", 3, "featureAction"],
+    ["SceneAnalytics.Track", null, null, 1, "action"],
+  ];
+  for (const source of sources) {
+    for (const [method, featureIndex, featureName, actionIndex, actionName] of specs) {
+      for (const args of callArguments(source, method)) {
+        const features = new Set();
+        const actions = new Set();
+        addLiteralValues(features, featureIndex === null ? '"scene_markers"' : argument(args, featureIndex, featureName));
+        addLiteralValues(actions, argument(args, actionIndex, actionName));
+        for (const feature_name of features) {
+          for (const action of actions) pairs.push({ feature_name, action });
+        }
+      }
+    }
+  }
+  return pairs;
+}
+
+test("producer fixtures preserve feature associations for colliding actions", () => {
+  const pairs = featureActionContracts([
+    'AnalyticsService.TrackFeatureUsed("dice", "saved");',
+    'AnalyticsService.TrackFeatureUsed(action: "removed", featureName: "tpa");',
+    'SceneAnalytics.Track(data, "saved");',
+  ]);
+  assert.deepEqual(pairs, [
+    { feature_name: "dice", action: "saved" },
+    { feature_name: "tpa", action: "removed" },
+    { feature_name: "scene_markers", action: "saved" },
+  ]);
+  for (const pair of pairs.slice(0, 2)) {
+    assert.equal(validatePayload(payloadForEvent("feature used", pair)).events.length, 0);
+  }
+  assertAccepted(validatePayload(payloadForEvent("feature used", pairs[2])), "actual scene producer");
+});
+
 function currentProducerContracts() {
   const contracts = {
     action: new Set([
@@ -368,14 +408,14 @@ function currentProducerContracts() {
   const specs = [
     ["SceneAnalytics.Track", ["action", 1, "action"]],
     ["AnalyticsService.TrackCommandUsed", ["command_name", 0, "commandName"], ["result", 2, "result"]],
-    ["AnalyticsService.TrackFeatureUsed", ["feature_name", 0, "featureName"], ["action", 1, "action"], ["result", 3, "result"]],
+    ["AnalyticsService.TrackFeatureUsed", ["feature_name", 0, "featureName"], ["result", 3, "result"]],
     ["AnalyticsService.TrackFailure", ["area", 0, "area"], ["operation", 1, "operation"], ["severity", 2, "severity"], ["result", 3, "result"]],
     ["AnalyticsService.TrackPlayerFailure", ["area", 1, "area"], ["operation", 2, "operation"], ["severity", 3, "severity"], ["result", 4, "result"]],
     ["TrackLanguageStateInvariantOutcome", ["operation", 0, "operation"]],
     ["TrackConfigEditorFailure", ["area", 1, "featureName"], ["operation", 2, "action"]],
     ["TrackHomeSpawnFailure", ["command_name", 1, "commandName"], ["action", 2, "featureAction"], ["result", 3, "result"]],
     ["TrackTpaFailure", ["command_name", 1, "commandName"], ["action", 2, "action"], ["result", 3, "result"]],
-    ["SendThroughPipeline", ["command_name", 1, "surface"], ["feature_name", 2, "featureName"], ["action", 3, "featureAction"], ["area", 2, "featureName"], ["operation", 1, "surface"]],
+    ["SendThroughPipeline", ["command_name", 1, "surface"], ["feature_name", 2, "featureName"], ["area", 2, "featureName"], ["operation", 1, "surface"]],
   ];
 
   for (const source of readSources()) {
@@ -531,6 +571,10 @@ test("relay accepts current production event contracts", () => {
   }
   assert.deepEqual(failures, []);
 
+  for (const pair of featureActionContracts(readSources())) {
+    assertAccepted(validatePayload(payloadForEvent("feature used", pair)), `${pair.feature_name}:${pair.action}`);
+  }
+
   const warmup = validatePayload(payloadForEvent("feature used", {
     action: "accept_warmup_start",
     feature_name: "tpa",
@@ -591,7 +635,7 @@ test("health exposes the relay contract required by the mod", async () => {
   );
 
   assert.ok(requiredRevision, "missing RequiredRelayContractRevision");
-  assert.equal(Number(requiredRevision[1]), CONTRACT_REVISION);
+  assert.ok(CONTRACT_REVISION >= Number(requiredRevision[1]), "relay must support the current mod contract");
   assert.match(source, /\["online_player_count"\]\s*=\s*Math\.Clamp\(GetOnlinePlayerCount\(\), 0, MaxOnlinePlayerCount\)/);
   assert.doesNotMatch(source, /\["online_player_count_bucket"\]/);
 
