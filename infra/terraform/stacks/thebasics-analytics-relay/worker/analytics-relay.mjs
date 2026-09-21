@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 const MAX_ONLINE_PLAYER_COUNT = 10_000;
-export const CONTRACT_REVISION = 6;
+export const CONTRACT_REVISION = 7;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -87,6 +87,22 @@ const TELEPORT_CONFIG_PROPERTIES = new Set([
   ...TELEPORT_BOOLEAN_PROPERTIES,
 ]);
 
+const SCENE_ACTIONS = new Set([
+  "placed", "saved", "reader_opened", "marked_read", "marked_unread", "moved", "removed", "bubble_viewed",
+]);
+const SCENE_COMMON_PROPERTIES = new Set([
+  "scene_display_mode", "scene_content", "scene_locked", "scene_body_shown",
+]);
+const SCENE_ACTION_PROPERTIES = new Map([
+  ["placed", new Set(["scene_placement", "scene_mount"])],
+  ["moved", new Set(["scene_placement", "scene_mount"])],
+  ["saved", new Set(["scene_save_kind"])],
+  ["reader_opened", new Set(["scene_read_source"])],
+]);
+const SCENE_PROPERTIES = new Set([
+  ...SCENE_COMMON_PROPERTIES, ...[...SCENE_ACTION_PROPERTIES.values()].flatMap((keys) => [...keys]),
+]);
+
 const DICE_BOOLEAN_PROPERTIES = new Set([
   "dice_explode", "dice_reroll", "dice_keep_drop", "dice_success_pool", "dice_arithmetic", "dice_helpers",
 ]);
@@ -94,6 +110,8 @@ const ALLOWED_PROPERTIES = new Set([
   ...DICE_BOOLEAN_PROPERTIES,
   "dice_complexity",
   ...TELEPORT_CONFIG_PROPERTIES,
+  ...SCENE_PROPERTIES,
+  "enable_scene_markers",
   "action",
   "allow_ooc_toggle",
   "allow_player_nickname_colors",
@@ -177,6 +195,7 @@ const ALLOWED_PROPERTIES = new Set([
 const ALLOWED_STRING_VALUES = new Map([
   ...[...TELEPORT_BUCKET_PROPERTIES].map((key) => [key, COUNT_BUCKET_VALUES]),
   ["action", new Set([
+    ...SCENE_ACTIONS,
     "accept",
     "accept_warmup_start",
     "add",
@@ -327,6 +346,7 @@ const ALLOWED_STRING_VALUES = new Map([
   ["max_rp_character_slots_bucket", new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"])],
   ["mod_id", new Set(["thebasics"])],
   ["feature_name", new Set([
+    "scene_markers",
     "dice",
     "character_headshot",
     "character_sheet_fields",
@@ -487,6 +507,12 @@ const ALLOWED_STRING_VALUES = new Map([
     "warmup_failed",
     "write_failed",
   ])],
+  ["scene_display_mode", new Set(["when_targeted", "always_nearby", "on_interaction"])],
+  ["scene_content", new Set(["empty", "written"])],
+  ["scene_placement", new Set(["fresh", "reused"])],
+  ["scene_mount", new Set(["ground", "wall"])],
+  ["scene_save_kind", new Set(["empty", "first_content", "edit"])],
+  ["scene_read_source", new Set(["placed", "held"])],
   ["warmup_seconds_bucket", COUNT_BUCKET_VALUES],
   ["restart_required_settings_bucket", new Set(["0", "1-5", "6-10", "11-20", "21-50", "51-100", "101+"])],
   ["session_duration_bucket", new Set(["<1m", "1-5m", "5-30m", "30-120m", "120m+"])],
@@ -498,6 +524,9 @@ const ALLOWED_STRING_VALUES = new Map([
 const BOOLEAN_PROPERTIES = new Set([
   ...DICE_BOOLEAN_PROPERTIES,
   ...TELEPORT_BOOLEAN_PROPERTIES,
+  "enable_scene_markers",
+  "scene_locked",
+  "scene_body_shown",
   "allow_ooc_toggle",
   "allow_player_nickname_colors",
   "allow_player_nicknames",
@@ -566,6 +595,7 @@ const BASE_PROPERTIES = new Set([
 
 const CONFIG_PROPERTIES = new Set([
   ...BASE_PROPERTIES,
+  "enable_scene_markers",
   ...TELEPORT_CONFIG_PROPERTIES,
   "allow_ooc_toggle",
   "allow_player_nickname_colors",
@@ -633,6 +663,7 @@ const EVENT_PROPERTIES = new Map([
     ...DICE_BOOLEAN_PROPERTIES,
     "dice_complexity",
     ...BASE_PROPERTIES,
+    ...SCENE_PROPERTIES,
     "action",
     "chat_type",
     "changed_settings_bucket",
@@ -889,6 +920,22 @@ function normalizeEvent(event, envelope) {
 
   if (!isPropertyCountAllowed(event.name, event.properties)) {
     return invalid("too_many_properties");
+  }
+
+  // Scene observations remain installation-only even under personalized consent.
+  // Keep optional fields tied to their action instead of admitting a generic property bag.
+  const isScene = event.name === "feature used" && event.properties.feature_name === "scene_markers";
+  if (isScene && !SCENE_ACTIONS.has(event.properties.action)) return invalid("invalid_scene_action");
+  if (!isScene && SCENE_ACTIONS.has(event.properties.action)) return invalid("scene_action_without_scene_feature");
+  for (const key of Object.keys(event.properties)) {
+    if (isScene) {
+      if (!BASE_PROPERTIES.has(key) && !["feature_name", "action", "success", "result"].includes(key)
+          && !SCENE_COMMON_PROPERTIES.has(key) && !SCENE_ACTION_PROPERTIES.get(event.properties.action)?.has(key)) {
+        return invalid("property_not_allowed_for_scene_action");
+      }
+    } else if (SCENE_PROPERTIES.has(key)) {
+      return invalid("scene_property_without_scene_feature");
+    }
   }
 
   const properties = {
