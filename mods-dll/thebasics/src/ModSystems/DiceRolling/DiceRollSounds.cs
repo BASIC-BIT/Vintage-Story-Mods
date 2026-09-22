@@ -5,12 +5,38 @@ using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.ProximityChat;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.DiceRolling;
 
 internal static class DiceRollSounds
 {
+    internal static void Play(ICoreClientAPI api, DiceRollSoundMessage message)
+    {
+        if (message == null || message.Clip is < 1 or > 9 ||
+            !double.IsFinite(message.X) || !double.IsFinite(message.InternalY) || !double.IsFinite(message.Z)) return;
+
+        var world = api?.World;
+        var position = world?.Player?.Entity?.Pos;
+        if (position == null || position.Dimension != message.Dimension) return;
+
+        var dx = position.X - message.X;
+        var dy = position.InternalY - message.InternalY;
+        var dz = position.Z - message.Z;
+        if (!(dx * dx + dy * dy + dz * dz < 64)) return;
+
+        var sound = new SoundAttributes(
+            new AssetLocation("thebasics", $"sounds/dice/diceroll{message.Clip}"),
+            withRandomPitch: false)
+        {
+            Range = 8f,
+            Type = EnumSoundType.Sound
+        };
+        world.PlaySoundAt(sound, message.X, message.InternalY, message.Z, message.Dimension);
+    }
+
     internal static void Deliver(ModConfig config, IServerPlayer roller, IReadOnlyList<IServerPlayer> audience,
         Action<DiceRollSoundMessage, IServerPlayer> send, Func<int> chooseClip)
     {
