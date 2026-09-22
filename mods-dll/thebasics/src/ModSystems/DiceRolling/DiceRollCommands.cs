@@ -92,6 +92,7 @@ internal sealed class DiceRollCommands : IDisposable
             if (isPrivate)
             {
                 player.SendMessage(args.Caller.FromChatGroupId, DicePresentation.Chat(result, "", mode, true), EnumChatType.OwnMessage);
+                TryDeliverSound(player, new[] { player });
             }
             else
             {
@@ -131,6 +132,20 @@ internal sealed class DiceRollCommands : IDisposable
         system.API.Logger.Chat(text);
         system.RecordChatHistory(context, text);
         system.PublishProximityChatMessageProcessed(context, text);
+        TryDeliverSound(player, recipients);
+    }
+
+    private void TryDeliverSound(IServerPlayer player, IReadOnlyList<IServerPlayer> recipients)
+    {
+        try
+        {
+            DiceRollSounds.Deliver(system.Config, player, recipients, system.SendDiceRollSound,
+                () => Random.Shared.Next(1, 10));
+        }
+        catch (Exception)
+        {
+            System.Diagnostics.Trace.TraceWarning("Dice roll sound dispatch failed.");
+        }
     }
 
     internal static bool InRange(IServerPlayer sender, IServerPlayer recipient, int range)
