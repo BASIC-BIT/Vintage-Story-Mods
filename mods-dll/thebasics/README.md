@@ -186,3 +186,5 @@ Notes:
 ## Contributions
 
 Feel free to submit PRs, or feature requests! To submit a request or issue, you can use Issues, submit a comment on ModDB, or send me a PM on discord.
+
+Dice roll recordings by Tagwin, used with permission.
