@@ -49,6 +49,14 @@ public class ModConfigUpgradeTests
     }
 
     [Fact]
+    public void DiceSoundJsonSettingDefaultsOnAndExplicitOffSurvivesReload()
+    {
+        LoadLegacyConfig().EnableDiceRollSounds.Should().BeTrue();
+        var saved = JsonConvert.SerializeObject(new ModConfig { EnableDiceRollSounds = false });
+        JsonConvert.DeserializeObject<ModConfig>(saved)!.EnableDiceRollSounds.Should().BeFalse();
+    }
+
+    [Fact]
     public void LegacyConfigGainsQuestionVerbsWithoutLosingConfiguredVerbs()
     {
         var config = LoadLegacyConfig();
@@ -73,6 +81,7 @@ public class ModConfigUpgradeTests
         var config = LoadLegacyConfig();
 
         config.EnableDiceRolling.Should().BeTrue();
+        config.EnableDiceRollSounds.Should().BeTrue();
         config.UseNicknameInSpectatorOOC.Should().BeFalse();
         config.AllowSpectatorPlacedEnvironmentalMessages.Should().BeTrue();
         config.ProtectSpectatorRoleplayChat.Should().BeTrue();
@@ -190,6 +199,7 @@ public class ModConfigUpgradeTests
         config.SpeechOcclusionWallPenaltyBlocks = 7;
         config.ProximityChatModeDistances[ProximityChatMode.Normal] = ModConfig.UnlimitedRange;
         config.EnableDiceRolling = false;
+        config.EnableDiceRollSounds = false;
         config.UseNicknameInSpectatorOOC = true;
         config.AllowSpectatorPlacedEnvironmentalMessages = false;
         config.ProtectSpectatorRoleplayChat = false;
@@ -206,6 +216,7 @@ public class ModConfigUpgradeTests
         restored.SpeechOcclusionWallPenaltyBlocks.Should().Be(7);
         restored.ProximityChatModeDistances[ProximityChatMode.Normal].Should().Be(ModConfig.UnlimitedRange);
         restored.EnableDiceRolling.Should().BeFalse();
+        restored.EnableDiceRollSounds.Should().BeFalse();
         restored.UseNicknameInSpectatorOOC.Should().BeTrue();
         restored.AllowSpectatorPlacedEnvironmentalMessages.Should().BeFalse();
         restored.ProtectSpectatorRoleplayChat.Should().BeFalse();

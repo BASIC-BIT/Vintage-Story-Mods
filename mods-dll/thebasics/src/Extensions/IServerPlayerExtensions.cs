@@ -58,6 +58,7 @@ namespace thebasics.Extensions
 
         private const string ModDataLastSelectedGroupId = "BASIC_LAST_SELECTED_GROUP_ID";
         private const string ModDataChatterEnabled = "BASIC_CHATTER_ENABLED";
+        private const string ModDataDiceRollSoundsEnabled = "thebasics-dice-roll-sounds-enabled";
         private const string ModDataChatVisualPreferences = "BASIC_CHAT_VISUAL_PREFERENCES";
         private const string ModDataChatLanguageColorsEnabled = "BASIC_CHAT_LANGUAGE_COLORS_ENABLED";
         private const string ModDataChatLanguageLabelsEnabled = "BASIC_CHAT_LANGUAGE_LABELS_ENABLED";
@@ -1004,6 +1005,17 @@ namespace thebasics.Extensions
         public static void SetChatterEnabled(this IServerPlayer player, bool enabled)
         {
             player.SetModdata(ModDataChatterEnabled, new[] { enabled ? (byte)1 : (byte)0 });
+        }
+
+        public static bool GetDiceRollSoundsEnabled(this IServerPlayer player)
+        {
+            var data = player.GetModdata(ModDataDiceRollSoundsEnabled);
+            return data == null || data.Length != 1 || data[0] != 0;
+        }
+
+        public static void SetDiceRollSoundsEnabled(this IServerPlayer player, bool enabled)
+        {
+            player.SetModdata(ModDataDiceRollSoundsEnabled, new[] { enabled ? (byte)1 : (byte)0 });
         }
 
         public static bool GetChatterEnabled(this IServerPlayer player)

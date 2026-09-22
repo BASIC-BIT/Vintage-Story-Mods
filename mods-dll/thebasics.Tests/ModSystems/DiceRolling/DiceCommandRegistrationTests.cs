@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using NSubstitute;
 using thebasics.Configs;
+using thebasics.Extensions;
 using thebasics.ModSystems.DiceRolling;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.Tests.Support;
@@ -15,6 +16,70 @@ namespace thebasics.Tests.ModSystems.DiceRolling;
 public class DiceCommandRegistrationTests
 {
     public DiceCommandRegistrationTests() => LangTestHelper.EnsureEnglish();
+    [Fact]
+    public void DiceSoundsStatusAndSettingWorkWhileServerAudioIsDisabled()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        api.Side.Returns(EnumAppSide.Server);
+        var chat = new ChatCommandApi(api);
+        api.ChatCommands.Returns(chat);
+        chat.GetOrCreate("thebasics").RequiresPrivilege(Privilege.chat);
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig { EnableDiceRollSounds = false, EnableDiceRolling = false } };
+        using var commands = new DiceRollCommands(system);
+        commands.Register();
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+
+        TextCommandResult? response = null;
+        chat.Execute("dicesounds", player, 7, "", value => response = value);
+        Assert.True(player.GetDiceRollSoundsEnabled());
+        Assert.Null(player.GetModdata("thebasics-dice-roll-sounds-enabled"));
+        Assert.Contains("dicesounds-status", response?.StatusMessage);
+        Assert.Contains("dicesounds-server-off", response?.StatusMessage);
+
+        chat.Execute("dicesounds", player, 7, "off", value => response = value);
+        Assert.False(player.GetDiceRollSoundsEnabled());
+        chat.Execute("dicesounds", player, 7, "", value => response = value);
+        Assert.Contains("dicesounds-status", response?.StatusMessage);
+        Assert.False(player.GetDiceRollSoundsEnabled());
+        chat.Execute("dicesounds", player, 7, "on", value => response = value);
+        Assert.True(player.GetDiceRollSoundsEnabled());
+    }
+
+    [Fact]
+    public void DiceSoundsCollisionKeepsShortCommandAndNamespacedFallbackWorks()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        api.Side.Returns(EnumAppSide.Server);
+        var chat = new ChatCommandApi(api);
+        api.ChatCommands.Returns(chat);
+        chat.GetOrCreate("thebasics").RequiresPrivilege(Privilege.chat);
+        var other = chat.Create("dicesounds").RequiresPrivilege(Privilege.chat).IgnoreAdditionalArgs().HandleWith(_ => TextCommandResult.Success("other"));
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
+        using var commands = new DiceRollCommands(system);
+        commands.Register();
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+        Assert.Same(other, chat.Get("dicesounds"));
+        chat.Execute("thebasics", player, 7, "dicesounds off");
+        Assert.False(player.GetDiceRollSoundsEnabled());
+    }
+
+    [Fact]
+    public void InvalidDiceSoundsArgumentDoesNotChangePreference()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        api.Side.Returns(EnumAppSide.Server);
+        var chat = new ChatCommandApi(api);
+        api.ChatCommands.Returns(chat);
+        chat.GetOrCreate("thebasics").RequiresPrivilege(Privilege.chat);
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
+        using var commands = new DiceRollCommands(system);
+        commands.Register();
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+        TextCommandResult? response = null;
+        chat.Execute("dicesounds", player, 7, "invalid", value => response = value);
+        Assert.True(player.GetDiceRollSoundsEnabled());
+        Assert.NotEqual(EnumCommandStatus.Success, response?.Status);
+    }
     [Theory]
     [InlineData("proll", "d6 # secret")]
     [InlineData("privateroll", "d6 # secret")]
