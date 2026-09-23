@@ -445,6 +445,19 @@ public class ConfigAdminSettingRegistryTests
     }
 
     [Fact]
+    public void DiceSoundAdminToggleChangesCurrentConfigLive()
+    {
+        var config = CreateConfig();
+        var setting = GetSetting("EnableDiceRollSounds");
+        setting.Group.Should().Be("Chat/RP");
+        setting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        setting.TrySetValue(config, "false", out var error).Should().BeTrue(error);
+        config.EnableDiceRollSounds.Should().BeFalse();
+        setting.TrySetValue(config, "true", out error).Should().BeTrue(error);
+        config.EnableDiceRollSounds.Should().BeTrue();
+    }
+
+    [Fact]
     public void SightBlockOverrideSettings_AreOptionalLivePatternLists()
     {
         var config = CreateConfig();
