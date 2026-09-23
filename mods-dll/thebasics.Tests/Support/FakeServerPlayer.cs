@@ -25,7 +25,7 @@ namespace thebasics.Tests.Support;
 /// methods (nicknames, languages, chat modes, visual preferences) work here without extra setup —
 /// they all read and write through <see cref="GetModdata"/>.
 /// </remarks>
-public sealed class FakeServerPlayer : IServerPlayer
+public class FakeServerPlayer : IServerPlayer
 {
     private readonly Dictionary<string, byte[]> _modData = new();
     private readonly Dictionary<string, object> _typedModData = new();

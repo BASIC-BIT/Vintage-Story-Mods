@@ -10,15 +10,15 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneMarkerAppearanceTests
 {
     [Fact]
-    public void BillboardIsSelectableWithoutAnInvisiblePhysicalObstacle()
+    public void BillboardKeepsASelectablePlateWithoutBlockingMovement()
     {
         var accessor = Substitute.For<IBlockAccessor>();
         var pos = new BlockPos(0, 0, 0, 0);
         var marker = new SceneDescriptionBlockEntity();
         marker.Data.Appearance = SceneMarkerAppearance.Billboard;
         accessor.GetBlockEntity(pos).Returns(marker);
-        var block = new SceneDescriptionBlock();
-        block.GetSelectionBoxes(accessor, pos).Should().ContainSingle();
+        var block = new SceneDescriptionBlock { SelectionBoxes = [new Cuboidf(0.1875f, 0, 0.1875f, 0.8125f, 0.0625f, 0.8125f)] };
+        block.GetSelectionBoxes(accessor, pos).Should().Contain(block.SelectionBoxes[0]);
         block.GetCollisionBoxes(accessor, pos).Should().BeEmpty();
     }
 

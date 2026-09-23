@@ -46,7 +46,7 @@ internal sealed class SceneMarkerSelection : IDisposable
     private void Select(Ray ray, float range, BlockFilter filter, ref BlockSelection result)
     {
         var player = _api.World.Player?.Entity;
-        // Invisible markers must not be pickable either. Gated per pick for the same reason the
+        // Invisible floating symbols must not intercept clicks. Gated per pick for the same reason the
         // renderer is: the synced config is not available when this patch is installed.
         if (player == null || !SceneDescriptionSystem.SceneMarkersEnabled(_api)) return;
         var nearest = (double)range;
@@ -66,7 +66,7 @@ internal sealed class SceneMarkerSelection : IDisposable
                 Block = marker.Block,
                 Face = BlockFacing.UP,
                 HitPosition = hit.SubCopy(marker.Pos.ToVec3d()),
-                SelectionBoxIndex = 0
+                SelectionBoxIndex = SceneDescriptionBlock.SymbolSelectionIndex
             };
         }
     }

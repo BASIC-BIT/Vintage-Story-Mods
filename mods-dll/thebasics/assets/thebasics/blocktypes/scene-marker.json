@@ -10,10 +10,11 @@
     handbook: { groupBy: ["scene-marker-*"] }
   },
   variantgroups: [
-    { code: "attachment", states: ["ground", "wall"] },
+    { code: "attachment", states: ["ground", "wall", "ceiling"] },
     { code: "side", loadFromProperties: "abstract/horizontalorientation" }
   ],
   shapebytype: {
+    "*-ceiling-*": { base: "thebasics:block/scene-marker-ground", rotateX: 180 },
     "*-ground-north": { base: "thebasics:block/scene-marker-ground", rotateY: 0 },
     "*-ground-east": { base: "thebasics:block/scene-marker-ground", rotateY: 270 },
     "*-ground-south": { base: "thebasics:block/scene-marker-ground", rotateY: 180 },
@@ -44,6 +45,7 @@
   resistance: 1,
   maxstacksize: 1,
   selectionboxbytype: {
+    "*-ceiling-*": { x1: 0.1875, y1: 0.9375, z1: 0.1875, x2: 0.8125, y2: 1, z2: 0.8125 },
     "*-wall-east": { x1: 0.9375, y1: 0.1875, z1: 0.1875, x2: 1, y2: 0.8125, z2: 0.8125 },
     "*-wall-south": { x1: 0.1875, y1: 0.1875, z1: 0.9375, x2: 0.8125, y2: 0.8125, z2: 1 },
     "*-wall-west": { x1: 0, y1: 0.1875, z1: 0.1875, x2: 0.0625, y2: 0.8125, z2: 0.8125 },
@@ -51,6 +53,7 @@
     "*": { x1: 0.1875, y1: 0, z1: 0.1875, x2: 0.8125, y2: 0.0625, z2: 0.8125 }
   },
   collisionboxbytype: {
+    "*-ceiling-*": { x1: 0.1875, y1: 0.9375, z1: 0.1875, x2: 0.8125, y2: 1, z2: 0.8125 },
     "*-wall-east": { x1: 0.9375, y1: 0.1875, z1: 0.1875, x2: 1, y2: 0.8125, z2: 0.8125 },
     "*-wall-south": { x1: 0.1875, y1: 0.1875, z1: 0.9375, x2: 0.8125, y2: 0.8125, z2: 1 },
     "*-wall-west": { x1: 0, y1: 0.1875, z1: 0.1875, x2: 0.0625, y2: 0.8125, z2: 0.8125 },

@@ -139,7 +139,7 @@ public class SceneReviewRegressionTests
             ((ICoreAPI)api).World.BlockAccessor.Received(1).MarkBlockDirty(marker.Pos, (IPlayer)null!);
             system.SetRuntimeEnabled(true);
             ((ICoreAPI)api).World.BlockAccessor.Received(2).MarkBlockDirty(marker.Pos, (IPlayer)null!);
-            marker.OnTesselation(null, null).Should().BeTrue();
+            marker.OnTesselation(null, null).Should().BeFalse();
         }
         finally { configField.SetValue(null, previous); }
     }

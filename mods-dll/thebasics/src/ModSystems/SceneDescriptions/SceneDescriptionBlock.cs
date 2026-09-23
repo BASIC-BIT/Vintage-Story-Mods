@@ -16,9 +16,10 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     private WorldInteraction[] _interactions;
     private long _lastBreakWarningMs;
 
-    // Fixed interaction bounds include the complete idle-bob envelope without making targeting wobble.
-    // The box is what the player aims at, so the outline and the break cracks are drawn on it too,
-    // rather than on the ground plate or the wall plaque the block shape actually occupies.
+    // The terrain picker uses index 0 for the plate; the supplemental picker uses index 1 for the symbol.
+    internal const int SymbolSelectionIndex = 1;
+
+    // Include the complete idle-bob envelope without making targeting wobble.
     internal static Cuboidf SymbolBox(SceneDescriptionData data)
     {
         var radius = data.SelectionHalfExtent;
@@ -31,40 +32,39 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
 
     public override Cuboidf[] GetSelectionBoxes(IBlockAccessor blockAccessor, BlockPos pos)
     {
-        // Terrain traversal must not stop early on boxes extending beyond this voxel.
-        // Keep the in-voxel plate selectable when an offset buries the symbol. The supplemental picker handles symbols.
-        if (api?.Side == EnumAppSide.Client)
+        // Out-of-voxel symbol boxes must not interrupt client terrain traversal.
+        // Plates remain targetable regardless of the floating indicator's distance or height.
+        if (api?.Side == EnumAppSide.Client || !SceneDescriptionSystem.SceneMarkersEnabled(api))
             return SelectionBoxes ?? [];
-        return [SymbolBox(DataAt(blockAccessor, pos))];
+        return [.. SelectionBoxes ?? [], SymbolBox(DataAt(blockAccessor, pos))];
     }
 
-    // Client outline. Vanilla would ask GetSelectionBoxes, which is empty here to keep the raycaster honest,
-    // so draw the symbol box ourselves instead of leaving the targeted marker with no outline at all.
+    internal Cuboidf SelectedBox(BlockSelection selection)
+    {
+        if (selection.SelectionBoxIndex == SymbolSelectionIndex && SceneDescriptionSystem.SceneMarkersEnabled(api))
+            return SymbolBox(DataAt(api.World.BlockAccessor, selection.Position));
+        return SelectionBoxes?[0];
+    }
+
     public void RenderSelectionBoxes(BlockSelection blockSel, RenderBoxDelegate renderBoxHandler)
     {
-        var capi = api as ICoreClientAPI;
-        if (capi == null || blockSel?.Position == null) return;
-        if (!SceneDescriptionSystem.SceneMarkersEnabled(capi))
-        {
-            foreach (var box in SelectionBoxes ?? [])
-                renderBoxHandler(box, 1.6f * ClientSettings.Wireframethickness, GetSelectionColor(capi, blockSel.Position));
-            return;
-        }
-        renderBoxHandler(SymbolBox(DataAt(capi.World.BlockAccessor, blockSel.Position)),
-            1.6f * ClientSettings.Wireframethickness, GetSelectionColor(capi, blockSel.Position));
+        if (api is not ICoreClientAPI capi || blockSel?.Position == null) return;
+        var box = SelectedBox(blockSel);
+        if (box != null)
+            renderBoxHandler(box, 1.6f * ClientSettings.Wireframethickness, GetSelectionColor(capi, blockSel.Position));
     }
 
-    // Break cracks default to the tesselated block shape, i.e. the plate or the wall plaque. Redirect them
-    // onto the same centred cube the player is aiming at. blockModelData is left alone: the decal shader
-    // reads its UVs per vertex for the opaque-texel test, and it always has more vertices than this cube.
     public override void GetDecal(IWorldAccessor world, BlockPos pos, ITexPositionSource decalTexSource, ref MeshData decalModelData, ref MeshData blockModelData)
     {
-        if (blockModelData == null || blockModelData.VerticesCount < 24) return;
-        if (!SceneDescriptionSystem.SceneMarkersEnabled(api))
+        var marker = world?.BlockAccessor.GetBlockEntity(pos) as SceneDescriptionBlockEntity;
+        if (marker?.BreakingSymbol != true ||
+            !SceneDescriptionSystem.SceneMarkersEnabled(api))
         {
             base.GetDecal(world, pos, decalTexSource, ref decalModelData, ref blockModelData);
             return;
         }
+        // Leave the terrain model's UVs intact for the decal shader's opaque-texel test.
+        if (blockModelData == null || blockModelData.VerticesCount < 24) return;
         var data = DataAt(world?.BlockAccessor, pos);
         var radius = data.SelectionHalfExtent;
         decalModelData = CubeMeshUtil.GetCubeOnlyScaleXyz(radius, radius, new Vec3f(0.5f, 0.65f + data.HeightOffset, 0.5f));
@@ -97,18 +97,37 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
             return false;
         }
 
-        var placed = base.TryPlaceBlock(world, byPlayer, itemStack, blockSelection, ref failureCode);
+        var placed = blockSelection.Face == BlockFacing.DOWN
+            ? TryPlaceCeiling(world, byPlayer, blockSelection, ref failureCode)
+            : base.TryPlaceBlock(world, byPlayer, itemStack, blockSelection, ref failureCode);
         if (placed && world.Side == EnumAppSide.Server && world.BlockAccessor.GetBlockEntity(blockSelection.Position) is SceneDescriptionBlockEntity blockEntity)
         {
             blockEntity.InitializeFromItem(itemStack, byPlayer);
             var reused = itemStack?.Attributes?.HasAttribute(SceneDescriptionData.TitleAttribute) == true;
             SceneAnalytics.Track(blockEntity.Data, "placed", "scene_placement", reused ? "reused" : "fresh",
-                blockEntity.Block?.Variant?["attachment"] == "wall" ? "wall" : "ground");
+                blockEntity.Block?.Variant?["attachment"] switch { "wall" => "wall", "ground" => "ground", _ => null });
             if (reused && SceneAnalytics.Written(blockEntity.Data)) SceneAnalytics.Track(blockEntity.Data, "moved", "scene_placement", "reused",
-                blockEntity.Block?.Variant?["attachment"] == "wall" ? "wall" : "ground");
+                blockEntity.Block?.Variant?["attachment"] switch { "wall" => "wall", "ground" => "ground", _ => null });
         }
 
         return placed;
+    }
+
+    private bool TryPlaceCeiling(IWorldAccessor world, IPlayer player, BlockSelection selection, ref string failureCode)
+    {
+        var supportPos = selection.Position.UpCopy();
+        var support = world.BlockAccessor.GetBlock(supportPos);
+        if (!support.CanAttachBlockAt(world.BlockAccessor, this, supportPos, BlockFacing.DOWN) &&
+            support.GetAttributes(world.BlockAccessor, supportPos)?.IsTrue("partialAttachable") != true)
+        {
+            failureCode = "requiresattachable";
+            return false;
+        }
+        var side = SuggestedHVOrientation(player, selection)[0].Code;
+        var ceiling = world.BlockAccessor.GetBlock(CodeWithParts("ceiling", side));
+        if (!ceiling.CanPlaceBlock(world, player, selection, ref failureCode)) return false;
+        world.BlockAccessor.SetBlock(ceiling.BlockId, selection.Position);
+        return true;
     }
 
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSelection)
@@ -169,11 +188,15 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
 
     public override float OnGettingBroken(IPlayer player, BlockSelection blockSel, ItemSlot itemslot, float remainingResistance, float dt, int counter)
     {
-        if (api.World.BlockAccessor.GetBlockEntity(blockSel.Position) is SceneDescriptionBlockEntity marker && BreakRefused(marker, player))
+        var marker = api.World.BlockAccessor.GetBlockEntity(blockSel.Position) as SceneDescriptionBlockEntity;
+        if (marker != null && BreakRefused(marker, player))
         {
             WarnBreakRefused(marker);
             return Math.Max(remainingResistance, 1);
         }
+
+        if (api.Side == EnumAppSide.Client && marker != null)
+            marker.BreakingSymbol = blockSel.SelectionBoxIndex == SymbolSelectionIndex;
 
         return base.OnGettingBroken(player, blockSel, itemslot, remainingResistance, dt, counter);
     }

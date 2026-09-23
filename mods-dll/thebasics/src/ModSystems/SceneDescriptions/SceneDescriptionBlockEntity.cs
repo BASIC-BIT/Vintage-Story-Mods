@@ -40,7 +40,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         if (Api is ICoreClientAPI client) client.ModLoader.GetModSystem<SceneDescriptionSystem>().Register(this);
     }
 
-    public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tesselator) => SceneDescriptionSystem.SceneMarkersEnabled(Api);
+    // Keep the physical plate in the terrain mesh independently of the floating overlays.
+    public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tesselator) => false;
+
+    // Client-only damage presentation, retained while cracks heal after looking away.
+    internal bool BreakingSymbol { get; set; }
 
     public SceneDescriptionData Data { get; private set; } = new();
 
