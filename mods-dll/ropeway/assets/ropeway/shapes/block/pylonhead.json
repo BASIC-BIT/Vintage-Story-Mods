@@ -1,0 +1,138 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "girder": "game:block/metal/riveted/iron1",
+    "machine": "game:block/metal/tarnished/iron"
+  },
+  "elements": [
+    {
+      "name": "footwest",
+      "from": [ 0.0, 0.0, 0.0 ],
+      "to": [ 3.2, 2.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
+      }
+    },
+    {
+      "name": "footeast",
+      "from": [ 12.8, 0.0, 0.0 ],
+      "to": [ 16.0, 2.0, 16.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
+      }
+    },
+    {
+      "name": "beamwest",
+      "from": [ 0.0, 2.0, 5.0 ],
+      "to": [ 3.2, 14.0, 11.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
+      }
+    },
+    {
+      "name": "beameast",
+      "from": [ 12.8, 2.0, 5.0 ],
+      "to": [ 16.0, 14.0, 11.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
+      }
+    },
+    {
+      "name": "housing",
+      "from": [ 5.0, 10.6, 3.0 ],
+      "to": [ 11.0, 14.0, 13.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "name": "sheavecheekwest",
+      "from": [ 3.2, 0.0, 4.0 ],
+      "to": [ 5.4, 12.2, 12.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "name": "sheavecheekeast",
+      "from": [ 10.6, 0.0, 4.0 ],
+      "to": [ 12.8, 12.2, 12.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    },
+    {
+      "//": "The return strand's mast. The haul rope is a LOOP - the cabin's strand and a return strand stacked BEPylonBase.ReturnLift = 1.3263 blocks over it, which is one bullwheel diameter - and a rope floating three quarters of a block over a crossarm with nothing under it reads as a mistake. This continues the head's own centre column off the top of housing, which ends at y 14. Three units square, like bullwheel.json's driveboss.",
+      "name": "returnmast",
+      "from": [ 6.5, 14.0, 6.5 ],
+      "to": [ 9.5, 26.2608, 9.5 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#girder" },
+        "east": { "texture": "#girder" },
+        "south": { "texture": "#girder" },
+        "west": { "texture": "#girder" },
+        "up": { "texture": "#girder" },
+        "down": { "texture": "#girder" }
+      }
+    },
+    {
+      "//": "The saddle the return strand sits on. Its TOP FACE is that strand's own underside: 8 + 16 * (ReturnLift - CableRadius) = 28.2608, which TheTowerCarriesTheReturnStrandOnItsOwnShoe re-derives rather than reads. 5.2 units wide, the sheave throat's own. SHORT along the line - 8 units, the sheave's own depth - and that is the lesson the deleted rail plate paid for: a fixture on the tower's cardinal is only right where the path passes through the anchor, and that is one point. At a 45 degree corner the strand runs off the side of it by 4 units, which is why it is a flat saddle and not a channel; cheeks would clash where a flat plate merely stops being under the rope.",
+      "name": "returnshoe",
+      "from": [ 5.4, 26.2608, 4.0 ],
+      "to": [ 10.6, 28.2608, 12.0 ],
+      "rotationOrigin": [ 8.0, 8.0, 8.0 ],
+      "faces": {
+        "north": { "texture": "#machine" },
+        "east": { "texture": "#machine" },
+        "south": { "texture": "#machine" },
+        "west": { "texture": "#machine" },
+        "up": { "texture": "#machine" },
+        "down": { "texture": "#machine" }
+      }
+    }
+  ]
+}

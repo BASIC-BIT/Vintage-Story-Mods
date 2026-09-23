@@ -1,0 +1,12 @@
+{
+  "//": "Pattern and quantities UNCHANGED - only the wildcard names are gone (see brace.json). Checked, not skipped: DECISIONS.md 5 forbids a metal gate on the cabin outright and this recipe never had one - its metal is only whatever the two haul ropes and two braces carry. It gets cheaper for free, 1.1 -> 0.53 ingot, because both of those did.",
+  "ingredientPattern": "R_R,BPB,PPP",
+  "ingredients": {
+    "R": { "type": "item", "code": "ropeway:haulrope" },
+    "B": { "type": "block", "code": "ropeway:brace-*" },
+    "P": { "type": "item", "code": "game:plank-*" }
+  },
+  "width": 3,
+  "height": 3,
+  "output": { "type": "item", "code": "cabin", "quantity": 1 }
+}

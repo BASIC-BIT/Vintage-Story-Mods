@@ -65,3 +65,6 @@ docs/architecture/workspace.json
 # Downloaded logs directory contents (but keep structure)
 logs/**/
 !logs/.gitkeep
+
+# Agentic research scratch (raw ingest notes)
+docs/agentic/ingest/
