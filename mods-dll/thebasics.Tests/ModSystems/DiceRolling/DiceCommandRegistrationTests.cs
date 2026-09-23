@@ -14,6 +14,7 @@ using Xunit;
 
 namespace thebasics.Tests.ModSystems.DiceRolling;
 
+[Collection(thebasics.Tests.ModSystems.AnalyticsServiceTestCollection.Name)]
 public class DiceCommandRegistrationTests
 {
     public DiceCommandRegistrationTests() => LangTestHelper.EnsureEnglish();
