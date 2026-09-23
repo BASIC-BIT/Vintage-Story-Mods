@@ -1,0 +1,12 @@
+{
+  "type": "code",
+  "modid": "agentcontrol",
+  "name": "Agent Control",
+  "authors": ["BASIC"],
+  "description": "Owner-controlled native action and observation substrate for Vintage Story clients.",
+  "version": "0.1.0",
+  "dependencies": {
+    "game": "1.22.7"
+  },
+  "side": "client"
+}
