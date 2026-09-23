@@ -31,7 +31,8 @@ public class DiceRollCommandsTests
 
         var response = commands.Handle(new TextCommandCallingArgs
         {
-            Caller = new Caller { Player = roller }, RawArgs = new CmdArgs("3d6")
+            Caller = new Caller { Player = roller },
+            RawArgs = new CmdArgs("3d6")
         }, false);
 
         Assert.Equal(EnumCommandStatus.Success, response.Status);
@@ -56,7 +57,8 @@ public class DiceRollCommandsTests
 
         var response = commands.Handle(new TextCommandCallingArgs
         {
-            Caller = new Caller { Player = roller }, RawArgs = new CmdArgs("d6 # secret")
+            Caller = new Caller { Player = roller },
+            RawArgs = new CmdArgs("d6 # secret")
         }, true);
 
         Assert.Equal(EnumCommandStatus.Success, response.Status);
@@ -79,7 +81,8 @@ public class DiceRollCommandsTests
         var commands = new DiceRollCommands(system);
         TextCommandResult Roll(string input) => commands.Handle(new TextCommandCallingArgs
         {
-            Caller = new Caller { Player = roller }, RawArgs = new CmdArgs(input)
+            Caller = new Caller { Player = roller },
+            RawArgs = new CmdArgs(input)
         }, false);
 
         Assert.Equal(EnumCommandStatus.Error, Roll("2d0").Status);
@@ -102,8 +105,13 @@ public class DiceRollCommandsTests
         api.ModLoader.GetModSystem<thebasics.ModSystems.ChatHistory.ChatHistorySystem>().Returns(history);
         var system = new RPProximityChatSystem { API = api, Config = config };
         var channel = Substitute.For<IServerNetworkChannel>();
+        var failedSends = 0;
         channel.When(x => x.SendPacket(Arg.Any<DiceRollSoundMessage>(), Arg.Any<IServerPlayer[]>()))
-            .Do(_ => throw new System.InvalidOperationException("network"));
+            .Do(_ =>
+            {
+                failedSends++;
+                throw new System.InvalidOperationException("network");
+            });
         typeof(RPProximityChatSystem).GetField("_serverConfigChannel", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(system, channel);
         var roller = new FakeServerPlayer("roller") { Entity = new EntityPlayer() };
@@ -115,7 +123,8 @@ public class DiceRollCommandsTests
 
         var response = commands.Handle(new TextCommandCallingArgs
         {
-            Caller = new Caller { Player = roller }, RawArgs = new CmdArgs("d6")
+            Caller = new Caller { Player = roller },
+            RawArgs = new CmdArgs("d6")
         }, false);
 
         Assert.Equal(EnumCommandStatus.Success, response.Status);
@@ -124,6 +133,7 @@ public class DiceRollCommandsTests
         Assert.Equal(1, events);
         channel.Received(1).SendPacket(Arg.Any<DiceRollSoundMessage>(), roller);
         channel.Received(1).SendPacket(Arg.Any<DiceRollSoundMessage>(), listener);
+        Assert.Equal(2, failedSends);
         var entries = (System.Collections.Generic.List<thebasics.ModSystems.ChatHistory.Models.ChatHistoryEntry>)
             typeof(thebasics.ModSystems.ChatHistory.ChatHistorySystem)
                 .GetField("_pending", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(history)!;
