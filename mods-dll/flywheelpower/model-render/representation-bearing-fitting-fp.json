@@ -1,0 +1,16 @@
+{
+  "name": "flywheel-bearing-fitting-fp-transform",
+  "representation": "first-person-held-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/bearing-fitting.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/sheet/iron1"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/bearingfittings.json",
+    "property": "fpHandTransform",
+    "variantCode": "bearingfittings-iron",
+    "reference": "grip-proxy"
+  }
+}

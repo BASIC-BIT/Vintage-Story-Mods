@@ -1,0 +1,119 @@
+{
+  "editor": {
+    "allAngles": false,
+    "entityTextureMode": false
+  },
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "wheel": "game:block/metal/ingot/iron",
+    "metal": "game:block/metal/tarnished/sheet/iron1",
+    "chalk": "game:block/cloth/wool/red1"
+  },
+  "elements": [
+    {
+      "name": "DiskCore",
+      "from": [7.0, 4.5, 4.5],
+      "to": [9.0, 11.5, 11.5],
+      "faces": {
+        "north": { "texture": "#wheel", "uv": [4.0, 4.0, 12.0, 12.0] },
+        "east": { "texture": "#wheel", "uv": [4.0, 4.0, 12.0, 12.0] },
+        "south": { "texture": "#wheel", "uv": [4.0, 4.0, 12.0, 12.0] },
+        "west": { "texture": "#wheel", "uv": [4.0, 4.0, 12.0, 12.0] },
+        "up": { "texture": "#wheel", "uv": [4.0, 4.0, 12.0, 9.0] },
+        "down": { "texture": "#wheel", "uv": [4.0, 7.0, 12.0, 12.0] }
+      }
+    },
+    {
+      "name": "DiskTop",
+      "from": [7.0, 11.5, 6.5],
+      "to": [9.0, 13.0, 9.5],
+      "faces": {
+        "north": { "texture": "#wheel", "uv": [6.0, 2.0, 10.0, 4.0] },
+        "east": { "texture": "#wheel", "uv": [6.0, 2.0, 10.0, 4.0] },
+        "south": { "texture": "#wheel", "uv": [6.0, 2.0, 10.0, 4.0] },
+        "west": { "texture": "#wheel", "uv": [6.0, 2.0, 10.0, 4.0] },
+        "up": { "texture": "#wheel", "uv": [6.0, 2.0, 10.0, 6.0] },
+        "down": { "texture": "#wheel", "uv": [6.0, 10.0, 10.0, 14.0] }
+      }
+    },
+    {
+      "name": "DiskBottom",
+      "from": [7.0, 3.0, 6.5],
+      "to": [9.0, 4.5, 9.5],
+      "faces": {
+        "north": { "texture": "#wheel", "uv": [6.0, 12.0, 10.0, 14.0] },
+        "east": { "texture": "#wheel", "uv": [6.0, 12.0, 10.0, 14.0] },
+        "south": { "texture": "#wheel", "uv": [6.0, 12.0, 10.0, 14.0] },
+        "west": { "texture": "#wheel", "uv": [6.0, 12.0, 10.0, 14.0] },
+        "up": { "texture": "#wheel", "uv": [6.0, 2.0, 10.0, 6.0] },
+        "down": { "texture": "#wheel", "uv": [6.0, 10.0, 10.0, 14.0] }
+      }
+    },
+    {
+      "name": "DiskNorth",
+      "from": [7.0, 6.5, 3.0],
+      "to": [9.0, 9.5, 4.5],
+      "faces": {
+        "north": { "texture": "#wheel", "uv": [6.0, 6.0, 10.0, 10.0] },
+        "east": { "texture": "#wheel", "uv": [6.0, 6.0, 10.0, 10.0] },
+        "south": { "texture": "#wheel", "uv": [6.0, 6.0, 10.0, 10.0] },
+        "west": { "texture": "#wheel", "uv": [6.0, 6.0, 10.0, 10.0] },
+        "up": { "texture": "#wheel", "uv": [6.0, 2.0, 10.0, 4.0] },
+        "down": { "texture": "#wheel", "uv": [6.0, 12.0, 10.0, 14.0] }
+      }
+    },
+    {
+      "name": "DiskSouth",
+      "from": [7.0, 6.5, 11.5],
+      "to": [9.0, 9.5, 13.0],
+      "faces": {
+        "north": { "texture": "#wheel", "uv": [6.0, 6.0, 10.0, 10.0] },
+        "east": { "texture": "#wheel", "uv": [6.0, 6.0, 10.0, 10.0] },
+        "south": { "texture": "#wheel", "uv": [6.0, 6.0, 10.0, 10.0] },
+        "west": { "texture": "#wheel", "uv": [6.0, 6.0, 10.0, 10.0] },
+        "up": { "texture": "#wheel", "uv": [6.0, 2.0, 10.0, 4.0] },
+        "down": { "texture": "#wheel", "uv": [6.0, 12.0, 10.0, 14.0] }
+      }
+    },
+    {
+      "name": "HubCollar",
+      "from": [6.9, 7.25, 7.25],
+      "to": [9.1, 8.75, 8.75],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [5.75, 5.75, 10.25, 10.25] },
+        "east": { "texture": "#metal", "uv": [5.75, 5.75, 10.25, 10.25] },
+        "south": { "texture": "#metal", "uv": [5.75, 5.75, 10.25, 10.25] },
+        "west": { "texture": "#metal", "uv": [5.75, 5.75, 10.25, 10.25] },
+        "up": { "texture": "#metal", "uv": [4.75, 5.75, 11.25, 10.25] },
+        "down": { "texture": "#metal", "uv": [4.75, 5.75, 11.25, 10.25] }
+      }
+    },
+    {
+      "name": "ChalkLineWest",
+      "from": [6.875, 7.5, 8.0],
+      "to": [7.0, 8.5, 13.125],
+      "faces": {
+        "north": { "texture": "#chalk", "uv": [6.75, 7.5, 9.25, 7.625] },
+        "east": { "texture": "#chalk", "uv": [6.75, 7.5, 9.25, 15.125] },
+        "south": { "texture": "#chalk", "uv": [6.75, 15.0, 9.25, 15.125] },
+        "west": { "texture": "#chalk", "uv": [6.75, 7.5, 9.25, 15.125] },
+        "up": { "texture": "#chalk", "uv": [4.875, 7.5, 5.0, 15.125] },
+        "down": { "texture": "#chalk", "uv": [4.875, 7.5, 5.0, 15.125] }
+      }
+    },
+    {
+      "name": "ChalkLineEast",
+      "from": [9.0, 7.5, 8.0],
+      "to": [9.125, 8.5, 13.125],
+      "faces": {
+        "north": { "texture": "#chalk", "uv": [6.75, 7.5, 9.25, 7.625] },
+        "east": { "texture": "#chalk", "uv": [6.75, 7.5, 9.25, 15.125] },
+        "south": { "texture": "#chalk", "uv": [6.75, 15.0, 9.25, 15.125] },
+        "west": { "texture": "#chalk", "uv": [6.75, 7.5, 9.25, 15.125] },
+        "up": { "texture": "#chalk", "uv": [11.0, 7.5, 11.125, 15.125] },
+        "down": { "texture": "#chalk", "uv": [11.0, 7.5, 11.125, 15.125] }
+      }
+    }
+  ]
+}
