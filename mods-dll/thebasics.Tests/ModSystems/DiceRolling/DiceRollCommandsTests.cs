@@ -134,10 +134,25 @@ public class DiceRollCommandsTests
         channel.Received(1).SendPacket(Arg.Any<DiceRollSoundMessage>(), roller);
         channel.Received(1).SendPacket(Arg.Any<DiceRollSoundMessage>(), listener);
         Assert.Equal(2, failedSends);
+        api.Logger.Received(2).Warning("Dice roll sound packet delivery failed.");
         var entries = (System.Collections.Generic.List<thebasics.ModSystems.ChatHistory.Models.ChatHistoryEntry>)
             typeof(thebasics.ModSystems.ChatHistory.ChatHistorySystem)
                 .GetField("_pending", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(history)!;
         Assert.Single(entries);
+    }
+
+    [Fact]
+    public void UnexpectedSoundDispatchFailureIsLoggedWithoutEscaping()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
+        var roller = new FakeServerPlayer("roller") { Entity = new EntityPlayer() };
+        var commands = new DiceRollCommands(system);
+        var dispatch = typeof(DiceRollCommands).GetMethod("TryDeliverSound", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        dispatch.Invoke(commands, [roller, null]);
+
+        api.Logger.Received(1).Warning("Dice roll sound dispatch failed.");
     }
 
     [Theory]

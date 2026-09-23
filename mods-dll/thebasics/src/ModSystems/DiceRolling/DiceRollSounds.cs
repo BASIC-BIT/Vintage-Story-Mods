@@ -38,7 +38,7 @@ internal static class DiceRollSounds
     }
 
     internal static void Deliver(ModConfig config, IServerPlayer roller, IReadOnlyList<IServerPlayer> audience,
-        Action<DiceRollSoundMessage, IServerPlayer> send, Func<int> chooseClip)
+        Action<DiceRollSoundMessage, IServerPlayer> send, Func<int> chooseClip, ILogger logger = null)
     {
         if (config?.EnableDiceRollSounds != true || !SpectatorChatPolicy.ShouldEmitEntityAttachedCues(roller)) return;
         var origin = roller?.Entity?.Pos;
@@ -54,12 +54,16 @@ internal static class DiceRollSounds
 
         var message = new DiceRollSoundMessage
         {
-            Clip = chooseClip(), X = x, InternalY = internalY, Z = z, Dimension = dimension
+            Clip = chooseClip(),
+            X = x,
+            InternalY = internalY,
+            Z = z,
+            Dimension = dimension
         };
         foreach (var recipient in listeners)
         {
             try { send(message, recipient); }
-            catch (Exception) { System.Diagnostics.Trace.TraceWarning("Dice roll sound packet delivery failed."); }
+            catch (Exception) { logger?.Warning("Dice roll sound packet delivery failed."); }
         }
     }
 

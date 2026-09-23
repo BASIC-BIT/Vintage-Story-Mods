@@ -140,11 +140,11 @@ internal sealed class DiceRollCommands : IDisposable
         try
         {
             DiceRollSounds.Deliver(system.Config, player, recipients, system.SendDiceRollSound,
-                () => Random.Shared.Next(1, 10));
+                () => Random.Shared.Next(1, 10), system.API?.Logger);
         }
         catch (Exception)
         {
-            System.Diagnostics.Trace.TraceWarning("Dice roll sound dispatch failed.");
+            system.API?.Logger?.Warning("Dice roll sound dispatch failed.");
         }
     }
 

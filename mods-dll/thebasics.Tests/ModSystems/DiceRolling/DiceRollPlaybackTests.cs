@@ -118,6 +118,7 @@ public class DiceRollPlaybackTests
             Assert.NotNull(handler);
             handler.Invoke(null, [new DiceRollSoundMessage { Clip = 1 }]);
             api.DidNotReceiveWithAnyArgs().ShowChatMessage(default!);
+            api.Logger.Received(1).Warning("Dice roll sound playback failed.");
         }
         finally { apiField.SetValue(null, previousApi); }
     }

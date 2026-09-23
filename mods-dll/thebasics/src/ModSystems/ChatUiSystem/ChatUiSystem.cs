@@ -1127,7 +1127,7 @@ public class ChatUiSystem : ModSystem
     private static void OnDiceRollSoundMessage(DiceRollSoundMessage message)
     {
         try { DiceRollSounds.Play(_api, message); }
-        catch (Exception) { System.Diagnostics.Trace.TraceWarning("Dice roll sound playback failed."); }
+        catch (Exception) { _api?.Logger?.Warning("Dice roll sound playback failed."); }
     }
 
     private static void ShowLanguageConfigChatMessage(string message)
