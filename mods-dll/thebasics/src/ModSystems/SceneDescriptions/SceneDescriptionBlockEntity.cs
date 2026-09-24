@@ -424,8 +424,8 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         float.IsFinite(packet.IndicatorScale) && packet.IndicatorScale is >= 0.25f and <= 3 &&
         float.IsFinite(packet.BubbleScale) && packet.BubbleScale is >= 0.4f and <= 3.5f &&
         float.IsFinite(packet.HeightOffset) && packet.HeightOffset is >= -2 and <= 4 &&
-        float.IsFinite(packet.IconDistance) && packet.IconDistance is >= 1 and <= 1024 &&
-        float.IsFinite(packet.TextDistance) && packet.TextDistance is >= 1 and <= 1024;
+        float.IsFinite(packet.IconDistance) && packet.IconDistance is >= SceneDescriptionData.MinDistance and <= SceneDescriptionData.MaxDistance &&
+        float.IsFinite(packet.TextDistance) && packet.TextDistance is >= SceneDescriptionData.MinDistance and <= SceneDescriptionData.MaxDistance;
 
     private bool CanSave(IPlayer player, bool creating, SceneDescriptionEntry entry) =>
         HasClaimAccess(player) && (creating

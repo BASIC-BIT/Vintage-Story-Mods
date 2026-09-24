@@ -20,6 +20,8 @@ public sealed class SceneDescriptionData
 {
     public const int MaxTitleLength = 80;
     public const int MaxBodyLength = 4096;
+    internal const float MinDistance = 1;
+    internal const float MaxDistance = 1024;
 
     internal const string TitleAttribute = "sceneTitle";
     internal const string BodyAttribute = "sceneBody";
@@ -174,8 +176,8 @@ public sealed class SceneDescriptionData
         if (!Enum.IsDefined(Display)) Display = SceneDescriptionDisplay.WhenTargeted;
         if (!Enum.IsDefined(Symbol)) Symbol = SceneMarkerSymbol.Exclamation;
         SymbolIconName = NormalizeIconName(SymbolIconName);
-        IconDistance = float.IsFinite(IconDistance) ? Math.Clamp(IconDistance, 1, 1024) : 24;
-        TextDistance = float.IsFinite(TextDistance) ? Math.Clamp(TextDistance, 1, 1024) : 8;
+        IconDistance = float.IsFinite(IconDistance) ? Math.Clamp(IconDistance, MinDistance, MaxDistance) : 24;
+        TextDistance = float.IsFinite(TextDistance) ? Math.Clamp(TextDistance, MinDistance, MaxDistance) : 8;
         HeightOffset = float.IsFinite(HeightOffset) ? Math.Clamp(HeightOffset, -2, 4) : 0;
         IndicatorScale = float.IsFinite(IndicatorScale) ? Math.Clamp(IndicatorScale, 0.25f, 3) : 1;
         // Retain the retired effect field for save/wire compatibility; all indicators now use one style.

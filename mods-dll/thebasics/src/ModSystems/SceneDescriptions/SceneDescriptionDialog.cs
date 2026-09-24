@@ -112,9 +112,15 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         }
     }
 
-    private string Snapshot() => SingleComposer?.Composed != true
-        ? _loadedSnapshot
-        : JsonConvert.SerializeObject(BuildDraft().Normalize()) + "|" + _lockAfterSave;
+    private string Snapshot()
+    {
+        if (SingleComposer?.Composed != true) return _loadedSnapshot;
+        var distances = _canEditAppearance
+            ? ActiveDistanceSnapshot(_appearance, SingleComposer.GetNumberInput("distance").GetText(),
+                _nearbyLayout ? SingleComposer.GetNumberInput("textdistance").GetText() : null, _nearbyLayout)
+            : string.Empty;
+        return JsonConvert.SerializeObject(BuildDraft().Normalize()) + "|" + distances + "|" + _lockAfterSave;
+    }
 
     private void ConfirmCloseWithUnsavedChanges()
     {
@@ -510,9 +516,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             if (!TryReadValidated("bubblesize", 40, 350, "scene-bubble-size", out _)) return false;
             if (!TryReadValidated("height", -2, 4, "scene-height", out _)) return false;
             if (_nearbyLayout && !_appearance.UnlimitedTextDistance &&
-                !TryReadValidated("textdistance", 1, 1024, "scene-distance", out _)) return false;
+                !TryReadValidated("textdistance", SceneDescriptionData.MinDistance, SceneDescriptionData.MaxDistance, "scene-distance", out _)) return false;
             if (!_appearance.UnlimitedIconDistance &&
-                !TryReadValidated("distance", 1, 1024, "scene-distance", out _)) return false;
+                !TryReadValidated("distance", SceneDescriptionData.MinDistance, SceneDescriptionData.MaxDistance, "scene-distance", out _)) return false;
         }
         data = BuildDraft().Normalize();
         return true;
@@ -556,13 +562,22 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     internal static (float IconDistance, float TextDistance) DraftDistances(SceneDescriptionData current,
         string iconInput, string textInput, bool nearbyLayout)
     {
-        static float ReadDistance(string input, float fallback) =>
+        static float ReadDistance(string input, float fallback, bool unlimited) =>
             float.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) &&
-            float.IsFinite(value) && value is >= 1 and <= 1024 ? value : fallback;
+            float.IsFinite(value) && (!unlimited || value is >= SceneDescriptionData.MinDistance and <= SceneDescriptionData.MaxDistance)
+                ? value : fallback;
 
-        return (ReadDistance(iconInput, current.IconDistance),
-            nearbyLayout ? ReadDistance(textInput, current.TextDistance) : current.TextDistance);
+        return (ReadDistance(iconInput, current.IconDistance, current.UnlimitedIconDistance),
+            nearbyLayout ? ReadDistance(textInput, current.TextDistance, current.UnlimitedTextDistance) : current.TextDistance);
     }
+
+    // Keep active field text in the close snapshot so an invalid edit still prompts before discard.
+    internal static string ActiveDistanceSnapshot(SceneDescriptionData current, string iconInput, string textInput, bool nearbyLayout) =>
+        JsonConvert.SerializeObject(new
+        {
+            Icon = current.UnlimitedIconDistance ? null : iconInput,
+            Text = nearbyLayout && !current.UnlimitedTextDistance ? textInput : null,
+        });
 
     private void OnTitleBarClose()
     {
