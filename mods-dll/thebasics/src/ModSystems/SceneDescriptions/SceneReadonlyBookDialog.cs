@@ -1,8 +1,10 @@
+using System;
 using thebasics.Utilities;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.SceneDescriptions;
@@ -13,22 +15,31 @@ namespace thebasics.ModSystems.SceneDescriptions;
 internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
 {
     private readonly BlockPos _pos;
+    private readonly string _entryId;
     private readonly string _titleIconName;
     private readonly long _stamp;
+    private readonly Action _onBack;
     private bool _read;
 
     internal BlockPos Pos => _pos;
+    internal string EntryId => _entryId;
 
     // A fresh reader is built per right-click, so drop it from the GUI manager and free its composers on close.
     public override bool UnregisterOnClose => true;
 
-    internal SceneReadonlyBookDialog(ItemStack bookStack, ICoreClientAPI capi, BlockPos pos, long stamp, string titleIconName) : base(bookStack, capi)
+    internal SceneReadonlyBookDialog(ItemStack bookStack, ICoreClientAPI capi, BlockPos pos, long stamp, string titleIconName)
+        : this(bookStack, capi, pos, SceneDescriptionEntries.LegacyId, stamp, titleIconName) { }
+
+    internal SceneReadonlyBookDialog(ItemStack bookStack, ICoreClientAPI capi, BlockPos pos, string entryId, long stamp,
+        string titleIconName, Action onBack = null) : base(bookStack, capi)
     {
         // The base constructor already composed once, before these fields existed.
         _pos = pos;
+        _entryId = entryId ?? string.Empty;
         _titleIconName = titleIconName ?? "";
         _stamp = stamp;
-        _read = SceneReadMarks.IsRead(pos, stamp);
+        _onBack = onBack;
+        _read = SceneReadMarks.IsRead(pos, _entryId, stamp);
         Compose();
     }
 
@@ -77,7 +88,7 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
             .AddIf(Pages.Count > 1)
             .AddSmallButton(Lang.Get(">"), nextPage, nextBounds)
             .EndIf()
-            .AddSmallButton(Lang.Get("Close"), () => TryClose(), closeBounds)
+            .AddSmallButton(Lang.Get(_onBack == null ? "Close" : "thebasics:scene-entry-back"), OnBackOrClose, closeBounds)
             .AddSmallButton(ReadButtonLabel(), OnToggleRead, markBounds, key: "markread")
             .EndChildElements()
             .Compose();
@@ -85,6 +96,13 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
     }
 
     private string ReadButtonLabel() => Lang.Get(_read ? "thebasics:scene-mark-unread" : "thebasics:scene-mark-read");
+
+    private bool OnBackOrClose()
+    {
+        if (!TryClose()) return false;
+        _onBack?.Invoke();
+        return true;
+    }
 
     private bool PreviousPage()
     {
@@ -106,7 +124,7 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
         // OpenedGuis, so the reply finds no reader and Refresh is never called on it.
         var marking = !_read;
         capi.Network.SendBlockEntityPacket(_pos, marking ? SceneDescriptionBlockEntity.MarkReadPacketId : SceneDescriptionBlockEntity.MarkUnreadPacketId,
-            System.BitConverter.GetBytes(_stamp));
+            SerializerUtil.Serialize(new SceneReadMarkPacket { EntryId = _entryId, Stamp = _stamp }));
         if (marking) TryClose();
         return true;
     }
@@ -114,7 +132,7 @@ internal sealed class SceneReadonlyBookDialog : GuiDialogReadonlyBook
     /// <summary>Re-reads the client mark cache after the server replied with the marker's current stamp (0 = unread).</summary>
     internal void Refresh(long stamp)
     {
-        _read = SceneReadMarks.IsRead(_pos, _stamp);
+        _read = SceneReadMarks.IsRead(_pos, _entryId, _stamp);
         // Rebuild rather than relabel: the button bounds were fitted to the previous label.
         Compose();
     }

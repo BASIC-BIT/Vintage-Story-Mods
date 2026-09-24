@@ -13,7 +13,7 @@ public sealed class SceneReadMarksMessage
 }
 
 /// <summary>
-/// A read mark pairs a marker position with the <see cref="SceneDescriptionData.ReadStamp"/> it
+/// A read mark pairs a marker entry with the <see cref="SceneDescriptionData.ReadStamp"/> it
 /// carried when the player read it, so any edit, re-placement, or explicit clear (all of which issue
 /// a fresh stamp) makes the marker unread again for everyone. Also holds the client-side cache.
 /// </summary>
@@ -25,6 +25,15 @@ internal static class SceneReadMarks
 
     internal static string Key(BlockPos pos) =>
         pos == null ? string.Empty : pos.X + "/" + pos.Y + "/" + pos.Z + "/" + pos.dimension;
+
+    // The first entry in a migrated marker retains its old position-only key, so existing player
+    // read marks remain valid. Every added entry has its own stable ID and key.
+    internal static string Key(BlockPos pos, string entryId) =>
+        pos == null || string.IsNullOrWhiteSpace(entryId) ? string.Empty :
+        entryId == "legacy" ? Key(pos) : Key(pos) + "/" + entryId;
+
+    internal static bool IsRead(IReadOnlyDictionary<string, long> marks, BlockPos pos, string entryId, long stamp) =>
+        IsRead(marks, Key(pos, entryId), stamp);
 
     internal static bool IsRead(IReadOnlyDictionary<string, long> marks, string key, long stamp) =>
         stamp != 0 && marks != null && marks.TryGetValue(key, out var read) && read == stamp;
@@ -48,7 +57,13 @@ internal static class SceneReadMarks
         }
     }
 
+    internal static void Set(Dictionary<string, long> marks, BlockPos pos, string entryId, long stamp) =>
+        Set(marks, Key(pos, entryId), stamp);
+
     internal static bool IsRead(BlockPos pos, long stamp) => IsRead(ClientMarks, Key(pos), stamp);
+
+    internal static bool IsRead(BlockPos pos, string entryId, long stamp) =>
+        IsRead(ClientMarks, Key(pos, entryId), stamp);
 
     internal static void ReplaceClientMarks(SceneReadMarksMessage message)
     {
@@ -58,6 +73,9 @@ internal static class SceneReadMarks
     }
 
     internal static void SetClientMark(BlockPos pos, long stamp) => Set(ClientMarks, Key(pos), stamp);
+
+    internal static void SetClientMark(BlockPos pos, string entryId, long stamp) =>
+        Set(ClientMarks, Key(pos, entryId), stamp);
 
     internal static void ClearClientMarks() => ClientMarks.Clear();
 }

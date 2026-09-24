@@ -1,8 +1,11 @@
 using System.Collections.Generic;
 using FluentAssertions;
+using NSubstitute;
 using thebasics.ModSystems.SceneDescriptions;
+using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
@@ -26,6 +29,46 @@ public class SceneReadMarksTests
     }
 
     [Fact]
+    public void EntryKeysKeepDescriptionsAtTheSamePositionIndependent()
+    {
+        var pos = new BlockPos(3, -4, 5, 0);
+        var marks = new Dictionary<string, long>();
+        SceneReadMarks.Set(marks, pos, "first", 100);
+        SceneReadMarks.IsRead(marks, pos, "first", 100).Should().BeTrue();
+        SceneReadMarks.IsRead(marks, pos, "second", 100).Should().BeFalse();
+        SceneReadMarks.Key(pos, "first").Should().Be("3/-4/5/0/first");
+    }
+
+    [Fact]
+    public void MigratedEntryKeepsItsLegacyReadMarkUntilItsNextToggle()
+    {
+        var pos = new BlockPos(3, -4, 5, 0);
+        var marks = new Dictionary<string, long> { [SceneReadMarks.Key(pos)] = 100 };
+        SceneReadMarks.Key(pos, "legacy").Should().Be(SceneReadMarks.Key(pos));
+        SceneReadMarks.IsRead(marks, pos, "legacy", 100).Should().BeTrue();
+        SceneReadMarks.Set(marks, pos, "legacy", 0);
+        SceneReadMarks.IsRead(marks, pos, "legacy", 100).Should().BeFalse();
+        marks.Should().NotContainKey(SceneReadMarks.Key(pos));
+    }
+
+    [Fact]
+    public void ProtobufUnreadReplyForLegacyEntryIsNotMistakenForAnOldRawStamp()
+    {
+        var pos = new BlockPos(3, -4, 5, 0);
+        var bytes = SerializerUtil.Serialize(new SceneReadMarkPacket { EntryId = "legacy", Stamp = 0 });
+        bytes.Should().HaveCount(8);
+        var marker = new SceneDescriptionBlockEntity { Api = Substitute.For<ICoreAPI>(), Pos = pos };
+        try
+        {
+            SceneReadMarks.SetClientMark(pos, "legacy", 100);
+            marker.OnReceivedServerPacket(1005, bytes);
+            SceneReadMarks.IsRead(pos, "legacy", 100).Should().BeFalse();
+            SceneReadMarks.IsRead(pos, "legacy", System.BitConverter.ToInt64(bytes)).Should().BeFalse();
+        }
+        finally { SceneReadMarks.ClearClientMarks(); }
+    }
+
+    [Fact]
     public void OnlyTheStampThatWasMarkedCountsAsRead()
     {
         var marks = new Dictionary<string, long> { ["a"] = 100 };
@@ -33,7 +76,7 @@ public class SceneReadMarksTests
         SceneReadMarks.IsRead(marks, "a", 101).Should().BeFalse();
         SceneReadMarks.IsRead(marks, "b", 100).Should().BeFalse();
         SceneReadMarks.IsRead(marks, "a", 0).Should().BeFalse();
-        SceneReadMarks.IsRead(null, "a", 100).Should().BeFalse();
+        SceneReadMarks.IsRead((IReadOnlyDictionary<string, long>)null!, "a", 100).Should().BeFalse();
     }
 
     [Fact]

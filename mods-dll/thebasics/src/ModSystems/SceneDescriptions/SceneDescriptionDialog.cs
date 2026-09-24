@@ -16,6 +16,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private const double BodyHeight = 260;
     private const double ButtonHeight = 30;
     private readonly Action<SceneDescriptionData, bool> _onSave;
+    private readonly Action _onAdd;
     private readonly Action _onClose;
     private SceneTitleIconDialog _iconPicker;
     private SceneTitleIconDialog _symbolIconPicker;
@@ -28,17 +29,25 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     // Whether the composed layout carries the text distance row. It only applies to the nearby mode.
     private bool _nearbyLayout;
     private readonly bool _canManageLock;
+    private readonly bool _canAdd;
+    private readonly bool _canEditAppearance;
+    private readonly bool _isNewEntry;
     private readonly Action _onUnlock;
     private readonly Action _onClearRead;
     private readonly SceneDescriptionData _appearance;
     private readonly Shape[] _symbolShapes;
 
-    public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, bool canManageLock, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose) : base(capi)
+    public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, bool canManageLock, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose,
+        Action onAdd = null, bool canAdd = false, bool canEditAppearance = true, bool isNewEntry = false) : base(capi)
     {
         _onSave = onSave;
+        _onAdd = onAdd;
         _onUnlock = onUnlock;
         _onClearRead = onClearRead;
         _canManageLock = canManageLock;
+        _canAdd = canAdd;
+        _canEditAppearance = canEditAppearance;
+        _isNewEntry = isNewEntry;
         _onClose = onClose;
         _appearance = (data ?? new SceneDescriptionData()).Clone().Normalize();
         _symbolShapes = Enum.GetValues<SceneMarkerSymbol>().Select(symbol => SceneMarkerVisuals.LoadShape(capi, symbol)).ToArray();
@@ -149,6 +158,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddStaticText(Lang.Get("thebasics:scene-description-body-label"), CairoFont.WhiteSmallText(), bodyLabelBounds)
             .AddScrollableTextArea(textAreaBounds, _ => RefreshPreview(), CairoFont.TextInput(), "body")
             ;
+        if (!_canEditAppearance)
+            SingleComposer.AddStaticText(Lang.Get("thebasics:scene-entry-shared-appearance"), CairoFont.WhiteSmallText(),
+                ElementBounds.Fixed(530, top, 260, 40));
         ComposeRightColumn(data, top, textRow);
         ComposeBottomRows(data, top, buttonY);
         for (var index = 0; index < _symbolShapes.Length; index++)
@@ -217,6 +229,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddStaticText(Lang.Get("thebasics:scene-show-body"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(250, top + 66, 250, 22))
             .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:scene-clear-read"), OnClearRead, ElementBounds.Fixed(140, buttonY, 140, ButtonHeight), key: "clearread")
+            .AddIf(_canAdd && _onAdd != null)
+            .AddSmallButton(Lang.Get("thebasics:scene-entry-add"), OnAdd, ElementBounds.Fixed(300, buttonY, 150, ButtonHeight))
+            .EndIf()
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth + 290 - 150, buttonY, 150, ButtonHeight), key: "save")
             .AddSmallButton("", OnLockButton, ElementBounds.Fixed(750, top, 36, 32), key: "lock")
             .AddSceneDrawing(ElementBounds.Fixed(756, top + 4, 24, 24), DrawLock, "lockart")
@@ -235,27 +250,27 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             SingleComposer.GetNumberInput("textdistance").SetValue(data.TextDistance.ToString(CultureInfo.InvariantCulture));
         }
         SingleComposer.GetNumberInput("height").SetValue(data.HeightOffset.ToString(CultureInfo.InvariantCulture));
-        SingleComposer.GetNumberInput("height").Enabled = !data.IsLocked;
+        SingleComposer.GetNumberInput("height").Enabled = !data.IsLocked && _canEditAppearance;
         SingleComposer.GetNumberInput("size").SetValue((data.IndicatorScale * 100).ToString(CultureInfo.InvariantCulture));
-        SingleComposer.GetNumberInput("size").Enabled = !data.IsLocked;
+        SingleComposer.GetNumberInput("size").Enabled = !data.IsLocked && _canEditAppearance;
         SingleComposer.GetNumberInput("bubblesize").SetValue((data.BubbleScale * 100).ToString(CultureInfo.InvariantCulture));
-        SingleComposer.GetNumberInput("bubblesize").Enabled = !data.IsLocked;
-        SingleComposer.GetButton("titleicon").Enabled = !data.IsLocked;
-        SingleComposer.GetButton("symbolicon").Enabled = !data.IsLocked;
-        SingleComposer.GetDropDown("color").Enabled = !data.IsLocked;
+        SingleComposer.GetNumberInput("bubblesize").Enabled = !data.IsLocked && _canEditAppearance;
+        SingleComposer.GetButton("titleicon").Enabled = !data.IsLocked && _canEditAppearance;
+        SingleComposer.GetButton("symbolicon").Enabled = !data.IsLocked && _canEditAppearance;
+        SingleComposer.GetDropDown("color").Enabled = !data.IsLocked && _canEditAppearance;
         SingleComposer.GetSwitch("bobbing").SetValue(data.IdleBobbing);
-        SingleComposer.GetSwitch("bobbing").Enabled = !data.IsLocked;
+        SingleComposer.GetSwitch("bobbing").Enabled = !data.IsLocked && _canEditAppearance;
         SingleComposer.GetSwitch("showbody").SetValue(data.ShowBodyInBubble);
-        SingleComposer.GetSwitch("showbody").Enabled = !data.IsLocked;
+        SingleComposer.GetSwitch("showbody").Enabled = !data.IsLocked && _canEditAppearance;
         RefreshPreview();
         SingleComposer.GetButton("lock").Enabled = _canManageLock;
         SingleComposer.GetButton("save").Enabled = !data.IsLocked;
-        SingleComposer.GetButton("clearread").Enabled = !data.IsLocked;
+        SingleComposer.GetButton("clearread").Enabled = !data.IsLocked && _onClearRead != null;
         SingleComposer.GetTextInput("title").Enabled = !data.IsLocked;
         SingleComposer.GetTextArea("body").Enabled = !data.IsLocked;
-        SingleComposer.GetDropDown("kind").Enabled = !data.IsLocked;
-        SingleComposer.GetSwitch("unlimited").Enabled = !data.IsLocked;
-        for (var i = 0; i < _symbolShapes.Length; i++) SingleComposer.GetToggleButton("symbol-" + i).Enabled = !data.IsLocked;
+        SingleComposer.GetDropDown("kind").Enabled = !data.IsLocked && _canEditAppearance;
+        SingleComposer.GetSwitch("unlimited").Enabled = !data.IsLocked && _canEditAppearance;
+        for (var i = 0; i < _symbolShapes.Length; i++) SingleComposer.GetToggleButton("symbol-" + i).Enabled = !data.IsLocked && _canEditAppearance;
         SingleComposer.GetTextInput("title").SetMaxLength(SceneDescriptionData.MaxTitleLength);
         SingleComposer.GetTextInput("title").SetValue(data.Title);
         SingleComposer.GetTextArea("body").SetMaxLength(SceneDescriptionData.MaxBodyLength);
@@ -267,11 +282,11 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private void RefreshPreview()
     {
         if (SingleComposer?.Composed != true) return;
-        SingleComposer.GetNumberInput("distance").Enabled = !_appearance.IsLocked && !_appearance.UnlimitedIconDistance;
+        SingleComposer.GetNumberInput("distance").Enabled = !_appearance.IsLocked && _canEditAppearance && !_appearance.UnlimitedIconDistance;
         if (_nearbyLayout)
         {
-            SingleComposer.GetNumberInput("textdistance").Enabled = !_appearance.IsLocked && !_appearance.UnlimitedTextDistance;
-            SingleComposer.GetSwitch("textunlimited").Enabled = !_appearance.IsLocked;
+            SingleComposer.GetNumberInput("textdistance").Enabled = !_appearance.IsLocked && _canEditAppearance && !_appearance.UnlimitedTextDistance;
+            SingleComposer.GetSwitch("textunlimited").Enabled = !_appearance.IsLocked && _canEditAppearance;
         }
         SingleComposer.GetSceneDrawing("preview").Redraw();
         SingleComposer.GetSceneDrawing("titleiconart").Redraw();
@@ -283,6 +298,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     // layout. Everything the user has typed but not saved is carried into the new composer.
     private void OnDisplayModeChanged()
     {
+        if (!_canEditAppearance) return;
         var nearby = SelectedDisplay() == SceneDescriptionDisplay.AlwaysNearby;
         if (nearby == _nearbyLayout)
         {
@@ -385,7 +401,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 
     private bool OpenSymbolIconPicker()
     {
-        if (_appearance.IsLocked || _symbolIconPicker != null) return false;
+        if (!_canEditAppearance || _appearance.IsLocked || _symbolIconPicker != null) return false;
         _symbolIconPicker = new SceneTitleIconDialog(capi, icon =>
         {
             _appearance.SymbolIconName = SceneDescriptionData.NormalizeIconName(icon);
@@ -398,7 +414,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 
     private bool OpenIconPicker()
     {
-        if (_appearance.IsLocked || _iconPicker != null) return false;
+        if (!_canEditAppearance || _appearance.IsLocked || _iconPicker != null) return false;
         _iconPicker = new SceneTitleIconDialog(capi, icon => { _appearance.TitleIcon = 0; _appearance.TitleIconName = icon; RefreshPreview(); }, () => _iconPicker = null);
         return _iconPicker.TryOpen();
     }
@@ -454,23 +470,31 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private bool OnSave()
     {
         if (_appearance.IsLocked) return false;
-        if (!TryReadValidated("size", 25, 300, "scene-size", out var percent)) return false;
-        _appearance.IndicatorScale = percent / 100;
-        if (!TryReadValidated("bubblesize", 40, 350, "scene-bubble-size", out var bubblePercent)) return false;
-        _appearance.BubbleScale = bubblePercent / 100;
-        if (!TryReadValidated("height", -2, 4, "scene-height", out var height)) return false;
-        _appearance.HeightOffset = height;
-        if (_nearbyLayout && !_appearance.UnlimitedTextDistance)
+        if (_canEditAppearance)
         {
-            if (!TryReadValidated("textdistance", 1, 1024, "scene-distance", out var textDistance)) return false;
-            _appearance.TextDistance = textDistance;
-        }
-        if (!_appearance.UnlimitedIconDistance)
-        {
-            if (!TryReadValidated("distance", 1, 1024, "scene-distance", out var distance)) return false;
-            _appearance.IconDistance = distance;
+            if (!TryReadValidated("size", 25, 300, "scene-size", out var percent)) return false;
+            _appearance.IndicatorScale = percent / 100;
+            if (!TryReadValidated("bubblesize", 40, 350, "scene-bubble-size", out var bubblePercent)) return false;
+            _appearance.BubbleScale = bubblePercent / 100;
+            if (!TryReadValidated("height", -2, 4, "scene-height", out var height)) return false;
+            _appearance.HeightOffset = height;
+            if (_nearbyLayout && !_appearance.UnlimitedTextDistance)
+            {
+                if (!TryReadValidated("textdistance", 1, 1024, "scene-distance", out var textDistance)) return false;
+                _appearance.TextDistance = textDistance;
+            }
+            if (!_appearance.UnlimitedIconDistance)
+            {
+                if (!TryReadValidated("distance", 1, 1024, "scene-distance", out var distance)) return false;
+                _appearance.IconDistance = distance;
+            }
         }
         var data = BuildDraft().Normalize();
+        if (_isNewEntry && !SceneAnalytics.Written(data))
+        {
+            capi.TriggerIngameError(this, "scene-entry-empty", Lang.Get("thebasics:scene-entry-empty-save"));
+            return false;
+        }
 
         _closing = true;
         base.TryClose();
@@ -482,11 +506,11 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     // number keeps the value already in _appearance, so the dirty check never errors or throws.
     private SceneDescriptionData BuildDraft()
     {
-        var iconDistance = !_appearance.UnlimitedIconDistance && TryReadNumber("distance", out var distance) ? distance : _appearance.IconDistance;
-        var textDistance = _nearbyLayout && !_appearance.UnlimitedTextDistance && TryReadNumber("textdistance", out var typedText) ? typedText : _appearance.TextDistance;
-        var height = TryReadNumber("height", out var offset) ? offset : _appearance.HeightOffset;
-        var indicatorScale = TryReadNumber("size", out var percent) ? percent / 100 : _appearance.IndicatorScale;
-        var bubbleScale = TryReadNumber("bubblesize", out var bubblePercent) ? bubblePercent / 100 : _appearance.BubbleScale;
+        var iconDistance = _canEditAppearance && !_appearance.UnlimitedIconDistance && TryReadNumber("distance", out var distance) ? distance : _appearance.IconDistance;
+        var textDistance = _canEditAppearance && _nearbyLayout && !_appearance.UnlimitedTextDistance && TryReadNumber("textdistance", out var typedText) ? typedText : _appearance.TextDistance;
+        var height = _canEditAppearance && TryReadNumber("height", out var offset) ? offset : _appearance.HeightOffset;
+        var indicatorScale = _canEditAppearance && TryReadNumber("size", out var percent) ? percent / 100 : _appearance.IndicatorScale;
+        var bubbleScale = _canEditAppearance && TryReadNumber("bubblesize", out var bubblePercent) ? bubblePercent / 100 : _appearance.BubbleScale;
         return new SceneDescriptionData
         {
             Kind = _appearance.Kind,
@@ -507,7 +531,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             TitleIconName = _appearance.TitleIconName,
             Title = SingleComposer.GetTextInput("title").GetText(),
             Body = SingleComposer.GetTextArea("body").GetText(),
-            Display = SelectedDisplay(),
+            Display = _canEditAppearance ? SelectedDisplay() : _appearance.Display,
         };
     }
 
@@ -519,6 +543,19 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private bool OnCancelButton()
     {
         TryClose();
+        return true;
+    }
+
+    private bool OnAdd()
+    {
+        if (!_canAdd || _onAdd == null) return false;
+        if (Snapshot() != _loadedSnapshot)
+        {
+            capi.TriggerIngameError(this, "scene-entry-save-first", Lang.Get("thebasics:scene-entry-save-first"));
+            return false;
+        }
+        if (!TryClose()) return false;
+        _onAdd();
         return true;
     }
 }

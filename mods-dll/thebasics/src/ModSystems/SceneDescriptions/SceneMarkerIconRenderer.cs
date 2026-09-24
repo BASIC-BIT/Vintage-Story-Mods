@@ -70,7 +70,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         var render = _api.Render;
         _shownDescriptions.Clear();
         GatherVisibleIcons(deltaTime);
-        BeginIconFrame(_visible.Where(icon => icon.Opacity > 0).Select(icon => icon.Marker.Data));
+        BeginIconFrame(_visible.Where(icon => icon.Opacity > 0).Select(icon => icon.Marker.DisplayData));
         if (_visible.Count == 0)
         {
             foreach (var marker in _descriptions.Keys.Where(marker => !_shownDescriptions.Contains(marker)).ToArray()) RemoveDescription(marker);
@@ -89,11 +89,12 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             foreach (var icon in _visible)
             {
                 if (icon.Opacity <= 0) continue;
-                var size = SceneDescriptionData.IndicatorBlocks * icon.Marker.Data.IndicatorScale * (1 + 0.10f * icon.Focus);
+                var data = icon.Marker.DisplayData;
+                var size = SceneDescriptionData.IndicatorBlocks * data.IndicatorScale * (1 + 0.10f * icon.Focus);
                 // A marker this player has read settles down: half the bob height at half the speed.
                 var (amplitude, period) = icon.Read ? (0.025, 8000.0) : (0.05, 4000.0);
-                var bob = icon.Marker.Data.IdleBobbing ? amplitude * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / period)) : 0;
-                RenderQuad(icon.Marker, GetIcon(icon.Marker.Data), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.IndicatorOpacity, size, size);
+                var bob = data.IdleBobbing ? amplitude * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / period)) : 0;
+                RenderQuad(icon.Marker, GetIcon(data), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.IndicatorOpacity, size, size);
             }
             // Safe to evict here even though the bubbles draw later in Ortho: GatherVisibleIcons
             // marks every marker whose text opacity is above zero, which is the Ortho pass's gate.
@@ -118,15 +119,16 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         foreach (var marker in _markers)
         {
             if (marker.Pos.dimension != player.Pos.Dimension) continue;
+            var data = marker.DisplayData;
             var position = marker.Pos.ToVec3d().Add(0.5, 0.65, 0.5);
             var distance = player.Pos.XYZ.DistanceTo(position);
             // A marker this player has read keeps a dimmed icon and never shows a bubble.
-            var read = SceneReadMarks.IsRead(marker.Pos, marker.Data.ReadStamp);
-            var opacity = marker.Data.GetIconOpacity(distance) * (read ? 0.5f : 1f);
-            position.Y += marker.Data.HeightOffset;
+            var read = marker.AllReadOnClient;
+            var opacity = data.GetIconOpacity(distance) * (read ? 0.5f : 1f);
+            position.Y += data.HeightOffset;
             var selected = _api.World.Player.CurrentBlockSelection?.Position?.Equals(marker.Pos) == true;
-            var targeted = selected && marker.Data.Display == SceneDescriptionDisplay.WhenTargeted && marker.Data.ShouldShowDescription(true);
-            var textOpacity = marker.Data.ShouldShowDescription(selected) ? marker.Data.GetTextOpacity(distance) : 0;
+            var targeted = selected && data.Display == SceneDescriptionDisplay.WhenTargeted && data.ShouldShowDescription(true);
+            var textOpacity = data.ShouldShowDescription(selected) ? data.GetTextOpacity(distance) : 0;
             if (targeted) textOpacity = 1;
             if (read) textOpacity = 0;
             var focus = _focus.GetValueOrDefault(marker);
@@ -138,8 +140,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
                 var text = DescriptionSize(marker);
                 if (text.Height > 0)
                 {
-                    var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, marker.Data.BubbleRenderScale);
-                    radius = SceneBubbleLayout.CullRadius(width, height, marker.Data.IndicatorScale);
+                    var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, data.BubbleRenderScale);
+                    radius = SceneBubbleLayout.CullRadius(width, height, data.IndicatorScale);
                 }
             }
             if ((opacity <= 0 && textOpacity <= 0) || !render.DefaultFrustumCuller.SphereInFrustum(position.X, position.Y, position.Z, radius)) continue;
@@ -169,15 +171,16 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private void RenderBubble(IClientPlayer player, SceneDescriptionBlockEntity marker, Vec3d position, float textOpacity)
     {
         var targeted = player.CurrentBlockSelection?.Position?.Equals(marker.Pos) == true;
-        if (!marker.Data.ShouldShowDescription(targeted)) return;
+        var data = marker.DisplayData;
+        if (!data.ShouldShowDescription(targeted)) return;
         var text = GetDescription(marker);
         if (text == null) return;
-        var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, marker.Data.BubbleRenderScale);
+        var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, data.BubbleRenderScale);
         if (height <= 0) return;
         var render = _api.Render;
         var view = render.CameraMatrixOriginf;
         // Reserve the full focus/bob envelope so the bubble stays still through both animations.
-        var offset = SceneDescriptionData.IndicatorBlocks * marker.Data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;
+        var offset = SceneDescriptionData.IndicatorBlocks * data.IndicatorScale * 1.1f / 2 + 0.15 + height / 2;
         var anchor = position.AddCopy(view[1] * offset, view[5] * offset, view[9] * offset);
         var centre = Project(anchor);
         if (centre.Z < 0) return;
@@ -190,7 +193,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         render.Render2DTexture(text.TextureId, (float)centre.X - pixelWidth / 2,
             render.FrameHeight - (float)centre.Y - pixelHeight / 2, pixelWidth, pixelHeight, 20f,
             new Vec4f(1, 1, 1, textOpacity));
-        if (SceneAnalytics.VisibleFrame(textOpacity, centre.X, centre.Y, render.FrameWidth, render.FrameHeight))
+        if (marker.Entries.Entries.Count == 1 && SceneAnalytics.VisibleFrame(textOpacity, centre.X, centre.Y, render.FrameWidth, render.FrameHeight))
             _api.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.BubbleRendered(marker.Pos);
     }
 
@@ -244,7 +247,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private (int Width, int Height) DescriptionSize(SceneDescriptionBlockEntity marker) =>
         DescriptionSize(marker, () =>
         {
-            using var surface = SceneMarkerVisuals.DescriptionSurface(_api, marker.Data);
+            using var surface = SceneMarkerVisuals.DescriptionSurface(_api, marker.DisplayData);
             return surface == null ? (0, 0) : (surface.Width, surface.Height);
         });
 
@@ -252,18 +255,18 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     // Culling therefore never needs a GPU texture, even after texture-cache eviction.
     internal (int Width, int Height) DescriptionSize(SceneDescriptionBlockEntity marker, Func<(int Width, int Height)> measure)
     {
-        if (_descriptionSizes.TryGetValue(marker, out var entry) && entry.Content == marker.Data.BubbleContent && entry.GuiScale == RuntimeEnv.GUIScale)
+        if (_descriptionSizes.TryGetValue(marker, out var entry) && entry.Content == marker.DisplayData.BubbleContent && entry.GuiScale == RuntimeEnv.GUIScale)
             return (entry.Width, entry.Height);
         var size = measure();
-        _descriptionSizes[marker] = (marker.Data.BubbleContent, RuntimeEnv.GUIScale, size.Width, size.Height);
+        _descriptionSizes[marker] = (marker.DisplayData.BubbleContent, RuntimeEnv.GUIScale, size.Width, size.Height);
         return size;
     }
     private LoadedTexture GetDescription(SceneDescriptionBlockEntity marker)
     {
         _shownDescriptions.Add(marker);
-        if (_descriptions.TryGetValue(marker, out var entry) && entry.Content == marker.Data.BubbleContent && entry.GuiScale == RuntimeEnv.GUIScale) return entry.Texture;
+        if (_descriptions.TryGetValue(marker, out var entry) && entry.Content == marker.DisplayData.BubbleContent && entry.GuiScale == RuntimeEnv.GUIScale) return entry.Texture;
         RemoveDescription(marker);
-        using var surface = SceneMarkerVisuals.DescriptionSurface(_api, marker.Data);
+        using var surface = SceneMarkerVisuals.DescriptionSurface(_api, marker.DisplayData);
         if (surface == null) return null;
         var texture = new LoadedTexture(_api);
         _api.Gui.LoadOrUpdateCairoTexture(surface, false, ref texture);
@@ -276,7 +279,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         RemoveDescription(marker);
         foreach (var unused in _descriptions.Keys.Where(key => !_shownDescriptions.Contains(key))
             .Take(Math.Max(0, _descriptions.Count - MaxCachedDescriptions + 1)).ToArray()) RemoveDescription(unused);
-        _descriptions[marker] = (marker.Data.BubbleContent, RuntimeEnv.GUIScale, texture);
+        _descriptions[marker] = (marker.DisplayData.BubbleContent, RuntimeEnv.GUIScale, texture);
     }
 
     internal LoadedTexture GetIcon(SceneDescriptionData data, Func<LoadedTexture> create = null)
