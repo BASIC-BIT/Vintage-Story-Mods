@@ -10,6 +10,9 @@ using Vintagestory.API.Config;
 
 namespace thebasics.ModSystems.SceneDescriptions;
 
+internal sealed record SceneDescriptionDialogOptions(
+    bool CanManageLock, bool CanAdd = false, bool CanEditAppearance = true, bool IsNewEntry = false);
+
 internal sealed class SceneDescriptionDialog : GuiDialog
 {
     private const double DialogWidth = 520;
@@ -37,17 +40,17 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private readonly SceneDescriptionData _appearance;
     private readonly Shape[] _symbolShapes;
 
-    public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, bool canManageLock, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose,
-        Action onAdd = null, bool canAdd = false, bool canEditAppearance = true, bool isNewEntry = false) : base(capi)
+    public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, SceneDescriptionDialogOptions options, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose,
+        Action onAdd = null) : base(capi)
     {
         _onSave = onSave;
         _onAdd = onAdd;
         _onUnlock = onUnlock;
         _onClearRead = onClearRead;
-        _canManageLock = canManageLock;
-        _canAdd = canAdd;
-        _canEditAppearance = canEditAppearance;
-        _isNewEntry = isNewEntry;
+        _canManageLock = options.CanManageLock;
+        _canAdd = options.CanAdd;
+        _canEditAppearance = options.CanEditAppearance;
+        _isNewEntry = options.IsNewEntry;
         _onClose = onClose;
         _appearance = (data ?? new SceneDescriptionData()).Clone().Normalize();
         _symbolShapes = Enum.GetValues<SceneMarkerSymbol>().Select(symbol => SceneMarkerVisuals.LoadShape(capi, symbol)).ToArray();

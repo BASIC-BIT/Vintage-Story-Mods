@@ -344,9 +344,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         if (packet == null) return;
         var creating = packet.CreateNew;
         var entry = creating ? null : ResolveEntry(packet.EntryId);
-        if (!HasClaimAccess(player) || (creating
-                ? !SceneAnalytics.Written(Data) || Entries.Entries.Count >= SceneDescriptionEntries.MaxEntries
-                : entry == null || !entry.Data.CanEdit(player?.PlayerUID, true)))
+        if (!CanSave(player, creating, entry))
         {
             (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
             return;
@@ -388,6 +386,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         SceneAnalytics.Track(entry.Data, "saved", "scene_save_kind", SceneAnalytics.SaveKind(previousData, entry.Data));
     }
 
+    private bool CanSave(IPlayer player, bool creating, SceneDescriptionEntry entry) =>
+        HasClaimAccess(player) && (creating
+            ? SceneAnalytics.Written(Data) && Entries.Entries.Count < SceneDescriptionEntries.MaxEntries
+            : entry != null && entry.Data.CanEdit(player?.PlayerUID, true));
+
     public override void OnReceivedServerPacket(int packetId, byte[] data)
     {
         if (packetId is MarkReadPacketId or MarkUnreadPacketId)
@@ -425,7 +428,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
         _dialog?.TryCloseWithoutPrompt();
         var entryId = packet.EntryId;
-        _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), packet.CanManageLock, (saved, lockAfterSave) =>
+        var options = new SceneDescriptionDialogOptions(packet.CanManageLock,
+            CanAdd: !packet.CreateNew && SceneAnalytics.Written(Data) && Entries.Entries.Count < SceneDescriptionEntries.MaxEntries,
+            CanEditAppearance: !packet.CreateNew && entryId == Entries.Primary.Id,
+            IsNewEntry: packet.CreateNew);
+        _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), options, (saved, lockAfterSave) =>
         {
             var savedPacket = ToPacket(saved);
             savedPacket.EntryId = entryId;
@@ -436,10 +443,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         }, packet.CreateNew ? null : () => clientApi.Network.SendBlockEntityPacket(Pos, UnlockPacketId, SerializerUtil.Serialize(new SceneEntryActionPacket { EntryId = entryId })),
             packet.CreateNew ? null : () => clientApi.Network.SendBlockEntityPacket(Pos, ClearReadPacketId, SerializerUtil.Serialize(new SceneEntryActionPacket { EntryId = entryId })),
             () => _dialog = null,
-            () => clientApi.Network.SendBlockEntityPacket(Pos, AddEntryPacketId),
-            !packet.CreateNew && SceneAnalytics.Written(Data) && Entries.Entries.Count < SceneDescriptionEntries.MaxEntries,
-            canEditAppearance: !packet.CreateNew && entryId == Entries.Primary.Id,
-            isNewEntry: packet.CreateNew);
+            () => clientApi.Network.SendBlockEntityPacket(Pos, AddEntryPacketId));
         _dialog.TryOpen();
     }
 

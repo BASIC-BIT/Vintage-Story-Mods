@@ -110,6 +110,11 @@ internal sealed class SceneAnalyticsObserver : IDisposable
             if (message.Bubble && SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, pos, entry.Id, data.ReadStamp)) return;
             key = SceneReadMarks.Key(pos, entry.Id);
         }
+        TrackObservation(player, message, data, key);
+    }
+
+    private void TrackObservation(IServerPlayer player, SceneObservationMessage message, SceneDescriptionData data, string key)
+    {
         var action = message.Bubble ? "bubble_viewed" : "reader_opened";
         if (!_gate.Accept(player.PlayerUID + ":" + action + ":" + key, _server.World.ElapsedMilliseconds, message.Bubble ? 60000 : 30000)) return;
         SceneAnalytics.Track(data, action, message.Bubble ? null : "scene_read_source", message.Held ? "held" : "placed");
