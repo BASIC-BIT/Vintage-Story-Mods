@@ -16,6 +16,18 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneMarkerPlateTests
 {
     [Fact]
+    public void PlacedPlateUsesSolidTwoSidedRenderPass()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Vintage-Story-Mods.sln"))) directory = directory.Parent;
+        var assetPath = Path.Combine(directory!.FullName, "mods-dll/thebasics/assets/thebasics/blocktypes/scene-marker.json");
+        var asset = JObject.Parse(File.ReadAllText(assetPath));
+
+        asset.Value<string>("renderpass").Should().Be("OpaqueNoCull");
+        asset.Value<string>("faceCullMode").Should().Be("NeverCull");
+    }
+
+    [Fact]
     public void EnabledMarkerKeepsItsTerrainMesh()
     {
         var (_, marker, _, _) = CreateMarker();

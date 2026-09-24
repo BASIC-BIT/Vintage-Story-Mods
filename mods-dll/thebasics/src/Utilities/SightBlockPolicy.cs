@@ -96,6 +96,12 @@ internal sealed class SightBlockPolicy
             return false;
         }
 
+        // The physical scene-marker plate is opaque, but should not hide roleplay sight.
+        if (block.Code?.Domain == "thebasics" && block.Code.Path.StartsWith("scene-marker-", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         if (foliagePasses && block.BlockMaterial is EnumBlockMaterial.Leaves or EnumBlockMaterial.Plant)
         {
             return false;
