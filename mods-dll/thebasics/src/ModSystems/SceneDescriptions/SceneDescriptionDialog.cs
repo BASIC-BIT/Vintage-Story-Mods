@@ -522,8 +522,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     // number keeps the value already in _appearance, so the dirty check never errors or throws.
     private SceneDescriptionData BuildDraft()
     {
-        var iconDistance = _canEditAppearance && !_appearance.UnlimitedIconDistance && TryReadNumber("distance", out var distance) ? distance : _appearance.IconDistance;
-        var textDistance = _canEditAppearance && _nearbyLayout && !_appearance.UnlimitedTextDistance && TryReadNumber("textdistance", out var typedText) ? typedText : _appearance.TextDistance;
+        var (iconDistance, textDistance) = _canEditAppearance
+            ? DraftDistances(_appearance, SingleComposer.GetNumberInput("distance").GetText(),
+                _nearbyLayout ? SingleComposer.GetNumberInput("textdistance").GetText() : null, _nearbyLayout)
+            : (_appearance.IconDistance, _appearance.TextDistance);
         var height = _canEditAppearance && TryReadNumber("height", out var offset) ? offset : _appearance.HeightOffset;
         var indicatorScale = _canEditAppearance && TryReadNumber("size", out var percent) ? percent / 100 : _appearance.IndicatorScale;
         var bubbleScale = _canEditAppearance && TryReadNumber("bubblesize", out var bubblePercent) ? bubblePercent / 100 : _appearance.BubbleScale;
@@ -549,6 +551,17 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             Body = SingleComposer.GetTextArea("body").GetText(),
             Display = _canEditAppearance ? SelectedDisplay() : _appearance.Display,
         };
+    }
+
+    internal static (float IconDistance, float TextDistance) DraftDistances(SceneDescriptionData current,
+        string iconInput, string textInput, bool nearbyLayout)
+    {
+        static float ReadDistance(string input, float fallback) =>
+            float.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) &&
+            float.IsFinite(value) && value is >= 1 and <= 1024 ? value : fallback;
+
+        return (ReadDistance(iconInput, current.IconDistance),
+            nearbyLayout ? ReadDistance(textInput, current.TextDistance) : current.TextDistance);
     }
 
     private void OnTitleBarClose()

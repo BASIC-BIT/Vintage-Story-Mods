@@ -1,10 +1,32 @@
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using thebasics.ModSystems.SceneDescriptions;
 
 namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 public class SceneDescriptionDialogLayoutTests
 {
+    [Fact]
+    public void UnlimitedKeepsTypedDistanceValuesInTheEditorDraft()
+    {
+        var current = new SceneDescriptionData
+        {
+            IconDistance = 24,
+            TextDistance = 8,
+            UnlimitedIconDistance = true,
+            UnlimitedTextDistance = true,
+        };
+
+        var (iconDistance, textDistance) = SceneDescriptionDialog.DraftDistances(current, "100", "12", nearbyLayout: true);
+
+        iconDistance.Should().Be(100);
+        textDistance.Should().Be(12);
+        SceneDescriptionDialog.DraftDistances(current, "invalid", "NaN", nearbyLayout: true)
+            .Should().Be((24f, 8f), "disabled invalid fields should retain the prior values");
+        SceneDescriptionDialog.DraftDistances(current, "2048", "0", nearbyLayout: true)
+            .Should().Be((24f, 8f), "disabled out-of-range fields should retain the prior values");
+    }
+
     [Fact]
     public void SharedAppearanceNoticeLeavesSpaceBeforeLockButton()
     {
