@@ -285,9 +285,13 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         SceneReadMarkPacket packet;
         try
         {
-            packet = data is { Length: 8 } ? new SceneReadMarkPacket { Stamp = BitConverter.ToInt64(data) }
-                : packetId == MarkUnreadPacketId && data is not { Length: > 0 } ? new SceneReadMarkPacket()
-                : SerializerUtil.Deserialize<SceneReadMarkPacket>(data);
+            if (packetId == MarkUnreadPacketId && data is not { Length: > 0 }) packet = new SceneReadMarkPacket();
+            // Old clients sent the displayed stamp as a raw Int64. A protobuf packet for the
+            // unstamped "legacy" entry is also eight bytes, so length alone cannot identify it.
+            else if (data is { Length: 8 } && Entries.Entries.Count == 1 &&
+                     BitConverter.ToInt64(data) == Data.ReadStamp)
+                packet = new SceneReadMarkPacket { Stamp = Data.ReadStamp };
+            else packet = SerializerUtil.Deserialize<SceneReadMarkPacket>(data);
         }
         catch { return; }
         var entry = ResolveEntry(packet?.EntryId);

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NSubstitute;
+using thebasics.Extensions;
 using thebasics.ModSystems.SceneDescriptions;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -135,6 +136,28 @@ public class SceneDescriptionEntriesServerTests
         }));
         first.Data.Body.Should().Be("Original text");
         second.Data.Body.Should().Be("Revised second text");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReadingAnUnstampedLegacyEntryAcceptsItsProtobufPacket(bool addSecondEntry)
+    {
+        var (marker, player, _) = CreateMarker();
+        var legacy = marker.Entries.Primary;
+        legacy.Id.Should().Be("legacy");
+        legacy.Data.ReadStamp.Should().Be(0);
+        var second = addSecondEntry ? marker.TryAddEntry(player) : null;
+        if (addSecondEntry) second.Should().NotBeNull();
+        var packet = SerializerUtil.Serialize(new SceneReadMarkPacket { EntryId = legacy.Id, Stamp = 0 });
+        packet.Should().HaveCount(8);
+
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.MarkReadPacketId, packet);
+
+        legacy.Data.ReadStamp.Should().BeGreaterThan(0);
+        var marks = player.GetSceneReadMarks().Marks;
+        SceneReadMarks.IsRead(marks, marker.Pos, legacy.Id, legacy.Data.ReadStamp).Should().BeTrue();
+        if (second != null) SceneReadMarks.IsRead(marks, marker.Pos, second.Id, second.Data.ReadStamp).Should().BeFalse();
     }
 
     [Fact]
