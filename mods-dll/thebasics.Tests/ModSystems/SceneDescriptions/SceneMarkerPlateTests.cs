@@ -181,7 +181,26 @@ public class SceneMarkerPlateTests
         faces.Properties().Select(face => face.Name).Should().BeEquivalentTo(
             new[] { "north", "east", "south", "west", "up", "down" }.Where(face => face != hiddenFace),
             "the other inlay faces remain visible");
-        ((JObject)plate["faces"]!).Properties().Should().HaveCount(6);
+        ((JObject)plate["faces"]!).Properties().Should().HaveCount(5);
+    }
+
+    [Theory]
+    [InlineData("ground", "down")]
+    [InlineData("wall", "north")]
+    [InlineData("ceiling", "down")]
+    public void PlateOmitsItsSupportContactFace(string attachment, string supportFace)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Vintage-Story-Mods.sln"))) directory = directory.Parent;
+        var shape = JObject.Parse(File.ReadAllText(Path.Combine(directory!.FullName,
+            $"mods-dll/thebasics/assets/thebasics/shapes/block/scene-marker-{attachment}.json")));
+        var plate = shape["elements"]![0]!;
+        var faces = (JObject)plate["faces"]!;
+
+        faces.Property(supportFace).Should().BeNull("the support-contact face lies coplanar with its supporting block surface");
+        faces.Properties().Select(face => face.Name).Should().BeEquivalentTo(
+            new[] { "north", "east", "south", "west", "up", "down" }.Where(face => face != supportFace),
+            "all exposed plate faces should remain visible");
     }
 
     [Theory]
