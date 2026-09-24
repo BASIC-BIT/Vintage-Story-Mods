@@ -25,6 +25,7 @@ public sealed class SceneObservationMessage
     [ProtoMember(4)] public int Dimension { get; set; }
     [ProtoMember(5)] public bool Bubble { get; set; }
     [ProtoMember(6)] public bool Held { get; set; }
+    [ProtoMember(7)] public string EntryId { get; set; } = string.Empty;
 }
 
 internal sealed class SceneAnalyticsObserver : IDisposable
@@ -65,15 +66,15 @@ internal sealed class SceneAnalyticsObserver : IDisposable
             });
         }, 1000);
     }
-    internal void ReaderOpened(BlockPos pos = null) => IgnoreFailure(() => Send(pos, false));
-    internal void BubbleRendered(BlockPos pos) => IgnoreFailure(() => Send(pos, true));
-    private void Send(BlockPos pos, bool bubble)
+    internal void ReaderOpened(BlockPos pos = null, string entryId = null) => IgnoreFailure(() => Send(pos, false, entryId));
+    internal void BubbleRendered(BlockPos pos) => IgnoreFailure(() => Send(pos, true, null));
+    private void Send(BlockPos pos, bool bubble, string entryId)
     {
         var now = _client?.World?.ElapsedMilliseconds ?? 0;
         if (_safe?.IsConnected != true || _permissionUntil == 0 || now >= _permissionUntil) { _gate.Clear(); return; }
         var key = (bubble ? "bubble:" : "reader:") + (pos == null ? "held" : SceneReadMarks.Key(pos));
         if (!(bubble ? _gate.Observe(key, now) : _gate.Accept(key, now, 30000))) return;
-        _safe.TrySendPacketWithoutQueue(new SceneObservationMessage { X = pos?.X ?? 0, Y = pos?.Y ?? 0, Z = pos?.Z ?? 0, Dimension = pos?.dimension ?? 0, Held = pos == null, Bubble = bubble });
+        _safe.TrySendPacketWithoutQueue(new SceneObservationMessage { X = pos?.X ?? 0, Y = pos?.Y ?? 0, Z = pos?.Z ?? 0, Dimension = pos?.dimension ?? 0, Held = pos == null, Bubble = bubble, EntryId = entryId ?? string.Empty });
     }
     internal void Receive(IServerPlayer player, SceneObservationMessage message)
     {
@@ -85,7 +86,10 @@ internal sealed class SceneAnalyticsObserver : IDisposable
             if (message.Bubble) return;
             var stack = player.InventoryManager?.ActiveHotbarSlot?.Itemstack;
             if (stack?.Block is not SceneDescriptionBlock) return;
-            data = SceneDescriptionData.ReadFrom(stack.Attributes);
+            var entries = SceneDescriptionEntries.ReadFrom(stack.Attributes);
+            var entry = ResolveEntry(entries, message.EntryId);
+            if (entry == null) return;
+            data = entry.Data;
             if (!SceneAnalytics.Written(data)) return;
             key = "held";
         }
@@ -94,17 +98,28 @@ internal sealed class SceneAnalyticsObserver : IDisposable
             var pos = new BlockPos(message.X, message.Y, message.Z, message.Dimension);
             if (player.Entity.Pos.Dimension != pos.dimension || _server.World.BlockAccessor.GetChunkAtBlockPos(pos) == null ||
                 _server.World.BlockAccessor.GetBlockEntity(pos) is not SceneDescriptionBlockEntity marker) return;
-            data = marker.Data;
+            // The shared multi-entry bubble has no individual author or content to attribute.
+            if (message.Bubble && marker.Entries.Entries.Count > 1) return;
+            var entry = ResolveEntry(marker.Entries, message.EntryId);
+            if (entry == null) return;
+            data = entry.Data;
             var distance = player.Entity.Pos.XYZ.DistanceTo(pos.ToVec3d().Add(0.5, 0.65, 0.5));
             var targeted = player.CurrentBlockSelection?.Position?.Equals(pos) == true;
             if (!ObservationAllowed(data, distance, message.Bubble, targeted)) return;
-            if (message.Bubble && SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, SceneReadMarks.Key(pos), data.ReadStamp)) return;
-            key = SceneReadMarks.Key(pos);
+            if (message.Bubble && SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, pos, entry.Id, data.ReadStamp)) return;
+            key = message.Bubble ? SceneReadMarks.Key(pos, entry.Id) : SceneReadMarks.Key(pos);
         }
+        TrackObservation(player, message, data, key);
+    }
+
+    private void TrackObservation(IServerPlayer player, SceneObservationMessage message, SceneDescriptionData data, string key)
+    {
         var action = message.Bubble ? "bubble_viewed" : "reader_opened";
         if (!_gate.Accept(player.PlayerUID + ":" + action + ":" + key, _server.World.ElapsedMilliseconds, message.Bubble ? 60000 : 30000)) return;
         SceneAnalytics.Track(data, action, message.Bubble ? null : "scene_read_source", message.Held ? "held" : "placed");
     }
+    private static SceneDescriptionEntry ResolveEntry(SceneDescriptionEntries entries, string entryId) =>
+        string.IsNullOrWhiteSpace(entryId) ? (entries.Entries.Count == 1 ? entries.Primary : null) : entries.Find(entryId);
     private bool CanReceive(IServerPlayer player, SceneObservationMessage message) =>
         AnalyticsService.IsEnabled && SceneDescriptionSystem.SceneMarkersEnabled(_server) && player?.Entity != null && message != null;
 

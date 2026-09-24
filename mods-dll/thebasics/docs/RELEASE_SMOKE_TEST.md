@@ -74,10 +74,10 @@ Run this after the ModDB release is published. It verifies the player-facing ins
       - Expect: Shapeless two-stone recipe yields one marker. All three views show the exclamation glyph, not a stone base. An unwritten marker's tooltip tells you to place it and Shift-right-click, and carries no `Material: Stone` line.
       - Watch for: recipe missing, stone base still rendered in any of the three views, a `Material:` line back in the tooltip, or a wrong held-item transform.
 
-   2. **Ground And Wall Placement** (P1)
-      - Do: Place one marker flat on the ground and one against a wall, trying each of the four facings. Aim at each and start breaking it, at height offset 0 and at 4.
-      - Expect: Both attachments place and orient like a sign, with no collision box and no light blocking. Aiming at either draws the selection outline as a cube around the floating symbol, and the break cracks appear on that same cube, never on the ground plate or the wall plaque.
-      - Watch for: refused placement, wrong rotation, a marker you cannot target, no outline at all, an outline or cracks on the flat plate/plaque, or the wall variant floating.
+   2. **Ground, Wall, And Ceiling Placement** (P1)
+      - Do: Place markers on a floor, against a wall, and under a ceiling, trying each of the four facings. Aim at the physical plate and the floating symbol of each and start breaking them, at height offset 0 and at 4. Set indicator distance to 1, move outside that range, and aim at each plate again.
+      - Expect: All three attachments place and orient like a sign, with no collision box and no light blocking. The plate and symbol can each be targeted: the outline and break cracks follow the part being aimed at. Plates remain targetable when the floating symbol has faded out at distance 1.
+      - Watch for: refused placement, wrong rotation, a marker or plate you cannot target, outline or cracks on the wrong part, a floating wall or ceiling plate, or an invisible symbol intercepting clicks.
 
    3. **Symbol, Color, Size, Height, Bobbing** (P1)
       - Do: Shift-right-click to edit. Step through all six symbols (exclamation, question, information, dot, ring, diamond) and all five colors (Yellow, White, Blue, Green, Red). Open `Other icons...`, pick a catalog icon, change color, save and reopen, then pick a symbol tile again. Set indicator size to 25, 100, and 300 percent, height offset to -2, 0, and 4, then toggle Idle bobbing off and on. Save & Close and reopen each time. Target the marker and look away.
@@ -95,8 +95,8 @@ Run this after the ModDB release is published. It verifies the player-facing ins
       - Watch for: shrinking letters in long bubbles, an icon jumping above the title, a cleared icon reappearing after save or pickup, unclickable catalog tiles, or a picker left open after the editor closes.
 
    6. **Read Versus Edit** (P0)
-      - Do: Plain right-click a written marker in every display mode, including as a claim visitor. Shift-right-click it. Shift-right-click a written marker while holding it. Try editing from more than 8 blocks away and from outside the claim. Open the editor, change the title, and try Cancel, the title-bar X, and Escape.
-      - Expect: Plain right-click always opens the full text in the book-style reader, headed by the marker's title icon and its title in bold above the page; Shift-right-click opens the editor only with claim build access and within 8 blocks. The held item reads in the same book view. The inspector shows the title once, as the block name, with a short preview under it. Closing the editor with unsaved changes asks for confirmation before discarding them, and a read-only locked marker never asks. Refusals are explicit localized errors.
+      - Do: Plain right-click a written single-entry marker in every display mode, including as a claim visitor. Shift-right-click it. Shift-right-click a written marker while holding it. Try editing from more than 8 blocks away and from outside the claim. Open the editor, change the title, and try Cancel, the title-bar X, and Escape.
+      - Expect: Plain right-click opens the entry's full text in the book-style reader, headed by its title icon and title in bold above the page; Shift-right-click opens its editor only with claim build access and within 8 blocks. The held item reads in the same book view. The inspector shows the title once, as the block name, with a short preview under it. Closing the editor with unsaved changes asks for confirmation before discarding them, and a read-only locked entry never asks. Refusals are explicit localized errors.
       - Watch for: right-click opening the editor, an editor opening for an unauthorized player, a silent refusal, or claim bypass.
 
    7. **Long Description Typing And Scrolling** (P1)
@@ -106,17 +106,17 @@ Run this after the ModDB release is published. It verifies the player-facing ins
 
    8. **Read Marks** (P1)
       - Do: With players A and B near one Always nearby marker, have A right-click it and press Mark as read, which closes the reader, then reopen it. Walk A away and back, and rejoin the server as A. Have B check the same marker. As A, reopen and press Mark as unread. Then as A edit and save the marker, and separately open the editor and use Clear read, confirming the prompt.
-      - Expect: After A marks it read, A sees no bubble in any display mode and a visibly dimmer indicator bobbing at half height and half speed, while B still sees the bubble at full strength. The reader button reads Mark as unread on reopen and A's state survives relog. Mark as unread restores A's bubble. Any save, and Clear read after its confirmation, make the marker unread for both players again. Clear read is disabled while the marker is locked and refused without claim build access or from beyond 8 blocks.
+      - Expect: After A marks the entry read, A sees no bubble in any display mode and a visibly dimmer indicator bobbing at half height and half speed, while B still sees the bubble at full strength. The reader button reads Mark as unread on reopen and A's state survives relog. Mark as unread restores A's bubble. Saving that entry, and Clear read after its confirmation, make that entry unread for both players again. Clear read is disabled for a locked entry and refused without claim build access or from beyond 8 blocks.
       - Watch for: the bubble still drawn for a reader, the indicator hidden instead of dimmed, one player's mark affecting the other, a stale button label, a read state lost on relog or surviving a save, or a Clear read that anyone can press.
 
    9. **Creator Lock** (P0)
       - Do: As A, edit a marker, click the top-right lock glyph, and Save & Close. Repeat once clicking the glyph and then Cancel. As B, open, read, break, and try to lock the marker. Keep a stale editor open on B while A locks. Then try to break the locked marker as A and as C, holding the pickaxe until the cracks would finish.
-      - Expect: The armed glyph locks the marker on Save & Close; Cancel discards the pending lock with no change. No padlock item is involved. A locked marker opens read-only for everyone, A included, with every field and Save & Close disabled. While locked, nobody breaks or picks it up - A and C are refused with a localized error exactly like B - and a stale editor's save is rejected. Attempting to break a locked marker shows the locked message on the breaker's own client while the pickaxe is held, repeating at most about once a second rather than every tick.
+      - Expect: The armed glyph locks that entry on Save & Close; Cancel discards the pending lock with no change. No padlock item is involved. A locked entry opens read-only for everyone, A included, with every field and Save & Close disabled. While any entry is locked, nobody breaks or picks up the marker - A and C are refused with a localized error exactly like B - and a stale editor's save is rejected. Attempting to break it shows the locked message on the breaker's own client while the pickaxe is held, repeating at most about once a second rather than every tick.
       - Watch for: a Save & lock button still present, a non-creator arming the lock, a stale editor bypassing the lock, the creator or an admin breaking a locked marker, the block vanishing on the breaker's client while the server keeps it, or the lock glyph showing the wrong state.
 
    10. **Unlock** (P0)
        - Do: As A, click the lock glyph on the locked marker. Repeat as C. Attempt it as B, from beyond 8 blocks, and without claim access.
-       - Expect: A and C unlock and the editor reopens fully editable; nothing is consumed or returned. B, out-of-range, and no-claim attempts are refused with a localized error.
+       - Expect: A and C unlock that entry and its editor reopens fully editable; nothing is consumed or returned. Other entries keep their own lock states. B, out-of-range, and no-claim attempts are refused with a localized error.
        - Watch for: an unauthorized unlock succeeding, the editor staying read-only after a successful unlock, or a lock state that does not reach other clients.
 
    11. **Pickup And Re-Place Persistence** (P0)
@@ -134,7 +134,37 @@ Run this after the ModDB release is published. It verifies the player-facing ins
        - Expect: Existing markers remain in the world as plain blocks. Placement, editing, floating bubbles, indicators, and the crafting recipe are all unavailable, with no client errors. Flipping it back restores every marker with its saved content and appearance intact.
        - Watch for: markers disappearing or losing data, the recipe still craftable, an indicator or bubble still rendering, an editor still opening, or the change taking effect without a restart.
 
-   14. **Logs And Exceptions** (P0)
+   14. **Legacy Single Entry Migration** (P0)
+       - Do: Record the original title, body, appearance, creator, and lock state of a written marker placed before multi-entry support and a held written marker saved before it. Load the placed marker and place the held one. Before changing either, read each and compare those five values; open each editor to check whether its original lock state makes it read-only or editable. Then unlock a locked entry if needed, edit it, add another entry, pick up the marker, and re-place it.
+       - Expect: Before any mutation, each marker has exactly one entry with the recorded title, body, appearance, creator, and lock state; a locked entry initially opens read-only, while an unlocked one opens editable. After unlock, edit, Add, pickup, and re-placement, the original entry and its creator remain present beside the new entry.
+       - Watch for: a blank replacement, duplicate entry before Add, changed original values or author, a lost initial lock, or migration appearing correct only after an edit.
+
+   15. **Free Add And Eight-Entry Limit** (P0)
+       - Do: On a written marker, use Add in its editor and in the multi-entry edit chooser. Cancel a new entry, then try Save & Close with both title and body blank. While still below eight entries, change an existing entry without saving and press Add. Save or discard that edit, add distinct written entries until there are eight, and try Add again.
+       - Expect: Add opens a new-entry editor without consuming an item. Cancel and blank Save create no entry; blank Save shows an error. Add with unsaved edits shows a save-first error and keeps the editor open. Eight entries persist, and Add is unavailable at the cap.
+       - Watch for: a phantom entry after Cancel or blank Save, a ninth entry, lost unsaved text, or an item consumed.
+
+   16. **Chooser And Reader Navigation** (P1)
+       - Do: Plain right-click and Shift-right-click a single-entry marker, then one with multiple entries. Select each entry to read it, use Back from the reader, and close the chooser. Shift-right-click a multi-entry marker while holding it.
+       - Expect: A single entry opens its reader or editor directly. Multiple entries open a read or edit chooser with their titles, authors, read states, and lock states. Back returns from a placed entry's reader to the read chooser; the held item offers a read chooser.
+       - Watch for: the wrong entry opening, a missing Back path, chooser state leaking between markers, or an editor opening from the held item.
+
+   17. **Independent Entry Ownership, Read, And Locks** (P0)
+       - Do: Have A create the first entry and B add a second within a claim both can build in. Have each edit their own entry and the other's. As A mark only the first entry read, then mark the second; have B check both. Save and Clear read on only one entry. Lock one entry as its author, try editing and removing it, edit the other, then attempt to break the marker. Unlock the locked entry as its author or C.
+       - Expect: The chooser identifies each author. Either player with claim access can edit an unlocked entry, but only its author can lock it; editing never transfers authorship. Read marks, saves, Clear read, and locks affect only the selected entry; the shared indicator dims only after every entry is read by that player. An unlocked entry stays editable while another is locked, but any lock prevents breaking the whole marker. Its author or C can unlock it with claim access within 8 blocks.
+       - Watch for: author transfer, one entry's read or lock state changing another, Clear read clearing every entry, or a locked entry being removed or the marker being picked up.
+
+   18. **Remove Entry And Shared Appearance** (P0)
+       - Do: Give a marker two entries with different titles and authors. As A, set a distinctive icon, color, and display mode on the first entry. Open the second entry's editor and check its appearance controls, then have its author lock the second entry. As A, mark the second entry read. In the edit chooser, press Remove on the unlocked first entry and cancel the confirmation; repeat and confirm. Reopen the marker for reading and editing.
+       - Expect: Appearance controls are editable only on the first entry; the second shows shared appearance with those controls disabled. Cancel leaves both entries and their metadata unchanged. Confirm removes only the unlocked first entry; the remaining entry keeps its title, body, author, read mark, and lock state. Its editor opens directly and read-only, its reader opens directly, and the marker keeps the first entry's shared icon, color, and display mode.
+       - Watch for: a missing confirmation, removal after Cancel, a changed remaining author/read/lock state, lost shared appearance, or a chooser opening for the last entry.
+
+   19. **Multi-Entry Caption And Pickup** (P0)
+       - Do: Give two entries different titles and authors. Target the marker, inspect it, then break and pick it up while all entries are unlocked. Shift-right-click the held item, re-place it on a different attachment, and restart the server.
+       - Expect: The targeted bubble uses a neutral entry-count caption rather than either author's title or body. Exactly one item drops, with every entry's title, body, author, and appearance retained through pickup, re-placement, and restart. The held item's name and tooltip identify the entry count and list the titles.
+       - Watch for: one entry replacing the other, multiple drops, a stale single-entry caption, or a held chooser missing an entry.
+
+   20. **Logs And Exceptions** (P0)
        - Do: Fetch server and client logs after the pass.
        - Expect: `SceneDescriptionSystem` loads once; audit entries record scene-marker edits and unlocks; no scene-marker exceptions or warnings.
        - Watch for: rejected-packet or malformed-edit warnings, appearance-preference read failures, renderer or texture exceptions, and ghost indicators after leaving and re-entering loaded terrain.

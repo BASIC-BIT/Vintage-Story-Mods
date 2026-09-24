@@ -7,6 +7,7 @@ namespace thebasics.ModSystems.SceneDescriptions;
 internal static class SceneAnalytics
 {
     internal static bool Written(SceneDescriptionData data) => !string.IsNullOrWhiteSpace(data.Title) || !string.IsNullOrWhiteSpace(data.Body);
+    internal static bool Written(SceneDescriptionEntries entries) => entries.Entries.Any(entry => Written(entry.Data));
     internal static Dictionary<string, object> Properties(SceneDescriptionData data) => new()
     {
         ["scene_display_mode"] = data.Display switch { SceneDescriptionDisplay.AlwaysNearby => "always_nearby", SceneDescriptionDisplay.OnInteraction => "on_interaction", _ => "when_targeted" },
@@ -14,6 +15,12 @@ internal static class SceneAnalytics
         ["scene_locked"] = data.IsLocked,
         ["scene_body_shown"] = data.ShowBodyInBubble
     };
+    internal static Dictionary<string, object> Properties(SceneDescriptionEntries entries)
+    {
+        var properties = Properties(entries.Primary.Data);
+        properties["scene_content"] = Written(entries) ? "written" : "empty";
+        return properties;
+    }
     internal static string SaveKind(SceneDescriptionData before, SceneDescriptionData after)
     {
         if (!Written(after)) return "empty";
@@ -22,11 +29,15 @@ internal static class SceneAnalytics
     internal static bool VisibleFrame(float opacity, double x, double y, int width, int height) =>
         opacity >= 0.5f && x >= 0 && x < width && y >= 0 && y < height;
     internal static void Track(SceneDescriptionData data, string action, string extraKey = null, string extraValue = null, string mount = null)
+        => Track(() => Properties(data), action, extraKey, extraValue, mount);
+    internal static void Track(SceneDescriptionEntries entries, string action, string extraKey = null, string extraValue = null, string mount = null)
+        => Track(() => Properties(entries), action, extraKey, extraValue, mount);
+    private static void Track(Func<Dictionary<string, object>> propertiesFactory, string action, string extraKey, string extraValue, string mount)
     {
         try
         {
             if (!AnalyticsService.IsEnabled) return;
-            var properties = Properties(data);
+            var properties = propertiesFactory();
             if (extraKey != null) properties[extraKey] = extraValue;
             if (mount != null) properties["scene_mount"] = mount;
             AnalyticsService.TrackFeatureUsed("scene_markers", action, properties: properties);

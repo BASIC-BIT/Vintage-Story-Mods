@@ -5,6 +5,9 @@ namespace thebasics.ModSystems.SceneDescriptions;
 [ProtoContract]
 public sealed class SceneDescriptionEditPacket
 {
+    [ProtoMember(24)] public string EntryId { get; set; } = string.Empty;
+    [ProtoMember(25)] public bool CreateNew { get; set; }
+
     [ProtoMember(1)]
     public string Title { get; set; } = string.Empty;
 
@@ -34,4 +37,17 @@ public sealed class SceneDescriptionEditPacket
     [ProtoMember(18), System.ComponentModel.DefaultValue(true)] public bool IdleBobbing { get; set; } = true;
     [ProtoMember(17)] public int Effect { get; set; }
     [ProtoMember(16)] public float IndicatorScale { get; set; } = 1;
+}
+
+[ProtoContract]
+public sealed class SceneEntryActionPacket
+{
+    [ProtoMember(1)] public string EntryId { get; set; } = string.Empty;
+}
+
+[ProtoContract]
+public sealed class SceneReadMarkPacket
+{
+    [ProtoMember(1)] public string EntryId { get; set; } = string.Empty;
+    [ProtoMember(2)] public long Stamp { get; set; }
 }

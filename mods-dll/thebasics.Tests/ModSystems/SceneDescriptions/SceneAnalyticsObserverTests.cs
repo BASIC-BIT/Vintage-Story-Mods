@@ -41,6 +41,29 @@ public class SceneAnalyticsObserverTests
     }
 
     [Fact]
+    public void ClientDedupesReaderOpensPerPlacedMarker()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        var channel = Substitute.For<IClientNetworkChannel>();
+        api.Network.RegisterChannel(Arg.Any<string>()).Returns(channel);
+        channel.RegisterMessageType<SceneObservationMessage>().Returns(channel);
+        channel.RegisterMessageType<SceneObservationPermission>().Returns(channel);
+        channel.Connected.Returns(true);
+        using var observer = new SceneAnalyticsObserver();
+        observer.StartClient(api);
+        observer.SetPermission(true);
+        var pos = new BlockPos(0, 0, 0, 0);
+
+        observer.ReaderOpened(pos, "first");
+        observer.ReaderOpened(pos, "second");
+        observer.ReaderOpened(pos, "first");
+
+        channel.Received(1).SendPacket(Arg.Any<SceneObservationMessage>());
+        channel.Received(1).SendPacket(Arg.Is<SceneObservationMessage>(message => message.EntryId == "first"));
+        channel.DidNotReceive().SendPacket(Arg.Is<SceneObservationMessage>(message => message.EntryId == "second"));
+    }
+
+    [Fact]
     public void ServerRejectsUnloadedWrongDimensionFarAndRevokedObservationsAndDedupesPerViewer()
     {
         var api = Substitute.For<ICoreServerAPI>();
@@ -92,6 +115,128 @@ public class SceneAnalyticsObserverTests
             api.World.ElapsedMilliseconds.Returns(30000L);
             observer.Receive(one, message);
             sink.Received(3).Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
+        }
+        finally { AnalyticsService.Shutdown(); }
+    }
+
+    [Fact]
+    public void PlacedReaderOpenAttributesTheFirstSelectedEntryAndRejectsUnknownOrAmbiguousIds()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var channel = Substitute.For<IServerNetworkChannel>();
+        api.Network.RegisterChannel(Arg.Any<string>()).Returns(channel);
+        channel.RegisterMessageType<SceneObservationMessage>().Returns(channel);
+        channel.RegisterMessageType<SceneObservationPermission>().Returns(channel);
+        var sink = Substitute.For<IAnalyticsSink>();
+        sink.IsEnabled.Returns(true);
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => new string('c', 64));
+        try
+        {
+            using var observer = new SceneAnalyticsObserver();
+            observer.StartServer(api);
+            var pos = new BlockPos(0, 0, 0, 0);
+            var marker = new SceneDescriptionBlockEntity { Pos = pos };
+            marker.Data.Title = "First description";
+            marker.Data.Display = SceneDescriptionDisplay.AlwaysNearby;
+            var second = marker.Entries.Add(new SceneDescriptionData
+            {
+                Body = "Second description",
+                Display = SceneDescriptionDisplay.OnInteraction,
+                LockItemCode = "ui",
+            })!;
+            second.Data.Display.Should().Be(SceneDescriptionDisplay.AlwaysNearby);
+            api.World.BlockAccessor.GetBlockEntity(Arg.Any<BlockPos>()).Returns(marker);
+            api.World.BlockAccessor.GetChunkAtBlockPos(Arg.Any<BlockPos>()).Returns(Substitute.For<IWorldChunk>());
+            var player = new FakeServerPlayer("reader") { Entity = new EntityPlayer() };
+            player.Entity.Pos.SetPos(0.5, 0.5, 0.5);
+
+            var selected = new SceneObservationMessage { EntryId = second.Id };
+            observer.Receive(player, selected);
+            observer.Receive(player, selected);
+            observer.Receive(player, new SceneObservationMessage { EntryId = marker.Entries.Primary.Id });
+            observer.Receive(player, new SceneObservationMessage { EntryId = "deleted-entry" });
+            observer.Receive(player, new SceneObservationMessage());
+
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(properties =>
+                (string)properties["action"] == "reader_opened" &&
+                (string)properties["scene_display_mode"] == "always_nearby" &&
+                (bool)properties["scene_locked"]));
+            sink.DidNotReceive().Track("feature used", Arg.Is<IDictionary<string, object>>(properties =>
+                (string)properties["action"] == "reader_opened" &&
+                !(bool)properties["scene_locked"]));
+            sink.Received(1).Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
+        }
+        finally { AnalyticsService.Shutdown(); }
+    }
+
+    [Fact]
+    public void MultiEntryBubbleDoesNotAttributeTheSharedSummaryToAnEntry()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var channel = Substitute.For<IServerNetworkChannel>();
+        api.Network.RegisterChannel(Arg.Any<string>()).Returns(channel);
+        channel.RegisterMessageType<SceneObservationMessage>().Returns(channel);
+        channel.RegisterMessageType<SceneObservationPermission>().Returns(channel);
+        var sink = Substitute.For<IAnalyticsSink>();
+        sink.IsEnabled.Returns(true);
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => new string('c', 64));
+        try
+        {
+            using var observer = new SceneAnalyticsObserver();
+            observer.StartServer(api);
+            var pos = new BlockPos(0, 0, 0, 0);
+            var marker = new SceneDescriptionBlockEntity { Pos = pos };
+            marker.Data.Title = "First description";
+            marker.Data.Display = SceneDescriptionDisplay.AlwaysNearby;
+            marker.Entries.Add(new SceneDescriptionData { Title = "Second description" });
+            api.World.BlockAccessor.GetBlockEntity(Arg.Any<BlockPos>()).Returns(marker);
+            api.World.BlockAccessor.GetChunkAtBlockPos(Arg.Any<BlockPos>()).Returns(Substitute.For<IWorldChunk>());
+            var player = new FakeServerPlayer("reader") { Entity = new EntityPlayer() };
+            player.Entity.Pos.SetPos(0.5, 0.5, 0.5);
+
+            observer.Receive(player, new SceneObservationMessage { Bubble = true });
+            observer.Receive(player, new SceneObservationMessage { Bubble = true, EntryId = marker.Entries.Primary.Id });
+
+            sink.DidNotReceive().Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
+        }
+        finally { AnalyticsService.Shutdown(); }
+    }
+
+    [Fact]
+    public void HeldReaderOpenAttributesTheSelectedEntry()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var channel = Substitute.For<IServerNetworkChannel>();
+        api.Network.RegisterChannel(Arg.Any<string>()).Returns(channel);
+        channel.RegisterMessageType<SceneObservationMessage>().Returns(channel);
+        channel.RegisterMessageType<SceneObservationPermission>().Returns(channel);
+        var sink = Substitute.For<IAnalyticsSink>();
+        sink.IsEnabled.Returns(true);
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => new string('c', 64));
+        try
+        {
+            using var observer = new SceneAnalyticsObserver();
+            observer.StartServer(api);
+            var entries = new SceneDescriptionEntries();
+            entries.Primary.Data.Title = "First description";
+            entries.Primary.Data.Display = SceneDescriptionDisplay.AlwaysNearby;
+            var second = entries.Add(new SceneDescriptionData { Body = "Second description", Display = SceneDescriptionDisplay.OnInteraction })!;
+            second.Data.Display.Should().Be(SceneDescriptionDisplay.AlwaysNearby);
+            var stack = new ItemStack(new SceneDescriptionBlock());
+            entries.WriteTo(stack.Attributes);
+            var player = new FakeServerPlayer("reader") { Entity = new EntityPlayer(), InventoryManager = Substitute.For<IPlayerInventoryManager>() };
+            player.Entity.Pos.SetPos(0.5, 0.5, 0.5);
+            player.InventoryManager.ActiveHotbarSlot.Returns(new DummySlot(stack));
+
+            observer.Receive(player, new SceneObservationMessage { Held = true, EntryId = second.Id });
+            observer.Receive(player, new SceneObservationMessage { Held = true, EntryId = "deleted-entry" });
+            observer.Receive(player, new SceneObservationMessage { Held = true });
+
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(properties =>
+                (string)properties["action"] == "reader_opened" &&
+                (string)properties["scene_read_source"] == "held" &&
+                (string)properties["scene_display_mode"] == "always_nearby"));
+            sink.Received(1).Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
         }
         finally { AnalyticsService.Shutdown(); }
     }

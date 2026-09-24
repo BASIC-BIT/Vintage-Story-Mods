@@ -130,11 +130,18 @@ public sealed class SceneDescriptionData
         }
     }
 
-    internal void ApplyText(SceneDescriptionData edited)
+    internal void ApplyText(SceneDescriptionData edited, bool includeAppearance = true)
     {
         Title = edited.Title;
         Body = edited.Body;
         Kind = edited.Kind;
+        if (includeAppearance) ApplyAppearance(edited);
+        else Normalize();
+    }
+
+    // A placed marker has one icon and bubble style, even when several descriptions share it.
+    internal void ApplyAppearance(SceneDescriptionData edited)
+    {
         Display = edited.Display;
         Appearance = edited.Appearance;
         Symbol = edited.Symbol;

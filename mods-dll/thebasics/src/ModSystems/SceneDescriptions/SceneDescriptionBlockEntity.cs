@@ -21,10 +21,15 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     internal const int MarkReadPacketId = 1004;
     internal const int MarkUnreadPacketId = 1005;
     private const int ClearReadPacketId = 1006;
+    internal const int RequestEditorPacketId = 1007;
+    internal const int AddEntryPacketId = 1008;
+    internal const int RemoveEntryPacketId = 1009;
     private const double MaxEditDistance = 8;
     private const string AppearancePreferencesKey = "thebasics-scene-appearance";
 
     private SceneDescriptionDialog _dialog;
+    private SceneEntryChooserDialog _chooser;
+    private SceneDescriptionData _summaryData;
     // A client-side placement prediction creates this entity with default data before the server's
     // copy (with the placer's appearance preferences) arrives, so drawing is deferred until then.
     private bool _synced;
@@ -46,34 +51,59 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     // Client-only damage presentation, retained while cracks heal after looking away.
     internal bool BreakingSymbol { get; set; }
 
-    public SceneDescriptionData Data { get; private set; } = new();
+    public SceneDescriptionEntries Entries { get; private set; } = new();
+    public SceneDescriptionData Data => Entries.Primary.Data;
+
+    // The first entry supplies the shared icon style. A multi-entry marker shows a neutral
+    // targeted caption instead of implying that one author's text represents every entry.
+    internal SceneDescriptionData DisplayData
+    {
+        get
+        {
+            if (Entries.Entries.Count == 1) return Data;
+            if (_summaryData != null) return _summaryData;
+            _summaryData = Data.Clone();
+            _summaryData.Title = Lang.Get("thebasics:scene-entry-count", Entries.Entries.Count);
+            _summaryData.Body = string.Empty;
+            _summaryData.Kind = SceneDescriptionKind.Environmental;
+            _summaryData.ShowBodyInBubble = false;
+            _summaryData.Display = SceneDescriptionDisplay.WhenTargeted;
+            return _summaryData;
+        }
+    }
+
+    internal bool AllReadOnClient => Entries.Entries.All(entry => SceneReadMarks.IsRead(Pos, entry.Id, entry.Data.ReadStamp));
 
     public void InitializeFromItem(ItemStack itemStack, IPlayer player)
     {
-        Data = SceneDescriptionData.ReadFrom(itemStack?.Attributes);
+        Entries = SceneDescriptionEntries.ReadFrom(itemStack?.Attributes);
         // Only pristine crafted markers inherit defaults. Picked-up markers carry scene metadata.
-        if (itemStack?.Attributes?.HasAttribute(SceneDescriptionData.TitleAttribute) != true)
+        if (itemStack?.Attributes?.HasAttribute(SceneDescriptionData.TitleAttribute) != true &&
+            itemStack?.Attributes?.GetTreeAttribute("sceneEntries") == null)
         {
-            Data = new SceneDescriptionData();
+            Entries = new SceneDescriptionEntries();
             if (player is IServerPlayer serverPlayer)
             {
                 try
                 {
                     var stored = serverPlayer.GetModData<SceneDescriptionEditPacket>(AppearancePreferencesKey);
-                    if (stored != null) Data = FromPacket(stored).AppearanceDefaults();
+                    if (stored != null) Data.ApplyText(FromPacket(stored).AppearanceDefaults());
                 }
                 catch (Exception ex) { Api.Logger.Warning("[THEBASICS] Could not read scene appearance preferences: {0}", ex.Message); }
             }
         }
-        Data.EstablishCreator(player?.PlayerUID, player?.PlayerName);
-
-        // Every placement is a fresh marker as far as read marks are concerned.
-        Data.Stamp();
-        Data.Normalize();
+        foreach (var entry in Entries.Entries)
+        {
+            entry.Data.EstablishCreator(player?.PlayerUID, player?.PlayerName);
+            // Every placement is fresh as far as read marks are concerned.
+            entry.Data.Stamp();
+            entry.Data.Normalize();
+        }
+        _summaryData = null;
         MarkDirty(redrawOnClient: true);
     }
 
-    public void OpenEditor(IPlayer player)
+    public void OpenEditor(IPlayer player, string entryId = null)
     {
         if (Api is not ICoreServerAPI serverApi || player is not IServerPlayer serverPlayer)
         {
@@ -93,11 +123,90 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
-        var packet = ToPacket(Data);
-        packet.CanManageLock = Data.IsLocked
-            ? Data.CanUnlock(player.PlayerUID, IsAdmin(player), true)
-            : Data.CanLock(player.PlayerUID, true);
+        var entry = ResolveEntry(entryId);
+        if (entry == null)
+        {
+            if (!string.IsNullOrEmpty(entryId))
+                serverPlayer.SendIngameError("scene-entry-removed", Lang.Get("thebasics:scene-entry-removed"));
+            return;
+        }
+        var editorData = entry.Data.Clone();
+        if (entry != Entries.Primary) editorData.ApplyAppearance(Data);
+        var packet = ToPacket(editorData);
+        packet.EntryId = entry.Id;
+        packet.CanManageLock = entry.Data.IsLocked
+            ? entry.Data.CanUnlock(player.PlayerUID, IsAdmin(player), true)
+            : entry.Data.CanLock(player.PlayerUID, true);
         serverApi.Network.SendBlockEntityPacket(serverPlayer, Pos, OpenEditorPacketId, SerializerUtil.Serialize(packet));
+    }
+
+    internal SceneDescriptionEntry TryAddEntry(IPlayer player, bool persist = true)
+    {
+        if (Api.Side != EnumAppSide.Server || !HasClaimAccess(player) || !IsWithinEditDistance(player) || !SceneAnalytics.Written(Entries)) return null;
+        var entry = Entries.Add(Data.AppearanceDefaults());
+        if (entry == null) return null;
+        entry.Data.EstablishCreator(player.PlayerUID, player.PlayerName);
+        entry.Data.Stamp();
+        if (persist) PersistEntries(player, "added a description to");
+        return entry;
+    }
+
+    internal bool TryRemoveEntry(IPlayer player, string entryId)
+    {
+        var entry = Entries.Find(entryId);
+        if (Api.Side != EnumAppSide.Server || entry == null || !entry.Data.CanEdit(player?.PlayerUID, HasClaimAccess(player)) ||
+            !IsWithinEditDistance(player) || !Entries.Remove(entryId)) return false;
+        _summaryData = null;
+        PersistEntries(player, "removed a description from");
+        return true;
+    }
+
+    internal void ShowChooser(ICoreClientAPI client, bool editing)
+    {
+        if (client == null) return;
+        if (editing && !CanOpenEditChooser(client.World.Player)) return;
+        _chooser?.TryClose();
+        var choices = Entries.Entries.Select(entry => new SceneEntryChoice(entry.Id, entry.Data.Title, entry.Data.AuthorName,
+            SceneReadMarks.IsRead(Pos, entry.Id, entry.Data.ReadStamp), entry.Data.IsLocked,
+            editing && Entries.Entries.Count > 1 && !entry.Data.IsLocked)).ToArray();
+        _chooser = new SceneEntryChooserDialog(client, choices, editing, editing && SceneAnalytics.Written(Entries) && choices.Length < SceneDescriptionEntries.MaxEntries,
+            id =>
+            {
+                if (editing) client.Network.SendBlockEntityPacket(Pos, RequestEditorPacketId, SerializerUtil.Serialize(new SceneEntryActionPacket { EntryId = id }));
+                else OpenReader(client, id, backToChooser: true);
+            },
+            () => client.Network.SendBlockEntityPacket(Pos, AddEntryPacketId),
+            id => client.Network.SendBlockEntityPacket(Pos, RemoveEntryPacketId, SerializerUtil.Serialize(new SceneEntryActionPacket { EntryId = id })),
+            () => _chooser = null);
+        _chooser.TryOpen();
+    }
+
+    internal void OpenReader(ICoreClientAPI client, string entryId = null, bool backToChooser = false)
+    {
+        if (client == null) return;
+        var entry = ResolveEntry(entryId);
+        if (entry == null)
+        {
+            if (!string.IsNullOrEmpty(entryId))
+                client.TriggerIngameError(this, "scene-entry-removed", Lang.Get("thebasics:scene-entry-removed"));
+            return;
+        }
+        var stack = new ItemStack(Block);
+        stack.Attributes.SetString("title", entry.Data.Title);
+        stack.Attributes.SetString("text", SceneDescriptionFormatter.EscapeLiteral(entry.Data.Body));
+        if (new SceneReadonlyBookDialog(stack, client, Pos.Copy(), entry.Id, entry.Data.ReadStamp, entry.Data.TitleIconName,
+                backToChooser ? () => ShowChooser(client, editing: false) : null).TryOpen())
+            client.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.ReaderOpened(Pos, entry.Id);
+    }
+
+    private SceneDescriptionEntry ResolveEntry(string entryId) =>
+        string.IsNullOrEmpty(entryId) ? (Entries.Entries.Count == 1 ? Entries.Primary : null) : Entries.Find(entryId);
+
+    private void PersistEntries(IPlayer player, string action)
+    {
+        MarkDirty(redrawOnClient: true);
+        Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
+        Api.World.Logger.Audit("{0} {1} a scene marker at {2}.", player.PlayerName, action, Pos);
     }
 
     public override void OnReceivedClientPacket(IPlayer player, int packetId, byte[] data)
@@ -114,76 +223,120 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         switch (packetId)
         {
             case UnlockPacketId:
-                HandleUnlock(player);
+                HandleUnlock(player, data);
                 return;
             case MarkReadPacketId:
             case MarkUnreadPacketId:
                 HandleReadMark(player, packetId, data);
                 return;
             case ClearReadPacketId:
-                HandleClearRead(player);
+                HandleClearRead(player, data);
                 return;
             case SaveEditorPacketId:
                 HandleSave(player, data);
                 return;
+            case RequestEditorPacketId:
+                OpenEditor(player, ReadActionId(data));
+                return;
+            case AddEntryPacketId:
+                HandleAddEntry(player);
+                return;
+            case RemoveEntryPacketId:
+                HandleRemoveEntry(player, data);
+                return;
         }
     }
 
-    private void HandleUnlock(IPlayer player)
+    private void HandleUnlock(IPlayer player, byte[] data)
     {
-        if (TryUnlock(player)) OpenEditor(player);
+        var entryId = ReadActionId(data);
+        if (TryUnlock(player, entryId)) OpenEditor(player, entryId);
         else (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+    }
+
+    private void HandleAddEntry(IPlayer player)
+    {
+        if (player is IServerPlayer serverPlayer && Api is ICoreServerAPI serverApi &&
+            HasClaimAccess(player) && IsWithinEditDistance(player) && SceneAnalytics.Written(Entries) &&
+            Entries.Entries.Count < SceneDescriptionEntries.MaxEntries)
+        {
+            var packet = ToPacket(Data.AppearanceDefaults());
+            packet.CreateNew = true;
+            packet.CanManageLock = true;
+            serverApi.Network.SendBlockEntityPacket(serverPlayer, Pos, OpenEditorPacketId, SerializerUtil.Serialize(packet));
+            return;
+        }
+        (player as IServerPlayer)?.SendIngameError("scene-entry-full", Lang.Get(
+            Entries.Entries.Count >= SceneDescriptionEntries.MaxEntries ? "thebasics:scene-entry-full" : "thebasics:scene-description-no-access"));
+    }
+
+    private void HandleRemoveEntry(IPlayer player, byte[] data)
+    {
+        var entryId = ReadActionId(data);
+        if (TryRemoveEntry(player, entryId)) return;
+        (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get(
+            Entries.Entries.Count == 1 ? "thebasics:scene-entry-last" : "thebasics:scene-description-no-access"));
+    }
+
+    private static string ReadActionId(byte[] data)
+    {
+        if (data == null || data.Length == 0) return null;
+        try { return SerializerUtil.Deserialize<SceneEntryActionPacket>(data)?.EntryId; }
+        catch { return null; }
     }
 
     // Marking a marker read is a personal preference, so it needs no edit permission.
     private void HandleReadMark(IPlayer player, int packetId, byte[] data)
     {
         if (player is not IServerPlayer readingPlayer) return;
-        // The reader is a snapshot. Never mark replacement content the player has not opened.
-        if (packetId == MarkReadPacketId && (data is not { Length: 8 } || BitConverter.ToInt64(data) != Data.ReadStamp)) return;
-        // Markers placed before read marks existed carry no stamp; give them one on first use.
-        if (packetId == MarkReadPacketId && Data.ReadStamp == 0)
+        SceneReadMarkPacket packet;
+        try
         {
-            Data.Stamp();
+            if (packetId == MarkUnreadPacketId && data is not { Length: > 0 }) packet = new SceneReadMarkPacket();
+            // Old clients sent the displayed stamp as a raw Int64. A protobuf packet for the
+            // unstamped "legacy" entry is also eight bytes, so length alone cannot identify it.
+            else if (data is { Length: 8 } && Entries.Entries.Count == 1 &&
+                     BitConverter.ToInt64(data) == Data.ReadStamp)
+                packet = new SceneReadMarkPacket { Stamp = Data.ReadStamp };
+            else packet = SerializerUtil.Deserialize<SceneReadMarkPacket>(data);
+        }
+        catch { return; }
+        var entry = ResolveEntry(packet?.EntryId);
+        if (entry == null) return;
+        // The reader is a snapshot. Never mark replacement content the player has not opened.
+        if (packetId == MarkReadPacketId && packet.Stamp != entry.Data.ReadStamp) return;
+        // Markers placed before read marks existed carry no stamp; give them one on first use.
+        if (packetId == MarkReadPacketId && entry.Data.ReadStamp == 0)
+        {
+            entry.Data.Stamp();
             MarkDirty(redrawOnClient: true);
             Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
         }
 
-        var wasRead = SceneReadMarks.IsRead(readingPlayer.GetSceneReadMarks().Marks, SceneReadMarks.Key(Pos), Data.ReadStamp);
+        var wasRead = SceneReadMarks.IsRead(readingPlayer.GetSceneReadMarks().Marks, Pos, entry.Id, entry.Data.ReadStamp);
         var markRead = packetId == MarkReadPacketId;
-        SetReadMark(readingPlayer, markRead ? Data.ReadStamp : 0);
+        SetReadMark(readingPlayer, entry, markRead ? entry.Data.ReadStamp : 0);
         if (SceneDescriptionSystem.SceneMarkersEnabled(Api) && wasRead != markRead && player.Entity?.Pos?.Dimension == Pos.dimension && IsWithinEditDistance(player))
-            SceneAnalytics.Track(Data, markRead ? "marked_read" : "marked_unread");
+            SceneAnalytics.Track(entry.Data, markRead ? "marked_read" : "marked_unread");
     }
 
-    private void HandleClearRead(IPlayer player)
+    private void HandleClearRead(IPlayer player, byte[] data)
     {
-        if (!CanEdit(player) || !IsWithinEditDistance(player))
+        var entry = ResolveEntry(ReadActionId(data));
+        if (entry == null || !entry.Data.CanEdit(player?.PlayerUID, HasClaimAccess(player)) || !IsWithinEditDistance(player))
         {
             (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
             return;
         }
 
-        Data.Stamp();
+        entry.Data.Stamp();
         MarkDirty(redrawOnClient: true);
         Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
-        Api.World.Logger.Audit("{0} cleared the read marks on a scene marker at {1}.", player.PlayerName, Pos);
+        Api.World.Logger.Audit("{0} cleared the read marks on a scene description at {1}.", player.PlayerName, Pos);
     }
 
     private void HandleSave(IPlayer player, byte[] data)
     {
-        if (!CanEdit(player))
-        {
-            (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
-            return;
-        }
-
-        if (!IsWithinEditDistance(player))
-        {
-            (player as IServerPlayer)?.SendIngameError("scene-description-too-far", Lang.Get("thebasics:scene-description-too-far"));
-            return;
-        }
-
         SceneDescriptionEditPacket packet;
         try
         {
@@ -195,36 +348,73 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
-        if (packet?.LockAfterSave == true && !Data.CanLock(player.PlayerUID, HasClaimAccess(player)))
+        if (packet == null) return;
+        var creating = packet.CreateNew;
+        var entry = creating ? null : ResolveEntry(packet.EntryId);
+        if (!CanSave(player, creating, entry))
         {
             (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
             return;
         }
-        var previousData = Data.Clone();
-        Data.ApplyText(FromPacket(packet));
+        if (!IsWithinEditDistance(player))
+        {
+            (player as IServerPlayer)?.SendIngameError("scene-description-too-far", Lang.Get("thebasics:scene-description-too-far"));
+            return;
+        }
+        if (creating && !SceneAnalytics.Written(FromPacket(packet)))
+        {
+            (player as IServerPlayer)?.SendIngameError("scene-entry-empty", Lang.Get("thebasics:scene-entry-empty-save"));
+            return;
+        }
+        if (packet.LockAfterSave && !creating && !entry.Data.CanLock(player.PlayerUID, true))
+        {
+            (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+            return;
+        }
+        if (creating)
+        {
+            entry = TryAddEntry(player, persist: false);
+            if (entry == null) return;
+        }
+        var previousData = creating ? new SceneDescriptionData() : entry.Data.Clone();
+        entry.Data.ApplyText(FromPacket(packet), includeAppearance: entry == Entries.Primary);
+        if (entry == Entries.Primary) Entries.SyncAppearance();
         // Edited text is new content, so existing read marks no longer apply.
-        Data.Stamp();
+        entry.Data.Stamp();
+        _summaryData = null;
         if (player is IServerPlayer savingPlayer)
         {
-            var defaults = ToPacket(Data.AppearanceDefaults());
+            var defaults = ToPacket(entry.Data.AppearanceDefaults());
             savingPlayer.SetModData(AppearancePreferencesKey, defaults);
         }
-        if (packet?.LockAfterSave == true) Data.LockItemCode = "ui";
+        if (packet.LockAfterSave) entry.Data.LockItemCode = "ui";
         MarkDirty(redrawOnClient: true);
         Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
-        Api.World.Logger.Audit("{0} edited a scene marker at {1}.", player.PlayerName, Pos);
-        SceneAnalytics.Track(Data, "saved", "scene_save_kind", SceneAnalytics.SaveKind(previousData, Data));
+        Api.World.Logger.Audit("{0} edited a scene description at {1}.", player.PlayerName, Pos);
+        SceneAnalytics.Track(entry.Data, "saved", "scene_save_kind", SceneAnalytics.SaveKind(previousData, entry.Data));
     }
+
+    private bool CanSave(IPlayer player, bool creating, SceneDescriptionEntry entry) =>
+        HasClaimAccess(player) && (creating
+            ? SceneAnalytics.Written(Entries) && Entries.Entries.Count < SceneDescriptionEntries.MaxEntries
+            : entry != null && entry.Data.CanEdit(player?.PlayerUID, true));
 
     public override void OnReceivedServerPacket(int packetId, byte[] data)
     {
         if (packetId is MarkReadPacketId or MarkUnreadPacketId)
         {
-            var stamp = data is { Length: 8 } ? BitConverter.ToInt64(data) : 0;
-            SceneReadMarks.SetClientMark(Pos, stamp);
+            SceneReadMarkPacket readPacket;
+            try
+            {
+                readPacket = SerializerUtil.Deserialize<SceneReadMarkPacket>(data);
+            }
+            catch { return; }
+            var entry = ResolveEntry(readPacket?.EntryId);
+            if (entry == null) return;
+            SceneReadMarks.SetClientMark(Pos, entry.Id, readPacket.Stamp);
             if (Api is ICoreClientAPI client)
                 foreach (var reader in client.Gui.OpenedGuis.OfType<SceneReadonlyBookDialog>().ToArray())
-                    if (reader.Pos.Equals(Pos)) reader.Refresh(stamp);
+                    if (reader.Pos.Equals(Pos) && reader.EntryId == entry.Id) reader.Refresh(readPacket.Stamp);
             return;
         }
 
@@ -245,27 +435,41 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         }
 
         _dialog?.TryCloseWithoutPrompt();
-        _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), packet.CanManageLock, (saved, lockAfterSave) =>
+        var entryId = packet.EntryId;
+        var options = EditorOptions(packet);
+        _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), options, (saved, lockAfterSave) =>
         {
             var savedPacket = ToPacket(saved);
+            savedPacket.EntryId = entryId;
+            savedPacket.CreateNew = packet.CreateNew;
             savedPacket.LockAfterSave = lockAfterSave;
             clientApi.Network.SendBlockEntityPacket(Pos, SaveEditorPacketId, SerializerUtil.Serialize(savedPacket));
             _dialog = null;
-        }, () => clientApi.Network.SendBlockEntityPacket(Pos, UnlockPacketId),
-            () => clientApi.Network.SendBlockEntityPacket(Pos, ClearReadPacketId), () => _dialog = null);
+        }, packet.CreateNew ? null : () => clientApi.Network.SendBlockEntityPacket(Pos, UnlockPacketId, SerializerUtil.Serialize(new SceneEntryActionPacket { EntryId = entryId })),
+            packet.CreateNew ? null : () => clientApi.Network.SendBlockEntityPacket(Pos, ClearReadPacketId, SerializerUtil.Serialize(new SceneEntryActionPacket { EntryId = entryId })),
+            () => _dialog = null,
+            () => clientApi.Network.SendBlockEntityPacket(Pos, AddEntryPacketId));
         _dialog.TryOpen();
     }
+
+    internal SceneDescriptionDialogOptions EditorOptions(SceneDescriptionEditPacket packet) => new(packet.CanManageLock,
+        CanAdd: !packet.CreateNew && SceneAnalytics.Written(Entries) && Entries.Entries.Count < SceneDescriptionEntries.MaxEntries,
+        CanEditAppearance: !packet.CreateNew && packet.EntryId == Entries.Primary.Id,
+        IsNewEntry: packet.CreateNew);
 
     public override void ToTreeAttributes(ITreeAttribute tree)
     {
         base.ToTreeAttributes(tree);
+        Entries.WriteTo(tree, includeReadStamps: true);
+        // Older builds can still display the first entry, though they cannot preserve a collection.
         Data.WriteTo(tree, includeReadStamp: true);
     }
 
     public override void FromTreeAttributes(ITreeAttribute tree, IWorldAccessor worldForResolving)
     {
         base.FromTreeAttributes(tree, worldForResolving);
-        Data = SceneDescriptionData.ReadFrom(tree);
+        Entries = SceneDescriptionEntries.ReadFrom(tree);
+        _summaryData = null;
         _synced = true;
         if (Api is ICoreClientAPI)
         {
@@ -277,6 +481,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     public override void GetBlockInfo(IPlayer forPlayer, StringBuilder description)
     {
         base.GetBlockInfo(forPlayer, description);
+        if (Entries.Entries.Count > 1)
+        {
+            description.AppendLine(Lang.Get("thebasics:scene-entry-count", Entries.Entries.Count));
+            return;
+        }
         // The name line above this is already the title (see SceneDescriptionBlock.GetHeldItemName).
         if (!string.IsNullOrWhiteSpace(Data.Body)) description.AppendLine(SceneDescriptionFormatter.InspectorPreview(Data.Body));
         if (string.IsNullOrWhiteSpace(Data.Body))
@@ -305,34 +514,34 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             client.ModLoader.GetModSystem<SceneDescriptionSystem>().Unregister(this);
     }
 
-    private void SetReadMark(IServerPlayer player, long stamp)
+    private void SetReadMark(IServerPlayer player, SceneDescriptionEntry entry, long stamp)
     {
         var marks = player.GetSceneReadMarks();
-        SceneReadMarks.Set(marks.Marks, SceneReadMarks.Key(Pos), stamp);
+        SceneReadMarks.Set(marks.Marks, Pos, entry.Id, stamp);
         player.SetSceneReadMarks(marks);
         (Api as ICoreServerAPI)?.Network.SendBlockEntityPacket(player, Pos,
-            stamp == 0 ? MarkUnreadPacketId : MarkReadPacketId, BitConverter.GetBytes(stamp));
-    }
-
-    private bool CanEdit(IPlayer player)
-    {
-        return Data.CanEdit(player?.PlayerUID, HasClaimAccess(player));
+            stamp == 0 ? MarkUnreadPacketId : MarkReadPacketId,
+            SerializerUtil.Serialize(new SceneReadMarkPacket { EntryId = entry.Id, Stamp = stamp }));
     }
 
     internal bool CanBreak(IPlayer player)
     {
-        return Data.CanBreak(player?.PlayerUID, IsAdmin(player), HasClaimAccess(player));
+        var hasClaimAccess = HasClaimAccess(player);
+        return Entries.Entries.All(entry => entry.Data.CanBreak(player?.PlayerUID, IsAdmin(player), hasClaimAccess));
     }
 
-    internal bool TryUnlock(IPlayer player)
+    internal bool CanOpenEditChooser(IPlayer player) => HasClaimAccess(player) && IsWithinEditDistance(player);
+
+    internal bool TryUnlock(IPlayer player, string entryId = null)
     {
+        var entry = ResolveEntry(entryId);
         if (Api.Side != EnumAppSide.Server || !IsWithinEditDistance(player) ||
-            !Data.CanUnlock(player?.PlayerUID, IsAdmin(player), HasClaimAccess(player)))
+            entry == null || !entry.Data.CanUnlock(player?.PlayerUID, IsAdmin(player), HasClaimAccess(player)))
         {
             return false;
         }
 
-        Data.LockItemCode = string.Empty;
+        entry.Data.LockItemCode = string.Empty;
         PersistLockChange(player, "unlocked");
         return true;
     }
@@ -358,6 +567,8 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     {
         _dialog?.TryCloseWithoutPrompt();
         _dialog = null;
+        _chooser?.TryClose();
+        _chooser = null;
     }
 
     private static SceneDescriptionEditPacket ToPacket(SceneDescriptionData data)

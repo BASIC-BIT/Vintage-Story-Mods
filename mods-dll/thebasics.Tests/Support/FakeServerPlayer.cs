@@ -39,6 +39,8 @@ public class FakeServerPlayer : IServerPlayer
     /// <summary>Messages this player was sent, in order, for assertions.</summary>
     public List<(int GroupId, string Message, EnumChatType ChatType, string Data)> SentMessages { get; } = new();
 
+    public List<(string Code, string Message)> IngameErrors { get; } = new();
+
     /// <summary>Arguments of each <see cref="BroadcastPlayerData"/> call, in order.</summary>
     public List<bool> BroadcastPlayerDataCalls { get; } = new();
 
@@ -115,7 +117,8 @@ public class FakeServerPlayer : IServerPlayer
 
     public void BroadcastPlayerData(bool sendInventory = false) => BroadcastPlayerDataCalls.Add(sendInventory);
 
-    public void SendIngameError(string code, string message = null, params object[] langparams) { }
+    public void SendIngameError(string code, string message = null, params object[] langparams) =>
+        IngameErrors.Add((code, message));
 
     public void SendLocalisedMessage(int groupId, string message, params object[] args) { }
 

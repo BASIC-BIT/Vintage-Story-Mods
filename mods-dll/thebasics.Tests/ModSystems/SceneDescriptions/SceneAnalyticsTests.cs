@@ -20,6 +20,16 @@ public class SceneAnalyticsTests
         props.Should().BeEquivalentTo(new Dictionary<string, object> { ["scene_content"] = "written", ["scene_display_mode"] = "always_nearby", ["scene_locked"] = true, ["scene_body_shown"] = true });
     }
     [Fact]
+    public void MarkerPropertiesCountWrittenSecondaryWhenPrimaryIsEmpty()
+    {
+        var entries = new SceneDescriptionEntries();
+        entries.Add(new SceneDescriptionData { Body = "Secondary account" });
+
+        var properties = SceneAnalytics.Properties(entries);
+
+        ((string)properties["scene_content"]).Should().Be("written");
+    }
+    [Fact]
     public void DwellRequiresContinuousVisibleSecondAndCooldown()
     {
         var gate = new SceneObservationGate();

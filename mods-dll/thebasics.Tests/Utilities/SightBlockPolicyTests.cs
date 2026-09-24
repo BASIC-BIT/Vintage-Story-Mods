@@ -10,6 +10,39 @@ namespace thebasics.Tests.Utilities;
 
 public class SightBlockPolicyTests
 {
+    [Theory]
+    [InlineData("thebasics:scene-marker-ground-north")]
+    [InlineData("thebasics:scene-marker-wall-east")]
+    [InlineData("thebasics:scene-marker-ceiling-south")]
+    public void OpaqueSceneMarkerPassesThroughBothSightFiltersByDefault(string code)
+    {
+        var marker = Block(50, code, EnumChunkRenderPass.OpaqueNoCull);
+        var policy = SightBlockPolicy.Resolve([marker], [], []);
+
+        policy.GeneralFilter(new BlockPos(0, 0, 0, 0), marker).Should().BeFalse();
+        policy.StrictFilter(new BlockPos(0, 0, 0, 0), marker).Should().BeFalse();
+    }
+
+    [Fact]
+    public void OrdinaryOpaqueBlockStillStopsBothSightFilters()
+    {
+        var stone = Block(51, "game:rock-granite", EnumChunkRenderPass.OpaqueNoCull);
+        var policy = SightBlockPolicy.Resolve([stone], [], []);
+
+        policy.GeneralFilter(new BlockPos(0, 0, 0, 0), stone).Should().BeTrue();
+        policy.StrictFilter(new BlockPos(0, 0, 0, 0), stone).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ExplicitBlockingPatternStopsOpaqueSceneMarkerInBothSightFilters()
+    {
+        var marker = Block(52, "thebasics:scene-marker-wall-east", EnumChunkRenderPass.OpaqueNoCull);
+        var policy = SightBlockPolicy.Resolve([marker], ["thebasics:scene-marker-*"], ["thebasics:scene-marker-wall-*"]);
+
+        policy.GeneralFilter(new BlockPos(0, 0, 0, 0), marker).Should().BeTrue();
+        policy.StrictFilter(new BlockPos(0, 0, 0, 0), marker).Should().BeTrue();
+    }
+
     [Fact]
     public void PassThroughPatternOverridesAnOpaqueModBlock()
     {

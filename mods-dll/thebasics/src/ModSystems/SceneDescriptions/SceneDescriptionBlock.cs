@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text;
 using thebasics.Utilities;
 using Vintagestory.API.Client;
@@ -103,10 +104,11 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         if (placed && world.Side == EnumAppSide.Server && world.BlockAccessor.GetBlockEntity(blockSelection.Position) is SceneDescriptionBlockEntity blockEntity)
         {
             blockEntity.InitializeFromItem(itemStack, byPlayer);
-            var reused = itemStack?.Attributes?.HasAttribute(SceneDescriptionData.TitleAttribute) == true;
-            SceneAnalytics.Track(blockEntity.Data, "placed", "scene_placement", reused ? "reused" : "fresh",
+            var reused = itemStack?.Attributes?.HasAttribute(SceneDescriptionData.TitleAttribute) == true ||
+                itemStack?.Attributes?.GetTreeAttribute("sceneEntries") != null;
+            SceneAnalytics.Track(blockEntity.Entries, "placed", "scene_placement", reused ? "reused" : "fresh",
                 blockEntity.Block?.Variant?["attachment"] switch { "wall" => "wall", "ground" => "ground", _ => null });
-            if (reused && SceneAnalytics.Written(blockEntity.Data)) SceneAnalytics.Track(blockEntity.Data, "moved", "scene_placement", "reused",
+            if (reused && SceneAnalytics.Written(blockEntity.Entries)) SceneAnalytics.Track(blockEntity.Entries, "moved", "scene_placement", "reused",
                 blockEntity.Block?.Variant?["attachment"] switch { "wall" => "wall", "ground" => "ground", _ => null });
         }
 
@@ -136,15 +138,25 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         {
             if (byPlayer?.Entity?.Controls?.ShiftKey == true)
             {
-                if (world.Side == EnumAppSide.Server) blockEntity.OpenEditor(byPlayer);
+                if (!SceneDescriptionSystem.SceneMarkersEnabled(api))
+                {
+                    (api as ICoreClientAPI)?.TriggerIngameError(this, "scene-markers-disabled", Lang.Get("thebasics:scene-markers-disabled"));
+                    return true;
+                }
+                if (blockEntity.Entries.Entries.Count == 1)
+                {
+                    if (world.Side == EnumAppSide.Server) blockEntity.OpenEditor(byPlayer);
+                }
+                else if (api is ICoreClientAPI editClient)
+                {
+                    if (blockEntity.CanOpenEditChooser(byPlayer)) blockEntity.ShowChooser(editClient, editing: true);
+                    else editClient.TriggerIngameError(this, "scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+                }
             }
             else if (api is ICoreClientAPI client)
             {
-                var stack = CreateStackFromPlacedBlock(world, blockSelection.Position);
-                stack.Attributes.SetString("title", blockEntity.Data.Title);
-                stack.Attributes.SetString("text", SceneDescriptionFormatter.EscapeLiteral(blockEntity.Data.Body));
-                if (new SceneReadonlyBookDialog(stack, client, blockSelection.Position.Copy(), blockEntity.Data.ReadStamp, blockEntity.Data.TitleIconName).TryOpen())
-                    client.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.ReaderOpened(blockSelection.Position);
+                if (blockEntity.Entries.Entries.Count == 1) blockEntity.OpenReader(client);
+                else blockEntity.ShowChooser(client, editing: false);
             }
 
             return true;
@@ -155,7 +167,8 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
 
     public override void OnHeldInteractStart(ItemSlot slot, EntityAgent byEntity, BlockSelection blockSelection, EntitySelection entitySelection, bool firstEvent, ref EnumHandHandling handling)
     {
-        if (byEntity?.Controls?.ShiftKey != true || !SceneAnalytics.Written(SceneDescriptionData.ReadFrom(slot?.Itemstack?.Attributes)))
+        var entries = SceneDescriptionEntries.ReadFrom(slot?.Itemstack?.Attributes);
+        if (byEntity?.Controls?.ShiftKey != true || !entries.Entries.Any(entry => SceneAnalytics.Written(entry.Data)))
         {
             base.OnHeldInteractStart(slot, byEntity, blockSelection, entitySelection, firstEvent, ref handling);
             return;
@@ -164,12 +177,28 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         handling = EnumHandHandling.PreventDefault;
         if (api is ICoreClientAPI capi)
         {
-            var readableStack = slot.Itemstack.Clone();
-            readableStack.Attributes.SetString("title", readableStack.Attributes.GetString(SceneDescriptionData.TitleAttribute, string.Empty));
-            readableStack.Attributes.SetString("text", SceneDescriptionFormatter.EscapeLiteral(readableStack.Attributes.GetString(SceneDescriptionData.BodyAttribute, string.Empty)));
-            if (new GuiDialogReadonlyBook(readableStack, capi).TryOpen())
-                capi.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.ReaderOpened();
+            if (entries.Entries.Count == 1) OpenHeldReader(capi, slot.Itemstack, entries.Primary);
+            else
+            {
+                var choices = entries.Entries.Select(entry => new SceneEntryChoice(entry.Id, entry.Data.Title,
+                    entry.Data.AuthorName, null, entry.Data.IsLocked)).ToArray();
+                new SceneEntryChooserDialog(capi, choices, editing: false, canAdd: false,
+                    id =>
+                    {
+                        var selected = entries.Find(id);
+                        if (selected != null) OpenHeldReader(capi, slot.Itemstack, selected);
+                    }).TryOpen();
+            }
         }
+    }
+
+    private static void OpenHeldReader(ICoreClientAPI client, ItemStack source, SceneDescriptionEntry entry)
+    {
+        var readableStack = source.Clone();
+        readableStack.Attributes.SetString("title", entry.Data.Title);
+        readableStack.Attributes.SetString("text", SceneDescriptionFormatter.EscapeLiteral(entry.Data.Body));
+        if (new GuiDialogReadonlyBook(readableStack, client).TryOpen())
+            client.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.ReaderOpened(null, entry.Id);
     }
 
     public override ItemStack[] GetDrops(IWorldAccessor world, BlockPos pos, IPlayer byPlayer, float dropQuantityMultiplier = 1f)
@@ -184,7 +213,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
 
     // A lock is absolute: the creator and admins unlock in the editor first, they do not get a break exemption.
     internal static bool BreakRefused(SceneDescriptionBlockEntity marker, IPlayer player) =>
-        marker.Data.IsLocked || (player != null && !marker.CanBreak(player));
+        marker.Entries.Entries.Any(entry => entry.Data.IsLocked) || (player != null && !marker.CanBreak(player));
 
     public override float OnGettingBroken(IPlayer player, BlockSelection blockSel, ItemSlot itemslot, float remainingResistance, float dt, int counter)
     {
@@ -209,7 +238,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         var now = capi.World.ElapsedMilliseconds;
         if (now - _lastBreakWarningMs < 1500) return;
         _lastBreakWarningMs = now;
-        var locked = marker.Data.IsLocked;
+        var locked = marker.Entries.Entries.Any(entry => entry.Data.IsLocked);
         capi.TriggerIngameError(this, locked ? "scene-description-locked" : "scene-description-no-access",
             Lang.Get(locked ? "thebasics:scene-description-locked-help" : "thebasics:scene-description-no-access"));
     }
@@ -223,7 +252,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
             return;
         }
 
-        var removed = (world.BlockAccessor.GetBlockEntity(pos) as SceneDescriptionBlockEntity)?.Data.Clone();
+        var removed = (world.BlockAccessor.GetBlockEntity(pos) as SceneDescriptionBlockEntity)?.Entries;
         base.OnBlockBroken(world, pos, byPlayer, dropQuantityMultiplier);
         if (world.Side == EnumAppSide.Server && SceneDescriptionSystem.SceneMarkersEnabled(api) && byPlayer != null && removed != null && world.BlockAccessor.GetBlockEntity(pos) is not SceneDescriptionBlockEntity)
             SceneAnalytics.Track(removed, "removed");
@@ -232,7 +261,8 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     public override void OnBlockExploded(IWorldAccessor world, BlockPos pos, BlockPos explosionCenter, EnumBlastType blastType, string ignitedByPlayerUid)
     {
         // Explosions must not become an indirect way to steal/destroy a locked marker.
-        if (world.BlockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity { Data.IsLocked: true })
+        if (world.BlockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity marker &&
+            marker.Entries.Entries.Any(entry => entry.Data.IsLocked))
         {
             return;
         }
@@ -246,14 +276,17 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     public override ItemStack OnPickBlock(IWorldAccessor world, BlockPos pos)
     {
         var stack = CreateStackFromPlacedBlock(world, pos);
-        var copy = SceneDescriptionData.ReadFrom(stack.Attributes);
-        copy.LockItemCode = string.Empty;
+        var copy = SceneDescriptionEntries.ReadFrom(stack.Attributes);
+        foreach (var entry in copy.Entries) entry.Data.LockItemCode = string.Empty;
         copy.WriteTo(stack.Attributes);
+        copy.Primary.Data.WriteTo(stack.Attributes);
         return stack;
     }
 
     public override string GetHeldItemName(ItemStack itemStack)
     {
+        var entries = SceneDescriptionEntries.ReadFrom(itemStack?.Attributes);
+        if (entries.Entries.Count > 1) return Lang.Get("thebasics:scene-entry-count", entries.Entries.Count);
         var title = itemStack?.Attributes?.GetString(SceneDescriptionData.TitleAttribute, string.Empty)?.Trim();
         return string.IsNullOrWhiteSpace(title) ? base.GetHeldItemName(itemStack) : SceneDescriptionFormatter.EscapeLiteral(title);
     }
@@ -263,6 +296,16 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         var vanilla = new StringBuilder();
         base.GetHeldItemInfo(inSlot, vanilla, world, withDebugInfo);
         description.Append(WithoutMaterialLine(vanilla.ToString(), world, inSlot?.Itemstack));
+        var entries = SceneDescriptionEntries.ReadFrom(inSlot?.Itemstack?.Attributes);
+        if (entries.Entries.Count > 1)
+        {
+            description.AppendLine(Lang.Get("thebasics:scene-entry-count", entries.Entries.Count));
+            foreach (var entry in entries.Entries)
+                description.AppendLine(SceneDescriptionFormatter.EscapeLiteral(string.IsNullOrWhiteSpace(entry.Data.Title)
+                    ? Lang.Get("thebasics:scene-entry-untitled") : entry.Data.Title));
+            description.AppendLine(Lang.Get("thebasics:scene-entry-read-item-help"));
+            return;
+        }
         var data = SceneDescriptionData.ReadFrom(inSlot?.Itemstack?.Attributes);
         if (!SceneAnalytics.Written(data))
         {
@@ -301,6 +344,7 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         var stack = new ItemStack(canonicalBlock);
         if (world.BlockAccessor.GetBlockEntity(pos) is SceneDescriptionBlockEntity blockEntity)
         {
+            blockEntity.Entries.WriteTo(stack.Attributes);
             blockEntity.Data.WriteTo(stack.Attributes);
         }
 
