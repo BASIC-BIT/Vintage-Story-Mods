@@ -24,6 +24,8 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     internal const int RequestEditorPacketId = 1007;
     internal const int AddEntryPacketId = 1008;
     internal const int RemoveEntryPacketId = 1009;
+    internal const int SetAppearanceDefaultsPacketId = 1010;
+    private const int AppearanceDefaultsSavedPacketId = 1011;
     private const double MaxEditDistance = 8;
     private const string AppearancePreferencesKey = "thebasics-scene-appearance";
 
@@ -244,6 +246,9 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             case RemoveEntryPacketId:
                 HandleRemoveEntry(player, data);
                 return;
+            case SetAppearanceDefaultsPacketId:
+                HandleSetAppearanceDefaults(player, data);
+                return;
         }
     }
 
@@ -382,17 +387,45 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         // Edited text is new content, so existing read marks no longer apply.
         entry.Data.Stamp();
         _summaryData = null;
-        if (player is IServerPlayer savingPlayer)
-        {
-            var defaults = ToPacket(entry.Data.AppearanceDefaults());
-            savingPlayer.SetModData(AppearancePreferencesKey, defaults);
-        }
         if (packet.LockAfterSave) entry.Data.LockItemCode = "ui";
         MarkDirty(redrawOnClient: true);
         Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
         Api.World.Logger.Audit("{0} edited a scene description at {1}.", player.PlayerName, Pos);
         SceneAnalytics.Track(entry.Data, "saved", "scene_save_kind", SceneAnalytics.SaveKind(previousData, entry.Data));
     }
+
+    private void HandleSetAppearanceDefaults(IPlayer player, byte[] data)
+    {
+        if (player is not IServerPlayer serverPlayer ||
+            !Data.CanEdit(player.PlayerUID, HasClaimAccess(player)) || !IsWithinEditDistance(player))
+        {
+            (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+            return;
+        }
+
+        SceneDescriptionEditPacket packet;
+        try { packet = SerializerUtil.Deserialize<SceneDescriptionEditPacket>(data); }
+        catch { packet = null; }
+        if (packet == null || packet.CreateNew || packet.EntryId != Entries.Primary.Id || !ValidAppearance(packet))
+        {
+            serverPlayer.SendIngameError("scene-defaults-invalid", Lang.Get("thebasics:scene-defaults-invalid"));
+            return;
+        }
+
+        serverPlayer.SetModData(AppearancePreferencesKey, ToPacket(FromPacket(packet).AppearanceDefaults()));
+        if (Api is ICoreServerAPI serverApi)
+            serverApi.Network.SendBlockEntityPacket(serverPlayer, Pos, AppearanceDefaultsSavedPacketId, Array.Empty<byte>());
+    }
+
+    private static bool ValidAppearance(SceneDescriptionEditPacket packet) =>
+        Enum.IsDefined((SceneDescriptionDisplay)packet.Display) &&
+        Enum.IsDefined((SceneMarkerSymbol)packet.Symbol) &&
+        Enum.IsDefined((SceneMarkerColor)packet.Color) &&
+        float.IsFinite(packet.IndicatorScale) && packet.IndicatorScale is >= 0.25f and <= 3 &&
+        float.IsFinite(packet.BubbleScale) && packet.BubbleScale is >= 0.4f and <= 3.5f &&
+        float.IsFinite(packet.HeightOffset) && packet.HeightOffset is >= -2 and <= 4 &&
+        float.IsFinite(packet.IconDistance) && packet.IconDistance is >= SceneDescriptionData.MinDistance and <= SceneDescriptionData.MaxDistance &&
+        float.IsFinite(packet.TextDistance) && packet.TextDistance is >= SceneDescriptionData.MinDistance and <= SceneDescriptionData.MaxDistance;
 
     private bool CanSave(IPlayer player, bool creating, SceneDescriptionEntry entry) =>
         HasClaimAccess(player) && (creating
@@ -401,6 +434,12 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     public override void OnReceivedServerPacket(int packetId, byte[] data)
     {
+        if (packetId == AppearanceDefaultsSavedPacketId)
+        {
+            if (Api is ICoreClientAPI confirmingClient)
+                confirmingClient.ShowChatMessage(Lang.Get("thebasics:scene-defaults-saved"));
+            return;
+        }
         if (packetId is MarkReadPacketId or MarkUnreadPacketId)
         {
             SceneReadMarkPacket readPacket;
@@ -436,7 +475,15 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
         _dialog?.TryCloseWithoutPrompt();
         var entryId = packet.EntryId;
-        var options = EditorOptions(packet);
+        var options = EditorOptions(packet) with
+        {
+            OnSetDefaults = defaults =>
+            {
+                var defaultsPacket = ToPacket(defaults.AppearanceDefaults());
+                defaultsPacket.EntryId = entryId;
+                clientApi.Network.SendBlockEntityPacket(Pos, SetAppearanceDefaultsPacketId, SerializerUtil.Serialize(defaultsPacket));
+            },
+        };
         _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), options, (saved, lockAfterSave) =>
         {
             var savedPacket = ToPacket(saved);

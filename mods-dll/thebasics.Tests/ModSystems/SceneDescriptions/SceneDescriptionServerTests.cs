@@ -44,11 +44,12 @@ public class SceneDescriptionServerTests
         marker.Data.IsLocked.Should().BeTrue();
     }
     [Fact]
-    public void AcceptedAppearanceIsRememberedOnlyForFreshMarkers()
+    public void ExplicitAppearanceDefaultsAreRememberedOnlyForFreshMarkers()
     {
         var (marker, player, _) = CreateMarker();
-        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.SetAppearanceDefaultsPacketId, SerializerUtil.Serialize(new SceneDescriptionEditPacket
         {
+            EntryId = marker.Entries.Primary.Id,
             Title = "Old title",
             Body = "Old body",
             Color = (int)SceneMarkerColor.Blue,
