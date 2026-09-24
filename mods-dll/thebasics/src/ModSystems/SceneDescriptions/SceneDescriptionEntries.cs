@@ -28,8 +28,15 @@ public sealed class SceneDescriptionEntries
     {
         if (_entries.Count >= MaxEntries) return null;
         var entry = new SceneDescriptionEntry(NewId(), (data ?? new SceneDescriptionData()).Clone().Normalize());
+        entry.Data.ApplyAppearance(Primary.Data);
         _entries.Add(entry);
         return entry;
+    }
+
+    internal void SyncAppearance()
+    {
+        for (var index = 1; index < _entries.Count; index++)
+            _entries[index].Data.ApplyAppearance(Primary.Data);
     }
 
     internal SceneDescriptionEntry? Find(string id)
@@ -43,7 +50,10 @@ public sealed class SceneDescriptionEntries
     {
         if (_entries.Count == 1) return false;
         var entry = Find(id);
-        return entry != null && _entries.Remove(entry);
+        if (entry == null) return false;
+        // The next primary retains the marker's current shared style.
+        if (entry == Primary) SyncAppearance();
+        return _entries.Remove(entry);
     }
 
     internal static SceneDescriptionEntries ReadFrom(ITreeAttribute? attributes)
@@ -72,11 +82,13 @@ public sealed class SceneDescriptionEntries
 
         if (result._entries.Count == 0)
             result._entries.Add(new SceneDescriptionEntry(LegacyId, SceneDescriptionData.ReadFrom(attributes)));
+        result.SyncAppearance();
         return result;
     }
 
     internal void WriteTo(ITreeAttribute attributes, bool includeReadStamps = false)
     {
+        SyncAppearance();
         var saved = new TreeAttribute();
         saved.SetInt("count", _entries.Count);
         for (var index = 0; index < _entries.Count; index++)

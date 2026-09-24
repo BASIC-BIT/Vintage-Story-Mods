@@ -96,18 +96,80 @@ public class SceneMarkerPlateTests
         var assets = Path.Combine(directory!.FullName, "mods-dll/thebasics/assets/thebasics");
         var json = JObject.Parse(File.ReadAllText(Path.Combine(assets, "blocktypes/scene-marker.json")));
         var shapeRef = json["shapebytype"]!["*-ceiling-*"]!;
+        shapeRef.Value<string>("base").Should().Be("thebasics:block/scene-marker-ceiling");
         var shape = JObject.Parse(File.ReadAllText(Path.Combine(assets,
             "shapes/" + shapeRef.Value<string>("base")!.Split(':')[1] + ".json")));
         var plate = shape["elements"]![0]!;
+        var inlay = shape["elements"]![1]!;
         var from = plate["from"]!.ToObject<float[]>()!;
         var to = plate["to"]!.ToObject<float[]>()!;
+        var inlayFrom = inlay["from"]!.ToObject<float[]>()!;
+        var inlayTo = inlay["to"]!.ToObject<float[]>()!;
+        (to[0] - from[0]).Should().Be(10);
+        (to[2] - from[2]).Should().Be(10);
+        (inlayTo[0] - inlayFrom[0]).Should().Be(4);
+        (inlayTo[2] - inlayFrom[2]).Should().Be(4);
         var bounds = new Cuboidf(from[0] / 16, from[1] / 16, from[2] / 16, to[0] / 16, to[1] / 16, to[2] / 16)
             .RotatedCopy(shapeRef.Value<float>("rotateX"), 0, 0, new Vec3d(0.5, 0.5, 0.5));
         bounds.Y2.Should().BeApproximately(1, 0.00001f, "the ceiling plate must touch its support above");
         bounds.Y1.Should().BeGreaterThan(0.9f);
         var box = json["selectionboxbytype"]!["*-ceiling-*"]!.ToObject<Cuboidf>()!;
+        box.X1.Should().BeApproximately(bounds.X1, 0.00001f);
+        box.X2.Should().BeApproximately(bounds.X2, 0.00001f);
         box.Y1.Should().BeApproximately(bounds.Y1, 0.00001f);
         box.Y2.Should().BeApproximately(bounds.Y2, 0.00001f);
+        box.Z1.Should().BeApproximately(bounds.Z1, 0.00001f);
+        box.Z2.Should().BeApproximately(bounds.Z2, 0.00001f);
+    }
+
+    [Fact]
+    public void GroundPlateAndInlayAreHalfAsWideAndStayCentered()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Vintage-Story-Mods.sln"))) directory = directory.Parent;
+        var shape = JObject.Parse(File.ReadAllText(Path.Combine(directory!.FullName,
+            "mods-dll/thebasics/assets/thebasics/shapes/block/scene-marker-ground.json")));
+        var plate = shape["elements"]![0]!;
+        var inlay = shape["elements"]![1]!;
+        var plateFrom = plate["from"]!.ToObject<float[]>()!;
+        var plateTo = plate["to"]!.ToObject<float[]>()!;
+        var inlayFrom = inlay["from"]!.ToObject<float[]>()!;
+        var inlayTo = inlay["to"]!.ToObject<float[]>()!;
+
+        (plateTo[0] - plateFrom[0]).Should().Be(5);
+        (plateTo[2] - plateFrom[2]).Should().Be(10);
+        (plateTo[1] - plateFrom[1]).Should().Be(1);
+        (plateTo[0] + plateFrom[0]).Should().Be(16);
+        (inlayTo[0] - inlayFrom[0]).Should().Be(2);
+        (inlayTo[2] - inlayFrom[2]).Should().Be(4);
+        (inlayTo[1] - inlayFrom[1]).Should().BeApproximately(0.35f, 0.00001f);
+        (inlayTo[0] + inlayFrom[0]).Should().Be(16);
+    }
+
+    [Theory]
+    [InlineData("north")]
+    [InlineData("east")]
+    [InlineData("south")]
+    [InlineData("west")]
+    public void GroundSelectionFollowsTheRotatedPlate(string side)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Vintage-Story-Mods.sln"))) directory = directory.Parent;
+        var assets = Path.Combine(directory!.FullName, "mods-dll/thebasics/assets/thebasics");
+        var block = JObject.Parse(File.ReadAllText(Path.Combine(assets, "blocktypes/scene-marker.json")));
+        var shape = JObject.Parse(File.ReadAllText(Path.Combine(assets, "shapes/block/scene-marker-ground.json")));
+        var plate = shape["elements"]![0]!;
+        var from = plate["from"]!.ToObject<float[]>()!;
+        var to = plate["to"]!.ToObject<float[]>()!;
+        var rotation = block["shapebytype"]![$"*-ground-{side}"]!.Value<float>("rotateY");
+        var bounds = new Cuboidf(from[0] / 16, from[1] / 16, from[2] / 16, to[0] / 16, to[1] / 16, to[2] / 16)
+            .RotatedCopy(0, rotation, 0, new Vec3d(0.5, 0.5, 0.5));
+        var selection = block["selectionboxbytype"]![$"*-ground-{side}"]!.ToObject<Cuboidf>()!;
+
+        selection.X1.Should().BeApproximately(bounds.X1, 0.00001f);
+        selection.X2.Should().BeApproximately(bounds.X2, 0.00001f);
+        selection.Z1.Should().BeApproximately(bounds.Z1, 0.00001f);
+        selection.Z2.Should().BeApproximately(bounds.Z2, 0.00001f);
     }
     [Theory]
     [InlineData(0)]

@@ -124,7 +124,12 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         }
 
         var entry = ResolveEntry(entryId);
-        if (entry == null) return;
+        if (entry == null)
+        {
+            if (!string.IsNullOrEmpty(entryId))
+                serverPlayer.SendIngameError("scene-entry-removed", Lang.Get("thebasics:scene-entry-removed"));
+            return;
+        }
         var editorData = entry.Data.Clone();
         if (entry != Entries.Primary) editorData.ApplyAppearance(Data);
         var packet = ToPacket(editorData);
@@ -149,11 +154,8 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     internal bool TryRemoveEntry(IPlayer player, string entryId)
     {
         var entry = Entries.Find(entryId);
-        var wasPrimary = entry == Entries.Primary;
-        var sharedAppearance = wasPrimary ? Data.Clone() : null;
         if (Api.Side != EnumAppSide.Server || entry == null || !entry.Data.CanEdit(player?.PlayerUID, HasClaimAccess(player)) ||
             !IsWithinEditDistance(player) || !Entries.Remove(entryId)) return false;
-        if (wasPrimary) Entries.Primary.Data.ApplyAppearance(sharedAppearance);
         _summaryData = null;
         PersistEntries(player, "removed a description from");
         SceneAnalytics.Track(entry.Data, "removed");
@@ -182,8 +184,14 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     internal void OpenReader(ICoreClientAPI client, string entryId = null, bool backToChooser = false)
     {
+        if (client == null) return;
         var entry = ResolveEntry(entryId);
-        if (client == null || entry == null) return;
+        if (entry == null)
+        {
+            if (!string.IsNullOrEmpty(entryId))
+                client.TriggerIngameError(this, "scene-entry-removed", Lang.Get("thebasics:scene-entry-removed"));
+            return;
+        }
         var stack = new ItemStack(Block);
         stack.Attributes.SetString("title", entry.Data.Title);
         stack.Attributes.SetString("text", SceneDescriptionFormatter.EscapeLiteral(entry.Data.Body));
@@ -371,6 +379,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         }
         var previousData = creating ? new SceneDescriptionData() : entry.Data.Clone();
         entry.Data.ApplyText(FromPacket(packet), includeAppearance: entry == Entries.Primary);
+        if (entry == Entries.Primary) Entries.SyncAppearance();
         // Edited text is new content, so existing read marks no longer apply.
         entry.Data.Stamp();
         _summaryData = null;

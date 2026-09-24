@@ -14,7 +14,7 @@
     { code: "side", loadFromProperties: "abstract/horizontalorientation" }
   ],
   shapebytype: {
-    "*-ceiling-*": { base: "thebasics:block/scene-marker-ground", rotateX: 180 },
+    "*-ceiling-*": { base: "thebasics:block/scene-marker-ceiling", rotateX: 180 },
     "*-ground-north": { base: "thebasics:block/scene-marker-ground", rotateY: 0 },
     "*-ground-east": { base: "thebasics:block/scene-marker-ground", rotateY: 270 },
     "*-ground-south": { base: "thebasics:block/scene-marker-ground", rotateY: 180 },
@@ -46,6 +46,10 @@
   maxstacksize: 1,
   selectionboxbytype: {
     "*-ceiling-*": { x1: 0.1875, y1: 0.9375, z1: 0.1875, x2: 0.8125, y2: 1, z2: 0.8125 },
+    "*-ground-north": { x1: 0.34375, y1: 0, z1: 0.1875, x2: 0.65625, y2: 0.0625, z2: 0.8125 },
+    "*-ground-south": { x1: 0.34375, y1: 0, z1: 0.1875, x2: 0.65625, y2: 0.0625, z2: 0.8125 },
+    "*-ground-east": { x1: 0.1875, y1: 0, z1: 0.34375, x2: 0.8125, y2: 0.0625, z2: 0.65625 },
+    "*-ground-west": { x1: 0.1875, y1: 0, z1: 0.34375, x2: 0.8125, y2: 0.0625, z2: 0.65625 },
     "*-wall-east": { x1: 0.9375, y1: 0.1875, z1: 0.1875, x2: 1, y2: 0.8125, z2: 0.8125 },
     "*-wall-south": { x1: 0.1875, y1: 0.1875, z1: 0.9375, x2: 0.8125, y2: 0.8125, z2: 1 },
     "*-wall-west": { x1: 0, y1: 0.1875, z1: 0.1875, x2: 0.0625, y2: 0.8125, z2: 0.8125 },

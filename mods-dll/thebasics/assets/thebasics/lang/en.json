@@ -861,5 +861,6 @@
   "scene-entry-count": "{0} descriptions",
   "scene-entry-full": "This marker can hold at most 8 descriptions.",
   "scene-entry-last": "The last description stays with the marker. Break the marker to remove it.",
+  "scene-entry-removed": "That description is no longer on this marker. Open the marker again to choose another.",
   "scene-markers-disabled": "Scene markers are turned off on this server."
 }

@@ -50,6 +50,60 @@ public class SceneDescriptionEntriesTests
     }
 
     [Fact]
+    public void LoadingAnOldCollectionRepairsSecondaryAppearanceWithoutChangingItsContent()
+    {
+        var entries = new SceneDescriptionEntries();
+        entries.Primary.Data.Color = SceneMarkerColor.Blue;
+        entries.Primary.Data.Display = SceneDescriptionDisplay.AlwaysNearby;
+        entries.Primary.Data.TitleIconName = "wpHome";
+        var second = entries.Add(new SceneDescriptionData
+        {
+            Title = "Second", Body = "A different account", Kind = SceneDescriptionKind.OocNotice,
+            AuthorUid = "bob", AuthorName = "Bob", LockItemCode = "ui", ReadStamp = 456,
+        })!;
+        var saved = new TreeAttribute();
+        entries.WriteTo(saved, includeReadStamps: true);
+        var secondaryTree = saved.GetTreeAttribute("sceneEntries").GetTreeAttribute("1");
+        secondaryTree.SetInt("sceneColor", (int)SceneMarkerColor.Red);
+        secondaryTree.SetInt("sceneDisplay", (int)SceneDescriptionDisplay.OnInteraction);
+        secondaryTree.SetString("sceneTitleIconName", "oldIcon");
+
+        var restored = SceneDescriptionEntries.ReadFrom(saved);
+        var repaired = restored.Find(second.Id)!.Data;
+
+        repaired.Color.Should().Be(SceneMarkerColor.Blue);
+        repaired.Display.Should().Be(SceneDescriptionDisplay.AlwaysNearby);
+        repaired.TitleIconName.Should().Be("wpHome");
+        repaired.Title.Should().Be("Second");
+        repaired.Body.Should().Be("A different account");
+        repaired.Kind.Should().Be(SceneDescriptionKind.OocNotice);
+        repaired.AuthorUid.Should().Be("bob");
+        repaired.AuthorName.Should().Be("Bob");
+        repaired.LockItemCode.Should().Be("ui");
+        repaired.ReadStamp.Should().Be(456);
+    }
+
+    [Fact]
+    public void RemovingPrimaryTransfersItsLatestAppearanceToTheNextEntry()
+    {
+        var entries = new SceneDescriptionEntries();
+        entries.Primary.Data.Title = "First";
+        var second = entries.Add(new SceneDescriptionData { Title = "Second", Body = "Still here", AuthorUid = "bob", ReadStamp = 456 })!;
+        entries.Primary.Data.Color = SceneMarkerColor.Blue;
+        entries.Primary.Data.Symbol = SceneMarkerSymbol.Diamond;
+
+        entries.Remove(entries.Primary.Id).Should().BeTrue();
+
+        entries.Primary.Should().BeSameAs(second);
+        second.Data.Color.Should().Be(SceneMarkerColor.Blue);
+        second.Data.Symbol.Should().Be(SceneMarkerSymbol.Diamond);
+        second.Data.Title.Should().Be("Second");
+        second.Data.Body.Should().Be("Still here");
+        second.Data.AuthorUid.Should().Be("bob");
+        second.Data.ReadStamp.Should().Be(456);
+    }
+
+    [Fact]
     public void EntriesCanBeFoundAndRemovedWithoutEmptyingTheMarker()
     {
         var entries = new SceneDescriptionEntries();

@@ -2,6 +2,7 @@ using FluentAssertions;
 using NSubstitute;
 using thebasics.Extensions;
 using thebasics.ModSystems.SceneDescriptions;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -178,6 +179,10 @@ public class SceneDescriptionEntriesServerTests
         second.Data.Body.Should().Be("Second scene");
         marker.Data.Color.Should().NotBe(SceneMarkerColor.Blue);
         marker.Data.Symbol.Should().NotBe(SceneMarkerSymbol.Diamond);
+        second.Data.Title = "Second title";
+        second.Data.Kind = SceneDescriptionKind.OocNotice;
+        second.Data.LockItemCode = "legacy-lock";
+        second.Data.ReadStamp = 456;
 
         marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
         {
@@ -185,10 +190,68 @@ public class SceneDescriptionEntriesServerTests
             Body = "Original text",
             Color = (int)SceneMarkerColor.Blue,
             Symbol = (int)SceneMarkerSymbol.Diamond,
+            Display = (int)SceneDescriptionDisplay.AlwaysNearby,
+            TitleIconName = "wpHome",
         }));
         marker.Data.Color.Should().Be(SceneMarkerColor.Blue);
         marker.Data.Symbol.Should().Be(SceneMarkerSymbol.Diamond);
+        second.Data.Color.Should().Be(SceneMarkerColor.Blue);
+        second.Data.Symbol.Should().Be(SceneMarkerSymbol.Diamond);
+        second.Data.Display.Should().Be(SceneDescriptionDisplay.AlwaysNearby);
+        second.Data.TitleIconName.Should().Be("wpHome");
+        second.Data.Title.Should().Be("Second title");
         second.Data.Body.Should().Be("Second scene");
+        second.Data.Kind.Should().Be(SceneDescriptionKind.OocNotice);
+        second.Data.AuthorUid.Should().Be(player.PlayerUID);
+        second.Data.LockItemCode.Should().Be("legacy-lock");
+        second.Data.ReadStamp.Should().Be(456);
+    }
+
+    [Fact]
+    public void RemovedChooserEntryReportsAnErrorAfterEditorAccessChecks()
+    {
+        var (marker, player, _) = CreateMarker();
+        var removed = marker.TryAddEntry(player)!;
+        marker.Entries.Remove(removed.Id).Should().BeTrue();
+        var serverApi = Substitute.For<ICoreServerAPI>();
+        var serverWorld = Substitute.For<IServerWorldAccessor>();
+        serverApi.Side.Returns(EnumAppSide.Server);
+        serverApi.World.Returns(serverWorld);
+        ((ICoreAPI)serverApi).World.Returns(serverWorld);
+        serverWorld.Claims.TryAccess(Arg.Any<IPlayer>(), marker.Pos, EnumBlockAccessFlags.BuildOrBreak).Returns(true);
+        var system = new SceneDescriptionSystem();
+        system.SetRuntimeEnabled(true);
+        serverApi.ModLoader.GetModSystem<SceneDescriptionSystem>().Returns(system);
+        marker.Api = serverApi;
+
+        marker.OpenEditor(player, removed.Id);
+
+        player.IngameErrors.Should().ContainSingle().Which.Code.Should().Be("scene-entry-removed");
+        serverApi.Network.DidNotReceive().SendBlockEntityPacket(player, marker.Pos, 1001, Arg.Any<byte[]>());
+
+        player.IngameErrors.Clear();
+        serverWorld.Claims.TryAccess(Arg.Any<IPlayer>(), marker.Pos, EnumBlockAccessFlags.BuildOrBreak).Returns(false);
+        marker.OpenEditor(player, removed.Id);
+        player.IngameErrors.Should().ContainSingle().Which.Code.Should().Be("scene-description-no-access");
+        serverWorld.Claims.TryAccess(Arg.Any<IPlayer>(), marker.Pos, EnumBlockAccessFlags.BuildOrBreak).Returns(true);
+        player.IngameErrors.Clear();
+        player.Entity.Pos.SetPos(50, 50, 50);
+        marker.OpenEditor(player, removed.Id);
+        player.IngameErrors.Should().ContainSingle().Which.Code.Should().Be("scene-description-no-access");
+    }
+
+    [Fact]
+    public void RemovedChooserEntryReportsAClientErrorWithoutOpeningTheReader()
+    {
+        LangTestHelper.EnsureEnglish();
+        var marker = new SceneDescriptionBlockEntity();
+        var client = Substitute.For<ICoreClientAPI>();
+        var removed = marker.Entries.Add(new SceneDescriptionData { Title = "Removed" })!;
+        marker.Entries.Remove(removed.Id).Should().BeTrue();
+
+        marker.OpenReader(client, removed.Id);
+
+        client.Received(1).TriggerIngameError(marker, "scene-entry-removed", Arg.Any<string>());
     }
 
     [Fact]
@@ -241,6 +304,8 @@ public class SceneDescriptionEntriesServerTests
         second.Should().NotBeNull();
         second!.Data.Title = "Second title";
         second.Data.Body = "Second text";
+        marker.Data.Color = SceneMarkerColor.Blue;
+        marker.Data.TitleIconName = "wpHome";
         var ids = marker.Entries.Entries.Select(entry => entry.Id).ToArray();
 
         var drops = marker.Block.GetDrops(world, marker.Pos, player);
@@ -251,6 +316,8 @@ public class SceneDescriptionEntriesServerTests
         marker.Entries.Entries.Select(entry => entry.Data.Title).Should().Equal("First title", "Second title");
         marker.Entries.Entries.Select(entry => entry.Data.Body).Should().Equal("Original text", "Second text");
         marker.Entries.Entries.Select(entry => entry.Data.AuthorUid).Should().Equal("creator", "second");
+        marker.Entries.Entries.Select(entry => entry.Data.Color).Should().Equal(SceneMarkerColor.Blue, SceneMarkerColor.Blue);
+        marker.Entries.Entries.Select(entry => entry.Data.TitleIconName).Should().Equal("wpHome", "wpHome");
     }
 
     [Fact]

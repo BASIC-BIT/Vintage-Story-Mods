@@ -144,6 +144,7 @@ public class SceneAnalyticsObserverTests
                 Display = SceneDescriptionDisplay.OnInteraction,
                 LockItemCode = "ui",
             })!;
+            second.Data.Display.Should().Be(SceneDescriptionDisplay.AlwaysNearby);
             api.World.BlockAccessor.GetBlockEntity(Arg.Any<BlockPos>()).Returns(marker);
             api.World.BlockAccessor.GetChunkAtBlockPos(Arg.Any<BlockPos>()).Returns(Substitute.For<IWorldChunk>());
             var player = new FakeServerPlayer("reader") { Entity = new EntityPlayer() };
@@ -158,7 +159,7 @@ public class SceneAnalyticsObserverTests
 
             sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(properties =>
                 (string)properties["action"] == "reader_opened" &&
-                (string)properties["scene_display_mode"] == "on_interaction" &&
+                (string)properties["scene_display_mode"] == "always_nearby" &&
                 (bool)properties["scene_locked"]));
             sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(properties =>
                 (string)properties["action"] == "reader_opened" &&
@@ -221,6 +222,7 @@ public class SceneAnalyticsObserverTests
             entries.Primary.Data.Title = "First description";
             entries.Primary.Data.Display = SceneDescriptionDisplay.AlwaysNearby;
             var second = entries.Add(new SceneDescriptionData { Body = "Second description", Display = SceneDescriptionDisplay.OnInteraction })!;
+            second.Data.Display.Should().Be(SceneDescriptionDisplay.AlwaysNearby);
             var stack = new ItemStack(new SceneDescriptionBlock());
             entries.WriteTo(stack.Attributes);
             var player = new FakeServerPlayer("reader") { Entity = new EntityPlayer(), InventoryManager = Substitute.For<IPlayerInventoryManager>() };
@@ -234,7 +236,7 @@ public class SceneAnalyticsObserverTests
             sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(properties =>
                 (string)properties["action"] == "reader_opened" &&
                 (string)properties["scene_read_source"] == "held" &&
-                (string)properties["scene_display_mode"] == "on_interaction"));
+                (string)properties["scene_display_mode"] == "always_nearby"));
             sink.Received(1).Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
         }
         finally { AnalyticsService.Shutdown(); }
