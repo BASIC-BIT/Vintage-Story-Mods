@@ -16,6 +16,152 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneDescriptionEntriesServerTests
 {
     [Fact]
+    public void SavingAMarkerDoesNotReplaceRememberedAppearance()
+    {
+        var (marker, player, _) = CreateMarker();
+        const string key = "thebasics-scene-appearance";
+        player.SetModData(key, new SceneDescriptionEditPacket { Color = (int)SceneMarkerColor.Green });
+
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
+        {
+            EntryId = marker.Entries.Primary.Id,
+            Body = "Edited text",
+            Color = (int)SceneMarkerColor.Red,
+        }));
+
+        marker.Data.Body.Should().Be("Edited text");
+        player.GetModData<SceneDescriptionEditPacket>(key).Color.Should().Be((int)SceneMarkerColor.Green);
+    }
+
+    [Fact]
+    public void SettingDefaultsCopiesOnlyAppearanceWithoutChangingThePlacedMarker()
+    {
+        var (marker, player, _) = CreateMarker();
+        var stamp = marker.Data.ReadStamp;
+        var packet = new SceneDescriptionEditPacket
+        {
+            EntryId = marker.Entries.Primary.Id,
+            Title = "Unsaved title",
+            Body = "Unsaved body",
+            Kind = (int)SceneDescriptionKind.OocNotice,
+            Display = (int)SceneDescriptionDisplay.AlwaysNearby,
+            Symbol = (int)SceneMarkerSymbol.Diamond,
+            SymbolIconName = "wpStar1",
+            Color = (int)SceneMarkerColor.Blue,
+            TitleIconName = "wpHome",
+            HeightOffset = 2,
+            IndicatorScale = 1.5f,
+            BubbleScale = 2,
+            IdleBobbing = false,
+            ShowBodyInBubble = true,
+            IconDistance = 72,
+            UnlimitedIconDistance = true,
+            TextDistance = 44,
+            UnlimitedTextDistance = true,
+            IsLocked = true,
+        };
+
+        marker.OnReceivedClientPacket(player, 1010, SerializerUtil.Serialize(packet));
+
+        var stored = player.GetModData<SceneDescriptionEditPacket>("thebasics-scene-appearance");
+        stored.Should().NotBeNull();
+        stored.Display.Should().Be((int)SceneDescriptionDisplay.AlwaysNearby);
+        stored.Symbol.Should().Be((int)SceneMarkerSymbol.Diamond);
+        stored.SymbolIconName.Should().Be("wpStar1");
+        stored.Color.Should().Be((int)SceneMarkerColor.Blue);
+        stored.TitleIconName.Should().Be("wpHome");
+        stored.HeightOffset.Should().Be(2);
+        stored.IndicatorScale.Should().Be(1.5f);
+        stored.BubbleScale.Should().Be(2);
+        stored.IdleBobbing.Should().BeFalse();
+        stored.ShowBodyInBubble.Should().BeTrue();
+        stored.IconDistance.Should().Be(72);
+        stored.UnlimitedIconDistance.Should().BeTrue();
+        stored.TextDistance.Should().Be(44);
+        stored.UnlimitedTextDistance.Should().BeTrue();
+        stored.Title.Should().BeEmpty();
+        stored.Body.Should().BeEmpty();
+        stored.Kind.Should().Be((int)SceneDescriptionKind.Environmental);
+        stored.IsLocked.Should().BeFalse();
+        marker.Data.Body.Should().Be("Original text");
+        marker.Data.Color.Should().Be(SceneMarkerColor.Gold);
+        marker.Data.ReadStamp.Should().Be(stamp);
+    }
+
+    [Fact]
+    public void DefaultsApplyToFreshCraftedMarkersButNotPickedUpMarkers()
+    {
+        var (marker, player, _) = CreateMarker();
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.SetAppearanceDefaultsPacketId,
+            SerializerUtil.Serialize(new SceneDescriptionEditPacket
+            {
+                EntryId = marker.Entries.Primary.Id,
+                Color = (int)SceneMarkerColor.Blue,
+                Display = (int)SceneDescriptionDisplay.AlwaysNearby,
+            }));
+
+        var fresh = new SceneDescriptionBlockEntity { Api = marker.Api, Pos = marker.Pos, Block = marker.Block };
+        fresh.InitializeFromItem(new ItemStack(marker.Block), player);
+        fresh.Data.Color.Should().Be(SceneMarkerColor.Blue);
+        fresh.Data.Display.Should().Be(SceneDescriptionDisplay.AlwaysNearby);
+        fresh.Data.Title.Should().BeEmpty();
+        fresh.Data.Body.Should().BeEmpty();
+
+        marker.Data.Color = SceneMarkerColor.Red;
+        var pickedUp = marker.Block.GetDrops(marker.Api.World, marker.Pos, player).Single();
+        var replaced = new SceneDescriptionBlockEntity { Api = marker.Api, Pos = marker.Pos, Block = marker.Block };
+        replaced.InitializeFromItem(pickedUp, player);
+        replaced.Data.Color.Should().Be(SceneMarkerColor.Red);
+        replaced.Data.Body.Should().Be("Original text");
+    }
+
+    [Theory]
+    [InlineData(0.24f, false)]
+    [InlineData(3.01f, false)]
+    [InlineData(float.NaN, false)]
+    [InlineData(1.5f, true)]
+    public void InvalidOrUnauthorizedDefaultsRequestsDoNotReplacePreferences(float scale, bool denyClaim)
+    {
+        var (marker, player, world) = CreateMarker();
+        const string key = "thebasics-scene-appearance";
+        player.SetModData(key, new SceneDescriptionEditPacket { Color = (int)SceneMarkerColor.Green });
+        if (denyClaim) world.Claims.TryAccess(player, marker.Pos, EnumBlockAccessFlags.BuildOrBreak).Returns(false);
+
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.SetAppearanceDefaultsPacketId,
+            SerializerUtil.Serialize(new SceneDescriptionEditPacket
+            {
+                EntryId = marker.Entries.Primary.Id,
+                IndicatorScale = scale,
+                Color = (int)SceneMarkerColor.Blue,
+            }));
+
+        player.GetModData<SceneDescriptionEditPacket>(key).Color.Should().Be((int)SceneMarkerColor.Green);
+        player.IngameErrors.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void SecondaryAndLockedEditorsCannotSetAppearanceDefaults()
+    {
+        var (marker, player, _) = CreateMarker();
+        var second = marker.TryAddEntry(player)!;
+        var packet = new SceneDescriptionEditPacket { EntryId = second.Id, Color = (int)SceneMarkerColor.Blue };
+        marker.EditorOptions(packet).CanEditAppearance.Should().BeFalse();
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.SetAppearanceDefaultsPacketId, SerializerUtil.Serialize(packet));
+        player.GetModData<SceneDescriptionEditPacket>("thebasics-scene-appearance").Should().BeNull();
+
+        packet.EntryId = marker.Entries.Primary.Id;
+        packet.CreateNew = true;
+        marker.EditorOptions(packet).IsNewEntry.Should().BeTrue();
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.SetAppearanceDefaultsPacketId, SerializerUtil.Serialize(packet));
+        player.GetModData<SceneDescriptionEditPacket>("thebasics-scene-appearance").Should().BeNull();
+
+        marker.Data.LockItemCode = "ui";
+        packet.CreateNew = false;
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.SetAppearanceDefaultsPacketId, SerializerUtil.Serialize(packet));
+        player.GetModData<SceneDescriptionEditPacket>("thebasics-scene-appearance").Should().BeNull();
+    }
+
+    [Fact]
     public void ClaimMemberCanAddAnIndependentServerAuthoredEntryWithoutChangingTheFirst()
     {
         var (marker, _, world) = CreateMarker();

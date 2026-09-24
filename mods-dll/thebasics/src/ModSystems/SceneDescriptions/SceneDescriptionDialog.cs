@@ -37,16 +37,18 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private readonly bool _isNewEntry;
     private readonly Action _onUnlock;
     private readonly Action _onClearRead;
+    private readonly Action<SceneDescriptionData> _onSetDefaults;
     private readonly SceneDescriptionData _appearance;
     private readonly Shape[] _symbolShapes;
 
     public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, SceneDescriptionDialogOptions options, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose,
-        Action onAdd = null) : base(capi)
+        Action onAdd = null, Action<SceneDescriptionData> onSetDefaults = null) : base(capi)
     {
         _onSave = onSave;
         _onAdd = onAdd;
         _onUnlock = onUnlock;
         _onClearRead = onClearRead;
+        _onSetDefaults = onSetDefaults;
         _canManageLock = options.CanManageLock;
         _canAdd = options.CanAdd;
         _canEditAppearance = options.CanEditAppearance;
@@ -235,6 +237,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddIf(_canAdd && _onAdd != null)
             .AddSmallButton(Lang.Get("thebasics:scene-entry-add"), OnAdd, ElementBounds.Fixed(300, buttonY, 150, ButtonHeight))
             .EndIf()
+            .AddIf(_canEditAppearance && !_isNewEntry && _onSetDefaults != null)
+            .AddSmallButton(Lang.Get("thebasics:scene-set-defaults"), OnSetDefaults, ElementBounds.Fixed(465, buttonY, 185, ButtonHeight), key: "setdefaults")
+            .EndIf()
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth + 290 - 150, buttonY, 150, ButtonHeight), key: "save")
             .AddSmallButton("", OnLockButton, ElementBounds.Fixed(750, top, 36, 32), key: "lock")
             .AddSceneDrawing(ElementBounds.Fixed(756, top + 4, 24, 24), DrawLock, "lockart")
@@ -268,6 +273,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         RefreshPreview();
         SingleComposer.GetButton("lock").Enabled = _canManageLock;
         SingleComposer.GetButton("save").Enabled = !data.IsLocked;
+        if (_canEditAppearance && !_isNewEntry && _onSetDefaults != null)
+            SingleComposer.GetButton("setdefaults").Enabled = !data.IsLocked;
         SingleComposer.GetButton("clearread").Enabled = !data.IsLocked && _onClearRead != null;
         SingleComposer.GetTextInput("title").Enabled = !data.IsLocked;
         SingleComposer.GetTextArea("body").Enabled = !data.IsLocked;
@@ -473,26 +480,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private bool OnSave()
     {
         if (_appearance.IsLocked) return false;
-        if (_canEditAppearance)
-        {
-            if (!TryReadValidated("size", 25, 300, "scene-size", out var percent)) return false;
-            _appearance.IndicatorScale = percent / 100;
-            if (!TryReadValidated("bubblesize", 40, 350, "scene-bubble-size", out var bubblePercent)) return false;
-            _appearance.BubbleScale = bubblePercent / 100;
-            if (!TryReadValidated("height", -2, 4, "scene-height", out var height)) return false;
-            _appearance.HeightOffset = height;
-            if (_nearbyLayout && !_appearance.UnlimitedTextDistance)
-            {
-                if (!TryReadValidated("textdistance", 1, 1024, "scene-distance", out var textDistance)) return false;
-                _appearance.TextDistance = textDistance;
-            }
-            if (!_appearance.UnlimitedIconDistance)
-            {
-                if (!TryReadValidated("distance", 1, 1024, "scene-distance", out var distance)) return false;
-                _appearance.IconDistance = distance;
-            }
-        }
-        var data = BuildDraft().Normalize();
+        if (!TryBuildValidatedDraft(out var data)) return false;
         if (_isNewEntry && !SceneAnalytics.Written(data))
         {
             capi.TriggerIngameError(this, "scene-entry-empty", Lang.Get("thebasics:scene-entry-empty-save"));
@@ -502,6 +490,31 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         _closing = true;
         base.TryClose();
         _onSave?.Invoke(data, _lockAfterSave);
+        return true;
+    }
+
+    private bool OnSetDefaults()
+    {
+        if (!_canEditAppearance || _isNewEntry || _appearance.IsLocked || _onSetDefaults == null) return false;
+        if (!TryBuildValidatedDraft(out var data)) return false;
+        _onSetDefaults(data.AppearanceDefaults());
+        return true;
+    }
+
+    private bool TryBuildValidatedDraft(out SceneDescriptionData data)
+    {
+        data = null;
+        if (_canEditAppearance)
+        {
+            if (!TryReadValidated("size", 25, 300, "scene-size", out _)) return false;
+            if (!TryReadValidated("bubblesize", 40, 350, "scene-bubble-size", out _)) return false;
+            if (!TryReadValidated("height", -2, 4, "scene-height", out _)) return false;
+            if (_nearbyLayout && !_appearance.UnlimitedTextDistance &&
+                !TryReadValidated("textdistance", 1, 1024, "scene-distance", out _)) return false;
+            if (!_appearance.UnlimitedIconDistance &&
+                !TryReadValidated("distance", 1, 1024, "scene-distance", out _)) return false;
+        }
+        data = BuildDraft().Normalize();
         return true;
     }
 
