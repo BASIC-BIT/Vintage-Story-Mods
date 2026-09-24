@@ -29,8 +29,7 @@
         "east": { "texture": "#accent", "uv": [0, 0, 4, 1] },
         "south": { "texture": "#accent", "uv": [0, 0, 1, 1] },
         "west": { "texture": "#accent", "uv": [0, 0, 4, 1] },
-        "up": { "texture": "#accent", "uv": [7.5, 6, 8.5, 10] },
-        "down": { "texture": "#accent", "uv": [7.5, 6, 8.5, 10] }
+        "up": { "texture": "#accent", "uv": [7.5, 6, 8.5, 10] }
       }
     }
   ]

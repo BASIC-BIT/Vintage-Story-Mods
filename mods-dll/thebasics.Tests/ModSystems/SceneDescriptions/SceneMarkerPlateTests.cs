@@ -149,6 +149,28 @@ public class SceneMarkerPlateTests
     }
 
     [Theory]
+    [InlineData("ground", "down", 1)]
+    [InlineData("ceiling", "down", 1)]
+    [InlineData("wall", "north", 2)]
+    public void InlayOmitsOnlyItsHiddenContactFace(string attachment, string hiddenFace, int contactAxis)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Vintage-Story-Mods.sln"))) directory = directory.Parent;
+        var shape = JObject.Parse(File.ReadAllText(Path.Combine(directory!.FullName,
+            $"mods-dll/thebasics/assets/thebasics/shapes/block/scene-marker-{attachment}.json")));
+        var plate = shape["elements"]![0]!;
+        var inlay = shape["elements"]![1]!;
+        var plateTo = plate["to"]!.ToObject<float[]>()!;
+        var inlayFrom = inlay["from"]!.ToObject<float[]>()!;
+        plateTo[contactAxis].Should().Be(inlayFrom[contactAxis]);
+
+        var faces = (JObject)inlay["faces"]!;
+        faces.Property(hiddenFace).Should().BeNull("the inlay's contact face is coplanar with the plate surface");
+        faces.Properties().Should().HaveCount(5, "the other inlay faces remain visible");
+        ((JObject)plate["faces"]!).Properties().Should().HaveCount(6);
+    }
+
+    [Theory]
     [InlineData("north")]
     [InlineData("east")]
     [InlineData("south")]
