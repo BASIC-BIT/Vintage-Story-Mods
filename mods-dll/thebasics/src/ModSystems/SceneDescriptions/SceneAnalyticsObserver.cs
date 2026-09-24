@@ -73,7 +73,6 @@ internal sealed class SceneAnalyticsObserver : IDisposable
         var now = _client?.World?.ElapsedMilliseconds ?? 0;
         if (_safe?.IsConnected != true || _permissionUntil == 0 || now >= _permissionUntil) { _gate.Clear(); return; }
         var key = (bubble ? "bubble:" : "reader:") + (pos == null ? "held" : SceneReadMarks.Key(pos));
-        if (!bubble && !string.IsNullOrEmpty(entryId)) key += ":" + entryId;
         if (!(bubble ? _gate.Observe(key, now) : _gate.Accept(key, now, 30000))) return;
         _safe.TrySendPacketWithoutQueue(new SceneObservationMessage { X = pos?.X ?? 0, Y = pos?.Y ?? 0, Z = pos?.Z ?? 0, Dimension = pos?.dimension ?? 0, Held = pos == null, Bubble = bubble, EntryId = entryId ?? string.Empty });
     }
@@ -92,7 +91,7 @@ internal sealed class SceneAnalyticsObserver : IDisposable
             if (entry == null) return;
             data = entry.Data;
             if (!SceneAnalytics.Written(data)) return;
-            key = entries.Entries.Count == 1 ? "held" : "held:" + entry.Id;
+            key = "held";
         }
         else
         {
@@ -108,7 +107,7 @@ internal sealed class SceneAnalyticsObserver : IDisposable
             var targeted = player.CurrentBlockSelection?.Position?.Equals(pos) == true;
             if (!ObservationAllowed(data, distance, message.Bubble, targeted)) return;
             if (message.Bubble && SceneReadMarks.IsRead(player.GetSceneReadMarks().Marks, pos, entry.Id, data.ReadStamp)) return;
-            key = SceneReadMarks.Key(pos, entry.Id);
+            key = message.Bubble ? SceneReadMarks.Key(pos, entry.Id) : SceneReadMarks.Key(pos);
         }
         TrackObservation(player, message, data, key);
     }

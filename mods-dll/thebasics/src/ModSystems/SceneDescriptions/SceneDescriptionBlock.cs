@@ -106,9 +106,9 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
             blockEntity.InitializeFromItem(itemStack, byPlayer);
             var reused = itemStack?.Attributes?.HasAttribute(SceneDescriptionData.TitleAttribute) == true ||
                 itemStack?.Attributes?.GetTreeAttribute("sceneEntries") != null;
-            SceneAnalytics.Track(blockEntity.Data, "placed", "scene_placement", reused ? "reused" : "fresh",
+            SceneAnalytics.Track(blockEntity.Entries, "placed", "scene_placement", reused ? "reused" : "fresh",
                 blockEntity.Block?.Variant?["attachment"] switch { "wall" => "wall", "ground" => "ground", _ => null });
-            if (reused && SceneAnalytics.Written(blockEntity.Data)) SceneAnalytics.Track(blockEntity.Data, "moved", "scene_placement", "reused",
+            if (reused && SceneAnalytics.Written(blockEntity.Entries)) SceneAnalytics.Track(blockEntity.Entries, "moved", "scene_placement", "reused",
                 blockEntity.Block?.Variant?["attachment"] switch { "wall" => "wall", "ground" => "ground", _ => null });
         }
 
@@ -138,6 +138,11 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         {
             if (byPlayer?.Entity?.Controls?.ShiftKey == true)
             {
+                if (!SceneDescriptionSystem.SceneMarkersEnabled(api))
+                {
+                    (api as ICoreClientAPI)?.TriggerIngameError(this, "scene-markers-disabled", Lang.Get("thebasics:scene-markers-disabled"));
+                    return true;
+                }
                 if (blockEntity.Entries.Entries.Count == 1)
                 {
                     if (world.Side == EnumAppSide.Server) blockEntity.OpenEditor(byPlayer);
@@ -247,11 +252,10 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
             return;
         }
 
-        var removed = (world.BlockAccessor.GetBlockEntity(pos) as SceneDescriptionBlockEntity)?.Entries.Entries
-            .Select(entry => entry.Data.Clone()).ToArray();
+        var removed = (world.BlockAccessor.GetBlockEntity(pos) as SceneDescriptionBlockEntity)?.Entries;
         base.OnBlockBroken(world, pos, byPlayer, dropQuantityMultiplier);
         if (world.Side == EnumAppSide.Server && SceneDescriptionSystem.SceneMarkersEnabled(api) && byPlayer != null && removed != null && world.BlockAccessor.GetBlockEntity(pos) is not SceneDescriptionBlockEntity)
-            foreach (var entry in removed) SceneAnalytics.Track(entry, "removed");
+            SceneAnalytics.Track(removed, "removed");
     }
 
     public override void OnBlockExploded(IWorldAccessor world, BlockPos pos, BlockPos explosionCenter, EnumBlastType blastType, string ignitedByPlayerUid)

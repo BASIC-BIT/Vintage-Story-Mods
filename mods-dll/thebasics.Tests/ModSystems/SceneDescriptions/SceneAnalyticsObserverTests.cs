@@ -41,7 +41,7 @@ public class SceneAnalyticsObserverTests
     }
 
     [Fact]
-    public void ClientDedupesReaderOpensPerSelectedEntry()
+    public void ClientDedupesReaderOpensPerPlacedMarker()
     {
         var api = Substitute.For<ICoreClientAPI>();
         var channel = Substitute.For<IClientNetworkChannel>();
@@ -58,9 +58,9 @@ public class SceneAnalyticsObserverTests
         observer.ReaderOpened(pos, "second");
         observer.ReaderOpened(pos, "first");
 
-        channel.Received(2).SendPacket(Arg.Any<SceneObservationMessage>());
+        channel.Received(1).SendPacket(Arg.Any<SceneObservationMessage>());
         channel.Received(1).SendPacket(Arg.Is<SceneObservationMessage>(message => message.EntryId == "first"));
-        channel.Received(1).SendPacket(Arg.Is<SceneObservationMessage>(message => message.EntryId == "second"));
+        channel.DidNotReceive().SendPacket(Arg.Is<SceneObservationMessage>(message => message.EntryId == "second"));
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public class SceneAnalyticsObserverTests
     }
 
     [Fact]
-    public void PlacedReaderOpenAttributesTheSelectedEntryAndRejectsUnknownOrAmbiguousIds()
+    public void PlacedReaderOpenAttributesTheFirstSelectedEntryAndRejectsUnknownOrAmbiguousIds()
     {
         var api = Substitute.For<ICoreServerAPI>();
         var channel = Substitute.For<IServerNetworkChannel>();
@@ -161,11 +161,10 @@ public class SceneAnalyticsObserverTests
                 (string)properties["action"] == "reader_opened" &&
                 (string)properties["scene_display_mode"] == "always_nearby" &&
                 (bool)properties["scene_locked"]));
-            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(properties =>
+            sink.DidNotReceive().Track("feature used", Arg.Is<IDictionary<string, object>>(properties =>
                 (string)properties["action"] == "reader_opened" &&
-                (string)properties["scene_display_mode"] == "always_nearby" &&
                 !(bool)properties["scene_locked"]));
-            sink.Received(2).Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
+            sink.Received(1).Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
         }
         finally { AnalyticsService.Shutdown(); }
     }

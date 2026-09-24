@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
 using thebasics.Extensions;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.SceneDescriptions;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -268,6 +269,82 @@ public class SceneDescriptionEntriesServerTests
     }
 
     [Fact]
+    public void RemovingAnEntryDoesNotReportMarkerRemoval()
+    {
+        var sink = Substitute.For<IAnalyticsSink>();
+        sink.IsEnabled.Returns(true);
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => new string('c', 64));
+        try
+        {
+            var (marker, player, _) = CreateMarker();
+            var second = marker.TryAddEntry(player)!;
+
+            marker.TryRemoveEntry(player, second.Id).Should().BeTrue();
+
+            sink.DidNotReceive().Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "removed"));
+        }
+        finally { AnalyticsService.Shutdown(); }
+    }
+
+    [Fact]
+    public void BreakingAMultiEntryMarkerReportsOneRemoval()
+    {
+        var sink = Substitute.For<IAnalyticsSink>();
+        sink.IsEnabled.Returns(true);
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => new string('c', 64));
+        try
+        {
+            var (marker, player, world) = CreateMarker();
+            marker.TryAddEntry(player).Should().NotBeNull();
+            player.WorldData = Substitute.For<IWorldPlayerData>();
+            typeof(CollectibleObject).GetField("api", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .SetValue(marker.Block, marker.Api);
+            var broken = false;
+            world.BlockAccessor.GetBlockEntity(marker.Pos).Returns(_ => broken ? null : marker);
+            world.BlockAccessor.When(accessor => accessor.SetBlock(Arg.Any<int>(), marker.Pos))
+                .Do(_ => broken = true);
+
+            marker.Block.OnBlockBroken(world, marker.Pos, player);
+
+            broken.Should().BeTrue();
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p => (string)p["action"] == "removed"));
+        }
+        finally { AnalyticsService.Shutdown(); }
+    }
+
+    [Fact]
+    public void PlacingStoredSecondaryContentReportsWrittenReuseAndOneMove()
+    {
+        var sink = Substitute.For<IAnalyticsSink>();
+        sink.IsEnabled.Returns(true);
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => new string('c', 64));
+        try
+        {
+            var (marker, player, world) = CreateMarker();
+            typeof(CollectibleObject).GetField("api", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .SetValue(marker.Block, marker.Api);
+            var entries = new SceneDescriptionEntries();
+            entries.Add(new SceneDescriptionData { Body = "Secondary account" });
+            var item = new ItemStack(marker.Block);
+            entries.WriteTo(item.Attributes);
+            var selection = new BlockSelection { Position = marker.Pos, Face = BlockFacing.DOWN, HitPosition = new Vec3d(0.5, 1, 0.5) };
+            world.BlockAccessor.GetBlock(marker.Pos.UpCopy()).Returns(new Block { SideSolid = new Vintagestory.API.Datastructures.SmallBoolArray(63) });
+            world.BlockAccessor.GetBlock(marker.Pos).Returns(new Block { Replaceable = 10000 });
+            world.BlockAccessor.GetBlock(Arg.Any<AssetLocation>()).Returns(new Block { BlockId = 101 });
+            world.Claims.TryAccess(player, marker.Pos, EnumBlockAccessFlags.BuildOrBreak).Returns(true);
+            var failure = string.Empty;
+
+            marker.Block.TryPlaceBlock(world, player, item, selection, ref failure).Should().BeTrue();
+
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p =>
+                (string)p["action"] == "placed" && (string)p["scene_placement"] == "reused" && (string)p["scene_content"] == "written"));
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p =>
+                (string)p["action"] == "moved" && (string)p["scene_content"] == "written"));
+        }
+        finally { AnalyticsService.Shutdown(); }
+    }
+
+    [Fact]
     public void EmptyPrimaryMustBeWrittenBeforeAdding()
     {
         var (marker, player, _) = CreateMarker();
@@ -277,6 +354,77 @@ public class SceneDescriptionEntriesServerTests
         marker.TryAddEntry(player).Should().BeNull();
         marker.OnReceivedClientPacket(player, 1008, null);
         marker.Entries.Entries.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void WrittenSecondaryAllowsAnotherEntryWhenPrimaryIsEmpty()
+    {
+        var (marker, player, _) = CreateMarker();
+        var second = marker.TryAddEntry(player)!;
+        second.Data.Body = "Secondary account";
+        marker.Data.Title = string.Empty;
+        marker.Data.Body = string.Empty;
+
+        marker.TryAddEntry(player).Should().NotBeNull();
+        marker.Entries.Entries.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void WrittenSecondaryCanRequestTheAddEditorWhenPrimaryIsEmpty()
+    {
+        var (marker, player, _) = CreateMarker();
+        var second = marker.TryAddEntry(player)!;
+        second.Data.Body = "Secondary account";
+        marker.Data.Body = string.Empty;
+        var serverApi = Substitute.For<ICoreServerAPI>();
+        var serverWorld = Substitute.For<IServerWorldAccessor>();
+        serverApi.Side.Returns(EnumAppSide.Server);
+        serverApi.World.Returns(serverWorld);
+        ((ICoreAPI)serverApi).World.Returns(serverWorld);
+        serverWorld.Claims.TryAccess(player, marker.Pos, EnumBlockAccessFlags.BuildOrBreak).Returns(true);
+        var system = new SceneDescriptionSystem();
+        system.SetRuntimeEnabled(true);
+        serverApi.ModLoader.GetModSystem<SceneDescriptionSystem>().Returns(system);
+        marker.Api = serverApi;
+
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.AddEntryPacketId, null!);
+
+        var openEditorId = (int)typeof(SceneDescriptionBlockEntity).GetField("OpenEditorPacketId",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.GetRawConstantValue()!;
+        serverApi.Network.Received(1).SendBlockEntityPacket(player, marker.Pos, openEditorId,
+            Arg.Is<byte[]>(bytes => SerializerUtil.Deserialize<SceneDescriptionEditPacket>(bytes).CreateNew));
+    }
+
+    [Fact]
+    public void WrittenSecondaryAllowsSavingANewEntryWhenPrimaryIsEmpty()
+    {
+        var (marker, player, _) = CreateMarker();
+        var second = marker.TryAddEntry(player)!;
+        second.Data.Body = "Secondary account";
+        marker.Data.Body = string.Empty;
+
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
+        {
+            CreateNew = true,
+            Body = "Third account",
+        }));
+
+        marker.Entries.Entries.Should().HaveCount(3);
+        marker.Entries.Entries[2].Data.Body.Should().Be("Third account");
+    }
+
+    [Fact]
+    public void WrittenSecondaryEnablesAddInAnExistingEditorWhenPrimaryIsEmpty()
+    {
+        var (marker, player, _) = CreateMarker();
+        var second = marker.TryAddEntry(player)!;
+        second.Data.Body = "Secondary account";
+        marker.Data.Body = string.Empty;
+        var packet = new SceneDescriptionEditPacket { EntryId = second.Id };
+
+        var options = marker.EditorOptions(packet);
+
+        options.CanAdd.Should().BeTrue();
     }
 
     [Fact]

@@ -28,6 +28,19 @@ public class SceneMarkerPlateTests
     }
 
     [Fact]
+    public void PlacedPlateHasDepthBiasAgainstItsSupport()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Vintage-Story-Mods.sln"))) directory = directory.Parent;
+        var assetPath = Path.Combine(directory!.FullName, "mods-dll/thebasics/assets/thebasics/blocktypes/scene-marker.json");
+        var asset = JObject.Parse(File.ReadAllText(assetPath));
+
+        asset["vertexFlags"].Should().NotBeNull("all marker attachments need depth bias");
+        asset["vertexFlags"]!.Value<int>("zOffset").Should().BeInRange(1, 7,
+            "the plate needs the game's depth bias for shallow geometry next to ground, walls, and ceilings");
+    }
+
+    [Fact]
     public void EnabledMarkerKeepsItsTerrainMesh()
     {
         var (_, marker, _, _) = CreateMarker();
@@ -132,6 +145,26 @@ public class SceneMarkerPlateTests
         box.Y2.Should().BeApproximately(bounds.Y2, 0.00001f);
         box.Z1.Should().BeApproximately(bounds.Z1, 0.00001f);
         box.Z2.Should().BeApproximately(bounds.Z2, 0.00001f);
+    }
+
+    [Fact]
+    public void DisabledMarkerShiftInteractionDoesNotOpenTheEditChooser()
+    {
+        LangTestHelper.EnsureEnglish();
+        var (block, marker, api, world) = CreateMarker();
+        marker.Entries.Add(new SceneDescriptionData { Body = "Second account" });
+        var player = (PlateTestPlayer)world.Player;
+        player.Entity.Pos.SetPos(0.5, 0.5, 0.5);
+        player.Entity.Controls.ShiftKey = true;
+        world.Claims.TryAccess(player, marker.Pos, EnumBlockAccessFlags.BuildOrBreak).Returns(true);
+        api.ModLoader.GetModSystem<SceneDescriptionSystem>().SetRuntimeEnabled(false);
+
+        var interact = () => block.OnBlockInteractStart(world, player, new BlockSelection { Position = marker.Pos });
+
+        interact.Should().NotThrow();
+        api.Received(1).TriggerIngameError(block, "scene-markers-disabled", Arg.Any<string>());
+        typeof(SceneDescriptionBlockEntity).GetField("_chooser", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(marker).Should().BeNull();
     }
 
     [Fact]

@@ -142,7 +142,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     internal SceneDescriptionEntry TryAddEntry(IPlayer player, bool persist = true)
     {
-        if (Api.Side != EnumAppSide.Server || !HasClaimAccess(player) || !IsWithinEditDistance(player) || !SceneAnalytics.Written(Data)) return null;
+        if (Api.Side != EnumAppSide.Server || !HasClaimAccess(player) || !IsWithinEditDistance(player) || !SceneAnalytics.Written(Entries)) return null;
         var entry = Entries.Add(Data.AppearanceDefaults());
         if (entry == null) return null;
         entry.Data.EstablishCreator(player.PlayerUID, player.PlayerName);
@@ -158,7 +158,6 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             !IsWithinEditDistance(player) || !Entries.Remove(entryId)) return false;
         _summaryData = null;
         PersistEntries(player, "removed a description from");
-        SceneAnalytics.Track(entry.Data, "removed");
         return true;
     }
 
@@ -170,7 +169,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         var choices = Entries.Entries.Select(entry => new SceneEntryChoice(entry.Id, entry.Data.Title, entry.Data.AuthorName,
             SceneReadMarks.IsRead(Pos, entry.Id, entry.Data.ReadStamp), entry.Data.IsLocked,
             editing && Entries.Entries.Count > 1 && !entry.Data.IsLocked)).ToArray();
-        _chooser = new SceneEntryChooserDialog(client, choices, editing, editing && SceneAnalytics.Written(Data) && choices.Length < SceneDescriptionEntries.MaxEntries,
+        _chooser = new SceneEntryChooserDialog(client, choices, editing, editing && SceneAnalytics.Written(Entries) && choices.Length < SceneDescriptionEntries.MaxEntries,
             id =>
             {
                 if (editing) client.Network.SendBlockEntityPacket(Pos, RequestEditorPacketId, SerializerUtil.Serialize(new SceneEntryActionPacket { EntryId = id }));
@@ -258,7 +257,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     private void HandleAddEntry(IPlayer player)
     {
         if (player is IServerPlayer serverPlayer && Api is ICoreServerAPI serverApi &&
-            HasClaimAccess(player) && IsWithinEditDistance(player) && SceneAnalytics.Written(Data) &&
+            HasClaimAccess(player) && IsWithinEditDistance(player) && SceneAnalytics.Written(Entries) &&
             Entries.Entries.Count < SceneDescriptionEntries.MaxEntries)
         {
             var packet = ToPacket(Data.AppearanceDefaults());
@@ -397,7 +396,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
     private bool CanSave(IPlayer player, bool creating, SceneDescriptionEntry entry) =>
         HasClaimAccess(player) && (creating
-            ? SceneAnalytics.Written(Data) && Entries.Entries.Count < SceneDescriptionEntries.MaxEntries
+            ? SceneAnalytics.Written(Entries) && Entries.Entries.Count < SceneDescriptionEntries.MaxEntries
             : entry != null && entry.Data.CanEdit(player?.PlayerUID, true));
 
     public override void OnReceivedServerPacket(int packetId, byte[] data)
@@ -437,10 +436,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
         _dialog?.TryCloseWithoutPrompt();
         var entryId = packet.EntryId;
-        var options = new SceneDescriptionDialogOptions(packet.CanManageLock,
-            CanAdd: !packet.CreateNew && SceneAnalytics.Written(Data) && Entries.Entries.Count < SceneDescriptionEntries.MaxEntries,
-            CanEditAppearance: !packet.CreateNew && entryId == Entries.Primary.Id,
-            IsNewEntry: packet.CreateNew);
+        var options = EditorOptions(packet);
         _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), options, (saved, lockAfterSave) =>
         {
             var savedPacket = ToPacket(saved);
@@ -455,6 +451,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             () => clientApi.Network.SendBlockEntityPacket(Pos, AddEntryPacketId));
         _dialog.TryOpen();
     }
+
+    internal SceneDescriptionDialogOptions EditorOptions(SceneDescriptionEditPacket packet) => new(packet.CanManageLock,
+        CanAdd: !packet.CreateNew && SceneAnalytics.Written(Entries) && Entries.Entries.Count < SceneDescriptionEntries.MaxEntries,
+        CanEditAppearance: !packet.CreateNew && packet.EntryId == Entries.Primary.Id,
+        IsNewEntry: packet.CreateNew);
 
     public override void ToTreeAttributes(ITreeAttribute tree)
     {

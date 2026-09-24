@@ -37,6 +37,7 @@
   },
   blockmaterial: "Stone",
   renderpass: "OpaqueNoCull",
+  vertexFlags: { zOffset: 3 },
   lightAbsorption: 0,
   sidesolid: { all: false },
   sideopaque: { all: false },
