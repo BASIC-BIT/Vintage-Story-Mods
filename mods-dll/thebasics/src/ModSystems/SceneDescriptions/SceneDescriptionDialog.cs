@@ -11,7 +11,8 @@ using Vintagestory.API.Config;
 namespace thebasics.ModSystems.SceneDescriptions;
 
 internal sealed record SceneDescriptionDialogOptions(
-    bool CanManageLock, bool CanAdd = false, bool CanEditAppearance = true, bool IsNewEntry = false);
+    bool CanManageLock, bool CanAdd = false, bool CanEditAppearance = true, bool IsNewEntry = false,
+    Action<SceneDescriptionData> OnSetDefaults = null);
 
 internal sealed class SceneDescriptionDialog : GuiDialog
 {
@@ -42,13 +43,13 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private readonly Shape[] _symbolShapes;
 
     public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, SceneDescriptionDialogOptions options, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose,
-        Action onAdd = null, Action<SceneDescriptionData> onSetDefaults = null) : base(capi)
+        Action onAdd = null) : base(capi)
     {
         _onSave = onSave;
         _onAdd = onAdd;
         _onUnlock = onUnlock;
         _onClearRead = onClearRead;
-        _onSetDefaults = onSetDefaults;
+        _onSetDefaults = options.OnSetDefaults;
         _canManageLock = options.CanManageLock;
         _canAdd = options.CanAdd;
         _canEditAppearance = options.CanEditAppearance;

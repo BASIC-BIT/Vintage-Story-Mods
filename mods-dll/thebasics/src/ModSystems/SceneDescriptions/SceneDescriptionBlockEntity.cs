@@ -475,7 +475,15 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
 
         _dialog?.TryCloseWithoutPrompt();
         var entryId = packet.EntryId;
-        var options = EditorOptions(packet);
+        var options = EditorOptions(packet) with
+        {
+            OnSetDefaults = defaults =>
+            {
+                var defaultsPacket = ToPacket(defaults.AppearanceDefaults());
+                defaultsPacket.EntryId = entryId;
+                clientApi.Network.SendBlockEntityPacket(Pos, SetAppearanceDefaultsPacketId, SerializerUtil.Serialize(defaultsPacket));
+            },
+        };
         _dialog = new SceneDescriptionDialog(clientApi, FromPacket(packet), options, (saved, lockAfterSave) =>
         {
             var savedPacket = ToPacket(saved);
@@ -487,13 +495,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         }, packet.CreateNew ? null : () => clientApi.Network.SendBlockEntityPacket(Pos, UnlockPacketId, SerializerUtil.Serialize(new SceneEntryActionPacket { EntryId = entryId })),
             packet.CreateNew ? null : () => clientApi.Network.SendBlockEntityPacket(Pos, ClearReadPacketId, SerializerUtil.Serialize(new SceneEntryActionPacket { EntryId = entryId })),
             () => _dialog = null,
-            () => clientApi.Network.SendBlockEntityPacket(Pos, AddEntryPacketId),
-            defaults =>
-            {
-                var defaultsPacket = ToPacket(defaults.AppearanceDefaults());
-                defaultsPacket.EntryId = entryId;
-                clientApi.Network.SendBlockEntityPacket(Pos, SetAppearanceDefaultsPacketId, SerializerUtil.Serialize(defaultsPacket));
-            });
+            () => clientApi.Network.SendBlockEntityPacket(Pos, AddEntryPacketId));
         _dialog.TryOpen();
     }
 
