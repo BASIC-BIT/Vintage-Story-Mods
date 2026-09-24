@@ -2,9 +2,9 @@
 
 Change: always-visible stone plates on ground, walls, and ceilings. The plate and floating icon select the same marker. No new toggle. Automated verification does not replace these visual checks.
 
-Status: not started. Obtain owner approval before staging or starting manual QA, and record observations before marking any card passed.
+Status: package staged on the disposable test server and Profile2/Profile3 with owner approval on September 23. Human visual checks are pending. Record observations before marking any card passed.
 
-One batch with EnableSceneMarkers=true. Stage the exact package on the test server and both client profiles, verify matching SHA-256 values and clean boot, then relaunch clients after approval.
+One batch with EnableSceneMarkers=true. The exact package is staged on the test server and both client profiles. The server reached RunGame with SceneDescriptionSystem loaded; Profile2 loaded the mod and connected, and Profile3 was launched for manual connection.
 
 1. **Short-distance floor marker (P0)**
    - Do: Place on a full floor block. Add a title and body, select When targeted, set icon and text distances to 1. Stand about two blocks away within normal interaction reach and aim at the stone plate.
@@ -23,4 +23,7 @@ One batch with EnableSceneMarkers=true. Stage the exact package on the test serv
    - Expect: Read markers keep their existing suppressed-bubble behavior; unread restores the bubble. Right-click can reread. Both targets obey the same existing lock and claim permissions.
    - Watch for: Plate interactions bypassing locks or claims, or read marks being lost.
 
-Automated evidence: full The BASICs suite passed 1,072 tests with six existing skips. Build-and-package succeeded. Local package SHA-256: `98224FD47DD29989702234CC33C295677CECE2E2B182FE447BAA8FCCC18F2EAE`. The package is a local build from the PR branch, not a published 5.9.1 release. No test server or client profile was changed.
+Automated evidence: full The BASICs suite passed 1,072 tests with six existing skips. Build-and-package succeeded. Local package SHA-256: `98224FD47DD29989702234CC33C295677CECE2E2B182FE447BAA8FCCC18F2EAE`. The package is a local build from the PR branch, not a published 5.9.1 release. The prior server ZIP is backed up locally under `.tmp/scene-plate-qa-backup/`.
+
+PR: https://github.com/BASIC-BIT/Vintage-Story-Mods/pull/243
+Retire this packet after the PR is merged or superseded and its manual QA observations are recorded.
