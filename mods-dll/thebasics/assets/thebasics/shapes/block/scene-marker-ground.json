@@ -9,28 +9,28 @@
   "elements": [
     {
       "name": "marker",
-      "from": [5.5, 0.0, 3.0],
-      "to": [10.5, 1.0, 13.0],
+      "from": [6.75, 0.0, 3.0],
+      "to": [9.25, 1.0, 13.0],
       "faces": {
-        "north": { "texture": "#material", "uv": [0, 0, 5, 1] },
+        "north": { "texture": "#material", "uv": [0, 0, 2.5, 1] },
         "east": { "texture": "#material", "uv": [0, 0, 10, 1] },
-        "south": { "texture": "#material", "uv": [0, 0, 5, 1] },
+        "south": { "texture": "#material", "uv": [0, 0, 2.5, 1] },
         "west": { "texture": "#material", "uv": [0, 0, 10, 1] },
-        "up": { "texture": "#material", "uv": [5.5, 3, 10.5, 13] },
-        "down": { "texture": "#material", "uv": [5.5, 3, 10.5, 13] }
+        "up": { "texture": "#material", "uv": [6.75, 3, 9.25, 13] },
+        "down": { "texture": "#material", "uv": [6.75, 3, 9.25, 13] }
       }
     },
     {
       "name": "inlay",
-      "from": [7.0, 1.0, 6.0],
-      "to": [9.0, 1.35, 10.0],
+      "from": [7.5, 1.0, 6.0],
+      "to": [8.5, 1.35, 10.0],
       "faces": {
-        "north": { "texture": "#accent", "uv": [0, 0, 2, 1] },
+        "north": { "texture": "#accent", "uv": [0, 0, 1, 1] },
         "east": { "texture": "#accent", "uv": [0, 0, 4, 1] },
-        "south": { "texture": "#accent", "uv": [0, 0, 2, 1] },
+        "south": { "texture": "#accent", "uv": [0, 0, 1, 1] },
         "west": { "texture": "#accent", "uv": [0, 0, 4, 1] },
-        "up": { "texture": "#accent", "uv": [7, 6, 9, 10] },
-        "down": { "texture": "#accent", "uv": [7, 6, 9, 10] }
+        "up": { "texture": "#accent", "uv": [7.5, 6, 8.5, 10] },
+        "down": { "texture": "#accent", "uv": [7.5, 6, 8.5, 10] }
       }
     }
   ]

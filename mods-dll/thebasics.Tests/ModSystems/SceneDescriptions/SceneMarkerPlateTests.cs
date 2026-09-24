@@ -136,14 +136,16 @@ public class SceneMarkerPlateTests
         var inlayFrom = inlay["from"]!.ToObject<float[]>()!;
         var inlayTo = inlay["to"]!.ToObject<float[]>()!;
 
-        (plateTo[0] - plateFrom[0]).Should().Be(5);
+        (plateTo[0] - plateFrom[0]).Should().Be(2.5f);
         (plateTo[2] - plateFrom[2]).Should().Be(10);
         (plateTo[1] - plateFrom[1]).Should().Be(1);
         (plateTo[0] + plateFrom[0]).Should().Be(16);
-        (inlayTo[0] - inlayFrom[0]).Should().Be(2);
+        (plateTo[2] + plateFrom[2]).Should().Be(16);
+        (inlayTo[0] - inlayFrom[0]).Should().Be(1);
         (inlayTo[2] - inlayFrom[2]).Should().Be(4);
         (inlayTo[1] - inlayFrom[1]).Should().BeApproximately(0.35f, 0.00001f);
         (inlayTo[0] + inlayFrom[0]).Should().Be(16);
+        (inlayTo[2] + inlayFrom[2]).Should().Be(16);
     }
 
     [Theory]
