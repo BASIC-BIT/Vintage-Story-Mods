@@ -58,8 +58,13 @@ public class SceneDescriptionEntriesTests
         entries.Primary.Data.TitleIconName = "wpHome";
         var second = entries.Add(new SceneDescriptionData
         {
-            Title = "Second", Body = "A different account", Kind = SceneDescriptionKind.OocNotice,
-            AuthorUid = "bob", AuthorName = "Bob", LockItemCode = "ui", ReadStamp = 456,
+            Title = "Second",
+            Body = "A different account",
+            Kind = SceneDescriptionKind.OocNotice,
+            AuthorUid = "bob",
+            AuthorName = "Bob",
+            LockItemCode = "ui",
+            ReadStamp = 456,
         })!;
         var saved = new TreeAttribute();
         entries.WriteTo(saved, includeReadStamps: true);
