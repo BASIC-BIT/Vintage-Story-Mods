@@ -163,7 +163,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             ;
         if (!_canEditAppearance)
             SingleComposer.AddStaticText(Lang.Get("thebasics:scene-entry-shared-appearance"), CairoFont.WhiteSmallText(),
-                ElementBounds.Fixed(530, top, 260, 40));
+                ElementBounds.Fixed(530, top, 210, 40));
         ComposeRightColumn(data, top, textRow);
         ComposeBottomRows(data, top, buttonY);
         for (var index = 0; index < _symbolShapes.Length; index++)
