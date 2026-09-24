@@ -178,7 +178,9 @@ public class SceneMarkerPlateTests
 
         var faces = (JObject)inlay["faces"]!;
         faces.Property(hiddenFace).Should().BeNull("the inlay's contact face is coplanar with the plate surface");
-        faces.Properties().Should().HaveCount(5, "the other inlay faces remain visible");
+        faces.Properties().Select(face => face.Name).Should().BeEquivalentTo(
+            new[] { "north", "east", "south", "west", "up", "down" }.Where(face => face != hiddenFace),
+            "the other inlay faces remain visible");
         ((JObject)plate["faces"]!).Properties().Should().HaveCount(6);
     }
 
