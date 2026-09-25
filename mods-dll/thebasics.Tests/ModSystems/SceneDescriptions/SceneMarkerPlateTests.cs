@@ -3,11 +3,13 @@ using Newtonsoft.Json.Linq;
 using FluentAssertions;
 using NSubstitute;
 using NSubstitute.Extensions;
+using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.SceneDescriptions;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 using Vintagestory.GameContent;
 
 namespace thebasics.Tests.ModSystems.SceneDescriptions;
@@ -86,6 +88,39 @@ public class SceneMarkerPlateTests
         block.TryPlaceBlock(world, player, new ItemStack(block), selection, ref failure).Should().Be(supported);
         if (supported) world.BlockAccessor.Received(1).SetBlock(101, selection.Position);
         else world.BlockAccessor.DidNotReceive().SetBlock(Arg.Any<int>(), Arg.Any<BlockPos>());
+    }
+
+    [Fact]
+    public void ReusedCeilingPlacementReportsCeilingForPlacedAndMoved()
+    {
+        var sink = Substitute.For<IAnalyticsSink>();
+        sink.IsEnabled.Returns(true);
+        AnalyticsService.Configure(sink);
+        try
+        {
+            var (block, marker, api, world) = CreateMarker();
+            api.Side.Returns(EnumAppSide.Server);
+            world.Side.Returns(EnumAppSide.Server);
+            block.Code = new AssetLocation("thebasics:scene-marker-ground-north");
+            marker.Block = new SceneDescriptionBlock { Variant = new RelaxedReadOnlyDictionary<string, string>(new Dictionary<string, string> { ["attachment"] = "ceiling" }) };
+            var selection = new BlockSelection { Position = marker.Pos, Face = BlockFacing.DOWN, HitPosition = new Vec3d(0.5, 1, 0.5) };
+            world.BlockAccessor.GetBlock(selection.Position.UpCopy()).Returns(new Block { SideSolid = new SmallBoolArray(63) });
+            world.BlockAccessor.GetBlock(selection.Position).Returns(new Block { Replaceable = 10000 });
+            world.BlockAccessor.GetBlock(Arg.Any<AssetLocation>()).Returns(new Block { BlockId = 101 });
+            var player = new FakeServerPlayer("creator") { Entity = new EntityPlayer() };
+            player.Entity.Pos.SetPos(0.5, -1, 2);
+            world.Claims.TryAccess(player, selection.Position, EnumBlockAccessFlags.BuildOrBreak).Returns(true);
+            var stack = new ItemStack(block);
+            new SceneDescriptionData { Title = "Reused" }.WriteTo(stack.Attributes);
+            var failure = "";
+
+            block.TryPlaceBlock(world, player, stack, selection, ref failure).Should().BeTrue();
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p =>
+                (string)p["action"] == "placed" && (string)p["scene_mount"] == "ceiling"));
+            sink.Received(1).Track("feature used", Arg.Is<IDictionary<string, object>>(p =>
+                (string)p["action"] == "moved" && (string)p["scene_mount"] == "ceiling"));
+        }
+        finally { AnalyticsService.Shutdown(); }
     }
 
     [Fact]

@@ -104,10 +104,11 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
         {
             blockEntity.InitializeFromItem(itemStack, byPlayer);
             var reused = itemStack?.Attributes?.HasAttribute(SceneDescriptionData.TitleAttribute) == true;
+            var mount = blockEntity.Block?.Variant?["attachment"] switch { "wall" => "wall", "ground" => "ground", "ceiling" => "ceiling", _ => null };
             SceneAnalytics.Track(blockEntity.Data, "placed", "scene_placement", reused ? "reused" : "fresh",
-                blockEntity.Block?.Variant?["attachment"] switch { "wall" => "wall", "ground" => "ground", _ => null });
+                mount);
             if (reused && SceneAnalytics.Written(blockEntity.Data)) SceneAnalytics.Track(blockEntity.Data, "moved", "scene_placement", "reused",
-                blockEntity.Block?.Variant?["attachment"] switch { "wall" => "wall", "ground" => "ground", _ => null });
+                mount);
         }
 
         return placed;

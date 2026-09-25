@@ -219,7 +219,8 @@ test("accepts all bounded scene property values", () => {
     ["saved", "scene_locked", [true, false]],
     ["saved", "scene_body_shown", [true, false]],
     ["placed", "scene_placement", ["fresh", "reused"]],
-    ["placed", "scene_mount", ["ground", "wall"]],
+    ["placed", "scene_mount", ["ground", "wall", "ceiling"]],
+    ["moved", "scene_mount", ["ground", "wall", "ceiling"]],
     ["saved", "scene_save_kind", ["empty", "first_content", "edit"]],
     ["reader_opened", "scene_read_source", ["placed", "held"]],
   ]) {

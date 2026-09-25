@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 const MAX_ONLINE_PLAYER_COUNT = 10_000;
-export const CONTRACT_REVISION = 7;
+export const CONTRACT_REVISION = 8;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -510,7 +510,7 @@ const ALLOWED_STRING_VALUES = new Map([
   ["scene_display_mode", new Set(["when_targeted", "always_nearby", "on_interaction"])],
   ["scene_content", new Set(["empty", "written"])],
   ["scene_placement", new Set(["fresh", "reused"])],
-  ["scene_mount", new Set(["ground", "wall"])],
+  ["scene_mount", new Set(["ground", "wall", "ceiling"])],
   ["scene_save_kind", new Set(["empty", "first_content", "edit"])],
   ["scene_read_source", new Set(["placed", "held"])],
   ["warmup_seconds_bucket", COUNT_BUCKET_VALUES],
