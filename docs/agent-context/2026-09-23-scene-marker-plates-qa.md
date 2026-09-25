@@ -22,6 +22,11 @@ One batch with EnableSceneMarkers=true. The exact package is staged on the test 
    - Do: Read and mark a marker as read, aim at its plate, then mark unread. Lock the marker and attempt editing and pickup via both targets, including from a second player.
    - Expect: Read markers keep their existing suppressed-bubble behavior; unread restores the bubble. Right-click can reread. Both targets obey the same existing lock and claim permissions.
    - Watch for: Plate interactions bypassing locks or claims, or read marks being lost.
+5. **Editor ranges across display changes (P1)**
+   - Config: EnableSceneMarkers=true. Use a marker that can be edited.
+   - Do: Shift-right-click the marker, select Always nearby, edit its title and body, type `50` for icon distance and `12` for text distance, then enable both Unlimited switches. Change display to When targeted, then back to Always nearby. Turn both Unlimited switches off without saving or closing the editor.
+   - Expect: The icon distance still reads `50`, the text distance still reads `12`, the title and body still contain the edits, and the selected display remains Always nearby. Save, reopen, and confirm those values persist.
+   - Watch for: Either range reverting to its previous value (usually `24` or `8`), title/body edits disappearing during the display change, or the display selection changing unexpectedly. This card needs the new package staged and human observation.
 
 Automated evidence: full The BASICs suite passed 1,072 tests with six existing skips. Build-and-package succeeded. Local package SHA-256: `98224FD47DD29989702234CC33C295677CECE2E2B182FE447BAA8FCCC18F2EAE`. The package is a local build from the PR branch, not a published 5.9.1 release. The prior server ZIP is backed up locally under `.tmp/scene-plate-qa-backup/`.
 
