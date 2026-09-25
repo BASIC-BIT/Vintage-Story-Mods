@@ -308,9 +308,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             pending.BubbleScale = draft.BubbleScale;
             pending.IconDistance = draft.IconDistance;
             pending.TextDistance = draft.TextDistance;
-            // Keep typed ranges even while Unlimited disables their inputs. The values matter again
-            // if the player turns Unlimited off after the layout has been rebuilt.
-            if (TryReadNumber("distance", out var iconDistance)) pending.IconDistance = iconDistance;
+            // Keep typed ranges in the backing state while Unlimited disables their inputs, so
+            // saving or turning Unlimited off after a layout change retains the values.
+            if (TryReadNumber("distance", out var iconDistance)) _appearance.IconDistance = pending.IconDistance = iconDistance;
             if (_nearbyLayout && TryReadNumber("textdistance", out var textDistance)) pending.TextDistance = textDistance;
             // Once the row is gone, saving reads this value from _appearance.
             if (_nearbyLayout) _appearance.TextDistance = pending.TextDistance;
