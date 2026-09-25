@@ -75,9 +75,9 @@ Run this after the ModDB release is published. It verifies the player-facing ins
       - Watch for: recipe missing, stone base still rendered in any of the three views, a `Material:` line back in the tooltip, or a wrong held-item transform.
 
    2. **Ground And Wall Placement** (P1)
-      - Do: Place one marker flat on the ground and one against a wall, trying each of the four facings. Aim at each and start breaking it, at height offset 0 and at 4.
-      - Expect: Both attachments place and orient like a sign, with no collision box and no light blocking. Aiming at either draws the selection outline as a cube around the floating symbol, and the break cracks appear on that same cube, never on the ground plate or the wall plaque.
-      - Watch for: refused placement, wrong rotation, a marker you cannot target, no outline at all, an outline or cracks on the flat plate/plaque, or the wall variant floating.
+      - Do: Place one marker flat on the ground and one against a wall, trying each of the four facings. At height offsets 0 and 4, aim directly at each physical plate or plaque, then at its floating symbol. Start breaking and right-click each part separately.
+      - Expect: Both attachments place and orient like a sign, with no collision box and no light blocking. Aiming at the plate or plaque outlines that physical part and shows break cracks on it. Aiming at the floating symbol outlines its cube and shows break cracks on that cube. Both targets open the same marker.
+      - Watch for: refused placement, wrong rotation, either part that cannot be targeted, an outline or cracks on the other part, or the wall variant floating.
 
    3. **Symbol, Color, Size, Height, Bobbing** (P1)
       - Do: Shift-right-click to edit. Step through all six symbols (exclamation, question, information, dot, ring, diamond) and all five colors (Yellow, White, Blue, Green, Red). Open `Other icons...`, pick a catalog icon, change color, save and reopen, then pick a symbol tile again. Set indicator size to 25, 100, and 300 percent, height offset to -2, 0, and 4, then toggle Idle bobbing off and on. Save & Close and reopen each time. Target the marker and look away.

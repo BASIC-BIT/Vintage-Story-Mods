@@ -36,7 +36,12 @@ internal static class SceneTitleIcons
                 api.Gui.DrawSvg(asset, surface, 0, 0, surface.Width, surface.Height,
                     ColorUtil.ToRgba(255, (int)(rgb.R * 255), (int)(rgb.G * 255), (int)(rgb.B * 255)));
             }
-            else api.Gui.Icons.DrawIcon(ctx, name, 0, 0, surface.Width, surface.Height, new[] { rgb.R, rgb.G, rgb.B, 1.0 });
+            else
+            {
+                // Mod icons can throw after changing Cairo state. Keep the caller's context usable for fallback art.
+                using var iconContext = new Context(surface);
+                api.Gui.Icons.DrawIcon(iconContext, name, 0, 0, surface.Width, surface.Height, new[] { rgb.R, rgb.G, rgb.B, 1.0 });
+            }
             return true;
         }
         catch (Exception)
