@@ -13,6 +13,9 @@ public class TheBasicsConfigMessage
     [ProtoMember(2)]
     public ModConfig Config { get; set; }
 
+    [ProtoMember(4)]
+    public bool? SceneMarkersRuntimeEnabled { get; set; }
+
     [ProtoMember(3)]
     public int? LastSelectedGroupId { get; set; }
 }

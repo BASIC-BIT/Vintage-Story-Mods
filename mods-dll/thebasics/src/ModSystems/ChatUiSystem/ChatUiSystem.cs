@@ -17,6 +17,7 @@ using thebasics.ModSystems.DiceRolling;
 using thebasics.ModSystems.ChatHistory.Models;
 using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.Notes.Models;
+using thebasics.ModSystems.SceneDescriptions;
 using thebasics.Utilities;
 using thebasics.Utilities.Network;
 using Vintagestory.API.Client;
@@ -359,6 +360,7 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsNotesViewMessage>()
             .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
+            .RegisterMessageType<SceneReadMarksMessage>()
             .RegisterMessageType<DiceRollSoundMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
@@ -376,6 +378,7 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<HeadshotFetchResult>(OnHeadshotFetchResult)
             .SetMessageHandler<TheBasicsNotesViewMessage>(OnNotesViewMessage)
             .SetMessageHandler<TheBasicsChatHistoryResultMessage>(OnChatHistoryResultMessage)
+            .SetMessageHandler<SceneReadMarksMessage>(SceneReadMarks.ReplaceClientMarks)
             .SetMessageHandler<DiceRollSoundMessage>(OnDiceRollSoundMessage);
 
         // Initialize the safe network channel wrapper
@@ -900,6 +903,10 @@ public class ChatUiSystem : ModSystem
     }
 
     internal static bool IsCustomNametagEnabled() => _config?.UseCustomNametagRenderer != false;
+
+    // Defaults to enabled: the synced config arrives after nearby chunks, so an unknown value must
+    // not blank out markers on a server that has them on.
+    internal static bool AreSceneMarkersEnabled() => _config?.EnableSceneMarkers != false;
 
     internal static bool IsHeadshotInNametagEnabled() => _config?.EnableCharacterHeadshots == true && _config?.ShowHeadshotInNametag == true;
 
@@ -1939,6 +1946,8 @@ public class ChatUiSystem : ModSystem
             }
 
             ApplyReceivedConfig(configMessage.Config);
+            _api.ModLoader.GetModSystem<SceneDescriptionSystem>()?.SetRuntimeEnabled(
+                configMessage.SceneMarkersRuntimeEnabled ?? configMessage.Config.EnableSceneMarkers);
 
             _proximityGroupId = configMessage.ProximityGroupId;
             _lastSelectedGroupId = configMessage.LastSelectedGroupId;
