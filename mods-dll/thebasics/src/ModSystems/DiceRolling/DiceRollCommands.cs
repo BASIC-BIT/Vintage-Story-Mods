@@ -7,7 +7,9 @@ using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.ModSystems.ProximityChat.Models;
 using thebasics.ModSystems.ProximityChat.Transformers;
+using thebasics.Utilities;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
 namespace thebasics.ModSystems.DiceRolling;
@@ -38,6 +40,9 @@ internal sealed class DiceRollCommands : IDisposable
         var root = system.API.ChatCommands.GetOrCreate("thebasics");
         RegisterCommand(root.BeginSubCommand("roll"), false);
         RegisterCommand(root.BeginSubCommand("proll"), true);
+        RegisterDiceSounds(root.BeginSubCommand("dicesounds"));
+        if (system.API.ChatCommands.Get("dicesounds") == null)
+            RegisterDiceSounds(system.API.ChatCommands.Create("dicesounds"));
         foreach (var alias in new[] { "roll", "r", "proll", "privateroll" })
         {
             if (system.API.ChatCommands.Get(alias) != null) continue;
@@ -50,6 +55,26 @@ internal sealed class DiceRollCommands : IDisposable
     {
         command.RequiresPrivilege(Privilege.chat).RequiresPlayer().WithArgs(system.API.ChatCommands.Parsers.Unparsed("dice expression and optional reason")).WithDescription(isPrivate ? "Roll dice privately." : "Roll dice for your scene.")
             .HandleWith(args => Handle(args, isPrivate));
+    }
+
+    private void RegisterDiceSounds(IChatCommand command)
+    {
+        command.RequiresPrivilege(Privilege.chat).RequiresPlayer()
+            .WithArgs(system.API.ChatCommands.Parsers.OptionalWordRange("on or off", "on", "off"))
+            .WithDescription(Lang.Get("thebasics:dicesounds-description"))
+            .HandleWith(HandleDiceSounds);
+    }
+
+    private TextCommandResult HandleDiceSounds(TextCommandCallingArgs args)
+    {
+        if (args.Caller.Player is not IServerPlayer player)
+            return TextCommandResult.Error("This command requires a player.");
+        if (!args.Parsers[0].IsMissing)
+            player.SetDiceRollSoundsEnabled(string.Equals((string)args[0], "on", StringComparison.OrdinalIgnoreCase));
+        var status = Lang.Get("thebasics:dicesounds-status", ChatHelper.OnOff(player.GetDiceRollSoundsEnabled()));
+        if (!system.Config.EnableDiceRollSounds)
+            status += " " + Lang.Get("thebasics:dicesounds-server-off");
+        return TextCommandResult.Success(status);
     }
 
     internal TextCommandResult Handle(TextCommandCallingArgs args, bool isPrivate)
@@ -67,6 +92,7 @@ internal sealed class DiceRollCommands : IDisposable
             if (isPrivate)
             {
                 player.SendMessage(args.Caller.FromChatGroupId, DicePresentation.Chat(result, "", mode, true), EnumChatType.OwnMessage);
+                TryDeliverSound(player, new[] { player });
             }
             else
             {
@@ -106,6 +132,20 @@ internal sealed class DiceRollCommands : IDisposable
         system.API.Logger.Chat(text);
         system.RecordChatHistory(context, text);
         system.PublishProximityChatMessageProcessed(context, text);
+        TryDeliverSound(player, recipients);
+    }
+
+    private void TryDeliverSound(IServerPlayer player, IReadOnlyList<IServerPlayer> recipients)
+    {
+        try
+        {
+            DiceRollSounds.Deliver(system.Config, player, recipients, system.SendDiceRollSound,
+                () => Random.Shared.Next(1, 10), system.API?.Logger);
+        }
+        catch (Exception)
+        {
+            system.API?.Logger?.Warning("Dice roll sound dispatch failed.");
+        }
     }
 
     internal static bool InRange(IServerPlayer sender, IServerPlayer recipient, int range)

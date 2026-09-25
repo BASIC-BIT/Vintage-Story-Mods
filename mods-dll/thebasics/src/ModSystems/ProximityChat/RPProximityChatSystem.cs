@@ -628,6 +628,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
             .RegisterMessageType<SceneReadMarksMessage>()
+            .RegisterMessageType<DiceRollSoundMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
@@ -2885,6 +2886,9 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         return player?.GetRpTextEnabled() == true ||
             SpectatorChatPolicy.ShouldProtectRoleplayChat(player, Config);
     }
+
+    internal void SendDiceRollSound(DiceRollSoundMessage message, IServerPlayer recipient) =>
+        _serverConfigChannel?.SendPacket(message, recipient);
 
     /// <summary>
     /// Sends a <see cref="PlacedEnvironmentMessage"/> packet to a specific recipient.

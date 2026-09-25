@@ -19,6 +19,7 @@ High-level systems:
  * TPA (teleport request) system with optional temporal gear cost, cooldowns, timeouts, and privileges.
  * Opt-in home, spawn, stuck, top, and back teleport command families with configurable privileges, warmups, cooldowns, safety gates, and optional per-command temporal gear costs. `/stuck` remains gear-free.
  * Admin repair utility for setting item durability.
+ * Public and private chat dice rolls with optional positional sounds.
 
 All features can be toggled.  If you want more granularity in any feature toggles, feel free to suggest it.
 
@@ -130,6 +131,14 @@ Admins can set another players languages via:
 
 The permission required to use the commands can be configured via the config values `ChangeOwnLanguagePermission` and `ChangeOtherLanguagePermission`.
 
+## Dice Roll Sounds
+
+Successful public dice rolls play one short sound for eligible listeners less than eight blocks from the roller. The sound follows the roll's chat audience, so a player outside that audience does not hear it. Private rolls play only for the roller. Dice rolling still works when sounds are muted.
+
+Admins can turn `EnableDiceRollSounds` on or off in the live Chat/RP settings or `ModConfig/the_basics.json`. It defaults to on. When the server turns sounds off, a player's personal on preference cannot override that setting.
+
+Players can use `/dicesounds on` or `/dicesounds off` to choose whether they hear dice sounds. `/dicesounds` reports the current preference and any server override without changing it. The personal preference defaults to on and persists on that server across reconnects and RP character changes. If another mod owns `/dicesounds`, use `/thebasics dicesounds` with the same arguments.
+
 ## Typing Indicator
 
 The BASICs can optionally show a small "Typing..." indicator above a player's head.
@@ -186,3 +195,5 @@ Notes:
 ## Contributions
 
 Feel free to submit PRs, or feature requests! To submit a request or issue, you can use Issues, submit a comment on ModDB, or send me a PM on discord.
+
+Dice roll recordings by Tagwin, used with permission.

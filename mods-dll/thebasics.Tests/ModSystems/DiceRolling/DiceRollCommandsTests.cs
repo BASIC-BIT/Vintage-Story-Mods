@@ -1,6 +1,9 @@
 using System.Linq;
+using System.Reflection;
 using NSubstitute;
 using thebasics.Configs;
+using thebasics.Extensions;
+using thebasics.Models;
 using thebasics.ModSystems.DiceRolling;
 using thebasics.ModSystems.ProximityChat;
 using thebasics.Tests.Support;
@@ -11,6 +14,147 @@ namespace thebasics.Tests.ModSystems.DiceRolling;
 
 public class DiceRollCommandsTests
 {
+    [Fact]
+    public void PublicMultiDieRollSendsOneSoundToEachEligibleTextRecipient()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
+        var channel = Substitute.For<IServerNetworkChannel>();
+        typeof(RPProximityChatSystem).GetField("_serverConfigChannel", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(system, channel);
+        var roller = new FakeServerPlayer("roller") { Entity = new EntityPlayer() };
+        var nearby = new FakeServerPlayer("nearby") { Entity = new EntityPlayer() };
+        nearby.Entity.Pos.X = 2;
+        roller.SetDiceRollSoundsEnabled(false);
+        api.World.AllOnlinePlayers.Returns(new IPlayer[] { roller, nearby });
+        var commands = new DiceRollCommands(system, input => DiceEvaluator.EvaluateInput(input, _ => 3));
+
+        var response = commands.Handle(new TextCommandCallingArgs
+        {
+            Caller = new Caller { Player = roller },
+            RawArgs = new CmdArgs("3d6")
+        }, false);
+
+        Assert.Equal(EnumCommandStatus.Success, response.Status);
+        Assert.Single(roller.SentMessages);
+        Assert.Single(nearby.SentMessages);
+        channel.Received(1).SendPacket(Arg.Any<DiceRollSoundMessage>(), nearby);
+        channel.DidNotReceive().SendPacket(Arg.Any<DiceRollSoundMessage>(), roller);
+    }
+
+    [Fact]
+    public void PrivateRollSendsSoundOnlyToRoller()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
+        var channel = Substitute.For<IServerNetworkChannel>();
+        typeof(RPProximityChatSystem).GetField("_serverConfigChannel", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(system, channel);
+        var roller = new FakeServerPlayer("roller") { Entity = new EntityPlayer() };
+        var listener = new FakeServerPlayer("listener") { Entity = new EntityPlayer() };
+        api.World.AllOnlinePlayers.Returns(new IPlayer[] { roller, listener });
+        var commands = new DiceRollCommands(system, input => DiceEvaluator.EvaluateInput(input, _ => 3));
+
+        var response = commands.Handle(new TextCommandCallingArgs
+        {
+            Caller = new Caller { Player = roller },
+            RawArgs = new CmdArgs("d6 # secret")
+        }, true);
+
+        Assert.Equal(EnumCommandStatus.Success, response.Status);
+        Assert.Single(roller.SentMessages);
+        Assert.Empty(listener.SentMessages);
+        channel.Received(1).SendPacket(Arg.Any<DiceRollSoundMessage>(), roller);
+        channel.DidNotReceive().SendPacket(Arg.Any<DiceRollSoundMessage>(), listener);
+    }
+
+    [Fact]
+    public void FailedHelpDisabledAndRateLimitedRollsSendNoSound()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
+        var channel = Substitute.For<IServerNetworkChannel>();
+        typeof(RPProximityChatSystem).GetField("_serverConfigChannel", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(system, channel);
+        var roller = new FakeServerPlayer("roller") { Entity = new EntityPlayer() };
+        api.World.AllOnlinePlayers.Returns(new IPlayer[] { roller });
+        var commands = new DiceRollCommands(system);
+        TextCommandResult Roll(string input) => commands.Handle(new TextCommandCallingArgs
+        {
+            Caller = new Caller { Player = roller },
+            RawArgs = new CmdArgs(input)
+        }, false);
+
+        Assert.Equal(EnumCommandStatus.Error, Roll("2d0").Status);
+        Assert.Equal(EnumCommandStatus.Success, Roll("").Status);
+        system.Config.EnableDiceRolling = false;
+        Assert.Equal(EnumCommandStatus.Error, Roll("d6").Status);
+        system.Config.EnableDiceRolling = true;
+        Assert.Equal(EnumCommandStatus.Error, Roll("2d0").Status);
+        Assert.Equal(EnumCommandStatus.Error, Roll("2d0").Status);
+        Assert.Equal(EnumCommandStatus.Error, Roll("d6").Status);
+        channel.DidNotReceive().SendPacket(Arg.Any<DiceRollSoundMessage>(), Arg.Any<IServerPlayer[]>());
+    }
+
+    [Fact]
+    public void AudioSendFailureLeavesDeliveredPublicRollSuccessful()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var config = new ModConfig { EnableChatHistory = true };
+        var history = new thebasics.ModSystems.ChatHistory.ChatHistorySystem { API = api, Config = config };
+        api.ModLoader.GetModSystem<thebasics.ModSystems.ChatHistory.ChatHistorySystem>().Returns(history);
+        var system = new RPProximityChatSystem { API = api, Config = config };
+        var channel = Substitute.For<IServerNetworkChannel>();
+        var failedSends = 0;
+        channel.When(x => x.SendPacket(Arg.Any<DiceRollSoundMessage>(), Arg.Any<IServerPlayer[]>()))
+            .Do(_ =>
+            {
+                failedSends++;
+                throw new System.InvalidOperationException("network");
+            });
+        typeof(RPProximityChatSystem).GetField("_serverConfigChannel", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(system, channel);
+        var roller = new FakeServerPlayer("roller") { Entity = new EntityPlayer() };
+        var listener = new FakeServerPlayer("listener") { Entity = new EntityPlayer() };
+        api.World.AllOnlinePlayers.Returns(new IPlayer[] { roller, listener });
+        var events = 0;
+        system.ProximityChatMessageProcessed += (_, _) => events++;
+        var commands = new DiceRollCommands(system, input => DiceEvaluator.EvaluateInput(input, _ => 3));
+
+        var response = commands.Handle(new TextCommandCallingArgs
+        {
+            Caller = new Caller { Player = roller },
+            RawArgs = new CmdArgs("d6")
+        }, false);
+
+        Assert.Equal(EnumCommandStatus.Success, response.Status);
+        Assert.Single(roller.SentMessages);
+        Assert.Single(listener.SentMessages);
+        Assert.Equal(1, events);
+        channel.Received(1).SendPacket(Arg.Any<DiceRollSoundMessage>(), roller);
+        channel.Received(1).SendPacket(Arg.Any<DiceRollSoundMessage>(), listener);
+        Assert.Equal(2, failedSends);
+        api.Logger.Received(2).Warning("Dice roll sound packet delivery failed.");
+        var entries = (System.Collections.Generic.List<thebasics.ModSystems.ChatHistory.Models.ChatHistoryEntry>)
+            typeof(thebasics.ModSystems.ChatHistory.ChatHistorySystem)
+                .GetField("_pending", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(history)!;
+        Assert.Single(entries);
+    }
+
+    [Fact]
+    public void UnexpectedSoundDispatchFailureIsLoggedWithoutEscaping()
+    {
+        var api = Substitute.For<ICoreServerAPI>();
+        var system = new RPProximityChatSystem { API = api, Config = new ModConfig() };
+        var roller = new FakeServerPlayer("roller") { Entity = new EntityPlayer() };
+        var commands = new DiceRollCommands(system);
+        var dispatch = typeof(DiceRollCommands).GetMethod("TryDeliverSound", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        dispatch.Invoke(commands, [roller, null]);
+
+        api.Logger.Received(1).Warning("Dice roll sound dispatch failed.");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

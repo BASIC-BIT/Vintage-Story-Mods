@@ -611,6 +611,11 @@ namespace thebasics.Configs
         [DefaultValue(true)]
         public bool EnableDiceRolling { get; set; } = true;
 
+        /// <summary>Play dice roll sounds for eligible listeners.</summary>
+        [ProtoMember(157)]
+        [DefaultValue(true)]
+        public bool EnableDiceRollSounds { get; set; } = true;
+
         [ProtoMember(17)]
         public IDictionary<ProximityChatMode, string> ProximityChatModePunctuation { get; set; }
 

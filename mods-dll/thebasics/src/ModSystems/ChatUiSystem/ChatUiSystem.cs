@@ -13,6 +13,7 @@ using HarmonyLib;
 using thebasics.Configs;
 using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
+using thebasics.ModSystems.DiceRolling;
 using thebasics.ModSystems.ChatHistory.Models;
 using thebasics.ModSystems.CharacterSheets;
 using thebasics.ModSystems.Notes.Models;
@@ -360,6 +361,7 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsChatHistoryQueryRequest>()
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
             .RegisterMessageType<SceneReadMarksMessage>()
+            .RegisterMessageType<DiceRollSoundMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
@@ -376,7 +378,8 @@ public class ChatUiSystem : ModSystem
             .SetMessageHandler<HeadshotFetchResult>(OnHeadshotFetchResult)
             .SetMessageHandler<TheBasicsNotesViewMessage>(OnNotesViewMessage)
             .SetMessageHandler<TheBasicsChatHistoryResultMessage>(OnChatHistoryResultMessage)
-            .SetMessageHandler<SceneReadMarksMessage>(SceneReadMarks.ReplaceClientMarks);
+            .SetMessageHandler<SceneReadMarksMessage>(SceneReadMarks.ReplaceClientMarks)
+            .SetMessageHandler<DiceRollSoundMessage>(OnDiceRollSoundMessage);
 
         // Initialize the safe network channel wrapper
         var config = new SafeClientNetworkChannel.SafeNetworkChannelConfig
@@ -1126,6 +1129,12 @@ public class ChatUiSystem : ModSystem
         }
 
         OpenChatHistoryDialog(message);
+    }
+
+    private static void OnDiceRollSoundMessage(DiceRollSoundMessage message)
+    {
+        try { DiceRollSounds.Play(_api, message); }
+        catch (Exception) { _api?.Logger?.Warning("Dice roll sound playback failed."); }
     }
 
     private static void ShowLanguageConfigChatMessage(string message)

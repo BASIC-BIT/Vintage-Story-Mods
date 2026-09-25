@@ -1,4 +1,7 @@
 {
+  "dicesounds-description": "Control whether you hear dice roll sounds.",
+  "dicesounds-status": "Your dice roll sounds are {0}.",
+  "dicesounds-server-off": "Dice roll sounds are disabled on this server.",
   "typingindicator-typing-icon": "<icon name=\"paintbrush\"></icon>",
   "typingindicator-composing-icon": "<icon name=\"paintbrush\"></icon>",
   "typingindicator-typing-text": "Typing...",

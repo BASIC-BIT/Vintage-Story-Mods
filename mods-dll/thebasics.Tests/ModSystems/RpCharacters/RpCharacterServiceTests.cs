@@ -215,6 +215,7 @@ public class RpCharacterServiceTests : IDisposable
         IServerPlayerExtensions.SetModData(player, "BASIC_DEFAULT_LANGUAGE", "Common");
         player.SetChatMode(ProximityChatMode.Whisper);
         player.SetChatterEnabled(true);
+        player.SetDiceRollSoundsEnabled(false);
 
         var selectResult = service.SelectCharacter(player, bob.CharacterId);
 
@@ -228,6 +229,7 @@ public class RpCharacterServiceTests : IDisposable
         player.GetDefaultLanguageName().Should().Be("Tradeband");
         player.GetChatMode().Should().Be(ProximityChatMode.Yell);
         player.GetChatterEnabled().Should().BeFalse();
+        player.GetDiceRollSoundsEnabled().Should().BeFalse();
 
         var savedRegistry = service.ReadRegistry(player);
         var savedAlice = savedRegistry.Characters.Should().ContainSingle(character => character.CharacterId == aliceId).Subject;
