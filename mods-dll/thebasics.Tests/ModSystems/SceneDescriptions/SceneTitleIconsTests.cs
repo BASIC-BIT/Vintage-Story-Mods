@@ -17,6 +17,9 @@ public class SceneTitleIconsTests
         icons.CustomIcons["broken"] = (ctx, _, _, _, _, _) =>
         {
             ctx.Operator = Operator.Clear;
+            ctx.Translate(100, 100);
+            ctx.Rectangle(0, 0, 1, 1);
+            ctx.Clip();
             throw new InvalidOperationException("broken custom icon");
         };
 
@@ -26,5 +29,10 @@ public class SceneTitleIconsTests
 
         SceneTitleIcons.Draw(api, caller, surface, "broken").Should().BeFalse();
         caller.Operator.Should().Be(Operator.Source);
+        caller.SetSourceRGBA(1, 0, 0, 1);
+        caller.Rectangle(0, 0, 16, 16);
+        caller.Fill();
+        surface.Flush();
+        surface.Data[3].Should().Be(255, "fallback art should remain visible after the custom icon fails");
     }
 }
