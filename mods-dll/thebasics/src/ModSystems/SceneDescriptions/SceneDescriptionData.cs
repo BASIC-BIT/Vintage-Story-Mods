@@ -318,6 +318,10 @@ public sealed class SceneDescriptionData
         }
 
         value = value.Trim();
-        return value.Length <= maxLength ? value : value[..maxLength];
+        if (value.Length <= maxLength) return value;
+        // The limit is in UTF-16 code units, but never keep half of a surrogate pair.
+        var length = maxLength;
+        if (char.IsHighSurrogate(value[length - 1]) && char.IsLowSurrogate(value[length])) length--;
+        return value[..length];
     }
 }

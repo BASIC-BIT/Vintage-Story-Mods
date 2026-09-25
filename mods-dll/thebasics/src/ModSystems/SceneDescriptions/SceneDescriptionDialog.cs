@@ -290,20 +290,28 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             return;
         }
 
-        var pending = _appearance.Clone();
-        pending.Display = SelectedDisplay();
-        pending.Title = SingleComposer.GetTextInput("title").GetText();
-        pending.Body = SingleComposer.GetTextArea("body").GetText();
-        if (TryReadNumber("height", out var height)) pending.HeightOffset = height;
-        if (TryReadNumber("size", out var size)) pending.IndicatorScale = size / 100;
-        if (TryReadNumber("bubblesize", out var bubble)) pending.BubbleScale = bubble / 100;
-        if (TryReadNumber("distance", out var iconDistance)) pending.IconDistance = iconDistance;
-        // Also written back to _appearance: once the row is gone, saving reads the text distance from
-        // there instead of from the input.
-        if (_nearbyLayout && TryReadNumber("textdistance", out var textDistance)) _appearance.TextDistance = pending.TextDistance = textDistance;
         // Deferred: the dropdown keeps working on itself after this callback returns, and composing
-        // now would dispose the element out from under it.
-        capi.Event.EnqueueMainThreadTask(() => { if (IsOpened()) Compose(pending); }, "thebasics-scene-recompose");
+        // now would dispose the element out from under it. Read the other fields when the task runs,
+        // so edits made before the recompose are not replaced by an earlier snapshot.
+        capi.Event.EnqueueMainThreadTask(() =>
+        {
+            if (!IsOpened()) return;
+            var selectedDisplay = SelectedDisplay();
+            if ((selectedDisplay == SceneDescriptionDisplay.AlwaysNearby) == _nearbyLayout) return;
+            var draft = BuildDraft();
+            var pending = _appearance.Clone();
+            pending.Display = selectedDisplay;
+            pending.Title = draft.Title;
+            pending.Body = draft.Body;
+            pending.HeightOffset = draft.HeightOffset;
+            pending.IndicatorScale = draft.IndicatorScale;
+            pending.BubbleScale = draft.BubbleScale;
+            pending.IconDistance = draft.IconDistance;
+            pending.TextDistance = draft.TextDistance;
+            // Once the row is gone, saving reads this value from _appearance.
+            if (_nearbyLayout) _appearance.TextDistance = draft.TextDistance;
+            Compose(pending);
+        }, "thebasics-scene-recompose");
     }
 
     private SceneDescriptionDisplay SelectedDisplay() => SingleComposer.GetDropDown("kind").SelectedValue switch

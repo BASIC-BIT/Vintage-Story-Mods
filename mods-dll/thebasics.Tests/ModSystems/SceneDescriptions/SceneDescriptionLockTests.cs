@@ -7,6 +7,17 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneDescriptionLockTests
 {
     [Theory]
+    [InlineData(0L, null, true)]
+    [InlineData(1000L, 1000L, false)]
+    [InlineData(2499L, 1000L, false)]
+    [InlineData(2500L, 1000L, true)]
+    [InlineData(100L, 5000L, true)]
+    public void BreakRefusalWarningResetsAfterClockRollback(long now, long? last, bool expected)
+    {
+        SceneDescriptionBlock.ShouldWarnBreakRefused(now, last).Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData("creator", false, true, false, false, true)]
     [InlineData("other", false, true, false, false, false)]
     [InlineData("admin", true, true, false, false, true)]

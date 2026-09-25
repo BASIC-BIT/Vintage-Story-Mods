@@ -14,7 +14,7 @@ namespace thebasics.ModSystems.SceneDescriptions;
 public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
 {
     private WorldInteraction[] _interactions;
-    private long _lastBreakWarningMs;
+    private long? _lastBreakWarningMs;
 
     // The terrain picker uses index 0 for the plate; the supplemental picker uses index 1 for the symbol.
     internal const int SymbolSelectionIndex = 1;
@@ -208,12 +208,15 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     {
         if (api is not ICoreClientAPI capi) return;
         var now = capi.World.ElapsedMilliseconds;
-        if (now - _lastBreakWarningMs < 1500) return;
+        if (!ShouldWarnBreakRefused(now, _lastBreakWarningMs)) return;
         _lastBreakWarningMs = now;
         var locked = marker.Data.IsLocked;
         capi.TriggerIngameError(this, locked ? "scene-description-locked" : "scene-description-no-access",
             Lang.Get(locked ? "thebasics:scene-description-locked-help" : "thebasics:scene-description-no-access"));
     }
+
+    internal static bool ShouldWarnBreakRefused(long now, long? lastWarningMs) =>
+        lastWarningMs is null || now < lastWarningMs || now - lastWarningMs >= 1500;
 
     public override void OnBlockBroken(IWorldAccessor world, BlockPos pos, IPlayer byPlayer, float dropQuantityMultiplier = 1f)
     {

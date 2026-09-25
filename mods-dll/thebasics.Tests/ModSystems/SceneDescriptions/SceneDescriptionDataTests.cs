@@ -347,6 +347,25 @@ public class SceneDescriptionDataTests
     }
 
     [Fact]
+    public void Normalize_DoesNotSplitSurrogatePairsAtTitleOrBodyLimit()
+    {
+        var data = new SceneDescriptionData
+        {
+            Title = new string('t', SceneDescriptionData.MaxTitleLength - 1) + "😀after",
+            Body = new string('b', SceneDescriptionData.MaxBodyLength - 1) + "😀after",
+        }.Normalize();
+
+        data.Title.Should().Be(new string('t', SceneDescriptionData.MaxTitleLength - 1));
+        data.Body.Should().Be(new string('b', SceneDescriptionData.MaxBodyLength - 1));
+
+        data.Title = new string('t', SceneDescriptionData.MaxTitleLength - 2) + "😀after";
+        data.Body = new string('b', SceneDescriptionData.MaxBodyLength - 2) + "😀after";
+        data.Normalize();
+        data.Title.Should().Be(new string('t', SceneDescriptionData.MaxTitleLength - 2) + "😀");
+        data.Body.Should().Be(new string('b', SceneDescriptionData.MaxBodyLength - 2) + "😀");
+    }
+
+    [Fact]
     public void TreeAttributes_RoundTripTextKindAndAuthorMetadata()
     {
         var attributes = new TreeAttribute();
