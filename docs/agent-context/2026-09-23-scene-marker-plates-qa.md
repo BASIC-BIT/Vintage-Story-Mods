@@ -30,7 +30,7 @@ One batch with EnableSceneMarkers=true. The September 23 package was staged on t
 
 September 23 staged-package evidence: full The BASICs suite passed 1,072 tests with six existing skips. Build-and-package succeeded. Package SHA-256: `98224FD47DD29989702234CC33C295677CECE2E2B182FE447BAA8FCCC18F2EAE`. The prior server ZIP is backed up locally under `.tmp/scene-plate-qa-backup/`.
 
-Current local package evidence: 190 scene-description tests passed; the full The BASICs suite passed 1,115 tests with six existing skips. Build-and-package succeeded. Local package SHA-256: `5FF8EB1B66CB1E8F89D2632A92A7744F5453A126CA1A1B9C1FD517BE71DEB801`. This package has not been staged on the test server or client profiles. It remains a local PR build, not a published 5.9.1 release or proof of in-game behavior.
+Current local package evidence: 190 scene-description tests passed; the full The BASICs suite passed 1,115 tests with six existing skips before the handbook-only text correction. Build-and-package succeeded after that correction, and the packaged handbook JSON was validated. Local package SHA-256: `D8A5E063D37C60306CD85477E9749A20E41B0BACAFBD34F950214AAA830D3269`. This package has not been staged on the test server or client profiles. It remains a local PR build, not a published 5.9.1 release or proof of in-game behavior.
 
 PR: https://github.com/BASIC-BIT/Vintage-Story-Mods/pull/243
 Retire this packet after the PR is merged or superseded and its manual QA observations are recorded.
