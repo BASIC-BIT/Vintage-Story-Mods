@@ -5,6 +5,7 @@ using thebasics.Configs;
 using thebasics.ModSystems.SceneDescriptions;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
 namespace thebasics.Tests.ModSystems.SceneDescriptions;
@@ -12,6 +13,54 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 [Collection(AnalyticsServiceTestCollection.Name)]
 public class SceneReviewRegressionTests
 {
+    [Fact]
+    public void MarkerSightCacheReusesAndRefreshesOnlyTheSameView()
+    {
+        using var renderer = new SceneMarkerIconRenderer(Substitute.For<ICoreClientAPI>());
+        var marker = new SceneDescriptionBlockEntity();
+        var world = Substitute.For<IWorldAccessor>();
+        var observer = new EntityPlayer();
+        var position = new Vec3d(1, 2, 3);
+        var checks = 0;
+        bool Check() { checks++; return true; }
+
+        renderer.CanSeeMarker(marker, world, observer, position, 0, Check).Should().BeTrue();
+        renderer.CanSeeMarker(marker, world, observer, position, 249, Check).Should().BeTrue();
+        checks.Should().Be(1);
+        renderer.CanSeeMarker(marker, world, observer, position, 250, Check).Should().BeTrue();
+        renderer.CanSeeMarker(marker, world, observer, position, 100, Check).Should().BeTrue();
+        observer.Pos.X += 1;
+        renderer.CanSeeMarker(marker, world, observer, position, 101, Check).Should().BeTrue();
+        checks.Should().Be(4);
+        renderer.CanSeeMarker(marker, world, observer, new Vec3d(1, 2.1, 3), 251, Check).Should().BeTrue();
+        renderer.CanSeeMarker(marker, Substitute.For<IWorldAccessor>(), observer, position, 252, Check).Should().BeTrue();
+        renderer.CanSeeMarker(marker, world, new EntityPlayer(), position, 253, Check).Should().BeTrue();
+        checks.Should().Be(7);
+
+        renderer.Unregister(marker);
+        renderer.CanSeeMarker(marker, world, observer, position, 254, Check).Should().BeTrue();
+        checks.Should().Be(8);
+    }
+
+    [Fact]
+    public void MarkerSightFailureIsHiddenAndUsesLongerRefresh()
+    {
+        using var renderer = new SceneMarkerIconRenderer(Substitute.For<ICoreClientAPI>());
+        var marker = new SceneDescriptionBlockEntity();
+        var world = Substitute.For<IWorldAccessor>();
+        var observer = new EntityPlayer();
+        var position = new Vec3d(1, 2, 3);
+        var checks = 0;
+        bool Hidden() { checks++; return false; }
+
+        renderer.CanSeeMarker(marker, world, observer, position, 0, Hidden).Should().BeFalse();
+        renderer.CanSeeMarker(marker, world, observer, position, 499, Hidden).Should().BeFalse();
+        checks.Should().Be(1);
+        renderer.CanSeeMarker(marker, world, observer, position, 500, Hidden).Should().BeFalse();
+        checks.Should().Be(2);
+        renderer.CanSeeMarker(new SceneDescriptionBlockEntity(), null!, observer, position, 0).Should().BeFalse();
+    }
+
     [Fact]
     public void ClientOverlaysWaitForAuthoritativeRuntimeState()
     {

@@ -6,6 +6,8 @@ using thebasics.Utilities;
 using Vintagestory.API.Config;
 using Cairo;
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 
 namespace thebasics.ModSystems.SceneDescriptions;
@@ -23,6 +25,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, int Width, int Height)> _descriptionSizes = new();
     private readonly HashSet<SceneDescriptionBlockEntity> _shownDescriptions = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, float> _focus = new();
+    private readonly Dictionary<SceneDescriptionBlockEntity, (IWorldAccessor World, Entity Observer, double X, double Y, double Z, double EyeX, double EyeY, double EyeZ, bool Visible, long CheckedMs, long NextCheckMs)> _los = new();
     private readonly Matrixf _model = new();
     private MeshRef _quad;
 
@@ -43,6 +46,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     {
         _markers.Remove(marker);
         _focus.Remove(marker);
+        _los.Remove(marker);
         _shownDescriptions.Remove(marker);
         _descriptionSizes.Remove(marker);
         RemoveDescription(marker);
@@ -67,6 +71,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         if (player == null || _markers.Count == 0 || !SceneDescriptionSystem.SceneMarkersEnabled(_api))
         {
             _visible.Clear(); // The Ortho pass reads this list later in the same frame.
+            _los.Clear();
             BeginIconFrame([]);
             _shownDescriptions.Clear();
             foreach (var marker in _descriptions.Keys.ToArray()) RemoveDescription(marker);
@@ -181,7 +186,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         var anchor = position.AddCopy(view[1] * offset, view[5] * offset, view[9] * offset);
         var centre = Project(anchor);
         if (centre.Z < 0) return;
-        if (!VisibilityUtils.HasLineOfSight(_api.World, player.Entity, position, failOpen: true)) return;
+        if (!CanSeeMarker(marker, _api.World, player.Entity, position, _api.World.ElapsedMilliseconds)) return;
         // One bubble height of world space at the anchor, in pixels: keeps the old quad's fixed
         // texel density per block without depending on the field of view.
         var pixelHeight = (float)Math.Abs(Project(anchor.AddCopy(view[1] * height, view[5] * height, view[9] * height)).Y - centre.Y);
@@ -194,6 +199,22 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
             new Vec4f(1, 1, 1, textOpacity));
         if (SceneAnalytics.VisibleFrame(textOpacity, centre.X, centre.Y, render.FrameWidth, render.FrameHeight))
             _api.ModLoader.GetModSystem<SceneDescriptionSystem>()?.Analytics.BubbleRendered(marker.Pos);
+    }
+
+    internal bool CanSeeMarker(SceneDescriptionBlockEntity marker, IWorldAccessor world, Entity observer, Vec3d position, long nowMs, Func<bool> check = null)
+    {
+        if (observer?.Pos == null || observer.LocalEyePos == null) return false;
+        var eye = observer.Pos.XYZ.AddCopy(observer.LocalEyePos);
+        if (!_los.TryGetValue(marker, out var entry) || !ReferenceEquals(entry.World, world) ||
+            !ReferenceEquals(entry.Observer, observer) || entry.X != position.X || entry.Y != position.Y || entry.Z != position.Z ||
+            entry.EyeX != eye.X || entry.EyeY != eye.Y || entry.EyeZ != eye.Z ||
+            nowMs < entry.CheckedMs || nowMs >= entry.NextCheckMs)
+        {
+            var visible = check?.Invoke() ?? VisibilityUtils.HasLineOfSight(world, observer, position);
+            entry = (world, observer, position.X, position.Y, position.Z, eye.X, eye.Y, eye.Z, visible, nowMs, nowMs + (visible ? 250 : 500));
+            _los[marker] = entry;
+        }
+        return entry.Visible;
     }
 
     private Vec3d Project(Vec3d worldPosition)
@@ -338,6 +359,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         _shownDescriptions.Clear();
         _markers.Clear();
         _focus.Clear();
+        _los.Clear();
         _visible.Clear();
     }
 
