@@ -308,7 +308,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     private void SetReadMark(IServerPlayer player, long stamp)
     {
         var marks = player.GetSceneReadMarks();
-        SceneReadMarks.Set(marks.Marks, SceneReadMarks.Key(Pos), stamp);
+        SceneReadMarks.Set(marks, SceneReadMarks.Key(Pos), stamp);
         player.SetSceneReadMarks(marks);
         (Api as ICoreServerAPI)?.Network.SendBlockEntityPacket(player, Pos,
             stamp == 0 ? MarkUnreadPacketId : MarkReadPacketId, BitConverter.GetBytes(stamp));

@@ -10,6 +10,7 @@ namespace thebasics.ModSystems.SceneDescriptions;
 public sealed class SceneReadMarksMessage
 {
     [ProtoMember(1)] public Dictionary<string, long> Marks { get; set; } = new();
+    [ProtoMember(2)] public List<string> ReadOrder { get; set; } = new();
 }
 
 /// <summary>
@@ -21,7 +22,7 @@ internal static class SceneReadMarks
 {
     internal const int MaxEntries = 4096;
 
-    private static readonly Dictionary<string, long> ClientMarks = new();
+    private static SceneReadMarksMessage ClientMarks = new();
 
     internal static string Key(BlockPos pos) =>
         pos == null ? string.Empty : pos.X + "/" + pos.Y + "/" + pos.Z + "/" + pos.dimension;
@@ -30,9 +31,15 @@ internal static class SceneReadMarks
         stamp != 0 && marks != null && marks.TryGetValue(key, out var read) && read == stamp;
 
     /// <summary>Records a mark, or clears it when <paramref name="stamp"/> is 0.</summary>
-    internal static void Set(Dictionary<string, long> marks, string key, long stamp)
+    internal static void Set(SceneReadMarksMessage message, string key, long stamp)
     {
-        if (marks == null || string.IsNullOrEmpty(key)) return;
+        if (message == null || string.IsNullOrEmpty(key)) return;
+        var marks = message.Marks ??= new Dictionary<string, long>();
+        // Old saves have only field 1. Content stamps give the best available initial order.
+        if (message.ReadOrder == null || message.ReadOrder.Count != marks.Count)
+            message.ReadOrder = marks.OrderBy(entry => entry.Value).Select(entry => entry.Key).ToList();
+        var order = message.ReadOrder;
+        order.Remove(key);
         if (stamp == 0)
         {
             marks.Remove(key);
@@ -40,24 +47,22 @@ internal static class SceneReadMarks
         }
 
         marks[key] = stamp;
-        // Stamps are wall-clock milliseconds, so the smallest ones are the oldest reads.
-        if (marks.Count <= MaxEntries) return;
-        foreach (var stale in marks.Where(entry => entry.Key != key).OrderBy(entry => entry.Value).Take(marks.Count - MaxEntries).Select(entry => entry.Key).ToArray())
+        order.Add(key);
+        while (marks.Count > MaxEntries)
         {
-            marks.Remove(stale);
+            marks.Remove(order[0]);
+            order.RemoveAt(0);
         }
     }
 
-    internal static bool IsRead(BlockPos pos, long stamp) => IsRead(ClientMarks, Key(pos), stamp);
+    internal static bool IsRead(BlockPos pos, long stamp) => IsRead(ClientMarks.Marks, Key(pos), stamp);
 
     internal static void ReplaceClientMarks(SceneReadMarksMessage message)
     {
-        ClientMarks.Clear();
-        if (message?.Marks == null) return;
-        foreach (var mark in message.Marks) Set(ClientMarks, mark.Key, mark.Value);
+        ClientMarks = message?.Marks == null ? new SceneReadMarksMessage() : message;
     }
 
     internal static void SetClientMark(BlockPos pos, long stamp) => Set(ClientMarks, Key(pos), stamp);
 
-    internal static void ClearClientMarks() => ClientMarks.Clear();
+    internal static void ClearClientMarks() => ClientMarks = new SceneReadMarksMessage();
 }

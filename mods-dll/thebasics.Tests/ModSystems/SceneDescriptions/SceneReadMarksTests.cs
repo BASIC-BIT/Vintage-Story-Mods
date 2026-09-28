@@ -3,19 +3,22 @@ using FluentAssertions;
 using thebasics.ModSystems.SceneDescriptions;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 
 namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 public class SceneReadMarksTests
 {
     [Fact]
-    public void NewlyReadOldContentSurvivesAtCapacity()
+    public void RecentlyReadOldContentSurvivesTheNextReadAtCapacity()
     {
-        var marks = new Dictionary<string, long>();
+        var marks = new SceneReadMarksMessage();
         for (var index = 0; index < SceneReadMarks.MaxEntries; index++) SceneReadMarks.Set(marks, "pos-" + index, index + 100);
         SceneReadMarks.Set(marks, "old-content", 1);
-        marks.Count.Should().Be(SceneReadMarks.MaxEntries);
-        SceneReadMarks.IsRead(marks, "old-content", 1).Should().BeTrue();
+        SceneReadMarks.Set(marks, "second-old-content", 2);
+        marks.Marks.Count.Should().Be(SceneReadMarks.MaxEntries);
+        SceneReadMarks.IsRead(marks.Marks, "old-content", 1).Should().BeTrue();
+        SceneReadMarks.IsRead(marks.Marks, "second-old-content", 2).Should().BeTrue();
     }
     [Fact]
     public void PositionKeySeparatesDimensions()
@@ -39,19 +42,44 @@ public class SceneReadMarksTests
     [Fact]
     public void SettingAZeroStampClearsTheMark()
     {
-        var marks = new Dictionary<string, long> { ["a"] = 100 };
+        var marks = new SceneReadMarksMessage { Marks = new Dictionary<string, long> { ["a"] = 100 } };
         SceneReadMarks.Set(marks, "a", 0);
-        marks.Should().BeEmpty();
+        marks.Marks.Should().BeEmpty();
+        marks.ReadOrder.Should().BeEmpty();
     }
 
     [Fact]
-    public void MarksAreCappedByDroppingTheOldestStamps()
+    public void MarksAreCappedByDroppingTheOldestReads()
     {
-        var marks = new Dictionary<string, long>();
+        var marks = new SceneReadMarksMessage();
         for (var index = 0; index <= SceneReadMarks.MaxEntries; index++) SceneReadMarks.Set(marks, "pos-" + index, index + 1);
-        marks.Count.Should().Be(SceneReadMarks.MaxEntries);
-        marks.Should().NotContainKey("pos-0");
-        marks.Should().ContainKey("pos-" + SceneReadMarks.MaxEntries);
+        marks.Marks.Count.Should().Be(SceneReadMarks.MaxEntries);
+        marks.Marks.Should().NotContainKey("pos-0");
+        marks.Marks.Should().ContainKey("pos-" + SceneReadMarks.MaxEntries);
+    }
+
+    [Fact]
+    public void ReadOrderSurvivesPersistenceAtCapacity()
+    {
+        var marks = new SceneReadMarksMessage();
+        for (var index = 0; index < SceneReadMarks.MaxEntries; index++) SceneReadMarks.Set(marks, "pos-" + index, index + 100);
+        SceneReadMarks.Set(marks, "pos-0", 100);
+        marks = SerializerUtil.Deserialize<SceneReadMarksMessage>(SerializerUtil.Serialize(marks));
+        SceneReadMarks.Set(marks, "old-content", 1);
+        marks.Marks.Should().ContainKey("pos-0");
+        marks.Marks.Should().NotContainKey("pos-1");
+    }
+
+    [Fact]
+    public void LegacyMarksWithoutReadOrderMigrateOnNextRead()
+    {
+        var marks = new SceneReadMarksMessage
+        {
+            Marks = new Dictionary<string, long> { ["old"] = 1, ["new"] = 2 },
+            ReadOrder = null
+        };
+        SceneReadMarks.Set(marks, "latest", 3);
+        marks.ReadOrder.Should().ContainInOrder("old", "new", "latest");
     }
 
     [Fact]
