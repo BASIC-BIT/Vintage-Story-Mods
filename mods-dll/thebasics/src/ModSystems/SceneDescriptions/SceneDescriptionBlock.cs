@@ -314,6 +314,6 @@ public sealed class SceneDescriptionBlock : BlockSign, ICustomSelectionBoxRender
     private static string Preview(string body)
     {
         body = body.Replace('\n', ' ').Trim();
-        return body.Length <= 180 ? body : body[..177] + "...";
+        return body.Length <= 180 ? body : SceneDescriptionData.TruncateToCodeUnits(body, 177) + "...";
     }
 }

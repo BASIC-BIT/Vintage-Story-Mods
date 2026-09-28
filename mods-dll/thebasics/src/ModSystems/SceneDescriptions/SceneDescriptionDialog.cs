@@ -310,8 +310,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             pending.TextDistance = draft.TextDistance;
             // Keep typed ranges in the backing state while Unlimited disables their inputs, so
             // saving or turning Unlimited off after a layout change retains the values.
-            if (TryReadNumber("distance", out var iconDistance)) _appearance.IconDistance = pending.IconDistance = iconDistance;
-            if (_nearbyLayout && TryReadNumber("textdistance", out var textDistance)) pending.TextDistance = textDistance;
+            if (TryReadDistance("distance", out var iconDistance)) _appearance.IconDistance = pending.IconDistance = iconDistance;
+            if (_nearbyLayout && TryReadDistance("textdistance", out var textDistance)) pending.TextDistance = textDistance;
             // Once the row is gone, saving reads this value from _appearance.
             if (_nearbyLayout) _appearance.TextDistance = pending.TextDistance;
             Compose(pending);
@@ -327,6 +327,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 
     private bool TryReadNumber(string key, out float value) =>
         float.TryParse(SingleComposer.GetNumberInput(key).GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out value) && float.IsFinite(value);
+
+    private bool TryReadDistance(string key, out float value) =>
+        TryReadNumber(key, out value) && value is >= 1 and <= 1024;
 
     private void DrawPreview(Context ctx, ImageSurface surface, ElementBounds bounds)
     {
@@ -494,8 +497,8 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     // number keeps the value already in _appearance, so the dirty check never errors or throws.
     private SceneDescriptionData BuildDraft()
     {
-        var iconDistance = !_appearance.UnlimitedIconDistance && TryReadNumber("distance", out var distance) ? distance : _appearance.IconDistance;
-        var textDistance = _nearbyLayout && !_appearance.UnlimitedTextDistance && TryReadNumber("textdistance", out var typedText) ? typedText : _appearance.TextDistance;
+        var iconDistance = TryReadDistance("distance", out var distance) ? distance : _appearance.IconDistance;
+        var textDistance = _nearbyLayout && TryReadDistance("textdistance", out var typedText) ? typedText : _appearance.TextDistance;
         var height = TryReadNumber("height", out var offset) ? offset : _appearance.HeightOffset;
         var indicatorScale = TryReadNumber("size", out var percent) ? percent / 100 : _appearance.IndicatorScale;
         var bubbleScale = TryReadNumber("bubblesize", out var bubblePercent) ? bubblePercent / 100 : _appearance.BubbleScale;

@@ -83,6 +83,26 @@ public class SceneReviewRegressionTests
         foreach (var marker in markers) renderer.Unregister(marker);
         cache.Count.Should().Be(0);
     }
+
+    [Fact]
+    public void DescriptionFrameEvictsOnlyTexturesThatWereActuallyShown()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        using var renderer = new SceneMarkerIconRenderer(api);
+        var visible = new SceneDescriptionBlockEntity();
+        var occluded = new SceneDescriptionBlockEntity();
+        renderer.CacheDescription(visible, new LoadedTexture(api));
+        renderer.CacheDescription(occluded, new LoadedTexture(api));
+        var shownField = typeof(SceneMarkerIconRenderer).GetField("_shownDescriptions", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        ((HashSet<SceneDescriptionBlockEntity>)shownField.GetValue(renderer)!).Add(visible);
+
+        renderer.TrimDescriptions();
+
+        var cacheField = typeof(SceneMarkerIconRenderer).GetField("_descriptions", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var cache = (System.Collections.IDictionary)cacheField.GetValue(renderer)!;
+        cache.Contains(visible).Should().BeTrue();
+        cache.Contains(occluded).Should().BeFalse();
+    }
     [Fact]
     public void CustomIconCacheKeyIncludesTheFallbackSymbol()
     {

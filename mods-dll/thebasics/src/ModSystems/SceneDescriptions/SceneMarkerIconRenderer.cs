@@ -53,6 +53,11 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         if (_descriptions.Remove(marker, out var entry)) entry.Texture?.Dispose();
     }
 
+    internal void TrimDescriptions()
+    {
+        foreach (var marker in _descriptions.Keys.Where(marker => !_shownDescriptions.Contains(marker)).ToArray()) RemoveDescription(marker);
+    }
+
     public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
     {
         if (stage != EnumRenderStage.Opaque) return;
@@ -73,7 +78,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         BeginIconFrame(_visible.Where(icon => icon.Opacity > 0).Select(icon => icon.Marker.Data));
         if (_visible.Count == 0)
         {
-            foreach (var marker in _descriptions.Keys.Where(marker => !_shownDescriptions.Contains(marker)).ToArray()) RemoveDescription(marker);
+            TrimDescriptions();
             return;
         }
         // Transparent symbols must blend back-to-front because they do not write terrain depth.
@@ -95,10 +100,6 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
                 var bob = icon.Marker.Data.IdleBobbing ? amplitude * Math.Sin(_api.World.ElapsedMilliseconds * (Math.PI * 2 / period)) : 0;
                 RenderQuad(icon.Marker, GetIcon(icon.Marker.Data), icon.Position.AddCopy(0, bob, 0), icon.Opacity * SceneMarkerVisuals.IndicatorOpacity, size, size);
             }
-            // Safe to evict here even though the bubbles draw later in Ortho: GatherVisibleIcons
-            // marks every marker whose text opacity is above zero, which is the Ortho pass's gate.
-            foreach (var marker in _descriptions.Keys.ToArray())
-                if (!_shownDescriptions.Contains(marker)) RemoveDescription(marker);
         }
         finally
         {
@@ -143,7 +144,6 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
                 }
             }
             if ((opacity <= 0 && textOpacity <= 0) || !render.DefaultFrustumCuller.SphereInFrustum(position.X, position.Y, position.Z, radius)) continue;
-            if (textOpacity > 0) _shownDescriptions.Add(marker);
             var camera = player.CameraPos;
             var view = render.CameraMatrixOriginf;
             var depth = -(view[2] * (position.X - camera.X) + view[6] * (position.Y - camera.Y) + view[10] * (position.Z - camera.Z));
@@ -164,15 +164,15 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         var player = _api.World.Player;
         foreach (var icon in _visible)
             if (icon.TextOpacity > 0) RenderBubble(player, icon.Marker, icon.Position, icon.TextOpacity);
+        TrimDescriptions();
     }
 
     private void RenderBubble(IClientPlayer player, SceneDescriptionBlockEntity marker, Vec3d position, float textOpacity)
     {
         var targeted = player.CurrentBlockSelection?.Position?.Equals(marker.Pos) == true;
         if (!marker.Data.ShouldShowDescription(targeted)) return;
-        var text = GetDescription(marker);
-        if (text == null) return;
-        var (width, height) = SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, marker.Data.BubbleRenderScale);
+        var size = DescriptionSize(marker);
+        var (width, height) = SceneBubbleLayout.Size(size.Width, size.Height, RuntimeEnv.GUIScale, marker.Data.BubbleRenderScale);
         if (height <= 0) return;
         var render = _api.Render;
         var view = render.CameraMatrixOriginf;
@@ -186,6 +186,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         // texel density per block without depending on the field of view.
         var pixelHeight = (float)Math.Abs(Project(anchor.AddCopy(view[1] * height, view[5] * height, view[9] * height)).Y - centre.Y);
         if (pixelHeight <= 0) return;
+        var text = GetDescription(marker);
+        if (text == null) return;
         var pixelWidth = pixelHeight * width / height;
         render.Render2DTexture(text.TextureId, (float)centre.X - pixelWidth / 2,
             render.FrameHeight - (float)centre.Y - pixelHeight / 2, pixelWidth, pixelHeight, 20f,

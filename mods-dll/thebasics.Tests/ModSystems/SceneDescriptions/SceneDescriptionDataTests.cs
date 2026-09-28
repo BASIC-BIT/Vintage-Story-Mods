@@ -314,6 +314,15 @@ public class SceneDescriptionDataTests
         data.Body.Split('\n').Should().HaveCount(100);
         SceneDescriptionFormatter.FloatingPreview(new string('x', 1000)).Should().HaveLength(603).And.EndWith("...");
     }
+
+    [Fact]
+    public void PreviewsDoNotSplitSurrogatePairsAtTheirLimits()
+    {
+        SceneDescriptionFormatter.FloatingPreview(new string('x', 599) + "😀" + "more")
+            .Should().Be(new string('x', 599) + "...");
+        SceneDescriptionFormatter.InspectorPreview(new string('x', 176) + "😀" + "more")
+            .Should().Be(new string('x', 176) + "...");
+    }
     [Fact]
     public void Normalize_CanonicalizesTextAndInvalidKind()
     {

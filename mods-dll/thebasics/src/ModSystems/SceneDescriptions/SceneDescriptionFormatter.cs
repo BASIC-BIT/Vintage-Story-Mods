@@ -29,14 +29,14 @@ public static class SceneDescriptionFormatter
     {
         body ??= string.Empty;
         var preview = string.Join("\n", body.Split('\n').Take(12));
-        if (preview.Length > 600) preview = preview[..600];
+        preview = SceneDescriptionData.TruncateToCodeUnits(preview, 600);
         return preview.Length < body.Length ? preview.TrimEnd() + "..." : preview;
     }
 
     public static string InspectorPreview(string body)
     {
         body = (body ?? string.Empty).Replace('\n', ' ').Replace('\r', ' ').Trim();
-        if (body.Length > 180) body = body[..177] + "...";
+        if (body.Length > 180) body = SceneDescriptionData.TruncateToCodeUnits(body, 177) + "...";
         return EscapeLiteral(body);
     }
 }
