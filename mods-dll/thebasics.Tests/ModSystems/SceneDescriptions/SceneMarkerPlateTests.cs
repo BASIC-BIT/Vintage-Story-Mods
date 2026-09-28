@@ -18,6 +18,57 @@ namespace thebasics.Tests.ModSystems.SceneDescriptions;
 public class SceneMarkerPlateTests
 {
     [Fact]
+    public void GroundPlateIsCenteredAndHalfSizedWithMatchingSelection()
+    {
+        var assets = AssetsDirectory();
+        var shape = JObject.Parse(File.ReadAllText(Path.Combine(assets, "shapes/block/scene-marker-ground.json")));
+        var block = JObject.Parse(File.ReadAllText(Path.Combine(assets, "blocktypes/scene-marker.json")));
+        var plate = shape["elements"]![0]!;
+        plate["from"]!.ToObject<float[]>().Should().Equal(5.5f, 0, 5.5f);
+        plate["to"]!.ToObject<float[]>().Should().Equal(10.5f, 1, 10.5f);
+        foreach (var side in new[] { "north", "east", "south", "west" })
+        {
+            var box = block["selectionboxbytype"]![$"*-ground-{side}"]!.ToObject<Cuboidf>()!;
+            box.X1.Should().Be(5.5f / 16);
+            box.X2.Should().Be(10.5f / 16);
+            box.Z1.Should().Be(5.5f / 16);
+            box.Z2.Should().Be(10.5f / 16);
+        }
+    }
+
+    [Fact]
+    public void PlateUsesOpaqueDepthBiasedRendering()
+    {
+        var block = JObject.Parse(File.ReadAllText(Path.Combine(AssetsDirectory(), "blocktypes/scene-marker.json")));
+        block.Value<string>("renderpass").Should().Be("OpaqueNoCull");
+        block["vertexFlags"]!.Value<int>("zOffset").Should().BePositive();
+    }
+
+    [Theory]
+    [InlineData("ground", "down")]
+    [InlineData("wall", "north")]
+    [InlineData("ceiling", "down")]
+    public void PlateOmitsItsSupportAndInlayContactFaces(string attachment, string contactFace)
+    {
+        if (attachment == "ceiling")
+        {
+            var block = JObject.Parse(File.ReadAllText(Path.Combine(AssetsDirectory(), "blocktypes/scene-marker.json")));
+            block["shapebytype"]!["*-ceiling-*"]!.Value<string>("base")
+                .Should().Be("thebasics:block/scene-marker-ceiling");
+        }
+        var shape = JObject.Parse(File.ReadAllText(Path.Combine(AssetsDirectory(), $"shapes/block/scene-marker-{attachment}.json")));
+        foreach (var element in shape["elements"]!)
+            ((JObject)element["faces"]!).Property(contactFace).Should().BeNull();
+    }
+
+    private static string AssetsDirectory()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Vintage-Story-Mods.sln"))) directory = directory.Parent;
+        return Path.Combine(directory!.FullName, "mods-dll/thebasics/assets/thebasics");
+    }
+
+    [Fact]
     public void EnabledMarkerKeepsItsTerrainMesh()
     {
         var (_, marker, _, _) = CreateMarker();
