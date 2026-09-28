@@ -21,6 +21,8 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
     internal const int MarkReadPacketId = 1004;
     internal const int MarkUnreadPacketId = 1005;
     private const int ClearReadPacketId = 1006;
+    internal const int SetAppearanceDefaultsPacketId = 1007;
+    private const int AppearanceDefaultsSavedPacketId = 1008;
     private const double MaxEditDistance = 8;
     private const string AppearancePreferencesKey = "thebasics-scene-appearance";
 
@@ -126,6 +128,9 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             case SaveEditorPacketId:
                 HandleSave(player, data);
                 return;
+            case SetAppearanceDefaultsPacketId:
+                HandleSetAppearanceDefaults(player, data);
+                return;
         }
     }
 
@@ -204,11 +209,6 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         Data.ApplyText(FromPacket(packet));
         // Edited text is new content, so existing read marks no longer apply.
         Data.Stamp();
-        if (player is IServerPlayer savingPlayer)
-        {
-            var defaults = ToPacket(Data.AppearanceDefaults());
-            savingPlayer.SetModData(AppearancePreferencesKey, defaults);
-        }
         if (packet?.LockAfterSave == true) Data.LockItemCode = "ui";
         MarkDirty(redrawOnClient: true);
         Api.World.BlockAccessor.GetChunkAtBlockPos(Pos)?.MarkModified();
@@ -216,8 +216,46 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         SceneAnalytics.Track(Data, "saved", "scene_save_kind", SceneAnalytics.SaveKind(previousData, Data));
     }
 
+    private void HandleSetAppearanceDefaults(IPlayer player, byte[] data)
+    {
+        if (player is not IServerPlayer serverPlayer || !CanEdit(player) || !IsWithinEditDistance(player))
+        {
+            (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
+            return;
+        }
+
+        SceneDescriptionEditPacket packet;
+        try { packet = SerializerUtil.Deserialize<SceneDescriptionEditPacket>(data); }
+        catch { packet = null; }
+        if (packet == null || !ValidAppearance(packet))
+        {
+            serverPlayer.SendIngameError("scene-defaults-invalid", Lang.Get("thebasics:scene-defaults-invalid"));
+            return;
+        }
+
+        serverPlayer.SetModData(AppearancePreferencesKey, ToPacket(FromPacket(packet).AppearanceDefaults()));
+        if (Api is ICoreServerAPI serverApi)
+            serverApi.Network.SendBlockEntityPacket(serverPlayer, Pos, AppearanceDefaultsSavedPacketId, Array.Empty<byte>());
+    }
+
+    private static bool ValidAppearance(SceneDescriptionEditPacket packet) =>
+        Enum.IsDefined((SceneDescriptionDisplay)packet.Display) &&
+        Enum.IsDefined((SceneMarkerSymbol)packet.Symbol) &&
+        Enum.IsDefined((SceneMarkerColor)packet.Color) &&
+        float.IsFinite(packet.IndicatorScale) && packet.IndicatorScale is >= 0.25f and <= 3 &&
+        float.IsFinite(packet.BubbleScale) && packet.BubbleScale is >= 0.4f and <= 3.5f &&
+        float.IsFinite(packet.HeightOffset) && packet.HeightOffset is >= -2 and <= 4 &&
+        float.IsFinite(packet.IconDistance) && packet.IconDistance is >= 1 and <= 1024 &&
+        float.IsFinite(packet.TextDistance) && packet.TextDistance is >= 1 and <= 1024;
+
     public override void OnReceivedServerPacket(int packetId, byte[] data)
     {
+        if (packetId == AppearanceDefaultsSavedPacketId)
+        {
+            if (Api is ICoreClientAPI confirmingClient)
+                confirmingClient.ShowChatMessage(Lang.Get("thebasics:scene-defaults-saved"));
+            return;
+        }
         if (packetId is MarkReadPacketId or MarkUnreadPacketId)
         {
             var stamp = data is { Length: 8 } ? BitConverter.ToInt64(data) : 0;
@@ -252,7 +290,9 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             clientApi.Network.SendBlockEntityPacket(Pos, SaveEditorPacketId, SerializerUtil.Serialize(savedPacket));
             _dialog = null;
         }, () => clientApi.Network.SendBlockEntityPacket(Pos, UnlockPacketId),
-            () => clientApi.Network.SendBlockEntityPacket(Pos, ClearReadPacketId), () => _dialog = null);
+            () => clientApi.Network.SendBlockEntityPacket(Pos, ClearReadPacketId), () => _dialog = null,
+            defaults => clientApi.Network.SendBlockEntityPacket(Pos, SetAppearanceDefaultsPacketId,
+                SerializerUtil.Serialize(ToPacket(defaults.AppearanceDefaults()))));
         _dialog.TryOpen();
     }
 

@@ -30,14 +30,16 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private readonly bool _canManageLock;
     private readonly Action _onUnlock;
     private readonly Action _onClearRead;
+    private readonly Action<SceneDescriptionData> _onSetDefaults;
     private readonly SceneDescriptionData _appearance;
     private readonly Shape[] _symbolShapes;
 
-    public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, bool canManageLock, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose) : base(capi)
+    public SceneDescriptionDialog(ICoreClientAPI capi, SceneDescriptionData data, bool canManageLock, Action<SceneDescriptionData, bool> onSave, Action onUnlock, Action onClearRead, Action onClose, Action<SceneDescriptionData> onSetDefaults) : base(capi)
     {
         _onSave = onSave;
         _onUnlock = onUnlock;
         _onClearRead = onClearRead;
+        _onSetDefaults = onSetDefaults;
         _canManageLock = canManageLock;
         _onClose = onClose;
         _appearance = (data ?? new SceneDescriptionData()).Clone().Normalize();
@@ -217,6 +219,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             .AddStaticText(Lang.Get("thebasics:scene-show-body"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(250, top + 66, 250, 22))
             .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:scene-clear-read"), OnClearRead, ElementBounds.Fixed(140, buttonY, 140, ButtonHeight), key: "clearread")
+            .AddSmallButton(Lang.Get("thebasics:scene-set-defaults"), OnSetDefaults, ElementBounds.Fixed(300, buttonY, 185, ButtonHeight), key: "setdefaults")
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth + 290 - 150, buttonY, 150, ButtonHeight), key: "save")
             .AddSmallButton("", OnLockButton, ElementBounds.Fixed(750, top, 36, 32), key: "lock")
             .AddSceneDrawing(ElementBounds.Fixed(756, top + 4, 24, 24), DrawLock, "lockart")
@@ -250,6 +253,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         RefreshPreview();
         SingleComposer.GetButton("lock").Enabled = _canManageLock;
         SingleComposer.GetButton("save").Enabled = !data.IsLocked;
+        SingleComposer.GetButton("setdefaults").Enabled = !data.IsLocked;
         SingleComposer.GetButton("clearread").Enabled = !data.IsLocked;
         SingleComposer.GetTextInput("title").Enabled = !data.IsLocked;
         SingleComposer.GetTextArea("body").Enabled = !data.IsLocked;
@@ -468,28 +472,31 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 
     private bool OnSave()
     {
-        if (_appearance.IsLocked) return false;
-        if (!TryReadValidated("size", 25, 300, "scene-size", out var percent)) return false;
-        _appearance.IndicatorScale = percent / 100;
-        if (!TryReadValidated("bubblesize", 40, 350, "scene-bubble-size", out var bubblePercent)) return false;
-        _appearance.BubbleScale = bubblePercent / 100;
-        if (!TryReadValidated("height", -2, 4, "scene-height", out var height)) return false;
-        _appearance.HeightOffset = height;
-        if (_nearbyLayout && !_appearance.UnlimitedTextDistance)
-        {
-            if (!TryReadValidated("textdistance", 1, 1024, "scene-distance", out var textDistance)) return false;
-            _appearance.TextDistance = textDistance;
-        }
-        if (!_appearance.UnlimitedIconDistance)
-        {
-            if (!TryReadValidated("distance", 1, 1024, "scene-distance", out var distance)) return false;
-            _appearance.IconDistance = distance;
-        }
-        var data = BuildDraft().Normalize();
-
+        if (_appearance.IsLocked || !TryBuildValidatedDraft(out var data)) return false;
         _closing = true;
         base.TryClose();
         _onSave?.Invoke(data, _lockAfterSave);
+        return true;
+    }
+
+    private bool OnSetDefaults()
+    {
+        if (_appearance.IsLocked || !TryBuildValidatedDraft(out var data)) return false;
+        _onSetDefaults?.Invoke(data.AppearanceDefaults());
+        return true;
+    }
+
+    private bool TryBuildValidatedDraft(out SceneDescriptionData data)
+    {
+        data = null;
+        if (!TryReadValidated("size", 25, 300, "scene-size", out _)) return false;
+        if (!TryReadValidated("bubblesize", 40, 350, "scene-bubble-size", out _)) return false;
+        if (!TryReadValidated("height", -2, 4, "scene-height", out _)) return false;
+        if (_nearbyLayout && !_appearance.UnlimitedTextDistance &&
+            !TryReadValidated("textdistance", 1, 1024, "scene-distance", out _)) return false;
+        if (!_appearance.UnlimitedIconDistance &&
+            !TryReadValidated("distance", 1, 1024, "scene-distance", out _)) return false;
+        data = BuildDraft().Normalize();
         return true;
     }
 
