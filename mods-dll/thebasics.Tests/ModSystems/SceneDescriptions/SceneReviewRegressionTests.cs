@@ -62,6 +62,20 @@ public class SceneReviewRegressionTests
     }
 
     [Fact]
+    public void MarkerSightRaytraceFailureIsHidden()
+    {
+        using var renderer = new SceneMarkerIconRenderer(Substitute.For<ICoreClientAPI>());
+        var world = Substitute.For<IWorldAccessor, IWorldIntersectionSupplier>();
+        var supplier = (IWorldIntersectionSupplier)world;
+        supplier.blockAccessor.GetBlock(Arg.Any<BlockPos>(), Arg.Any<int>())
+            .Returns(_ => throw new InvalidOperationException("Chunk is unavailable"));
+        var observer = new EntityPlayer();
+
+        renderer.CanSeeMarker(new SceneDescriptionBlockEntity(), world, observer, new Vec3d(2, 2, 2), 0).Should().BeFalse();
+        supplier.blockAccessor.Received().GetBlock(Arg.Any<BlockPos>(), Arg.Any<int>());
+    }
+
+    [Fact]
     public void ClientOverlaysWaitForAuthoritativeRuntimeState()
     {
         var api = Substitute.For<ICoreClientAPI>();
