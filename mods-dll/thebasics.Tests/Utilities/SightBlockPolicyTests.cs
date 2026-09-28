@@ -10,6 +10,26 @@ namespace thebasics.Tests.Utilities;
 
 public class SightBlockPolicyTests
 {
+    [Theory]
+    [InlineData("thebasics:scene-marker-ground-north")]
+    [InlineData("thebasics:scene-marker-wall-east")]
+    [InlineData("thebasics:scene-marker-ceiling-south")]
+    public void OpaqueSceneMarkerDoesNotBlockSight(string code)
+    {
+        var marker = Block(50, code, EnumChunkRenderPass.OpaqueNoCull);
+        var policy = SightBlockPolicy.Resolve([marker], [], []);
+        policy.GeneralFilter(new BlockPos(0), marker).Should().BeFalse();
+        policy.StrictFilter(new BlockPos(0), marker).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ExplicitBlockingPatternCanBlockSceneMarker()
+    {
+        var marker = Block(50, "thebasics:scene-marker-wall-east", EnumChunkRenderPass.OpaqueNoCull);
+        var policy = SightBlockPolicy.Resolve([marker], [], ["thebasics:scene-marker-*"]);
+        policy.GeneralFilter(new BlockPos(0), marker).Should().BeTrue();
+    }
+
     [Fact]
     public void PassThroughPatternOverridesAnOpaqueModBlock()
     {

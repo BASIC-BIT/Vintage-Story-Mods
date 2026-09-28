@@ -1,0 +1,35 @@
+{
+  "editor": { "allAngles": false, "entityTextureMode": false },
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "material": "game:block/stone/rock/slate1",
+    "accent": "game:block/stone/rock/chalk1"
+  },
+  "elements": [
+    {
+      "name": "marker",
+      "from": [5.5, 0.0, 5.5],
+      "to": [10.5, 1.0, 10.5],
+      "faces": {
+        "north": { "texture": "#material", "uv": [0, 0, 5, 1] },
+        "east": { "texture": "#material", "uv": [0, 0, 5, 1] },
+        "south": { "texture": "#material", "uv": [0, 0, 5, 1] },
+        "west": { "texture": "#material", "uv": [0, 0, 5, 1] },
+        "up": { "texture": "#material", "uv": [5.5, 5.5, 10.5, 10.5] }
+      }
+    },
+    {
+      "name": "inlay",
+      "from": [7.0, 1.0, 7.0],
+      "to": [9.0, 1.35, 9.0],
+      "faces": {
+        "north": { "texture": "#accent", "uv": [0, 0, 2, 1] },
+        "east": { "texture": "#accent", "uv": [0, 0, 2, 1] },
+        "south": { "texture": "#accent", "uv": [0, 0, 2, 1] },
+        "west": { "texture": "#accent", "uv": [0, 0, 2, 1] },
+        "up": { "texture": "#accent", "uv": [7, 7, 9, 9] }
+      }
+    }
+  ]
+}

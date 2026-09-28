@@ -219,7 +219,8 @@ test("accepts all bounded scene property values", () => {
     ["saved", "scene_locked", [true, false]],
     ["saved", "scene_body_shown", [true, false]],
     ["placed", "scene_placement", ["fresh", "reused"]],
-    ["placed", "scene_mount", ["ground", "wall"]],
+    ["placed", "scene_mount", ["ground", "wall", "ceiling"]],
+    ["moved", "scene_mount", ["ground", "wall", "ceiling"]],
     ["saved", "scene_save_kind", ["empty", "first_content", "edit"]],
     ["reader_opened", "scene_read_source", ["placed", "held"]],
   ]) {
@@ -406,6 +407,7 @@ function currentProducerContracts() {
     severity: new Set(),
   };
   const specs = [
+    ["SceneAnalytics.Track", ["action", 1, "action"]],
     ["AnalyticsService.TrackCommandUsed", ["command_name", 0, "commandName"], ["result", 2, "result"]],
     ["AnalyticsService.TrackFeatureUsed", ["feature_name", 0, "featureName"], ["result", 3, "result"]],
     ["AnalyticsService.TrackFailure", ["area", 0, "area"], ["operation", 1, "operation"], ["severity", 2, "severity"], ["result", 3, "result"]],
@@ -435,6 +437,19 @@ function currentProducerContracts() {
 
   return contracts;
 }
+
+test("scene producer properties and dynamic observation actions have contract fixtures", () => {
+  const source = readSources().filter((text) => text.includes("namespace thebasics.ModSystems.SceneDescriptions")).join("\n");
+  const fixtureKeys = new Set(sceneActions.flatMap((action) => Object.keys(sceneProperties(action))));
+  const keys = [...source.matchAll(/"(scene_[a-z_]+)"/g)].map((match) => match[1]).filter((key) => key !== "scene_markers");
+  for (const key of keys) assert.ok(fixtureKeys.has(key), `Missing scene property contract fixture: ${key}`);
+  const observer = readFileSync(new URL("../../../../../mods-dll/thebasics/src/ModSystems/SceneDescriptions/SceneAnalyticsObserver.cs", import.meta.url), "utf8");
+  const expression = observer.match(/var action = ([^;]+);/);
+  assert.ok(expression, "missing scene observation action definition");
+  const actions = new Set();
+  addLiteralValues(actions, expression[1]);
+  for (const action of actions) assert.ok(sceneActions.includes(action), `Missing observation action fixture: ${action}`);
+});
 
 test("relay accepts phase-one 5.6 and current 5.9 payloads", () => {
   const phaseOne = validatePayload(payload("5.6.0", "server", undefined, undefined, true));
@@ -500,7 +515,7 @@ test("relay accepts current production event contracts", () => {
   const fixtures = {
     action: (value) => payloadForEvent("feature used", {
       action: value,
-      feature_name: "tpa",
+      feature_name: sceneActions.includes(value) ? "scene_markers" : "tpa",
       result: "success",
       success: true,
     }),

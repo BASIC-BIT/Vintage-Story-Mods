@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
+using thebasics.Gui;
 using thebasics.Models;
 using thebasics.ModSystems.CharacterSheets.Models;
 using thebasics.Utilities;
@@ -935,7 +936,7 @@ public class CharacterSheetDialog : GuiDialog
         }
     }
 
-    private sealed class ScrollClippedTextArea : GuiElementTextArea
+    private sealed class ScrollClippedTextArea : ScrollableTextArea
     {
         public ScrollClippedTextArea(ICoreClientAPI capi, ElementBounds bounds, Action<string> onTextChanged, CairoFont font)
             : base(capi, bounds, onTextChanged, font)

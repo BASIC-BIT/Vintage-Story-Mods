@@ -97,6 +97,15 @@ public class ModConfigUpgradeTests
     }
 
     [Fact]
+    public void LegacyConfigGainsSceneMarkersTurnedOn()
+    {
+        // An upgrading server gets scene markers on, the same as a fresh install.
+        var config = LoadLegacyConfig();
+
+        config.EnableSceneMarkers.Should().BeTrue();
+    }
+
+    [Fact]
     public void TheRetiredFontFloorIsUpgradedOnAnExistingConfig()
     {
         // Every successful load rewrites the config, so a running server has the retired default
@@ -188,6 +197,40 @@ public class ModConfigUpgradeTests
         verb.Should().BeOneOf("whispers", "mumbles", "mutters");
     }
 
+    [ProtoContract]
+    public sealed class PublishedSceneMarkerConfig
+    {
+        // V5.10.0-pre.1 shipped this field before dice was merged or released.
+        [ProtoMember(155)]
+        [System.ComponentModel.DefaultValue(true)]
+        public bool EnableSceneMarkers { get; set; } = true;
+    }
+
+    [Fact]
+    public void PublishedSceneMarkerWireFieldDoesNotChangeDiceSetting()
+    {
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, new PublishedSceneMarkerConfig { EnableSceneMarkers = false });
+        stream.Position = 0;
+        var restored = Serializer.Deserialize<ModConfig>(stream);
+
+        restored.EnableSceneMarkers.Should().BeFalse();
+        restored.EnableDiceRolling.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CurrentSceneMarkerSettingRetainsPublishedWireField()
+    {
+        var config = LoadLegacyConfig();
+        config.EnableSceneMarkers = false;
+        config.EnableDiceRolling = true;
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, config);
+        stream.Position = 0;
+        var restored = Serializer.Deserialize<PublishedSceneMarkerConfig>(stream);
+
+        restored.EnableSceneMarkers.Should().BeFalse();
+    }
     [Fact]
     public void NewFieldsSurviveProtobufRoundTripToClients()
     {
@@ -205,6 +248,7 @@ public class ModConfigUpgradeTests
         config.ProtectSpectatorRoleplayChat = false;
         config.SightPassThroughBlockCodePatterns = ["decorplus:brass-lattice-*"];
         config.SightBlockingBlockCodePatterns = ["decorplus:privacy-curtain-*"];
+        config.EnableSceneMarkers = false;
 
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, config);
@@ -222,6 +266,7 @@ public class ModConfigUpgradeTests
         restored.ProtectSpectatorRoleplayChat.Should().BeFalse();
         restored.SightPassThroughBlockCodePatterns.Should().Equal("decorplus:brass-lattice-*");
         restored.SightBlockingBlockCodePatterns.Should().Equal("decorplus:privacy-curtain-*");
+        restored.EnableSceneMarkers.Should().BeFalse();
 
         // Neighbouring fields must be untouched by the new ids.
         restored.ProximityChatModeVerbs[ProximityChatMode.Yell].Should().BeEquivalentTo(["yells", "shouts"]);
