@@ -144,7 +144,9 @@ public static class NameTagRenderRangePatches
 
     private static bool CanSeeCached(IWorldAccessor world, Entity observer, Entity target)
     {
-        if (world == null || observer == null || target == null)
+        // Check before consulting the cache: a teleport/dimension change can invalidate
+        // a previously visible target before its cached LOS result expires.
+        if (world == null || !VisibilityUtils.IsSafeNametagTarget(observer, target))
         {
             return false;
         }
@@ -158,7 +160,7 @@ public static class NameTagRenderRangePatches
 
         if (!LosCache.TryGetValue(target.EntityId, out var entry) || nowMs >= entry.nextCheckMs)
         {
-            var canSee = VisibilityUtils.HasLineOfSight(world, observer, target, failOpen: false, useMultiPointTargets: true);
+            var canSee = VisibilityUtils.HasNametagLineOfSight(world, observer, target);
             var refreshMs = canSee ? 250L : 500L;
             entry = (canSee, nowMs + refreshMs);
             LosCache[target.EntityId] = entry;

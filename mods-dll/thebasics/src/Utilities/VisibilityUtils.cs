@@ -13,6 +13,45 @@ namespace thebasics.Utilities;
 
 public static class VisibilityUtils
 {
+    // Render-thread backstop matching the largest supported nametag configuration.
+    // The normal configured range gate remains in NameTagRenderRangePatches.
+    internal const double MaxNametagRayLength = 512;
+
+    internal static bool IsSafeNametagSegment(Vec3d from, Vec3d to)
+    {
+        const double coordinateLimit = int.MaxValue - 1024d;
+        static bool ValidCoordinate(double value) =>
+            double.IsFinite(value) && Math.Abs(value) <= coordinateLimit;
+
+        if (from == null || to == null ||
+            !ValidCoordinate(from.X) || !ValidCoordinate(from.Y) || !ValidCoordinate(from.Z) ||
+            !ValidCoordinate(to.X) || !ValidCoordinate(to.Y) || !ValidCoordinate(to.Z))
+        {
+            return false;
+        }
+
+        return from.SquareDistanceTo(to) <= MaxNametagRayLength * MaxNametagRayLength;
+    }
+
+    internal static bool IsSafeNametagTarget(Entity observer, Entity target)
+    {
+        return observer?.Pos != null && target?.Pos != null &&
+               observer.Pos.Dimension == target.Pos.Dimension &&
+               IsSafeNametagSegment(observer.Pos.XYZ, target.Pos.XYZ);
+    }
+
+    internal static bool HasNametagLineOfSight(IWorldAccessor world, Entity observer, Entity target)
+    {
+        if (!IsSafeNametagTarget(observer, target))
+        {
+            return false;
+        }
+
+        var policy = GetSightPolicy(world);
+        return HasClearPath(world, observer, target, failOpen: false, useMultiPointTargets: true,
+            policy.GeneralFilter, policy, boundNametagRays: true);
+    }
+
     private const double SegmentSampleStep = 0.5;
 
     // Backstop for the occluder walk: 512 blocks at half-block steps, matching the largest
@@ -201,7 +240,8 @@ public static class VisibilityUtils
         bool failOpen,
         bool useMultiPointTargets,
         BlockFilter filter,
-        SightBlockPolicy sightPolicy = null)
+        SightBlockPolicy sightPolicy = null,
+        bool boundNametagRays = false)
     {
         if (world == null || observer == null || target == null)
         {
@@ -222,7 +262,8 @@ public static class VisibilityUtils
             var fromPos = fromBase.AddCopy(observer.LocalEyePos);
 
             return GetEntityLineOfSightTargetPositions(toBase, target, useMultiPointTargets)
-                .Any(targetPos => IsRayClear(world, fromPos, targetPos, failOpen, filter, sightPolicy));
+                .Any(targetPos => (!boundNametagRays || IsSafeNametagSegment(fromPos, targetPos)) &&
+                                  IsRayClear(world, fromPos, targetPos, failOpen, filter, sightPolicy));
         }
         catch
         {
