@@ -103,7 +103,8 @@ public class SceneDescriptionServerTests
 
         marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
         {
-            Body = "Edited", Color = (int)SceneMarkerColor.Red,
+            Body = "Edited",
+            Color = (int)SceneMarkerColor.Red,
         }));
 
         marker.Data.Body.Should().Be("Edited");
@@ -122,7 +123,10 @@ public class SceneDescriptionServerTests
         marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.SetAppearanceDefaultsPacketId,
             SerializerUtil.Serialize(new SceneDescriptionEditPacket
             {
-                IndicatorScale = scale, BubbleScale = 1, IconDistance = 24, TextDistance = 8,
+                IndicatorScale = scale,
+                BubbleScale = 1,
+                IconDistance = 24,
+                TextDistance = 8,
                 Color = (int)SceneMarkerColor.Blue,
             }));
         player.GetModData<SceneDescriptionEditPacket>(key).Color.Should().Be((int)SceneMarkerColor.Green);
