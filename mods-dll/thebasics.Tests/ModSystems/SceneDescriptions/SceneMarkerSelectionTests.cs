@@ -24,14 +24,23 @@ public class SceneMarkerSelectionTests
             "mods-dll/thebasics/assets/thebasics/blocktypes/scene-marker.json")));
         var expected = new Cuboidf(0.1875f, 0.1875f, 0, 0.8125f, 0.8125f, 0.0625f)
             .RotatedCopy(0, rotation, 0, new Vec3d(0.5, 0.5, 0.5));
-        foreach (var property in new[] { "selectionboxbytype", "collisionboxbytype" })
-        {
-            var box = json[property]!["*-wall-" + facing]!.ToObject<Cuboidf>()!;
-            box.X1.Should().BeApproximately(expected.X1, 0.00001f);
-            box.X2.Should().BeApproximately(expected.X2, 0.00001f);
-            box.Z1.Should().BeApproximately(expected.Z1, 0.00001f);
-            box.Z2.Should().BeApproximately(expected.Z2, 0.00001f);
-        }
+        var box = json["selectionboxbytype"]!["*-wall-" + facing]!.ToObject<Cuboidf>()!;
+        box.X1.Should().BeApproximately(expected.X1, 0.00001f);
+        box.X2.Should().BeApproximately(expected.X2, 0.00001f);
+        box.Z1.Should().BeApproximately(expected.Z1, 0.00001f);
+        box.Z2.Should().BeApproximately(expected.Z2, 0.00001f);
+    }
+
+    [Fact]
+    public void PlacedMarkerHasSelectionButNoStaticCollision()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Vintage-Story-Mods.sln"))) directory = directory.Parent;
+        var json = JObject.Parse(File.ReadAllText(Path.Combine(directory!.FullName,
+            "mods-dll/thebasics/assets/thebasics/blocktypes/scene-marker.json")));
+        json["selectionboxbytype"].Should().NotBeNull();
+        json["collisionbox"]!.Type.Should().Be(JTokenType.Null);
+        json["collisionboxbytype"].Should().BeNull();
     }
     // The outline and the break decal are drawn from SymbolBox; the pick ray uses centre + half extent.
     // They have to describe the same cube or you break a box you were not aiming at.
