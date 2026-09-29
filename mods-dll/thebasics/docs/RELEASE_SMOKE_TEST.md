@@ -120,9 +120,9 @@ Run this after the ModDB release is published. It verifies the player-facing ins
        - Watch for: an unauthorized unlock succeeding, the editor staying read-only after a successful unlock, or a lock state that does not reach other clients.
 
    11. **Pickup And Re-Place Persistence** (P0)
-       - Do: Unlock a written, appearance-customized, locked marker, then break and re-place it. Restart the server and rejoin. Also place a fresh crafted marker after saving a distinctive appearance.
-       - Expect: Title, body, display mode, every appearance setting, and creator survive pickup, re-place, and restart, and a marker locked again after re-placing stays locked across the restart. Exactly one item drops. The fresh marker inherits your last saved appearance with empty content; the picked-up marker keeps its own.
-       - Watch for: duplicate or missing drops, reset appearance, transferred ownership, a lost lock, or a fresh marker inheriting someone else's content.
+       - Do: Unlock a written, appearance-customized, locked marker, then break and re-place it. Restart the server and rejoin. Set a distinctive appearance with Set as my defaults, cancel the edit, then place a fresh crafted marker. Save a different appearance normally and place another fresh marker.
+       - Expect: Title, body, display mode, every appearance setting, and creator survive pickup, re-place, and restart, and a marker locked again after re-placing stays locked across the restart. Exactly one item drops. Fresh markers inherit the explicitly saved defaults with empty content, while an ordinary Save & Close changes only the placed marker. The picked-up marker keeps its own appearance.
+       - Watch for: duplicate or missing drops, reset appearance, transferred ownership, a lost lock, or a fresh marker inheriting someone else's content or ordinary Save & Close changing your defaults.
 
    12. **Markup Safety** (P0)
        - Do: Save a title and body containing `<strong>`, an anchor tag, an icon tag, an unbalanced `<`, and a very long single word. Check the bubble, reader, inspector, item name, and item tooltip.

@@ -37,6 +37,52 @@ public class SceneMarkerPlateTests
     }
 
     [Fact]
+    public void WallAndCeilingPlatesMatchGroundFootprintAndSelection()
+    {
+        var assets = AssetsDirectory();
+        var block = JObject.Parse(File.ReadAllText(Path.Combine(assets, "blocktypes/scene-marker.json")));
+        foreach (var attachment in new[] { "wall", "ceiling" })
+        {
+            var shape = JObject.Parse(File.ReadAllText(Path.Combine(assets, $"shapes/block/scene-marker-{attachment}.json")));
+            foreach (var element in shape["elements"]!)
+            {
+                var from = element["from"]!.ToObject<float[]>()!;
+                var to = element["to"]!.ToObject<float[]>()!;
+                var lateralAxes = attachment == "wall" ? new[] { 0, 1 } : new[] { 0, 2 };
+                var halfSize = element.Value<string>("name") == "marker" ? 2.5f : 1f;
+                foreach (var axis in lateralAxes)
+                {
+                    from[axis].Should().Be(8 - halfSize);
+                    to[axis].Should().Be(8 + halfSize);
+                }
+            }
+        }
+
+        var boxes = block["selectionboxbytype"]!;
+        var ceiling = boxes["*-ceiling-*"]!.ToObject<Cuboidf>()!;
+        ceiling.X1.Should().Be(5.5f / 16);
+        ceiling.X2.Should().Be(10.5f / 16);
+        ceiling.Z1.Should().Be(5.5f / 16);
+        ceiling.Z2.Should().Be(10.5f / 16);
+        foreach (var side in new[] { "north", "east", "south", "west" })
+        {
+            var wall = boxes[$"*-wall-{side}"]!.ToObject<Cuboidf>()!;
+            wall.Y1.Should().Be(5.5f / 16);
+            wall.Y2.Should().Be(10.5f / 16);
+            if (side is "north" or "south")
+            {
+                wall.X1.Should().Be(5.5f / 16);
+                wall.X2.Should().Be(10.5f / 16);
+            }
+            else
+            {
+                wall.Z1.Should().Be(5.5f / 16);
+                wall.Z2.Should().Be(10.5f / 16);
+            }
+        }
+    }
+
+    [Fact]
     public void PlateUsesOpaqueDepthBiasedRendering()
     {
         var block = JObject.Parse(File.ReadAllText(Path.Combine(AssetsDirectory(), "blocktypes/scene-marker.json")));

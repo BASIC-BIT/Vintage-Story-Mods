@@ -44,16 +44,17 @@ public class SceneDescriptionServerTests
         marker.Data.IsLocked.Should().BeTrue();
     }
     [Fact]
-    public void AcceptedAppearanceIsRememberedOnlyForFreshMarkers()
+    public void ExplicitAppearanceDefaultsAreRememberedOnlyForFreshMarkers()
     {
         var (marker, player, _) = CreateMarker();
-        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.SetAppearanceDefaultsPacketId, SerializerUtil.Serialize(new SceneDescriptionEditPacket
         {
             Title = "Old title",
             Body = "Old body",
             Color = (int)SceneMarkerColor.Blue,
             HeightOffset = 3,
             IndicatorScale = 2,
+            IconDistance = 24,
             TextDistance = 5,
             IdleBobbing = false,
             ShowBodyInBubble = true,
@@ -91,6 +92,44 @@ public class SceneDescriptionServerTests
         marker.InitializeFromItem(new ItemStack(new SceneDescriptionBlock()), new FakeServerPlayer("other"));
         marker.Data.Color.Should().Be(SceneMarkerColor.Gold);
         marker.Data.TextDistance.Should().Be(8);
+    }
+
+    [Fact]
+    public void OrdinarySaveDoesNotChangeExplicitDefaults()
+    {
+        var (marker, player, _) = CreateMarker();
+        const string key = "thebasics-scene-appearance";
+        player.SetModData(key, new SceneDescriptionEditPacket { Color = (int)SceneMarkerColor.Green });
+
+        marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
+        {
+            Body = "Edited",
+            Color = (int)SceneMarkerColor.Red,
+        }));
+
+        marker.Data.Body.Should().Be("Edited");
+        player.GetModData<SceneDescriptionEditPacket>(key).Color.Should().Be((int)SceneMarkerColor.Green);
+    }
+
+    [Theory]
+    [InlineData(0.24f, true)]
+    [InlineData(3.01f, true)]
+    [InlineData(1.5f, false)]
+    public void InvalidOrUnauthorizedDefaultsDoNotReplacePreferences(float scale, bool claim)
+    {
+        var (marker, player, _) = CreateMarker(claim);
+        const string key = "thebasics-scene-appearance";
+        player.SetModData(key, new SceneDescriptionEditPacket { Color = (int)SceneMarkerColor.Green });
+        marker.OnReceivedClientPacket(player, SceneDescriptionBlockEntity.SetAppearanceDefaultsPacketId,
+            SerializerUtil.Serialize(new SceneDescriptionEditPacket
+            {
+                IndicatorScale = scale,
+                BubbleScale = 1,
+                IconDistance = 24,
+                TextDistance = 8,
+                Color = (int)SceneMarkerColor.Blue,
+            }));
+        player.GetModData<SceneDescriptionEditPacket>(key).Color.Should().Be((int)SceneMarkerColor.Green);
     }
 
     [Fact]
