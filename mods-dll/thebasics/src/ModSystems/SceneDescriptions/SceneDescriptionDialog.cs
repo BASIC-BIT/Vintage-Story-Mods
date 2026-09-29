@@ -20,7 +20,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private SceneTitleIconDialog _iconPicker;
     private SceneTitleIconDialog _symbolIconPicker;
     private GuiDialogConfirm _clearReadConfirm;
-    private GuiDialogConfirm _unsavedCloseConfirm;
+    private SceneUnsavedCloseDialog _unsavedCloseConfirm;
     private string _loadedSnapshot;
     private bool _forceClose;
     private bool _closing;
@@ -107,11 +107,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private void ConfirmCloseWithUnsavedChanges()
     {
         if (_unsavedCloseConfirm?.IsOpened() == true) return;
-        _unsavedCloseConfirm = new GuiDialogConfirm(capi, Lang.Get("thebasics:scene-close-unsaved-confirm"), ok =>
-        {
-            _unsavedCloseConfirm = null;
-            if (ok) TryCloseWithoutPrompt();
-        });
+        _unsavedCloseConfirm = new SceneUnsavedCloseDialog(capi, TryCloseWithoutPrompt, () => OnSave(), () => _unsavedCloseConfirm = null);
         _unsavedCloseConfirm.TryOpen();
     }
 
