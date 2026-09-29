@@ -22,7 +22,7 @@ public class SceneMarkerSelectionTests
         while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Vintage-Story-Mods.sln"))) directory = directory.Parent;
         var json = JObject.Parse(File.ReadAllText(Path.Combine(directory!.FullName,
             "mods-dll/thebasics/assets/thebasics/blocktypes/scene-marker.json")));
-        var expected = new Cuboidf(0.1875f, 0.1875f, 0, 0.8125f, 0.8125f, 0.0625f)
+        var expected = new Cuboidf(0.34375f, 0.34375f, 0, 0.65625f, 0.65625f, 0.0625f)
             .RotatedCopy(0, rotation, 0, new Vec3d(0.5, 0.5, 0.5));
         var box = json["selectionboxbytype"]!["*-wall-" + facing]!.ToObject<Cuboidf>()!;
         box.X1.Should().BeApproximately(expected.X1, 0.00001f);
