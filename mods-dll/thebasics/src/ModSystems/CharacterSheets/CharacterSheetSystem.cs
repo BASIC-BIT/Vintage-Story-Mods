@@ -93,14 +93,15 @@ public class CharacterSheetSystem : BaseBasicModSystem
             .WithAlias("sheet")
             .WithDescription(Lang.Get("thebasics:charsheet-cmd-view-desc"))
             .RequiresPrivilege(Privilege.chat)
-            .BeginSubCommand("autoopen")
-                .WithDescription(Lang.Get("thebasics:charsheet-autoopen-cmd-desc"))
-                .RequiresPlayer()
-                .WithArgs(new StringArgParser("choice", false))
-                .HandleWith(SetAutoOpenChoice)
-            .EndSubCommand()
             .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false, Config))
             .HandleWith(ViewSheet);
+
+        API.ChatCommands.GetOrCreate("charsheetautoopen")
+            .WithDescription(Lang.Get("thebasics:charsheet-autoopen-cmd-desc"))
+            .RequiresPrivilege(Privilege.chat)
+            .RequiresPlayer()
+            .WithArgs(new StringArgParser("choice", false))
+            .HandleWith(SetAutoOpenChoice);
 
         API.ChatCommands.GetOrCreate("look")
             .WithAlias("inspect")

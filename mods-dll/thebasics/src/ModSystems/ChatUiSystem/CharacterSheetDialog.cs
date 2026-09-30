@@ -203,10 +203,12 @@ public class CharacterSheetDialog : GuiDialog
 
         if (_onSettings != null && _view?.TargetPlayerUid == capi.World?.Player?.PlayerUID)
         {
-            var settingsBounds = ElementBounds.Fixed(DialogWidth - 82, 4, 28, 28);
-            var icon = new SettingsIcon(capi, settingsBounds, _onSettings);
-            composer.AddInteractiveElement(icon, "settingsButton")
-                .AddHoverText(Lang.Get("thebasics:charsheet-settings-title"), CairoFont.WhiteSmallText(), 260, settingsBounds.FlatCopy());
+            var settingsBounds = ElementBounds.Fixed(DialogWidth - 145, 1, 88, 27);
+            composer.AddSmallButton("", () => { _onSettings(); return true; }, settingsBounds, EnumButtonStyle.Small, "settingsButton")
+                .AddRichtext(
+                    VtmlUtils.EscapeVtml(Lang.Get("game:mainmenu-settings")) + " <icon path=\"thebasics:icons/settings.svg\"></icon>",
+                    CairoFont.WhiteSmallText().WithFontSize(18),
+                    ElementBounds.Fixed(settingsBounds.fixedX + 5, settingsBounds.fixedY + 2, 80, 23));
         }
 
         composer.BeginChildElements(layout.BodyBounds);
@@ -974,27 +976,4 @@ public class CharacterSheetDialog : GuiDialog
         }
     }
 
-    private sealed class SettingsIcon : GuiElementRichtext
-    {
-        private readonly Action _onClick;
-
-        public SettingsIcon(ICoreClientAPI api, ElementBounds bounds, Action onClick)
-            : base(api, VtmlUtil.Richtextify(api, "<icon path=\"thebasics:icons/settings.svg\"></icon>", CairoFont.WhiteSmallText().WithFontSize(26)), bounds)
-        {
-            _onClick = onClick;
-        }
-
-        public override void RenderInteractiveElements(float deltaTime)
-        {
-            base.RenderInteractiveElements(deltaTime);
-            MouseOverCursor = "linkselect";
-        }
-
-        public override void OnMouseDownOnElement(ICoreClientAPI api, MouseEvent args)
-        {
-            if (args.Button != EnumMouseButton.Left) return;
-            _onClick();
-            args.Handled = true;
-        }
-    }
 }

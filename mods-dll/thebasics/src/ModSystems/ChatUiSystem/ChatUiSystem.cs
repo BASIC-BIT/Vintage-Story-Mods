@@ -515,7 +515,7 @@ public class ChatUiSystem : ModSystem
     {
         if (_characterSheetSettingsDialog?.IsOpened() == true || _config == null) return;
         _characterSheetSettingsDialog = new CharacterSheetSettingsDialog(_api, _config.CharacterSheetAutoOpenOnCharacterScreen, _characterSheetAutoOpenChoice,
-            choice => _api.SendChatMessage("/charsheet autoopen " + (choice switch { 1 => "on", 2 => "off", _ => "default" })));
+            choice => _api.SendChatMessage("/charsheetautoopen " + (choice switch { 1 => "on", 2 => "off", _ => "default" })));
         _characterSheetSettingsDialog.TryOpen();
     }
 
