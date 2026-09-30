@@ -199,8 +199,17 @@ public class CharacterSheetDialog : GuiDialog
 
         var composer = capi.Gui.CreateCompo("thebasics-character-sheet", layout.DialogBounds)
             .AddShadedDialogBG(layout.BodyBounds)
-            .AddDialogTitleBar(title, OnTitleBarCloseClicked)
-            .BeginChildElements(layout.BodyBounds);
+            .AddDialogTitleBar(title, OnTitleBarCloseClicked);
+
+        if (_onSettings != null && _view?.TargetPlayerUid == capi.World?.Player?.PlayerUID)
+        {
+            var settingsBounds = ElementBounds.Fixed(DialogWidth - 82, 4, 28, 28);
+            var icon = new SettingsIcon(capi, settingsBounds, _onSettings);
+            composer.AddInteractiveElement(icon, "settingsButton")
+                .AddHoverText(Lang.Get("thebasics:charsheet-settings-title"), CairoFont.WhiteSmallText(), 260, settingsBounds.FlatCopy());
+        }
+
+        composer.BeginChildElements(layout.BodyBounds);
 
         // Single inset wraps the header + scroll content. Draw it before adding interactive
         // children so the children render on top of the frame.
@@ -223,13 +232,6 @@ public class CharacterSheetDialog : GuiDialog
             .AddSmallButton(Lang.Get("thebasics:guide-button"), OnGuide, ElementBounds.Fixed(130, layout.ButtonY, 120, layout.ButtonHeight));
 
         AddSaveButtonIfEditable(composer, layout.ButtonY, layout.ButtonHeight);
-
-        if (_onSettings != null && _view?.TargetPlayerUid == capi.World?.Player?.PlayerUID)
-        {
-            var settingsBounds = ElementBounds.Fixed(DialogWidth - 82, 5, 28, 26);
-            composer.AddSmallButton("⚙", OnSettings, settingsBounds, EnumButtonStyle.Small, "settingsButton")
-                .AddHoverText(Lang.Get("thebasics:charsheet-settings-title"), CairoFont.WhiteSmallText(), 260, settingsBounds.FlatCopy());
-        }
 
         SingleComposer = composer.EndChildElements().Compose(focusFirstElement: false);
         SingleComposer.GetScrollbar("scrollbar").SetHeights((float)layout.ScrollHeight, (float)_scrollContainer.Bounds.fixedHeight);
@@ -500,12 +502,6 @@ public class CharacterSheetDialog : GuiDialog
     {
         _headshotCallbacks?.ClearHeadshot?.Invoke(_view?.TargetPlayerUid);
         SetHeadshotStatus(Lang.Get("thebasics:headshot-status-clearing"));
-        return true;
-    }
-
-    private bool OnSettings()
-    {
-        _onSettings?.Invoke();
         return true;
     }
 
@@ -975,6 +971,30 @@ public class CharacterSheetDialog : GuiDialog
             {
                 api.Render.PopScissor();
             }
+        }
+    }
+
+    private sealed class SettingsIcon : GuiElementRichtext
+    {
+        private readonly Action _onClick;
+
+        public SettingsIcon(ICoreClientAPI api, ElementBounds bounds, Action onClick)
+            : base(api, VtmlUtil.Richtextify(api, "<icon path=\"thebasics:icons/settings.svg\"></icon>", CairoFont.WhiteSmallText().WithFontSize(26)), bounds)
+        {
+            _onClick = onClick;
+        }
+
+        public override void RenderInteractiveElements(float deltaTime)
+        {
+            base.RenderInteractiveElements(deltaTime);
+            MouseOverCursor = "linkselect";
+        }
+
+        public override void OnMouseDownOnElement(ICoreClientAPI api, MouseEvent args)
+        {
+            if (args.Button != EnumMouseButton.Left) return;
+            _onClick();
+            args.Handled = true;
         }
     }
 }
