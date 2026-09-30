@@ -46,17 +46,19 @@ public class CharacterSheetDialog : GuiDialog
     private bool _forceClose;
     private Action _afterDiscardConfirmed;
     private readonly Action _onClosed;
+    private readonly Action _onSettings;
     private bool _closing;
     private DialogDraftState _draftState;
     private Dictionary<(string Id, int Occurrence), string> _preservedInputs;
 
-    public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null, Action onClosed = null) : base(capi)
+    public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null, Action onClosed = null, Action onSettings = null) : base(capi)
     {
         _view = view;
         _draftState = new DialogDraftState(SnapshotValues(view));
         _onSave = onSave;
         _headshotCallbacks = headshotCallbacks;
         _onClosed = onClosed;
+        _onSettings = onSettings;
         ComposeDialog();
     }
 
@@ -221,6 +223,13 @@ public class CharacterSheetDialog : GuiDialog
             .AddSmallButton(Lang.Get("thebasics:guide-button"), OnGuide, ElementBounds.Fixed(130, layout.ButtonY, 120, layout.ButtonHeight));
 
         AddSaveButtonIfEditable(composer, layout.ButtonY, layout.ButtonHeight);
+
+        if (_onSettings != null && _view?.TargetPlayerUid == capi.World?.Player?.PlayerUID)
+        {
+            var settingsBounds = ElementBounds.Fixed(DialogWidth - 82, 5, 28, 26);
+            composer.AddSmallButton("⚙", OnSettings, settingsBounds, EnumButtonStyle.Small, "settingsButton")
+                .AddHoverText(Lang.Get("thebasics:charsheet-settings-title"), CairoFont.WhiteSmallText(), 260, settingsBounds.FlatCopy());
+        }
 
         SingleComposer = composer.EndChildElements().Compose(focusFirstElement: false);
         SingleComposer.GetScrollbar("scrollbar").SetHeights((float)layout.ScrollHeight, (float)_scrollContainer.Bounds.fixedHeight);
@@ -491,6 +500,12 @@ public class CharacterSheetDialog : GuiDialog
     {
         _headshotCallbacks?.ClearHeadshot?.Invoke(_view?.TargetPlayerUid);
         SetHeadshotStatus(Lang.Get("thebasics:headshot-status-clearing"));
+        return true;
+    }
+
+    private bool OnSettings()
+    {
+        _onSettings?.Invoke();
         return true;
     }
 

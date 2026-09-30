@@ -15,6 +15,7 @@ New guide/help strings in non-English locale files intentionally use English fal
 - `/chatprefs` - View or change local chat accessibility and color preferences.
 - `/thebasics guide`, `/basic guide`, `/tb guide` - Link to the in-game Survival Handbook guide.
 - `/charsheet` - Open your character sheet.
+- `/charsheet autoopen default|on|off` - Choose whether the sheet opens with the C menu. Default follows the server setting.
 - `/look` - Inspect visible character details for a nearby player.
 - `/bio` - Quick character sheet view alias.
 - `/character` - Manage optional RP character slots when enabled.
