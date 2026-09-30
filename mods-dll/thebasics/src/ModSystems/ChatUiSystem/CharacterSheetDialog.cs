@@ -203,12 +203,17 @@ public class CharacterSheetDialog : GuiDialog
 
         if (_onSettings != null && _view?.TargetPlayerUid == capi.World?.Player?.PlayerUID)
         {
-            var settingsBounds = ElementBounds.Fixed(DialogWidth - 67, 1, 30, 27);
+            var settingsLabel = Lang.Get("game:mainmenu-settings");
+            var settingsFont = CairoFont.WhiteSmallText().WithFontSize(18);
+            var labelWidth = Math.Ceiling(settingsFont.GetTextExtents(settingsLabel).Width / RuntimeEnv.GUIScale) + 2;
+            var settingsBounds = ElementBounds.Fixed(DialogWidth - 37 - labelWidth - 38, 4, labelWidth + 38, 27);
             composer.AddSmallButton("", () => { _onSettings(); return true; }, settingsBounds, EnumButtonStyle.Small, "settingsButton")
+                .AddStaticText(settingsLabel, settingsFont,
+                    ElementBounds.Fixed(settingsBounds.fixedX + 6, settingsBounds.fixedY + 2, labelWidth, 23))
                 .AddRichtext(
                     "<icon path=\"thebasics:icons/settings.svg\"></icon>",
                     CairoFont.WhiteSmallText().WithFontSize(24),
-                    ElementBounds.Fixed(settingsBounds.fixedX + 7, settingsBounds.fixedY - 2, 24, 28))
+                    ElementBounds.Fixed(settingsBounds.fixedX + labelWidth + 14, settingsBounds.fixedY - 2, 24, 28))
                 .AddHoverText(Lang.Get("thebasics:charsheet-settings-title"), CairoFont.WhiteSmallText(), 260, settingsBounds.FlatCopy());
         }
 
