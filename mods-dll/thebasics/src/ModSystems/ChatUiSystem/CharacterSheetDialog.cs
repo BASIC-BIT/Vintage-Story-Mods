@@ -203,12 +203,13 @@ public class CharacterSheetDialog : GuiDialog
 
         if (_onSettings != null && _view?.TargetPlayerUid == capi.World?.Player?.PlayerUID)
         {
-            var settingsBounds = ElementBounds.Fixed(DialogWidth - 145, 1, 88, 27);
+            var settingsBounds = ElementBounds.Fixed(DialogWidth - 67, 1, 30, 27);
             composer.AddSmallButton("", () => { _onSettings(); return true; }, settingsBounds, EnumButtonStyle.Small, "settingsButton")
                 .AddRichtext(
-                    VtmlUtils.EscapeVtml(Lang.Get("game:mainmenu-settings")) + " <icon path=\"thebasics:icons/settings.svg\"></icon>",
-                    CairoFont.WhiteSmallText().WithFontSize(18),
-                    ElementBounds.Fixed(settingsBounds.fixedX + 5, settingsBounds.fixedY + 2, 80, 23));
+                    "<icon path=\"thebasics:icons/settings.svg\"></icon>",
+                    CairoFont.WhiteSmallText().WithFontSize(24),
+                    ElementBounds.Fixed(settingsBounds.fixedX + 7, settingsBounds.fixedY - 2, 24, 28))
+                .AddHoverText(Lang.Get("thebasics:charsheet-settings-title"), CairoFont.WhiteSmallText(), 260, settingsBounds.FlatCopy());
         }
 
         composer.BeginChildElements(layout.BodyBounds);
