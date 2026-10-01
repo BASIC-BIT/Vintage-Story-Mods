@@ -33,9 +33,16 @@ public sealed class CharacterSheetSettingsDialog : GuiDialog
     }
 
     public override string ToggleKeyCombinationCode => null;
+    public override bool UnregisterOnClose => true;
     public override bool PrefersUngrabbedMouse => true;
     public override bool DisableMouseGrab => true;
     public override double DrawOrder => 0.55;
+
+    public override void OnGuiClosed()
+    {
+        base.OnGuiClosed();
+        Dispose();
+    }
 
     private bool Save()
     {

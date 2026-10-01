@@ -140,7 +140,11 @@ public sealed class PreviewHost : IDisposable
             case "RegisterDialog": loaded.AddRange((GuiDialog[])a[0]!); return null;
             case "RequestFocus": foreach (var d in loaded) d.UnFocus(); ((GuiDialog)a[0]!).Focus(); return null;
             case "TriggerDialogOpened": opened.Add((GuiDialog)a[0]!); return null;
-            case "TriggerDialogClosed": opened.Remove((GuiDialog)a[0]!); return null;
+            case "TriggerDialogClosed":
+                var closedDialog = (GuiDialog)a[0]!;
+                opened.Remove(closedDialog);
+                if (closedDialog.UnregisterOnClose) loaded.Remove(closedDialog);
+                return null;
             case "PlaySound": RecordedEffects.Add("sound:" + a[0]); return null;
         }
         return Unknown(m);
