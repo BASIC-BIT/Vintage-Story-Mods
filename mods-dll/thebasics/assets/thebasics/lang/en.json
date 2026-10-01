@@ -221,11 +221,11 @@
 
   "charsheet-cmd-view-desc": "View your character sheet, or another online player's character sheet",
   "charsheet-autoopen-cmd-desc": "Choose whether your character sheet opens with the C menu",
-  "charsheet-autoopen-usage": "Use /charsheetautoopen default|on|off.",
+  "charsheet-autoopen-usage": "Use /thebasics charsheetautoopen default|on|off.",
   "charsheet-autoopen-default": "Default ({0})",
   "charsheet-autoopen-on": "On",
   "charsheet-autoopen-off": "Off",
-  "charsheet-autoopen-status": "Character sheet with C menu: {0}. Use /charsheetautoopen default|on|off to change it.",
+  "charsheet-autoopen-status": "Character sheet with C menu: {0}. Use /thebasics charsheetautoopen default|on|off to change it.",
   "charsheet-settings-title": "Character sheet settings",
   "charsheet-settings-autoopen-label": "Open with character menu (default key: C)",
   "charsheet-cmd-look-desc": "Look at a nearby player and read their visible character details",
