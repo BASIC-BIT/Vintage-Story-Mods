@@ -147,6 +147,8 @@ public sealed class PreviewHost : IDisposable
     }
     private int Upload(ImageSurface surface, bool linear, int id = 0)
     {
+        // Native scrollbars upload an empty handle before SetHeights initializes them.
+        if (surface.Width == 0 || surface.Height == 0) return Canvas.UploadTexture(new byte[4], 1, 1, 4, linear, id);
         surface.Flush(); var bytes = new byte[surface.Stride * surface.Height]; Marshal.Copy(surface.DataPtr, bytes, 0, bytes.Length);
         return Canvas.UploadTexture(bytes, surface.Width, surface.Height, surface.Stride, linear, id);
     }

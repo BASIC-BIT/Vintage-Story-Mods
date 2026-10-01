@@ -650,11 +650,14 @@ public class CharacterSheetDialog : GuiDialog
 
     private void AddLongStringField(Action<GuiElement> add, ElementBounds inputBounds, CharacterSheetFieldViewMessage field, int index)
     {
-        var textArea = new ScrollClippedTextArea(capi, inputBounds, null, CairoFont.TextInput())
-        {
-            Autoheight = false
-        };
-        textArea.SetMaxLines(GetEditorRows(field.EditorRows));
+        var viewport = new TextAreaContainer(capi, inputBounds) { Tabbable = true, unscaledCellSpacing = 0 };
+        var textBounds = ElementBounds.Fixed(0, 0, inputBounds.fixedWidth - GuiElementScrollbar.DefaultScrollbarWidth - 7, inputBounds.fixedHeight);
+        var textArea = new ScrollableTextArea(capi, textBounds, null, CairoFont.TextInput());
+        textArea.Scrollbar = new GuiElementScrollbar(capi, textArea.OnScroll, ElementStdBounds.VerticalScrollbar(textBounds));
+        viewport.Add(textArea);
+        viewport.Add(textArea.Scrollbar);
+        textArea.InsideClipBounds = viewport.Bounds;
+        textArea.Scrollbar.InsideClipBounds = viewport.Bounds;
         if (field.MaxLength > 0)
         {
             textArea.SetMaxLength(field.MaxLength);
@@ -662,7 +665,7 @@ public class CharacterSheetDialog : GuiDialog
 
         _textAreas[index] = textArea;
         _textAreaInitialValues[index] = InitialValue(field);
-        add(textArea);
+        add(viewport);
     }
 
     private void AddTextField(Action<GuiElement> add, ElementBounds inputBounds, CharacterSheetFieldViewMessage field, int index)
@@ -955,11 +958,20 @@ public class CharacterSheetDialog : GuiDialog
         }
     }
 
-    private sealed class ScrollClippedTextArea : ScrollableTextArea
+    private sealed class TextAreaContainer : GuiElementContainer
     {
-        public ScrollClippedTextArea(ICoreClientAPI capi, ElementBounds bounds, Action<string> onTextChanged, CairoFont font)
-            : base(capi, bounds, onTextChanged, font)
+        public TextAreaContainer(ICoreClientAPI capi, ElementBounds bounds) : base(capi, bounds)
         {
+        }
+
+        public override void OnMouseDown(ICoreClientAPI api, MouseEvent args)
+        {
+            if (IsPositionInside(args.X, args.Y)) base.OnMouseDown(api, args);
+        }
+
+        public override void OnMouseWheel(ICoreClientAPI api, MouseWheelEventArgs args)
+        {
+            if (IsPositionInside(api.Input.MouseX, api.Input.MouseY)) base.OnMouseWheel(api, args);
         }
 
         public override void RenderInteractiveElements(float deltaTime)
