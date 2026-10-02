@@ -1,0 +1,15 @@
+{
+  "name": "flywheel-web-full-gui-transform",
+  "representation": "gui-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-web-full.json"
+  ],
+  "textures": {
+    "wood": "game:block/wood/planks/generic"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/flywheelweb.json",
+    "property": "guiTransform",
+    "variantCode": "flywheelweb-full"
+  }
+}

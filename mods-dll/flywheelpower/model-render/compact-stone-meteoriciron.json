@@ -1,0 +1,18 @@
+{
+  "name": "flywheel-compact-stone-meteoriciron",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/compact-flywheel-frame-horizontal.json",
+    "../assets/flywheelpower/shapes/block/flywheel-axle.json"
+  ],
+  "proceduralFlywheel": {
+    "dimensionsSource": "../src/FlywheelModelDimensions.cs",
+    "size": "compact"
+  },
+  "textures": {
+    "wheel": "game:block/stone/rock/granite1",
+    "metal": "game:block/metal/ingot/meteoriciron",
+    "bearing": "game:block/metal/tarnished/iron-riveted1",
+    "chalk": "game:block/cloth/wool/red1",
+    "wood": "game:block/wood/planks/generic"
+  }
+}

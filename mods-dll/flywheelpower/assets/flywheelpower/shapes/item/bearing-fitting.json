@@ -1,0 +1,358 @@
+{
+  "editor": {
+    "allAngles": false,
+    "entityTextureMode": false
+  },
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "metal": "game:block/metal/sheet/iron1"
+  },
+  "elements": [
+    {
+      "name": "LeftFoot",
+      "from": [
+        2.5,
+        3.4,
+        6.4
+      ],
+      "to": [
+        5.4,
+        5.2,
+        9.6
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            2.9,
+            1.8
+          ]
+        },
+        "east": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            1.8
+          ]
+        },
+        "south": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            2.9,
+            1.8
+          ]
+        },
+        "west": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            1.8
+          ]
+        },
+        "up": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            2.9,
+            3.2
+          ]
+        },
+        "down": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            2.9,
+            3.2
+          ]
+        }
+      }
+    },
+    {
+      "name": "RightFoot",
+      "from": [
+        10.6,
+        3.4,
+        6.42
+      ],
+      "to": [
+        13.5,
+        5.2,
+        9.62
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            2.9,
+            1.8
+          ]
+        },
+        "east": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            1.8
+          ]
+        },
+        "south": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            2.9,
+            1.8
+          ]
+        },
+        "west": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            1.8
+          ]
+        },
+        "up": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            2.9,
+            3.2
+          ]
+        },
+        "down": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            2.9,
+            3.2
+          ]
+        }
+      }
+    },
+    {
+      "name": "LeftCheek",
+      "from": [
+        3.6,
+        4.8,
+        6.44
+      ],
+      "to": [
+        5.2,
+        10.0,
+        9.64
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            1.6,
+            5.2
+          ]
+        },
+        "east": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            5.2
+          ]
+        },
+        "south": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            1.6,
+            5.2
+          ]
+        },
+        "west": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            5.2
+          ]
+        },
+        "up": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            1.6,
+            3.2
+          ]
+        },
+        "down": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            1.6,
+            3.2
+          ]
+        }
+      }
+    },
+    {
+      "name": "RightCheek",
+      "from": [
+        10.8,
+        4.8,
+        6.46
+      ],
+      "to": [
+        12.4,
+        10.0,
+        9.66
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            1.6,
+            5.2
+          ]
+        },
+        "east": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            5.2
+          ]
+        },
+        "south": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            1.6,
+            5.2
+          ]
+        },
+        "west": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            5.2
+          ]
+        },
+        "up": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            1.6,
+            3.2
+          ]
+        },
+        "down": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            1.6,
+            3.2
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crown",
+      "from": [
+        4.8,
+        8.9,
+        6.48
+      ],
+      "to": [
+        11.2,
+        11.0,
+        9.68
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            6.4,
+            2.1
+          ]
+        },
+        "east": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            2.1
+          ]
+        },
+        "south": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            6.4,
+            2.1
+          ]
+        },
+        "west": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            3.2,
+            2.1
+          ]
+        },
+        "up": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            6.4,
+            3.2
+          ]
+        },
+        "down": {
+          "texture": "#metal",
+          "uv": [
+            0.0,
+            0.0,
+            6.4,
+            3.2
+          ]
+        }
+      }
+    }
+  ]
+}
