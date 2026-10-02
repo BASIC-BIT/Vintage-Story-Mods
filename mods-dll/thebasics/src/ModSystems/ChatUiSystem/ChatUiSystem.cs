@@ -47,6 +47,7 @@ public class ChatUiSystem : ModSystem
     private static dynamic _rpttsApi = null;
     private static dynamic _rpttsChatSystem = null;
     private static CharacterSheetDialog _characterSheetDialog;
+    private static CharacterSheetSettingsDialog _characterSheetSettingsDialog;
     private static CharacterSheetMessageDialog _characterSheetMessageDialog;
     private static LanguageConfigDialog _languageConfigDialog;
     private static CharacterSheetFieldConfigDialog _characterSheetFieldConfigDialog;
@@ -57,6 +58,7 @@ public class ChatUiSystem : ModSystem
     private static readonly DialogRequestTracker NotesRequests = new();
     private static readonly DialogRequestTracker LanguageRequests = new();
     private static bool _pendingCharacterSheetOpenFromCharacterDialog;
+    private static int _characterSheetAutoOpenChoice;
     private static long _nextCharacterSheetAutoOpenRequestId;
     private static long _pendingCharacterSheetAutoOpenRequestId;
     private static bool _characterDialogSheetAutoOpenHandled;
@@ -191,7 +193,7 @@ public class ChatUiSystem : ModSystem
             return;
         }
 
-        if (_config == null || !_config.EnableCharacterSheets || _characterDialogSheetAutoOpenHandled || _characterSheetDialog?.IsOpened() == true || _pendingCharacterSheetOpenFromCharacterDialog)
+        if (!ShouldAutoOpenCharacterSheet(_config, _characterSheetAutoOpenChoice) || _characterDialogSheetAutoOpenHandled || _characterSheetDialog?.IsOpened() == true || _pendingCharacterSheetOpenFromCharacterDialog)
         {
             return;
         }
@@ -223,6 +225,14 @@ public class ChatUiSystem : ModSystem
     {
         SendCharacterSheetRequest(new CharacterSheetOpenRequest { Mode = CharacterSheetOpenRequest.ModeOwn });
     }
+
+    internal static bool ShouldAutoOpenCharacterSheet(ModConfig config, int choice) =>
+        config?.EnableCharacterSheets == true && (choice switch
+        {
+            1 => true,
+            2 => false,
+            _ => config.CharacterSheetAutoOpenOnCharacterScreen
+        });
 
     private static void SendCharacterSheetRequest(CharacterSheetOpenRequest request)
     {
@@ -475,7 +485,7 @@ public class ChatUiSystem : ModSystem
     {
         if (_characterSheetDialog == null)
         {
-            _characterSheetDialog = new CharacterSheetDialog(_api, message, SendCharacterSheetSaveRequest, BuildHeadshotCallbacks(), OnCharacterSheetDialogClosed);
+            _characterSheetDialog = new CharacterSheetDialog(_api, message, SendCharacterSheetSaveRequest, BuildHeadshotCallbacks(), OnCharacterSheetDialogClosed, OpenCharacterSheetSettings);
         }
         else
         {
@@ -492,11 +502,21 @@ public class ChatUiSystem : ModSystem
 
     private static void OnCharacterSheetDialogClosed()
     {
+        _characterSheetSettingsDialog?.TryClose();
+        _characterSheetSettingsDialog = null;
         CharacterSheetRequests.Reset();
         _pendingCharacterSheetAutoOpenRequestId = 0;
         _characterSheetDialog = null;
         _pendingCharacterSheetOpenFromCharacterDialog = false;
         _characterSheetOpenedFromCharacterDialog = false;
+    }
+
+    private static void OpenCharacterSheetSettings()
+    {
+        if (_characterSheetSettingsDialog?.IsOpened() == true || _config == null) return;
+        _characterSheetSettingsDialog = new CharacterSheetSettingsDialog(_api, _config.CharacterSheetAutoOpenOnCharacterScreen, _characterSheetAutoOpenChoice,
+            choice => _api.SendChatMessage("/thebasics charsheetautoopen " + (choice switch { 1 => "on", 2 => "off", _ => "default" })));
+        _characterSheetSettingsDialog.TryOpen();
     }
 
     private static HeadshotDialogCallbacks BuildHeadshotCallbacks()
@@ -1946,6 +1966,7 @@ public class ChatUiSystem : ModSystem
             }
 
             ApplyReceivedConfig(configMessage.Config);
+            _characterSheetAutoOpenChoice = configMessage.CharacterSheetAutoOpenChoice;
             _api.ModLoader.GetModSystem<SceneDescriptionSystem>()?.SetRuntimeEnabled(
                 configMessage.SceneMarkersRuntimeEnabled ?? configMessage.Config.EnableSceneMarkers);
 
@@ -2385,6 +2406,7 @@ public class ChatUiSystem : ModSystem
             _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
             _pendingCharacterSheetOpenFromCharacterDialog = false;
             _pendingCharacterSheetAutoOpenRequestId = 0;
+            _characterSheetAutoOpenChoice = 0;
             _suppressNextCharacterDialogSheetOpen = false;
             CharacterSheetRequests.Reset();
             NotesRequests.Reset();

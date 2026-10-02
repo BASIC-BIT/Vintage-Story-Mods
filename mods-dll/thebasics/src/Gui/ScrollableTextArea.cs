@@ -38,6 +38,7 @@ internal class ScrollableTextArea : GuiElementTextArea
     internal ScrollableTextArea(ICoreClientAPI capi, ElementBounds bounds, Action<string> onChanged, CairoFont font)
         : base(capi, bounds, null, font)
     {
+        MouseOverCursor = "textselect";
         _visible = bounds.fixedHeight;
         // Vanilla autoheight counts hard line breaks twice and mixes scaled with unscaled units.
         Autoheight = false;

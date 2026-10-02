@@ -140,13 +140,19 @@ public sealed class PreviewHost : IDisposable
             case "RegisterDialog": loaded.AddRange((GuiDialog[])a[0]!); return null;
             case "RequestFocus": foreach (var d in loaded) d.UnFocus(); ((GuiDialog)a[0]!).Focus(); return null;
             case "TriggerDialogOpened": opened.Add((GuiDialog)a[0]!); return null;
-            case "TriggerDialogClosed": opened.Remove((GuiDialog)a[0]!); return null;
+            case "TriggerDialogClosed":
+                var closedDialog = (GuiDialog)a[0]!;
+                opened.Remove(closedDialog);
+                if (closedDialog.UnregisterOnClose) loaded.Remove(closedDialog);
+                return null;
             case "PlaySound": RecordedEffects.Add("sound:" + a[0]); return null;
         }
         return Unknown(m);
     }
     private int Upload(ImageSurface surface, bool linear, int id = 0)
     {
+        // Native scrollbars upload an empty handle before SetHeights initializes them.
+        if (surface.Width == 0 || surface.Height == 0) return Canvas.UploadTexture(new byte[4], 1, 1, 4, linear, id);
         surface.Flush(); var bytes = new byte[surface.Stride * surface.Height]; Marshal.Copy(surface.DataPtr, bytes, 0, bytes.Length);
         return Canvas.UploadTexture(bytes, surface.Width, surface.Height, surface.Stride, linear, id);
     }

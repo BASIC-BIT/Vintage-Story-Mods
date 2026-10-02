@@ -1157,5 +1157,9 @@ namespace thebasics.Configs
 
         [ProtoMember(146)]
         public SemanticLanguageLearningConfig SemanticLanguageLearning { get; set; } = new SemanticLanguageLearningConfig();
+
+        [ProtoMember(158)]
+        [DefaultValue(true)]
+        public bool CharacterSheetAutoOpenOnCharacterScreen { get; set; } = true;
     }
 }

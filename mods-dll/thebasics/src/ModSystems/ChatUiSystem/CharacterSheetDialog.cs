@@ -46,17 +46,19 @@ public class CharacterSheetDialog : GuiDialog
     private bool _forceClose;
     private Action _afterDiscardConfirmed;
     private readonly Action _onClosed;
+    private readonly Action _onSettings;
     private bool _closing;
     private DialogDraftState _draftState;
     private Dictionary<(string Id, int Occurrence), string> _preservedInputs;
 
-    public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null, Action onClosed = null) : base(capi)
+    public CharacterSheetDialog(ICoreClientAPI capi, CharacterSheetViewMessage view, Action<CharacterSheetSaveRequest> onSave, HeadshotDialogCallbacks headshotCallbacks = null, Action onClosed = null, Action onSettings = null) : base(capi)
     {
         _view = view;
         _draftState = new DialogDraftState(SnapshotValues(view));
         _onSave = onSave;
         _headshotCallbacks = headshotCallbacks;
         _onClosed = onClosed;
+        _onSettings = onSettings;
         ComposeDialog();
     }
 
@@ -197,8 +199,25 @@ public class CharacterSheetDialog : GuiDialog
 
         var composer = capi.Gui.CreateCompo("thebasics-character-sheet", layout.DialogBounds)
             .AddShadedDialogBG(layout.BodyBounds)
-            .AddDialogTitleBar(title, OnTitleBarCloseClicked)
-            .BeginChildElements(layout.BodyBounds);
+            .AddDialogTitleBar(title, OnTitleBarCloseClicked);
+
+        if (_onSettings != null && _view?.TargetPlayerUid == capi.World?.Player?.PlayerUID)
+        {
+            var settingsLabel = Lang.Get("game:mainmenu-settings");
+            var settingsFont = CairoFont.WhiteSmallText().WithFontSize(18).WithColor(new double[] { 1, 1, 1, 1 });
+            var labelWidth = Math.Ceiling(settingsFont.GetTextExtents(settingsLabel).Width / RuntimeEnv.GUIScale) + 2;
+            var settingsBounds = ElementBounds.Fixed(DialogWidth - 37 - labelWidth - 38, 3, labelWidth + 38, 27);
+            composer.AddSmallButton("", () => { _onSettings(); return true; }, settingsBounds, EnumButtonStyle.Small, "settingsButton")
+                .AddRichtext(VtmlUtils.EscapeVtml(settingsLabel), settingsFont,
+                    ElementBounds.Fixed(settingsBounds.fixedX + 6, settingsBounds.fixedY + 3, labelWidth, 23))
+                .AddRichtext(
+                    "<icon path=\"thebasics:icons/settings.svg\"></icon>",
+                    CairoFont.WhiteSmallText().WithFontSize(24),
+                    ElementBounds.Fixed(settingsBounds.fixedX + labelWidth + 14, settingsBounds.fixedY - 3, 24, 28))
+                .AddHoverText(Lang.Get("thebasics:charsheet-settings-title"), CairoFont.WhiteSmallText(), 260, settingsBounds.FlatCopy());
+        }
+
+        composer.BeginChildElements(layout.BodyBounds);
 
         // Single inset wraps the header + scroll content. Draw it before adding interactive
         // children so the children render on top of the frame.
@@ -631,11 +650,14 @@ public class CharacterSheetDialog : GuiDialog
 
     private void AddLongStringField(Action<GuiElement> add, ElementBounds inputBounds, CharacterSheetFieldViewMessage field, int index)
     {
-        var textArea = new ScrollClippedTextArea(capi, inputBounds, null, CairoFont.TextInput())
-        {
-            Autoheight = false
-        };
-        textArea.SetMaxLines(GetEditorRows(field.EditorRows));
+        var viewport = new TextAreaContainer(capi, inputBounds) { Tabbable = true, unscaledCellSpacing = 0 };
+        var textBounds = ElementBounds.Fixed(0, 0, inputBounds.fixedWidth - GuiElementScrollbar.DefaultScrollbarWidth - 7, inputBounds.fixedHeight);
+        var textArea = new ScrollableTextArea(capi, textBounds, null, CairoFont.TextInput());
+        textArea.Scrollbar = new GuiElementScrollbar(capi, textArea.OnScroll, ElementStdBounds.VerticalScrollbar(textBounds));
+        viewport.Add(textArea);
+        viewport.Add(textArea.Scrollbar);
+        textArea.InsideClipBounds = viewport.Bounds;
+        textArea.Scrollbar.InsideClipBounds = viewport.Bounds;
         if (field.MaxLength > 0)
         {
             textArea.SetMaxLength(field.MaxLength);
@@ -643,7 +665,7 @@ public class CharacterSheetDialog : GuiDialog
 
         _textAreas[index] = textArea;
         _textAreaInitialValues[index] = InitialValue(field);
-        add(textArea);
+        add(viewport);
     }
 
     private void AddTextField(Action<GuiElement> add, ElementBounds inputBounds, CharacterSheetFieldViewMessage field, int index)
@@ -936,11 +958,20 @@ public class CharacterSheetDialog : GuiDialog
         }
     }
 
-    private sealed class ScrollClippedTextArea : ScrollableTextArea
+    private sealed class TextAreaContainer : GuiElementContainer
     {
-        public ScrollClippedTextArea(ICoreClientAPI capi, ElementBounds bounds, Action<string> onTextChanged, CairoFont font)
-            : base(capi, bounds, onTextChanged, font)
+        public TextAreaContainer(ICoreClientAPI capi, ElementBounds bounds) : base(capi, bounds)
         {
+        }
+
+        public override void OnMouseDown(ICoreClientAPI api, MouseEvent args)
+        {
+            if (IsPositionInside(args.X, args.Y)) base.OnMouseDown(api, args);
+        }
+
+        public override void OnMouseWheel(ICoreClientAPI api, MouseWheelEventArgs args)
+        {
+            if (IsPositionInside(api.Input.MouseX, api.Input.MouseY)) base.OnMouseWheel(api, args);
         }
 
         public override void RenderInteractiveElements(float deltaTime)
@@ -962,4 +993,5 @@ public class CharacterSheetDialog : GuiDialog
             }
         }
     }
+
 }

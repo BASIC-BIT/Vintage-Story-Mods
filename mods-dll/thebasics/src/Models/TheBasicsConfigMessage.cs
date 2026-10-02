@@ -18,4 +18,8 @@ public class TheBasicsConfigMessage
 
     [ProtoMember(3)]
     public int? LastSelectedGroupId { get; set; }
+
+    // 0 uses the server default, 1 opens the sheet, 2 keeps it closed.
+    [ProtoMember(5)]
+    public int CharacterSheetAutoOpenChoice { get; set; }
 }

@@ -20,6 +20,37 @@ namespace thebasics.Tests.ModSystems.CharacterSheets;
 public class CharacterSheetSystemTests
 {
     [Fact]
+    public void AutoOpenSubcommandChangesPreferenceWithoutUsingThePlayerLookup()
+    {
+        EnsureLangInitialized();
+        var api = Substitute.For<ICoreServerAPI>();
+        api.Side.Returns(EnumAppSide.Server);
+        var chat = new Vintagestory.Common.ChatCommandApi(api);
+        api.ChatCommands.Returns(chat);
+        chat.GetOrCreate("thebasics").RequiresPrivilege(Privilege.chat)
+            .HandleWith(_ => TextCommandResult.Success("root help"));
+        var system = new CharacterSheetSystem { API = api, Config = new ModConfig() };
+        typeof(CharacterSheetSystem).GetMethod("RegisterCommands", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(system, null);
+        var player = new FakeServerPlayer { PrivilegeCheck = privilege => privilege == Privilege.chat };
+        TextCommandResult? result = null;
+
+        chat.Execute("thebasics", player, 0, "charsheetautoopen off", response => result = response);
+        result!.Status.Should().Be(EnumCommandStatus.Success);
+        player.GetModData(CharacterSheetSystem.AutoOpenChoiceModDataKey, 0).Should().Be(2);
+        chat.Execute("thebasics", player, 0, "charsheetautoopen invalid", response => result = response);
+        result!.Status.Should().NotBe(EnumCommandStatus.Success);
+        player.GetModData(CharacterSheetSystem.AutoOpenChoiceModDataKey, 0).Should().Be(2);
+        chat.Execute("thebasics", player, 0, "charsheetautoopen on", response => result = response);
+        result!.Status.Should().Be(EnumCommandStatus.Success);
+        player.GetModData(CharacterSheetSystem.AutoOpenChoiceModDataKey, 0).Should().Be(1);
+        chat.Execute("thebasics", player, 0, "charsheetautoopen default", response => result = response);
+        result!.Status.Should().Be(EnumCommandStatus.Success);
+        player.GetModdata(CharacterSheetSystem.AutoOpenChoiceModDataKey).Should().BeNull();
+        chat.Get("charsheetautoopen").Should().BeNull();
+    }
+
+    [Fact]
     public void GetMissingRequiredFieldLabels_ReturnsMissingRequiredFields()
     {
         var player = CreatePlayer();

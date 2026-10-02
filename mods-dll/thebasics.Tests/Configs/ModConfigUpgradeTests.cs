@@ -249,6 +249,7 @@ public class ModConfigUpgradeTests
         config.SightPassThroughBlockCodePatterns = ["decorplus:brass-lattice-*"];
         config.SightBlockingBlockCodePatterns = ["decorplus:privacy-curtain-*"];
         config.EnableSceneMarkers = false;
+        config.CharacterSheetAutoOpenOnCharacterScreen = false;
 
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, config);
@@ -267,6 +268,7 @@ public class ModConfigUpgradeTests
         restored.SightPassThroughBlockCodePatterns.Should().Equal("decorplus:brass-lattice-*");
         restored.SightBlockingBlockCodePatterns.Should().Equal("decorplus:privacy-curtain-*");
         restored.EnableSceneMarkers.Should().BeFalse();
+        restored.CharacterSheetAutoOpenOnCharacterScreen.Should().BeFalse();
 
         // Neighbouring fields must be untouched by the new ids.
         restored.ProximityChatModeVerbs[ProximityChatMode.Yell].Should().BeEquivalentTo(["yells", "shouts"]);

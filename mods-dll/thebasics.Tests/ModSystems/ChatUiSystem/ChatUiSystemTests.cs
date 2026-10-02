@@ -13,6 +13,22 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 public class ChatUiSystemTests
 {
     [Theory]
+    [InlineData(true, 0, true)]
+    [InlineData(false, 0, false)]
+    [InlineData(true, 1, true)]
+    [InlineData(false, 1, true)]
+    [InlineData(true, 2, false)]
+    [InlineData(false, 2, false)]
+    public void ShouldAutoOpenCharacterSheet_UsesPlayerChoiceOrServerDefault(bool serverDefault, int choice, bool expected)
+    {
+        var config = new ModConfig { CharacterSheetAutoOpenOnCharacterScreen = serverDefault };
+
+        ChatUiModSystem.ShouldAutoOpenCharacterSheet(config, choice).Should().Be(expected);
+        config.EnableCharacterSheets = false;
+        ChatUiModSystem.ShouldAutoOpenCharacterSheet(config, choice).Should().BeFalse();
+    }
+
+    [Theory]
     [InlineData("NotesRequests", "OnNotesViewMessage")]
     [InlineData("LanguageRequests", "OnLanguageConfigResultMessage")]
     [InlineData("LanguageRequests", "OnLanguageConfigOpenMessage")]
