@@ -1,0 +1,12 @@
+{
+  "//": "A pylon footing plated both sides for a headframe. Two plates against the drive station footing's one, because this footing carries the drive leg AND the sheave's own bedplate - a shaft head is both of a ropeway's two stations in one block, and the whole machine is 11 placed blocks against a ropeway's 30, so the footing is where the difference is paid rather than in the block count.",
+  "//pattern": "3x1, not the drive station's 2x1 and not the tension station's BFB: one plate cannot sit in the middle of a symmetric row, and both of the other station footings already own their grid. P-F-P is the only symmetric 3-wide arrangement left and it reads as what it is.",
+  "ingredientPattern": "PFP",
+  "ingredients": {
+    "P": { "type": "item", "code": "game:metalplate-*" },
+    "F": { "type": "block", "code": "ropeway:pylonbase-*" }
+  },
+  "width": 3,
+  "height": 1,
+  "output": { "type": "block", "code": "shafthead-north", "quantity": 1 }
+}

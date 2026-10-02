@@ -1,0 +1,11 @@
+{
+  "//": "A pylon footing rigged for a counterweight - two sets of guide fittings, one each side. Pattern unchanged; the two bits become eight a side (0.15 -> 0.85 ingot). It stays the cheaper of the two footings, but by 2.4x rather than by 40x, and it is now paying for something instead of being free.",
+  "ingredientPattern": "BFB",
+  "ingredients": {
+    "B": { "type": "item", "code": "game:metalbit-*", "quantity": 8 },
+    "F": { "type": "block", "code": "ropeway:pylonbase-*" }
+  },
+  "width": 3,
+  "height": 1,
+  "output": { "type": "block", "code": "tensionstation-north", "quantity": 1 }
+}

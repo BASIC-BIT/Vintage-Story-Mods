@@ -1,0 +1,12 @@
+{
+  "//": "The bevel gearbox: one plate for the case and forty bits of gearing inside it. Still the most expensive single block in the mod, which is right - it is the one cell where the drive turns a corner - but 4.0 ingots rather than 6.15, which puts it beside vanilla's hub-light4way at 3.",
+  "//bug": "This file used to name BOTH metalplate-* and metalbit-* 'metal'. GetNameToCodeMappingForBasicWildcard ends in a plain assignment, so the last ingredient iterated wins the mapping outright - metalbit did, and it carries blistersteel, leadsolder and silversolder, which metalplate does not. Three of the generated recipes therefore asked for metalplate-blistersteel and friends, failed to resolve, and logged three errors at EVERY server start. layshaft.json and tensionhead.json had the same double-naming and were accidentally fine only because Dictionary enumeration put metalbit first. Deleting every name closes all three at once.",
+  "ingredientPattern": "BPB,BBB",
+  "ingredients": {
+    "P": { "type": "item", "code": "game:metalplate-*" },
+    "B": { "type": "item", "code": "game:metalbit-*", "quantity": 8 }
+  },
+  "width": 3,
+  "height": 2,
+  "output": { "type": "block", "code": "drivehead-north", "quantity": 1 }
+}

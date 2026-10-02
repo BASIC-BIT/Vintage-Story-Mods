@@ -1,0 +1,129 @@
+{
+  "code": "shaftfoot",
+  "//": "The BOTTOM of a shaft: two blocks, and one of them is this. The car stops on it and never travels below it, so unlike the head there is nothing above it and nothing to get out of the way of. It carries `tensioner` because a counterweight is EXACTLY what keeps a traction rope taut - so BEPylonBase.HasTensioner and TryPlaceCabin's one build requirement are satisfied by the machine that is actually doing the tensioning, and neither needed a line of change.",
+  "class": "BlockPylonBase",
+  "entityClass": "PylonBase",
+  "behaviors": [
+    {
+      "name": "HorizontalOrientable"
+    }
+  ],
+  "variantgroups": [
+    {
+      "code": "side",
+      "states": [
+        "north",
+        "east",
+        "south",
+        "west"
+      ]
+    }
+  ],
+  "//side": "SOMETHING DOES READ THIS FOOTING'S FACING, and an earlier version of this comment said otherwise. BEPylonBase.Init passes RotationFor(side) to MultiblockStructure.InitForUse, which rotates every offset - including the one cell below, the tensionguide at local (0,0,-3). So this variant decides which way the player has to dig the counterweight's lane, while ShaftRenderer.Lane draws the weight along the HEAD's facing. SpanMath.ShaftLinkFits is what reconciles them: a shaft link whose two footings face different ways is refused. RopewayLine.ShaftFacing is still the head's alone and there is still one heading in the machine - what is not true is that this one is inert.",
+  "shapeByType": {
+    "*-north": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 0
+    },
+    "*-east": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 270
+    },
+    "*-south": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 180
+    },
+    "*-west": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 90
+    }
+  },
+  "textures": {
+    "stone": {
+      "base": "game:block/stone/rock/andesite1"
+    },
+    "shaft": {
+      "base": "game:block/metal/plate/steel"
+    }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Stone",
+  "creativeinventory": {
+    "general": [
+      "*-north"
+    ],
+    "construction": [
+      "*-north"
+    ]
+  },
+  "attributes": {
+    "handbook": {
+      "groupBy": [
+        "shaftfoot-*"
+      ]
+    },
+    "reinforcable": false,
+    "shaft": "foot",
+    "//tensioner": "See the header. There is no matching flag on shafthead.json for the same reason there is none on drivestation.json - the head is named by the intake cell it owns.",
+    "tensioner": true,
+    "maxSpan": 48,
+    "maxLineLength": 320,
+    "ropePerBlock": 0.5,
+    "maxCandidates": 16,
+    "//multiblockStructure": "One cell: the counterweight's bottom guide, three columns along the head's own lane, which is where the weight's shoe lands when the car is at the top. It is the SAME ropeway:tensionguide a tension station uses - the same lattice column with the same two guide rails and the same rope - because it is doing the same job. Making the guide a required cell forces the player to dig ONE cell of that lane - the bottom one - and no more; the lane is H blocks tall and the rest of it is uncertified, so a player who digs only what the multiblock asks for gets a counterweight that runs through stone and a lift that works. See docs/KNOWN-ISSUES.md, which is honest about the rest. What the required cell actually buys is that the lane is unmistakably started, in the right column, before the structure will complete.",
+    "multiblockStructure": {
+      "blockNumbers": {
+        "ropeway:tensionguide": 1
+      },
+      "offsets": [
+        { "x": 0, "y": 0, "z": -3, "w": 1 }
+      ]
+    }
+  },
+  "replaceable": 500,
+  "resistance": 4.5,
+  "lightAbsorption": 0,
+  "sidesolid": {
+    "all": false
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "collisionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 0.5,
+    "z2": 1
+  },
+  "selectionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 0.5,
+    "z2": 1
+  },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/rock-break-pickaxe",
+    "hit": "game:block/rock-hit-pickaxe",
+    "byTool": {
+      "Pickaxe": {
+        "hit": "game:block/rock-hit-pickaxe",
+        "break": "game:block/rock-break-pickaxe"
+      }
+    }
+  },
+  "guiTransform": {
+    "rotation": {
+      "x": -22.6,
+      "y": 45,
+      "z": 0
+    },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "//": "A pylon footing with the hoist rope dead-ended over it and a buffer under it. It is the cheapest of the four station footings, at one haul rope and eight bits over the plain one, and that is right: everything the bottom of a shaft has to do is stop the car and hold the guide.",
+  "//pattern": "1x3 COLUMN, which no other recipe in the mod uses with these ingredients - the tension station footing is BFB in a 3x1 ROW and would otherwise be the same three cells. Rope on top, footing, buffer under: the grid is a picture of the block.",
+  "ingredientPattern": "R,F,B",
+  "ingredients": {
+    "R": { "type": "item", "code": "ropeway:haulrope" },
+    "F": { "type": "block", "code": "ropeway:pylonbase-*" },
+    "B": { "type": "item", "code": "game:metalbit-*", "quantity": 8 }
+  },
+  "width": 1,
+  "height": 3,
+  "output": { "type": "block", "code": "shaftfoot-north", "quantity": 1 }
+}

@@ -1,0 +1,12 @@
+{
+  "//": "The head sheave on its pedestal: one plate for the sheave, thirty-two bits for the pedestal and the tie rod. It was three plates and cost MORE than the drive head it mirrors, which inverted the mod's own argument that the tensioner is not a machine. 6.1 -> 3.6 ingots, and it now sits below the gearbox instead of above it.",
+  "ingredientPattern": "BPB,BSB",
+  "ingredients": {
+    "B": { "type": "item", "code": "game:metalbit-*", "quantity": 8 },
+    "P": { "type": "item", "code": "game:metalplate-*" },
+    "S": { "type": "item", "code": "game:stick" }
+  },
+  "width": 3,
+  "height": 2,
+  "output": { "type": "block", "code": "tensionhead-north", "quantity": 1 }
+}

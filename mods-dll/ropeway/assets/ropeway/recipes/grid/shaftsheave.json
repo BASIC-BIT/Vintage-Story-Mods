@@ -1,0 +1,12 @@
+{
+  "//": "A bullwheel re-rimmed and hung in a headframe. It EATS a bullwheel, which itself eats a pylon head, and that chain is the point rather than a tax: the head sheave is the same wheel with a rope radius of 1.5 blocks instead of 0.663, so the recipe says so. Forty-eight bits and two plates all told, which puts it one step above ropeway:drivehead - the most expensive block in the mod until this one, and it is meant to be.",
+  "ingredientPattern": "BPB,BWB",
+  "ingredients": {
+    "B": { "type": "item", "code": "game:metalbit-*", "quantity": 8 },
+    "P": { "type": "item", "code": "game:metalplate-*" },
+    "W": { "type": "block", "code": "ropeway:bullwheel-*" }
+  },
+  "width": 3,
+  "height": 2,
+  "output": { "type": "block", "code": "shaftsheave-north", "quantity": 1 }
+}

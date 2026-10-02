@@ -1,0 +1,62 @@
+{
+  "code": "shaftsheave",
+  "//": "The head sheave: a mine winder standing on its own bedplate over the hoistway, with the rope coming up the shaft, half a turn over the wheel and back down the counterweight's lane. Same block entity class as ropeway:bullwheel and the same renderer - it is a bigger wheel, not a different machine.",
+  "//whynotabullwheel": "Two numbers. bullwheel.json is authored for a rope running HORIZONTALLY THROUGH its cell: sheavecheekwest/east form a throat the cabin's hanger blade rides along the passage, so on a shaft, where the blade arrives from below and stops, the throat's axis is wrong. And the rim's rope radius is BullwheelRenderer.WrapRadius = 0.663 blocks, so a 180 degree wrap separates the two strands by 1.326 - which is INSIDE a car whose half-length is 2.0. The counterweight could not pass. This wheel's rope radius is BEBullwheel.ShaftWrapOut = 1.5 and its wrap separates them by 3.0.",
+  "entityClass": "Bullwheel",
+  "behaviors": [
+    { "name": "HorizontalOrientable" }
+  ],
+  "variantgroups": [
+    { "code": "side", "states": [ "north", "east", "south", "west" ] }
+  ],
+  "shapeByType": {
+    "*-north": { "base": "ropeway:block/shaftsheave", "rotateY": 0 },
+    "*-east": { "base": "ropeway:block/shaftsheave", "rotateY": 270 },
+    "*-south": { "base": "ropeway:block/shaftsheave", "rotateY": 180 },
+    "*-west": { "base": "ropeway:block/shaftsheave", "rotateY": 90 }
+  },
+  "//textures": "FIVE keys and only two of them appear on this block's own shape faces. BEBullwheel tesselates shaftrim, shaftweight and shaftstrand with Tesselator.TesselateShape(Block, ...), which builds a BLOCK texture source (ShapeTesselator.cs:179-190) and never consults the shape's own map - so `machine`, `stone` and `rope` have to be declared HERE or the wheel, the counterweight and both strands render as the unknown-texture checker with one 'Missing mapping for texture code' line on the tesselation thread. Same handshake bullwheel.json documents for `machine`, three shapes further.",
+  "textures": {
+    "girder": { "base": "game:block/metal/riveted/iron1" },
+    "machine": { "base": "game:block/metal/tarnished/iron" },
+    "shaft": { "base": "game:block/metal/plate/steel" },
+    "stone": { "base": "game:block/stone/rock/andesite1" },
+    "rope": { "base": "game:block/cloth/reedrope" }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Metal",
+  "creativeinventory": { "general": [ "*-north" ], "construction": [ "*-north" ] },
+  "attributes": {
+    "handbook": {
+      "groupBy": [ "shaftsheave-*" ]
+    },
+    "reinforcable": false,
+    "//shaft": "Read by BEBullwheel.Initialize, and the only thing it decides is whether this wheel also carries a ShaftRenderer - the two strands and the counterweight, which on a hoistway cannot be chunk mesh because the rope has moving ends.",
+    "shaft": true,
+    "rimShape": "shapes/block/shaftrim.json",
+    "//cullRadius": "BullwheelRenderer.CullRadius is 2.75 and is the BULLWHEEL's number. This hub stands 1.5 blocks along the lane and 1.106 up from the block centre - 1.864 away - and its swept rim reaches 1.44 further, so the wheel alone needs 3.30; the headframe beam reaches 3.52. 3.75 is the next quarter past it. Erring large costs a draw call that was going to happen anyway; erring small pops a two-and-three-quarter-block wheel off a headframe the player is standing under.",
+    "cullRadius": 3.75
+  },
+  "replaceable": 500,
+  "resistance": 4.5,
+  "lightAbsorption": 0,
+  "sidesolid": { "all": false },
+  "sideopaque": { "all": false },
+  "//collisionbox": "The bedplate only, 2 units. The wheel and its headframe hang outside this cell entirely and are drawn geometry - giving them collision would mean a solid block four cells above a shaft head that nothing can walk on anyway.",
+  "collisionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.125, "z2": 1 },
+  "selectionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.125, "z2": 1 },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/anvil",
+    "hit": "game:block/anvil",
+    "byTool": {
+      "Pickaxe": { "hit": "game:block/rock-hit-pickaxe", "break": "game:block/rock-break-pickaxe" }
+    }
+  },
+  "guiTransform": {
+    "rotation": { "x": -22.6, "y": 45, "z": 0 },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

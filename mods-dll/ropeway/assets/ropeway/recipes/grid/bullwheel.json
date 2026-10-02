@@ -1,0 +1,13 @@
+{
+  "//": "A pylon head rebuilt as a spoked wheel: a felloe, a hub and the rivets and bands holding them together, which is what a wheel actually is. It was two metalplates, and vanilla's ceiling for a machine recipe is ONE plate (pulverizer toggle, archimedes screw) - multi-plate recipes exist only in plate armour. Bits instead: 4.55 -> 1.10 ingots.",
+  "//eightbits": "Eight bits per station-machinery slot, throughout this folder. That is 0.4 ingot, the value of one vanilla metalnailsandstrips, which is the fastener vanilla's own water wheel construction spends. Plain-tower blocks and haul rope keep ONE bit, because those are the marginal costs DECISIONS.md 3 protects. Tried and rejected: metalnailsandstrips-* at quantity 1 - better fiction, identical value, but it adds a smithing intermediate to QA-SCRIPT step 2's craft list and step 2 has to stay walkable off one grid craft per part. metalbit stacks to 128, so the largest slot in the mod (drivehead, 8 x 5) fits in one stack with room over.",
+  "//collision": "B-H-B is distinct from tensionstation's B-F-B and layshaft's B-P-B by its centre cell, and from brace's S-P-S by both. No two recipes in this folder resolve to the same grid.",
+  "ingredientPattern": "BHB",
+  "ingredients": {
+    "B": { "type": "item", "code": "game:metalbit-*", "quantity": 8 },
+    "H": { "type": "block", "code": "ropeway:pylonhead-*" }
+  },
+  "width": 3,
+  "height": 1,
+  "output": { "type": "block", "code": "bullwheel-north", "quantity": 1 }
+}
