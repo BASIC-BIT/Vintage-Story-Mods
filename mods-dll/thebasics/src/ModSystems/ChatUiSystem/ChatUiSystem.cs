@@ -38,6 +38,8 @@ public class ChatUiSystem : ModSystem
     private static int? _proximityGroupId = null;
     private static int? _lastSelectedGroupId = null;
     private static ModConfig _config = null;
+    private static HudDialogChat _chatTabDialog;
+    private static GuiTab[] _chatTabGameOrder;
     private static readonly System.Collections.Generic.List<System.Action> _pendingConfigActions = new System.Collections.Generic.List<System.Action>();
 
     private static IClientNetworkChannel _clientConfigChannel;
@@ -1945,12 +1947,11 @@ public class ChatUiSystem : ModSystem
                 return;
             }
 
+            _proximityGroupId = configMessage.ProximityGroupId;
+            _lastSelectedGroupId = configMessage.LastSelectedGroupId;
             ApplyReceivedConfig(configMessage.Config);
             _api.ModLoader.GetModSystem<SceneDescriptionSystem>()?.SetRuntimeEnabled(
                 configMessage.SceneMarkersRuntimeEnabled ?? configMessage.Config.EnableSceneMarkers);
-
-            _proximityGroupId = configMessage.ProximityGroupId;
-            _lastSelectedGroupId = configMessage.LastSelectedGroupId;
 
             DebugLog($"[THEBASICS] Received server config: PreventProximityChannelSwitching={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
             DebugLog($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
@@ -1975,6 +1976,46 @@ public class ChatUiSystem : ModSystem
         _config = config;
         VisibilityUtils.ConfigureSightBlockOverrides(_api?.World, config);
         _safeNetworkChannel?.SetEnableDebugLogging(config.DebugMode);
+        RefreshChatTabPosition();
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(HudDialogChat), "ComposeChatGuis")]
+    public static void OnChatTabsComposed(HudDialogChat __instance, GuiTab[] ___tabs)
+    {
+        _chatTabDialog = __instance;
+        _chatTabGameOrder = ___tabs.ToArray();
+        RefreshChatTabPosition();
+    }
+
+    private static void RefreshChatTabPosition()
+    {
+        if (_config == null || _chatTabDialog == null || _chatTabGameOrder == null ||
+            _api?.World is not ClientMain game) return;
+
+        try
+        {
+            var widget = _chatTabDialog.Composers["chat"].GetHorizontalTabs("tabs");
+            var alarms = widget.tabs.Select((tab, index) => (tab.DataInt, Alarm: widget.TabHasAlarm[index]))
+                .ToDictionary(entry => entry.DataInt, entry => entry.Alarm);
+            if (!ChatTabLayout.Arrange(widget.tabs, _chatTabGameOrder, _config, _proximityGroupId)) return;
+
+            for (var index = 0; index < widget.tabs.Length; index++)
+            {
+                widget.TabHasAlarm[index] = alarms[widget.tabs[index].DataInt];
+            }
+
+            // ponytail: recompose once per group rebuild; use a pre-compose hook if this becomes measurable.
+            _chatTabDialog.Composers["chat"].ReCompose();
+            // ReCompose refreshes ordinary tabs, but vanilla builds unread textures separately.
+            AccessTools.Method(typeof(GuiElementHorizontalTabs), "ComposeOverlays").Invoke(widget, [true]);
+            var selectedIndex = Array.FindIndex(widget.tabs, tab => tab.DataInt == game.currentGroupid);
+            if (selectedIndex >= 0) widget.SetValue(selectedIndex, callhandler: false);
+        }
+        catch (Exception exception)
+        {
+            _api.Logger.Warning("[THEBASICS] Could not apply proximity tab position: {0}", exception.Message);
+        }
     }
 
     private static void ApplyClientNametagSettingsToLoadedPlayers()
@@ -2287,15 +2328,8 @@ public class ChatUiSystem : ModSystem
 
         try
         {
-            var targetGroupId = GlobalConstants.GeneralChatGroup;
-            if (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null)
-            {
-                targetGroupId = _lastSelectedGroupId.Value;
-            }
-            else if (_config.ProximityChatAsDefault && _proximityGroupId != null)
-            {
-                targetGroupId = _proximityGroupId.Value;
-            }
+            var tabs = __instance.Composers["chat"].GetHorizontalTabs("tabs").tabs;
+            var targetGroupId = ChatTabLayout.OpeningGroup(tabs, _config, _lastSelectedGroupId, _proximityGroupId);
 
             // Get the tab index for the target group
             System.Reflection.MethodInfo tabIndexMethod = typeof(HudDialogChat).GetMethod("tabIndexByGroupId",
@@ -2357,6 +2391,9 @@ public class ChatUiSystem : ModSystem
 
     public override void Dispose()
     {
+        _chatTabDialog = null;
+        _chatTabGameOrder = null;
+        _proximityGroupId = null;
         try
         {
             if (_api != null)

@@ -1988,10 +1988,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void RemoveProximityGroupIfExists()
     {
-
         var proximityGroup = GetProximityGroup();
         if (proximityGroup != null)
         {
+            // Remove saved memberships too, including players who are currently offline.
+            foreach (var playerData in API.PlayerData.PlayerDataByUid.Values)
+            {
+                playerData.PlayerGroupMemberships.Remove(proximityGroup.Uid);
+            }
+
             API.Groups.RemovePlayerGroup(proximityGroup);
         }
     }
