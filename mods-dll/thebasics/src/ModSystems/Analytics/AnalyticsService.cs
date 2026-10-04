@@ -16,6 +16,32 @@ public static class AnalyticsService
     private static readonly object PendingFailureLock = new();
     private static volatile bool _allowErrorTelemetry;
     private static volatile bool _errorTelemetryConfigured;
+    private static readonly HashSet<string> SetupWizardSteps = new(StringComparer.Ordinal)
+    {
+        "invitation", "start", "hub", "review", "finish", "advanced",
+        "chat.basics", "chat.language", "chat.ranges", "chat.obfuscation", "chat.tabs",
+        "teleport.tools", "teleport.utilities", "teleport.requests", "teleport.requesttiming",
+        "teleport.homes", "teleport.spawn", "teleport.top", "teleport.back", "teleport.stuck",
+        "teleport.stuckpolicy", "teleport.warmup",
+        "notifications.savestart", "notifications.savefinish", "notifications.sleep"
+    };
+    private static readonly HashSet<string> SetupWizardActions = new(StringComparer.Ordinal)
+    {
+        "offered", "dismissed", "started", "opened", "viewed", "choice", "back", "skip",
+        "advanced", "close", "closed", "save_requested", "save_timeout", "save_failed",
+        "saved", "conflict", "failed", "validation_failed", "completed"
+    };
+    private static readonly HashSet<string> SetupWizardChoices = new(StringComparer.Ordinal)
+    {
+        "on", "off", "chat", "popup", "edited", "StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose",
+        "option0", "option1", "option2", "option3", "option4", "option5", "option6", "option7",
+        "option8", "option9", "option10", "option11", "option12", "option13", "option14", "option15"
+    };
+    private static readonly HashSet<string> SetupWizardResults = new(StringComparer.Ordinal)
+    {
+        "success", "conflict", "validation_failed", "write_failed", "failure", "timeout",
+        "cancelled", "unauthorized", "saved_live", "saved_pending_restart"
+    };
 
     public static bool IsEnabled => _sink.IsEnabled;
 
@@ -78,6 +104,36 @@ public static class AnalyticsService
         AddProperties(eventProperties, properties);
         AddPlayerPseudonym(eventProperties, actorPlayerUid);
         Track("feature used", eventProperties);
+    }
+
+    public static bool IsValidSetupWizardJourney(string wizardRunId, int sequence, string stepId, string action, string choice = null, string result = null)
+    {
+        return wizardRunId?.Length == 32 && Guid.TryParseExact(wizardRunId, "N", out _)
+            && sequence is >= 1 and <= 10_000
+            && SetupWizardSteps.Contains(stepId) && SetupWizardActions.Contains(action)
+            && (string.IsNullOrEmpty(choice) || SetupWizardChoices.Contains(choice))
+            && (string.IsNullOrEmpty(result) || SetupWizardResults.Contains(result));
+    }
+
+    public static void TrackSetupWizardJourney(string wizardRunId, int sequence, string stepId, string action, string choice = null, string result = null, bool pendingRestart = false, string actorPlayerUid = null)
+    {
+        if (!IsEnabled || !IsValidSetupWizardJourney(wizardRunId, sequence, stepId, action, choice, result))
+        {
+            return;
+        }
+
+        var properties = new Dictionary<string, object>
+        {
+            ["wizard_run_id"] = wizardRunId.ToLowerInvariant(),
+            ["wizard_sequence"] = sequence,
+            ["wizard_step_id"] = stepId,
+            ["wizard_action"] = action,
+            ["pending_restart"] = pendingRestart
+        };
+        if (!string.IsNullOrEmpty(choice)) properties["wizard_choice"] = choice;
+        if (!string.IsNullOrEmpty(result)) properties["wizard_result"] = result;
+        AddPlayerPseudonym(properties, actorPlayerUid);
+        Track("setup wizard journey", properties);
     }
 
     public static void TrackFailure(string area, string operation, string severity, string result, Exception exception = null, bool recovered = true, IDictionary<string, object> properties = null)

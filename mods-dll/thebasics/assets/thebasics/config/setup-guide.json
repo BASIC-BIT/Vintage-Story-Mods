@@ -1,0 +1,24 @@
+{
+  "name": "Pip",
+  "skinParts": {
+    "baseskin": "skin10",
+    "eyecolor": "goldenrod",
+    "underwear": "breeches",
+    "voicetype": "altoflute",
+    "voicepitch": "medium",
+    "hairbase": "combed",
+    "hairextra": "backbun",
+    "facialexpression": "kind",
+    "mustache": "none",
+    "beard": "none",
+    "haircolor": "mossgreen"
+  },
+  "gear": [
+    { "slot": 2, "code": "game:clothes-upperbody-pastoral-shirt" },
+    { "slot": 3, "code": "game:clothes-lowerbody-pastoral-pants" },
+    { "slot": 4, "code": "game:clothes-foot-commoner-boots" },
+    { "slot": 7, "code": "game:clothes-emblem-silver-star" },
+    { "slot": 9, "code": "game:clothes-waist-moss-embroidered-belt" }
+  ],
+  "animations": ["idle", "wave", "nod", "cheer"]
+}

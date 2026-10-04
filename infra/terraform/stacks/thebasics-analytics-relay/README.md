@@ -17,6 +17,8 @@ Contract revision 7 adds Scene Marker action counts and `enable_scene_markers` c
 
 Contract revision 8 accepts `scene_mount=ceiling` for placed and moved Scene Marker events, alongside `ground` and `wall`. Deploy the revision 8 relay before publishing a mod that requires it.
 
+Contract revision 9 adds `setup wizard journey`: server-issued run IDs, bounded sequence numbers, finite page/action/choice/result labels, and pending-restart status. Existing server consent reports anonymous runs; personalized consent may add the existing per-server actor pseudonym. Numeric and text edits report only `edited`. Analyze ordered runs by `wizard_run_id`, since the server install remains `distinct_id`. A missing final event does not prove abandonment, and saved pending-restart configuration does not prove activation. Deploy revision 9 before publishing a mod that requires it.
+
 Closed values and semantic analytics labels use explicit server-side registries. This includes `feature_name`, `action`, `command_name`, `result`, `area`, `operation`, and `severity`, because string shape alone cannot distinguish a legitimate label from a player name or identifier. The contract suite derives literals from known C# analytics seams, covers dynamic labels with explicit fixtures, and fails CI when a producer emits a value that the relay does not recognize. This keeps the registries synchronized without weakening the privacy boundary.
 
 Pull requests that change Worker behavior must also increase `CONTRACT_REVISION`. Release builds independently verify that the deployed relay revision satisfies the mod's `RequiredRelayContractRevision` before publishing.

@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 const MAX_ONLINE_PLAYER_COUNT = 10_000;
-export const CONTRACT_REVISION = 8;
+export const CONTRACT_REVISION = 9;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -33,6 +33,7 @@ const ALLOWED_EVENTS = new Set([
   "player session started",
   "server started",
   "server stopped",
+  "setup wizard journey",
 ]);
 
 const ALLOWED_CONSENT_LEVELS = new Set(["server", "personalized"]);
@@ -106,7 +107,34 @@ const SCENE_PROPERTIES = new Set([
 const DICE_BOOLEAN_PROPERTIES = new Set([
   "dice_explode", "dice_reroll", "dice_keep_drop", "dice_success_pool", "dice_arithmetic", "dice_helpers",
 ]);
+const WIZARD_STEPS = new Set([
+  "invitation", "start", "hub", "review", "finish", "advanced",
+  "chat.basics", "chat.language", "chat.ranges", "chat.obfuscation", "chat.tabs",
+  "teleport.tools", "teleport.utilities", "teleport.requests", "teleport.requesttiming",
+  "teleport.homes", "teleport.spawn", "teleport.top", "teleport.back", "teleport.stuck",
+  "teleport.stuckpolicy", "teleport.warmup",
+  "notifications.savestart", "notifications.savefinish", "notifications.sleep",
+]);
+const WIZARD_ACTIONS = new Set([
+  "offered", "dismissed", "started", "opened", "viewed", "choice", "back", "skip",
+  "advanced", "close", "closed", "save_requested", "save_timeout", "save_failed",
+  "saved", "conflict", "failed", "validation_failed", "completed",
+]);
+const WIZARD_CHOICES = new Set([
+  "on", "off", "chat", "popup", "edited", "StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose",
+  "option0", "option1", "option2", "option3", "option4", "option5", "option6", "option7",
+  "option8", "option9", "option10", "option11", "option12", "option13", "option14", "option15",
+]);
+const WIZARD_RESULTS = new Set([
+  "success", "conflict", "validation_failed", "write_failed", "failure", "timeout",
+  "cancelled", "unauthorized", "saved_live", "saved_pending_restart",
+]);
+const WIZARD_REQUIRED_PROPERTIES = new Set([
+  "wizard_run_id", "wizard_sequence", "wizard_step_id", "wizard_action", "pending_restart",
+]);
+const WIZARD_PROPERTIES = new Set([...WIZARD_REQUIRED_PROPERTIES, "wizard_choice", "wizard_result"]);
 const ALLOWED_PROPERTIES = new Set([
+  ...WIZARD_PROPERTIES,
   ...DICE_BOOLEAN_PROPERTIES,
   "dice_complexity",
   ...TELEPORT_CONFIG_PROPERTIES,
@@ -193,6 +221,10 @@ const ALLOWED_PROPERTIES = new Set([
 ]);
 
 const ALLOWED_STRING_VALUES = new Map([
+  ["wizard_step_id", WIZARD_STEPS],
+  ["wizard_action", WIZARD_ACTIONS],
+  ["wizard_choice", WIZARD_CHOICES],
+  ["wizard_result", WIZARD_RESULTS],
   ...[...TELEPORT_BUCKET_PROPERTIES].map((key) => [key, COUNT_BUCKET_VALUES]),
   ["action", new Set([
     ...SCENE_ACTIONS,
@@ -522,6 +554,7 @@ const ALLOWED_STRING_VALUES = new Map([
 ]);
 
 const BOOLEAN_PROPERTIES = new Set([
+  "pending_restart",
   ...DICE_BOOLEAN_PROPERTIES,
   ...TELEPORT_BOOLEAN_PROPERTIES,
   "enable_scene_markers",
@@ -574,6 +607,7 @@ const BOOLEAN_PROPERTIES = new Set([
 ]);
 
 const STRING_PROPERTIES = new Set([
+  "wizard_run_id",
   ...ALLOWED_STRING_VALUES.keys(),
   "exception_type",
   "game_version",
@@ -644,6 +678,7 @@ const CONFIG_PROPERTIES = new Set([
 ]);
 
 const EVENT_PROPERTIES = new Map([
+  ["setup wizard journey", new Set([...BASE_PROPERTIES, ...WIZARD_PROPERTIES, "pseudonymous_player_id"])],
   ["analytics consent changed", new Set([
     ...BASE_PROPERTIES,
     "new_consent_level",
@@ -922,6 +957,11 @@ function normalizeEvent(event, envelope) {
     return invalid("too_many_properties");
   }
 
+  if (event.name === "setup wizard journey"
+      && ![...WIZARD_REQUIRED_PROPERTIES].every((key) => Object.hasOwn(event.properties, key))) {
+    return invalid("missing_wizard_property");
+  }
+
   // Scene observations remain installation-only even under personalized consent.
   // Keep optional fields tied to their action instead of admitting a generic property bag.
   const isScene = event.name === "feature used" && event.properties.feature_name === "scene_markers";
@@ -996,6 +1036,16 @@ function normalizePropertyValue(key, value) {
 
   if (key === "server_session_id") {
     return isHexId(value, 32) ? { ok: true, value: value.toLowerCase() } : invalid("invalid_server_session_id");
+  }
+
+  if (key === "wizard_run_id") {
+    return isHexId(value, 32) ? { ok: true, value: value.toLowerCase() } : invalid("invalid_wizard_run_id");
+  }
+
+  if (key === "wizard_sequence") {
+    return Number.isInteger(value) && value >= 1 && value <= 10_000
+      ? { ok: true, value }
+      : invalid("invalid_wizard_sequence");
   }
 
   if (key === "pseudonymous_player_id") {

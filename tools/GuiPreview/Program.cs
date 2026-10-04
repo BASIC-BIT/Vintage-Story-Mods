@@ -11,7 +11,7 @@ public static class Program
         {
             if (args.Length == 0 || args[0] is "--help" or "help")
             {
-                Console.WriteLine("GUI preview: render --game PATH --assets MOD_ASSETS --output DIR [--scenario all|NAME] [--scale 1] [--width 1600] [--height 1000] [--baseline DIR]");
+                Console.WriteLine("GUI preview: render --game PATH --assets MOD_ASSETS --output DIR [--scenario all|wizard-all|NAME] [--scale 1] [--width 1600] [--height 1000] [--baseline DIR] [--source-tree-hash SHA256]");
                 Console.WriteLine("Image comparison: compare --expected PNG --actual PNG --diff PNG");
                 return 0;
             }
@@ -24,7 +24,7 @@ public static class Program
                 return comparison.Matches ? 0 : 1;
             }
             if (args[0] != "render") throw new ArgumentException("Unknown command: " + args[0]);
-            EnsureKnown(options, "game", "assets", "output", "scenario", "scale", "width", "height", "baseline");
+            EnsureKnown(options, "game", "assets", "output", "scenario", "scale", "width", "height", "baseline", "source-tree-hash");
             var game = Required(options, "game");
             var assets = Required(options, "assets");
             var output = Path.GetFullPath(Required(options, "output"));
@@ -36,11 +36,15 @@ public static class Program
             if (options.TryGetValue("baseline", out var baselineDirectory) &&
                 string.Equals(Path.TrimEndingDirectorySeparator(output), Path.TrimEndingDirectorySeparator(Path.GetFullPath(baselineDirectory)), StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("Output and baseline directories must be different.");
+            var sourceTreeHash = options.GetValueOrDefault("source-tree-hash");
+            if (sourceTreeHash is not null && (sourceTreeHash.Length != 64 || sourceTreeHash.Any(c => !Uri.IsHexDigit(c))))
+                throw new ArgumentException("Source tree identity must be a SHA256 hex digest.");
             Directory.CreateDirectory(output);
             var selected = options.GetValueOrDefault("scenario", "all");
             var names = PreviewScene.Names.Concat(DicePreview.Names).ToArray();
-            var scenarios = selected == "all" ? names : new[] { selected };
+            var scenarios = selected switch { "all" => names, "wizard-all" => thebasics.ModSystems.ChatUiSystem.SetupWizardCaptureScenes.Names, _ => new[] { selected } };
             var failed = false;
+            var captures = new List<object>();
             foreach (var scenario in scenarios)
             {
                 if (!names.Contains(scenario, StringComparer.Ordinal)) throw new ArgumentException("Unknown scenario: " + scenario);
@@ -55,14 +59,21 @@ public static class Program
                     host.Canvas.SavePng(imagePath);
                     File.WriteAllText(Path.Combine(output, scenario + ".json"), JsonSerializer.Serialize(new
                     {
+                        schema = 1,
                         scenario,
                         width,
                         height,
                         scale,
-                        fixture,
+                        fixture = scene?.Fixture ?? fixture,
+                        previewTime = scene?.Coverage == "layout-only" ? 0.75 : 0,
+                        coverage = scene?.Coverage ?? "standalone-gui",
+                        omissions = scene?.Omissions ?? Array.Empty<string>(),
+                        sourceTreeHash,
                         fidelity = "Production dialog and widgets; standalone composition has not been calibrated against in-game screenshots.",
+                        environmentIdentity = host.EnvironmentIdentity,
                         environment = host.Manifest
                     }, new JsonSerializerOptions { WriteIndented = true }));
+                    captures.Add(new { scenario, file = scenario + ".png", manifest = scenario + ".json" });
                     if (options.TryGetValue("baseline", out var baseline))
                     {
                         var comparison = ImageComparison.Compare(Path.Combine(baseline, scenario + ".png"), imagePath, Path.Combine(output, scenario + ".diff.png"));
@@ -78,6 +89,8 @@ public static class Program
                     throw;
                 }
             }
+            File.WriteAllText(Path.Combine(output, "captures.json"), JsonSerializer.Serialize(new
+            { schema = 1, sourceTreeHash, coverage = selected == "wizard-all" || scenarios.All(s => s.StartsWith("wizard-", StringComparison.Ordinal)) ? "layout-only" : "standalone-gui", captures }, new JsonSerializerOptions { WriteIndented = true }));
             return failed ? 1 : 0;
         }
         catch (Exception exception)

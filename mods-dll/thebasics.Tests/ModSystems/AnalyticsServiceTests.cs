@@ -229,11 +229,97 @@ public class AnalyticsServiceTests : IDisposable
         properties.Should().ContainKey("teleport_cancel_warmup_on_interaction").WhoseValue.Should().Be(false);
     }
 
+    [Fact]
+    public void SetupJourney_WithServerConsent_EmitsOrderedRunWithoutActorOrRawContent()
+    {
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(sink);
+
+        AnalyticsService.TrackSetupWizardJourney(new string('d', 32), 2, "chat.basics", "choice", "off", actorPlayerUid: "raw-player-uid");
+
+        var analyticsEvent = sink.Events.Should().ContainSingle().Subject;
+        analyticsEvent.Name.Should().Be("setup wizard journey");
+        analyticsEvent.Properties.Should().BeEquivalentTo(new Dictionary<string, object>
+        {
+            ["wizard_run_id"] = new string('d', 32),
+            ["wizard_sequence"] = 2,
+            ["wizard_step_id"] = "chat.basics",
+            ["wizard_action"] = "choice",
+            ["wizard_choice"] = "off",
+            ["pending_restart"] = false
+        });
+    }
+
+    [Fact]
+    public void SetupJourney_WithPersonalizedConsent_UsesExistingPseudonymForActor()
+    {
+        var playerPseudonym = new string('c', 64);
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => playerPseudonym);
+
+        AnalyticsService.TrackSetupWizardJourney(new string('d', 32), 10_000, "finish", "completed", result: "saved_pending_restart", pendingRestart: true, actorPlayerUid: "raw-player-uid");
+
+        var properties = sink.Events.Should().ContainSingle().Subject.Properties;
+        properties.Should().ContainKey("pseudonymous_player_id").WhoseValue.Should().Be(playerPseudonym);
+        properties.Should().ContainKey("wizard_result").WhoseValue.Should().Be("saved_pending_restart");
+        properties.Should().ContainKey("pending_restart").WhoseValue.Should().Be(true);
+        properties.Values.Should().NotContain("raw-player-uid");
+    }
+
+    [Fact]
+    public void SetupJourney_WhenDisabled_DoesNotTrackOrPseudonymize()
+    {
+        var sink = new RecordingAnalyticsSink(enabled: false);
+        var pseudonymCalls = 0;
+        AnalyticsService.Configure(sink, playerPseudonymizer: _ => { pseudonymCalls++; return new string('c', 64); });
+
+        AnalyticsService.TrackSetupWizardJourney(new string('d', 32), 1, "hub", "viewed", actorPlayerUid: "raw-player-uid");
+
+        sink.Events.Should().BeEmpty();
+        pseudonymCalls.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("player-name", 1, "hub", "viewed", null, null)]
+    [InlineData("dddddddddddddddddddddddddddddddd", 0, "hub", "viewed", null, null)]
+    [InlineData("dddddddddddddddddddddddddddddddd", 10_001, "hub", "viewed", null, null)]
+    [InlineData("dddddddddddddddddddddddddddddddd", 1, "private page", "viewed", null, null)]
+    [InlineData("dddddddddddddddddddddddddddddddd", 1, "hub", "chat text", null, null)]
+    [InlineData("dddddddddddddddddddddddddddddddd", 1, "hub", "choice", "custom privilege", null)]
+    [InlineData("dddddddddddddddddddddddddddddddd", 1, "hub", "save_failed", null, "exception message")]
+    public void SetupJourney_RejectsUnboundedOrMalformedFields(string runId, int sequence, string stepId, string action, string choice, string result)
+    {
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(sink);
+
+        AnalyticsService.IsValidSetupWizardJourney(runId, sequence, stepId, action, choice, result).Should().BeFalse();
+        AnalyticsService.TrackSetupWizardJourney(runId, sequence, stepId, action, choice, result);
+
+        sink.Events.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SetupJourney_EmptyOptionalFieldsAreOmitted()
+    {
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(sink);
+
+        AnalyticsService.TrackSetupWizardJourney(new string('d', 32), 1, "hub", "viewed", "", "");
+
+        var properties = sink.Events.Should().ContainSingle().Subject.Properties;
+        properties.Should().NotContainKey("wizard_choice").And.NotContainKey("wizard_result");
+    }
+
     private sealed class RecordingAnalyticsSink : IAnalyticsSink
     {
+        public RecordingAnalyticsSink(bool enabled = true)
+        {
+            IsEnabled = enabled;
+        }
+
         public List<RecordedEvent> Events { get; } = new();
 
-        public bool IsEnabled => true;
+        public bool IsEnabled { get; }
 
         public void Track(string eventName, IDictionary<string, object> properties)
         {

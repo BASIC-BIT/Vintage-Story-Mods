@@ -209,6 +209,8 @@ public sealed class PreviewHost : IDisposable
     public void SetMouse(int x, int y) { mouseX = x; mouseY = y; }
     public void SetClock(long milliseconds) => elapsed = milliseconds;
     public void RenderGuiDialog(GuiDialog dialog, float deltaTime = 1f / 60) { Canvas.Clear(30, 30, 30, 255); dialog.OnRenderGUI(deltaTime); dialog.OnFinalizeFrame(deltaTime); }
+    public object EnvironmentIdentity => thebasics.ModSystems.ChatUiSystem.SetupWizardCaptureIdentity.EnvironmentIdentity(
+        gamePath, Canvas.Width, Canvas.Height, RuntimeEnv.GUIScale, Lang.CurrentLocale ?? "en", GuiStyle.StandardFontName, GuiStyle.DecorativeFontName);
     private object[] ControlBounds() => loaded.SelectMany(dialog => dialog.Composers.SelectMany(composer =>
         ((Dictionary<string, GuiElement>)(typeof(GuiComposer).GetField("staticElements", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new MissingFieldException("Game composer elements changed")).GetValue(composer.Value)!)

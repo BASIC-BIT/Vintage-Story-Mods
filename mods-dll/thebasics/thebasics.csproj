@@ -78,4 +78,15 @@
     <Folder Include="assets_bak\" />
   </ItemGroup>
   <PropertyGroup />
+  <Target Name="StampGuiCaptureSource" BeforeTargets="CoreCompile" Condition="'$(TheBasicsSourceTreeHash)' != ''">
+    <ItemGroup>
+      <GuiCaptureAssemblyMetadata Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>GuiCaptureSourceTreeHash</_Parameter1>
+        <_Parameter2>$(TheBasicsSourceTreeHash)</_Parameter2>
+      </GuiCaptureAssemblyMetadata>
+    </ItemGroup>
+    <WriteCodeFragment Language="C#" OutputFile="$(IntermediateOutputPath)GuiCaptureSource.g.cs" AssemblyAttributes="@(GuiCaptureAssemblyMetadata)">
+      <Output TaskParameter="OutputFile" ItemName="Compile" />
+    </WriteCodeFragment>
+  </Target>
 </Project>

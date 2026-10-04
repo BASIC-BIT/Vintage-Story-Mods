@@ -17,11 +17,23 @@ public sealed class PreviewScene : IDisposable
     private PreviewScene(string name, GuiDialog dialog, Action? restore = null)
     { Name = name; Dialog = dialog; this.restore = restore ?? (() => { }); }
 
-    public static string[] Names => ["language-default", "language-focus", "language-dropdown", "language-hover", "language-tooltip", "language-error", "admin-chat", "admin-bubbles", "admin-discord"];
+    public static string[] Names => new[] { "language-default", "language-focus", "language-dropdown", "language-hover", "language-tooltip", "language-error", "admin-chat", "admin-bubbles", "admin-discord" }.Concat(SetupWizardCaptureScenes.Names).ToArray();
+
+    public string Coverage => Name.StartsWith("wizard-", StringComparison.Ordinal) ? "layout-only" : "standalone-gui";
+    public string[] Omissions => Coverage == "layout-only" ? ["Native character, clothing, animation and world rendering are omitted."] : [];
+    public object? Fixture => Dialog is SetupWizardDialog wizard ? wizard.Draft.Values : null;
 
     public static PreviewScene Create(string name, PreviewHost host)
     {
         if (!Names.Contains(name, StringComparer.Ordinal)) throw new ArgumentException("Unknown GUI fixture: " + name);
+        if (name.StartsWith("wizard-", StringComparison.Ordinal))
+        {
+            var wizard = new SetupWizardDialog(host.Api, new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues()),
+                "standalone-capture", name != "wizard-restart-integrated", () => { }, (_, _, _) => { }, () => { }, layoutOnly: true);
+            wizard.TryOpen();
+            SetupWizardCaptureScenes.Show(wizard, name, 0.75);
+            return new PreviewScene(name, wizard);
+        }
         if (name.StartsWith("admin-", StringComparison.Ordinal)) return CreateAdmin(name, host);
         var languages = new List<LanguageConfigEntryMessage>
         {

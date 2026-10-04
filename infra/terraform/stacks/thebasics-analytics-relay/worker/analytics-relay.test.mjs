@@ -1031,3 +1031,129 @@ test("scene actions cannot be attributed to another feature", () => {
     assert.equal(result.rejected.length, 1, action);
   }
 });
+
+const wizardSteps = [
+  "invitation", "start", "hub", "review", "finish", "advanced",
+  "chat.basics", "chat.language", "chat.ranges", "chat.obfuscation", "chat.tabs",
+  "teleport.tools", "teleport.utilities", "teleport.requests", "teleport.requesttiming",
+  "teleport.homes", "teleport.spawn", "teleport.top", "teleport.back", "teleport.stuck",
+  "teleport.stuckpolicy", "teleport.warmup",
+  "notifications.savestart", "notifications.savefinish", "notifications.sleep",
+];
+const wizardActions = [
+  "offered", "dismissed", "started", "opened", "viewed", "choice", "back", "skip",
+  "advanced", "close", "closed", "save_requested", "save_timeout", "save_failed",
+  "saved", "conflict", "failed", "validation_failed", "completed",
+];
+const wizardChoices = [
+  "on", "off", "chat", "popup", "edited",
+  "StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose",
+  ...Array.from({ length: 16 }, (_, index) => `option${index}`),
+];
+const wizardResults = [
+  "success", "conflict", "validation_failed", "write_failed", "failure", "timeout",
+  "cancelled", "unauthorized", "saved_live", "saved_pending_restart",
+];
+
+function wizardProperties(properties = {}) {
+  return {
+    wizard_run_id: "d".repeat(32),
+    wizard_sequence: 1,
+    wizard_step_id: "hub",
+    wizard_action: "viewed",
+    pending_restart: false,
+    ...properties,
+  };
+}
+
+test("setup journey retains run order and server identity under existing consent", () => {
+  for (const consent of ["server", "personalized"]) {
+    const batch = payloadForEvent("setup wizard journey", wizardProperties({
+      wizard_sequence: 10_000,
+      wizard_step_id: "finish",
+      wizard_action: "completed",
+      wizard_result: "saved_pending_restart",
+      pending_restart: true,
+      ...(consent === "personalized" ? { pseudonymous_player_id: playerPseudonym } : {}),
+    }));
+    batch.consent_level = consent;
+    const checked = validatePayload(batch);
+    assertAccepted(checked, consent);
+    const properties = checked.events[0].properties;
+    assert.equal(properties.distinct_id, serverInstallId);
+    assert.equal(properties.server_install_id, serverInstallId);
+    assert.equal(properties.wizard_run_id, "d".repeat(32));
+    assert.equal(properties.wizard_sequence, 10_000);
+    assert.equal(properties.pending_restart, true);
+    assert.equal(properties.pseudonymous_player_id, consent === "personalized" ? playerPseudonym : undefined);
+  }
+});
+
+test("setup journey accepts only registered finite step, action, choice and result labels", () => {
+  for (const [key, values] of [
+    ["wizard_step_id", wizardSteps], ["wizard_action", wizardActions],
+    ["wizard_choice", wizardChoices], ["wizard_result", wizardResults],
+  ]) {
+    for (const value of values) {
+      assertAccepted(validatePayload(payloadForEvent("setup wizard journey", wizardProperties({ [key]: value }))), `${key}=${value}`);
+    }
+  }
+});
+
+test("setup journey rejects missing order fields and arbitrary content", () => {
+  for (const key of ["wizard_run_id", "wizard_sequence", "wizard_step_id", "wizard_action", "pending_restart"]) {
+    const properties = wizardProperties();
+    delete properties[key];
+    assert.equal(validatePayload(payloadForEvent("setup wizard journey", properties)).events.length, 0, key);
+  }
+  for (const addition of [
+    { wizard_run_id: "player-name" }, { wizard_sequence: 0 }, { wizard_sequence: 10_001 },
+    { wizard_sequence: 1.5 }, { wizard_sequence: "1" }, { wizard_step_id: "player-name" },
+    { wizard_action: "message-text" }, { wizard_choice: "custom privilege" },
+    { wizard_result: "notification wording" }, { pending_restart: "true" },
+    { player_uid: "raw-player-uid" }, { config_value: "private config" },
+    { message: "chat text" },
+  ]) {
+    const checked = validatePayload(payloadForEvent("setup wizard journey", wizardProperties(addition)));
+    assert.equal(checked.events.length, 0, JSON.stringify(addition));
+    assert.equal(checked.rejected.length, 1);
+  }
+  const noPersonalizedConsent = payloadForEvent("setup wizard journey", wizardProperties({ pseudonymous_player_id: playerPseudonym }));
+  noPersonalizedConsent.consent_level = "server";
+  assert.equal(validatePayload(noPersonalizedConsent).events.length, 0);
+  assert.equal(validatePayload({ ...payloadForEvent("setup wizard journey", wizardProperties()), consent_level: "disabled" }).ok, false);
+  assert.equal(validatePayload(payloadForEvent("feature used", { feature_name: "dice", ...wizardProperties() })).events.length, 0);
+});
+
+test("relay accepts every setup label registered by the C# producer", () => {
+  const source = readFileSync(new URL("ModSystems/Analytics/AnalyticsService.cs", sourceRoot), "utf8");
+  for (const [registration, key] of [
+    ["SetupWizardSteps", "wizard_step_id"], ["SetupWizardActions", "wizard_action"],
+    ["SetupWizardChoices", "wizard_choice"], ["SetupWizardResults", "wizard_result"],
+  ]) {
+    const registered = source.match(new RegExp(`${registration} = new\\(StringComparer\\.Ordinal\\)\\s*\\{([\\s\\S]*?)\\};`));
+    assert.ok(registered, `missing finite producer registry ${registration}`);
+    for (const [, value] of registered[1].matchAll(/"([^"]+)"/g)) {
+      assertAccepted(validatePayload(payloadForEvent("setup wizard journey", wizardProperties({ [key]: value }))), `${key}=${value}`);
+    }
+  }
+});
+
+test("relay forwards ordered setup events without putting journey identifiers in logs", async () => {
+  stubUpstream();
+  captureLogs();
+  const batch = payloadForEvent("setup wizard journey", wizardProperties({ wizard_action: "saved", wizard_result: "saved_live" }));
+  batch.consent_level = "server";
+
+  const response = await postBatch(batch);
+
+  assert.equal(response.status, 204);
+  const event = upstreamBody().batch[0];
+  assert.equal(event.event, "setup wizard journey");
+  assert.equal(event.properties.distinct_id, serverInstallId);
+  assert.equal(event.properties.wizard_sequence, 1);
+  assert.equal(event.properties.wizard_result, "saved_live");
+  assert.equal(event.properties.$process_person_profile, false);
+  assert.equal(event.properties.$geoip_disable, true);
+  assert.ok(logLines.every((line) => !line.includes(serverInstallId) && !line.includes("d".repeat(32))));
+});

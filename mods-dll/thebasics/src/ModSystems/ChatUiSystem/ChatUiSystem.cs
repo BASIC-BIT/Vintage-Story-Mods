@@ -78,6 +78,8 @@ public class ChatUiSystem : ModSystem
     private static string _lastChatInputText;
     private static long _lastChatInputChangeMs;
     private static ConfirmingConfigAdminDialog _configAdminDialog;
+    private static SetupWizardClientController _setupWizardController;
+    private static SetupWizardCaptureAdapter _setupWizardCapture;
     private static Dictionary<string, string> _configAdminDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static Dictionary<string, string> _configAdminLoadedDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static HashSet<string> _configAdminReviewedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -362,9 +364,12 @@ public class ChatUiSystem : ModSystem
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
             .RegisterMessageType<DiceRollSoundMessage>()
             .RegisterMessageType<SceneReadMarksMessage>()
+            .RegisterMessageType<TheBasicsSetupWizardRequestMessage>()
+            .RegisterMessageType<TheBasicsSetupWizardResultMessage>()
             .SetMessageHandler<TheBasicsConfigMessage>(OnServerConfigMessage)
             .SetMessageHandler<TheBasicsConfigAdminOpenMessage>(OnConfigAdminOpenMessage)
             .SetMessageHandler<TheBasicsConfigAdminResultMessage>(OnConfigAdminResultMessage)
+            .SetMessageHandler<TheBasicsSetupWizardResultMessage>(message => _setupWizardController?.HandleResult(message))
             .SetMessageHandler<TheBasicsLanguageConfigOpenMessage>(OnLanguageConfigOpenMessage)
             .SetMessageHandler<TheBasicsLanguageConfigResultMessage>(OnLanguageConfigResultMessage)
             .SetMessageHandler<TheBasicsCharacterSheetFieldConfigOpenMessage>(OnCharacterSheetFieldConfigOpenMessage)
@@ -390,6 +395,10 @@ public class ChatUiSystem : ModSystem
             MaxRetries = 10
         };
         _safeNetworkChannel = new SafeClientNetworkChannel(_clientConfigChannel, _api, config);
+        _setupWizardController = new SetupWizardClientController(_api, _safeNetworkChannel,
+            () => _api.SendChatMessage("/basic config"));
+        _setupWizardCapture = new SetupWizardCaptureAdapter(_api, _setupWizardController.OpenForCapture,
+            () => _setupWizardController?.IsCaptureOnly == true ? _setupWizardController.CurrentDialog : null);
     }
 
     private static void OnCharacterSheetViewMessage(CharacterSheetViewMessage message)
@@ -2361,6 +2370,10 @@ public class ChatUiSystem : ModSystem
         {
             if (_api != null)
             {
+                _setupWizardCapture?.Dispose();
+                _setupWizardCapture = null;
+                _setupWizardController?.Dispose();
+                _setupWizardController = null;
                 _api.Event.PlayerJoin -= OnPlayerJoin;
                 _api.Event.PlayerEntitySpawn -= OnPlayerEntitySpawn;
                 if (_headshotFileDropSubscribed)
