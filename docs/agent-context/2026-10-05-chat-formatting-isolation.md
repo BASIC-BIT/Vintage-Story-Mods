@@ -7,12 +7,12 @@ The client's existing HudDialogChat.UpdateText prefix now builds rich-text compo
 
 The reported restart announcement has not been captured. A synthetic unclosed strong/font/i message reproduces the same class of formatting leak. This change contains that mechanism regardless of the sender; it does not identify the reporting server's scheduler or mod.
 
-Validation: 31 focused checks passed, including the native Harmony patch installation check. Build and package completed successfully. Test cases exercise later message weight, color, slant, legitimate bold names, multiline formatting, empty entries, and spacing. The package was copied only inside this worktree, with no server or game-profile deployment.
+Validation: 126 relevant checks passed, including the native Harmony patch installation check. Build and package completed successfully. Test cases exercise later message weight, color, slant, legitimate bold names, multiline formatting, empty entries, spacing, escaped literal brackets, font sizes, native link components, and custom VTML tag converters. Existing VTML utility and chat occlusion tests also pass. The package was copied only inside this worktree, with no server or game-profile deployment.
 
 Runnable checks (from this worktree, VINTAGE_STORY set):
 
     $env:PATH = "$env:VINTAGE_STORY\Lib;" + $env:PATH
-    & D:\bench\vs\.dotnet\dotnet.exe test mods-dll/thebasics.Tests/thebasics.Tests.csproj --configuration Release /p:SkipPostBuildPackage=true --filter 'FullyQualifiedName~ChatHistoryFormattingTests|FullyQualifiedName~ChatUiSystemTests'
+    & D:\bench\vs\.dotnet\dotnet.exe test mods-dll/thebasics.Tests/thebasics.Tests.csproj --configuration Release /p:SkipPostBuildPackage=true --filter 'FullyQualifiedName~ChatHistoryFormattingTests|FullyQualifiedName~ChatUiSystemTests|FullyQualifiedName~VtmlUtilsTests|FullyQualifiedName~ChatOcclusionTests'
 
 Manual QA is pending, and is required before merge because this changes a client Harmony/rendering path. Use the disposable server after staging the final package with matching client hashes. Do not run an actual restart to reproduce the input; console broadcasts are sufficient.
 
@@ -27,4 +27,18 @@ Manual QA is pending, and is required before merge because this changes a client
    - Expect: history formatting stays isolated after recomposition, line spacing remains readable, held-handle scrolling is not forced to the bottom, and subsequent normal updates follow vanilla scrolling behavior.
    - Watch for: missing lines, doubled separators, overlapping text, broken tab focus, or a stuck scrollbar.
 
+Historical review (October 5):
+- PR #23 introduced player-markup injection protection. Its early descriptive bracket replacements were superseded by PR #28.
+- PR #28 (https://github.com/BASIC-BIT/Vintage-Story-Mods/pull/28) established minimal angle-bracket escaping for command arguments and nicknames, matching vanilla player-chat escaping and retaining literal bracket display.
+- The May 4 hotfix ec2381f added the current user-tag sanitizer and trusted-renderable-tag handling.
+- PR #207 (https://github.com/BASIC-BIT/Vintage-Story-Mods/pull/207#discussion_r3682098127) fixed malformed tag handling during distance obfuscation. Bare/unclosed brackets must be garbled rather than opening a markup span. The existing ChatOcclusionTests verify this still holds.
+- PR #199 concerned long-token wrapping on bubbles and related surfaces, rather than the chat history parser.
+- These fixes remain intact. The HUD patch supplies containment for messages that bypass the player pipeline, including server/console announcements and other mods.
+
+Scope: all messages rendered by HudDialogChat on clients loading The BASICs, regardless of sender or chat tab. Other rendering surfaces, server message delivery, stored history strings, and player escaping/obfuscation are unaffected. The same native richtext parser and registered custom tag converters are used for each entry. The full UpdateText replacement retains the installed native scrolling behavior, but interactions with other patches and visual layout still need in-game verification. This is containment, not repair of malformed content within the offending message.
+
+3. **Native and other-source messages** (P1)
+   - Do: view server-info, damage/info logs, vanilla command feedback, and any installed mod's chat output. Send a balanced formatted console announcement with an embedded link, then ordinary player text. Send escaped literal bracket text through normal chat and /ooc.
+   - Expect: valid styles, literal brackets, multiline text, link clicks, and message visibility retain their usual behavior. Formatting does not span separate messages.
+   - Watch for: broken links, lost icons/custom tags, changed spacing, client exceptions, or conflicting chat patches.
 Retire this packet once the fix is merged with explicit human QA observations, or the change is abandoned.

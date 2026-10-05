@@ -65,6 +65,44 @@ public class ChatHistoryFormattingTests : IDisposable
     }
 
     [Fact]
+    public void EscapedUserAngles_RemainLiteralText()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        var baseFont = new CairoFont(17, "Arial", [1.0, 1.0, 1.0, 1.0]);
+        var messages = new[] { "a &lt; b &gt; c &lt;strong&gt;literal&lt;/strong&gt; &amp;", "next-marker" };
+
+        var components = ChatUiModSystem.BuildChatHistoryComponents(api, messages, baseFont).OfType<RichTextComponent>().ToArray();
+
+        string.Concat(components.Select(c => c.DisplayText)).Should().Be("a < b > c <strong>literal</strong> &amp;\r\nnext-marker");
+        components.Should().OnlyContain(c => c.Font.FontWeight == FontWeight.Normal && c.Font.Slant == FontSlant.Normal);
+    }
+
+    [Fact]
+    public void NativeLinksFontSizesAndOtherModTagConverters_ArePreserved()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        var baseFont = new CairoFont(17, "Arial", [1.0, 1.0, 1.0, 1.0]);
+        const string tagName = "thebasicshistorytest";
+        VtmlUtil.TagConverters.Add(tagName, (capi, tag, fontStack, didClickLink) =>
+            new RichTextComponent(capi, "converted-marker", fontStack.Peek()));
+        try
+        {
+            var messages = new[] { "<font size=\"24\">large-marker</font> <a href=\"https://example.com\">link-marker</a>", "<thebasicshistorytest>custom</thebasicshistorytest> next-marker" };
+            var components = ChatUiModSystem.BuildChatHistoryComponents(api, messages, baseFont);
+
+            var link = components.OfType<LinkTextComponent>().Single();
+            link.Href.Should().Be("https://example.com");
+            link.DisplayText.Should().Be("link-marker");
+            components.OfType<RichTextComponent>().Single(c => c.DisplayText == "large-marker").Font.UnscaledFontsize.Should().Be(24);
+            components.OfType<RichTextComponent>().Single(c => c.DisplayText == "converted-marker").Font.UnscaledFontsize.Should().Be(17);
+            components.OfType<RichTextComponent>().Single(c => c.DisplayText == "next-marker").Font.UnscaledFontsize.Should().Be(17);
+        }
+        finally
+        {
+            VtmlUtil.TagConverters.Remove(tagName);
+        }
+    }
+    [Fact]
     public void MessageBoundaries_PreserveMultilineMarkupAndEmptyEntries()
     {
         var api = Substitute.For<ICoreClientAPI>();
