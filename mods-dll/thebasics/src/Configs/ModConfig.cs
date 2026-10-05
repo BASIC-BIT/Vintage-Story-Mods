@@ -1161,5 +1161,10 @@ namespace thebasics.Configs
         [ProtoMember(158)]
         [DefaultValue(true)]
         public bool CharacterSheetAutoOpenOnCharacterScreen { get; set; } = true;
+
+        // Keep formatting scoped to individual chat messages. False uses vanilla history parsing.
+        [ProtoMember(159)]
+        [DefaultValue(true)]
+        public bool IsolateChatMessageFormatting { get; set; } = true;
     }
 }

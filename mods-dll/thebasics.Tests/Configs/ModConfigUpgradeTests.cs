@@ -197,6 +197,30 @@ public class ModConfigUpgradeTests
         verb.Should().BeOneOf("whispers", "mumbles", "mutters");
     }
 
+    [Fact]
+    public void LegacyConfigGainsChatFormattingIsolationEnabled()
+    {
+        new ModConfig().IsolateChatMessageFormatting.Should().BeTrue();
+        LoadLegacyConfig().IsolateChatMessageFormatting.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ChatFormattingIsolation_PreservesServerChoiceInJsonAndWire(bool enabled)
+    {
+        var config = new ModConfig { IsolateChatMessageFormatting = enabled };
+        var json = JsonConvert.SerializeObject(config);
+        var fromJson = JsonConvert.DeserializeObject<ModConfig>(json)!;
+        fromJson.InitializeDefaultsIfNeeded();
+        fromJson.IsolateChatMessageFormatting.Should().Be(enabled);
+
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, config);
+        stream.Position = 0;
+        Serializer.Deserialize<ModConfig>(stream).IsolateChatMessageFormatting.Should().Be(enabled);
+    }
+
     [ProtoContract]
     public sealed class PublishedSceneMarkerConfig
     {

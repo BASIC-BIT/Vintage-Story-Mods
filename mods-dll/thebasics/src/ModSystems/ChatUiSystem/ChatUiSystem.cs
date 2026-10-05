@@ -2276,7 +2276,7 @@ public class ChatUiSystem : ModSystem
             __state = PerfStats.Timestamp();
         }
 
-        if (_api == null) return true;
+        if (_api == null || _config?.IsolateChatMessageFormatting != true) return true;
 
         var game = (ClientMain)_api.World;
         var richtext = __instance.Composers["chat-group-" + game.currentGroupid].GetRichtext("chathistory");
