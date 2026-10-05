@@ -2268,13 +2268,47 @@ public class ChatUiSystem : ModSystem
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(HudDialogChat), "UpdateText")]
-    public static void HudDialogChat_UpdateText_Prefix(ref long __state)
+    public static bool HudDialogChat_UpdateText_Prefix(HudDialogChat __instance, ref long __state)
     {
         __state = 0;
         if (IsDebugModeEnabled())
         {
             __state = PerfStats.Timestamp();
         }
+
+        if (_api == null) return true;
+
+        var game = (ClientMain)_api.World;
+        var richtext = __instance.Composers["chat-group-" + game.currentGroupid].GetRichtext("chathistory");
+        var components = BuildChatHistoryComponents(_api, game.ChatHistoryByPlayerGroup[game.currentGroupid], CairoFont.WhiteDetailText().WithFontSize(17f));
+        foreach (var component in richtext.Components ?? Array.Empty<RichTextComponentBase>())
+        {
+            component?.Dispose();
+        }
+        richtext.SetNewText(components);
+
+        // Preserve vanilla scroll behavior when replacing its joined-history parsing.
+        var scrollbar = __instance.Composers["chat"].GetCompactScrollbar("scrollbar");
+        scrollbar.SetNewTotalHeight((float)richtext.Bounds.fixedHeight + 5f);
+        if (!scrollbar.mouseDownOnScrollbarHandle)
+        {
+            scrollbar.ScrollToBottom();
+        }
+        return false;
+    }
+
+    internal static RichTextComponentBase[] BuildChatHistoryComponents(ICoreClientAPI api, IEnumerable<string> messages, CairoFont baseFont)
+    {
+        var components = new List<RichTextComponentBase>();
+        var first = true;
+        foreach (var message in messages)
+        {
+            if (!first) components.Add(new RichTextComponent(api, "\r\n", baseFont));
+            first = false;
+            // Each message gets its own tag and font stacks, including multiline messages.
+            components.AddRange(VtmlUtil.Richtextify(api, message, baseFont.Clone()));
+        }
+        return components.ToArray();
     }
 
     [HarmonyPostfix]
