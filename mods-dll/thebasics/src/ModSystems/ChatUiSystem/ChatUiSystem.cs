@@ -2,7 +2,6 @@
 #pragma warning disable S2696 // Static client state is required by Harmony patch callbacks and reset on Dispose.
 #pragma warning disable S3011 // Reflection accesses private Vintage Story UI state for compatibility patches.
 using System;
-using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -2281,9 +2280,7 @@ public class ChatUiSystem : ModSystem
 
         var game = (ClientMain)_api.World;
         var richtext = __instance.Composers["chat-group-" + game.currentGroupid].GetRichtext("chathistory");
-        var history = game.ChatHistoryByPlayerGroup[game.currentGroupid];
-        if (!history.Any(HasUnsafeChatMarkup)) return true;
-        var components = BuildChatHistoryComponents(_api, history, CairoFont.WhiteDetailText().WithFontSize(17f));
+        var components = BuildChatHistoryComponents(_api, game.ChatHistoryByPlayerGroup[game.currentGroupid], CairoFont.WhiteDetailText().WithFontSize(17f));
         foreach (var component in richtext.Components ?? Array.Empty<RichTextComponentBase>())
         {
             component?.Dispose();
@@ -2302,15 +2299,9 @@ public class ChatUiSystem : ModSystem
 
     internal static RichTextComponentBase[] BuildChatHistoryComponents(ICoreClientAPI api, IEnumerable<string> messages, CairoFont baseFont)
     {
-        var entries = messages.ToArray();
-        if (!entries.Any(HasUnsafeChatMarkup))
-        {
-            return VtmlUtil.Richtextify(api, string.Join("\r\n", entries), baseFont.Clone());
-        }
-
         var components = new List<RichTextComponentBase>();
         var first = true;
-        foreach (var message in entries)
+        foreach (var message in messages)
         {
             if (!first) components.Add(new RichTextComponent(api, "\r\n", baseFont));
             first = false;
@@ -2318,47 +2309,6 @@ public class ChatUiSystem : ModSystem
             components.AddRange(VtmlUtil.Richtextify(api, message, baseFont.Clone()));
         }
         return components.ToArray();
-    }
-
-    internal static bool HasUnsafeChatMarkup(string message)
-    {
-        if (message == null || message.IndexOfAny(['<', '>']) < 0) return false;
-        var tags = new Stack<string>();
-        var tag = new StringBuilder();
-        var insideTag = false;
-        // Match VtmlParser's angle-bracket delimiters, even inside attribute quotes.
-        // This is only a guard; the native parser still handles all rendering.
-        foreach (var character in message)
-        {
-            if (character == '<')
-            {
-                if (insideTag) return true;
-                insideTag = true;
-            }
-            else if (character == '>')
-            {
-                if (!insideTag) return true;
-                insideTag = false;
-                var text = tag.ToString();
-                tag.Clear();
-                if (text.StartsWith('/'))
-                {
-                    if (tags.Count == 0 || tags.Pop() != text[1..]) return true;
-                }
-                else if (text != "br" && !text.EndsWith('/'))
-                {
-                    var separator = text.IndexOfAny([' ', '\t', '\r', '\n']);
-                    var name = separator < 0 ? text : text[..separator];
-                    if (name.Length == 0) return true;
-                    tags.Push(name);
-                }
-            }
-            else if (insideTag)
-            {
-                tag.Append(character);
-            }
-        }
-        return insideTag || tags.Count > 0;
     }
 
     [HarmonyPostfix]
