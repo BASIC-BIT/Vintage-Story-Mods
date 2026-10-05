@@ -3,11 +3,11 @@
 Objective: prevent a malformed message from styling subsequent chat history entries.
 Branch: codex/chat-message-format-isolation, based on the available origin/main.
 
-The client's existing HudDialogChat.UpdateText prefix now builds rich-text components separately for each saved message. Each parse starts with a fresh tag stack and cloned base font. Native multiline markup, message separators, and scroll behavior are retained. Previous rich-text components are disposed before replacement.
+The client's existing HudDialogChat.UpdateText prefix first checks each history entry for malformed markup. Balanced histories run the original vanilla method. Only histories containing malformed markup build rich-text components separately for each saved message. Each parse starts with a fresh tag stack and cloned base font. Native multiline markup, message separators, and scroll behavior are retained. Previous rich-text components are disposed before replacement.
 
 The reported restart announcement has not been captured. A synthetic unclosed strong/font/i message reproduces the same class of formatting leak. This change contains that mechanism regardless of the sender; it does not identify the reporting server's scheduler or mod.
 
-Validation: 126 relevant checks passed, including the native Harmony patch installation check. Build and package completed successfully. Test cases exercise later message weight, color, slant, legitimate bold names, multiline formatting, empty entries, spacing, escaped literal brackets, font sizes, native link components, and custom VTML tag converters. Existing VTML utility and chat occlusion tests also pass. The package was copied only inside this worktree, with no server or game-profile deployment.
+Validation: 146 relevant checks passed, including the native Harmony patch installation check. Build and package completed successfully. Test cases exercise later message weight, color, slant, legitimate bold names, multiline formatting, empty entries, spacing, escaped literal brackets, font sizes, native link components, and custom VTML tag converters. Existing VTML utility and chat occlusion tests also pass. Thirty-two native Cairo comparisons cover valid histories at two widths and two UI scales, including wrapping, mixed fonts, multiline/empty messages, literal brackets, and leading/trailing spaces. Pixels and total heights match vanilla on the balanced path. The package was copied only inside this worktree, with no server or game-profile deployment.
 
 Runnable checks (from this worktree, VINTAGE_STORY set):
 
@@ -35,10 +35,13 @@ Historical review (October 5):
 - PR #199 concerned long-token wrapping on bubbles and related surfaces, rather than the chat history parser.
 - These fixes remain intact. The HUD patch supplies containment for messages that bypass the player pipeline, including server/console announcements and other mods.
 
-Scope: all messages rendered by HudDialogChat on clients loading The BASICs, regardless of sender or chat tab. Other rendering surfaces, server message delivery, stored history strings, and player escaping/obfuscation are unaffected. The same native richtext parser and registered custom tag converters are used for each entry. The full UpdateText replacement retains the installed native scrolling behavior, but interactions with other patches and visual layout still need in-game verification. This is containment, not repair of malformed content within the offending message.
+Scope: all messages rendered by HudDialogChat on clients loading The BASICs, regardless of sender or chat tab. Other rendering surfaces, server message delivery, stored history strings, and player escaping/obfuscation are unaffected. The same native richtext parser and registered custom tag converters are used for each entry. The UpdateText replacement runs only when a malformed entry is present and retains the installed native scrolling behavior. The guard follows native angle-bracket tokenization, including its handling of delimiters inside attribute quotes. It is conservative for malformed/nested delimiters. Interactions with other patches and visual layout still need in-game verification. This is containment, not repair of malformed content within the offending message.
 
 3. **Native and other-source messages** (P1)
    - Do: view server-info, damage/info logs, vanilla command feedback, and any installed mod's chat output. Send a balanced formatted console announcement with an embedded link, then ordinary player text. Send escaped literal bracket text through normal chat and /ooc.
    - Expect: valid styles, literal brackets, multiline text, link clicks, and message visibility retain their usual behavior. Formatting does not span separate messages.
    - Watch for: broken links, lost icons/custom tags, changed spacing, client exceptions, or conflicting chat patches.
+Measured limitation: independent parsing creates extra native text components. In a synthetic multiline history containing empty entries, this introduced a one-pixel vertical rounding difference at UI scale 1 (the scale 1.5 comparison matched). The patch was narrowed in response: ordinary balanced histories retain vanilla's parsing and method body. The small rounding difference can still occur in the containment path while malformed text remains in the history. It is not claimed to be eliminated on that path.
+
+Local package SHA256 after narrowing: 4CAE8D5B9A4A1FF331A91AF4565CB602AAEE9CADCC63B214FEAF0B5055E5778A. Build and package passed with deployment restricted to this worktree's artifacts/local-mods.
 Retire this packet once the fix is merged with explicit human QA observations, or the change is abandoned.

@@ -69,11 +69,11 @@ public class ChatHistoryFormattingTests : IDisposable
     {
         var api = Substitute.For<ICoreClientAPI>();
         var baseFont = new CairoFont(17, "Arial", [1.0, 1.0, 1.0, 1.0]);
-        var messages = new[] { "a &lt; b &gt; c &lt;strong&gt;literal&lt;/strong&gt; &amp;", "next-marker" };
+        var messages = new[] { "<strong", "a &lt; b &gt; c &lt;strong&gt;literal&lt;/strong&gt; &amp;", "next-marker" };
 
         var components = ChatUiModSystem.BuildChatHistoryComponents(api, messages, baseFont).OfType<RichTextComponent>().ToArray();
 
-        string.Concat(components.Select(c => c.DisplayText)).Should().Be("a < b > c <strong>literal</strong> &amp;\r\nnext-marker");
+        string.Concat(components.Select(c => c.DisplayText)).Should().Be("\r\na < b > c <strong>literal</strong> &amp;\r\nnext-marker");
         components.Should().OnlyContain(c => c.Font.FontWeight == FontWeight.Normal && c.Font.Slant == FontSlant.Normal);
     }
 
@@ -87,7 +87,7 @@ public class ChatHistoryFormattingTests : IDisposable
             new RichTextComponent(capi, "converted-marker", fontStack.Peek()));
         try
         {
-            var messages = new[] { "<font size=\"24\">large-marker</font> <a href=\"https://example.com\">link-marker</a>", "<thebasicshistorytest>custom</thebasicshistorytest> next-marker" };
+            var messages = new[] { "<strong", "<font size=\"24\">large-marker</font> <a href=\"https://example.com\">link-marker</a>", "<thebasicshistorytest>custom</thebasicshistorytest> next-marker" };
             var components = ChatUiModSystem.BuildChatHistoryComponents(api, messages, baseFont);
 
             var link = components.OfType<LinkTextComponent>().Single();
@@ -102,6 +102,71 @@ public class ChatHistoryFormattingTests : IDisposable
             VtmlUtil.TagConverters.Remove(tagName);
         }
     }
+    [Theory]
+    [InlineData("hello", false)]
+    [InlineData("a &lt; b &gt; c", false)]
+    [InlineData("<strong>Alice</strong> hello", false)]
+    [InlineData("<i>first<br>second</i>", false)]
+    [InlineData("<font size=\"24\"><strong>large</strong></font>", false)]
+    [InlineData("<a href=\"https://example.com\">link</a>", false)]
+    [InlineData("<icon name=\"warning\"/>", false)]
+    [InlineData("<custom>other mod</custom>", false)]
+    [InlineData("<strong>announcement", true)]
+    [InlineData("<font color=\"#f00\">announcement", true)]
+    [InlineData("<strong", true)]
+    [InlineData("<font color=\"unfinished", true)]
+    [InlineData("</strong>", true)]
+    [InlineData("<strong><i>bad</strong></i>", true)]
+    [InlineData("raw > bracket", true)]
+    [InlineData("<i<nested>", true)]
+    public void MarkupGuard_LeavesBalancedMessagesOnTheNativePath(string message, bool unsafeMarkup)
+    {
+        ChatUiModSystem.HasUnsafeChatMarkup(message).Should().Be(unsafeMarkup);
+    }
+    [Theory]
+    [InlineData(220, 1f)]
+    [InlineData(700, 1f)]
+    [InlineData(220, 1.5f)]
+    [InlineData(700, 1.5f)]
+    public void ValidHistory_RendersIdenticallyToVanilla(int width, float scale)
+    {
+        RuntimeEnv.GUIScale = scale;
+        var api = Substitute.For<ICoreClientAPI>();
+        var baseFont = CairoFont.WhiteDetailText().WithFontSize(17f);
+        string[][] histories =
+        [
+            [], ["", ""], ["single message"],
+            ["hello world", "another ordinary message", "last message"],
+            ["<strong>Alice</strong> says a long sentence with enough ordinary words to wrap in the narrow chat window.", "<i>Bob waves hello.</i>", "(OOC) plain message"],
+            ["<font size=\"24\" color=\"#ff0000\">Large announcement</font>", "<font size=\"12\">Quiet speech</font>", "normal speech"],
+            ["<i>first<br>second</i>", "", "third\r\nfourth", ""],
+            ["leading and trailing spaces  ", "  second message  ", "a &lt; b &gt; c"]
+        ];
+        foreach (var history in histories)
+        {
+            var vanilla = RenderHistory(api, VtmlUtil.Richtextify(api, string.Join("\r\n", history), baseFont.Clone()), width);
+            var isolated = RenderHistory(api, ChatUiModSystem.BuildChatHistoryComponents(api, history, baseFont), width);
+
+
+            isolated.Height.Should().Be(vanilla.Height, "valid history should retain its height: {0}", string.Join(" | ", history));
+            isolated.Pixels.Should().Equal(vanilla.Pixels, "valid history should retain its pixels: {0}", string.Join(" | ", history));
+        }
+    }
+
+    private static (double Height, byte[] Pixels) RenderHistory(ICoreClientAPI api, RichTextComponentBase[] components, int width)
+    {
+        var bounds = ElementBounds.FixedSize(width, 600).WithEmptyParent();
+        using var richtext = new GuiElementRichtext(api, components, bounds);
+        richtext.CalcHeightAndPositions();
+        var height = bounds.fixedHeight;
+        bounds.CalcWorldBounds();
+        using var surface = new ImageSurface(Format.Argb32, (int)Math.Ceiling(bounds.InnerWidth), Math.Max(1, (int)Math.Ceiling(bounds.InnerHeight)));
+        using var context = new Context(surface);
+        richtext.ComposeFor(bounds, context, surface);
+        surface.Flush();
+        return (height, surface.Data.ToArray());
+    }
+
     [Fact]
     public void MessageBoundaries_PreserveMultilineMarkupAndEmptyEntries()
     {
