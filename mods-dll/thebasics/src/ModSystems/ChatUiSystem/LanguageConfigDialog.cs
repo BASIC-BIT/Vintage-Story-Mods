@@ -91,6 +91,20 @@ public class LanguageConfigDialog : GuiDialog
 
     public override double DrawOrder => 0.26;
 
+    internal bool JumpTo(string name, string field)
+    {
+        CaptureSelectedInputToDraft();
+        var index = _languages.FindIndex(entry => string.Equals(entry.OriginalName, name, StringComparison.OrdinalIgnoreCase));
+        if (index < 0) return false;
+        _selectedIndex = index;
+        ComposeDialog();
+        GuiElement control = _textInputs.GetValueOrDefault(field);
+        control ??= _dropDowns.GetValueOrDefault(field);
+        if (control == null) return false;
+        SingleComposer.FocusElement(control.TabIndex);
+        return true;
+    }
+
     public void SetView(List<LanguageConfigEntryMessage> languages, string message, bool success)
     {
         CaptureSelectedInputToDraft();

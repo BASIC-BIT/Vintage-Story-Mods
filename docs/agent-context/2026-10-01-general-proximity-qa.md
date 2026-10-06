@@ -76,7 +76,15 @@ The isolated worktree now implements `ProximityChatTabPosition` with `GameOrder`
 (legacy default), `First`, and `AfterGeneral`. The server setting applies live;
 it does not change memberships. General mode ignores old saved tab choices and
 opens General. Build/package and 75 focused migration, tab-layout, configuration,
-and wire-format tests passed. Follow-up package SHA256: 8D936D61F4DC94F719CF086CFBCDBD8A639C3D071B8F5EDBDB73B1448EF42A0E. This package has not been staged.
+and wire-format tests passed. Follow-up package SHA256:
+`8D936D61F4DC94F719CF086CFBCDBD8A639C3D071B8F5EDBDB73B1448EF42A0E`.
+On October 2, the owner requested QA. The other VS chat was inactive and preflight
+confirmed the server and both profiles still had the preceding QA build. Current
+config and packages were backed up under `.tmp/general-proximity-qa/before-pinning*`.
+The follow-up package was uploaded and all three hashes verified; server restart
+reached running in separate-channel mode. Both test clients were relaunched.
+Claims and XLib are present on the test server. The existing flywheelpower duplicate
+warning and `/home/container` startup error remain. No human observation is recorded yet.
 Coordinate shared server/client use with the owner because another VS agent is
 working on a native configuration wizard in a separate worktree.
 

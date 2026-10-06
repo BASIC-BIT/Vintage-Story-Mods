@@ -32,6 +32,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     private GuiDialogConfirm _unsavedCloseConfirm;
     private GuiDialogConfirm _deleteConfirm;
     private bool _suspendCallbacks;
+    private string _searchField;
 
     public CharacterSheetFieldConfigDialog(
         ICoreClientAPI capi,
@@ -55,6 +56,22 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     public override bool DisableMouseGrab => true;
 
     public override double DrawOrder => 0.27;
+
+    internal bool JumpTo(string id, string field)
+    {
+        CaptureSelectedInputToDraft();
+        var index = _fields.FindIndex(entry => string.Equals(entry.OriginalId, id, StringComparison.OrdinalIgnoreCase));
+        if (index < 0) return false;
+        _selectedIndex = index;
+        _searchField = field;
+        ComposeDialog();
+        GuiElement control = _textInputs.GetValueOrDefault(field);
+        control ??= _dropDowns.GetValueOrDefault(field);
+        // Existing field IDs are read-only; highlight their displayed value.
+        if (control == null) return field == nameof(CharacterSheetFieldConfigEntryMessage.Id);
+        if (control.Focusable) SingleComposer.FocusElement(control.TabIndex);
+        return true;
+    }
 
     public void SetView(List<CharacterSheetFieldConfigEntryMessage> fields, bool updateBaseline)
     {
@@ -222,7 +239,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         var labelBounds = ElementBounds.Fixed(x, y, columnWidth, 20);
         AddLabel(composer, Lang.Get("thebasics:charsheet-field-config-key-locked"), labelBounds, tooltip: Lang.Get("thebasics:charsheet-field-config-key-locked-tooltip"));
         var valueBounds = ElementBounds.Fixed(x, y + 22, columnWidth, FieldHeight);
-        composer.AddStaticText(field.Id ?? string.Empty, CairoFont.WhiteSmallText(), valueBounds);
+        composer.AddStaticText((_searchField == nameof(CharacterSheetFieldConfigEntryMessage.Id) ? "> " : "") + (field.Id ?? string.Empty), CairoFont.WhiteSmallText(), valueBounds);
         AddTooltip(composer, "field-key-locked", valueBounds, Lang.Get("thebasics:charsheet-field-config-key-locked-tooltip"));
         return y + FieldRowHeight;
     }
@@ -415,6 +432,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
         _fields.RemoveAt(index);
         _selectedIndex = ClampSelectedIndex(index);
+        _searchField = null;
         ComposeDialog();
     }
 
@@ -517,6 +535,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
         CaptureSelectedInputToDraft();
         _selectedIndex = ClampSelectedIndex(index);
+        _searchField = null;
         ComposeDialog();
     }
 
