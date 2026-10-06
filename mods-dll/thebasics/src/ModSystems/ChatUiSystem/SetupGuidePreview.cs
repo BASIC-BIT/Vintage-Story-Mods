@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
+using HarmonyLib;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -82,7 +84,14 @@ public sealed class SetupGuidePreview : IDisposable
         }
         catch
         {
-            Dispose();
+            try
+            {
+                Dispose();
+            }
+            catch (Exception cleanupError)
+            {
+                api.Logger.Warning("Setup guide cleanup failed: {0}", cleanupError);
+            }
             throw;
         }
     }
@@ -118,9 +127,12 @@ public sealed class SetupGuidePreview : IDisposable
     {
         // EntityProperties.Clone changes the source Attributes to read-only; copy without touching it.
         var client = (EntityClientProperties)source.Client.Clone();
-        client.BehaviorsAsJsonObj = source.Client.BehaviorsAsJsonObj
+        // Player model mods can replace this descriptor; the detached guide still uses native skin behavior.
+        var skinBehavior = source.Client.BehaviorsAsJsonObj
             .Where(behavior => behavior["code"].AsString() == "extraskinnable")
-            .Select(behavior => new JsonObject(behavior.Token.DeepClone())).ToArray();
+            .Select(behavior => new JsonObject(behavior.Token.DeepClone())).FirstOrDefault()
+            ?? new JsonObject(Newtonsoft.Json.Linq.JObject.FromObject(new { code = "extraskinnable" }));
+        client.BehaviorsAsJsonObj = [skinBehavior];
         client.Textures = new Dictionary<string, CompositeTexture>();
         foreach (var texture in source.Client.Textures)
         {
@@ -205,12 +217,14 @@ public sealed class SetupGuidePreview : IDisposable
         actor.AnimManager.Animator = previewAnimator;
         var active = actor.AnimManager.ActiveAnimationsByAnimCode;
         active.Clear();
-        active["idle"] = actor.Properties.Client.AnimationsByMetaCode["idle"].Clone();
+        var idle = actor.Properties.Client.AnimationsByMetaCode["idle"].Clone();
+        active[idle.Animation] = idle;
         if (animationCode != "idle")
         {
-            active[animationCode] = actor.Properties.Client.AnimationsByMetaCode[animationCode].Clone();
+            var selected = actor.Properties.Client.AnimationsByMetaCode[animationCode].Clone();
+            active[selected.Animation] = selected;
         }
-        previewAnimator.OnFrame(active, 0);
+        // A zero-delta native frame decrements Iterations and prevents EaseOut animations from easing in.
         int steps = (int)Math.Floor(previewTime * 60);
         for (int step = 0; step < steps; step++)
         {
@@ -253,7 +267,7 @@ public sealed class SetupGuidePreview : IDisposable
                 api.Render.RenderEntityToGui(0, actor,
                     bounds.renderX + bounds.InnerWidth / 2 - size,
                     bounds.renderY + bounds.InnerHeight * 0.96 - 2 * size,
-                    100, -0.18f, size, -1);
+                    100, -1.2707963f, size, -1);
             }
             finally
             {
@@ -323,14 +337,25 @@ public sealed class SetupGuidePreview : IDisposable
                     shape = addGearToShape(shape, slot, "default", path, ref cloned, ref deleted);
                 }
             }
-            reloadSkin();
+            NativeSkin.Reload(this);
         }
 
         public override void OnEntityDespawn(EntityDespawnData despawn)
         {
             // Native clothing frees slot zero even if no skin space was allocated.
-            if (skinTexPos != null) base.OnEntityDespawn(despawn);
+            if (entity.Properties?.Client?.Renderer is EntityShapeRenderer { skinTexPos: not null })
+                base.OnEntityDespawn(despawn);
         }
+    }
+
+    [HarmonyPatch(typeof(EntityBehaviorTexturedClothing), nameof(EntityBehaviorTexturedClothing.reloadSkin))]
+    private static class NativeSkin
+    {
+        // Player model mods suppress the global method; this original runs only for our private guide.
+        [HarmonyReversePatch(HarmonyReversePatchType.Original)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void Reload(EntityBehaviorTexturedClothing inventory) =>
+            throw new InvalidOperationException("The setup guide native skin patch was not initialized.");
     }
 
     private sealed class GuideRenderer : EntityShapeRenderer

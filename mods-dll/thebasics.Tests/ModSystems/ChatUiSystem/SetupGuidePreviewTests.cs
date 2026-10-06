@@ -1,3 +1,4 @@
+using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using NSubstitute;
 using System.Reflection;
@@ -10,12 +11,66 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
+using Vintagestory.GameContent;
 
 namespace thebasics.Tests.ModSystems.ChatUiSystem;
 
 [Collection("Standalone GUI")]
 public class SetupGuidePreviewTests
 {
+    private static EntityBehaviorTexturedClothing? suppressedSkin;
+    private static int suppressedReloadCalls;
+
+    [Fact]
+    public void GuideSkinUsesOriginalNativeMethodWithoutRemovingGlobalSuppression()
+    {
+        var inventoryType = typeof(SetupGuidePreview).GetNestedType("GuideInventory", BindingFlags.NonPublic)!;
+        var inventory = (EntityBehaviorTexturedClothing)Activator.CreateInstance(inventoryType, new EntityPlayerBot())!;
+        var original = AccessTools.Method(typeof(EntityBehaviorTexturedClothing), nameof(EntityBehaviorTexturedClothing.reloadSkin));
+        var reverseType = typeof(SetupGuidePreview).GetNestedType("NativeSkin", BindingFlags.NonPublic)!;
+        var harmony = new Harmony("thebasics.tests.guide-skin-" + Guid.NewGuid().ToString("N"));
+        suppressedSkin = inventory;
+        suppressedReloadCalls = 0;
+        try
+        {
+            harmony.Patch(original, prefix: new HarmonyMethod(typeof(SetupGuidePreviewTests), nameof(SuppressSkinReload)));
+            harmony.CreateClassProcessor(reverseType).Patch();
+            inventory.reloadSkin();
+            Assert.Equal(1, suppressedReloadCalls);
+            reverseType.GetMethod("Reload")!.Invoke(null, [inventory]);
+            Assert.Equal(1, suppressedReloadCalls);
+            inventory.reloadSkin();
+            Assert.Equal(2, suppressedReloadCalls);
+            Assert.Contains(Harmony.GetPatchInfo(original)!.Prefixes, patch => patch.owner == harmony.Id);
+        }
+        finally
+        {
+            harmony.Unpatch(original, HarmonyPatchType.Prefix, harmony.Id);
+            suppressedSkin = null;
+        }
+    }
+
+    private static bool SuppressSkinReload(EntityBehaviorTexturedClothing __instance)
+    {
+        if (!ReferenceEquals(__instance, suppressedSkin)) return true;
+        suppressedReloadCalls++;
+        return false;
+    }
+
+    [Fact]
+    public void PartiallyInitializedInventoryCanDespawnBeforeItsRendererExists()
+    {
+        var actor = new Vintagestory.GameContent.EntityPlayerBot();
+        var inventoryType = typeof(SetupGuidePreview).GetNestedType("GuideInventory", BindingFlags.NonPublic)!;
+        var inventory = (EntityBehavior)Activator.CreateInstance(inventoryType, actor)!;
+        inventory.OnEntityDespawn(new EntityDespawnData { Reason = EnumDespawnReason.Removed });
+        typeof(Entity).GetProperty(nameof(Entity.Properties))!.SetValue(actor, new EntityProperties
+        {
+            Client = new EntityClientProperties([], null)
+        });
+        inventory.OnEntityDespawn(new EntityDespawnData { Reason = EnumDespawnReason.Removed });
+    }
+
     [VisualTheory]
     [InlineData("wizard-restart-dedicated", false, "Restart the server from your hosting panel")]
     [InlineData("wizard-restart-integrated", true, "Save and quit to the main menu")]
@@ -101,6 +156,8 @@ public class SetupGuidePreviewTests
             preview.Render(0.25f, bounds);
         }
         Assert.Same(animator, actor.AnimManager.Animator);
+        api.Render.Received().RenderEntityToGui(Arg.Is(0f), actor, Arg.Any<double>(), Arg.Any<double>(), Arg.Any<double>(),
+            Arg.Is(-1.2707963f), Arg.Any<float>(), -1);
         Assert.True((double)GetField(preview, "previewTime")! > 60);
         Assert.Throws<ArgumentOutOfRangeException>(() => preview.SetAnimation("idle", 61));
 
@@ -114,6 +171,69 @@ public class SetupGuidePreviewTests
         preview.PlayAnimation("idle");
         Assert.Same(resumedAnimator, actor.AnimManager.Animator);
         Assert.Throws<ArgumentException>(() => preview.PlayAnimation("unknown"));
+    }
+
+    [Fact]
+    public void NamedWaveFramesEaseInAndChangeNativeJointMatricesWithIdleAlias()
+    {
+        static AnimationKeyFrame KeyFrame(int frame, double rotation) => new()
+        {
+            Frame = frame,
+            Elements = new() { ["UpperArmR"] = new() { RotationX = 0, RotationY = 0, RotationZ = rotation } }
+        };
+        var shape = new Shape
+        {
+            Elements = [new() { Name = "UpperArmR", From = [0, 0, 0], To = [1, 4, 1], RotationOrigin = [0, 4, 0] }],
+            Animations =
+            [
+                new() { Code = "idle1", QuantityFrames = 80, KeyFrames = [KeyFrame(0, 0), KeyFrame(79, 0)] },
+                new()
+                {
+                    Code = "wave", QuantityFrames = 80, OnActivityStopped = EnumEntityActivityStoppedHandling.EaseOut,
+                    OnAnimationEnd = EnumEntityAnimationEndHandling.EaseOut,
+                    KeyFrames = [KeyFrame(0, 0), KeyFrame(30, 90), KeyFrame(60, -90), KeyFrame(79, 0)]
+                }
+            ]
+        };
+        shape.InitForAnimations(Substitute.For<ILogger>(), "setup-guide-test");
+        var actorType = typeof(SetupGuidePreview).GetNestedType("DetachedGuideEntity", BindingFlags.NonPublic)!;
+        var actor = (Entity)Activator.CreateInstance(actorType)!;
+        typeof(Entity).GetProperty(nameof(Entity.Properties))!.SetValue(actor, new EntityProperties
+        {
+            Client = new EntityClientProperties([], null)
+            {
+                AnimationsByMetaCode = new()
+                {
+                    ["idle"] = new() { Code = "idle", Animation = "idle1" },
+                    ["wave"] = new() { Code = "wave", Animation = "wave", AnimationSpeed = 1.3f, EaseInSpeed = 1 }
+                }
+            }
+        });
+        actor.AnimManager.Animator = new ClientAnimator(() => 1, shape.Animations, shape.Elements, shape.JointsById);
+        var preview = (SetupGuidePreview)RuntimeHelpers.GetUninitializedObject(typeof(SetupGuidePreview));
+        var fixtureField = typeof(SetupGuidePreview).GetField("fixture", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var fixture = Activator.CreateInstance(fixtureField.FieldType)!;
+        fixtureField.FieldType.GetProperty("Animations")!.SetValue(fixture, new[] { "idle", "wave" });
+        fixtureField.SetValue(preview, fixture);
+        SetField(preview, "actor", actor);
+
+        preview.SetAnimation("wave", 0);
+        var identity = actor.AnimManager.Animator.Matrices.ToArray();
+        Assert.Equal(new float[] { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }, identity.Skip(16).Take(16));
+        Assert.Equal(0, actor.AnimManager.Animator.GetAnimationState("wave").Iterations);
+
+        preview.SetAnimation("wave", 0.75);
+        var animator = actor.AnimManager.Animator;
+        var firstFrame = animator.Matrices.ToArray();
+        Assert.Contains("idle1", actor.AnimManager.ActiveAnimationsByAnimCode.Keys);
+        Assert.True(animator.GetAnimationState("idle1").Active);
+        Assert.InRange(animator.GetAnimationState("wave").EasingFactor, 0.5f, 1f);
+        Assert.InRange(animator.GetAnimationState("wave").CurrentFrame, 29.2f, 29.3f);
+        Assert.False(identity.SequenceEqual(firstFrame));
+
+        preview.SetAnimation("wave", 1.5);
+        Assert.InRange(actor.AnimManager.Animator.GetAnimationState("wave").CurrentFrame, 58.4f, 58.6f);
+        Assert.False(firstFrame.SequenceEqual(actor.AnimManager.Animator.Matrices));
     }
 
     [VisualTheory]
@@ -196,5 +316,11 @@ public class SetupGuidePreviewTests
         Assert.Equal(1, source.Attributes["value"].AsInt());
         Assert.Equal(1, source.Client.BehaviorsAsJsonObj[0]["options"]["value"].AsInt());
         Assert.Equal(41, texture.Baked.TextureSubId);
+
+        source.Client.BehaviorsAsJsonObj[0].Token["code"] = "PlayerModelLib:ExtraSkinnable";
+        var moddedCopy = SetupGuidePreview.CopyProperties(source, api);
+        Assert.Single(moddedCopy.Client.BehaviorsAsJsonObj);
+        Assert.Equal("extraskinnable", moddedCopy.Client.BehaviorsAsJsonObj[0]["code"].AsString());
+        Assert.Equal("PlayerModelLib:ExtraSkinnable", source.Client.BehaviorsAsJsonObj[0]["code"].AsString());
     }
 }

@@ -13,6 +13,91 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 [Collection("Standalone GUI")]
 public class SetupWizardClientControllerTests
 {
+    [VisualTheory]
+    [InlineData(1.0)]
+    public void ReopenCompositionFailureKeepsTheDirtyDraftAndAllowsRetry(double scale)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
+            Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1000, scale);
+        var api = Substitute.For<ICoreClientAPI>();
+        api.Render.Returns(host.Api.Render);
+        api.Settings.Returns(host.Api.Settings);
+        var compositions = 0;
+        api.Gui.Returns(StrictApiProxy.Create<IGuiAPI>((method, arguments) =>
+        {
+            if (method.Name == "CreateCompo" && ++compositions == 2)
+                throw new InvalidOperationException("reopen composition failed");
+            return method.Invoke(host.Api.Gui, arguments);
+        }));
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        using var safeChannel = new SafeClientNetworkChannel(channel, api, new() { EnableDebugLogging = false });
+        using var controller = new SetupWizardClientController(api, safeChannel);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        var changedValue = draft.Get("EnableChatter") == "1" ? "0" : "1";
+        draft.Set("EnableChatter", changedValue);
+        var dialog = new SetupWizardDialog(api, draft, "initial-run", true, null!, null!, null!, layoutOnly: true);
+        typeof(SetupWizardClientController).GetProperty(nameof(SetupWizardClientController.CurrentDialog))!
+            .SetValue(controller, dialog);
+        dialog.TryOpen();
+        controller.Open();
+
+        var failure = Record.Exception(() => controller.HandleResult(new TheBasicsSetupWizardResultMessage
+        {
+            Kind = SetupWizardResultKind.Open, RequestId = 1, RunId = "failed-reopen", Success = true,
+            Values = SetupWizardCaptureScenes.DefaultValues()
+        }));
+
+        failure.Should().BeNull();
+        controller.CurrentDialog.Should().BeSameAs(dialog);
+        dialog.Draft.Should().BeSameAs(draft);
+        draft.Get("EnableChatter").Should().Be(changedValue);
+        draft.IsDirty.Should().BeTrue();
+        dialog.IsOpened().Should().BeFalse();
+        host.Api.Gui.LoadedGuis.Should().NotContain(dialog);
+        api.Received(1).ShowChatMessage("Setup could not reopen. Your draft is kept; try /basic setup again.");
+
+        controller.Open();
+        controller.HandleResult(new TheBasicsSetupWizardResultMessage
+        {
+            Kind = SetupWizardResultKind.Open, RequestId = 2, RunId = "retried-run", Success = true,
+            Values = SetupWizardCaptureScenes.DefaultValues()
+        });
+
+        compositions.Should().Be(3);
+        controller.CurrentDialog.Should().BeSameAs(dialog);
+        draft.Get("EnableChatter").Should().Be(changedValue);
+        draft.IsDirty.Should().BeTrue();
+        dialog.IsOpened().Should().BeTrue();
+        host.Api.Gui.LoadedGuis.Should().Contain(dialog);
+    }
+
+    [Fact]
+    public void PreviewConstructionFailureDoesNotEscapeTheNetworkHandlerAndCanRetry()
+    {
+        var api = Substitute.For<ICoreClientAPI>();
+        api.Assets.Get(Arg.Any<Vintagestory.API.Common.AssetLocation>())
+            .Returns(_ => throw new InvalidOperationException("guide fixture unavailable"));
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        using var safeChannel = new SafeClientNetworkChannel(channel, api, new() { EnableDebugLogging = false });
+        using var controller = new SetupWizardClientController(api, safeChannel);
+        controller.OpenForCapture();
+
+        var failure = Record.Exception(() => controller.HandleResult(new TheBasicsSetupWizardResultMessage
+        {
+            Kind = SetupWizardResultKind.Open, RequestId = 1, RunId = "capture-run", Success = true,
+            Values = SetupWizardCaptureScenes.DefaultValues()
+        }));
+
+        failure.Should().BeNull();
+        controller.CurrentDialog.Should().BeNull();
+        controller.IsCaptureOnly.Should().BeFalse();
+        api.Received(1).ShowChatMessage("Setup could not open. See the client log, or use /basic config.");
+        controller.OpenForCapture();
+        channel.Received(2).SendPacket(Arg.Is<TheBasicsSetupWizardRequestMessage>(request => request.CaptureOnly));
+    }
+
     [Fact]
     public void CaptureOpenSendsExplicitReadOnlyQaRequest()
     {

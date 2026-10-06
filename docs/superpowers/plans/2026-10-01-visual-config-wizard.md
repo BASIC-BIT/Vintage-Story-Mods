@@ -39,7 +39,7 @@
 - [x] Implement the clipped native renderer from the inspected engine seams; retain only appearance/inventory behaviors and deep-copy mutable properties.
 - [ ] Add a test for owned fixture validation and a native probe for two GUI scales, named animation times, player-state invariance, and close-before-upload cleanup.
 - [x] Queue capture at Done; own/dispose raw bitmaps, apply a vertical flip to the full viewport without relying on the engine's leaking transformed screenshot allocation.
-- [ ] Capture the real production panel and inspect PNGs before claiming native rendering works.
+- [x] Capture the real production panel and inspect PNGs before claiming native rendering works.
 
 ## Task 2: Wizard catalog, protocol, and safe draft
 
@@ -81,14 +81,14 @@
 - [x] Add server-issued run IDs, ordered finite step/action/choice properties, consent-compliant attribution, and saved/live/pending outcomes.
 - [x] Update producer/Worker contract revision and allowlists together; run existing relay contract tests plus the new journey cases.
 - [x] Add before/after/diff manifests and reuse the sticky-comment marker pattern for added/changed/removed/missing/stale captures.
-- [ ] Generate short native clips from named frames and adapt the existing Gemini reviewer rubric/sampling. Verify provider access before making review claims.
+- [x] Generate short native clips from named frames and adapt the existing Gemini reviewer rubric/sampling. Verify provider access before making review claims.
 
 ## Task 6: Final validation and handoff
 
 - [x] Run focused tests, then one complete suite and canonical build-and-package with output restricted to local staging until QA staging.
 - [x] Review each task and one whole-branch diff; fix substantive findings and rerun affected checks.
-- [ ] Stage the authorized test build, collect real-client captures, and keep human gameplay observation separate from model/image results.
-- [ ] Record exact package/source/game versions and remaining human QA cards. No merge-ready or release claim without the repository's required evidence.
+- [x] Stage the authorized test build, collect real-client captures, and keep human gameplay observation separate from model/image results.
+- [x] Record exact package/source/game versions and remaining human QA cards. No merge-ready or release claim without the repository's required evidence.
 
 ## Execution ledger
 
@@ -104,10 +104,10 @@
 - CPU layout evidence: 13 production wizard scenes render at 1600x1000 and 1280x720 at 1.25 scale. The compact dialog fits the smaller viewport. These fixtures explicitly omit the 3D actor. Whisper, Normal, and Yell now each affect labeled hearing diagrams.
 - Lifecycle checks cover capture-only server snapshots, reauthorization while retaining drafts, failed live application after successful persistence, and replay after a lost acknowledgement. QA snapshots do not acknowledge an invitation or emit normal setup journey events.
 - Capture CI provisioning: official Windows server 1.22.7 binaries plus Linux client 1.22.7 assets render the production GUI without another runtime dependency. Archive SHA-256 pins are recorded in `scripts/collect-gui-captures.ps1`. GUI binary, asset, and font identities match the local installation. Source identity normalizes text line endings, and the renderer rejects a claimed hash that differs from its compiled source stamp.
-- QA preflight: disposable server `8982de16` is running with `thebasics_5_9_1.zip`. Its current config and startup log are backed up in ignored `.tmp/wizard-qa-preflight`; no wizard package has been deployed yet. Agent Control is installed on Profile2 but starts disabled until the operator presses Ctrl+Alt+F8.
+- Initial QA preflight: disposable server `8982de16` was running with `thebasics_5_9_1.zip`; its config and startup log were backed up before wizard staging. At that point Agent Control started disabled. The later Profile2-only startup patch below replaces that manual enable step.
 
 - Final October 6 check: 1251/1251 full-suite tests pass with no skips, plus the subsequently added native-identity regression passes separately. Report checks pass 15/15, relay checks 28/28, workflow trust checks 2/2, and agent tooling passes. The canonical package builds with zero errors and 132 analyzer warnings. Fresh final capture evidence has 26 added layout scenes and no missing or stale frames.
 - Fresh review fixes cover transient dialog registration, owned Cancel confirmations, invitation visibility and distinct entry actions, spawn-only gear controls, conditional travel descriptions, capture host labels, and native assembly/effective patched asset provenance. Native asset identity states its runtime mutation and external-family omissions.
 - Live telemetry boundary: deployed collector revision 8 rejects wizard events; revision 9 source and tests are ready, but production Terraform apply and PostHog ingestion have not been performed.
 
-- QA staged October 6: canonical package SHA-256 cf4f92afa75f7de38741d3e640094fb44fcf43cf2dacb96725f79217e145d5a0 matches server readback and both client profiles. Server reached RunGame without exceptions; Profile2 connected with the wizard and Agent Control. Native captures await the owner's Ctrl+Alt+F8 enable step. Exact launch and transfer recovery evidence is in docs/agent-context/2026-10-06-visual-config-wizard-qa.md. Manual cards remain unobserved.
+- Native checkpoint October 6: canonical package SHA-256 `7654294da2f5ead9c766b813578d90c7cbf1341d12ae446f95228b1f768b81fa` matches server readback and both client profiles. GUI source hash `e845a6c86dd96ad30cc3ce43e41e28d0ed83c706ba5669d421b9b3a5395363f3` matches 26 fresh CPU frames, 13 real-client scenes, and the nine-frame native wave clip. Profile2's isolated helper enables once after player readiness and cancels extension work at every request terminal state. All 23 helper checks pass; the main suite has 1257 passing checks plus the corrected new native-joint fixture passes separately. Native recovery covers PML skin behavior/clothing suppression, viewing angle, error cleanup, and zero-time animation priming. Gemini reports six visual criteria passed on the sampled clip. Strict player-state invariance is unproven because yaw drifted, while inventory, hotbar, and position match. Native scale 1/1.25 probes, manual cards, and live revision-9 telemetry remain pending. Exact reproduction, package, source, clip, and review evidence is in docs/agent-context/2026-10-06-visual-config-wizard-qa.md.

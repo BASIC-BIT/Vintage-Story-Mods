@@ -49,8 +49,17 @@ public sealed class SetupWizardDialog : GuiDialog
         _onAdvanced = onAdvanced;
         LayoutOnly = layoutOnly;
         IsCaptureOnly = captureOnly;
-        if (!layoutOnly) _preview = new SetupGuidePreview(api);
-        ComposeDialog();
+        try
+        {
+            if (!layoutOnly) _preview = new SetupGuidePreview(api);
+            ComposeDialog();
+        }
+        catch
+        {
+            try { Dispose(); }
+            catch (Exception cleanupError) { api.Logger.Warning("Setup dialog cleanup failed: {0}", cleanupError); }
+            throw;
+        }
     }
 
     public SetupWizardDraft Draft { get; }
@@ -138,7 +147,8 @@ public sealed class SetupWizardDialog : GuiDialog
         _diagram = null;
         _sample = null;
         var body = ElementBounds.Fixed(0, 0, Width, CompactLayout ? 528 : 608).WithFixedPadding(GuiStyle.ElementToDialogPadding);
-        var composer = capi.Gui.CreateCompo("thebasics-setup-wizard", ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle))
+        SingleComposer = capi.Gui.CreateCompo("thebasics-setup-wizard", ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle));
+        var composer = SingleComposer
             .AddShadedDialogBG(body)
             .AddDialogTitleBar(IsCaptureOnly ? "The BASICs setup (QA preview, save disabled)" : "The BASICs setup", () => TryClose())
             .BeginChildElements(body);
@@ -155,7 +165,7 @@ public sealed class SetupWizardDialog : GuiDialog
 
         Text(composer, _message ?? (_pending ? "Waiting for the server to acknowledge the save..." : "Changes stay in this draft until you save."), 0, StatusY, Width, CompactLayout ? 30 : 42);
         Button(composer, "Close", () => TryClose(), Width - 110, FooterY, 110);
-        SingleComposer = composer.EndChildElements().Compose(focusFirstElement: false);
+        composer.EndChildElements().Compose(focusFirstElement: false);
         if (_diagram != null) _sample = SingleComposer.GetRichtext("preview-text");
     }
 
@@ -616,8 +626,8 @@ public sealed class SetupWizardDialog : GuiDialog
         _closeConfirm?.Dispose();
         _closeConfirm = null;
         base.TryClose();
-        _preview?.Dispose();
-        base.Dispose();
+        try { _preview?.Dispose(); }
+        finally { base.Dispose(); }
     }
 
     private sealed class DiscardConfirmDialog(ICoreClientAPI api, string text, Action<bool> onChoice)

@@ -1,4 +1,6 @@
 using System.Reflection;
+using Cairo;
+using NSubstitute;
 using TheBasics.GuiPreview;
 using thebasics.ModSystems.ChatUiSystem;
 using thebasics.Tests.GuiPreview;
@@ -10,6 +12,31 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 [Collection("Standalone GUI")]
 public class SetupWizardLifecycleTests
 {
+    [VisualTheory]
+    [InlineData(1.0)]
+    public void FailedConstructorDisposesItsUnfinishedComposerAndPreservesOriginalException(double scale)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
+            Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1000, scale);
+        var api = Substitute.For<ICoreClientAPI>();
+        api.Render.Returns(host.Api.Render);
+        api.Settings.Returns(host.Api.Settings);
+        var failure = new InvalidOperationException("composition failed");
+        var element = new FailingComposeElement(host.Api, failure);
+        api.Gui.Returns(StrictApiProxy.Create<IGuiAPI>((method, arguments) =>
+        {
+            if (method.Name != "CreateCompo") return method.Invoke(host.Api.Gui, arguments);
+            var composer = host.Api.Gui.CreateCompo((string)arguments[0]!, (ElementBounds)arguments[1]!);
+            return composer.AddStaticElement(element, "composition-failure");
+        }));
+
+        var actual = Assert.Throws<InvalidOperationException>(() => new SetupWizardDialog(api,
+            new(SetupWizardCaptureScenes.DefaultValues()), "run", true, null!, null!, null!, layoutOnly: true));
+
+        Assert.Same(failure, actual);
+        Assert.True(element.WasDisposed);
+    }
+
     [VisualTheory]
     [InlineData(false)]
     [InlineData(true)]
@@ -79,5 +106,17 @@ public class SetupWizardLifecycleTests
         dialog.OnMouseMove(new MouseEvent(x, y));
         dialog.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
         dialog.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+    }
+
+    private sealed class FailingComposeElement(ICoreClientAPI api, Exception failure)
+        : GuiElement(api, ElementBounds.Fixed(0, 0, 10, 10))
+    {
+        public bool WasDisposed { get; private set; }
+        public override void ComposeElements(Context context, ImageSurface surface) => throw failure;
+        public override void Dispose()
+        {
+            WasDisposed = true;
+            base.Dispose();
+        }
     }
 }

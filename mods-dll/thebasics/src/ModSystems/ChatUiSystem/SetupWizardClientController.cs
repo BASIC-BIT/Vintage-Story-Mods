@@ -88,8 +88,17 @@ public sealed class SetupWizardClientController : IDisposable
         {
             _runId = result.RunId;
             CurrentDialog.Draft.CancelRequest();
-            CurrentDialog.SetSession(result);
-            CurrentDialog.TryOpen();
+            try
+            {
+                CurrentDialog.SetSession(result);
+                CurrentDialog.TryOpen();
+            }
+            catch (Exception error)
+            {
+                _api.Logger.Error("The BASICs setup could not reopen: {0}", error);
+                CurrentDialog.Suspend();
+                _api.ShowChatMessage("Setup could not reopen. Your draft is kept; try /basic setup again.");
+            }
             return;
         }
         _pendingInvitation = null;
@@ -98,10 +107,20 @@ public sealed class SetupWizardClientController : IDisposable
         _runId = result.RunId;
         IsCaptureOnly = _captureRequested;
         _captureRequested = false;
-        CurrentDialog = new SetupWizardDialog(_api, new SetupWizardDraft(result.Values), _runId, result.IsDedicated,
-            IsCaptureOnly ? null : Save, IsCaptureOnly ? null : Track, Close, IsCaptureOnly ? null : _openAdvanced, captureOnly: IsCaptureOnly);
-        CurrentDialog.SetSession(result);
-        CurrentDialog.TryOpen();
+        try
+        {
+            CurrentDialog = new SetupWizardDialog(_api, new SetupWizardDraft(result.Values), _runId, result.IsDedicated,
+                IsCaptureOnly ? null : Save, IsCaptureOnly ? null : Track, Close, IsCaptureOnly ? null : _openAdvanced, captureOnly: IsCaptureOnly);
+            CurrentDialog.SetSession(result);
+            CurrentDialog.TryOpen();
+        }
+        catch (Exception error)
+        {
+            _api.Logger.Error("The BASICs setup could not open: {0}", error);
+            Close();
+            _api.ShowChatMessage("Setup could not open. See the client log, or use /basic config.");
+            return;
+        }
         Track("hub", "viewed", null);
     }
 
