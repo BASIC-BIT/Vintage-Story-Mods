@@ -9,6 +9,7 @@ using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.CharacterSheets.Models;
+using thebasics.ModSystems.ProximityChat;
 using thebasics.Utilities;
 using thebasics.Utilities.Parsers;
 using Vintagestory.API.Common;
@@ -22,6 +23,7 @@ namespace thebasics.ModSystems.CharacterSheets;
 public class CharacterSheetSystem : BaseBasicModSystem
 {
     private const string ModDataKey = "BASIC_CHARACTER_SHEET";
+    internal const string AutoOpenChoiceModDataKey = "BASIC_CHARACTER_SHEET_AUTO_OPEN_CHOICE";
     private const string NicknameBind = "thebasics.nickname";
     private const string FullNameBind = "thebasics.fullName";
     /// <summary>
@@ -94,6 +96,14 @@ public class CharacterSheetSystem : BaseBasicModSystem
             .WithArgs(new PlayerByNameOrNicknameArgParser("player", API, false, Config))
             .HandleWith(ViewSheet);
 
+        API.ChatCommands.GetOrCreate("thebasics").BeginSubCommand("charsheetautoopen")
+            .WithDescription(Lang.Get("thebasics:charsheet-autoopen-cmd-desc"))
+            .RequiresPrivilege(Privilege.chat)
+            .RequiresPlayer()
+            .WithArgs(new StringArgParser("choice", false))
+            .HandleWith(SetAutoOpenChoice)
+            .EndSubCommand();
+
         API.ChatCommands.GetOrCreate("look")
             .WithAlias("inspect")
             .WithDescription(Lang.Get("thebasics:charsheet-cmd-look-desc"))
@@ -165,6 +175,42 @@ public class CharacterSheetSystem : BaseBasicModSystem
                 .WithArgs(new PlayersArgParser("player", API, true))
                 .HandleWith(ClearAdminHeadshot);
         }
+    }
+
+    private TextCommandResult SetAutoOpenChoice(TextCommandCallingArgs args)
+    {
+        var player = (IServerPlayer)args.Caller.Player;
+        if (!args.Parsers[0].IsMissing)
+        {
+            var choice = args.Parsers[0].GetValue()?.ToString()?.Trim().ToLowerInvariant() switch
+            {
+                "default" => 0,
+                "on" => 1,
+                "off" => 2,
+                _ => -1
+            };
+            if (!TrySetAutoOpenChoice(player, choice)) return Error(Lang.Get("thebasics:charsheet-autoopen-usage"));
+        }
+
+        var savedChoice = player.GetModData(AutoOpenChoiceModDataKey, 0);
+        var label = savedChoice switch
+        {
+            1 => Lang.Get("thebasics:charsheet-autoopen-on"),
+            2 => Lang.Get("thebasics:charsheet-autoopen-off"),
+            _ => Lang.Get("thebasics:charsheet-autoopen-default", Lang.Get(Config.CharacterSheetAutoOpenOnCharacterScreen
+                ? "thebasics:charsheet-autoopen-on"
+                : "thebasics:charsheet-autoopen-off"))
+        };
+        return Success(Lang.Get("thebasics:charsheet-autoopen-status", label));
+    }
+
+    private bool TrySetAutoOpenChoice(IServerPlayer player, int choice)
+    {
+        if (player == null || choice is < 0 or > 2 || !Config.EnableCharacterSheets) return false;
+        if (choice == 0) player.RemoveModdata(AutoOpenChoiceModDataKey);
+        else player.SetModData(AutoOpenChoiceModDataKey, choice);
+        API.ModLoader.GetModSystem<RPProximityChatSystem>()?.SendClientConfig(player);
+        return true;
     }
 
     private TextCommandResult ClearOwnHeadshot(TextCommandCallingArgs args)

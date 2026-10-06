@@ -1316,14 +1316,15 @@ public partial class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProxi
         };
     }
 
-    private void SendClientConfig(IServerPlayer byPlayer)
+    internal void SendClientConfig(IServerPlayer byPlayer)
     {
         _serverConfigChannel.SendPacket(new TheBasicsConfigMessage
         {
             ProximityGroupId = ProximityChatId,
             Config = Config,
             SceneMarkersRuntimeEnabled = SceneDescriptionSystem.SceneMarkersEnabled(API),
-            LastSelectedGroupId = byPlayer.GetLastSelectedGroupId()
+            LastSelectedGroupId = byPlayer.GetLastSelectedGroupId(),
+            CharacterSheetAutoOpenChoice = byPlayer.GetModData(CharacterSheetSystem.AutoOpenChoiceModDataKey, 0)
         }, byPlayer);
 
         if (Config.DebugMode)
