@@ -1,7 +1,10 @@
 name: GUI Capture Report
 
-# Evidence comparison only. Rendering, baseline approval, and gameplay QA are separate.
+# Rendering runs without write permissions. This trusted workflow only reads capture evidence.
 on:
+  workflow_run:
+    workflows: ['GUI Captures']
+    types: [completed]
   workflow_dispatch:
     inputs:
       baseline_run_id:
@@ -45,12 +48,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: gui-capture-report-${{ inputs.pr_number || github.run_id }}
+  group: gui-capture-report-${{ inputs.pr_number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   compare:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       actions: read
@@ -62,14 +67,50 @@ jobs:
           # Run trusted report code, never a script downloaded in capture artifacts.
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Validate explicit evidence selection
+      - name: Select immutable evidence and bind automatic runs to the current PR
+        id: selection
+        uses: actions/github-script@v7
         env:
-          BASELINE_RUN: ${{ inputs.baseline_run_id }}
-          CURRENT_RUN: ${{ inputs.current_run_id }}
-          BASELINE_HASH: ${{ inputs.baseline_source_hash }}
+          DISPATCH_INPUTS: ${{ toJSON(inputs) }}
+        with:
+          script: |
+            let selected;
+            if (context.eventName === 'workflow_run') {
+              const {data: run} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: context.payload.workflow_run.id});
+              if (run.event !== 'pull_request' || run.repository.full_name !== `${context.repo.owner}/${context.repo.repo}` || run.name !== 'GUI Captures') throw new Error('Unexpected capture workflow identity.');
+              const records = run.pull_requests.filter(pr => pr.head.sha === run.head_sha);
+              if (records.length !== 1) throw new Error('Capture run does not identify one immutable PR head.');
+              const record = records[0];
+              const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: record.number});
+              if (pr.state !== 'open' || pr.head.sha !== run.head_sha) throw new Error('Capture run is no longer the open PR head.');
+              selected = {baseline_run: String(run.id), current_run: String(run.id), baseline_artifact: 'gui-captures-baseline',
+                current_artifact: 'gui-captures-current', baseline_ref: record.base.sha, source_ref: run.head_sha,
+                baseline_hash: '', pr_number: String(pr.number), publish: 'true', reviewed: 'false',
+                reference_label: 'Regenerated PR base at capture run (not a reviewed screenshot baseline)'};
+            } else {
+              const input = JSON.parse(process.env.DISPATCH_INPUTS);
+              selected = {baseline_run: input.baseline_run_id, current_run: input.current_run_id,
+                baseline_artifact: input.baseline_artifact, current_artifact: input.current_artifact,
+                baseline_ref: '', source_ref: input.current_source_ref, baseline_hash: input.baseline_source_hash,
+                pr_number: input.pr_number || '', publish: String(input.publish_comment), reviewed: String(input.baseline_reviewed), reference_label: 'Reviewed baseline run'};
+              if (selected.reviewed !== 'true') throw new Error('Explicit baseline review is required for manual comparison.');
+            }
+            for (const key of ['baseline_run', 'current_run']) if (!/^[1-9][0-9]*$/.test(selected[key])) throw new Error('Invalid workflow run ID.');
+            if (!/^[0-9a-f]{40}$/i.test(selected.source_ref) || (selected.baseline_ref && !/^[0-9a-f]{40}$/i.test(selected.baseline_ref))) throw new Error('Invalid immutable source ref.');
+            if (selected.baseline_hash && !/^[0-9a-f]{64}$/i.test(selected.baseline_hash)) throw new Error('Invalid reviewed source hash.');
+            if (selected.pr_number && !/^[1-9][0-9]*$/.test(selected.pr_number)) throw new Error('Invalid PR number.');
+            if (selected.publish === 'true' && !selected.pr_number) throw new Error('Publishing requires a PR.');
+            for (const key of ['baseline_artifact', 'current_artifact']) if (!/^[A-Za-z0-9._-]{1,128}$/.test(selected[key])) throw new Error('Invalid capture artifact name.');
+            for (const [key, value] of Object.entries(selected)) core.setOutput(key, value);
+      - name: Validate explicit evidence selection
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          BASELINE_RUN: ${{ steps.selection.outputs.baseline_run }}
+          CURRENT_RUN: ${{ steps.selection.outputs.current_run }}
+          BASELINE_HASH: ${{ steps.selection.outputs.baseline_hash }}
           REVIEWED: ${{ inputs.baseline_reviewed }}
-          SOURCE_REF: ${{ inputs.current_source_ref }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          SOURCE_REF: ${{ steps.selection.outputs.source_ref }}
+          PR_NUMBER: ${{ steps.selection.outputs.pr_number }}
           PUBLISH: ${{ inputs.publish_comment }}
         run: |
           [[ "$REVIEWED" == true ]]
@@ -82,38 +123,61 @@ jobs:
           python-version: '3.12'
       - name: Check comparison logic
         run: python -B -m unittest discover -s scripts -p test_gui_capture_report.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check workflow trust boundaries
+        run: node --test scripts/test_gui_capture_workflow.mjs
       - name: Read immutable current source tree
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.current_source_ref }}
+          ref: ${{ steps.selection.outputs.source_ref }}
           path: source
           persist-credentials: false
       - name: Calculate expected current source identity
         id: identity
         shell: pwsh
+        env:
+          BASELINE_HASH: ${{ steps.selection.outputs.baseline_hash }}
         run: |
           $identity = & ./scripts/gui-source-identity.ps1 -Repo ./source
           if ($identity -notmatch '^[0-9a-f]{64}$') { throw 'Invalid source identity.' }
           "source_hash=$identity" >> $env:GITHUB_OUTPUT
-      - name: Download explicit reviewed baseline
+          "baseline_hash=$env:BASELINE_HASH" >> $env:GITHUB_OUTPUT
+      - name: Read automatic reference source without executing it
+        if: steps.selection.outputs.baseline_ref != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.selection.outputs.baseline_ref }}
+          path: reference-source
+          persist-credentials: false
+      - name: Calculate automatic reference identity
+        id: reference
+        if: steps.selection.outputs.baseline_ref != ''
+        shell: pwsh
+        run: |
+          $identity = & ./scripts/gui-source-identity.ps1 -Repo ./reference-source
+          if ($identity -notmatch '^[0-9a-f]{64}$') { throw 'Invalid reference identity.' }
+          "source_hash=$identity" >> $env:GITHUB_OUTPUT
+      - name: Download selected reference captures
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ inputs.baseline_run_id }}
-          name: ${{ inputs.baseline_artifact }}
+          run-id: ${{ steps.selection.outputs.baseline_run }}
+          name: ${{ steps.selection.outputs.baseline_artifact }}
           path: inputs/baseline
       - name: Download current captures
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ inputs.current_run_id }}
-          name: ${{ inputs.current_artifact }}
+          run-id: ${{ steps.selection.outputs.current_run }}
+          name: ${{ steps.selection.outputs.current_artifact }}
           path: inputs/current
       - name: Compare evidence without changing inputs
         id: comparison
         continue-on-error: true
         env:
-          BASELINE_HASH: ${{ inputs.baseline_source_hash }}
+          BASELINE_HASH: ${{ steps.reference.outputs.source_hash || steps.identity.outputs.baseline_hash }}
           CURRENT_HASH: ${{ steps.identity.outputs.source_hash }}
         run: |
           python -B scripts/gui-capture-report.py \
@@ -121,7 +185,7 @@ jobs:
             --baseline-source-hash "$BASELINE_HASH" --current-source-hash "$CURRENT_HASH"
       - name: Upload immutable before, after, diff, and provenance report
         id: artifact
-        if: always() && steps.comparison.outcome != 'skipped'
+        if: always() && (steps.comparison.outcome == 'success' || steps.comparison.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: gui-capture-report-${{ github.run_id }}-${{ github.run_attempt }}
@@ -132,9 +196,10 @@ jobs:
         if: steps.artifact.outcome == 'success'
         env:
           REPORT_URL: ${{ steps.artifact.outputs.artifact-url }}
-          BASELINE_RUN: ${{ inputs.baseline_run_id }}
-          CURRENT_RUN: ${{ inputs.current_run_id }}
-          SOURCE_REF: ${{ inputs.current_source_ref }}
+          BASELINE_RUN: ${{ steps.selection.outputs.baseline_run }}
+          CURRENT_RUN: ${{ steps.selection.outputs.current_run }}
+          SOURCE_REF: ${{ steps.selection.outputs.source_ref }}
+          REFERENCE_LABEL: ${{ steps.selection.outputs.reference_label }}
         run: |
           python - <<'PY'
           import html, json, os
@@ -145,7 +210,7 @@ jobs:
           body = ['<!-- gui-capture-report -->', '[AGENT]', '', 'GUI capture evidence: **' + ('compatible' if report['evidenceValid'] else 'missing or stale') + '**.', '',
                   'Pixel changes require review. Layout-only captures do not certify native character or animation appearance. This report does not approve a baseline or complete gameplay QA.', '',
                   '[Download before/after images, pixel diffs, HTML report, and manifests](' + os.environ['REPORT_URL'] + ').', '',
-                  '[Reviewed baseline run](' + server + '/' + repo + '/actions/runs/' + os.environ['BASELINE_RUN'] + '), [current capture run](' + server + '/' + repo + '/actions/runs/' + os.environ['CURRENT_RUN'] + ').', '',
+                  '[' + os.environ['REFERENCE_LABEL'] + '](' + server + '/' + repo + '/actions/runs/' + os.environ['BASELINE_RUN'] + '), [current capture run](' + server + '/' + repo + '/actions/runs/' + os.environ['CURRENT_RUN'] + ').', '',
                   'Baseline source: `' + report['baselineSourceTreeHash'] + '`. Current source: `' + report['currentSourceTreeHash'] + '`.',
                   'Current source commit: `' + os.environ['SOURCE_REF'] + '`. Source-tree identity permits later evidence-only commits.', '',
                   '| Scenario | Status | Changed pixels |', '| --- | --- | ---: |']
@@ -161,24 +226,27 @@ jobs:
           PY
       - name: Read PR head before optional publication
         id: pr
-        if: inputs.publish_comment && steps.artifact.outcome == 'success'
+        if: steps.selection.outputs.publish == 'true' && steps.artifact.outcome == 'success'
         uses: actions/github-script@v7
         env:
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ steps.selection.outputs.pr_number }}
+          SOURCE_REF: ${{ steps.selection.outputs.source_ref }}
+          AUTOMATIC: ${{ github.event_name == 'workflow_run' }}
         with:
           script: |
             const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: Number(process.env.PR_NUMBER)});
             if (pr.state !== 'open') throw new Error('PR is no longer open.');
+            if (process.env.AUTOMATIC === 'true' && pr.head.sha !== process.env.SOURCE_REF) throw new Error('Automatic capture run is no longer the PR head.');
             core.setOutput('head', pr.head.sha);
       - name: Read current PR source tree
-        if: inputs.publish_comment && steps.artifact.outcome == 'success'
+        if: steps.selection.outputs.publish == 'true' && steps.artifact.outcome == 'success'
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.pr.outputs.head }}
           path: pr-source
           persist-credentials: false
       - name: Require capture source identity to match current PR code
-        if: inputs.publish_comment && steps.artifact.outcome == 'success'
+        if: steps.selection.outputs.publish == 'true' && steps.artifact.outcome == 'success'
         shell: pwsh
         env:
           EXPECTED_HASH: ${{ steps.identity.outputs.source_hash }}
@@ -186,10 +254,10 @@ jobs:
           $identity = & ./scripts/gui-source-identity.ps1 -Repo ./pr-source
           if ($identity -ne $env:EXPECTED_HASH) { throw 'PR source changed. Collect current captures before publishing.' }
       - name: Upsert explicitly selected PR sticky report
-        if: inputs.publish_comment && steps.artifact.outcome == 'success'
+        if: steps.selection.outputs.publish == 'true' && steps.artifact.outcome == 'success'
         uses: actions/github-script@v7
         env:
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ steps.selection.outputs.pr_number }}
           EXPECTED_HEAD: ${{ steps.pr.outputs.head }}
         with:
           script: |
@@ -206,3 +274,22 @@ jobs:
       - name: Fail on missing or stale evidence
         if: always() && steps.comparison.outcome == 'failure'
         run: exit 1
+      - name: Replace stale automatic sticky report when current evidence is unavailable
+        if: always() && github.event_name == 'workflow_run' && steps.selection.outputs.publish == 'true' && steps.artifact.outcome != 'success'
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.selection.outputs.pr_number }}
+          EXPECTED_HEAD: ${{ steps.selection.outputs.source_ref }}
+          CAPTURE_RUN: ${{ steps.selection.outputs.current_run }}
+        with:
+          script: |
+            const issue_number = Number(process.env.PR_NUMBER);
+            const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: issue_number});
+            if (pr.state !== 'open' || pr.head.sha !== process.env.EXPECTED_HEAD) return;
+            const marker = '<!-- gui-capture-report -->';
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${process.env.CAPTURE_RUN}`;
+            const body = `${marker}\n[AGENT]\n\nGUI capture evidence is unavailable for \`${process.env.EXPECTED_HEAD}\`. [Inspect the capture run](${url}) and this report workflow for the failed rendering, dependency, or evidence check. No screenshot baseline was approved.\n`;
+            const comments = await github.paginate(github.rest.issues.listComments, {...context.repo, issue_number, per_page: 100});
+            const existing = comments.filter(comment => comment.user.login === 'github-actions[bot]' && comment.body.includes(marker)).at(-1);
+            if (existing) await github.rest.issues.updateComment({...context.repo, comment_id: existing.id, body});
+            else await github.rest.issues.createComment({...context.repo, issue_number, body});

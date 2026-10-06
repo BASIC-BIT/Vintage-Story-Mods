@@ -132,6 +132,7 @@ public class SetupWizardDraftTests
     [Theory]
     [InlineData("3")]
     [InlineData("0.5")]
+    [InlineData("2")]
     public void FailedConflictRefresh_RetainsDraftUpdatesExpectedOriginalAndMergesUntouchedKeysForRetry(string laterValue)
     {
         var draft = CreateDraft();

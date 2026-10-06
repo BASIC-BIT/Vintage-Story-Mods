@@ -22,7 +22,7 @@ import zlib
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 MAX_DIMENSION = 4096
 MAX_PNG_BYTES = 128 * 1024 * 1024
-ENVIRONMENT_FIELDS = ("viewport", "locale", "scale", "fonts", "gameBinaries", "gameAssets")
+ENVIRONMENT_FIELDS = ("viewport", "locale", "scale", "fonts", "gameBinaries", "gameAssets", "nativeGuide")
 SCENE_FIELDS = ("scale", "previewTime", "fixture", "coverage", "omissions")
 COVERAGE = ("layout-only", "native-client")
 
@@ -176,10 +176,12 @@ def load_index(root):
     index = read_json(root / "captures.json")
     if not isinstance(index, dict) or index.get("schema") != 1 or not isinstance(index.get("captures"), list):
         raise ValueError("Expected captures.json schema 1")
+    if len(index["captures"]) > 256:
+        raise ValueError("Capture count exceeds 256")
     captures = {}
     for entry in index["captures"]:
-        if not isinstance(entry, dict) or not isinstance(entry.get("scenario"), str) or not entry["scenario"].strip():
-            raise ValueError("Each capture requires a scenario")
+        if not isinstance(entry, dict) or not isinstance(entry.get("scenario"), str) or not re.fullmatch(r"[A-Za-z0-9_./:-]{1,128}", entry["scenario"]):
+            raise ValueError("Each capture requires a bounded ASCII scenario identifier")
         if entry["scenario"] in captures:
             raise ValueError("Duplicate scenario: " + entry["scenario"])
         input_path(root, entry.get("file"))
@@ -239,6 +241,22 @@ def validate_capture(root, index, entry, expected_hash):
             result["stale"].append("invalid environmentIdentity." + field)
     if type(environment.get("scale")) not in (int, float) or environment.get("scale") != manifest.get("scale"):
         result["stale"].append("environmentIdentity.scale mismatch")
+    guide = environment.get("nativeGuide")
+    if not isinstance(guide, dict) or type(guide.get("rendered")) is not bool or guide.get("rendered") != (manifest.get("coverage") == "native-client"):
+        result["stale"].append("environmentIdentity.nativeGuide coverage mismatch")
+        guide = {}
+    if not isinstance(guide.get("scope"), str) or not guide["scope"].strip() or not isinstance(guide.get("omissions"), list) or any(not isinstance(item, str) or not item.strip() for item in guide["omissions"]):
+        result["stale"].append("invalid environmentIdentity.nativeGuide scope")
+    if guide.get("rendered"):
+        for field, name_field in (("loadedAssemblies", "name"), ("assets", "path")):
+            entries = guide.get(field)
+            if not isinstance(entries, list) or not entries or any(not isinstance(item, dict) or not isinstance(item.get(name_field), str) or not item[name_field].strip() or not isinstance(item.get("sha256"), str) or not re.fullmatch(r"[0-9a-fA-F]{64}", item["sha256"]) for item in entries):
+                result["stale"].append("invalid environmentIdentity.nativeGuide." + field)
+        guide_assets = guide.get("assets")
+        if isinstance(guide_assets, list) and any(type(item.get("patched")) is not bool for item in guide_assets if isinstance(item, dict)):
+            result["stale"].append("invalid environmentIdentity.nativeGuide asset patch provenance")
+    elif guide and (guide.get("loadedAssemblies") != [] or guide.get("assets") != [] or not guide.get("omissions")):
+        result["stale"].append("layout-only nativeGuide must state its omission")
     try:
         result["image"] = decode_png(input_path(root, entry["file"]))
         if result["image"][:2] != (manifest.get("width"), manifest.get("height")):
@@ -329,7 +347,7 @@ def make_report(baseline, current, output, baseline_hash, current_hash):
 
 
 def render_reports(output, report):
-    intro = ("GUI capture comparison. Baseline is an explicit reviewed input. "
+    intro = ("GUI capture comparison. Reference provenance is recorded; this report does not approve a baseline. "
              "Pixel differences require review; this report does not approve captures or certify gameplay. "
              "Layout-only evidence does not certify native character or animation appearance.")
     markdown = ["<!-- gui-capture-report -->", "[AGENT]", "", intro, "",

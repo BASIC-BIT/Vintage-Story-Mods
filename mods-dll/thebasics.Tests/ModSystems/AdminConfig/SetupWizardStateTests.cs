@@ -174,6 +174,20 @@ public class SetupWizardStateTests
         SetupWizardState.ValidateRequest(Request([], [Value("EnableChatter", "1")])).Should().NotBeEmpty();
     }
 
+    [Theory]
+    [InlineData(SetupWizardRequestKind.InviteStart)]
+    [InlineData(SetupWizardRequestKind.InviteDismiss)]
+    [InlineData(SetupWizardRequestKind.Save)]
+    [InlineData(SetupWizardRequestKind.Track)]
+    [InlineData(SetupWizardRequestKind.Closed)]
+    public void ValidateRequest_RejectsCaptureModeOutsideOpen(SetupWizardRequestKind kind)
+    {
+        SetupWizardState.ValidateRequest(new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = kind, RequestId = 1, CaptureOnly = true
+        }).Should().Contain("Only open requests may use QA capture mode.");
+    }
+
     private static IEnumerable<string> KeysFor(string topic) => SetupWizardCatalog.Pages
         .Where(page => page.TopicId == topic).SelectMany(page => page.SettingKeys);
 

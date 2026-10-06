@@ -15,6 +15,7 @@ public partial class RPProximityChatSystem
 {
     private const string SetupWizardSeenKey = "thebasics:setup-invitation-seen-v1";
     private SetupWizardState _setupWizardState;
+    private bool _setupWizardRuntimeApplyFailed;
     private readonly SetupWizardInvitationState _setupWizardInvitation = new();
     private readonly Dictionary<string, SetupWizardRun> _setupWizardRuns = new(StringComparer.Ordinal);
 
@@ -58,11 +59,17 @@ public partial class RPProximityChatSystem
         if (requestErrors.Count > 0)
         {
             SendSetupWizardResult(player, SetupWizardResultKind.Denied, request?.RequestId ?? 0,
-                request?.RunId, false, "Invalid setup request.");
+                request?.RunId?.Length <= 64 ? request.RunId : null, false, "Invalid setup request.");
             return;
         }
         if (request.Kind == SetupWizardRequestKind.Open)
         {
+            if (request.CaptureOnly)
+            {
+                SendSetupWizardResult(player, SetupWizardResultKind.Open, request.RequestId,
+                    Guid.NewGuid().ToString("N"), true);
+                return;
+            }
             var newRun = _setupWizardRuns.TryGetValue(player.PlayerUID, out var existingRun)
                 ? existingRun : new SetupWizardRun();
             _setupWizardRuns[player.PlayerUID] = newRun;
@@ -82,7 +89,7 @@ public partial class RPProximityChatSystem
             case SetupWizardRequestKind.InviteStart:
                 player.SetModData(SetupWizardSeenKey, true);
                 SendSetupWizardResult(player, SetupWizardResultKind.Open, request.RequestId, run.Id, true);
-                TrackSetupWizard(player, run, "start", "opened");
+                TrackSetupWizard(player, run, "invitation", "started");
                 break;
             case SetupWizardRequestKind.InviteDismiss:
                 player.SetModData(SetupWizardSeenKey, true);
@@ -135,30 +142,48 @@ public partial class RPProximityChatSystem
                 result: sightErrors.Count > 0 ? "validation_failed" : "write_failed");
             return;
         }
-        ApplyConfigChangeSideEffects(changedKeys.ToHashSet(StringComparer.OrdinalIgnoreCase));
-        BroadcastClientConfigs();
+        try
+        {
+            ApplyConfigChangeSideEffects(changedKeys.ToHashSet(StringComparer.OrdinalIgnoreCase));
+            BroadcastClientConfigs();
+        }
+        catch (Exception exception)
+        {
+            _setupWizardRuntimeApplyFailed = true;
+            API.Logger?.Error($"The BASICs: setup was saved, but live application failed ({exception.GetType().Name}). Restart required.");
+        }
         run.LastSaveRequestId = request.RequestId;
-        run.LastSaveResult = SendSetupWizardResult(player, SetupWizardResultKind.SaveResult, request.RequestId,
-            run.Id, true, "Saved The BASICs setup.");
+        run.LastSaveResult = CreateSetupWizardResult(SetupWizardResultKind.SaveResult, request.RequestId, run.Id, true,
+            _setupWizardRuntimeApplyFailed
+                ? "Saved The BASICs setup, but live application failed. Restart the server to apply the saved settings."
+                : "Saved The BASICs setup.");
         TrackSetupWizard(player, run, "review", "saved",
-            result: run.LastSaveResult.RestartRequiredKeys.Count > 0 ? "saved_pending_restart" : "saved_live");
+            result: _setupWizardRuntimeApplyFailed || run.LastSaveResult.RestartRequiredKeys.Count > 0 ? "saved_pending_restart" : "saved_live");
+        _serverConfigChannel?.SendPacket(run.LastSaveResult, player);
     }
 
     private TheBasicsSetupWizardResultMessage SendSetupWizardResult(IServerPlayer player, SetupWizardResultKind kind,
         long requestId, string runId, bool success, string message = null, List<string> conflicts = null)
     {
+        var result = CreateSetupWizardResult(kind, requestId, runId, success, message, conflicts);
+        _serverConfigChannel?.SendPacket(result, player);
+        return result;
+    }
+
+    private TheBasicsSetupWizardResultMessage CreateSetupWizardResult(SetupWizardResultKind kind,
+        long requestId, string runId, bool success, string message = null, List<string> conflicts = null)
+    {
         var includeSnapshot = kind != SetupWizardResultKind.Denied;
         if (includeSnapshot) _setupWizardState ??= new SetupWizardState(Config);
-        var result = new TheBasicsSetupWizardResultMessage
+        return new TheBasicsSetupWizardResultMessage
         {
             Kind = kind, RequestId = requestId, RunId = runId, Success = success, Message = message,
             Values = includeSnapshot ? GetConfigAdminValues(Config).Where(value => SetupWizardCatalog.IsSettingKey(value.Key)).ToList() : [],
             RestartRequiredKeys = includeSnapshot ? _setupWizardState.GetPendingRestartKeys(Config).ToList() : [],
             IsDedicated = API.Server?.IsDedicated == true,
-            ConflictKeys = conflicts ?? []
+            ConflictKeys = conflicts ?? [],
+            RuntimeApplyFailed = includeSnapshot && _setupWizardRuntimeApplyFailed
         };
-        _serverConfigChannel?.SendPacket(result, player);
-        return result;
     }
 
     private void TrackSetupWizard(IServerPlayer player, SetupWizardRun run, string step, string action,
@@ -166,6 +191,6 @@ public partial class RPProximityChatSystem
     {
         if (run.Sequence >= 10000) return;
         AnalyticsService.TrackSetupWizardJourney(run.Id, ++run.Sequence, step, action, choice, result,
-            _setupWizardState?.GetPendingRestartKeys(Config).Count > 0, player.PlayerUID);
+            _setupWizardRuntimeApplyFailed || _setupWizardState?.GetPendingRestartKeys(Config).Count > 0, player.PlayerUID);
     }
 }

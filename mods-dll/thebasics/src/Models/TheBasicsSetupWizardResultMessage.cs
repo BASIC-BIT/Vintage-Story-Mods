@@ -23,4 +23,5 @@ public sealed class TheBasicsSetupWizardResultMessage
     [ProtoMember(7)] public List<string> RestartRequiredKeys { get; set; } = new();
     [ProtoMember(8)] public bool IsDedicated { get; set; }
     [ProtoMember(9)] public List<string> ConflictKeys { get; set; } = new();
+    [ProtoMember(10)] public bool RuntimeApplyFailed { get; set; }
 }

@@ -66,6 +66,7 @@ public sealed class SetupWizardState
         var errors = new List<string>();
         if (request == null) return new[] { "Missing setup request." };
         if (!Enum.IsDefined(request.Kind)) errors.Add("Unknown setup request kind.");
+        if (request.CaptureOnly && request.Kind != SetupWizardRequestKind.Open) errors.Add("Only open requests may use QA capture mode.");
         if (request.RequestId < 0 || request.Kind == SetupWizardRequestKind.Save && request.RequestId == 0) errors.Add("Invalid setup request ID.");
         if ((request.RunId?.Length ?? 0) > 64 || (request.RunId?.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_') ?? false)) errors.Add("Invalid setup run ID.");
         if ((request.StepId?.Length ?? 0) > 64 || (request.ChoiceId?.Length ?? 0) > 64 || (request.JourneyAction?.Length ?? 0) > 64) errors.Add("Setup journey fields are too long.");

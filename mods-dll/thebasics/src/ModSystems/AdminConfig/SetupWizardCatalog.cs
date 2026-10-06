@@ -10,13 +10,13 @@ public static class SetupWizardCatalog
 {
     public static IReadOnlyList<SetupWizardPage> Pages { get; } = Array.AsReadOnly(new[]
     {
-        Page("chat.basics", "chat", "RP features and delivery", "RP features add speech formatting and commands. Disabling them keeps proximity delivery. General can remain global with a separate Proximity tab, or carry proximity speech itself.",
+        Page("chat.basics", "chat", "RP features and delivery", "Choose roleplay formatting and where nearby chat appears. Keep General global with a separate Proximity tab, or use General for nearby speech. Turning RP features off keeps proximity delivery.",
             "DisableRPChat", "UseGeneralChannelAsProximityChat", "ProximityChatPresentationMode", "NormalizeProximityChatText", "EnableChatter"),
         Page("chat.language", "chat", "Languages and OOC", "Languages are an independent choice. Explicit local OOC stays local; sticky local OOC mode has its own permission. Global OOC requires RP features and reaches the server.",
             "EnableLanguageSystem", "EnableGlobalOOC", "AllowOOCToggle", "OOCTogglePermission", "UseNicknameInOOC"),
-        Page("chat.ranges", "chat", "Who hears speech?", "Delivery uses integer-block Manhattan distance, strictly less than the range. The level footprint is a diamond. Exactly -1 means server-wide speech.",
+        Page("chat.ranges", "chat", "Who hears speech?", "A range of 5 reaches players up to 4 blocks away along the grid. The outlines show who can hear each mode. Set -1 for server-wide speech.",
             "ProximityChatModeDistances.Whisper", "ProximityChatModeDistances.Normal", "ProximityChatModeDistances.Yell"),
-        Page("chat.obfuscation", "chat", "Distant speech", "Distance obfuscation makes distant words harder to understand. Its circular distance guide differs from the diamond used for delivery.",
+        Page("chat.obfuscation", "chat", "Distant speech", "Words become harder to understand beyond the dashed circles. This uses straight-line distance; the diamonds show the hearing range measured along the grid.",
             "EnableDistanceObfuscationSystem", "ProximityChatModeObfuscationRanges.Whisper", "ProximityChatModeObfuscationRanges.Normal", "ProximityChatModeObfuscationRanges.Yell"),
         Page("chat.tabs", "chat", "Default chat tab", "Choose the initial tab and whether to remember player choice. The existing /rptext off option bypasses chat-tab filtering; these settings do not enforce every player's chat experience.",
             "ProximityChatAsDefault", "PreserveDefaultChatChoice", "PreventProximityChannelSwitching"),
@@ -31,7 +31,7 @@ public static class SetupWizardCatalog
         Page("teleport.homes", "teleportation", "Returning home", "Homes have a per-player limit, a stand-still warmup, and a cooldown in real seconds. Home and spawn share the gear choice; payment occurs only on successful arrival.",
             "Teleportation.MaxHomes", "Teleportation.HomeWarmupSeconds", "Teleportation.HomeCooldownSeconds", "HomeSpawnRequireTemporalGear", "HomeCommandPrivilege"),
         Page("teleport.spawn", "teleportation", "Returning to spawn", "Spawn uses its own stand-still warmup and cooldown in real seconds. Its gear choice is shared with home and is checked before warmup, then charged on successful arrival.",
-            "Teleportation.SpawnWarmupSeconds", "Teleportation.SpawnCooldownSeconds", "SpawnCommandPrivilege"),
+            "Teleportation.SpawnWarmupSeconds", "Teleportation.SpawnCooldownSeconds", "HomeSpawnRequireTemporalGear", "SpawnCommandPrivilege"),
         Page("teleport.top", "teleportation", "Moving to the surface", "Top has an independent privilege, real-second warmup, cooldown, and gear cost. A required gear is consumed only when the teleport completes.",
             "Teleportation.TopCommandPrivilege", "Teleportation.TopWarmupSeconds", "Teleportation.TopCooldownSeconds", "Teleportation.TopRequireTemporalGear"),
         Page("teleport.back", "teleportation", "Returning to a previous location", "Back keeps a temporary return location. Warmup, cooldown, and expiry use real seconds; zero expiry keeps the location indefinitely. Gear payment occurs on successful completion.",

@@ -44,6 +44,7 @@ public class SetupWizardProtocolTests
             Values = [new() { Key = "EnableChatter", Value = "0" }],
             RestartRequiredKeys = ["DisableRPChat"],
             IsDedicated = true,
+            RuntimeApplyFailed = true,
             ConflictKeys = ["EnableChatter"]
         });
 
@@ -55,6 +56,20 @@ public class SetupWizardProtocolTests
         result.Values.Single().Value.Should().Be("0");
         result.RestartRequiredKeys.Should().Equal("DisableRPChat");
         result.IsDedicated.Should().BeTrue();
+        result.RuntimeApplyFailed.Should().BeTrue();
         result.ConflictKeys.Should().Equal("EnableChatter");
+    }
+
+    [Fact]
+    public void CaptureOpenRoundtrip_PreservesExplicitQaMode()
+    {
+        var request = Serializer.DeepClone(new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = SetupWizardRequestKind.Open, RequestId = 125, CaptureOnly = true
+        });
+
+        request.Kind.Should().Be(SetupWizardRequestKind.Open);
+        request.RequestId.Should().Be(125);
+        request.CaptureOnly.Should().BeTrue();
     }
 }

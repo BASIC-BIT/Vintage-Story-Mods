@@ -6,6 +6,10 @@ This executable runs The BASICs production dialogs and Vintage Story's compiled 
 
 A complete Vintage Story installation is required for full scenes, including its assets and native Cairo/Skia libraries. The small CI dependency bundle can compile the tool and run compositor/comparison tests, but cannot render full dialogs. Windows is the validated host; other platforms need matching native libraries and fonts.
 
+Wizard PR captures use `scripts/collect-gui-captures.ps1` to supply the full environment: SHA-256-pinned official Windows server binaries and native libraries, with official Linux client assets. Only Windows binaries are executed. The `GUI Captures` workflow runs without write permissions; the trusted `GUI Capture Report` workflow compares its immutable artifacts and updates the PR's sticky report after checking the current source identity.
+
+The automatic reference is the regenerated PR base, explicitly labeled separately from a human-reviewed screenshot baseline. Added, changed, and removed frames require review. The manual report workflow accepts an explicitly selected reviewed baseline. Neither path promotes captures or completes gameplay QA.
+
 From the repository root:
 
     $env:VINTAGE_STORY = 'D:\Games\Vintagestory'
@@ -14,6 +18,8 @@ From the repository root:
     .\scripts\preview-gui.ps1 -Test
 
 Pass -DotNet PATH if the .NET 10 SDK is not on PATH. Output defaults to ignored .superpowers/sdd/gui-preview/output. Each scene produces a PNG and a JSON provenance manifest. Use a separate output directory for each scale or environment.
+
+Use `-Wizard` for the 13 setup scenes at scales 1 and 1.25. These production dialog fixtures omit Pip's native 3D rendering and record that omission. The script stamps a normalized source-tree hash into the built mod; a later test build can remove that stamp, so rerun the preview script before capturing. A claimed hash that does not match the compiled mod is rejected.
 
 Scenes include language editor default, focused input, open dropdown, button hover, tooltip, error status; admin chat, bubble and Discord settings; and dice bubbles. Fixtures use local callbacks and do not send settings to a server.
 

@@ -26,6 +26,7 @@ public sealed class SetupWizardInvitationDialog : GuiDialog
     }
 
     public override string ToggleKeyCombinationCode => null;
+    public override bool UnregisterOnClose => true;
     public override bool PrefersUngrabbedMouse => true;
     public override bool DisableMouseGrab => true;
 

@@ -21,7 +21,7 @@ public static class SetupWizardCaptureScenes
     {
         var config = new ModConfig();
         config.InitializeDefaultsIfNeeded();
-        return ConfigAdminSettingRegistry.Settings.Select(setting => new ConfigAdminSettingValue
+        return ConfigAdminSettingRegistry.Settings.Where(setting => SetupWizardCatalog.IsSettingKey(setting.Key)).Select(setting => new ConfigAdminSettingValue
         { Key = setting.Key, Value = setting.GetValue(config) }).ToList();
     }
 

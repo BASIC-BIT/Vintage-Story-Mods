@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Text.Json;
 
 namespace TheBasics.GuiPreview;
@@ -39,6 +40,10 @@ public static class Program
             var sourceTreeHash = options.GetValueOrDefault("source-tree-hash");
             if (sourceTreeHash is not null && (sourceTreeHash.Length != 64 || sourceTreeHash.Any(c => !Uri.IsHexDigit(c))))
                 throw new ArgumentException("Source tree identity must be a SHA256 hex digest.");
+            if (sourceTreeHash is not null && !string.Equals(sourceTreeHash,
+                typeof(thebasics.ModSystems.ChatUiSystem.SetupWizardDialog).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                    .SingleOrDefault(attribute => attribute.Key == "GuiCaptureSourceTreeHash")?.Value, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Source identity does not match the compiled mod. Rebuild with TheBasicsSourceTreeHash before capturing.");
             Directory.CreateDirectory(output);
             var selected = options.GetValueOrDefault("scenario", "all");
             var names = PreviewScene.Names.Concat(DicePreview.Names).ToArray();

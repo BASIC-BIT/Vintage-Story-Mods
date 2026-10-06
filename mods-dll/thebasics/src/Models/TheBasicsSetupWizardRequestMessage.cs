@@ -24,4 +24,5 @@ public sealed class TheBasicsSetupWizardRequestMessage
     [ProtoMember(6)] public string StepId { get; set; }
     [ProtoMember(7)] public string ChoiceId { get; set; }
     [ProtoMember(8)] public string JourneyAction { get; set; }
+    [ProtoMember(9)] public bool CaptureOnly { get; set; }
 }

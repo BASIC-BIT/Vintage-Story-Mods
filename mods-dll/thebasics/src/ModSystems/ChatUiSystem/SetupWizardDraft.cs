@@ -26,6 +26,7 @@ public sealed class SetupWizardDraft
     public string Get(string key) => _values.TryGetValue(key, out var value) ? value : string.Empty;
     public string GetOriginal(string key) => _originals.TryGetValue(key, out var value) ? value : string.Empty;
     public bool IsDirty => ChangedKeys.Count > 0;
+    public bool IsSavePending => _submitted != null;
     public IReadOnlyList<ConfigAdminSettingValue> Values => Snapshot(_values);
     public IReadOnlyList<string> ChangedKeys => _values.Where(pair => pair.Value != _originals[pair.Key]).Select(pair => pair.Key).ToArray();
 

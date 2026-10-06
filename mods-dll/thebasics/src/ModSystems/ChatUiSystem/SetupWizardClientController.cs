@@ -42,13 +42,9 @@ public sealed class SetupWizardClientController : IDisposable
 
     public void Open()
     {
-        if (_disposed || _opening) return;
-        if (CurrentDialog != null && _authorized)
-        {
-            CurrentDialog.ShowPage("hub");
-            CurrentDialog.TryOpen();
-            return;
-        }
+        if (_disposed || _opening || CurrentDialog?.Draft.IsSavePending == true) return;
+        if (IsCaptureOnly) Close();
+        CurrentDialog?.Suspend();
         RequestOpen(SetupWizardRequestKind.Open, null);
     }
 
@@ -87,6 +83,7 @@ public sealed class SetupWizardClientController : IDisposable
         }
         if (result.Kind != SetupWizardResultKind.Open) return;
         _authorized = true;
+        if (IsCaptureOnly && !_captureRequested) Close();
         if (CurrentDialog != null)
         {
             _runId = result.RunId;
@@ -113,11 +110,23 @@ public sealed class SetupWizardClientController : IDisposable
         if (_disposed || _pendingInvitation == null || CurrentDialog != null || _invitation != null) return;
         if (_api.Gui.LoadedGuis.Any(dialog => dialog.DialogType == EnumDialogType.Dialog && dialog.IsOpened())) return;
         var offered = _pendingInvitation;
-        _pendingInvitation = null;
         _invitation = new SetupWizardInvitationDialog(_api,
             () => AcknowledgeInvitation(offered.RunId, true),
             () => AcknowledgeInvitation(offered.RunId, false));
-        _invitation.TryOpen();
+        if (_invitation.TryOpen())
+        {
+            _pendingInvitation = null;
+            _channel.TrySendPacketWithoutQueue(new TheBasicsSetupWizardRequestMessage
+            {
+                Kind = SetupWizardRequestKind.Track, RunId = offered.RunId,
+                StepId = "invitation", JourneyAction = "viewed"
+            });
+        }
+        else
+        {
+            _invitation.Dispose();
+            _invitation = null;
+        }
     }
 
     private void AcknowledgeInvitation(string runId, bool start)
@@ -144,7 +153,10 @@ public sealed class SetupWizardClientController : IDisposable
             _captureRequested = false;
             if (!_disposed) _api.ShowChatMessage("Setup could not open. Try /basic setup again.");
         });
-        _channel.SendPacketSafely(new TheBasicsSetupWizardRequestMessage { Kind = kind, RequestId = id, RunId = runId }, () => _requests.Fail(id));
+        _channel.SendPacketSafely(new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = kind, RequestId = id, RunId = runId, CaptureOnly = _captureRequested
+        }, () => _requests.Fail(id));
     }
 
     private void Save()

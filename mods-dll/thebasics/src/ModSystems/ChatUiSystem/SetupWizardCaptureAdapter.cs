@@ -127,7 +127,7 @@ public sealed class SetupWizardCaptureAdapter : IRenderer
         if (!openedForCapture) throw new InvalidOperationException("Open a fresh capture-only wizard before each scene.");
         if (jobs.Count >= 32) throw new InvalidOperationException("Capture session limit reached.");
         var dialog = currentDialog() ?? throw new InvalidOperationException("Wait for the server-authorized capture dialog to open.");
-        if (dialog.LayoutOnly) throw new InvalidOperationException("Native captures require the native production preview.");
+        if (dialog.LayoutOnly || !dialog.IsCaptureOnly) throw new InvalidOperationException("Native captures require the native capture-only production preview.");
         ownedDialog = dialog;
         SetupWizardCaptureScenes.Show(dialog, scenario, previewTime);
         var job = new Job { Scenario = scenario, PreviewTime = previewTime, Dialog = dialog, QueuedAt = api.ElapsedMilliseconds, Cancellation = cancellation };
@@ -205,7 +205,7 @@ public sealed class SetupWizardCaptureAdapter : IRenderer
             schema = 1, scenario = job.Scenario, width = raw.Width, height = raw.Height, scale = (double)RuntimeEnv.GUIScale,
             previewTime = job.PreviewTime, fixture = job.Dialog.Draft.Values, coverage = "native-client", omissions = Array.Empty<string>(), sourceTreeHash,
             environmentIdentity = SetupWizardCaptureIdentity.EnvironmentIdentity(gamePath, raw.Width, raw.Height, RuntimeEnv.GUIScale,
-                Lang.CurrentLocale ?? "en", GuiStyle.StandardFontName, GuiStyle.DecorativeFontName),
+                Lang.CurrentLocale ?? "en", GuiStyle.StandardFontName, GuiStyle.DecorativeFontName, api.Assets),
             environment = new { gameVersion = GameVersion.ShortGameVersion, modBinaryHash = SetupWizardCaptureIdentity.HashFile(typeof(SetupWizardDialog).Assembly.Location),
                 runId = job.Dialog.RunId, renderStage = "Done", readyFrame = job.ReadyFrame, captureFrame = frame,
                 sourceIdentityVerified = sourceTreeHash != null, fidelity = "Native production dialog in the current client framebuffer. Human gameplay acceptance is separate." }

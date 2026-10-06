@@ -168,6 +168,12 @@ At minimum, verify:
 
 ## Failure Triage
 
+### GUI capture dependencies
+
+The small private DLL bundle remains the compile/test dependency route. Full wizard screenshots use the separate read-only `GUI Captures` workflow and `scripts/collect-gui-captures.ps1`: official Windows server binaries/native libraries plus Linux client assets, pinned by SHA-256. Linux libraries are not executed. No game files are committed or uploaded as dependencies.
+
+When changing the capture game version, update both official archive names and hashes together in that collector after verifying the metadata and a local render. Confirm the GUI binary, asset, and font identities agree between PR base and head. Run `scripts/test_gui_capture_report.py`, one collector smoke run, and `scripts/check-agent-tooling.ps1` after workflow or skill changes. The trusted report workflow must never execute scripts from source checkouts or capture artifacts.
+
 If a run still fails at dependency download, check:
 
 - workflow `VS_VERSION` matches the uploaded dependency folder name exactly

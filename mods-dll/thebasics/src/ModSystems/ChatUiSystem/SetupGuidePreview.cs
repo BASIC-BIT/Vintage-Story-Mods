@@ -159,14 +159,24 @@ public sealed class SetupGuidePreview : IDisposable
         };
     }
 
-    /// <summary>Pins a repeatable frame. Ordinary rendering advances idle until a named time is set.</summary>
+    /// <summary>Plays a live animation. Keeping the same animation does not restart its pose.</summary>
+    public void PlayAnimation(string code)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        ValidateAnimationCode(code);
+        if (!namedTime && animationCode == code) return;
+        animationCode = code;
+        previewTime = 0;
+        frameRemainder = 0;
+        namedTime = false;
+        ResetAnimation();
+    }
+
+    /// <summary>Pins a repeatable frame for an explicit capture.</summary>
     public void SetAnimation(string code, double timeSeconds)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        if (!fixture.Animations.Contains(code, StringComparer.Ordinal))
-        {
-            throw new ArgumentException("Unknown setup guide animation.", nameof(code));
-        }
+        ValidateAnimationCode(code);
         if (!double.IsFinite(timeSeconds) || timeSeconds < 0 || timeSeconds > 60)
         {
             throw new ArgumentOutOfRangeException(nameof(timeSeconds));
@@ -175,6 +185,12 @@ public sealed class SetupGuidePreview : IDisposable
         previewTime = timeSeconds;
         namedTime = true;
         ResetAnimation();
+    }
+
+    private void ValidateAnimationCode(string code)
+    {
+        if (!fixture.Animations.Contains(code, StringComparer.Ordinal))
+            throw new ArgumentException("Unknown setup guide animation.", nameof(code));
     }
 
     private void ResetAnimation()

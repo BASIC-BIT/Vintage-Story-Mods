@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 import struct
+import shutil
+import subprocess
 import tempfile
 import unittest
 import zlib
@@ -57,7 +59,8 @@ class CaptureReportTests(unittest.TestCase):
                     "sourceTreeHash": source, "environment": {"modBinary": source},
                     "environmentIdentity": {"viewport": {"width": 1600, "height": 1000}, "locale": "en",
                                             "scale": 1, "fonts": {"standard": "Test Font", "decorative": "Test Font", "fontFiles": [{"path": "font.ttf", "sha256": "c" * 64}]},
-                                            "gameBinaries": [{"name": "API", "sha256": "d" * 64}], "gameAssets": [{"path": "gui.png", "sha256": "e" * 64}]}}
+                                            "gameBinaries": [{"name": "API", "sha256": "d" * 64}], "gameAssets": [{"path": "gui.png", "sha256": "e" * 64}],
+                                            "nativeGuide": {"rendered": False, "scope": "Layout only", "loadedAssemblies": [], "assets": [], "omissions": ["Native character"]}}}
         (root / (scenario + ".png")).write_bytes(reporter.encode_png(width, height, pixels))
         reporter.write_json(root / (scenario + ".json"), manifest)
         index_path = root / "captures.json"
@@ -125,6 +128,34 @@ class CaptureReportTests(unittest.TestCase):
         self.assertTrue(report["evidenceValid"])
         self.assertFalse(any("diff" in row["artifacts"] for row in report["captures"]))
 
+    def test_native_dependencies_are_required_and_changes_make_comparison_stale(self):
+        for mutation in (lambda guide: guide["assets"][0].update(sha256="f" * 64),
+                         lambda guide: guide["loadedAssemblies"][0].update(sha256="f" * 64),
+                         lambda guide: guide["loadedAssemblies"].clear(),
+                         lambda guide: guide.update(assets=None),
+                         lambda guide: guide["assets"][0].pop("patched"),
+                         lambda guide: guide.update(rendered=False)):
+            with self.subTest(mutation=mutation):
+                for root in (self.before, self.after):
+                    self.capture(root)
+                    def native(manifest):
+                        manifest.update(coverage="native-client", omissions=[])
+                        manifest["environmentIdentity"]["nativeGuide"] = {
+                            "rendered": True, "scope": "Loaded native guide assets", "omissions": ["Runtime object changes"],
+                            "loadedAssemblies": [{"name": "VSSurvivalMod", "sha256": "c" * 64}],
+                            "assets": [{"path": "game:entities/player.json", "sha256": "d" * 64, "patched": False}]}
+                    self.change_manifest(root, native)
+                    index = reporter.read_json(root / "captures.json")
+                    index["coverage"] = "native-client"
+                    reporter.write_json(root / "captures.json", index)
+                self.change_manifest(self.after, lambda manifest: mutation(manifest["environmentIdentity"]["nativeGuide"]))
+                report = self.run_report()
+                self.assertFalse(report["evidenceValid"])
+                self.assertEqual(report["counts"], {"stale": 1})
+                shutil.rmtree(self.output)
+                for root in (self.before, self.after):
+                    (root / "captures.json").unlink()
+
     def test_missing_image_and_manifest_are_missing(self):
         for filename in ("chat.png", "chat.json"):
             with self.subTest(filename=filename):
@@ -138,7 +169,6 @@ class CaptureReportTests(unittest.TestCase):
 
     def reset_case(self):
         # Only removes this test's fixed disposable directories.
-        import shutil
         for root in (self.before, self.after, self.output):
             if root.exists():
                 shutil.rmtree(root)
@@ -203,6 +233,19 @@ class CaptureReportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             reporter.load_index(self.after)
 
+    def test_untrusted_scenario_labels_and_capture_count_are_bounded(self):
+        self.capture(self.after)
+        index = reporter.read_json(self.after / "captures.json")
+        for scenario in ("[click](https://example.com)", "@everyone", "x" * 129):
+            index["captures"][0]["scenario"] = scenario
+            reporter.write_json(self.after / "captures.json", index)
+            with self.assertRaises(ValueError):
+                reporter.load_index(self.after)
+        index["captures"] = [dict(index["captures"][0], scenario="scene-" + str(number)) for number in range(257)]
+        reporter.write_json(self.after / "captures.json", index)
+        with self.assertRaises(ValueError):
+            reporter.load_index(self.after)
+
     def test_cli_exit_codes_and_invalid_hash(self):
         self.capture(self.before)
         self.capture(self.after)
@@ -214,6 +257,28 @@ class CaptureReportTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as error:
             reporter.main(args[:-1] + ["bad"])
         self.assertEqual(error.exception.code, 2)
+
+    @unittest.skipUnless(shutil.which("pwsh"), "PowerShell required for source identity check")
+    def test_source_identity_ignores_checkout_eol_but_retains_source_and_binary_changes(self):
+        script = Path(__file__).with_name("gui-source-identity.ps1")
+        source = self.root / "mods-dll" / "thebasics" / "src" / "test.cs"
+        image = self.root / "mods-dll" / "thebasics" / "assets" / "test.png"
+        source.parent.mkdir(parents=True)
+        image.parent.mkdir(parents=True)
+        image.write_bytes(b"\r\n\x00")
+
+        def identity():
+            return subprocess.check_output(["pwsh", "-NoProfile", "-File", str(script), "-Repo", str(self.root)], text=True).strip()
+
+        source.write_bytes(b"class C {}\n")
+        original = identity()
+        source.write_bytes(b"class C {}\r\n")
+        self.assertEqual(original, identity())
+        source.write_bytes(b"class C { int X; }\n")
+        self.assertNotEqual(original, identity())
+        source.write_bytes(b"class C {}\n")
+        image.write_bytes(b"\n\x00")
+        self.assertNotEqual(original, identity())
 
 
 if __name__ == "__main__":
