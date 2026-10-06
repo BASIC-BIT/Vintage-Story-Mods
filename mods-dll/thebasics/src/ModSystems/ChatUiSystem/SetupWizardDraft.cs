@@ -70,8 +70,9 @@ public sealed class SetupWizardDraft
         {
             if (value?.Key == null || !SetupWizardCatalog.IsSettingKey(value.Key) || !ConfigAdminSettingRegistry.TryGet(value.Key, out var setting)) continue;
             var key = setting.Key;
-            var reference = result.Success && _submitted.TryGetValue(key, out var submitted) ? submitted : GetOriginal(key);
-            if (!_values.TryGetValue(key, out var current) || current == reference) _values[key] = value.Value ?? string.Empty;
+            if (!_values.TryGetValue(key, out var current) ||
+                (_submitted.TryGetValue(key, out var submitted) && current == submitted &&
+                 (result.Success || submitted == GetOriginal(key)))) _values[key] = value.Value ?? string.Empty;
             _originals[key] = value.Value ?? string.Empty;
         }
         CancelRequest();
