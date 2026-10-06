@@ -5,6 +5,17 @@ Scope: chat, teleportation, notifications, invitation, restart guidance, native 
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
 
+## Staged checkpoint, October 6
+
+- Code commit: `b9e4d8c1d0a46d32ce6466f52ee8946899488408`, pushed to the feature branch.
+- Package: `thebasics_5_9_1.zip`, SHA-256 `cf4f92afa75f7de38741d3e640094fb44fcf43cf2dacb96725f79217e145d5a0`. Server readback and both profile packages match.
+- Source identity: `1f11444f065be8492eed2b3086a1a8b713b506ea5d99d6a596fb5e41239429bc`, identical in the canonical build and 26 final CPU captures.
+- Verification: full suite 1251 passed with no skips; one later native-identity check passed separately. Python report checks 15 passed, relay checks 28 passed, workflow trust checks 2 passed. Canonical packaging has zero errors and 132 analyzer warnings.
+- Server restarted and reached RunGame with all BASICs systems loaded and no exceptions. Existing flywheel duplicate warnings and a bare container-path error remain outside this change.
+- Profile2 connected at 16:35 local. Agent Control is loaded but disabled; the owner must press Ctrl+Alt+F8 before native capture. No native appearance, video, PostHog ingestion, or manual card is complete.
+- Launch discovery: Vintage Story forwards `-c` to an existing instance through a global URI pipe. An immediate second launch reached the first client before input initialization and caused vanilla `walkforward` startup failure. Launch Profile2 without `-c`, wait for the menu's shaders and controls, then run the connection command to forward to that initialized window. A second profile must also start without `-c` and connect from its own menu.
+- WinSCP deployment requires Windows PowerShell for the installed .NET Framework assembly; using PowerShell Core fails before transfer. The successful transfer used the supported runtime and verified remote bytes before restart.
+
 ## Preparation and evidence
 
 - Existing QA mod, config, startup log, and both client packages are backed up in `.tmp/wizard-qa-backup-20261006-160450`.
