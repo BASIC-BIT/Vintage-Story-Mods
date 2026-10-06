@@ -1,6 +1,14 @@
 # Config search, local implementation and QA
 
-Owner: this chat. Worktree: `.codex-worktrees/general-proximity-cleanup`, branch `codex/general-proximity-cleanup`.
+Owner: handoff requested by BASIC to the existing chat "Find proximity chat settings", thread `01a0fa70-8ca5-7321-ac1f-07fe824f5be2`, host `local`. Source worktree: `.codex-worktrees/general-proximity-cleanup`, branch `codex/general-proximity-cleanup`.
+
+## Ownership handoff, October 6
+
+Source chat "Document proximity chat settings" (`01a0fa7a-30cd-7112-8f20-0edd0fcb11e3`) is stopping overlapping implementation. The receiving chat owns integration with its config wizard work and the remaining combined QA. Its freshly observed working directory is `.codex-worktrees/visual-config-wizard`; preserve its current work and test environment.
+
+Search implementation is committed as `53e86fc`. Earlier General proximity cleanup, focus and tab placement are in `0c5aa0a`. Inspect ancestry and integrate only missing changes. Likely overlapping files are `ChatUiSystem.cs`, `en.json`, `README.md`, and `tools/GuiPreview/PreviewScene.cs`. Keep the search validation boundary below distinct from live wizard evidence. No search package has been staged by the source chat.
+
+Expected next result: reconcile the accepted search behavior with the wizard, validate the combined build, and stage combined QA when appropriate. All human cards below remain pending. General removal or renaming is undecided. No merge or release authorization is implied by this handoff.
 
 Scope: a separate read-only search modal in `/basic config`, native editor navigation, current settings draft values, language definitions, character-sheet field definitions, and scrollable settings. No player character-sheet answers are indexed. General chat removal or renaming remains a separate undecided request.
 
