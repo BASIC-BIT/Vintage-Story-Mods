@@ -147,6 +147,7 @@ public class SetupGuidePreviewTests
         SetField(preview, "actor", actor);
         SetField(preview, "animationCode", "idle");
         SetField(preview, "previewAnimator", animator);
+        SetField(preview, "rotationYaw", -1.2707963f);
         var bounds = ElementBounds.Fixed(0, 0, 120, 168);
         bounds.ParentBounds = ElementBounds.Empty;
         bounds.CalcWorldBounds();
@@ -234,6 +235,67 @@ public class SetupGuidePreviewTests
         preview.SetAnimation("wave", 1.5);
         Assert.InRange(actor.AnimManager.Animator.GetAnimationState("wave").CurrentFrame, 58.4f, 58.6f);
         Assert.False(firstFrame.SequenceEqual(actor.AnimManager.Animator.Matrices));
+    }
+
+    [VisualTheory]
+    [InlineData(5.5)]
+    public void InstalledNativeGreetingReturnsToMovingIdleAfterCaptureResumes(double liveSeconds)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
+            Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1000);
+        var shape = host.Api.Assets.Get(new AssetLocation("game:shapes/entity/humanoid/seraph-faceless.json")).ToObject<Shape>();
+        shape.InitForAnimations(host.Api.Logger, "setup-guide-native-test");
+        var player = JObject.Parse(host.Api.Assets.Get(new AssetLocation("game:entities/humanoid/player.json")).ToText());
+        var metadata = player["client"]!["animations"]!
+            .Where(token => token.Value<string>("code") is "idle" or "wave")
+            .Select(token => token.ToObject<AnimationMetaData>()!.Init())
+            .ToDictionary(animation => animation.Code);
+        var api = Substitute.For<ICoreClientAPI>();
+        api.Render.ScissorStack.Returns(new Stack<ElementBounds>());
+        var actorType = typeof(SetupGuidePreview).GetNestedType("DetachedGuideEntity", BindingFlags.NonPublic)!;
+        var actor = (Entity)Activator.CreateInstance(actorType)!;
+        typeof(Entity).GetProperty(nameof(Entity.Properties))!.SetValue(actor, new EntityProperties
+        {
+            Client = new EntityClientProperties([], null) { AnimationsByMetaCode = metadata }
+        });
+        actor.AnimManager.Animator = new ClientAnimator(() => 1, shape.Animations, shape.Elements, shape.JointsById);
+        var preview = (SetupGuidePreview)RuntimeHelpers.GetUninitializedObject(typeof(SetupGuidePreview));
+        var fixtureField = typeof(SetupGuidePreview).GetField("fixture", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var fixtureJson = JObject.Parse(host.Api.Assets.Get(new AssetLocation("thebasics:config/setup-guide.json")).ToText());
+        fixtureField.SetValue(preview, fixtureJson.ToObject(fixtureField.FieldType)!);
+        SetField(preview, "api", api);
+        SetField(preview, "actor", actor);
+        SetField(preview, "animationCode", "idle");
+        var bounds = ElementBounds.Fixed(0, 0, 120, 168);
+        bounds.ParentBounds = ElementBounds.Empty;
+        bounds.CalcWorldBounds();
+
+        preview.SetAnimation("wave", 0.75);
+        var pinnedAnimator = actor.AnimManager.Animator;
+        var pinnedMatrices = pinnedAnimator.Matrices.ToArray();
+        preview.Render(0.25f, bounds);
+        Assert.Same(pinnedAnimator, actor.AnimManager.Animator);
+        Assert.True(pinnedMatrices.SequenceEqual(pinnedAnimator.Matrices));
+        Assert.Equal(0.75, GetField(preview, "previewTime"));
+
+        // ResumePreview uses this same transition from a named frame into live native animation.
+        preview.PlayAnimation("wave");
+        var liveAnimator = actor.AnimManager.Animator;
+        Assert.NotSame(pinnedAnimator, liveAnimator);
+        for (int frame = 0; frame < Math.Ceiling(liveSeconds * 60); frame++) preview.Render(1f / 60, bounds);
+        Assert.Same(liveAnimator, actor.AnimManager.Animator);
+        Assert.DoesNotContain("wave", actor.AnimManager.ActiveAnimationsByAnimCode.Keys);
+        Assert.False(liveAnimator.GetAnimationState("wave").Running);
+        Assert.Contains("idle1", actor.AnimManager.ActiveAnimationsByAnimCode.Keys);
+        Assert.True(liveAnimator.GetAnimationState("idle1").Running);
+        Assert.True(liveAnimator.GetAnimationState("idle1").Iterations >= 2);
+        Assert.True((double)GetField(preview, "previewTime")! > 5);
+
+        var idleMatrices = liveAnimator.Matrices.ToArray();
+        float idleFrame = liveAnimator.GetAnimationState("idle1").CurrentFrame;
+        for (int frame = 0; frame < 15; frame++) preview.Render(1f / 60, bounds);
+        Assert.NotEqual(idleFrame, liveAnimator.GetAnimationState("idle1").CurrentFrame);
+        Assert.False(idleMatrices.SequenceEqual(liveAnimator.Matrices));
     }
 
     [VisualTheory]

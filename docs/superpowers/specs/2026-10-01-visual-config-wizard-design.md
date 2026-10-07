@@ -55,7 +55,28 @@ flowchart TD
     L --> R
 ```
 
-Each topic returns to the hub. Back preserves edits. Review shows old and new values, with explicit live/restart status. Closing a dirty draft asks whether to discard it. Preview state is isolated from server config and player inventory.
+Each topic returns to the hub. Back preserves edits. Native topic tabs provide consistent navigation between Topics, Chat, Teleportation, Notifications, and Review. Review shows old and new values and marks restart-shaped changes with `After restart`; ordinary settings pages omit restart labels. Closing a dirty draft asks whether to discard it and cancels any guide drag. Preview state is isolated from server config and player inventory.
+
+The currently authorized chat interaction and save subflow is:
+
+```mermaid
+flowchart TD
+    C["Chat settings"] -->|Open presentation selector| P["Expanded choices: title and smaller description"]
+    P -->|Choose a mode| W["Whole fake native chat window: tabs, history, input"]
+    C -->|Change channel, RP, language, or OOC choices| W
+    W -->|Compare General and Proximity tabs| W
+    W -->|Review draft| R["Old and new values; After restart where required"]
+    R -->|Back| C
+    R -->|Save| S["Server validates and persists changed values"]
+    S -->|Failure or conflict, preserve draft| R
+    S -->|Saved, no pending restart| D["Done, return to game"]
+    S -->|Saved, pending restart| I["Actual restart instructions for this host"]
+    I -->|Later| D
+    I -->|Back to setup| C
+    I -->|Follow hosting-panel or save-and-quit instructions| A["Restart server or reopen world; reconnect"]
+```
+
+This replaces the earlier text-only preview. The richer language editor and later animated feature scenes remain the longer-term direction, outside this chat interaction increment.
 
 Advanced editor suspends the wizard and opens the existing `/basic config` workflow. Its settings draft and search query survive category changes, closing Search, dedicated editor roundtrips, and canceled discard. A true config-menu close clears the search query and focus target. Reopen the suspended wizard with `/basic setup`; closing the advanced editor returns to the game. The wizard draft and advanced settings draft are separate. Search indexes setting values and definition metadata, not players' character-sheet answers. Rich visual language editing remains a later release.
 
@@ -81,9 +102,20 @@ Expose existing independent controls, without changing their meaning:
 
 1. RP features: `DisableRPChat`, with an accurate explanation that proximity delivery remains.
 2. Channel: ordinary global General plus separate Proximity, or General replaced by proximity chat (`UseGeneralChannelAsProximityChat`). Show both tab layouts and their delivery consequences.
-3. Presentation: `StandardRoleplay`, `SimpleSpeech`, `PlainProximity`, `Prose`, using real formatted sample text. PlainProximity is `Name: message`; it is not a language or range disable switch.
+3. Presentation: use friendly names in the selector and review, while retaining the existing config values. Expanded selector rows show a title with a smaller description beneath it. The selected option also has a nearby description.
 4. Language enable and local/global OOC examples. Global OOC requires the existing RP gate. Sticky local OOC permission is distinct from explicit local OOC syntax.
 5. Whisper/normal/yell ranges, distance obfuscation, and default/remembered tab behavior. Keep advanced knobs in the existing editor.
+
+| Config value | Friendly name | Description |
+| --- | --- | --- |
+| `StandardRoleplay` | Roleplay dialogue | Names, speech verbs and quoted speech. |
+| `SimpleSpeech` | Quoted chat | Names and quoted speech. |
+| `PlainProximity` | Simple chat | Names and unquoted speech. |
+| `Prose` | Storytelling | Mix actions and quoted speech in one line. |
+
+Replace the isolated sample text with a whole fake chat window in the lower-left of the preview area. Reuse the native overlay, horizontal tabs, rich-text history, scrollbar, and chat input elements with local example content. The input is disabled, and tab clicks only change the example; neither sends chat nor alters the player's real chat window. Construct these elements within the wizard rather than creating a live `HudDialogChat`, which owns real chat state and event handlers.
+
+When General is proximity chat, show General without a Proximity tab. Otherwise, let the administrator compare ordinary global General with a separate Proximity tab. Reflect the draft's presentation and permitted OOC examples in history. PlainProximity remains `Name: message`; it does not disable languages or change delivery ranges. Disabling RP retains the selected speech presentation and proximity delivery, while ordinary speech uses the account name and RP-dependent language/global-OOC features are unavailable. Explain unavailable or out-of-range examples outside the history rather than inserting fictitious system messages.
 
 The hearing visual follows current integer-block Manhattan delivery, with strict distance < range. Show a diamond footprint on a level grid and a separate circular obfuscation guide. Exactly -1 is server-wide speech. Defaults remain whisper 5, normal 35, yell 90, with obfuscation onset 2, 15, 45.
 
@@ -115,7 +147,7 @@ Persist the detached validated draft before mutating shared runtime Config, appl
 
 Only show the final success screen after the correlated server acknowledgement. A save failure or timeout retains edits and offers retry. Merge acknowledgements per key: replace values unchanged since submission with authoritative response values, preserve edits made since submission, and update their expected originals. Whole-snapshot retention must not turn unrelated concurrent changes into accidental edits.
 
-When pending restart keys exist, finish with their names and appropriate instructions:
+Keep restart wording on review and save results, rather than repeating `(restart)` on the settings pages. Review marks affected changes `After restart`. When pending restart keys exist after the acknowledged save, finish with their names and appropriate instructions:
 
 - Dedicated: `Restart the server from your hosting panel, or stop and start it using your normal launch method. Players must reconnect.`
 - Integrated: `Save and quit to the main menu, then reopen this world.`
@@ -125,11 +157,13 @@ Vintage Story exposes graceful shutdown but no portable restart API. Do not labe
 
 ## First visual experiment
 
-One clipped production GUI panel contains a detached native seraph, nearby and distant listener indicators, and formatted sample chat. Use a valid temporary appearance/outfit fixture. Start with native idle and one greeting animation, then add the speech scene's explanatory beats.
+One clipped production GUI panel contains a detached native seraph and nearby and distant listener indicators, alongside the whole fake native chat window. Use a valid temporary appearance/outfit fixture. The ordinary preview animates live with native idle and a greeting wave; do not leave normal interaction frozen at a capture pose. Then add the speech scene's explanatory beats.
 
-Use an unregistered `EntityPlayerBot`, its private native gear inventory, and independently copied skin attributes. Deep-copy mutable entity properties/textures. Advance only its private animator with a fixed preview clock. Avoid world/entity simulation ticks, player UID inventory lookups, and server character-switch restore methods.
+Use an unregistered `EntityPlayerBot`, its private native gear inventory, and independently copied skin attributes. Deep-copy mutable entity properties/textures. Advance only its private animator, using elapsed preview time during ordinary interaction and an explicit named time for captures. Avoid world/entity simulation ticks, player UID inventory lookups, and server character-switch restore methods.
 
-The detached character and named-time greeting have been captured on 1.22.7 at GUI scale 1.125 in checkpoint `548bb84`; that sampled clip received six passing Gemini rubric checks. Combined-source native probes now cover Chat, Teleportation, and Notifications at scales 1 and 1.25, with distinct Chat wave poses at 0.75 and 1.5 seconds. These images establish sampled appearance and clipping. Whole-player invariance, owner observations, and late mesh-upload close behavior remain pending. Inventory and hotbar snapshots match, but camera yaw drift prevented a strict whole-player-state pass.
+Dragging the character horizontally rotates the private preview actor. Releasing a recent drag allows bounded momentum that decays smoothly to rest; cap velocity and delayed-frame integration, and cancel stale momentum on a paused release or lost interaction. This changes only preview orientation. A named capture resets orientation and freezes animation at the requested time for reproducible frames. After the frame is captured, resume live animation rather than leaving the dialog permanently frozen.
+
+Historical native evidence before this chat-window and interaction revision: the detached character and named-time greeting were captured on 1.22.7 at GUI scale 1.125 in checkpoint `548bb84`; that sampled clip received six passing Gemini rubric checks. Combined-source native probes covered Chat, Teleportation, and Notifications at scales 1 and 1.25, with distinct Chat wave poses at 0.75 and 1.5 seconds. These images establish sampled appearance and clipping for that version, not proof of the revised selector, whole chat window, drag momentum, or resumed live animation. Whole-player invariance, owner observations, and late mesh-upload close behavior remain pending. Inventory and hotbar snapshots matched, but camera yaw drift prevented a strict whole-player-state pass.
 
 Standalone GuiPreview continues to fail on unsupported 3D operations. A separately named layout-only fixture may explicitly omit the native panel and record that omission. It cannot certify character or animation appearance.
 

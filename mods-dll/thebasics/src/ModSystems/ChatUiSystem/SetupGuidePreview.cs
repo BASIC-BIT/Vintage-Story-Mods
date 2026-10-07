@@ -16,6 +16,8 @@ namespace thebasics.ModSystems.ChatUiSystem;
 public sealed class SetupGuidePreview : IDisposable
 {
     private const float FrameStep = 1f / 60f;
+    private const float DefaultYaw = -1.2707963f;
+    private const float RotationDamping = 6f;
     private static long nextEntityId = -20000000;
     private readonly ICoreClientAPI api;
     private readonly GuideFixture fixture;
@@ -25,6 +27,11 @@ public sealed class SetupGuidePreview : IDisposable
     private string animationCode = "idle";
     private double previewTime;
     private double frameRemainder;
+    private float rotationYaw = DefaultYaw;
+    private float rotationVelocity;
+    private double dragX;
+    private long dragTime;
+    private bool dragging;
     private bool namedTime;
     private bool disposed;
 
@@ -196,7 +203,54 @@ public sealed class SetupGuidePreview : IDisposable
         animationCode = code;
         previewTime = timeSeconds;
         namedTime = true;
+        rotationYaw = DefaultYaw;
+        rotationVelocity = 0;
+        dragging = false;
         ResetAnimation();
+    }
+
+    public void BeginDrag(double x)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (!double.IsFinite(x)) throw new ArgumentOutOfRangeException(nameof(x));
+        if (namedTime) return;
+        dragging = true;
+        dragX = x;
+        dragTime = api.ElapsedMilliseconds;
+        rotationVelocity = 0;
+    }
+
+    public void DragTo(double x)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (!double.IsFinite(x)) throw new ArgumentOutOfRangeException(nameof(x));
+        if (!dragging) return;
+        long now = api.ElapsedMilliseconds;
+        long elapsed = now - dragTime;
+        // Match the native character editor's direction and one radian per 100 pixels.
+        double delta = -(x - dragX) / 100;
+        if (double.IsFinite(delta))
+        {
+            rotationYaw = (float)Math.IEEERemainder(rotationYaw + delta, Math.Tau);
+            if (elapsed > 0 && elapsed <= 100)
+                rotationVelocity = (float)Math.Clamp(delta * 1000 / elapsed, -12, 12);
+            else if (elapsed != 0)
+                rotationVelocity = 0;
+        }
+        else
+        {
+            rotationVelocity = 0;
+        }
+        dragX = x;
+        dragTime = now;
+    }
+
+    public void EndDrag(bool allowMomentum = true)
+    {
+        if (disposed) return;
+        long elapsed = api.ElapsedMilliseconds - dragTime;
+        if (!allowMomentum || elapsed < 0 || elapsed > 100) rotationVelocity = 0;
+        dragging = false;
     }
 
     private void ValidateAnimationCode(string code)
@@ -257,6 +311,15 @@ public sealed class SetupGuidePreview : IDisposable
                 frameRemainder -= FrameStep;
             }
         }
+        if (!namedTime && !dragging && rotationVelocity != 0 && float.IsFinite(dt) && dt > 0)
+        {
+            // Bound a delayed frame, then integrate the decay so coasting is consistent across frame rates.
+            float decay = MathF.Exp(-RotationDamping * Math.Min(dt, 0.05f));
+            rotationYaw = (float)Math.IEEERemainder(
+                rotationYaw + rotationVelocity * (1 - decay) / RotationDamping, Math.Tau);
+            rotationVelocity *= decay;
+            if (MathF.Abs(rotationVelocity) < 0.01f) rotationVelocity = 0;
+        }
         api.Render.GlPushMatrix();
         try
         {
@@ -267,7 +330,7 @@ public sealed class SetupGuidePreview : IDisposable
                 api.Render.RenderEntityToGui(0, actor,
                     bounds.renderX + bounds.InnerWidth / 2 - size,
                     bounds.renderY + bounds.InnerHeight * 0.96 - 2 * size,
-                    100, -1.2707963f, size, -1);
+                    100, rotationYaw, size, -1);
             }
             finally
             {

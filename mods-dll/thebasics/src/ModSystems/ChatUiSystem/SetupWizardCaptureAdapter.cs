@@ -172,6 +172,7 @@ public sealed class SetupWizardCaptureAdapter : IRenderer
             if (job.ReadyFrame == null) { job.ReadyFrame = frame; return; }
             if (frame <= job.ReadyFrame) return;
             Capture(job);
+            job.Dialog.ResumePreview();
             job.Status = "completed";
             pending = null;
         }

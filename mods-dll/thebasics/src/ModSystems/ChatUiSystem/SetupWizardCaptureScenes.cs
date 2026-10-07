@@ -4,6 +4,8 @@ using System.Linq;
 using thebasics.Configs;
 using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 
 namespace thebasics.ModSystems.ChatUiSystem;
 
@@ -12,7 +14,7 @@ public static class SetupWizardCaptureScenes
 {
     public static readonly string[] Names =
     [
-        "wizard-chat-default", "wizard-chat-edited", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
+        "wizard-chat-default", "wizard-chat-edited", "wizard-chat-presentation", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
         "wizard-travel-default", "wizard-travel-edited", "wizard-notifications-default", "wizard-notifications-edited",
         "wizard-review", "wizard-error", "wizard-restart-dedicated", "wizard-restart-integrated"
     ];
@@ -82,5 +84,13 @@ public static class SetupWizardCaptureScenes
             });
         }
         dialog.SetPreviewTime(previewTime);
+        if (scenario == "wizard-chat-presentation")
+        {
+            var bounds = dialog.SingleComposer.GetElement("ProximityChatPresentationMode").Bounds;
+            var x = (int)(bounds.renderX + bounds.OuterWidth / 2);
+            var y = (int)(bounds.renderY + bounds.OuterHeight / 2);
+            dialog.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            dialog.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        }
     }
 }

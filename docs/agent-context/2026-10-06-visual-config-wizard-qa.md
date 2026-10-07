@@ -5,6 +5,17 @@ Scope: chat, teleportation, notifications, invitation, restart guidance, native 
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
 
+## Chat window and interaction revision, October 6
+
+- Chat now previews a complete miniature native chat window, with General/Proximity tabs, clipped history, scrollbar, and a disabled example input. It owns no live chat history and sends no chat. General replacement removes the mock Proximity tab; local OOC follows the nickname choice; the default-tab page starts without a remembered player tab.
+- Presentation choices use English names and smaller descriptions in expanded rows. Topic tabs and an inset footer organize navigation. Ordinary pages omit restart suffixes; review identifies `After restart`, and the acknowledged-save screen retains the host-specific instructions.
+- Pip supports horizontal drag, release momentum with bounded exponential decay, and gesture cancellation when changing pages, closing, suspending, or disposing. Native wave and idle animation remain live; named captures reset orientation and pin a pose, then resume live animation after capture.
+- Full suite: 1310 tests passed, no skips. After the default-tab correction, all 33 affected checks passed; after the final copy/tooltip correction, all 8 chat checks passed. Tests cover native menu row clicks and keyboard/focus behavior at scales 1 and 1.25, input isolation, preview clipping and nickname/default-tab choices, momentum/cancellation, and actual installed native joint movement beyond 5.5 seconds after capture resumes.
+- Canonical build: zero errors, 152 warnings. Source identity `0c4a680a4fc2a5c00101d343e0b9ea16dde6348456779ecc43dca5b1bd7abeb1`; package SHA-256 `22ec5adba8e55af618dee1eea7884717498ccf36045deecb8af48db830152b38`. QA server readback and both profile zips match.
+- CPU report `.tmp/wizard-ci-chat-window-report/report.json` records 28 additions with valid evidence at scales 1 and 1.25, including the new expanded `wizard-chat-presentation` fixture. CPU images omit native Pip. Earlier native images below do not certify this revision.
+- The staged server reached RunGame at 01:01:43 UTC on October 7 (21:01:43 EDT on October 6). Startup has no exceptions; the existing bare container-path error remains. All 14 fresh native scenes in `.tmp/wizard-native-chat-window-set` report native-client coverage, the staged source stamp, 1908x1260, and the restored GUI scale 1.125. Native inspection confirms the full chat window, expanded English title/description rows, guide clipping, review, and restart pages. The client log has no errors or exceptions. The capture runner also completed all 14 mocked scene receipts.
+- An additional raised-wave capture at 1.5 seconds is in `.tmp/wizard-native-chat-window-live`. It shows Pip's arm moving from the 0.75-second pose without leaving the panel. Its completed capture receipt runs `ResumePreview`, so Profile2 is left on the live Chat page with drag enabled. This proves the captured native poses and the resume path, not owner acceptance of gesture feel or real-time animation smoothness.
+
 ## Combined search checkpoint, October 6
 
 - Integrated source commits `0c5aa0a`, `53e86fc`, and handoff `424982a` into the wizard branch. Preserve `CharacterSheetAutoOpenOnCharacterScreen` at protobuf field 158; the new `ProximityChatTabPosition` uses 159. Search navigation and wizard hooks coexist.
@@ -53,9 +64,9 @@ Retire this packet after the first release completes these cards and moves remai
 
 2. **Native guide and repeated close** (P1)
    - Config: any; capture-only fixtures are sufficient.
-   - Do: inspect Pip on Chat and Teleportation, change pages, close and reopen several times. Repeat at GUI scales 1 and 1.25. Compare the live player's clothes and inventory before and after.
-   - Expect: Pip has the selected skin and pastoral outfit, plays a greeting and page animations, stays clipped inside the panel, and does not change the live player. Cancel on the dirty-close confirmation preserves the draft.
-   - Watch for: invisible guide, stretched mesh, clipped controls, stalled animation, duplicated dialogs, inventory changes, or exceptions after closing during a mesh upload.
+   - Do: inspect Pip on Chat and Teleportation for at least ten seconds. Drag slowly, then flick and release, including outside the panel. Catch the moving preview with another drag. Change a setting, begin another drag, press Escape, and cancel discard. Change pages, close, and reopen several times. Repeat at GUI scales 1 and 1.25. Compare the live player's clothes and inventory before and after.
+   - Expect: Pip has the selected skin and pastoral outfit, greets and returns to a moving idle, stays clipped inside the panel, and does not change the live player. Slow dragging turns Pip; a recent flick coasts smoothly to rest. A new drag catches the motion. Canceling discard preserves the draft and leaves no stuck gesture.
+   - Watch for: invisible guide, stretched mesh, clipped controls, stalled animation, motion without a pressed button after cancellation, duplicated dialogs, inventory changes, or exceptions after closing during a mesh upload.
 
 3. **Draft, review, and restart instructions** (P0)
    - Config: current General channel choice; note its original value.
@@ -82,3 +93,9 @@ Retire this packet after the first release completes these cards and moves remai
    - Do: use General to speak near the other player, then beyond the configured hearing range. Send global OOC with `(( hello ))` at a distance.
    - Expect: General replaces the separate Proximity tab, ordinary speech follows proximity delivery, and global OOC reaches the distant player. Restore the original configuration and restart after this batch.
    - Watch for: duplicate tabs, lost OOC, differences between the diagram and delivery, or the existing `/rptext off` player opt-out being mistaken for universal filtering.
+
+7. **Chat window and described presentation choices** (P1)
+   - Config: draft only, no save needed.
+   - Do: compare General and Proximity in the preview with General replacement Off, then enable replacement. Open the presentation selector and choose each option, using both mouse and keyboard. On Languages and OOC, switch the local OOC nickname choice; on Default chat tab, switch the initial tab. Review the draft, then discard it.
+   - Expect: General shows ordinary global chat when separate channels are selected; Proximity shows RP examples. Replacement leaves one General tab showing nearby chat. Every expanded option has an English title and smaller description, and the collapsed value stays plain. All chat lines fit the history; the example input cannot send text. Nickname and initial-tab changes update the mock. Restart information appears in review and hover help, with explicit instructions after an acknowledged save.
+   - Watch for: Pascal-case values, tooltips covering expanded descriptions, double-offset or clipped chat lines, inactive choices with misleading previews, or fake input changing live chat.
