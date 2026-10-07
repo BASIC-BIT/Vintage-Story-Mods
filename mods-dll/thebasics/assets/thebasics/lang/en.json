@@ -1,4 +1,11 @@
 {
+  "config-search-title": "Search settings",
+  "config-search-help": "Search names, keys, descriptions, categories, and values. Click a result to open its editor.",
+  "config-search-value": "Current value: {0}",
+  "config-search-unsaved": "Unsaved",
+  "config-search-empty": "Type to search all settings, languages, and character-sheet field definitions.",
+  "config-search-none": "No settings match. Try a different word or JSON key.",
+  "config-search-back": "Back to config",
   "dicesounds-description": "Control whether you hear dice roll sounds.",
   "dicesounds-status": "Your dice roll sounds are {0}.",
   "dicesounds-server-off": "Dice roll sounds are disabled on this server.",

@@ -38,6 +38,8 @@ public class ChatUiSystem : ModSystem
     private static int? _proximityGroupId = null;
     private static int? _lastSelectedGroupId = null;
     private static ModConfig _config = null;
+    private static HudDialogChat _chatTabDialog;
+    private static GuiTab[] _chatTabGameOrder;
     private static readonly System.Collections.Generic.List<System.Action> _pendingConfigActions = new System.Collections.Generic.List<System.Action>();
 
     private static IClientNetworkChannel _clientConfigChannel;
@@ -82,6 +84,10 @@ public class ChatUiSystem : ModSystem
     private static ConfirmingConfigAdminDialog _configAdminDialog;
     private static SetupWizardClientController _setupWizardController;
     private static SetupWizardCaptureAdapter _setupWizardCapture;
+    private static ConfigSearchDialog _configSearchDialog;
+    private static string _configSearchQuery = string.Empty;
+    private static ConfigSearchResult _configSearchTarget;
+    private static bool _configAdminReplacing;
     private static Dictionary<string, string> _configAdminDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static Dictionary<string, string> _configAdminLoadedDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static HashSet<string> _configAdminReviewedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1064,6 +1070,7 @@ public class ChatUiSystem : ModSystem
 
     private static void OnConfigAdminOpenMessage(TheBasicsConfigAdminOpenMessage message)
     {
+        _configSearchDialog?.TryClose();
         if (message?.Config != null)
         {
             ApplyReceivedConfig(message.Config);
@@ -1075,6 +1082,7 @@ public class ChatUiSystem : ModSystem
 
     private static void OnConfigAdminResultMessage(TheBasicsConfigAdminResultMessage message)
     {
+        _configSearchDialog?.TryClose();
         if (message?.Config != null)
         {
             ApplyReceivedConfig(message.Config);
@@ -1095,11 +1103,17 @@ public class ChatUiSystem : ModSystem
         if (message?.Success == false)
         {
             ShowLanguageConfigChatMessage(message.Message);
-            _returnToConfigAdminAfterLanguageDialog = false;
+            _configSearchTarget = null;
+            OnLanguageConfigClosed();
             return;
         }
 
         OpenLanguageConfigDialog(message?.Languages, message?.Message, true);
+        if (_configSearchTarget?.Destination == ConfigSearchDestination.Language)
+        {
+            _languageConfigDialog.JumpTo(_configSearchTarget.EntryId, _configSearchTarget.Key);
+            _configSearchTarget = null;
+        }
     }
 
     private static void OnLanguageConfigResultMessage(TheBasicsLanguageConfigResultMessage message)
@@ -1108,6 +1122,11 @@ public class ChatUiSystem : ModSystem
         if (_languageConfigDialog == null)
         {
             ShowLanguageConfigChatMessage(message?.Message);
+            if (message?.Success == false && _returnToConfigAdminAfterLanguageDialog)
+            {
+                _configSearchTarget = null;
+                OnLanguageConfigClosed();
+            }
             return;
         }
 
@@ -1119,11 +1138,17 @@ public class ChatUiSystem : ModSystem
         if (message?.Success == false)
         {
             ShowConfigAdminChatMessage(message.Message);
-            _returnToConfigAdminAfterCharacterSheetFieldDialog = false;
+            _configSearchTarget = null;
+            OnCharacterSheetFieldConfigClosed();
             return;
         }
 
         OpenCharacterSheetFieldConfigDialog(message?.Fields, message?.Message, true);
+        if (_configSearchTarget?.Destination == ConfigSearchDestination.CharacterField)
+        {
+            _characterSheetFieldConfigDialog.JumpTo(_configSearchTarget.EntryId, _configSearchTarget.Key);
+            _configSearchTarget = null;
+        }
     }
 
     private static void OnCharacterSheetFieldConfigResultMessage(TheBasicsCharacterSheetFieldConfigResultMessage message)
@@ -1131,6 +1156,11 @@ public class ChatUiSystem : ModSystem
         if (_characterSheetFieldConfigDialog == null)
         {
             ShowConfigAdminChatMessage(message?.Message);
+            if (message?.Success == false && _returnToConfigAdminAfterCharacterSheetFieldDialog)
+            {
+                _configSearchTarget = null;
+                OnCharacterSheetFieldConfigClosed();
+            }
             return;
         }
 
@@ -1341,7 +1371,9 @@ public class ChatUiSystem : ModSystem
         }
 
         _configAdminOpenQueued = false;
-        _configAdminDialog?.TryCloseWithoutPrompt();
+        _configAdminReplacing = true;
+        try { _configAdminDialog?.TryCloseWithoutPrompt(); }
+        finally { _configAdminReplacing = false; }
         _configAdminDialog = new ConfirmingConfigAdminDialog(
             BuildConfigAdminDialogSettings(),
             _api,
@@ -1350,6 +1382,10 @@ public class ChatUiSystem : ModSystem
             ConfirmConfigAdminDiscard,
             OnConfigAdminDialogClosed);
         _configAdminDialog.TryOpen(withFocus: false);
+        if (_configSearchTarget?.Destination == ConfigSearchDestination.Setting)
+        {
+            _configAdminDialog.JumpTo(_configSearchTarget.Key);
+        }
     }
 
     private static void QueueConfigAdminDialogOpen()
@@ -1375,6 +1411,12 @@ public class ChatUiSystem : ModSystem
 
     private static void OnConfigAdminDialogClosed()
     {
+        if (!_configAdminReplacing && !_returnToConfigAdminAfterLanguageDialog && !_returnToConfigAdminAfterCharacterSheetFieldDialog)
+        {
+            _configSearchDialog?.TryClose();
+            _configSearchQuery = string.Empty;
+            _configSearchTarget = null;
+        }
         _configAdminDialog = null;
         var unsavedCloseConfirm = _configAdminUnsavedCloseConfirm;
         _configAdminUnsavedCloseConfirm = null;
@@ -1569,6 +1611,7 @@ public class ChatUiSystem : ModSystem
     private static void AddConfigAdminLanguageShortcutRow(List<DialogRow> rows)
     {
         rows.Add(new DialogRow(
+            CreateButton("search", Lang.Get("thebasics:config-search-title"), Lang.Get("thebasics:config-search-help")),
             CreateButton("languages", Lang.Get("thebasics:config-admin-languages"), Lang.Get("thebasics:config-admin-languages-tooltip")),
             CreateButton("charsheetfields", Lang.Get("thebasics:config-admin-charsheet-fields"), Lang.Get("thebasics:config-admin-charsheet-fields-tooltip")),
             CreateButton("guide", Lang.Get("thebasics:guide-button"), Lang.Get("thebasics:config-admin-guide-tooltip")))
@@ -1644,6 +1687,8 @@ public class ChatUiSystem : ModSystem
     private static DialogElement CreateConfigAdminElement(ConfigAdminSettingDefinition setting)
     {
         var label = _configAdminReviewedKeys.Contains(setting.Key) ? setting.Label : Lang.Get("thebasics:config-admin-new-prefix", setting.Label);
+        if (_configSearchTarget?.Destination == ConfigSearchDestination.Setting && _configSearchTarget.Key == setting.Key)
+            label = "> " + label;
         var tooltip = setting.ReloadBehavior == ConfigAdminReloadBehavior.Live
             ? Lang.Get("thebasics:config-admin-live-tooltip", setting.Description)
             : Lang.Get("thebasics:config-admin-restart-tooltip", setting.Description);
@@ -1708,6 +1753,9 @@ public class ChatUiSystem : ModSystem
     {
         switch (code)
         {
+            case "search":
+                OpenConfigSearch();
+                break;
             case "save":
                 SendConfigAdminSave();
                 break;
@@ -1737,6 +1785,7 @@ public class ChatUiSystem : ModSystem
                 _configAdminDialog?.TryClose();
                 break;
             case "group-select":
+                _configSearchTarget = null;
                 _configAdminSelectedGroup = NormalizeConfigAdminGroup(value, GetConfigAdminGroups());
                 QueueConfigAdminDialogOpen();
                 break;
@@ -1974,13 +2023,12 @@ public class ChatUiSystem : ModSystem
                 return;
             }
 
+            _proximityGroupId = configMessage.ProximityGroupId;
+            _lastSelectedGroupId = configMessage.LastSelectedGroupId;
             ApplyReceivedConfig(configMessage.Config);
             _characterSheetAutoOpenChoice = configMessage.CharacterSheetAutoOpenChoice;
             _api.ModLoader.GetModSystem<SceneDescriptionSystem>()?.SetRuntimeEnabled(
                 configMessage.SceneMarkersRuntimeEnabled ?? configMessage.Config.EnableSceneMarkers);
-
-            _proximityGroupId = configMessage.ProximityGroupId;
-            _lastSelectedGroupId = configMessage.LastSelectedGroupId;
 
             DebugLog($"[THEBASICS] Received server config: PreventProximityChannelSwitching={_config.PreventProximityChannelSwitching}, ProximityId={_proximityGroupId}, LastSelectedGroupId={_lastSelectedGroupId}");
             DebugLog($"[THEBASICS] Full config received from server with settings: ProximityChatName={_config.ProximityChatName}, UseGeneralChannelAsProximityChat={_config.UseGeneralChannelAsProximityChat}, PreserveDefaultChatChoice={_config.PreserveDefaultChatChoice}, ProximityChatAsDefault={_config.ProximityChatAsDefault}");
@@ -2005,6 +2053,66 @@ public class ChatUiSystem : ModSystem
         _config = config;
         VisibilityUtils.ConfigureSightBlockOverrides(_api?.World, config);
         _safeNetworkChannel?.SetEnableDebugLogging(config.DebugMode);
+        RefreshChatTabPosition();
+    }
+
+    private static void OpenConfigSearch()
+    {
+        _configSearchDialog?.TryClose();
+        _configSearchDialog?.Dispose();
+        _configSearchDialog = new ConfigSearchDialog(_api,
+            ConfigAdminSearch.Build(_config, _configAdminDraft, _configAdminLoadedDraft), _configSearchQuery,
+            query => _configSearchQuery = query, result =>
+            {
+                _configSearchTarget = result;
+                if (result.Destination == ConfigSearchDestination.Language) OpenLanguageConfigFromConfigAdmin();
+                else if (result.Destination == ConfigSearchDestination.CharacterField) OpenCharacterSheetFieldConfigFromConfigAdmin();
+                else
+                {
+                    _configAdminSelectedGroup = result.Group;
+                    QueueConfigAdminDialogOpen();
+                }
+            });
+        _configSearchDialog.TryOpen();
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(HudDialogChat), "ComposeChatGuis")]
+    public static void OnChatTabsComposed(HudDialogChat __instance, GuiTab[] ___tabs)
+    {
+        _chatTabDialog = __instance;
+        _chatTabGameOrder = ___tabs.ToArray();
+        RefreshChatTabPosition();
+    }
+
+    private static void RefreshChatTabPosition()
+    {
+        if (_config == null || _chatTabDialog == null || _chatTabGameOrder == null ||
+            _api?.World is not ClientMain game) return;
+
+        try
+        {
+            var widget = _chatTabDialog.Composers["chat"].GetHorizontalTabs("tabs");
+            var alarms = widget.tabs.Select((tab, index) => (tab.DataInt, Alarm: widget.TabHasAlarm[index]))
+                .ToDictionary(entry => entry.DataInt, entry => entry.Alarm);
+            if (!ChatTabLayout.Arrange(widget.tabs, _chatTabGameOrder, _config, _proximityGroupId)) return;
+
+            for (var index = 0; index < widget.tabs.Length; index++)
+            {
+                widget.TabHasAlarm[index] = alarms[widget.tabs[index].DataInt];
+            }
+
+            // ponytail: recompose once per group rebuild; use a pre-compose hook if this becomes measurable.
+            _chatTabDialog.Composers["chat"].ReCompose();
+            // ReCompose refreshes ordinary tabs, but vanilla builds unread textures separately.
+            AccessTools.Method(typeof(GuiElementHorizontalTabs), "ComposeOverlays").Invoke(widget, [true]);
+            var selectedIndex = Array.FindIndex(widget.tabs, tab => tab.DataInt == game.currentGroupid);
+            if (selectedIndex >= 0) widget.SetValue(selectedIndex, callhandler: false);
+        }
+        catch (Exception exception)
+        {
+            _api.Logger.Warning("[THEBASICS] Could not apply proximity tab position: {0}", exception.Message);
+        }
     }
 
     private static void ApplyClientNametagSettingsToLoadedPlayers()
@@ -2317,15 +2425,8 @@ public class ChatUiSystem : ModSystem
 
         try
         {
-            var targetGroupId = GlobalConstants.GeneralChatGroup;
-            if (_config.PreserveDefaultChatChoice && _lastSelectedGroupId != null)
-            {
-                targetGroupId = _lastSelectedGroupId.Value;
-            }
-            else if (_config.ProximityChatAsDefault && _proximityGroupId != null)
-            {
-                targetGroupId = _proximityGroupId.Value;
-            }
+            var tabs = __instance.Composers["chat"].GetHorizontalTabs("tabs").tabs;
+            var targetGroupId = ChatTabLayout.OpeningGroup(tabs, _config, _lastSelectedGroupId, _proximityGroupId);
 
             // Get the tab index for the target group
             System.Reflection.MethodInfo tabIndexMethod = typeof(HudDialogChat).GetMethod("tabIndexByGroupId",
@@ -2387,6 +2488,9 @@ public class ChatUiSystem : ModSystem
 
     public override void Dispose()
     {
+        _chatTabDialog = null;
+        _chatTabGameOrder = null;
+        _proximityGroupId = null;
         try
         {
             if (_api != null)
@@ -2443,6 +2547,12 @@ public class ChatUiSystem : ModSystem
             _chatHistoryDialog = null;
             _configAdminDialog?.TryCloseWithoutPrompt();
             _configAdminDialog = null;
+            _configSearchDialog?.TryClose();
+            _configSearchDialog?.Dispose();
+            _configSearchDialog = null;
+            _configSearchQuery = string.Empty;
+            _configSearchTarget = null;
+            _configAdminReplacing = false;
             var configAdminUnsavedCloseConfirm = _configAdminUnsavedCloseConfirm;
             _configAdminUnsavedCloseConfirm = null;
             configAdminUnsavedCloseConfirm?.TryClose();
@@ -2636,7 +2746,7 @@ public class ChatUiSystem : ModSystem
         }
     }
 
-    private sealed class ConfirmingConfigAdminDialog : GuiJsonDialog
+    private sealed class ConfirmingConfigAdminDialog : ScrollableConfigAdminDialog
     {
         private readonly Func<bool> _hasUnsavedChanges;
         private readonly Action<Action> _confirmDiscard;

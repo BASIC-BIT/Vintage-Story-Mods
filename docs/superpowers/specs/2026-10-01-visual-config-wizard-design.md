@@ -2,6 +2,8 @@
 
 Date: 2026-10-01. Agreed direction; implementation authorized by the owner's instruction to continue autonomously. Creative and real-game observation checkpoints remain.
 
+October 6 integration checkpoint: the existing editor's read-only config search is integrated with the wizard and the combined package is staged on disposable QA. All five search human QA cards remain pending. Source-only search previews and earlier wizard captures are separate evidence. The result-denial recovery passed native GUI regression checks; in-game search remains unverified.
+
 ## Outcome and agreed scope
 
 An authorized administrator understands and configures chat, teleportation, and notifications through short explanations and previews of their current draft. Existing installations retain their current settings until an explicit successful save. The advanced configuration editor remains available.
@@ -31,8 +33,20 @@ flowchart TD
     CH --> R["Review changed settings"]
     T --> R
     N --> R
-    H --> E["Existing advanced editor"]
-    E --> H
+    H -->|Advanced editor| E["Existing configuration editor"]
+    AC["/basic config"] --> E
+    E -->|Search settings| Q["Read-only search modal"]
+    E -->|Category navigation| V["Native category and setting control"]
+    Q -->|Setting result| V
+    Q -->|Language result, server permission check| LE["Dedicated language editor and focused field"]
+    Q -->|Field result, server permission check| FE["Dedicated field editor and focused control"]
+    Q -->|Escape or Back, preserve query and draft| E
+    Q -->|Open denied, preserve query and main draft| E
+    LE -->|Close, preserve query and main draft| E
+    FE -->|Close, preserve query and main draft| E
+    V -->|Reopen Search, preserve query and draft| Q
+    E -->|True close after save or discard, clear search query and target| D
+    D --> C
     R --> S["Server validates and saves"]
     S -->|"Applied live"| D["Done, return to game"]
     S -->|"Restart required"| P["Restart instructions / Later"]
@@ -42,6 +56,10 @@ flowchart TD
 ```
 
 Each topic returns to the hub. Back preserves edits. Review shows old and new values, with explicit live/restart status. Closing a dirty draft asks whether to discard it. Preview state is isolated from server config and player inventory.
+
+Advanced editor suspends the wizard and opens the existing `/basic config` workflow. Its settings draft and search query survive category changes, closing Search, dedicated editor roundtrips, and canceled discard. A true config-menu close clears the search query and focus target. Reopen the suspended wizard with `/basic setup`; closing the advanced editor returns to the game. The wizard draft and advanced settings draft are separate. Search indexes setting values and definition metadata, not players' character-sheet answers. Rich visual language editing remains a later release.
+
+The integrated tab-position setting uses `ProtoMember(159)`, preserving the existing `CharacterSheetAutoOpenOnCharacterScreen` field at `ProtoMember(158)`. Recovery for language and field open denials delivered as result messages preserves the main editor draft and query in native GUI regression checks. Human observations must verify the full in-game route.
 
 ## Invitation and access
 
@@ -111,7 +129,7 @@ One clipped production GUI panel contains a detached native seraph, nearby and d
 
 Use an unregistered `EntityPlayerBot`, its private native gear inventory, and independently copied skin attributes. Deep-copy mutable entity properties/textures. Advance only its private animator with a fixed preview clock. Avoid world/entity simulation ticks, player UID inventory lookups, and server character-switch restore methods.
 
-The public engine GUI rendering seams are verified; the detached animated character is not yet demonstrated on 1.22.7. Acceptance requires clipped appearance/clothing at two GUI scales, repeatable named-time frames, independence from the live player's animation, unchanged player appearance/inventory, and clean repeated open/close including a late mesh upload.
+The detached character and named-time greeting have been captured on 1.22.7 at GUI scale 1.125 in checkpoint `548bb84`; that sampled clip received six passing Gemini rubric checks. Combined-source native probes now cover Chat, Teleportation, and Notifications at scales 1 and 1.25, with distinct Chat wave poses at 0.75 and 1.5 seconds. These images establish sampled appearance and clipping. Whole-player invariance, owner observations, and late mesh-upload close behavior remain pending. Inventory and hotbar snapshots match, but camera yaw drift prevented a strict whole-player-state pass.
 
 Standalone GuiPreview continues to fail on unsupported 3D operations. A separately named layout-only fixture may explicitly omit the native panel and record that omission. It cannot certify character or animation appearance.
 

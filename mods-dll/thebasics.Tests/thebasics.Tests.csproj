@@ -65,11 +65,11 @@
       <HintPath>$(VINTAGE_STORY)\Mods\VSEssentials.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <!-- Exercise Harmony startup against the game's own patching runtime. -->
     <Reference Include="0Harmony">
       <HintPath>$(VINTAGE_STORY)\Lib\0Harmony.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <!-- Exercise Harmony startup against the game's own patching runtime. -->
     <Reference Include="$(VINTAGE_STORY)\Lib\Mono.Cecil*.dll;$(VINTAGE_STORY)\Lib\MonoMod.*.dll">
       <Private>True</Private>
     </Reference>

@@ -237,6 +237,8 @@ public class ModConfigUpgradeTests
         // ModConfig is ProtoContract because it is synced to clients. New ProtoMember ids must not
         // collide with existing ones, which would silently corrupt an unrelated field.
         var config = LoadLegacyConfig();
+        config.ProximityChatTabPosition.Should().Be("GameOrder");
+        config.ProximityChatTabPosition = "AfterGeneral";
         config.ProximityChatModeQuestionVerbs[ProximityChatMode.Normal] = ["inquires"];
         config.RequireClearSoundPathForSpeech[ProximityChatMode.Yell] = true;
         config.SpeechOcclusionWallPenaltyBlocks = 7;
@@ -256,6 +258,7 @@ public class ModConfigUpgradeTests
         stream.Position = 0;
         var restored = Serializer.Deserialize<ModConfig>(stream);
 
+        restored.ProximityChatTabPosition.Should().Be("AfterGeneral");
         restored.ProximityChatModeQuestionVerbs[ProximityChatMode.Normal].Should().BeEquivalentTo(["inquires"]);
         restored.RequireClearSoundPathForSpeech[ProximityChatMode.Yell].Should().BeTrue();
         restored.SpeechOcclusionWallPenaltyBlocks.Should().Be(7);

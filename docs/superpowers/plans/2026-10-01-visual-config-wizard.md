@@ -37,7 +37,8 @@
 - [x] Validate Pip's 11 native skin options, five garment codes/slots, and idle/wave/nod/cheer animation codes.
 - [x] Add the fixture and run its focused asset test.
 - [x] Implement the clipped native renderer from the inspected engine seams; retain only appearance/inventory behaviors and deep-copy mutable properties.
-- [ ] Add a test for owned fixture validation and a native probe for two GUI scales, named animation times, player-state invariance, and close-before-upload cleanup.
+- [x] Validate the owned fixture and capture native Chat, Teleportation, and Notifications at GUI scales 1 and 1.25, including Chat wave poses at 0.75 and 1.5 seconds. Evidence: `.tmp/wizard-native-combined-scale-*` and `.tmp/wizard-native-combined-wave-1.5`, source `3ab79de9d2d8fb83bff5e4151a5edd05a47fed6f3a5a5a938195407c65bbadc4`.
+- [ ] Complete strict player-state invariance and close-before-upload observations. Inventory/hotbar match, but the earlier yaw drift prevents a whole-state pass. Do not substitute model inspection for the owner's human QA acceptance.
 - [x] Queue capture at Done; own/dispose raw bitmaps, apply a vertical flip to the full viewport without relying on the engine's leaking transformed screenshot allocation.
 - [x] Capture the real production panel and inspect PNGs before claiming native rendering works.
 

@@ -98,7 +98,7 @@ The admin panel exposes fixed-shape complex settings as validated flattened rows
 
 Features:
 
-- Dedicated proximity chat group, or optional General-chat replacement via `UseGeneralChannelAsProximityChat`.
+- Dedicated proximity chat group, or optional General-chat replacement via `UseGeneralChannelAsProximityChat` (see the setup below).
 - Whisper, normal, yell, and sign-language ranges. The three speech ranges accept exactly `-1` to deliver server-wide; any other negative value is rejected by config validation, and `SignLanguageRange` has no unlimited sentinel at all. An unlimited range cannot be combined with `RequireClearSoundPathForSpeech`, since the sound-path check needs a bounded range to raycast against.
 - Two independent chat axes: range (`/whisper`, `/say`, `/yell`) and sticky override kind (`/me`, `/ooc`, `/gooc`). Whispered OOC and yelled emotes are both valid combinations.
 - Sticky override modes toggle: running the same override command again returns you to speech, and running a different one replaces it. An explicit message prefix still wins for that single line.
@@ -116,6 +116,50 @@ Features:
 - Environmental messages and raycast-placed environmental messages.
 - Optional RPTTS bridge for speech text.
 - Character chatter sounds using the speaker's seraph voice instrument, with per-player opt-out.
+
+### Use General for proximity chat and remove the Proximity tab
+
+In `/basic config`, open **Chat tabs**, set **Use General as proximity chat** to **On** and save.
+Alternatively, set `"UseGeneralChannelAsProximityChat": true` in the server's
+`ModConfig/the_basics.json`. Restart the server and reconnect clients.
+General then uses proximity chat's distance and formatting rules. The configured
+proximity group is removed, including saved memberships for offline players.
+Opening chat selects General, ignoring saved choices from separate-channel mode.
+Other player-created groups remain available.
+
+```mermaid
+flowchart LR
+    GUI["/basic config: turn setting On and save"] --> Restart[Restart server]
+    File["Edit the_basics.json: set value to true"] --> Restart
+    Restart --> Reconnect[Reconnect clients]
+    Reconnect --> General["Chat in General with proximity rules"]
+```
+
+| UI setting | Config key | What it controls |
+| --- | --- | --- |
+| Use General as proximity chat | `UseGeneralChannelAsProximityChat` | Uses General for proximity chat and removes the separate configured proximity group. Requires a server restart and client reconnect. |
+| Proximity chat as default | `ProximityChatAsDefault` | Selects proximity chat when opening chat. `PreserveDefaultChatChoice` takes precedence when a valid previous selection exists in separate-channel mode. In General mode, the proximity channel is General. Does not hide tabs. |
+| Preserve default chat choice | `PreserveDefaultChatChoice` | Restores a valid saved tab in separate-channel mode, otherwise falls back to the configured default. General mode always opens General. |
+| Proximity tab position | `ProximityChatTabPosition` | `GameOrder` (default), `First`, or `AfterGeneral`. Moves only Proximity; other tabs keep their order. Saves apply live. Ignored in General mode. |
+| Prevent proximity tab switching | `PreventProximityChannelSwitching` | Stops incoming messages from automatically switching away from the active proximity channel. Manual tab selection still works. Does not hide tabs. |
+| Enable global OOC | `EnableGlobalOOC` | Allows `/gooc` and `((message))` to reach all players regardless of distance. Turn Off if you do not want this global OOC option. Does not control tab visibility. |
+
+Turning **Use General as proximity chat** Off and restarting restores the separate
+proximity group; players join it when they reconnect. If the old tab persists,
+check that the setting was saved and that `ProximityChatName` still matches the
+old group's name. This setting removes the currently configured group only.
+
+To pin the separate Proximity tab, open **Chat tabs**, choose **Proximity tab position**, and save. **First** puts it before General; **AfterGeneral** puts it directly after General and before logs. Returning to **GameOrder** restores the game's order. Tab placement does not change the selected channel.
+
+```mermaid
+flowchart LR
+    Config["/basic config"] --> Tabs[Chat tabs]
+    Tabs --> Position[Choose proximity tab position]
+    Position --> Save[Save]
+    Save --> Layout[Tabs update; selected channel stays selected]
+```
+
+The BASICs has no switch that disables General itself. Turning off global OOC removes that global speech option, but does not enforce distance restrictions on every form of communication: players with RP text disabled can use vanilla chat, and unrelated groups remain available.
 
 Player-facing commands:
 
@@ -156,6 +200,7 @@ Primary config areas:
 - `DisableRPChat`
 - `ProximityChatName`
 - `UseGeneralChannelAsProximityChat`
+- `ProximityChatTabPosition`
 - `ProximityChatAsDefault`
 - `PreserveDefaultChatChoice`
 - `PreventProximityChannelSwitching`

@@ -1,5 +1,6 @@
 using TheBasics.GuiPreview;
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Xunit;
 
 namespace thebasics.Tests.GuiPreview;
@@ -53,6 +54,12 @@ public class StandaloneDialogTests
     [InlineData("admin-chat", 1.0)]
     [InlineData("admin-bubbles", 1.0)]
     [InlineData("admin-discord", 1.0)]
+    [InlineData("admin-search", 1.0)]
+    [InlineData("admin-search", 1.25)]
+    [InlineData("admin-search-empty", 1.0)]
+    [InlineData("admin-search-none", 1.0)]
+    [InlineData("admin-search-target", 1.0)]
+    [InlineData("admin-search-target", 1.25)]
     public void Production_dialog_renders_complete_repeatable_frame_without_game(string scenario, double scale)
     {
         var game = Environment.GetEnvironmentVariable("VINTAGE_STORY") ?? throw new InvalidOperationException("VINTAGE_STORY required.");
@@ -73,5 +80,152 @@ public class StandaloneDialogTests
         var filename = scenario + "-" + scale.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
         host.Canvas.SavePng(Path.Combine(output, filename + ".png"));
         File.WriteAllText(Path.Combine(output, filename + ".json"), System.Text.Json.JsonSerializer.Serialize(host.Manifest));
+        if (scenario == "admin-chat")
+        {
+            var composer = scene.Dialog.SingleComposer;
+            var selector = composer.GetDropDown("dropdown-3");
+            var headerY = selector.Bounds.absY;
+            var scrollbar = composer.GetScrollbar("settings-scrollbar");
+            scrollbar.ScrollToBottom();
+            Assert.Equal(headerY, selector.Bounds.absY);
+            var elements = (Dictionary<string, GuiElement>)typeof(GuiComposer)
+                .GetField("staticElements", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(composer)!;
+            Assert.DoesNotContain(elements.Values, element => element is GuiElementStaticText && element.InsideClipBounds != null);
+            Assert.Contains(elements.Values, element => element.InsideClipBounds != null && element.Bounds.absY < element.InsideClipBounds.absY);
+            host.RenderGuiDialog(scene.Dialog, 0);
+            var commands = System.Text.Json.JsonSerializer.SerializeToElement(host.Canvas.Commands);
+            Assert.DoesNotContain(commands.EnumerateArray(), command => command.GetProperty("op").GetString() == "texture" &&
+                command.GetProperty("height").GetDouble() < 50 && command.GetProperty("y").GetDouble() < composer.Bounds.absY && !command.GetProperty("scissorEnabled").GetBoolean());
+            host.Canvas.SavePng(Path.Combine(output, filename + "-scrolled.png"));
+        }
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void Search_focus_scroll_navigation_and_session_query_use_production_controls(double scale)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1000, scale);
+        using var scene = PreviewScene.Create("admin-search-target", host);
+        var type = typeof(thebasics.ModSystems.ChatUiSystem.ChatUiSystem);
+        var flags = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic;
+        void Invoke(string method) => type.GetMethod(method, flags)!.Invoke(null, null);
+        var queryField = type.GetField("_configSearchQuery", flags)!;
+        queryField.SetValue(null, "proximity");
+        Invoke("OpenConfigSearch");
+        var search = (GuiDialog)type.GetField("_configSearchDialog", flags)!.GetValue(null)!;
+        var input = search.SingleComposer.GetTextInput("query");
+        Assert.True(input.HasFocus);
+        Assert.Equal("proximity", input.GetText());
+        var results = (GuiElementContainer)search.SingleComposer["results"];
+        Assert.InRange(results.Bounds.absY - results.InsideClipBounds.absY, -0.1, 0.1);
+        var scrollbar = search.SingleComposer.GetScrollbar("scrollbar");
+        scrollbar.ScrollToBottom();
+        Assert.InRange(results.Elements.Last().Bounds.absY + results.Elements.Last().Bounds.OuterHeight - (results.InsideClipBounds.absY + results.InsideClipBounds.OuterHeight), -1, 1);
+        input.SetValue("missing-setting-xyz");
+        Assert.False(results.Tabbable);
+        Assert.True(input.HasFocus);
+        Assert.Equal("missing-setting-xyz", queryField.GetValue(null));
+        Assert.Equal(0, scrollbar.CurrentYPosition);
+        input.SetValue("a");
+        Assert.True(results.Bounds.fixedHeight > 16384);
+        var commands = System.Text.Json.JsonSerializer.SerializeToElement(host.Canvas.Commands);
+        Assert.All(commands.EnumerateArray().Where(command => command.GetProperty("op").GetString() == "upload"),
+            command => Assert.True(command.GetProperty("height").GetInt32() < 16384));
+        host.RenderGuiDialog(search, 0);
+        input.SetValue("missing-setting-xyz");
+        var outsideClick = new MouseEvent(0, 0, EnumMouseButton.Left, 0);
+        search.OnMouseDown(outsideClick);
+        Assert.True(outsideClick.Handled);
+        search.TryClose();
+        search.Dispose();
+        Invoke("OpenConfigAdminDialog");
+        Assert.Equal("missing-setting-xyz", queryField.GetValue(null));
+        var settings = (GuiDialog)type.GetField("_configAdminDialog", flags)!.GetValue(null)!;
+        var controls = (Dictionary<string, (string Control, double Y)>)typeof(thebasics.ModSystems.ChatUiSystem.ScrollableConfigAdminDialog)
+            .GetField("_controls", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(settings)!;
+        Assert.True(settings.SingleComposer.GetElement(controls["ProximityChatTabPosition"].Control).HasFocus);
+        Invoke("OnConfigAdminDialogClosed");
+        Assert.Equal("", queryField.GetValue(null));
+        settings.Dispose();
+
+        using var language = new thebasics.ModSystems.ChatUiSystem.LanguageConfigDialog(host.Api,
+            new() { new() { OriginalName = "Common", Name = "Common", Color = "#ffffff" }, new() { OriginalName = "Old", Name = "Old", Color = "#ffffff" } }, "", true, _ => { }, () => { }, () => { });
+        language.SingleComposer.GetTextInput("input-Name").SetValue("Draft name");
+        Assert.True(language.JumpTo("Old", "Description"));
+        Assert.True(language.SingleComposer["input-Description"].HasFocus);
+        Assert.True(language.JumpTo("Common", "Name"));
+        Assert.Equal("Draft name", language.SingleComposer.GetTextInput("input-Name").GetText());
+
+        using var fields = new thebasics.ModSystems.ChatUiSystem.CharacterSheetFieldConfigDialog(host.Api,
+            new() { new() { OriginalId = "bio", Id = "bio", Label = "Bio", Type = "string" }, new() { OriginalId = "trade", Id = "trade", Label = "Trade", Type = "select", Options = "Scribe, Glassblower" } }, _ => { }, () => { }, () => { });
+        Assert.True(fields.JumpTo("trade", "Options"));
+        Assert.True(fields.SingleComposer["input-Options"].HasFocus);
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Denied_definition_editor_open_returns_to_config_preserving_draft_and_query(bool language)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1000);
+        using var scene = PreviewScene.Create("admin-search-target", host);
+        var type = typeof(thebasics.ModSystems.ChatUiSystem.ChatUiSystem);
+        var flags = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic;
+        var dialogField = type.GetField("_configAdminDialog", flags)!;
+        var queryField = type.GetField("_configSearchQuery", flags)!;
+        var targetField = type.GetField("_configSearchTarget", flags)!;
+        var returnField = type.GetField(language ? "_returnToConfigAdminAfterLanguageDialog" : "_returnToConfigAdminAfterCharacterSheetFieldDialog", flags)!;
+        var otherReturnField = type.GetField(language ? "_returnToConfigAdminAfterCharacterSheetFieldDialog" : "_returnToConfigAdminAfterLanguageDialog", flags)!;
+        var editorField = type.GetField(language ? "_languageConfigDialog" : "_characterSheetFieldConfigDialog", flags)!;
+        var previous = new[] { returnField, otherReturnField, editorField }.ToDictionary(field => field, field => field.GetValue(null));
+        var requests = (thebasics.ModSystems.ChatUiSystem.DialogRequestTracker)type.GetField("LanguageRequests", flags)!.GetValue(null)!;
+        requests.Reset();
+        try
+        {
+            var draft = (Dictionary<string, string>)type.GetField("_configAdminDraft", flags)!.GetValue(null)!;
+            var loaded = (Dictionary<string, string>)type.GetField("_configAdminLoadedDraft", flags)!.GetValue(null)!;
+            draft["ProximityChatTabPosition"] = "AfterGeneral";
+            queryField.SetValue(null, "proximity position");
+            var target = (thebasics.ModSystems.AdminConfig.ConfigSearchResult)targetField.GetValue(null)!;
+            targetField.SetValue(null, target with
+            {
+                Destination = language ? thebasics.ModSystems.AdminConfig.ConfigSearchDestination.Language : thebasics.ModSystems.AdminConfig.ConfigSearchDestination.CharacterField
+            });
+            returnField.SetValue(null, true);
+            otherReturnField.SetValue(null, false);
+            editorField.SetValue(null, null);
+            scene.Dialog.GetType().GetMethod("TryCloseWithoutPrompt")!.Invoke(scene.Dialog, null);
+            Assert.Null(dialogField.GetValue(null));
+
+            object response = language ? new thebasics.Models.TheBasicsLanguageConfigResultMessage { Success = false }
+                : new thebasics.Models.TheBasicsCharacterSheetFieldConfigResultMessage { Success = false };
+            type.GetMethod(language ? "OnLanguageConfigResultMessage" : "OnCharacterSheetFieldConfigResultMessage", flags)!.Invoke(null, [response]);
+
+            var reopened = Assert.IsAssignableFrom<GuiDialog>(dialogField.GetValue(null));
+            Assert.NotSame(scene.Dialog, reopened);
+            Assert.True(reopened.IsOpened());
+            Assert.Same(draft, type.GetField("_configAdminDraft", flags)!.GetValue(null));
+            Assert.Same(loaded, type.GetField("_configAdminLoadedDraft", flags)!.GetValue(null));
+            Assert.Equal("AfterGeneral", draft["ProximityChatTabPosition"]);
+            Assert.Equal("GameOrder", loaded["ProximityChatTabPosition"]);
+            Assert.Equal("proximity position", queryField.GetValue(null));
+            Assert.False((bool)returnField.GetValue(null)!);
+            Assert.Null(targetField.GetValue(null));
+            Assert.Null(editorField.GetValue(null));
+            host.RenderGuiDialog(reopened, 0);
+            Assert.Empty(host.UnsupportedCalls);
+        }
+        finally
+        {
+            if (dialogField.GetValue(null) is GuiDialog dialog)
+            {
+                dialog.GetType().GetMethod("TryCloseWithoutPrompt")!.Invoke(dialog, null);
+                dialog.Dispose();
+            }
+            foreach (var pair in previous) pair.Key.SetValue(null, pair.Value);
+            requests.Reset();
+        }
     }
 }

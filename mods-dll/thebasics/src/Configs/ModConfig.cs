@@ -644,6 +644,9 @@ namespace thebasics.Configs
         [ProtoMember(26)]
         public bool PreserveDefaultChatChoice { get; set; } = true;
 
+        [ProtoMember(159)]
+        public string ProximityChatTabPosition { get; set; } = "GameOrder";
+
         [ProtoMember(27)]
         public bool SendServerSaveAnnouncement { get; set; } = true;
 

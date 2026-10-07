@@ -10,6 +10,18 @@ namespace thebasics.Tests.ModSystems.AdminConfig;
 public class ConfigAdminSettingRegistryTests
 {
     [Fact]
+    public void ProximityTabPosition_CanonicalizesValidChoiceAndRejectsUnknownChoice()
+    {
+        var config = CreateConfig();
+        var setting = GetSetting("ProximityChatTabPosition");
+        setting.TrySetValue(config, "aftergeneral", out var error).Should().BeTrue(error);
+        config.ProximityChatTabPosition.Should().Be("AfterGeneral");
+        setting.TrySetValue(config, "Last", out _).Should().BeFalse();
+        config.ProximityChatTabPosition.Should().Be("AfterGeneral");
+        setting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+    }
+
+    [Fact]
     public void ValidateConfig_AcceptsTheUnlimitedSentinel()
     {
         var config = CreateConfig();

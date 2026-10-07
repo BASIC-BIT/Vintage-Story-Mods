@@ -17,7 +17,7 @@ public sealed class PreviewScene : IDisposable
     private PreviewScene(string name, GuiDialog dialog, Action? restore = null)
     { Name = name; Dialog = dialog; this.restore = restore ?? (() => { }); }
 
-    public static string[] Names => new[] { "language-default", "language-focus", "language-dropdown", "language-hover", "language-tooltip", "language-error", "admin-chat", "admin-bubbles", "admin-discord" }.Concat(SetupWizardCaptureScenes.Names).ToArray();
+    public static string[] Names => new[] { "language-default", "language-focus", "language-dropdown", "language-hover", "language-tooltip", "language-error", "admin-chat", "admin-bubbles", "admin-discord", "admin-search", "admin-search-empty", "admin-search-none", "admin-search-target" }.Concat(SetupWizardCaptureScenes.Names).ToArray();
 
     public string Coverage => Name.StartsWith("wizard-", StringComparison.Ordinal) ? "layout-only" : "standalone-gui";
     public string[] Omissions => Coverage == "layout-only" ? ["Native character, clothing, animation and world rendering are omitted."] : [];
@@ -77,7 +77,7 @@ public sealed class PreviewScene : IDisposable
         // including its dialog subclass. No copy of the layout or JSON control mapping.
         var type = typeof(ChatUiSystem);
         var fields = type.GetFields(BindingFlags.Static | BindingFlags.NonPublic)
-            .Where(f => f.Name.StartsWith("_configAdmin", StringComparison.Ordinal) || f.Name is "_api" or "_config").ToArray();
+            .Where(f => f.Name.StartsWith("_configAdmin", StringComparison.Ordinal) || f.Name.StartsWith("_configSearch", StringComparison.Ordinal) || f.Name is "_api" or "_config").ToArray();
         var previous = fields.ToDictionary(f => f, f => f.GetValue(null));
         void Set(string field, object? value) => (fields.SingleOrDefault(f => f.Name == field)
             ?? throw new MissingFieldException(type.FullName, field)).SetValue(null, value);
@@ -89,12 +89,34 @@ public sealed class PreviewScene : IDisposable
             config.InitializeDefaultsIfNeeded();
             Set("_config", config);
             Set("_configAdminDialog", null);
+            Set("_configAdminReplacing", false);
+            Set("_configSearchDialog", null);
+            Set("_configSearchTarget", null);
             Invoke("UpdateConfigAdminDraft", null, null, "Preview fixture: settings are not sent to a server.");
             var settingKey = name switch { "admin-bubbles" => "OverheadChatBubbleMode", "admin-discord" => "EnableTh3EssentialsDiscordRelay", _ => "EnableGlobalOOC" };
             Set("_configAdminSelectedGroup", ConfigAdminSettingRegistry.Settings.Single(s => s.Key == settingKey).Group);
             Invoke("OpenConfigAdminDialog");
             var dialog = (GuiDialog?)fields.Single(f => f.Name == "_configAdminDialog").GetValue(null)
                 ?? throw new InvalidOperationException("Production settings dialog did not open.");
+            if (name.StartsWith("admin-search", StringComparison.Ordinal))
+            {
+                var draft = ConfigAdminSettingRegistry.Settings.ToDictionary(setting => setting.Key, setting => setting.GetValue(config));
+                var entries = ConfigAdminSearch.Build(config, draft, draft);
+                if (name == "admin-search-target")
+                {
+                    var target = entries.First(result => result.Key == "ProximityChatTabPosition");
+                    Set("_configAdminSelectedGroup", target.Group);
+                    Set("_configSearchTarget", target);
+                    Invoke("OpenConfigAdminDialog");
+                    dialog = (GuiDialog)fields.Single(field => field.Name == "_configAdminDialog").GetValue(null)!;
+                }
+                else
+                {
+                    var query = name == "admin-search-empty" ? "" : name == "admin-search-none" ? "missing-setting-xyz" : "proximity";
+                    dialog = new ConfigSearchDialog(host.Api, entries, query, _ => { }, _ => { });
+                    dialog.TryOpen();
+                }
+            }
             return new PreviewScene(name, dialog, Restore);
         }
         catch { Restore(); throw; }
