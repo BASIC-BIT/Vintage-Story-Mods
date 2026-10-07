@@ -10,8 +10,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $scenes = @(
-    'wizard-chat-default', 'wizard-chat-edited', 'wizard-chat-presentation', 'wizard-chat-language', 'wizard-chat-ranges', 'wizard-chat-tabs',
-    'wizard-travel-default', 'wizard-travel-edited', 'wizard-notifications-default', 'wizard-notifications-edited',
+    'wizard-hub', 'wizard-chat-default', 'wizard-chat-edited', 'wizard-chat-presentation', 'wizard-chat-language', 'wizard-chat-ranges', 'wizard-chat-tabs',
+    'wizard-travel-default', 'wizard-travel-edited', 'wizard-notifications-default', 'wizard-notifications-edited', 'wizard-notifications-sleep',
     'wizard-review', 'wizard-error', 'wizard-restart-dedicated', 'wizard-restart-integrated'
 )
 if ($Scenarios) {

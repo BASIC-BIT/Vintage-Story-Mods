@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using TheBasics.GuiPreview;
+using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.ChatUiSystem;
 using thebasics.Tests.GuiPreview;
 using Vintagestory.API.Client;
@@ -118,7 +119,9 @@ public class SetupWizardChatPreviewTests
                 Assert.Equal(modes, mode.listMenu.Values);
                 Assert.Equal(labels, mode.listMenu.Names);
                 Assert.Equal(modes[index], mode.SelectedValue);
-                Assert.Equal(labels[index], DisplayedText(mode.richTextElem));
+                AssertSelectedPresentation(mode, labels[index], PresentationDescriptions[index]);
+                Assert.DoesNotContain(Elements(wizard).Values.OfType<GuiElementStaticText>(),
+                    text => text.Text == PresentationDescriptions[index]);
                 Assert.Contains(examples[index], PreviewText(wizard));
                 if (rpDisabled) Assert.DoesNotContain("(GOOC)", PreviewText(wizard));
                 else Assert.Contains("(GOOC)", PreviewText(wizard));
@@ -141,6 +144,98 @@ public class SetupWizardChatPreviewTests
             }
         }
         Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void EachSettingShowsOnlyItsRelevantPreview(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        using var wizard = CreateWizard(host, draft);
+        wizard.TryOpen();
+
+        Assert.Equal("hub", wizard.CurrentStepId);
+        AssertPreviewElements(wizard, chat: false, diagram: false, layoutGuide: true);
+        Assert.Contains(Elements(wizard).Values.OfType<GuiElementStaticText>(), text => text.Text == "Native 3D Pip omitted");
+        host.RenderGuiDialog(wizard, 0);
+
+        foreach (var page in new[] { "chat.basics", "chat.language", "chat.tabs" })
+        {
+            wizard.ShowPage(page);
+            AssertPreviewElements(wizard, chat: true, diagram: false);
+            AssertDisabledInput(host, wizard);
+            host.RenderGuiDialog(wizard, 0);
+        }
+
+        foreach (var page in new[] { "chat.ranges", "chat.obfuscation" }
+            .Concat(SetupWizardCatalog.Pages.Where(page => page.TopicId == "teleportation").Select(page => page.Id)))
+        {
+            wizard.ShowPage(page);
+            AssertPreviewElements(wizard, chat: false, diagram: true);
+            host.RenderGuiDialog(wizard, 0);
+        }
+
+        wizard.ShowPage("notifications.sleep");
+        AssertPreviewElements(wizard, chat: true, diagram: true);
+        AssertDisabledInput(host, wizard);
+        Assert.Equal("General", Assert.Single(wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs").tabs).Name);
+        host.RenderGuiDialog(wizard, 0);
+        Assert.Empty(host.UnsupportedCalls);
+        Assert.DoesNotContain(host.UsedCalls, call => call.Contains("SendChatMessage", StringComparison.Ordinal));
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void SaveAnnouncementModesAndEditsUpdateOnlyTheMockChat(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        using var wizard = CreateWizard(host, draft);
+        wizard.TryOpen();
+
+        foreach (var start in new[] { true, false })
+        {
+            var enabled = start ? "SendServerSaveAnnouncement" : "SendServerSaveFinishedAnnouncement";
+            var notification = start ? "ServerSaveAnnouncementAsNotification" : "ServerSaveFinishedAsNotification";
+            var wording = start ? "TEXT_ServerSaveAnnouncement" : "TEXT_ServerSaveFinished";
+            wizard.ShowPage(start ? "notifications.savestart" : "notifications.savefinish");
+            AssertPreviewElements(wizard, chat: true, diagram: false);
+            var tabs = wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs");
+            Assert.Equal("General", Assert.Single(tabs.tabs).Name);
+            Assert.Equal(0, tabs.activeElement);
+            AssertDisabledInput(host, wizard);
+            var mode = Assert.IsType<GuiElementDropDown>(wizard.SingleComposer["announcement-mode"]);
+            Assert.Equal(new[] { "off", "chat", "popup" }, mode.listMenu.Values);
+            Assert.Equal(new[] { "Off", "Chat", "Chat notification" }, mode.listMenu.Names);
+
+            SelectAnnouncementMode(host, mode, 0);
+            Assert.Equal("0", draft.Get(enabled));
+            Assert.Equal("", PreviewText(wizard));
+            SelectAnnouncementMode(host, mode, 1);
+            Assert.Equal("1", draft.Get(enabled));
+            Assert.Equal("0", draft.Get(notification));
+            Assert.Equal(draft.Get(wording), PreviewText(wizard));
+            var normal = wizard.SingleComposer.GetRichtext("preview-text").Components.OfType<RichTextComponent>().Single().Font.Color.ToArray();
+
+            SelectAnnouncementMode(host, mode, 2);
+            Assert.Equal("1", draft.Get(enabled));
+            Assert.Equal("1", draft.Get(notification));
+            Assert.Equal(draft.Get(wording), PreviewText(wizard));
+            var highlighted = wizard.SingleComposer.GetRichtext("preview-text").Components.OfType<RichTextComponent>().Single().Font.Color;
+            Assert.Equal(new[] { 224 / 255d, 207 / 255d, 187 / 255d, 204 / 255d }, highlighted);
+            Assert.False(normal.SequenceEqual(highlighted));
+
+            wizard.SingleComposer.GetTextInput(wording).SetValue("Saving test <world>!");
+            Assert.Equal("Saving test <world>!", draft.Get(wording));
+            Assert.Equal("Saving test <world>!", PreviewText(wizard));
+            host.RenderGuiDialog(wizard, 0);
+        }
+        Assert.Empty(host.UnsupportedCalls);
+        Assert.DoesNotContain(host.UsedCalls, call => call.Contains("SendChatMessage", StringComparison.Ordinal));
+        Assert.Same(wizard, Assert.Single(host.Api.Gui.LoadedGuis));
     }
 
     [VisualTheory]
@@ -181,23 +276,44 @@ public class SetupWizardChatPreviewTests
         using var wizard = CreateWizard(host, draft);
         wizard.ShowPage("notifications.sleep");
         wizard.TryOpen();
-        wizard.SetPreviewTime(0);
+        wizard.SetPreviewTime(2);
         host.SetClock(0);
         host.RenderGuiDialog(wizard, 0);
-        Assert.Contains("1/4 sleeping.", PreviewText(wizard));
+        Assert.Equal("1/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+        Assert.Equal("", PreviewText(wizard));
         var fixedPixels = host.Canvas.GetRgbaPixels();
         host.SetClock(2100);
         host.RenderGuiDialog(wizard, 2.1f);
-        Assert.Contains("1/4 sleeping.", PreviewText(wizard));
+        Assert.Equal("1/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+        Assert.Equal("", PreviewText(wizard));
         Assert.Equal(fixedPixels, host.Canvas.GetRgbaPixels());
 
         wizard.ResumePreview();
         host.SetClock(4200);
-        host.RenderGuiDialog(wizard, 2.1f);
-        Assert.Contains("2/4 sleeping.", PreviewText(wizard));
-        Assert.Contains(draft.Get("TEXT_SleepNotification"), PreviewText(wizard));
+        host.RenderGuiDialog(wizard, 4.1f);
+        Assert.Equal("2/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+        Assert.Equal(draft.Get("TEXT_SleepNotification"), PreviewText(wizard));
         Assert.False(fixedPixels.SequenceEqual(host.Canvas.GetRgbaPixels()));
         Assert.Equal(3, wizard.SingleComposer.GetHorizontalTabs("topic-tabs").activeElement);
+
+        foreach (var threshold in new[] { 0d, 0.25, 0.5, 0.75, 1 })
+        {
+            draft.Set("SleepNotificationThreshold", threshold.ToString(CultureInfo.InvariantCulture));
+            for (var sleepers = 0; sleepers < 4; sleepers++)
+            {
+                wizard.SetPreviewTime(sleepers * 2);
+                host.RenderGuiDialog(wizard, 0);
+                Assert.Equal($"{sleepers}/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+                var crossed = threshold > 0 && threshold < 1 && sleepers / 4d >= threshold;
+                Assert.Equal(crossed ? draft.Get("TEXT_SleepNotification") : "", PreviewText(wizard));
+            }
+        }
+        draft.Set("EnableSleepNotifications", "0");
+        draft.Set("SleepNotificationThreshold", "0.75");
+        wizard.SetPreviewTime(6);
+        host.RenderGuiDialog(wizard, 0);
+        Assert.Equal("3/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+        Assert.Equal("", PreviewText(wizard));
         Assert.Empty(host.UnsupportedCalls);
     }
 
@@ -211,6 +327,45 @@ public class SetupWizardChatPreviewTests
 
     private static string DisplayedText(GuiElementRichtext text) =>
         string.Join(" ", text.Components.OfType<RichTextComponent>().Select(component => component.DisplayText));
+
+    private static readonly string[] PresentationDescriptions =
+    ["Names, speech verbs and quoted speech.", "Names and quoted speech.", "Names and unquoted speech.",
+        "Mix actions and quoted speech in one line."];
+
+    private static void AssertSelectedPresentation(GuiElementDescribedDropDown mode, string title, string description)
+    {
+        Assert.Equal(58, mode.Bounds.fixedHeight);
+        var components = mode.richTextElem.Components.OfType<RichTextComponent>().ToArray();
+        Assert.Contains(components, component => component.DisplayText == title && component.Font.UnscaledFontsize == 17);
+        Assert.Contains(components, component => component.DisplayText == description && component.Font.UnscaledFontsize == 13);
+        foreach (var line in components.SelectMany(component => component.BoundsPerLine))
+        {
+            Assert.True(line.X + line.Width + mode.richTextElem.Bounds.drawX <= mode.Bounds.InnerWidth - 20 * mode.Bounds.InnerHeight / 58);
+            Assert.InRange(line.Y + line.Height + mode.richTextElem.Bounds.drawY, 0, mode.Bounds.InnerHeight);
+        }
+    }
+
+    private static void AssertPreviewElements(SetupWizardDialog wizard, bool chat, bool diagram, bool layoutGuide = false)
+    {
+        var elements = Elements(wizard);
+        Assert.Equal(chat, elements.ContainsKey("preview-chat-tabs"));
+        Assert.Equal(chat, elements.ContainsKey("preview-chat-input"));
+        Assert.Equal(chat, elements.ContainsKey("preview-chat-scroll"));
+        Assert.Equal(diagram, elements.ContainsKey("preview-diagram"));
+        Assert.False(elements.ContainsKey("pip"));
+        Assert.DoesNotContain(elements.Values.OfType<GuiElementStaticText>(), text =>
+            text.Text.Contains("Drag Pip to turn", StringComparison.OrdinalIgnoreCase) ||
+            (!layoutGuide && text.Text.Contains("Native 3D Pip omitted", StringComparison.Ordinal)));
+    }
+
+    private static void SelectAnnouncementMode(PreviewHost host, GuiElementDropDown mode, int index)
+    {
+        mode.OnFocusGained();
+        mode.OnKeyDown(host.Api, new KeyEvent { KeyCode = (int)GlKeys.Home });
+        for (var i = 0; i < index; i++) mode.OnKeyDown(host.Api, new KeyEvent { KeyCode = (int)GlKeys.Down });
+        mode.OnFocusLost();
+        Assert.Equal(index, mode.listMenu.SelectedIndex);
+    }
 
     private static Dictionary<string, GuiElement> Elements(SetupWizardDialog wizard) =>
         (Dictionary<string, GuiElement>)typeof(GuiComposer).GetField("staticElements", BindingFlags.Instance | BindingFlags.NonPublic)!

@@ -42,9 +42,9 @@ public static class SetupWizardCatalog
             "Teleportation.StuckAdminNotifyPrivilege", "Teleportation.StuckBlockedByOnlinePrivilege"),
         Page("teleport.warmup", "teleportation", "Interrupting a warmup", "Travel warmups require the player to stand still. Choose whether damage and interactions also cancel them.",
             "Teleportation.CancelWarmupOnDamage", "Teleportation.CancelWarmupOnInteraction"),
-        Page("notifications.savestart", "notifications", "Save started", "Choose Off, Chat, or Popup and edit the announcement. Turning the message off does not disable saving or save pauses.",
+        Page("notifications.savestart", "notifications", "Save started", "Choose Off, Chat, or Chat notification and edit the announcement. Notifications use highlighted text in General. Turning the message off does not disable saving or save pauses.",
             "SendServerSaveAnnouncement", "ServerSaveAnnouncementAsNotification", "TEXT_ServerSaveAnnouncement"),
-        Page("notifications.savefinish", "notifications", "Save finished", "Choose Off, Chat, or Popup independently for the finished message and edit its text.",
+        Page("notifications.savefinish", "notifications", "Save finished", "Choose Off, Chat, or Chat notification independently for the finished message. Notifications use highlighted text in General.",
             "SendServerSaveFinishedAnnouncement", "ServerSaveFinishedAsNotification", "TEXT_ServerSaveFinished"),
         Page("notifications.sleep", "notifications", "Sleep reminder", "The threshold controls a reminder, not night skipping. With four players, the default 50% reminds at two sleepers. Existing 0% and 100% thresholds send no reminder.",
             "EnableSleepNotifications", "SleepNotificationThreshold", "TEXT_SleepNotification")

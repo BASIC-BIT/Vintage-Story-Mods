@@ -14,8 +14,8 @@ public static class SetupWizardCaptureScenes
 {
     public static readonly string[] Names =
     [
-        "wizard-chat-default", "wizard-chat-edited", "wizard-chat-presentation", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
-        "wizard-travel-default", "wizard-travel-edited", "wizard-notifications-default", "wizard-notifications-edited",
+        "wizard-hub", "wizard-chat-default", "wizard-chat-edited", "wizard-chat-presentation", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
+        "wizard-travel-default", "wizard-travel-edited", "wizard-notifications-default", "wizard-notifications-edited", "wizard-notifications-sleep",
         "wizard-review", "wizard-error", "wizard-restart-dedicated", "wizard-restart-integrated"
     ];
 
@@ -62,11 +62,13 @@ public static class SetupWizardCaptureScenes
         ApplyDraft(dialog.Draft, scenario);
         var page = scenario switch
         {
+            "wizard-hub" => "hub",
             "wizard-chat-language" => "chat.language",
             "wizard-chat-ranges" => "chat.ranges",
             "wizard-chat-tabs" => "chat.tabs",
             "wizard-travel-default" or "wizard-travel-edited" => "teleport.tools",
             "wizard-notifications-default" or "wizard-notifications-edited" => "notifications.savestart",
+            "wizard-notifications-sleep" => "notifications.sleep",
             "wizard-review" => "review",
             _ => "chat.basics"
         };

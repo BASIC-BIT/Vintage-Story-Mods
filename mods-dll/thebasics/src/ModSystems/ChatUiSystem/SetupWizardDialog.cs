@@ -24,6 +24,7 @@ public sealed class SetupWizardDialog : GuiDialog
     private bool _isDedicated;
     private GuiElementCustomDraw _diagram;
     private GuiElementRichtext _sample;
+    private GuiElementRichtext _sleepCount;
     private int _chatPreviewTab = 1;
     private GuiDialogConfirm _closeConfirm;
     private IReadOnlyList<string> _restartKeys = Array.Empty<string>();
@@ -53,7 +54,11 @@ public sealed class SetupWizardDialog : GuiDialog
         IsCaptureOnly = captureOnly;
         try
         {
-            if (!layoutOnly) _preview = new SetupGuidePreview(api);
+            if (!layoutOnly)
+            {
+                _preview = new SetupGuidePreview(api);
+                _preview.PlayAnimation(AnimationCode());
+            }
             ComposeDialog();
         }
         catch
@@ -69,7 +74,7 @@ public sealed class SetupWizardDialog : GuiDialog
     public string CurrentStepId { get; private set; } = "hub";
     public bool LayoutOnly { get; }
     public bool IsCaptureOnly { get; }
-    public bool IsPreviewReady => LayoutOnly || _preview?.IsReady == true;
+    public bool IsPreviewReady => LayoutOnly || SingleComposer?.GetElement("pip") == null || _preview?.IsReady == true;
     public override string ToggleKeyCombinationCode => null;
     public override bool UnregisterOnClose => true;
     public override bool PrefersUngrabbedMouse => true;
@@ -81,7 +86,7 @@ public sealed class SetupWizardDialog : GuiDialog
             throw new ArgumentException("Unknown setup page.", nameof(stepId));
         CurrentStepId = stepId;
         _preview?.EndDrag(false);
-        _chatPreviewTab = Bool("UseGeneralChannelAsProximityChat") || CurrentStepId == "chat.tabs" && !Bool("ProximityChatAsDefault") ? 0 : 1;
+        _chatPreviewTab = CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) || Bool("UseGeneralChannelAsProximityChat") || CurrentStepId == "chat.tabs" && !Bool("ProximityChatAsDefault") ? 0 : 1;
         _reviewOffset = 0;
         _elapsed = 0;
         _lastBeat = -1;
@@ -158,6 +163,7 @@ public sealed class SetupWizardDialog : GuiDialog
         SingleComposer?.Dispose();
         _diagram = null;
         _sample = null;
+        _sleepCount = null;
         var body = ElementBounds.Fixed(0, 0, Width, CompactLayout ? 528 : 608).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         SingleComposer = capi.Gui.CreateCompo("thebasics-setup-wizard", ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle));
         var composer = SingleComposer
@@ -182,7 +188,8 @@ public sealed class SetupWizardDialog : GuiDialog
         Text(composer, _message ?? (_pending ? "Waiting for the server to acknowledge the save..." : "Changes stay in this draft until you save."), 0, StatusY, Width, CompactLayout ? 30 : 42);
         Button(composer, "Close", () => TryClose(), Width - 110, FooterY, 110);
         composer.EndChildElements().Compose(focusFirstElement: false);
-        if (_diagram != null) _sample = SingleComposer.GetRichtext("preview-text");
+        _sample = SingleComposer.GetRichtext("preview-text");
+        _sleepCount = SingleComposer.GetRichtext("preview-sleep-count");
     }
 
     private void ComposeHub(GuiComposer composer)
@@ -195,7 +202,10 @@ public sealed class SetupWizardDialog : GuiDialog
         Text(composer, "Chat\nPresentation, languages, hearing ranges and tabs.", 12, 275, 248, 80);
         Text(composer, "Teleportation\nChoose BASICs commands, then their costs and timing.", 317, 275, 248, 80);
         Text(composer, "Notifications\nSave announcements and sleep reminders.", 622, 275, 248, 80);
-        Text(composer, $"{Draft.ChangedKeys.Count} changes ready to review." + (NeedsRestart ? " Some saved changes still need a server restart." : ""), 0, CompactLayout ? 358 : 397, Width, 40);
+        Text(composer, $"{Draft.ChangedKeys.Count} changes ready to review." + (NeedsRestart ? " Some saved changes still need a server restart." : ""), 0, CompactLayout ? 358 : 397, 640, 40);
+        var guideBounds = ElementBounds.Fixed(690, CompactLayout ? 352 : 350, 170, CompactLayout ? 98 : 154);
+        if (LayoutOnly) Text(composer, "Native 3D Pip omitted", guideBounds.fixedX, guideBounds.fixedY, guideBounds.fixedWidth, guideBounds.fixedHeight);
+        else composer.AddInteractiveElement(new PreviewActorElement(capi, guideBounds, this), "pip");
         Button(composer, "Review changes", () => ShowPage("review"), 0, CompactLayout ? 403 : 453, 240);
         if (_onAdvanced != null)
             Button(composer, "Advanced editor", () => { Track("advanced"); Suspend(); _onAdvanced(); }, 260, CompactLayout ? 403 : 453, 240);
@@ -207,7 +217,7 @@ public sealed class SetupWizardDialog : GuiDialog
         Text(composer, page.Title, 0, 88, Width, 27, true);
         Text(composer, page.Description, 0, 120, Width, 44);
         AddPreview(composer);
-        var y = 178d;
+        var y = CompactLayout && CurrentStepId == "chat.basics" ? 170d : 178d;
         if (CurrentStepId == "notifications.savestart" || CurrentStepId == "notifications.savefinish")
             AddAnnouncement(composer, ref y);
         else
@@ -278,11 +288,11 @@ public sealed class SetupWizardDialog : GuiDialog
             var selected = Math.Max(0, Array.FindIndex(options, candidate => candidate.Equals(value, StringComparison.OrdinalIgnoreCase)));
             if (key == "ProximityChatPresentationMode")
             {
+                bounds.fixedHeight = 58;
                 composer.AddInteractiveElement(new GuiElementDescribedDropDown(capi, options, options.Select(PresentationName).ToArray(),
                     options.Select(PresentationDescription).ToArray(), selected,
                     (choice, _) => Changed(key, choice, "option" + Array.IndexOf(options, choice), true), bounds, CairoFont.WhiteSmallText()), key);
-                Text(composer, PresentationDescription(value), 334, y + 55, 546, 20);
-                y += 18;
+                y += 30;
             }
             else
                 composer.AddInteractiveElement(new GuiElementDropDown(capi, options, definition.OptionNames.ToArray(), selected,
@@ -314,7 +324,7 @@ public sealed class SetupWizardDialog : GuiDialog
         var popup = started ? "ServerSaveAnnouncementAsNotification" : "ServerSaveFinishedAsNotification";
         var text = started ? "TEXT_ServerSaveAnnouncement" : "TEXT_ServerSaveFinished";
         Text(composer, "Announcement", 334, y, 546, 21);
-        composer.AddInteractiveElement(new GuiElementDropDown(capi, new[] { "off", "chat", "popup" }, new[] { "Off", "Chat", "Popup" },
+        composer.AddInteractiveElement(new GuiElementDropDown(capi, new[] { "off", "chat", "popup" }, new[] { "Off", "Chat", "Chat notification" },
             !Bool(enabled) ? 0 : Bool(popup) ? 2 : 1, (choice, _) =>
             {
                 Draft.Set(enabled, choice == "off" ? "0" : "1");
@@ -395,39 +405,39 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void AddPreview(GuiComposer composer)
     {
-        var chat = CurrentStepId.StartsWith("chat.", StringComparison.Ordinal);
-        var pictureHeight = chat ? CompactLayout ? 107 : 140 : CompactLayout ? 146 : 168;
-        composer.AddInset(ElementBounds.Fixed(0, 174, 310, CompactLayout ? 274 : 330), 3);
-        if (LayoutOnly)
-            Text(composer, "Layout only\nNative 3D Pip omitted", 8, 190, 122, 160);
-        else
-            composer.AddInteractiveElement(new PreviewActorElement(capi, ElementBounds.Fixed(4, 184, 120, pictureHeight), this), "pip");
-        _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(132, 184, 169, pictureHeight), DrawDiagram, true);
-        composer.AddInteractiveElement(_diagram, "preview-diagram");
-        if (chat)
+        if (CurrentStepId is "chat.basics" or "chat.language" or "chat.tabs" or "notifications.savestart" or "notifications.savefinish")
         {
-            Text(composer, "Drag Pip to turn", 4, CompactLayout ? 294 : 329, 125, 16);
-            AddChatPreview(composer);
+            AddChatPreview(composer, CompactLayout ? 204 : 212, CompactLayout ? 184 : 230);
+            return;
         }
-        else
+        var hearing = CurrentStepId is "chat.ranges" or "chat.obfuscation";
+        var sleep = CurrentStepId == "notifications.sleep";
+        var pictureHeight = hearing ? CompactLayout ? 274 : 330 : sleep ? CompactLayout ? 112 : 140 : CompactLayout ? 146 : 168;
+        _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, 174, 310, pictureHeight), DrawDiagram, true);
+        composer.AddInteractiveElement(_diagram, "preview-diagram");
+        if (sleep)
+        {
+            composer.AddRichtext(SleepCountText(), CairoFont.WhiteSmallText().WithFontSize(14),
+                ElementBounds.Fixed(0, CompactLayout ? 289 : 317, 310, 20), "preview-sleep-count");
+            AddChatPreview(composer, CompactLayout ? 314 : 347, CompactLayout ? 72 : 92);
+        }
+        else if (!hearing)
             composer.AddRichtext(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(10, CompactLayout ? 338 : 366, 289, CompactLayout ? 103 : 129), "preview-text");
     }
 
-    private void AddChatPreview(GuiComposer composer)
+    private void AddChatPreview(GuiComposer composer, double y, double historyHeight)
     {
         const double historyWidth = 288;
-        var y = CompactLayout ? 314 : 347;
-        var historyHeight = CompactLayout ? 72 : 92;
         var bounds = ElementBounds.Fixed(0, y, historyWidth + 22, historyHeight + 57);
         composer.BeginChildElements(bounds)
             .AddGameOverlay(ElementBounds.Fixed(0, 23, historyWidth + 22, historyHeight + 34), new[] { 0.25, 0.208, 0.161, 0.75 });
-        var tabs = Bool("UseGeneralChannelAsProximityChat")
+        var tabs = CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) || Bool("UseGeneralChannelAsProximityChat")
             ? new[] { new GuiTab { Name = "General", DataInt = 0 } }
             : new[] { new GuiTab { Name = "General", DataInt = 0 }, new GuiTab { Name = "Proximity", DataInt = 1 } };
         var font = CairoFont.WhiteDetailText().WithFontSize(14);
         composer.AddHorizontalTabs(tabs, ElementBounds.Fixed(0, 0, historyWidth + 22, 23), index =>
         { _chatPreviewTab = index; RefreshPreview(); }, font, font.Clone().WithColor(GuiStyle.ActiveButtonTextColor), "preview-chat-tabs");
-        composer.GetHorizontalTabs("preview-chat-tabs").SetValue(Bool("UseGeneralChannelAsProximityChat") ? 0 : _chatPreviewTab, false);
+        composer.GetHorizontalTabs("preview-chat-tabs").SetValue(tabs.Length == 1 ? 0 : _chatPreviewTab, false);
         var clip = ElementBounds.Fixed(6, 26, historyWidth, historyHeight);
         composer.BeginClip(clip)
             .AddRichtext(BuildPreviewText(), font, ElementBounds.Fixed(0, 0, historyWidth, historyHeight), "preview-text")
@@ -448,12 +458,10 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         _diagram?.Redraw();
         _sample?.SetNewText(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), null);
-        if (CurrentStepId.StartsWith("chat.", StringComparison.Ordinal))
-        {
-            var scroll = SingleComposer.GetCompactScrollbar("preview-chat-scroll");
-            if (scroll != null && _sample != null)
-                scroll.SetHeights(CompactLayout ? 72 : 92, (float)(_sample.Bounds.fixedHeight));
-        }
+        _sleepCount?.SetNewText(SleepCountText(), CairoFont.WhiteSmallText().WithFontSize(14), null);
+        var scroll = SingleComposer.GetCompactScrollbar("preview-chat-scroll");
+        if (scroll != null && _sample != null)
+            scroll.SetHeights((float)_sample.InsideClipBounds.fixedHeight, (float)_sample.Bounds.fixedHeight);
     }
 
     private string BuildPreviewText()
@@ -486,15 +494,17 @@ public sealed class SetupWizardDialog : GuiDialog
             if (CurrentStepId == "notifications.sleep")
             {
                 var threshold = Number("SleepNotificationThreshold");
-                var sleepers = ((int)(Time / 2) % 2) + 1;
-                var triggers = Bool("EnableSleepNotifications") && threshold > 0 && threshold < 1 && (threshold <= 0.25 ? sleepers == 1 : threshold <= 0.5 && sleepers == 2);
-                return VtmlUtils.EscapeVtml($"{sleepers}/4 sleeping. " + (triggers ? Draft.Get("TEXT_SleepNotification") : "No reminder at this beat.") + "\nThis reminder does not change night skipping. 0% and 100% send no reminder.");
+                // Keep the reminder in history after the threshold crossing, until the example starts again.
+                var triggers = Bool("EnableSleepNotifications") && threshold > 0 && threshold < 1 && Sleepers / 4d >= threshold;
+                return triggers ? VtmlUtils.EscapeVtml(Draft.Get("TEXT_SleepNotification")) : "";
             }
             var start = CurrentStepId == "notifications.savestart";
             var enabled = Bool(start ? "SendServerSaveAnnouncement" : "SendServerSaveFinishedAnnouncement");
             var popup = Bool(start ? "ServerSaveAnnouncementAsNotification" : "ServerSaveFinishedAsNotification");
             var wording = Draft.Get(start ? "TEXT_ServerSaveAnnouncement" : "TEXT_ServerSaveFinished");
-            return VtmlUtils.EscapeVtml(enabled ? (popup ? "Popup: " : "Chat: ") + wording : "Announcement off. Server saving continues.");
+            if (!enabled) return "";
+            var escaped = VtmlUtils.EscapeVtml(wording);
+            return popup ? "<font color=\"#CCe0cfbb\">" + escaped + "</font>" : escaped;
         }
         return VtmlUtils.EscapeVtml(TeleportExplanation());
     }
@@ -513,11 +523,13 @@ public sealed class SetupWizardDialog : GuiDialog
     }
 
     private double Time => _fixedTime ?? _elapsed;
+    private int Sleepers => (int)(Time / 2) % 4;
+    private string SleepCountText() => $"{Sleepers}/4 sleeping.";
     private bool NeedsRestart => _runtimeApplyFailed || _restartKeys.Count > 0;
     private bool CompactLayout => capi.Render.FrameHeight / Math.Max(RuntimeEnv.GUIScale, 0.1f) < 660;
     private double FooterY => CompactLayout ? 490 : 570;
     private double StatusY => CompactLayout ? 454 : 514;
-    private string AnimationCode() => CurrentStepId == "finish" ? "cheer" : CurrentStepId.StartsWith("chat.", StringComparison.Ordinal) ? "wave" : "idle";
+    private string AnimationCode() => CurrentStepId == "hub" ? "wave" : CurrentStepId == "finish" ? "cheer" : "idle";
 
     private static string PresentationName(string mode) => ProximityChatPresentationModes.Normalize(mode) switch
     {
@@ -555,22 +567,11 @@ public sealed class SetupWizardDialog : GuiDialog
         if (CurrentStepId.StartsWith("chat.", StringComparison.Ordinal)) DrawHearing(context);
         else if (CurrentStepId == "notifications.sleep")
         {
-            var sleepers = ((int)(Time / 2) % 2) + 1;
+            var sleepers = Sleepers;
             for (var index = 0; index < 4; index++)
             {
                 Person(context, 25 + index * 38, 68, index < sleepers);
                 if (index < sleepers) { context.Rectangle(16 + index * 38, 101, 27, 12); context.Fill(); }
-            }
-        }
-        else if (CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal))
-        {
-            var start = CurrentStepId == "notifications.savestart";
-            if (Bool(start ? "SendServerSaveAnnouncement" : "SendServerSaveFinishedAnnouncement"))
-            {
-                var popup = Bool(start ? "ServerSaveAnnouncementAsNotification" : "ServerSaveFinishedAsNotification");
-                context.SetSourceRGBA(0.8, 0.73, 0.45, 1);
-                context.Rectangle(17, popup ? 22 : 98, 136, 40); context.Stroke();
-                for (var line = 0; line < 3; line++) { context.MoveTo(29, (popup ? 34 : 110) + line * 8); context.LineTo(139 - line * 15, (popup ? 34 : 110) + line * 8); context.Stroke(); }
             }
         }
         else
@@ -585,70 +586,49 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void DrawHearing(Context context)
     {
-        if (CurrentStepId is "chat.ranges" or "chat.obfuscation")
+        var modes = new[] { "Whisper", "Normal", "Yell" };
+        var ranges = modes.Select(mode => Number("ProximityChatModeDistances." + mode)).ToArray();
+        var onsets = modes.Select(mode => Number("ProximityChatModeObfuscationRanges." + mode)).ToArray();
+        var obfuscation = Bool("EnableDistanceObfuscationSystem");
+        var extent = Math.Max(1, ranges.Concat(obfuscation ? onsets : Array.Empty<double>()).Max());
+        var pixelsPerBlock = 45 / extent;
+        const double centerX = 84, centerY = 57;
+        context.SetSourceRGBA(0.2, 0.25, 0.27, 1);
+        for (var line = -3; line <= 3; line++)
         {
-            var modes = new[] { "Whisper", "Normal", "Yell" };
-            var ranges = modes.Select(mode => Number("ProximityChatModeDistances." + mode)).ToArray();
-            var onsets = modes.Select(mode => Number("ProximityChatModeObfuscationRanges." + mode)).ToArray();
-            var obfuscation = Bool("EnableDistanceObfuscationSystem");
-            var extent = Math.Max(1, ranges.Concat(obfuscation ? onsets : Array.Empty<double>()).Max());
-            var pixelsPerBlock = 45 / extent;
-            const double centerX = 84, centerY = 57;
-            context.SetSourceRGBA(0.2, 0.25, 0.27, 1);
-            for (var line = -3; line <= 3; line++)
-            {
-                context.MoveTo(28, centerY + line * 15); context.LineTo(140, centerY + line * 15);
-                context.MoveTo(centerX + line * 15, 7); context.LineTo(centerX + line * 15, 107);
-            }
-            context.Stroke();
-            context.SelectFontFace("sans-serif", FontSlant.Normal, FontWeight.Normal);
-            context.SetFontSize(10);
-            for (var index = modes.Length - 1; index >= 0; index--)
-            {
-                context.SetSourceRGBA(index == 0 ? 0.6 : index == 1 ? 0.35 : 0.98,
-                    index == 0 ? 0.78 : index == 1 ? 0.85 : 0.7, index == 0 ? 1 : index == 1 ? 0.52 : 0.38, 1);
-                context.LineWidth = 1.5;
-                if (ranges[index] > 0)
-                {
-                    var radius = Math.Max(0.8, (Math.Ceiling(ranges[index]) - 1) * pixelsPerBlock);
-                    context.MoveTo(centerX, centerY - radius);
-                    context.LineTo(centerX + radius, centerY);
-                    context.LineTo(centerX, centerY + radius);
-                    context.LineTo(centerX - radius, centerY);
-                    context.ClosePath(); context.Stroke();
-                }
-                if (obfuscation)
-                {
-                    context.SetDash(new[] { 3d, 3d }, index);
-                    context.Arc(centerX, centerY, Math.Max(0, onsets[index]) * pixelsPerBlock, 0, Math.PI * 2);
-                    context.Stroke(); context.SetDash(Array.Empty<double>(), 0);
-                }
-                var rangeLabel = ranges[index] == -1 ? "global" : ranges[index] <= 0 ? "no listeners" : ranges[index].ToString("G3", CultureInfo.InvariantCulture) + " blocks";
-                var onsetLabel = obfuscation ? "; fade " + onsets[index].ToString("G3", CultureInfo.InvariantCulture) : "";
-                context.MoveTo(4, 122 + index * 17);
-                context.ShowText(modes[index] + ": " + rangeLabel + onsetLabel);
-            }
-            context.SetSourceRGBA(1, 1, 1, 1);
-            context.Arc(centerX, centerY, 1.5, 0, Math.PI * 2); context.Fill();
-            return;
+            context.MoveTo(28, centerY + line * 15); context.LineTo(140, centerY + line * 15);
+            context.MoveTo(centerX + line * 15, 7); context.LineTo(centerX + line * 15, 107);
         }
-        var range = Number("ProximityChatModeDistances.Normal");
-        var onset = Number("ProximityChatModeObfuscationRanges.Normal");
-        const double center = 84;
-        for (var x = -5; x <= 5; x++)
-            for (var z = -5; z <= 5; z++)
-            {
-                var blocks = Math.Abs(x * 7) + Math.Abs(z * 7);
-                var hearing = range == -1 || blocks < range;
-                context.SetSourceRGBA(hearing ? 0.35 : 0.17, hearing ? 0.65 : 0.2, hearing ? 0.5 : 0.23, 0.9);
-                context.Rectangle(center + x * 13 - 5, center + z * 13 - 5, 10, 10); context.Fill();
-            }
-        if (Bool("EnableDistanceObfuscationSystem"))
+        context.Stroke();
+        context.SelectFontFace("sans-serif", FontSlant.Normal, FontWeight.Normal);
+        context.SetFontSize(10);
+        for (var index = modes.Length - 1; index >= 0; index--)
         {
-            context.SetSourceRGBA(0.9, 0.65, 0.24, 1);
-            context.Arc(center, center, Math.Min(75, onset / 7 * 13), 0, Math.PI * 2); context.Stroke();
+            context.SetSourceRGBA(index == 0 ? 0.6 : index == 1 ? 0.35 : 0.98,
+                index == 0 ? 0.78 : index == 1 ? 0.85 : 0.7, index == 0 ? 1 : index == 1 ? 0.52 : 0.38, 1);
+            context.LineWidth = 1.5;
+            if (ranges[index] > 0)
+            {
+                var radius = Math.Max(0.8, (Math.Ceiling(ranges[index]) - 1) * pixelsPerBlock);
+                context.MoveTo(centerX, centerY - radius);
+                context.LineTo(centerX + radius, centerY);
+                context.LineTo(centerX, centerY + radius);
+                context.LineTo(centerX - radius, centerY);
+                context.ClosePath(); context.Stroke();
+            }
+            if (obfuscation)
+            {
+                context.SetDash(new[] { 3d, 3d }, index);
+                context.Arc(centerX, centerY, Math.Max(0, onsets[index]) * pixelsPerBlock, 0, Math.PI * 2);
+                context.Stroke(); context.SetDash(Array.Empty<double>(), 0);
+            }
+            var rangeLabel = ranges[index] == -1 ? "global" : ranges[index] <= 0 ? "no listeners" : ranges[index].ToString("G3", CultureInfo.InvariantCulture) + " blocks";
+            var onsetLabel = obfuscation ? "; fade " + onsets[index].ToString("G3", CultureInfo.InvariantCulture) : "";
+            context.MoveTo(4, 122 + index * 17);
+            context.ShowText(modes[index] + ": " + rangeLabel + onsetLabel);
         }
-        Person(context, center, center - 8, true);
+        context.SetSourceRGBA(1, 1, 1, 1);
+        context.Arc(centerX, centerY, 1.5, 0, Math.PI * 2); context.Fill();
     }
 
     private static void Person(Context context, double x, double y, bool active)
@@ -661,7 +641,7 @@ public sealed class SetupWizardDialog : GuiDialog
     public override void OnRenderGUI(float deltaTime)
     {
         _elapsed += deltaTime;
-        var beat = (int)(Time / 1.5);
+        var beat = (int)(Time / (CurrentStepId == "notifications.sleep" ? 2 : 1.5));
         if (beat != _lastBeat)
         {
             _lastBeat = beat;
