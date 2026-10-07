@@ -388,6 +388,7 @@ public class SetupWizardChatPreviewTests
         Assert.False(input.Enabled);
         Assert.False(input.Focusable);
         var before = input.GetText();
+        Assert.Empty(before);
         var x = (int)(input.Bounds.absX + input.Bounds.OuterWidth / 2);
         var y = (int)(input.Bounds.absY + input.Bounds.OuterHeight / 2);
         host.SetMouse(x, y);

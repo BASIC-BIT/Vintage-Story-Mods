@@ -5,6 +5,12 @@ Scope: chat, teleportation, notifications, invitation, restart guidance, native 
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
 
+## Empty preview input, October 7
+
+- Removed the `Example chat` filler from the shared mock chat input. The native input starts empty and remains disabled, with its separator and background intact.
+- All 12 affected chat preview checks pass with no skips, including an empty-input assertion. Canonical build: zero errors, 151 warnings. Source identity `29ac1ff7fafb71df6a03d1d40004e987afdddca619e4e2a37393adfe754ee684`; package SHA-256 `89e3d870be2b211f9a3d8777102a830cf0df89ba5cef9a1b1e04fbeff30b3379`. QA server readback and both profile packages match. The server reached RunGame at 05:30:23 UTC with no startup exceptions and the existing bare container-path error.
+- Fresh native capture `.tmp/wizard-native-empty-input/wizard-chat-default.png` reports this source stamp, native-client coverage, 1908x1260, and GUI scale 1.125. Model inspection confirms the blank input. Profile2 is left on Chat; client logs contain no errors or exceptions. Earlier full suites and capture sets below are separate evidence; owner QA cards remain pending.
+
 ## Contextual preview revision, October 7
 
 - The closed presentation dropdown contains its English title and smaller description in the same 58-pixel row as the open choices. Both rows center the entire text block. The drag hint and separate description label are removed.

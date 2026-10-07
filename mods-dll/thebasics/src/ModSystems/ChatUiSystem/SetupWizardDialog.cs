@@ -450,7 +450,6 @@ public sealed class SetupWizardDialog : GuiDialog
                 text.Bounds.CalcWorldBounds();
             }, ElementBounds.Fixed(historyWidth + 12, 24, 10, historyHeight + 3), "preview-chat-scroll");
         var input = new GuiElementChatInput(capi, ElementBounds.Fixed(0, historyHeight + 29, historyWidth + 22, 25), _ => { }) { Enabled = false };
-        input.SetValue("Example chat");
         composer.AddInteractiveElement(input, "preview-chat-input").EndChildElements();
     }
 
