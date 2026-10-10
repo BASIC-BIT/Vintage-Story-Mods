@@ -157,6 +157,21 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
+
+    - name: Check repeatable client QA workflows with isolated fixtures
+      shell: pwsh
+      run: |
+        git fetch --no-tags origin ffab5508d10153f0dce3fe0073a94b9172d3a568
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        pwsh -NoProfile -File scripts/test-vs-agent-profile.ps1 -AgentControlSource .
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        foreach ($script in @('test-vs-local-package.ps1', 'test-vs-agent-visuals.ps1')) {
+          pwsh -NoProfile -File "scripts/$script"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        }
+        powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-vs-qa-package.ps1
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        ./scripts/check-agent-tooling.ps1
         
     - name: Cache VS Dependencies
       id: cache-vs-deps

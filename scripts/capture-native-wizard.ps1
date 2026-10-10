@@ -9,6 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$DataPath = (Resolve-Path -LiteralPath $DataPath).Path
 $scenes = @(
     'wizard-hub', 'wizard-chat-default', 'wizard-chat-edited', 'wizard-chat-presentation', 'wizard-chat-language', 'wizard-chat-ranges', 'wizard-chat-tabs',
     'wizard-travel-default', 'wizard-travel-edited', 'wizard-notifications-default', 'wizard-notifications-edited', 'wizard-notifications-sleep',
@@ -88,6 +89,6 @@ foreach ($scene in $scenes) {
     $captures += @{ scenario = $scene; file = "$scene.png"; manifest = "$scene.json" }
     Write-Host "$scene captured ($($manifest.width)x$($manifest.height), scale $($manifest.scale))."
 }
-@{ schema = 1; sourceTreeHash = $ExpectedSourceTreeHash; coverage = 'native-client'; captures = $captures } |
+@{ schema = 1; sourceTreeHash = $ExpectedSourceTreeHash; coverage = 'native-client'; dataPath = $DataPath; pipeName = $PipeName; captures = $captures } |
     ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $outputRoot 'captures.json') -Encoding utf8
 Write-Host "Native capture set: $outputRoot"

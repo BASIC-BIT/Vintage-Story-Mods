@@ -19,7 +19,9 @@ From the repository root:
 
 Pass -DotNet PATH if the .NET 10 SDK is not on PATH. Output defaults to ignored .superpowers/sdd/gui-preview/output. Each scene produces a PNG and a JSON provenance manifest. Use a separate output directory for each scale or environment.
 
-Use `-Wizard` for the 13 setup scenes at scales 1 and 1.25. These production dialog fixtures omit Pip's native 3D rendering and record that omission. The script stamps a normalized source-tree hash into the built mod; a later test build can remove that stamp, so rerun the preview script before capturing. A claimed hash that does not match the compiled mod is rejected.
+Use `-Wizard` for the 16 setup scenes at scales 1 and 1.25. These production dialog fixtures omit Pip's native 3D rendering and record that omission. The script stamps a normalized source-tree hash into the built mod; a later test build can remove that stamp, so rerun the preview script before capturing. A claimed hash that does not match the compiled mod is rejected.
+
+For native client captures, Profile2 provisioning, launch, scale probes and sampled-pose clips, use `.opencode/skills/vintage-story-agent-control/SKILL.md`. That workflow keeps source identity, installed-package hashes and restoration receipts together.
 
 Scenes include language editor default, focused input, open dropdown, button hover, tooltip, error status; admin chat, bubble and Discord settings; and dice bubbles. Fixtures use local callbacks and do not send settings to a server.
 
