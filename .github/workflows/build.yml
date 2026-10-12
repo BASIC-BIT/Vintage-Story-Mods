@@ -304,6 +304,28 @@ jobs:
         Write-Host "Set VS_DEPENDENCIES=$modernPath" -ForegroundColor Green
       shell: pwsh
       
+    - name: Install Cairo runtime for chat rendering tests
+      run: |
+        $metadata = Invoke-RestMethod -Uri "https://api.vintagestory.at/stable.json"
+        $download = $metadata.PSObject.Properties[$env:VS_VERSION].Value.windowsserver
+        $archivePath = Join-Path $env:RUNNER_TEMP "vs-server-native.zip"
+        Invoke-WebRequest -Uri $download.urls.cdn -OutFile $archivePath
+        if ((Get-FileHash -LiteralPath $archivePath -Algorithm MD5).Hash -ne $download.md5) {
+          throw "Vintage Story server package checksum mismatch."
+        }
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
+        try {
+          $entry = $archive.GetEntry("Lib/libcairo-2.dll")
+          if ($null -eq $entry) {
+            throw "Pinned server package does not contain the Cairo runtime."
+          }
+          $destination = Join-Path $env:VINTAGE_STORY "Lib/libcairo-2.dll"
+          [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destination, $true)
+        } finally {
+          $archive.Dispose()
+        }
+      shell: pwsh
+
     - name: Restore Dependencies
       run: |
         $projects = @(
