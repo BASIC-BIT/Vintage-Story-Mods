@@ -1,0 +1,92 @@
+{
+  "editor": {
+    "allAngles": false,
+    "entityTextureMode": false
+  },
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "metal": "game:block/metal/tarnished/sheet/iron1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "elements": [
+    {
+      "name": "WideFooting",
+      "from": [-8.0, 0.0, -8.0],
+      "to": [24.0, 1.5, 24.0],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0.0, 0.0, 16.0, 1.5] },
+        "east": { "texture": "#wood", "uv": [0.0, 0.0, 16.0, 1.5] },
+        "south": { "texture": "#wood", "uv": [0.0, 0.0, 16.0, 1.5] },
+        "west": { "texture": "#wood", "uv": [0.0, 0.0, 16.0, 1.5] },
+        "up": { "texture": "#wood", "uv": [0.0, 0.0, 16.0, 16.0] },
+        "down": { "texture": "#wood", "uv": [0.0, 0.0, 16.0, 16.0] }
+      }
+    },
+    {
+      "name": "RaisedPedestal",
+      "from": [2.0, 1.5, 2.0],
+      "to": [14.0, 4.0, 14.0],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 2.5] },
+        "east": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 2.5] },
+        "south": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 2.5] },
+        "west": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 2.5] },
+        "up": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 12.0] },
+        "down": { "texture": "#wood", "uv": [0.0, 0.0, 12.0, 12.0] }
+      }
+    },
+    {
+      "name": "ThrustBearingNorth",
+      "from": [4.0, 4.0, 3.0],
+      "to": [12.0, 6.0, 5.25],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [0.0, 0.0, 8.0, 2.0] },
+        "east": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 2.0] },
+        "south": { "texture": "#metal", "uv": [0.0, 0.0, 8.0, 2.0] },
+        "west": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 2.0] },
+        "up": { "texture": "#metal", "uv": [0.0, 0.0, 8.0, 2.25] },
+        "down": { "texture": "#metal", "uv": [0.0, 0.0, 8.0, 2.25] }
+      }
+    },
+    {
+      "name": "ThrustBearingSouth",
+      "from": [4.0, 4.0, 10.75],
+      "to": [12.0, 6.0, 13.0],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [0.0, 0.0, 8.0, 2.0] },
+        "east": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 2.0] },
+        "south": { "texture": "#metal", "uv": [0.0, 0.0, 8.0, 2.0] },
+        "west": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 2.0] },
+        "up": { "texture": "#metal", "uv": [0.0, 0.0, 8.0, 2.25] },
+        "down": { "texture": "#metal", "uv": [0.0, 0.0, 8.0, 2.25] }
+      }
+    },
+    {
+      "name": "ThrustBearingWest",
+      "from": [3.0, 4.0, 5.25],
+      "to": [5.25, 6.0, 10.75],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 2.0] },
+        "east": { "texture": "#metal", "uv": [0.0, 0.0, 5.5, 2.0] },
+        "south": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 2.0] },
+        "west": { "texture": "#metal", "uv": [0.0, 0.0, 5.5, 2.0] },
+        "up": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 5.5] },
+        "down": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 5.5] }
+      }
+    },
+    {
+      "name": "ThrustBearingEast",
+      "from": [10.75, 4.0, 5.25],
+      "to": [13.0, 6.0, 10.75],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 2.0] },
+        "east": { "texture": "#metal", "uv": [0.0, 0.0, 5.5, 2.0] },
+        "south": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 2.0] },
+        "west": { "texture": "#metal", "uv": [0.0, 0.0, 5.5, 2.0] },
+        "up": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 5.5] },
+        "down": { "texture": "#metal", "uv": [0.0, 0.0, 2.25, 5.5] }
+      }
+    }
+  ]
+}

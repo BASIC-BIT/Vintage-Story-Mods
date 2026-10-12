@@ -1,0 +1,20 @@
+{
+  "name": "flywheel-assembly-compact-gui-transform",
+  "representation": "gui-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/compact-flywheel-wheel-coupled.json",
+    "../assets/flywheelpower/shapes/block/flywheel-axle.json"
+  ],
+  "textures": {
+    "wheel": "game:block/metal/ingot/steel",
+    "metal": "game:block/metal/ingot/steel",
+    "bearing": "game:block/metal/ingot/steel",
+    "chalk": "game:block/cloth/wool/red1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/blocktypes/compactflywheel.json",
+    "property": "guiTransform",
+    "variantCode": "compactflywheel-steel-steel-ud"
+  }
+}

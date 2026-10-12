@@ -1,0 +1,10 @@
+{
+  "name": "flywheel-full-timber-web-item",
+  "representation": "inventory-and-held-component",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-web-full.json"
+  ],
+  "textures": {
+    "wood": "game:block/wood/planks/generic"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "editor": { "allAngles": false, "entityTextureMode": false },
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "metal": "game:block/metal/ingot/iron",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "elements": [
+    {
+      "name": "LeftSleeper", "from": [1.0, 0.0, 2.0], "to": [4.75, 4.0, 14.0],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0,0,3.75,4] }, "east": { "texture": "#wood", "uv": [0,0,12,4] },
+        "south": { "texture": "#wood", "uv": [0,0,3.75,4] }, "west": { "texture": "#wood", "uv": [0,0,12,4] },
+        "up": { "texture": "#wood", "uv": [0,0,3.75,12] }, "down": { "texture": "#wood", "uv": [0,0,3.75,12] }
+      }
+    },
+    {
+      "name": "RightSleeper", "from": [11.25, 0.0, 2.0], "to": [15.0, 4.0, 14.0],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0,0,3.75,4] }, "east": { "texture": "#wood", "uv": [0,0,12,4] },
+        "south": { "texture": "#wood", "uv": [0,0,3.75,4] }, "west": { "texture": "#wood", "uv": [0,0,12,4] },
+        "up": { "texture": "#wood", "uv": [0,0,3.75,12] }, "down": { "texture": "#wood", "uv": [0,0,3.75,12] }
+      }
+    },
+    {
+      "name": "FrontCrossTie", "from": [1.125, 0.5, 0.5], "to": [14.875, 3.0, 2.25],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0,0,14,2.5] }, "east": { "texture": "#wood", "uv": [0,0,1.75,2.5] },
+        "south": { "texture": "#wood", "uv": [0,0,14,2.5] }, "west": { "texture": "#wood", "uv": [0,0,1.75,2.5] },
+        "up": { "texture": "#wood", "uv": [0,0,14,1.75] }, "down": { "texture": "#wood", "uv": [0,0,14,1.75] }
+      }
+    },
+    {
+      "name": "RearCrossTie", "from": [1.125, 0.5, 13.75], "to": [14.875, 3.0, 15.5],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0,0,14,2.5] }, "east": { "texture": "#wood", "uv": [0,0,1.75,2.5] },
+        "south": { "texture": "#wood", "uv": [0,0,14,2.5] }, "west": { "texture": "#wood", "uv": [0,0,1.75,2.5] },
+        "up": { "texture": "#wood", "uv": [0,0,14,1.75] }, "down": { "texture": "#wood", "uv": [0,0,14,1.75] }
+      }
+    },
+    {
+      "name": "LeftBearingPost", "from": [1.75, 1.5, 4.5], "to": [4.7, 7.25, 11.5],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0,0,2.95,5.75] }, "east": { "texture": "#wood", "uv": [0,0,7,5.75] },
+        "south": { "texture": "#wood", "uv": [0,0,2.95,5.75] }, "west": { "texture": "#wood", "uv": [0,0,7,5.75] },
+        "up": { "texture": "#wood", "uv": [0,0,2.95,7] }, "down": { "texture": "#wood", "uv": [0,0,2.95,7] }
+      }
+    },
+    {
+      "name": "RightBearingPost", "from": [11.3, 1.5, 4.5], "to": [14.25, 7.25, 11.5],
+      "faces": {
+        "north": { "texture": "#wood", "uv": [0,0,2.95,5.75] }, "east": { "texture": "#wood", "uv": [0,0,7,5.75] },
+        "south": { "texture": "#wood", "uv": [0,0,2.95,5.75] }, "west": { "texture": "#wood", "uv": [0,0,7,5.75] },
+        "up": { "texture": "#wood", "uv": [0,0,2.95,7] }, "down": { "texture": "#wood", "uv": [0,0,2.95,7] }
+      }
+    },
+    {
+      "name": "LeftBearingHousingLower", "from": [1.0, 4.75, 3.75], "to": [4.65, 5.75, 12.25],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "LeftBearingHousingUpper", "from": [1.0, 10.25, 3.75], "to": [4.65, 11.5, 12.25],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "LeftBearingHousingFront", "from": [1.0, 5.75, 3.75], "to": [4.65, 10.25, 5.75],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "LeftBearingHousingRear", "from": [1.0, 5.75, 10.25], "to": [4.65, 10.25, 12.25],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "RightBearingHousingLower", "from": [11.35, 4.75, 3.75], "to": [15.0, 5.75, 12.25],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "RightBearingHousingUpper", "from": [11.35, 10.25, 3.75], "to": [15.0, 11.5, 12.25],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "RightBearingHousingFront", "from": [11.35, 5.75, 3.75], "to": [15.0, 10.25, 5.75],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    },
+    {
+      "name": "RightBearingHousingRear", "from": [11.35, 5.75, 10.25], "to": [15.0, 10.25, 12.25],
+      "faces": {
+        "north": { "texture": "#wood" }, "east": { "texture": "#wood" }, "south": { "texture": "#wood" },
+        "west": { "texture": "#wood" }, "up": { "texture": "#wood" }, "down": { "texture": "#wood" }
+      }
+    }
+  ]
+}

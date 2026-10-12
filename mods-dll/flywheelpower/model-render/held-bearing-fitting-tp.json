@@ -1,0 +1,11 @@
+{
+  "name": "flywheel-bearing-fitting-third-person-transform",
+  "representation": "third-person-held-transform",
+  "shapes": ["../assets/flywheelpower/shapes/item/bearing-fitting.json"],
+  "textures": {"metal": "game:block/metal/sheet/iron1"},
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/bearingfittings.json",
+    "property": "tpHandTransform",
+    "reference": "grip-proxy"
+  }
+}
