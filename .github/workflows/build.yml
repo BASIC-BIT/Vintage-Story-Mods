@@ -9,6 +9,7 @@ on:
 
 env:
   VS_VERSION: "1.22.7"
+  VS_WINDOWS_SERVER_SHA256: "e72f27de387c53342a6aedafb181fdfb154816e263fec41c31823c9afd69c65c"
   DOTNET_VERSION: "10.0.x"
 
 jobs:
@@ -165,7 +166,7 @@ jobs:
         path: |
           vs-dependencies
           vs-installation
-        key: vs-deps-${{ env.VS_VERSION }}-harmony-runtime
+        key: vs-deps-${{ env.VS_VERSION }}-harmony-runtime-cairo-${{ env.VS_WINDOWS_SERVER_SHA256 }}
         
     - name: Download VS Dependencies
       if: steps.cache-vs-deps.outputs.cache-hit != 'true'
@@ -305,12 +306,11 @@ jobs:
       shell: pwsh
       
     - name: Install Cairo runtime for chat rendering tests
+      if: steps.cache-vs-deps.outputs.cache-hit != 'true'
       run: |
-        $metadata = Invoke-RestMethod -Uri "https://api.vintagestory.at/stable.json"
-        $download = $metadata.PSObject.Properties[$env:VS_VERSION].Value.windowsserver
         $archivePath = Join-Path $env:RUNNER_TEMP "vs-server-native.zip"
-        Invoke-WebRequest -Uri $download.urls.cdn -OutFile $archivePath
-        if ((Get-FileHash -LiteralPath $archivePath -Algorithm MD5).Hash -ne $download.md5) {
+        Invoke-WebRequest -Uri "https://cdn.vintagestory.at/gamefiles/stable/vs_server_win-x64_$env:VS_VERSION.zip" -OutFile $archivePath
+        if ((Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash -ne $env:VS_WINDOWS_SERVER_SHA256) {
           throw "Vintage Story server package checksum mismatch."
         }
         $archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
