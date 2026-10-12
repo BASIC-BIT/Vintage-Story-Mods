@@ -1,7 +1,8 @@
 #pragma warning disable S1133 // Deprecated config members are retained for live config compatibility.
 #pragma warning disable S1168 // Legacy shims must getter-return null: NullValueHandling.Ignore only
-                              // skips nulls, so an empty collection would write the retired key back
-                              // into every saved config.
+// skips nulls, so an empty collection would write the retired key back
+// into every saved config.
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
