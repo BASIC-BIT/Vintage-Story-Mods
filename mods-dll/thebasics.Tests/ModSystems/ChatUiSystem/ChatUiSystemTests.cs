@@ -353,6 +353,31 @@ public class ChatUiSystemTests
         GetStaticField<bool>("_characterSheetOpenedFromCharacterDialog").Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void ChatFormattingIsolation_DisabledOrMissingConfigLeavesNativeUpdate(bool? enabled)
+    {
+        var previousApi = GetStaticField<ICoreClientAPI>("_api");
+        var previousConfig = GetStaticField<ModConfig>("_config");
+        var api = Substitute.For<ICoreClientAPI>();
+        try
+        {
+            SetStaticField("_api", api);
+            SetStaticField<ModConfig>("_config", enabled.HasValue
+                ? new ModConfig { IsolateChatMessageFormatting = enabled.Value }
+                : null!);
+            long state = 0;
+            ChatUiModSystem.HudDialogChat_UpdateText_Prefix(null!, ref state).Should().BeTrue();
+            _ = api.DidNotReceive().World;
+        }
+        finally
+        {
+            SetStaticField("_api", previousApi);
+            SetStaticField("_config", previousConfig);
+        }
+    }
+
     private static void SetStaticField<T>(string name, T value)
     {
         var field = GetStaticFieldInfo(name);

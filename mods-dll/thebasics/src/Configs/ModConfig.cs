@@ -1,7 +1,8 @@
 #pragma warning disable S1133 // Deprecated config members are retained for live config compatibility.
 #pragma warning disable S1168 // Legacy shims must getter-return null: NullValueHandling.Ignore only
-                              // skips nulls, so an empty collection would write the retired key back
-                              // into every saved config.
+// skips nulls, so an empty collection would write the retired key back
+// into every saved config.
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -1161,5 +1162,10 @@ namespace thebasics.Configs
         [ProtoMember(158)]
         [DefaultValue(true)]
         public bool CharacterSheetAutoOpenOnCharacterScreen { get; set; } = true;
+
+        // Keep formatting scoped to individual chat messages. False uses vanilla history parsing.
+        [ProtoMember(159)]
+        [DefaultValue(true)]
+        public bool IsolateChatMessageFormatting { get; set; } = true;
     }
 }
