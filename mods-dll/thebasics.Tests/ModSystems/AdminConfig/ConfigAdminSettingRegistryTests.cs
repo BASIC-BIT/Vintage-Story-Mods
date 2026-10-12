@@ -291,6 +291,20 @@ public class ConfigAdminSettingRegistryTests
     }
 
     [Fact]
+    public void ChatFormattingIsolation_CanBeToggledLive()
+    {
+        var config = CreateConfig();
+        var setting = GetSetting("IsolateChatMessageFormatting");
+        setting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        setting.GetValue(config).Should().Be("1");
+
+        setting.TrySetValue(config, "false", out var error).Should().BeTrue(error);
+        config.IsolateChatMessageFormatting.Should().BeFalse();
+        setting.TrySetValue(config, "true", out error).Should().BeTrue(error);
+        config.IsolateChatMessageFormatting.Should().BeTrue();
+    }
+
+    [Fact]
     public void ChatHistorySettings_AreRegisteredAndValidateRanges()
     {
         var config = CreateConfig();

@@ -508,3 +508,11 @@ Messages:
 
 - Expand custom nested editors for any remaining variable-length config collections.
 - Investigate a targeted decompiled Vintage Story API diff between the previous supported version and the current version before major compatibility releases.
+
+## Chat formatting isolation
+
+IsolateChatMessageFormatting defaults to true. Each message in the chat window keeps its own formatting scope, so an unfinished tag in a server announcement cannot change later messages. This covers all chat tabs and message sources.
+
+Admins can change **Prevent chat formatting leaks** under **Client UX** in the config editor. Setting it to false restores vanilla history rendering for clients. Changes apply on the next chat update. Overhead bubbles and other UI text are unaffected.
+
+Independent parsing can introduce a small spacing difference in multiline histories with empty entries. In the measured case this was one pixel at UI scale 1.

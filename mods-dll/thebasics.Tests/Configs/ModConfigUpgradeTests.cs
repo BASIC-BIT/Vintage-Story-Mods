@@ -197,6 +197,49 @@ public class ModConfigUpgradeTests
         verb.Should().BeOneOf("whispers", "mumbles", "mutters");
     }
 
+    [Fact]
+    public void LegacyConfigGainsChatFormattingIsolationEnabled()
+    {
+        new ModConfig().IsolateChatMessageFormatting.Should().BeTrue();
+        LoadLegacyConfig().IsolateChatMessageFormatting.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ChatFormattingIsolation_PreservesServerChoiceInJsonAndWire(bool enabled)
+    {
+        var config = new ModConfig { IsolateChatMessageFormatting = enabled, ProximityChatTabPosition = "AfterGeneral" };
+        var json = JsonConvert.SerializeObject(config);
+        var fromJson = JsonConvert.DeserializeObject<ModConfig>(json)!;
+        fromJson.InitializeDefaultsIfNeeded();
+        fromJson.IsolateChatMessageFormatting.Should().Be(enabled);
+
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, config);
+        stream.Position = 0;
+        var restored = Serializer.Deserialize<ModConfig>(stream);
+        restored.IsolateChatMessageFormatting.Should().Be(enabled);
+        restored.ProximityChatTabPosition.Should().Be("AfterGeneral");
+        stream.Position = 0;
+        Serializer.Deserialize<PublishedChatFormattingConfig>(stream).IsolateChatMessageFormatting.Should().Be(enabled);
+
+        using var publishedStream = new MemoryStream();
+        Serializer.Serialize(publishedStream, new PublishedChatFormattingConfig { IsolateChatMessageFormatting = enabled });
+        publishedStream.Position = 0;
+        var fromPublished = Serializer.Deserialize<ModConfig>(publishedStream);
+        fromPublished.IsolateChatMessageFormatting.Should().Be(enabled);
+        fromPublished.ProximityChatTabPosition.Should().Be("GameOrder");
+    }
+
+    [ProtoContract]
+    public sealed class PublishedChatFormattingConfig
+    {
+        [ProtoMember(159)]
+        [System.ComponentModel.DefaultValue(true)]
+        public bool IsolateChatMessageFormatting { get; set; } = true;
+    }
+
     [ProtoContract]
     public sealed class PublishedSceneMarkerConfig
     {

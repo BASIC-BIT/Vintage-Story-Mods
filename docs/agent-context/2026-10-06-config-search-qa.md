@@ -39,7 +39,7 @@ The combined local suite passed 1,290 tests with no skips. The subsequent result
 
 The canonical combined package has been staged on QA server `8982de16` and Profile2/Profile3, with matching readback SHA-256 `59a59e0bbd1a6e5646502825007d0155bbac6cdfa7ae573a0287f525704fb699`. Source identity is `3ab79de9d2d8fb83bff5e4151a5edd05a47fed6f3a5a5a938195407c65bbadc4`. Build: zero errors, 141 warnings. The server reached RunGame at 23:59:10 UTC; `.tmp/wizard-native-combined-set` holds 13 source-verified native wizard scenes at GUI scale 1.125. In-game search and all human cards remain pending. Combined standalone search artifacts are in `.tmp/combined-search-tests` and `.tmp/combined-search-denial-tests`.
 
-`ProximityChatTabPosition` uses `ProtoMember(159)`. The existing `CharacterSheetAutoOpenOnCharacterScreen` remains at `ProtoMember(158)`; integration does not renumber it.
+After the October 12 main integration, `ProximityChatTabPosition` uses `ProtoMember(160)`. Main's shipped `IsolateChatMessageFormatting` keeps `ProtoMember(159)`. The existing `CharacterSheetAutoOpenOnCharacterScreen` remains at `ProtoMember(158)`.
 
 ### Historical source-only validation
 

@@ -166,6 +166,14 @@ At minimum, verify:
 - Build workflow downloads or restores the requested dependency version.
 - Build workflow gets past dependency verification, restore, build, formatting, and tests.
 
+### Native Cairo test runtime
+
+Chat-history rendering comparisons need the native Windows Cairo library as well as cairo-sharp.dll. On dependency-cache misses, the build workflow downloads the official Windows server archive for its pinned VS_VERSION, verifies it against VS_WINDOWS_SERVER_SHA256 stored in build.yml, and extracts only Lib/libcairo-2.dll into the staged install before building tests. The existing cache paths retain the library; cache hits make no vendor download. The cache key includes the archive hash. GuiPreview's existing project reference copies that runtime to the test output.
+
+When updating VS_VERSION, update VS_WINDOWS_SERVER_SHA256 using a verified official Windows server archive and compare the extracted library against the intended local installation. Do not derive the trusted hash from live metadata during CI.
+
+If chat rendering tests fail with DllNotFoundException for libcairo-2, inspect this step and the native library in the test output. Keep the rendering tests enabled. This download does not change the pinned game version or push files to vs-build-dependencies.
+
 ## Failure Triage
 
 ### GUI capture dependencies

@@ -96,7 +96,7 @@ The earlier combined preview becomes these page-specific scenes. A future settin
 
 Advanced editor suspends the wizard and opens the existing `/basic config` workflow. Its settings draft and search query survive category changes, closing Search, dedicated editor roundtrips, and canceled discard. A true config-menu close clears the search query and focus target. Reopen the suspended wizard with `/basic setup`; closing the advanced editor returns to the game. The wizard draft and advanced settings draft are separate. Search indexes setting values and definition metadata, not players' character-sheet answers. Rich visual language editing remains a later release.
 
-The integrated tab-position setting uses `ProtoMember(159)`, preserving the existing `CharacterSheetAutoOpenOnCharacterScreen` field at `ProtoMember(158)`. Recovery for language and field open denials delivered as result messages preserves the main editor draft and query in native GUI regression checks. Human observations must verify the full in-game route.
+After the October 12 main integration, the integrated tab-position setting uses `ProtoMember(160)`. Main's shipped `IsolateChatMessageFormatting` keeps `ProtoMember(159)`, and `CharacterSheetAutoOpenOnCharacterScreen` remains at `ProtoMember(158)`. Recovery for language and field open denials delivered as result messages preserves the main editor draft and query in native GUI regression checks. Human observations must verify the full in-game route.
 
 ## Invitation and access
 

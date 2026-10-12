@@ -129,6 +129,7 @@ public class SetupWizardStateTests
         var current = CreateConfig();
         var state = new SetupWizardState(current);
         current.Teleportation.HomeWarmupSeconds = 42;
+        current.IsolateChatMessageFormatting = false;
         var request = Request([Value("EnableChatter", "false")], [Value("EnableChatter", "1")]);
 
         state.TryValidatePatch(current, request, out var draft, out var changed, out var conflicts, out var errors)
@@ -140,6 +141,7 @@ public class SetupWizardStateTests
         draft.Should().NotBeSameAs(current);
         draft.EnableChatter.Should().BeFalse();
         draft.Teleportation.HomeWarmupSeconds.Should().Be(42);
+        draft.IsolateChatMessageFormatting.Should().BeFalse();
         draft.Teleportation.HomeWarmupSeconds = 7;
         current.EnableChatter.Should().BeTrue();
         current.Teleportation.HomeWarmupSeconds.Should().Be(42);
