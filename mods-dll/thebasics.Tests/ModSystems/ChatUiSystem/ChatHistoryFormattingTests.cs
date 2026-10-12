@@ -1,3 +1,6 @@
+using System.Runtime.CompilerServices;
+using thebasics.Configs;
+using Vintagestory.API.Datastructures;
 using Cairo;
 using HarmonyLib;
 using Vintagestory.Client.NoObf;
@@ -38,6 +41,91 @@ public class ChatHistoryFormattingTests : IDisposable
         finally
         {
             harmony.Unpatch(original, HarmonyPatchType.All, harmony.Id);
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(77)]
+    public void NativeHudUpdate_ReplacesComponentsPreservesHeldScrollAndTogglesLive(int groupId)
+    {
+        var apiField = AccessTools.Field(typeof(ChatUiModSystem), "_api");
+        var configField = AccessTools.Field(typeof(ChatUiModSystem), "_config");
+        var previousApi = apiField.GetValue(null);
+        var previousConfig = configField.GetValue(null);
+        var api = Substitute.For<ICoreClientAPI>();
+        // Initialize only the native HUD/world state used by UpdateText; GPU uploads stay mocked.
+        var game = (ClientMain)RuntimeHelpers.GetUninitializedObject(typeof(ClientMain));
+        game.currentGroupid = groupId;
+        var history = new LimitedList<string>(100);
+        history.Add("<strong>restart<br>");
+        for (var i = 0; i < 20; i++) history.Add($"<font color=\"#ffffff\">plain-marker-{i}</font>");
+        game.ChatHistoryByPlayerGroup = new Dictionary<int, LimitedList<string>> { [groupId] = history };
+        api.World.Returns(game);
+        var hud = (HudDialogChat)RuntimeHelpers.GetUninitializedObject(typeof(HudDialogChat));
+        AccessTools.Field(typeof(HudDialogChat), "game").SetValue(hud, game);
+        hud.Composers = new GuiDialog.DlgComposers(hud);
+        var font = CairoFont.WhiteDetailText().WithFontSize(17f);
+        var oldComponent = Substitute.ForPartsOf<RichTextComponent>(api, "old", font);
+        using var historyComposer = new GuiComposer(api, ElementBounds.FixedSize(220, 600).WithEmptyParent(), "history");
+        var richtext = new GuiElementRichtext(api, [oldComponent], ElementBounds.FixedSize(220, 1));
+        historyComposer.AddInteractiveElement(richtext, "chathistory");
+        hud.Composers["chat-group-" + groupId] = historyComposer;
+        var scrollChanges = new List<float>();
+        using var chatComposer = new GuiComposer(api, ElementBounds.FixedSize(10, 80).WithEmptyParent(), "chat");
+        var scrollbar = new GuiElementCompactScrollbar(api, scrollChanges.Add, ElementBounds.FixedSize(10, 80));
+        chatComposer.AddInteractiveElement(scrollbar, "scrollbar");
+        hud.Composers["chat"] = chatComposer;
+        scrollbar.Bounds.CalcWorldBounds();
+        scrollbar.SetHeights(80, 80);
+        scrollChanges.Clear();
+        var original = AccessTools.Method(typeof(HudDialogChat), "UpdateText");
+        var harmony = new Harmony("thebasics.tests.native-hud-" + Guid.NewGuid());
+        var config = new ModConfig { IsolateChatMessageFormatting = true };
+        try
+        {
+            apiField.SetValue(null, api);
+            configField.SetValue(null, config);
+            harmony.Patch(original,
+                prefix: new HarmonyMethod(typeof(ChatUiModSystem), nameof(ChatUiModSystem.HudDialogChat_UpdateText_Prefix)),
+                postfix: new HarmonyMethod(typeof(ChatUiModSystem), nameof(ChatUiModSystem.HudDialogChat_UpdateText_Postfix)));
+            original.Invoke(hud, null);
+
+            oldComponent.Received(1).Dispose();
+            richtext.Components.OfType<RichTextComponent>().Single(c => c.DisplayText == "plain-marker-0")
+                .Font.FontWeight.Should().Be(FontWeight.Normal);
+            richtext.Bounds.fixedHeight.Should().BeGreaterThan(80);
+            scrollChanges.Last().Should().Be((float)richtext.Bounds.fixedHeight + 5 - 80);
+            LoadedTexture texture = null!;
+            api.Gui.ReceivedWithAnyArgs().LoadOrUpdateCairoTexture(null!, true, ref texture);
+
+            scrollbar.mouseDownOnScrollbarHandle = true;
+            scrollbar.SetScrollbarPosition(0);
+            scrollChanges.Clear();
+            history.Add("<font color=\"#ffffff\">later-marker</font>");
+            original.Invoke(hud, null);
+            scrollChanges.Should().ContainSingle().Which.Should().Be(0);
+            richtext.Components.OfType<RichTextComponent>().Single(c => c.DisplayText == "later-marker")
+                .Font.FontWeight.Should().Be(FontWeight.Normal);
+
+            config.IsolateChatMessageFormatting = false;
+            original.Invoke(hud, null);
+            richtext.Components.OfType<RichTextComponent>().Single(c => c.DisplayText.Contains("later-marker"))
+                .Font.FontWeight.Should().Be(FontWeight.Bold);
+
+            config.IsolateChatMessageFormatting = true;
+            scrollbar.mouseDownOnScrollbarHandle = false;
+            scrollChanges.Clear();
+            original.Invoke(hud, null);
+            richtext.Components.OfType<RichTextComponent>().Single(c => c.DisplayText == "later-marker")
+                .Font.FontWeight.Should().Be(FontWeight.Normal);
+            scrollChanges.Last().Should().Be((float)richtext.Bounds.fixedHeight + 5 - 80);
+        }
+        finally
+        {
+            harmony.Unpatch(original, HarmonyPatchType.All, harmony.Id);
+            apiField.SetValue(null, previousApi);
+            configField.SetValue(null, previousConfig);
         }
     }
 
