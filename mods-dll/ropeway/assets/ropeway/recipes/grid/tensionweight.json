@@ -1,0 +1,12 @@
+{
+  "//": "A frame and a heavy mass: stone for the mass, planks for the guide, and the sheave it hangs over. Pattern and yield UNCHANGED - the shape is right and QA-SCRIPT step 2's sketch of it stays valid. Only the bit quantity moves, 1 -> 8 a side, so 0.1 -> 0.8 ingot: it is a station cell, and at 0.1 the metal in it meant nothing at all.",
+  "ingredientPattern": "MSM,PSP,PSP",
+  "ingredients": {
+    "S": { "type": "item", "code": "game:stone-*" },
+    "P": { "type": "item", "code": "game:plank-*" },
+    "M": { "type": "item", "code": "game:metalbit-*", "quantity": 8 }
+  },
+  "width": 3,
+  "height": 3,
+  "output": { "type": "block", "code": "tensionweight", "quantity": 1 }
+}

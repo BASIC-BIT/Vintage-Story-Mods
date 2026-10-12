@@ -1,0 +1,13 @@
+{
+  "//": "One cell of lattice leg with the counterweight's rails and its rope. This was the sharpest incoherence in the folder: 3 plates for 2 cells is 1.5 plates a cell, against the DRIVE shaft's 1 - so the block whose own neighbours' comments call the tensioner 'not a machine' was the most plate-hungry cell in the mod, 50% dearer than the leg with the actual drive in it. One plate and sixteen bits, yield 3 against a leg of three cells: 3 -> 0.93 ingots per cell. That is a shade OVER the drive shaft it mirrors at 0.80, not under - this cell carries two bit slots to the shaft's one - and 0.13 of an ingot a cell is not worth touching a grid for. The ordering the fiction wanted holds everywhere it is worth having: tension head 3.60 against drive head 4.00, tension footing 0.85 against 2.05, tension weight 0.80 against drive housing 2.80, and the whole tension station 12.70 against the drive station's 15.90.",
+  "ingredientPattern": "SPS,BRB",
+  "ingredients": {
+    "S": { "type": "item", "code": "game:stick" },
+    "P": { "type": "item", "code": "game:metalplate-*" },
+    "B": { "type": "item", "code": "game:metalbit-*", "quantity": 8 },
+    "R": { "type": "item", "code": "game:rope" }
+  },
+  "width": 3,
+  "height": 2,
+  "output": { "type": "block", "code": "tensionguide", "quantity": 3 }
+}

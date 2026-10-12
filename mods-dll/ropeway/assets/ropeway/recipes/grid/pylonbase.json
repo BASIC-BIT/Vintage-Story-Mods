@@ -1,0 +1,13 @@
+{
+  "//": "Pattern and quantities UNCHANGED - only the wildcard names are gone (see brace.json). Checked, not skipped: cheap and wood-first, per DECISIONS.md 3. Loose stone for the pad, a plank sill, and one metal bit for the drive plate. It repeats once per tower, so it is the one that must stay near-free.",
+  "//expansion": "This file alone used to register 9,100 grid recipes - 14 woods x 26 metals x 25 rocks - because all three wildcards were named. The output is 'pylonbase-north' with no placeholder in it, so all 9,100 were identical bar their ingredient codes.",
+  "ingredientPattern": "PMP,SSS",
+  "ingredients": {
+    "P": { "type": "item", "code": "game:plank-*" },
+    "M": { "type": "item", "code": "game:metalbit-*" },
+    "S": { "type": "item", "code": "game:stone-*" }
+  },
+  "width": 3,
+  "height": 2,
+  "output": { "type": "block", "code": "pylonbase-north", "quantity": 1 }
+}

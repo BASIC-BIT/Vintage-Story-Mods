@@ -1,0 +1,280 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "girder": "game:block/metal/riveted/iron1",
+    "machine": "game:block/metal/tarnished/iron",
+    "shaft": "game:block/metal/plate/steel"
+  },
+  "elements": [
+    {
+      "//": "brace.json's girder profile, copied box for box. A machine cell is a brace cell with gear on top of it, so the crossarm has to read continuous across the join or the tower looks like two structures bolted together.",
+      "name": "foot",
+      "from": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "to": [
+        16.0,
+        2.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "beam",
+      "from": [
+        2.0,
+        2.0,
+        5.0
+      ],
+      "to": [
+        14.0,
+        14.0,
+        11.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "flangewest",
+      "from": [
+        0.0,
+        2.0,
+        4.0
+      ],
+      "to": [
+        2.0,
+        15.0,
+        12.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "flangeeast",
+      "from": [
+        14.0,
+        2.0,
+        4.0
+      ],
+      "to": [
+        16.0,
+        15.0,
+        12.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "//": "The knee: vertical shaft in from the cell below, horizontal shaft out to the west. It reaches 1.5 units below its own cell so the drive shaft's top visibly enters it instead of stopping at a seam.",
+      "name": "gearbox",
+      "from": [
+        3.5,
+        -1.5,
+        3.5
+      ],
+      "to": [
+        12.5,
+        28.2,
+        12.5
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "gearcap",
+      "from": [
+        2.5,
+        28.2,
+        2.5
+      ],
+      "to": [
+        13.5,
+        29.7,
+        13.5
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "//": "Leaves west at the lay shaft's height, so gearbox to bullwheel hub is one unbroken line at one height.",
+      "name": "shaftwest",
+      "from": [
+        0.0,
+        24.7,
+        7.0
+      ],
+      "to": [
+        4.0,
+        26.7,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    }
+  ]
+}
