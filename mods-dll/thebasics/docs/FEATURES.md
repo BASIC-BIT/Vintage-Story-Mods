@@ -83,14 +83,14 @@ Features:
 - Shared server config object so live-safe changes update existing systems without replacing stale references.
 - Client config resync after successful saves or disk reloads.
 - New-setting discovery through persisted `ReviewedConfigSettingKeys`.
-- Live/restart labeling in the panel; startup-shaped settings can be edited but are reported as restart-required.
+- The panel identifies changes that apply immediately and changes that require a server restart.
 
 Admin commands:
 
 - `/basic config`, `/thebasics config`, `/tb config`
 - `/basic reloadconfig`, `/thebasics reloadconfig`, `/tb reloadconfig`
 
-Live-applied setting groups currently include chatter, typing indicators, nametag display/range/style, map player visibility, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, per-mode proximity/chat/audio dictionaries, chat delimiters, player-stat toggles, and debug mode. Restart-required settings include startup-shaped command registration, chat group setup, language system enablement, and player stats enablement.
+Setting groups that apply immediately include chatter, typing indicators, nametag display/range/style, map player visibility, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, per-mode proximity/chat/audio dictionaries, chat delimiters, player-stat toggles, and debug mode. Changes to the available travel and nickname commands, chat group setup, or language and player-statistics enablement require a server restart.
 
 The admin panel exposes fixed-shape complex settings as validated flattened rows. This covers per-mode distance, obfuscation, font-size, verb, punctuation, RPTTS, chatter dictionaries, chat delimiter start/end values, player-stat toggles, and comma-separated font-size clamps. Variable-length/nested collections use dedicated editors where available: `/thebasics config languages` for `Languages` and `/thebasics config charsheetfields` for `CharacterSheetFields`. Prefer these editors over direct JSON edits because they validate field keys, bindings, options, and persisted character-sheet compatibility.
 
