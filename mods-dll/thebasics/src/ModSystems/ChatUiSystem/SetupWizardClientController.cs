@@ -75,7 +75,7 @@ public sealed class SetupWizardClientController : IDisposable
                 {
                     _authorized = false;
                     CurrentDialog.Suspend();
-                    _api.ShowChatMessage(result.Message ?? "Setup authorization was lost. Your draft is kept; reopen with /basic setup after access is restored.");
+                    _api.ShowChatMessage(result.Message ?? "You no longer have permission to change these settings. Your edits are still here. Reopen with /basic setup when you have access again.");
                 }
             }
             else _api.ShowChatMessage(result.Message ?? "Setup is not available.");
@@ -97,7 +97,7 @@ public sealed class SetupWizardClientController : IDisposable
             {
                 _api.Logger.Error("The BASICs setup could not reopen: {0}", error);
                 CurrentDialog.Suspend();
-                _api.ShowChatMessage("Setup could not reopen. Your draft is kept; try /basic setup again.");
+                _api.ShowChatMessage("Could not reopen setup. Your edits are still here. Try /basic setup again.");
             }
             return;
         }
@@ -118,7 +118,7 @@ public sealed class SetupWizardClientController : IDisposable
         {
             _api.Logger.Error("The BASICs setup could not open: {0}", error);
             Close();
-            _api.ShowChatMessage("Setup could not open. See the client log, or use /basic config.");
+            _api.ShowChatMessage("Could not open setup. Use /basic config to edit your settings.");
             return;
         }
         Track("hub", "viewed", null);
@@ -170,7 +170,7 @@ public sealed class SetupWizardClientController : IDisposable
         {
             _opening = false;
             _captureRequested = false;
-            if (!_disposed) _api.ShowChatMessage("Setup could not open. Try /basic setup again.");
+            if (!_disposed) _api.ShowChatMessage("Could not open setup. Try /basic setup again.");
         });
         _channel.SendPacketSafely(new TheBasicsSetupWizardRequestMessage
         {
@@ -189,8 +189,8 @@ public sealed class SetupWizardClientController : IDisposable
             dialog.SetRequestFailure(message);
             Track("review", action, null);
         }
-        var id = BeginRequest(() => Failure("Could not send the save. Your changes are kept; try again.", "save_failed"),
-            () => Failure("The server did not acknowledge the save. Your changes are kept; try again.", "save_timeout"));
+        var id = BeginRequest(() => Failure("Could not send your changes. Your edits are still here. Try again.", "save_failed"),
+            () => Failure("The server has not confirmed the save. Your edits are still here. Try again.", "save_timeout"));
         var request = dialog.Draft.CreateSaveRequest(id, _runId);
         Track("review", "save_requested", null);
         _channel.SendPacketSafely(request, () => _requests.Fail(id));

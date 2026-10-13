@@ -114,9 +114,9 @@ public class SetupGuidePreviewTests
         wizard.ShowPage("teleport.requests");
         var text = (string)typeof(SetupWizardDialog).GetMethod("BuildPreviewText", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(wizard, null)!;
-        Assert.Contains(enabled ? "TPA gear is charged when submitting" : "TPA needs no gear", text);
-        Assert.Contains(enabled ? "Cooldown:" : "Cooldown off", text);
-        Assert.Contains(enabled ? "Timeout:" : "Timeout off", text);
+        Assert.Contains(enabled ? "Sending a request costs one temporal gear" : "No temporal gear is required", text);
+        Assert.Contains(enabled ? "in-game hours between requests" : "No wait between requests", text);
+        Assert.Contains(enabled ? "Requests expire after" : "Requests do not expire", text);
     }
 
     [Fact]

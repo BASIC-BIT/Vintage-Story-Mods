@@ -55,7 +55,7 @@ public class SetupWizardClientControllerTests
         draft.IsDirty.Should().BeTrue();
         dialog.IsOpened().Should().BeFalse();
         host.Api.Gui.LoadedGuis.Should().NotContain(dialog);
-        api.Received(1).ShowChatMessage("Setup could not reopen. Your draft is kept; try /basic setup again.");
+        api.Received(1).ShowChatMessage("Could not reopen setup. Your edits are still here. Try /basic setup again.");
 
         controller.Open();
         controller.HandleResult(new TheBasicsSetupWizardResultMessage
@@ -93,7 +93,7 @@ public class SetupWizardClientControllerTests
         failure.Should().BeNull();
         controller.CurrentDialog.Should().BeNull();
         controller.IsCaptureOnly.Should().BeFalse();
-        api.Received(1).ShowChatMessage("Setup could not open. See the client log, or use /basic config.");
+        api.Received(1).ShowChatMessage("Could not open setup. Use /basic config to edit your settings.");
         controller.OpenForCapture();
         channel.Received(2).SendPacket(Arg.Is<TheBasicsSetupWizardRequestMessage>(request => request.CaptureOnly));
     }

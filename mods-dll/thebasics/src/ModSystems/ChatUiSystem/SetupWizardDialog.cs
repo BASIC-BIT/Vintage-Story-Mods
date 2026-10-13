@@ -131,12 +131,13 @@ public sealed class SetupWizardDialog : GuiDialog
         _runtimeApplyFailed = result.RuntimeApplyFailed;
         if (result.Success && !Draft.IsDirty)
         {
+            _message = null;
             ShowPage("finish");
             Track("completed");
         }
         else
         {
-            if (result.Success) _message = (_runtimeApplyFailed ? result.Message + " " : "Saved. ") + "Changes made while saving are still in your draft.";
+            if (result.Success) _message = (_runtimeApplyFailed ? result.Message + " " : "Saved. ") + "Your newer edits are not saved yet.";
             ShowPage("review");
         }
     }
@@ -145,7 +146,7 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         Draft.CancelRequest();
         _pending = false;
-        _message = message ?? "The request failed. Your changes are kept.";
+        _message = message ?? "Could not save your changes. Your edits are still here.";
         ComposeDialog();
     }
 
@@ -185,7 +186,7 @@ public sealed class SetupWizardDialog : GuiDialog
         else if (CurrentStepId == "finish") ComposeFinish(composer);
         else ComposePage(composer);
 
-        Text(composer, _message ?? (_pending ? "Waiting for the server to acknowledge the save..." : "Changes stay in this draft until you save."), 0, StatusY, Width, CompactLayout ? 30 : 42);
+        Text(composer, _message ?? (_pending ? "Saving settings..." : Draft.IsDirty && CurrentStepId != "hub" ? "Your changes aren't saved yet." : ""), 0, StatusY, Width, CompactLayout ? 30 : 42);
         Button(composer, "Close", () => TryClose(), Width - 110, FooterY, 110);
         composer.EndChildElements().Compose(focusFirstElement: false);
         _sample = SingleComposer.GetRichtext("preview-text");
@@ -194,21 +195,22 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void ComposeHub(GuiComposer composer)
     {
-        Text(composer, "A few choices, with previews of your draft", 0, 92, Width, 30, true);
-        Text(composer, "Choose a topic. Back and skipping keep your edits. The advanced editor remains available.", 0, 129, Width, 48);
+        Text(composer, "Set up your server", 0, 92, Width, 30, true);
+        Text(composer, "Choose a topic to get started.", 0, 129, Width, 48);
         Button(composer, "Chat", () => ShowPage("chat.basics"), 0, 205, 270, 52);
         Button(composer, "Teleportation", () => ShowPage("teleport.tools"), 305, 205, 270, 52);
         Button(composer, "Notifications", () => ShowPage("notifications.savestart"), 610, 205, 270, 52);
-        Text(composer, "Chat\nPresentation, languages, hearing ranges and tabs.", 12, 275, 248, 80);
-        Text(composer, "Teleportation\nChoose BASICs commands, then their costs and timing.", 317, 275, 248, 80);
-        Text(composer, "Notifications\nSave announcements and sleep reminders.", 622, 275, 248, 80);
-        Text(composer, $"{Draft.ChangedKeys.Count} changes ready to review." + (NeedsRestart ? " Some saved changes still need a server restart." : ""), 0, CompactLayout ? 358 : 397, 640, 40);
+        Text(composer, "Chat style, languages and hearing distance.", 12, 275, 248, 80);
+        Text(composer, "Teleport requests, homes and travel commands.", 317, 275, 248, 80);
+        Text(composer, "Save announcements and sleep reminders.", 622, 275, 248, 80);
+        var changes = Draft.ChangedKeys.Count;
+        if (changes > 0) Text(composer, changes == 1 ? "1 unsaved change" : $"{changes} unsaved changes", 0, CompactLayout ? 358 : 397, 640, 40);
         var guideBounds = ElementBounds.Fixed(690, CompactLayout ? 352 : 350, 170, CompactLayout ? 98 : 154);
         if (LayoutOnly) Text(composer, "Native 3D Pip omitted", guideBounds.fixedX, guideBounds.fixedY, guideBounds.fixedWidth, guideBounds.fixedHeight);
         else composer.AddInteractiveElement(new PreviewActorElement(capi, guideBounds, this), "pip");
         Button(composer, "Review changes", () => ShowPage("review"), 0, CompactLayout ? 403 : 453, 240);
         if (_onAdvanced != null)
-            Button(composer, "Advanced editor", () => { Track("advanced"); Suspend(); _onAdvanced(); }, 260, CompactLayout ? 403 : 453, 240);
+            Button(composer, "All settings", () => { Track("advanced"); Suspend(); _onAdvanced(); }, 260, CompactLayout ? 403 : 453, 240);
     }
 
     private void ComposePage(GuiComposer composer)
@@ -230,7 +232,7 @@ public sealed class SetupWizardDialog : GuiDialog
         else Button(composer, "< Back", () => { Track("back"); ShowPage("hub"); }, 8, FooterY, 92);
         var next = index + 1 < pages.Count ? pages[index + 1].Id : "hub";
         Button(composer, index + 1 < pages.Count ? "Next >" : "Topics", () => ShowPage(next), 108, FooterY, 100);
-        Button(composer, "Skip topic", () => { Track("skip"); ShowPage("hub"); }, 615, FooterY, 132);
+        Button(composer, "All topics", () => { Track("skip"); ShowPage("hub"); }, 615, FooterY, 132);
         var codes = pages.Select(candidate => candidate.Id).ToArray();
         composer.AddInteractiveElement(new GuiElementDropDown(capi, codes, pages.Select((candidate, number) => $"{number + 1}/{pages.Count}  {candidate.Title}").ToArray(),
             Math.Max(0, index), (value, _) => ShowPage(value), ElementBounds.Fixed(220, FooterY, 380, 30), CairoFont.WhiteSmallText(), false), "page-picker");
@@ -269,8 +271,7 @@ public sealed class SetupWizardDialog : GuiDialog
     private void AddSetting(GuiComposer composer, string key, ref double y)
     {
         if (!ConfigAdminSettingRegistry.TryGet(key, out var definition)) return;
-        var label = key == "DisableRPChat" ? "RP features" : definition.Label;
-        if (key == "SleepNotificationThreshold") label = "Sleeping players needed (%)";
+        var label = SettingLabel(definition);
         Text(composer, label, 334, y, 546, 21);
         var bounds = ElementBounds.Fixed(334, y + 23, 546, 28);
         var value = Draft.Get(key);
@@ -312,8 +313,17 @@ public sealed class SetupWizardDialog : GuiDialog
             composer.AddInteractiveElement(input, key);
         }
         if (key != "ProximityChatPresentationMode")
-            composer.AddHoverText(definition.Description + (definition.ReloadBehavior == ConfigAdminReloadBehavior.RestartRequired
-                ? "\nThis change takes effect after the server restarts." : ""), CairoFont.WhiteSmallText(), 400, bounds.FlatCopy(), "help-" + key);
+        {
+            var help = key switch
+            {
+                "SleepNotificationThreshold" => "Percentage of online players who must be in bed to trigger a reminder. Enter 50 for 50%. At 0% or 100%, no reminder is sent.",
+                "DisableRPChat" => "Enable roleplay commands, languages and global OOC. Nearby chat still works when this is off.",
+                _ => definition.Description
+            };
+            if (definition.ReloadBehavior == ConfigAdminReloadBehavior.RestartRequired && !help.Contains("restart", StringComparison.OrdinalIgnoreCase))
+                help += "\nThis change takes effect after the server restarts.";
+            composer.AddHoverText(help, CairoFont.WhiteSmallText(), 400, bounds.FlatCopy(), "help-" + key);
+        }
         y += CurrentStepId == "chat.basics" ? (CompactLayout ? 50 : 61) : CompactLayout ? 54 : 65;
     }
 
@@ -334,7 +344,6 @@ public sealed class SetupWizardDialog : GuiDialog
             }, ElementBounds.Fixed(334, y + 23, 546, 28), CairoFont.WhiteSmallText(), false), "announcement-mode");
         y += CompactLayout ? 54 : 65;
         AddSetting(composer, text, ref y);
-        Text(composer, "This controls the announcement. Saving and save pauses continue when it is Off.", 334, y + 12, 546, 75);
     }
 
     private void Changed(string key, string value, string choice, bool recompose)
@@ -356,17 +365,17 @@ public sealed class SetupWizardDialog : GuiDialog
     private void ComposeReview(GuiComposer composer)
     {
         Text(composer, "Review changes", 0, 90, Width, 28, true);
-        Text(composer, "Check your changes before saving. Settings marked After restart take effect when the server restarts.", 0, 125, Width, 42);
+        Text(composer, "Check the changes below, then save. Anything marked After restart will take effect when the server restarts.", 0, 125, Width, 42);
         var keys = Draft.ChangedKeys;
         var y = 180d;
         foreach (var key in keys.Skip(_reviewOffset).Take(5))
         {
             ConfigAdminSettingRegistry.TryGet(key, out var definition);
-            Text(composer, (key == "DisableRPChat" ? "RP features" : definition.Label) + (definition.ReloadBehavior == ConfigAdminReloadBehavior.Live ? "" : " | After restart"), 0, y, Width, 20, true);
+            Text(composer, SettingLabel(definition) + (definition.ReloadBehavior == ConfigAdminReloadBehavior.Live ? "" : " | After restart"), 0, y, Width, 20, true);
             Text(composer, $"{DisplayValue(definition, Draft.GetOriginal(key))}  >  {DisplayValue(definition, Draft.Get(key))}", 0, y + 22, Width, 36);
             y += CompactLayout ? 54 : 64;
         }
-        if (keys.Count == 0) Text(composer, "No settings changed. Save to confirm the current pending restart state.", 0, y, Width, 60);
+        if (keys.Count == 0) Text(composer, NeedsRestart ? "No new changes. Restart the server to apply your saved settings." : "No changes to save.", 0, y, Width, 60);
         if (keys.Count > 5)
             Button(composer, $"More changes ({_reviewOffset + 1}-{Math.Min(_reviewOffset + 5, keys.Count)} of {keys.Count})", () =>
             { _reviewOffset = _reviewOffset + 5 < keys.Count ? _reviewOffset + 5 : 0; ComposeDialog(); }, 335, FooterY, 420);
@@ -376,7 +385,7 @@ public sealed class SetupWizardDialog : GuiDialog
             {
                 if (_pending) return;
                 _pending = true;
-                _message = "Waiting for the server to acknowledge the save...";
+                _message = "Saving settings...";
                 ComposeDialog();
                 _onSave?.Invoke();
             }, 160, FooterY, 160);
@@ -386,21 +395,20 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         Text(composer, IsCaptureOnly ? "QA example: saved settings" : "Settings saved", 0, 90, Width, 28, true);
         if (!NeedsRestart)
-            Text(composer, "Your changes are active. You can return to the game.", 0, 145, Width, 80);
+            Text(composer, "Your settings are now in use.", 0, 145, Width, 80);
         else
         {
-            Text(composer, "Saved settings awaiting restart:", 0, 143, Width, 27, true);
-            var names = _restartKeys.Select(key => ConfigAdminSettingRegistry.TryGet(key, out var setting) ? setting.Label : key);
-            Text(composer, _runtimeApplyFailed ? "Live application failed. Restart to apply the saved settings.\n" + string.Join(", ", names) : string.Join(", ", names), 0, 179, Width, 126);
+            Text(composer, "Restart needed", 0, 143, Width, 27, true);
+            var names = _restartKeys.Select(key => ConfigAdminSettingRegistry.TryGet(key, out var setting) ? SettingLabel(setting) : key);
+            Text(composer, _runtimeApplyFailed ? "Restart the server to apply the saved settings.\n" + string.Join(", ", names) : string.Join(", ", names), 0, 179, Width, 126);
             Text(composer, RestartInstructions(), 0, 330, Width, 90);
-            Button(composer, "How to restart", () => { _message = RestartInstructions(); ComposeDialog(); }, 0, CompactLayout ? 411 : 455, 210);
         }
         Button(composer, "Back to setup", () => ShowPage("hub"), 0, FooterY, 180);
         Button(composer, NeedsRestart ? "Later" : "Done", () => TryClose(), 195, FooterY, 150);
     }
 
     private string RestartInstructions() => _isDedicated
-        ? "Restart the server from your hosting panel, or stop and start it using your normal launch method. Players must reconnect."
+        ? "Restart the server from your hosting panel. If you host it yourself, stop and start the server. Players will need to reconnect."
         : "Save and quit to the main menu, then reopen this world.";
 
     private void AddPreview(GuiComposer composer)
@@ -511,19 +519,28 @@ public sealed class SetupWizardDialog : GuiDialog
     private string TeleportExplanation()
     {
         if (CurrentStepId.Contains("request", StringComparison.Ordinal))
-            return "Request > accept > stand still > arrive.\n" +
-                (Bool("TpaRequireTemporalGear") ? "TPA gear is charged when submitting." : "TPA needs no gear.") +
-                (Bool("TpaUseCooldown") ? $" Cooldown: {Draft.Get("TpaCooldownInGameHours")} in-game hours." : " Cooldown off.") +
-                (Bool("TpaUseTimeout") ? $" Timeout: {Draft.Get("TpaTimeoutMinutes")} real minutes." : " Timeout off.") +
-                $" Warmup: {Draft.Get("Teleportation.TpaWarmupSeconds")} real seconds.";
+            return "The other player must accept.\n" +
+                (Bool("TpaRequireTemporalGear") ? "Sending a request costs one temporal gear." : "No temporal gear is required.") + "\n" +
+                (Bool("TpaUseCooldown") ? $"Wait {Draft.Get("TpaCooldownInGameHours")} in-game hours between requests." : "No wait between requests.") + "\n" +
+                (Bool("TpaUseTimeout") ? $"Requests expire after {Draft.Get("TpaTimeoutMinutes")} real minutes." : "Requests do not expire.") + "\n" +
+                (Number("Teleportation.TpaWarmupSeconds") > 0 ? $"After acceptance, stand still for {Draft.Get("Teleportation.TpaWarmupSeconds")} real seconds." : "Teleport immediately after acceptance.");
         if (CurrentStepId.Contains("stuck", StringComparison.Ordinal))
-            return "Emergency return to spawn. Stuck is gear-free, with separate staff-online rules and notices. Stand still, then arrive.";
-        return "Choose BASICs commands independently. Other mods keep their own commands.\nIf a gear is required, home, spawn, top and back charge it only after a successful teleport. Warmup and cooldown use real seconds.";
+            return "Use /stuck to return to spawn. No temporal gear is required.\n" +
+                (Number("Teleportation.StuckWarmupSeconds") > 0 ? $"Stand still for {Draft.Get("Teleportation.StuckWarmupSeconds")} real seconds." : "Travel is immediate.");
+        return CurrentStepId switch
+        {
+            "teleport.homes" => "Set a home with /sethome, then use /home to return.",
+            "teleport.spawn" => "Use /spawn to return to the world's spawn point.",
+            "teleport.top" => "Use /top to find a safe place above you.",
+            "teleport.back" => "Use /back to return to the place you last teleported from.",
+            "teleport.warmup" => "Moving cancels the wait before a teleport.",
+            _ => ""
+        };
     }
 
     private double Time => _fixedTime ?? _elapsed;
     private int Sleepers => (int)(Time / 2) % 4;
-    private string SleepCountText() => $"{Sleepers}/4 sleeping.";
+    private string SleepCountText() => $"{Sleepers} of 4 players are asleep.";
     private bool NeedsRestart => _runtimeApplyFailed || _restartKeys.Count > 0;
     private bool CompactLayout => capi.Render.FrameHeight / Math.Max(RuntimeEnv.GUIScale, 0.1f) < 660;
     private double FooterY => CompactLayout ? 490 : 570;
@@ -539,14 +556,22 @@ public sealed class SetupWizardDialog : GuiDialog
     };
     private static string PresentationDescription(string mode) => ProximityChatPresentationModes.Normalize(mode) switch
     {
-        ProximityChatPresentationModes.SimpleSpeech => "Names and quoted speech.",
-        ProximityChatPresentationModes.PlainProximity => "Names and unquoted speech.",
-        ProximityChatPresentationModes.Prose => "Mix actions and quoted speech in one line.",
-        _ => "Names, speech verbs and quoted speech."
+        ProximityChatPresentationModes.SimpleSpeech => "Shows the speaker's name and speech in quotes.",
+        ProximityChatPresentationModes.PlainProximity => "Shows the speaker's name and message without quotes.",
+        ProximityChatPresentationModes.Prose => "Mix actions and dialogue in one message.",
+        _ => "Adds a speech verb, such as \"says\", before the dialogue."
+    };
+    private static string SettingLabel(ConfigAdminSettingDefinition definition) => definition.Key switch
+    {
+        "DisableRPChat" => "Roleplay features",
+        "SleepNotificationThreshold" => "Sleeping players needed (%)",
+        _ => definition.Label
     };
     private static string DisplayValue(ConfigAdminSettingDefinition definition, string value)
     {
         if (definition.Key == "ProximityChatPresentationMode") return PresentationName(value);
+        if (definition.Key == "SleepNotificationThreshold" && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var fraction))
+            return (fraction * 100).ToString(CultureInfo.InvariantCulture) + "%";
         if (definition.Kind == ConfigAdminSettingKind.Boolean && ConfigAdminSettingDefinition.TryParseBool(value, out var enabled))
             return enabled != (definition.Key == "DisableRPChat") ? "On" : "Off";
         return value;
@@ -615,16 +640,17 @@ public sealed class SetupWizardDialog : GuiDialog
                 context.LineTo(centerX - radius, centerY);
                 context.ClosePath(); context.Stroke();
             }
-            if (obfuscation)
+            var fades = obfuscation && ranges[index] > 0;
+            if (fades)
             {
                 context.SetDash(new[] { 3d, 3d }, index);
                 context.Arc(centerX, centerY, Math.Max(0, onsets[index]) * pixelsPerBlock, 0, Math.PI * 2);
                 context.Stroke(); context.SetDash(Array.Empty<double>(), 0);
             }
-            var rangeLabel = ranges[index] == -1 ? "global" : ranges[index] <= 0 ? "no listeners" : ranges[index].ToString("G3", CultureInfo.InvariantCulture) + " blocks";
-            var onsetLabel = obfuscation ? "; fade " + onsets[index].ToString("G3", CultureInfo.InvariantCulture) : "";
+            var rangeLabel = ranges[index] == -1 ? "server-wide" : ranges[index] <= 0 ? "no listeners" : "up to " + (Math.Ceiling(ranges[index]) - 1).ToString("G3", CultureInfo.InvariantCulture) + " blocks";
+            var onsetLabel = fades ? "; fade " + onsets[index].ToString("G3", CultureInfo.InvariantCulture) : "";
             context.MoveTo(4, 122 + index * 17);
-            context.ShowText(modes[index] + ": " + rangeLabel + onsetLabel);
+            context.ShowText((index == 1 ? "Talk" : modes[index]) + ": " + rangeLabel + onsetLabel);
         }
         context.SetSourceRGBA(1, 1, 1, 1);
         context.Arc(centerX, centerY, 1.5, 0, Math.PI * 2); context.Fill();
@@ -667,7 +693,7 @@ public sealed class SetupWizardDialog : GuiDialog
             if (_closeConfirm?.IsOpened() != true)
             {
                 _closeConfirm?.Dispose();
-                _closeConfirm = new DiscardConfirmDialog(capi, "Discard your unsaved setup changes?", discard =>
+                _closeConfirm = new DiscardConfirmDialog(capi, _pending ? "Close while saving? Your save may still complete." : "Discard your unsaved changes?", discard =>
                 {
                     if (!discard) return;
                     _forceClose = true;

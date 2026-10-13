@@ -155,8 +155,8 @@ public partial class RPProximityChatSystem
         run.LastSaveRequestId = request.RequestId;
         run.LastSaveResult = CreateSetupWizardResult(SetupWizardResultKind.SaveResult, request.RequestId, run.Id, true,
             _setupWizardRuntimeApplyFailed
-                ? "Saved The BASICs setup, but live application failed. Restart the server to apply the saved settings."
-                : "Saved The BASICs setup.");
+                ? "Settings saved. Restart the server to apply them."
+                : "Settings saved.");
         TrackSetupWizard(player, run, "review", "saved",
             result: _setupWizardRuntimeApplyFailed || run.LastSaveResult.RestartRequiredKeys.Count > 0 ? "saved_pending_restart" : "saved_live");
         _serverConfigChannel?.SendPacket(run.LastSaveResult, player);

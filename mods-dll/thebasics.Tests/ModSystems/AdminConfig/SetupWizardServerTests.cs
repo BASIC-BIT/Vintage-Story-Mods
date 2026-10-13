@@ -170,7 +170,7 @@ public class SetupWizardServerTests : IDisposable
         var saved = results.Last();
         saved.Success.Should().BeTrue();
         saved.RuntimeApplyFailed.Should().BeTrue();
-        saved.Message.Should().Contain("Saved").And.Contain("live application failed").And.Contain("Restart");
+        saved.Message.Should().Contain("Settings saved").And.Contain("Restart");
         saved.RestartRequiredKeys.Should().BeEmpty();
         system.Config.EnableChatter.Should().BeFalse();
         system.OnSetupWizardRequest(player, request);

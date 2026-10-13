@@ -5,6 +5,13 @@ Scope: chat, teleportation, notifications, invitation, restart guidance, native 
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
 
+## Copy revision, October 12
+
+- Owner feedback rejected the earlier hub and explanatory copy. The hub now uses one instruction, removes repeated topic names, hides the empty change count, and names the full configuration route `All settings`. Page descriptions, shared setting labels/help, presentation options, travel examples and save/restart messages were rewritten. The reviewed source corrects language gates, cost timing and timeout wording without changing config keys or reload behavior.
+- Review now shows sleep thresholds in the same percentage units as the control. Unlimited speech no longer draws a misleading distance-fading boundary. Those changes have native-widget regressions at scales 1 and 1.25.
+- Full suite: 1,342 passed, zero failed or skipped. All 16 wizard fixtures render at scales 1 and 1.25. The canonical local-only package builds with zero errors and 153 warnings. Source identity: `bb68356bc0349c9547bd2b986227997af6e26c1e35870916470d336a2e382305`; package SHA-256: `8e9ac2ca2f814685426297c74e5f945ce47c607142da4660e037cc91ec30df38`.
+- Evidence: `.tmp/wizard-copy-20261012-1791856876473/`, including final TRX, rendered PNGs/manifests and build receipt. Standalone renders explicitly omit native Pip. The running QA clients and server still use the preceding main-integration package below; no restart or profile replacement was made while the owner's draft state is unknown. Fresh native captures and human acceptance of the new wording remain pending.
+
 ## Main integration, October 12
 
 - Integration target: `origin/main` at `26069b4`, which adds configurable chat-history formatting isolation from PR #254.

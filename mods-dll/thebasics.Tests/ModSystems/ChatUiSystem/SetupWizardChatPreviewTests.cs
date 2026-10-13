@@ -267,6 +267,76 @@ public class SetupWizardChatPreviewTests
     [VisualTheory]
     [InlineData(1.0)]
     [InlineData(1.25)]
+    public void SleepPercentageEditKeepsItsLabelAndUnitsInReview(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        using var wizard = CreateWizard(host, draft);
+        wizard.ShowPage("notifications.sleep");
+        wizard.TryOpen();
+
+        const string label = "Sleeping players needed (%)";
+        Assert.Contains(Elements(wizard).Values.OfType<GuiElementStaticText>(), text => text.Text == label);
+        var threshold = wizard.SingleComposer.GetTextInput("SleepNotificationThreshold");
+        Assert.Equal("50", threshold.GetText());
+        threshold.SetValue("75");
+        Assert.Equal("75", threshold.GetText());
+        Assert.Equal("0.75", draft.Get("SleepNotificationThreshold"));
+        host.RenderGuiDialog(wizard, 0);
+
+        wizard.ShowPage("review");
+        host.RenderGuiDialog(wizard, 0);
+        var reviewText = Elements(wizard).Values.OfType<GuiElementStaticText>().Select(text => text.Text).ToArray();
+        Assert.Contains(label, reviewText);
+        Assert.Contains("50%  >  75%", reviewText);
+        Assert.DoesNotContain(reviewText, text => text.Contains("0.5", StringComparison.Ordinal) || text.Contains("0.75", StringComparison.Ordinal));
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void UnlimitedSpeechDiagramStaysTheSameWhenDistanceFadingIsEnabled(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        foreach (var mode in new[] { "Whisper", "Normal", "Yell" })
+            draft.Set("ProximityChatModeDistances." + mode, "-1");
+        draft.Set("EnableDistanceObfuscationSystem", "0");
+        using var wizard = CreateWizard(host, draft);
+        wizard.ShowPage("chat.obfuscation");
+        wizard.TryOpen();
+        host.SetMouse(-1, -1);
+        host.RenderGuiDialog(wizard, 0);
+        Assert.Equal(0, Assert.IsType<GuiElementDropDown>(wizard.SingleComposer["EnableDistanceObfuscationSystem"]).listMenu.SelectedIndex);
+        var before = host.Canvas.GetRgbaPixels();
+        var bounds = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
+        var region = ((int)bounds.renderX, (int)bounds.renderY, bounds.OuterWidthInt, bounds.OuterHeightInt);
+
+        draft.Set("EnableDistanceObfuscationSystem", "1");
+        wizard.ShowPage("chat.obfuscation");
+        host.RenderGuiDialog(wizard, 0);
+        Assert.Equal(1, Assert.IsType<GuiElementDropDown>(wizard.SingleComposer["EnableDistanceObfuscationSystem"]).listMenu.SelectedIndex);
+        var after = host.Canvas.GetRgbaPixels();
+        bounds = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
+        Assert.Equal(region, ((int)bounds.renderX, (int)bounds.renderY, bounds.OuterWidthInt, bounds.OuterHeightInt));
+        var (left, top, width, height) = region;
+        Assert.InRange(left, 0, host.Canvas.Width - 1);
+        Assert.InRange(top, 0, host.Canvas.Height - 1);
+        Assert.InRange(width, 1, host.Canvas.Width - left);
+        Assert.InRange(height, 1, host.Canvas.Height - top);
+        for (var y = top; y < top + height; y++)
+        {
+            var offset = (y * host.Canvas.Width + left) * 4;
+            Assert.True(before.AsSpan(offset, width * 4).SequenceEqual(after.AsSpan(offset, width * 4)),
+                $"Unlimited speech preview changed inside the diagram on row {y} when distance fading was enabled.");
+        }
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
     public void ResumingAFixedPreviewLetsTheNormalAnimationAdvance(double scale)
     {
         using var host = CreateHost(scale);
@@ -279,19 +349,19 @@ public class SetupWizardChatPreviewTests
         wizard.SetPreviewTime(2);
         host.SetClock(0);
         host.RenderGuiDialog(wizard, 0);
-        Assert.Equal("1/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+        Assert.Equal("1 of 4 players are asleep.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
         Assert.Equal("", PreviewText(wizard));
         var fixedPixels = host.Canvas.GetRgbaPixels();
         host.SetClock(2100);
         host.RenderGuiDialog(wizard, 2.1f);
-        Assert.Equal("1/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+        Assert.Equal("1 of 4 players are asleep.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
         Assert.Equal("", PreviewText(wizard));
         Assert.Equal(fixedPixels, host.Canvas.GetRgbaPixels());
 
         wizard.ResumePreview();
         host.SetClock(4200);
         host.RenderGuiDialog(wizard, 4.1f);
-        Assert.Equal("2/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+        Assert.Equal("2 of 4 players are asleep.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
         Assert.Equal(draft.Get("TEXT_SleepNotification"), PreviewText(wizard));
         Assert.False(fixedPixels.SequenceEqual(host.Canvas.GetRgbaPixels()));
         Assert.Equal(3, wizard.SingleComposer.GetHorizontalTabs("topic-tabs").activeElement);
@@ -303,7 +373,7 @@ public class SetupWizardChatPreviewTests
             {
                 wizard.SetPreviewTime(sleepers * 2);
                 host.RenderGuiDialog(wizard, 0);
-                Assert.Equal($"{sleepers}/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+                Assert.Equal($"{sleepers} of 4 players are asleep.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
                 var crossed = threshold > 0 && threshold < 1 && sleepers / 4d >= threshold;
                 Assert.Equal(crossed ? draft.Get("TEXT_SleepNotification") : "", PreviewText(wizard));
             }
@@ -312,7 +382,7 @@ public class SetupWizardChatPreviewTests
         draft.Set("SleepNotificationThreshold", "0.75");
         wizard.SetPreviewTime(6);
         host.RenderGuiDialog(wizard, 0);
-        Assert.Equal("3/4 sleeping.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
+        Assert.Equal("3 of 4 players are asleep.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
         Assert.Equal("", PreviewText(wizard));
         Assert.Empty(host.UnsupportedCalls);
     }
@@ -329,8 +399,8 @@ public class SetupWizardChatPreviewTests
         string.Join(" ", text.Components.OfType<RichTextComponent>().Select(component => component.DisplayText));
 
     private static readonly string[] PresentationDescriptions =
-    ["Names, speech verbs and quoted speech.", "Names and quoted speech.", "Names and unquoted speech.",
-        "Mix actions and quoted speech in one line."];
+    ["Adds a speech verb, such as \"says\", before the dialogue.", "Shows the speaker's name and speech in quotes.", "Shows the speaker's name and message without quotes.",
+        "Mix actions and dialogue in one message."];
 
     private static void AssertSelectedPresentation(GuiElementDescribedDropDown mode, string title, string description)
     {

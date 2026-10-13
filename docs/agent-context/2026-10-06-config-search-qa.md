@@ -17,7 +17,7 @@ Scope: a separate read-only search modal in `/basic config`, native editor navig
 ```mermaid
 flowchart LR
     Setup["/basic setup"] --> Wizard["Setup wizard"]
-    Wizard -->|Advanced editor| Editor["Existing configuration editor"]
+    Wizard -->|All settings| Editor["Existing configuration editor"]
     Command["/basic config"] --> Editor
     Editor -->|Category navigation| Setting["Native category and focused setting"]
     Editor -->|Search settings| Search["Read-only search modal"]
@@ -58,7 +58,7 @@ Run after the combined package is staged and the owner is ready. Use an admin ac
 
 1. **Read-only search and navigation** (P1)
    - Config: any.
-   - Do: `/basic setup`, Advanced editor, Search settings, type `proximity position`, then click Proximity tab position. Also verify direct entry with `/basic config`.
+   - Do: `/basic setup`, All settings, Search settings, type `proximity position`, then click Proximity tab position. Also verify direct entry with `/basic config`.
    - Expect: a read-only result shows category, current value and description. Search closes; Chat tabs opens with `>` beside the setting and its dropdown focused. Reopen Search: the query is selected, and Delete clears it.
    - Watch for: editable controls appearing in search, wrong category or control, query lost during navigation.
 
