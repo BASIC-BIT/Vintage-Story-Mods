@@ -149,6 +149,122 @@ public class SetupWizardChatPreviewTests
     [VisualTheory]
     [InlineData(1.0)]
     [InlineData(1.25)]
+    public void HubCardsRouteFromTheirDescriptionAreaAndFooterActionsShareARow(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        var advancedCalls = 0;
+        using var wizard = CreateWizard(host, draft, () => advancedCalls++);
+        wizard.TryOpen();
+        host.RenderGuiDialog(wizard, 0);
+
+        var destinations = new[]
+        {
+            (Key: "topic-chat", Page: "chat.basics", Tab: 1),
+            (Key: "topic-teleportation", Page: "teleport.tools", Tab: 2),
+            (Key: "topic-notifications", Page: "notifications.savestart", Tab: 3)
+        };
+        var cards = destinations.Select(destination =>
+            Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer[destination.Key])).ToArray();
+        var elements = Elements(wizard);
+        var footer = new[] { "Review changes", "All settings", "Close" }.Select(label =>
+            elements.Values.OfType<GuiElementTextButton>().Single(button => button.Text == label)).ToArray();
+        var footerY = footer[0].Bounds.absY;
+        foreach (var button in footer)
+        {
+            var bounds = button.Bounds;
+            Assert.Equal(footerY, bounds.absY);
+            Assert.Equal(footer[0].Bounds.OuterHeight, bounds.OuterHeight);
+            Assert.InRange(bounds.absX, 0, host.Canvas.Width);
+            Assert.InRange(bounds.absY, 0, host.Canvas.Height);
+            Assert.True(bounds.absX + bounds.OuterWidth <= host.Canvas.Width);
+            Assert.True(bounds.absY + bounds.OuterHeight <= host.Canvas.Height);
+        }
+        for (var index = 1; index < footer.Length; index++)
+            Assert.True(footer[index - 1].Bounds.absX + footer[index - 1].Bounds.OuterWidth < footer[index].Bounds.absX,
+                "Hub footer actions must have a gap between their click targets.");
+        foreach (var card in cards)
+            Assert.True(card.Bounds.absY + card.Bounds.OuterHeight < footerY,
+                "Topic cards must not overlap the hub footer actions.");
+        for (var index = 1; index < cards.Length; index++)
+            Assert.True(cards[index - 1].Bounds.absX + cards[index - 1].Bounds.OuterWidth < cards[index].Bounds.absX,
+                "Topic cards must have separate click targets.");
+
+        foreach (var destination in destinations)
+        {
+            wizard.ShowPage("hub");
+            host.RenderGuiDialog(wizard, 0);
+            var card = Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer[destination.Key]);
+            ClickElement(host, wizard, card, 0.75);
+            Assert.Equal(destination.Page, wizard.CurrentStepId);
+            Assert.Equal(destination.Tab, wizard.SingleComposer.GetHorizontalTabs("topic-tabs").activeElement);
+        }
+
+        wizard.ShowPage("hub");
+        ClickElement(host, wizard, Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer["hub-all-settings"]));
+        Assert.Equal(1, advancedCalls);
+        Assert.False(wizard.IsOpened());
+
+        draft.Set("EnableChatter", draft.Get("EnableChatter") == "1" ? "0" : "1");
+        wizard.ShowPage("hub");
+        Assert.True(wizard.TryOpen());
+        ClickElement(host, wizard, Elements(wizard).Values.OfType<GuiElementTextButton>().Single(button => button.Text == "Close"));
+        Assert.True(wizard.IsOpened());
+        Assert.True(draft.IsDirty);
+        Assert.True(Assert.Single(host.Api.Gui.LoadedGuis.OfType<GuiDialogConfirm>()).IsOpened());
+        Assert.Equal(1, advancedCalls);
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void HubSaveStatusReplacesTheUnsavedCountWithoutOverlappingTheGuide(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        draft.Set("EnableChatter", draft.Get("EnableChatter") == "1" ? "0" : "1");
+        var saveCalls = 0;
+        using var wizard = new SetupWizardDialog(host.Api, draft, "hub-status", true,
+            () => saveCalls++, null!, null!, layoutOnly: true);
+        wizard.TryOpen();
+        host.RenderGuiDialog(wizard, 0);
+
+        GuiElementStaticText[] VisibleText() => wizard.SingleComposer.staticElements.Values.OfType<GuiElementStaticText>().ToArray();
+        Assert.Single(VisibleText().Where(text => text.Text == "1 unsaved change"));
+
+        const string failure = "Could not save your changes. Try again.";
+        wizard.SetRequestFailure(failure);
+        host.RenderGuiDialog(wizard, 0);
+        var texts = VisibleText();
+        var failureText = Assert.Single(texts.Where(text => text.Text == failure));
+        Assert.DoesNotContain(texts, text => text.Text.Contains("unsaved change", StringComparison.Ordinal));
+        var guide = Assert.Single(texts.Where(text => text.Text == "Native 3D Pip omitted"));
+        Assert.True(failureText.Bounds.renderX + failureText.Bounds.OuterWidth <= guide.Bounds.renderX,
+            "The hub failure message must stay beside the guide.");
+
+        wizard.SingleComposer.GetHorizontalTabs("topic-tabs").SetValue(4);
+        var save = Assert.Single(wizard.SingleComposer.staticElements.Values.OfType<GuiElementTextButton>()
+            .Where(button => button.Text == "Save settings"));
+        ClickElement(host, wizard, save);
+        Assert.Equal(1, saveCalls);
+        wizard.SingleComposer.GetHorizontalTabs("topic-tabs").SetValue(0);
+        Assert.Equal("hub", wizard.CurrentStepId);
+        host.RenderGuiDialog(wizard, 0);
+        texts = VisibleText();
+        var pendingText = Assert.Single(texts.Where(text => text.Text == "Saving settings..."));
+        Assert.DoesNotContain(texts, text => text.Text.Contains("unsaved change", StringComparison.Ordinal));
+        Assert.DoesNotContain(texts, text => text.Text == failure);
+        guide = Assert.Single(texts.Where(text => text.Text == "Native 3D Pip omitted"));
+        Assert.True(pendingText.Bounds.renderX + pendingText.Bounds.OuterWidth <= guide.Bounds.renderX,
+            "The hub pending message must stay beside the guide.");
+        Assert.Equal(1, saveCalls);
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
     public void EachSettingShowsOnlyItsRelevantPreview(double scale)
     {
         using var host = CreateHost(scale);
@@ -390,8 +506,8 @@ public class SetupWizardChatPreviewTests
     private static PreviewHost CreateHost(double scale) => new(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
         Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 800, scale);
 
-    private static SetupWizardDialog CreateWizard(PreviewHost host, SetupWizardDraft draft) =>
-        new(host.Api, draft, "chat-preview", true, null!, null!, null!, layoutOnly: true);
+    private static SetupWizardDialog CreateWizard(PreviewHost host, SetupWizardDraft draft, Action? onAdvanced = null) =>
+        new(host.Api, draft, "chat-preview", true, null!, null!, null!, onAdvanced: onAdvanced!, layoutOnly: true);
 
     private static string PreviewText(SetupWizardDialog wizard) => DisplayedText(wizard.SingleComposer.GetRichtext("preview-text"));
 
@@ -440,6 +556,16 @@ public class SetupWizardChatPreviewTests
     private static Dictionary<string, GuiElement> Elements(SetupWizardDialog wizard) =>
         (Dictionary<string, GuiElement>)typeof(GuiComposer).GetField("staticElements", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(wizard.SingleComposer)!;
+
+    private static void ClickElement(PreviewHost host, SetupWizardDialog wizard, GuiElement element, double heightFraction = 0.5)
+    {
+        var x = (int)(element.Bounds.absX + element.Bounds.OuterWidth / 2);
+        var y = (int)(element.Bounds.absY + element.Bounds.OuterHeight * heightFraction);
+        host.SetMouse(x, y);
+        wizard.OnMouseMove(new MouseEvent(x, y));
+        wizard.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        wizard.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+    }
 
     private static void ClickTab(PreviewHost host, SetupWizardDialog wizard, GuiElementHorizontalTabs tabs, int index)
     {

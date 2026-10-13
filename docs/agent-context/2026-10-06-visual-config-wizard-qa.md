@@ -5,6 +5,32 @@ Scope: chat, teleportation, notifications, invitation, restart guidance, native 
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
 
+## Topic cards and footer, October 12
+
+- Owner feedback identified the boxed Close footer, detached Review changes action, and plain topic choices. The hub now uses three complete clickable cards with Cairo pictograms, titles, integrated descriptions, warm borders and native hover/focus/pressed states. Review changes, All settings and Close share the footer row, separated from the body by a thin rule. The hub is 78 logical pixels shorter; Pip stays above the footer. Other pages retain their existing navigation and dimensions.
+- All settings stays visible but disabled when a fixture has no editor callback. It remains enabled in the normal wizard. The unsaved count yields to pending-save or failure text, and hub status text stays left of Pip.
+- Existing navigation is preserved; this revision changes its layout:
+
+```mermaid
+flowchart LR
+    Command["/basic setup"] --> Topics["Topics"]
+    Invite["Administrator invitation"] --> Topics
+    Topics -->|Choose a card| Topic["Chat, Teleportation or Notifications"]
+    Topic -->|All topics| Topics
+    Topics -->|Review changes| Review["Review and save"]
+    Review -->|Back to topics| Topics
+    Review -->|Save| Finish["Saved settings and restart guidance"]
+    Topics -->|All settings| Editor["Configuration editor"]
+    Topics -->|Close| Game["Return to game"]
+    Editor -->|Close| Game
+    Finish -->|Done or Later| Game
+    Game --> Command
+```
+
+- Full initial layout suite: 1,344 passed, zero failed or skipped. After the status-overlap correction and its two new scale cases, all 90 wizard/guide checks passed. Tests exercise card description-area clicks, footer spacing, All settings dispatch, the Close discard confirmation, and pending/failure status precedence at scales 1 and 1.25. Independent source review checked native input, reentrant navigation and texture cleanup. All 16 standalone scenes render at both scales. Final canonical build: zero errors, 158 warnings.
+- Source identity: `33102251b062088632e26a7f2016defd7268c8e6a741cc2dbe16c2b15a9f29b1`. Package SHA-256: `6dcfc1350b82da6e578ef7a365d6075fdf895179744e4c307a196373b26ec002`. QA server readback and Profile2/Profile3 match. The fresh RunGame marker is 03:20:04 UTC on October 13 (October 12 locally). No startup exceptions; the Flywheel duplicate warning and bare `/home/container` error were present before this staging.
+- Evidence: `.tmp/wizard-hub-style-20261012/`, including TRX files, standalone renders, build receipt, staging backups/journal/recovery mapping, launch receipt and all 16 source-verified native captures at 1908x1260 and the original GUI scale 1.125. The inspected hub shows integrated card content, aligned footer actions, and clothed Pip within bounds. Profile2's client log has no errors or exceptions. The controller was disabled after capture, leaving Profile2 connected for `/basic setup`; Profile3 was relaunched to its menu. Native gesture feel, gameplay save/restart checks and owner acceptance remain pending.
+
 ## Copy revision, October 12
 
 - Owner feedback rejected the earlier hub and explanatory copy. The hub now uses one instruction, removes repeated topic names, hides the empty change count, and names the full configuration route `All settings`. Page descriptions, shared setting labels/help, presentation options, travel examples and save/restart messages were rewritten. The reviewed source corrects language gates, cost timing and timeout wording without changing config keys or reload behavior.

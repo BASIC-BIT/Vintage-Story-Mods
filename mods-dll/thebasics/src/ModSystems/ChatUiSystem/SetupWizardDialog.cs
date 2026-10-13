@@ -165,7 +165,7 @@ public sealed class SetupWizardDialog : GuiDialog
         _diagram = null;
         _sample = null;
         _sleepCount = null;
-        var body = ElementBounds.Fixed(0, 0, Width, CompactLayout ? 528 : 608).WithFixedPadding(GuiStyle.ElementToDialogPadding);
+        var body = ElementBounds.Fixed(0, 0, Width, BodyHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         SingleComposer = capi.Gui.CreateCompo("thebasics-setup-wizard", ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle));
         var composer = SingleComposer
             .AddShadedDialogBG(body)
@@ -179,14 +179,21 @@ public sealed class SetupWizardDialog : GuiDialog
         var selectedTopic = CurrentStepId == "hub" ? 0 : CurrentStepId.StartsWith("chat.", StringComparison.Ordinal) ? 1
             : CurrentStepId.StartsWith("teleport.", StringComparison.Ordinal) ? 2 : CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) ? 3 : 4;
         composer.GetHorizontalTabs("topic-tabs").SetValue(selectedTopic, false);
-        composer.AddInset(ElementBounds.Fixed(0, FooterY - 8, Width, 46), 1);
+        composer.AddStaticElement(new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, FooterY - 14, Width, 1),
+            (context, _, bounds) =>
+            {
+                context.SetSourceRGBA(0.82, 0.73, 0.59, 0.3);
+                context.Rectangle(bounds.bgDrawX, bounds.bgDrawY, bounds.OuterWidth, bounds.OuterHeight);
+                context.Fill();
+            }), "footer-rule");
 
         if (CurrentStepId == "hub") ComposeHub(composer);
         else if (CurrentStepId == "review") ComposeReview(composer);
         else if (CurrentStepId == "finish") ComposeFinish(composer);
         else ComposePage(composer);
 
-        Text(composer, _message ?? (_pending ? "Saving settings..." : Draft.IsDirty && CurrentStepId != "hub" ? "Your changes aren't saved yet." : ""), 0, StatusY, Width, CompactLayout ? 30 : 42);
+        Text(composer, _message ?? (_pending ? "Saving settings..." : Draft.IsDirty && CurrentStepId != "hub" ? "Your changes aren't saved yet." : ""),
+            0, StatusY, CurrentStepId == "hub" ? 640 : Width, CompactLayout ? 30 : 42);
         Button(composer, "Close", () => TryClose(), Width - 110, FooterY, 110);
         composer.EndChildElements().Compose(focusFirstElement: false);
         _sample = SingleComposer.GetRichtext("preview-text");
@@ -197,21 +204,31 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         Text(composer, "Set up your server", 0, 92, Width, 30, true);
         Text(composer, "Choose a topic to get started.", 0, 129, Width, 48);
-        Button(composer, "Chat", () => ShowPage("chat.basics"), 0, 205, 270, 52);
-        Button(composer, "Teleportation", () => ShowPage("teleport.tools"), 305, 205, 270, 52);
-        Button(composer, "Notifications", () => ShowPage("notifications.savestart"), 610, 205, 270, 52);
-        Text(composer, "Chat style, languages and hearing distance.", 12, 275, 248, 80);
-        Text(composer, "Teleport requests, homes and travel commands.", 317, 275, 248, 80);
-        Text(composer, "Save announcements and sleep reminders.", 622, 275, 248, 80);
+        TopicCard(composer, "Chat", "Chat style, languages\nand hearing distance.", SetupTopicCardIcon.Chat, "chat.basics", 0, "topic-chat");
+        TopicCard(composer, "Teleportation", "Teleport requests, homes\nand travel commands.", SetupTopicCardIcon.Teleportation, "teleport.tools", 305, "topic-teleportation");
+        TopicCard(composer, "Notifications", "Save announcements\nand sleep reminders.", SetupTopicCardIcon.Notifications, "notifications.savestart", 610, "topic-notifications");
         var changes = Draft.ChangedKeys.Count;
-        if (changes > 0) Text(composer, changes == 1 ? "1 unsaved change" : $"{changes} unsaved changes", 0, CompactLayout ? 358 : 397, 640, 40);
-        var guideBounds = ElementBounds.Fixed(690, CompactLayout ? 352 : 350, 170, CompactLayout ? 98 : 154);
+        if (changes > 0 && string.IsNullOrEmpty(_message) && !_pending)
+            Text(composer, changes == 1 ? "1 unsaved change" : $"{changes} unsaved changes", 0, StatusY, 640, 30);
+        var guideBounds = ElementBounds.Fixed(700, CompactLayout ? 314 : 330, 160, CompactLayout ? 80 : 142);
         if (LayoutOnly) Text(composer, "Native 3D Pip omitted", guideBounds.fixedX, guideBounds.fixedY, guideBounds.fixedWidth, guideBounds.fixedHeight);
         else composer.AddInteractiveElement(new PreviewActorElement(capi, guideBounds, this), "pip");
-        Button(composer, "Review changes", () => ShowPage("review"), 0, CompactLayout ? 403 : 453, 240);
-        if (_onAdvanced != null)
-            Button(composer, "All settings", () => { Track("advanced"); Suspend(); _onAdvanced(); }, 260, CompactLayout ? 403 : 453, 240);
+        Button(composer, "Review changes", () => ShowPage("review"), 0, FooterY, 240);
+        composer.AddSmallButton("All settings", () =>
+        {
+            if (_onAdvanced == null) return false;
+            Track("advanced");
+            Suspend();
+            _onAdvanced();
+            return true;
+        }, ElementBounds.Fixed(260, FooterY, 240, 30), key: "hub-all-settings");
+        composer.GetButton("hub-all-settings").Enabled = _onAdvanced != null;
     }
+
+    private void TopicCard(GuiComposer composer, string title, string description, SetupTopicCardIcon icon,
+        string page, double x, string key)
+        => composer.AddInteractiveElement(new GuiElementSetupTopicCard(capi, title, description, icon,
+            () => { ShowPage(page); return true; }, ElementBounds.Fixed(x, 179, 270, 132)), key);
 
     private void ComposePage(GuiComposer composer)
     {
@@ -543,8 +560,9 @@ public sealed class SetupWizardDialog : GuiDialog
     private string SleepCountText() => $"{Sleepers} of 4 players are asleep.";
     private bool NeedsRestart => _runtimeApplyFailed || _restartKeys.Count > 0;
     private bool CompactLayout => capi.Render.FrameHeight / Math.Max(RuntimeEnv.GUIScale, 0.1f) < 660;
-    private double FooterY => CompactLayout ? 490 : 570;
-    private double StatusY => CompactLayout ? 454 : 514;
+    private double BodyHeight => CurrentStepId == "hub" ? CompactLayout ? 450 : 530 : CompactLayout ? 528 : 608;
+    private double FooterY => BodyHeight - 38;
+    private double StatusY => FooterY - (CompactLayout ? 36 : 56);
     private string AnimationCode() => CurrentStepId == "hub" ? "wave" : CurrentStepId == "finish" ? "cheer" : "idle";
 
     private static string PresentationName(string mode) => ProximityChatPresentationModes.Normalize(mode) switch
