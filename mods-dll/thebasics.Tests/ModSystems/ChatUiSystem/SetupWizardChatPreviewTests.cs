@@ -209,7 +209,7 @@ public class SetupWizardChatPreviewTests
             ClickElement(host, wizard, card, 0.75);
             Assert.Equal(topic.EntryPageId, wizard.CurrentStepId);
             var tabs = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
-            Assert.Equal(new[] { "Topics", topic.Title, "Review" }, tabs.tabs.Select(tab => tab.Name));
+            Assert.Equal(NavigationNames(), tabs.tabs.Select(tab => tab.Name));
             Assert.Equal(topic.Title, tabs.tabs[tabs.activeElement].Name);
         }
 
@@ -226,6 +226,65 @@ public class SetupWizardChatPreviewTests
         Assert.True(draft.IsDirty);
         Assert.True(Assert.Single(host.Api.Gui.LoadedGuis.OfType<GuiDialogConfirm>()).IsOpened());
         Assert.Equal(1, advancedCalls);
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void TopBarCategoriesSwitchDirectlyAndRestoreEachDraftPage(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        draft.Set("EnableChatter", draft.Get("EnableChatter") == "1" ? "0" : "1");
+        var editedValue = draft.Get("EnableChatter");
+        var changedKeys = draft.ChangedKeys.ToArray();
+        using var wizard = CreateWizard(host, draft);
+        wizard.ShowPage("chat.tabs");
+        wizard.TryOpen();
+        host.RenderGuiDialog(wizard, 0);
+        AssertNavigationFits(host, wizard, scale);
+        var remembered = new Dictionary<string, string> { ["chat"] = "chat.tabs" };
+        var topics = SetupWizardCatalog.Topics.Skip(1).Concat(SetupWizardCatalog.Topics.Take(1)).ToArray();
+
+        foreach (var topic in topics)
+        {
+            Assert.NotEqual("hub", wizard.CurrentStepId);
+            var tabs = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+            var index = Array.FindIndex(tabs.tabs, tab => tab.Name == topic.Title);
+            Assert.InRange(index, 1, SetupWizardCatalog.Topics.Count);
+            ClickTab(host, wizard, tabs, index);
+            Assert.Equal(remembered.GetValueOrDefault(topic.Id, topic.EntryPageId), wizard.CurrentStepId);
+            tabs = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+            Assert.Equal(topic.Title, tabs.tabs[tabs.activeElement].Name);
+            Assert.Equal(editedValue, draft.Get("EnableChatter"));
+            Assert.Equal(changedKeys, draft.ChangedKeys);
+
+            var pagePicker = Assert.IsType<GuiElementDropDown>(wizard.SingleComposer["page-picker"]);
+            var detailPage = pagePicker.listMenu.Values.Last();
+            wizard.ShowPage(detailPage);
+            remembered[topic.Id] = detailPage;
+        }
+
+        foreach (var topic in topics)
+        {
+            var tabs = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+            var index = Array.FindIndex(tabs.tabs, tab => tab.Name == topic.Title);
+            ClickTab(host, wizard, tabs, index);
+            Assert.Equal(remembered[topic.Id], wizard.CurrentStepId);
+            Assert.Equal(editedValue, draft.Get("EnableChatter"));
+            Assert.Equal(changedKeys, draft.ChangedKeys);
+            host.RenderGuiDialog(wizard, 0);
+            AssertNavigationFits(host, wizard, scale);
+        }
+
+        var navigation = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+        var reviewIndex = Array.FindIndex(navigation.tabs, tab => tab.Name == "Review");
+        ClickTab(host, wizard, navigation, reviewIndex);
+        Assert.Equal("review", wizard.CurrentStepId);
+        Assert.Equal("Review", wizard.SingleComposer.GetHorizontalTabs("topic-tabs").tabs[^1].Name);
+        Assert.Equal(reviewIndex, wizard.SingleComposer.GetHorizontalTabs("topic-tabs").activeElement);
+        Assert.True(draft.IsDirty);
         Assert.Empty(host.UnsupportedCalls);
     }
 
@@ -256,7 +315,8 @@ public class SetupWizardChatPreviewTests
         Assert.True(failureText.Bounds.renderX + failureText.Bounds.OuterWidth <= guide.Bounds.renderX,
             "The hub failure message must stay beside the guide.");
 
-        wizard.SingleComposer.GetHorizontalTabs("topic-tabs").SetValue(2);
+        var navigation = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+        navigation.SetValue(Array.FindIndex(navigation.tabs, tab => tab.Name == "Review"));
         var save = Assert.Single(wizard.SingleComposer.staticElements.Values.OfType<GuiElementTextButton>()
             .Where(button => button.Text == "Save settings"));
         ClickElement(host, wizard, save);
@@ -574,6 +634,48 @@ public class SetupWizardChatPreviewTests
         new(host.Api, draft, "chat-preview", true, null!, null!, null!, onAdvanced: onAdvanced!, layoutOnly: true);
 
     private static string PreviewText(SetupWizardDialog wizard) => DisplayedText(wizard.SingleComposer.GetRichtext("preview-text"));
+
+    private static string[] NavigationNames() => new[] { "Topics" }
+        .Concat(SetupWizardCatalog.Topics.Select(topic => topic.Title)).Append("Review").ToArray();
+
+    private static void AssertNavigationFits(PreviewHost host, SetupWizardDialog wizard, double scale)
+    {
+        var tabs = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+        Assert.Equal(NavigationNames(), tabs.tabs.Select(tab => tab.Name));
+        var widths = (int[])typeof(GuiElementHorizontalTabs).GetField("tabWidths", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(tabs)!;
+        var totalWidth = (double)typeof(GuiElementHorizontalTabs).GetField("totalWidth", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(tabs)!;
+        var scrollOffset = (double)typeof(GuiElementHorizontalTabs).GetField("currentScrollOffset", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(tabs)!;
+        var spacing = GuiElement.scaled(tabs.unscaledTabSpacing);
+        var end = spacing;
+        foreach (var width in widths)
+        {
+            end += width;
+            Assert.True(end <= GuiElement.scaled(870), "Every category tab must fit within 870 logical pixels.");
+            end += spacing;
+        }
+        Assert.True(totalWidth + spacing <= tabs.Bounds.InnerWidth, "All category tabs must fit without scrolling.");
+        Assert.Equal(0, scrollOffset);
+        Assert.InRange(tabs.Bounds.absX + end, 0, host.Canvas.Width);
+
+        var output = Environment.GetEnvironmentVariable("THEBASICS_GUI_OUTPUT");
+        if (!string.IsNullOrEmpty(output))
+        {
+            Directory.CreateDirectory(output);
+            var suffix = scale.ToString("0.##", CultureInfo.InvariantCulture);
+            File.WriteAllText(Path.Combine(output, "navigation-widths-" + suffix + ".json"),
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    scale,
+                    fontSize = tabs.Font.UnscaledFontsize,
+                    padding = tabs.unscaledTabPadding,
+                    spacing = tabs.unscaledTabSpacing,
+                    tabWidths = widths,
+                    logicalEnd = end / scale,
+                    innerWidth = tabs.Bounds.InnerWidth,
+                    scrollOffset
+                }));
+        }
+    }
 
     private static byte[] DiagramPixels(PreviewHost host, SetupWizardDialog wizard)
     {

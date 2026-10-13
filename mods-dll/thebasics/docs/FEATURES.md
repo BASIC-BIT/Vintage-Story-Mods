@@ -76,7 +76,7 @@ Version 5.5.0 shifts the generated/default config toward showcasing RP-server fe
 
 ## In-Game Admin Config
 
-`/basic setup` opens a wizard with 40 focused pages across eight topics: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. Each page has at most five controls. The wizard and advanced config panel use the same setting registry and validation.
+`/basic setup` opens a wizard with 40 focused pages across eight topics: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. All eight topics stay available in the top bar; switching returns to the last page visited in that topic. Each page has at most five controls. The wizard and advanced config panel use the same setting registry and validation.
 
 Features:
 

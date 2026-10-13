@@ -5,11 +5,21 @@ Scope: hierarchical configuration, invitation, restart guidance, native Pip prev
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
 
+## Direct category tabs, October 13
+
+The owner asked to switch between any of the eight categories from the top bar. All eight category tabs now stay visible between Topics and Review. Each category returns to its last visited page, and hub cards use the same remembered page. Draft edits remain shared across categories. The tab labels keep their full English titles with slightly smaller type and tighter spacing.
+
+All 24 wizard preview tests passed, zero failed or skipped. Native mouse-click tests switch directly across all categories, preserve the draft, resume each last page, and select Review by label. Measured tab ends use 817 logical pixels at scale 1 and 833.8 at scale 1.25, below the 870 limit, with zero scroll offset. Independent source review found no navigation or reentrant-composition blocker. This changes navigation only; the 40-page catalog and saved configuration format stay the same.
+
+Evidence: `.tmp/wizard-all-tabs-20261013/`, including the TRX, measured widths, all 23 standalone scenes at scales 1 and 1.25, build and QA receipts. Process-stop receipts are retained in `.tmp/wizard-all-tabs-processes-20261013/`. The canonical build has zero errors and 175 warnings. Source identity is `004f9257e7facb1129068412eecd4d28e446f4f267589635ce57ee2f7c3c83de`; package SHA-256 is `d70481e9809f07b8b30fce2312f8c5ca56a807e1163afa59ee24b4e757808b7f`. Server readback and both client profile zips match. QA reached RunGame at 16:22:03 UTC on October 13, with no startup exceptions beyond the previously documented warnings and container-path error.
+
+Four source-verified native captures cover the hub, Chat, Player display and Server tools at 1908x1260, scale 1.125. The inspected hub and stats page show the full top bar without clipping. Profile2's client log has no errors or exceptions. `controller-shutdown.json` confirms automation was disabled, leaving Profile2 connected for `/basic setup`; `profile3-launch.json` records Profile3's launch to its menu. Card 10 remains pending owner observation; no merge, release or screenshot-baseline approval occurred.
+
 ## Hierarchy expansion, October 13
 
 The goal is to make every BASICs setting accessible through a hierarchy with useful explanations and previews. This revision expands the existing setup rather than treating its original three topics as the final scope.
 
-- The hub now has eight cards in two rows: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. Pip moves into the header. The shared catalog defines each branch, its entry page, and 40 focused pages. Navigation keeps only Topics, the active branch, and Review across the top. Short new pages size their dialog to the controls and preview.
+- The hub now has eight cards in two rows: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. Pip moves into the header. The shared catalog defines each branch, its entry page, and 40 focused pages. Its initial top bar showed Topics, the active branch and Review; the direct category tabs above supersede that navigation. Short new pages size their dialog to the controls and preview.
 - New pages cover language access and signing; overhead speech, typing, names and colors; player maps; character sheets, access and slots; dice, scene markers, spectators and nickname choices; history, retention, staff and personal notes, and player stats. The original 19 page IDs remain valid. Six existing character-sheet fields are now registered for validated editing; no configuration fields or protobuf numbers were added.
 - Contextual previews illustrate the selected feature. Display pages put a speech box, typing indicator or nametag above native Pip. Other new pages show a map, sheet, dice, notes, history or statistics panel. New language pages use the mock chat window. These illustrative panels are not the actual feature GUIs and do not establish gameplay behavior.
 - Analytics accepts the catalog's bounded page IDs as wizard steps. The relay's finite step list now matches those pages, with contract revision 10 and the producer's required revision set to 10. Custom text, privileges and colors are still excluded from wizard event properties. Deploy relay revision 10 before releasing this producer: the revision-9 relay rejects new page IDs. The relay change is local; production rollout and PostHog ingestion are not verified here.
@@ -21,6 +31,7 @@ flowchart TD
     Invitation -->|Not now| Reminder[Chat reminder with /basic setup]
     Reminder --> Game[Return to game]
     Topics -->|Choose a category| Branch[Focused settings pages]
+    Branch -->|Choose another category tab| Branch
     Branch -->|Next, Back or page selector| Branch
     Branch -->|All topics| Topics
     Branch -->|Review tab| Review[Review changes]
@@ -233,8 +244,8 @@ flowchart LR
 ## Expanded hierarchy: draft-only checks
 
 10. **Eight categories and branch navigation** (P1)
-    - Do: open `/basic setup`, click each card's description area, and visit its first and last pages with Next, Back and the page selector. Return with All topics, then select the active branch tab. Change one setting in three different categories and open Review.
-    - Expect: every card opens its own branch, the top tab shows that branch's English title, and the branch tab returns to its last visited page. Review includes all three changes. Two rows of cards, the unsaved count and footer fit at scales 1 and 1.25. Short feature pages have a shorter dialog. Close and discard afterward.
+    - Do: open `/basic setup`, click each card's description area, and visit its first and last pages with Next, Back and the page selector. Switch directly between all eight category tabs. Return with Topics or All topics, then reselect a category. Change one setting in three different categories and open Review.
+    - Expect: every category is available in the top bar and its tab returns to its last visited page. Hub cards return to that same page. Review includes all three changes. The full top bar fits without scrolling, as do the two rows of cards, unsaved count and footer at scales 1 and 1.25. Short feature pages have a shorter dialog. Close and discard afterward.
     - Watch for: dead description areas, wrong branch titles, lost drafts, skipped pages, clipped five-control pages or footer overlap.
 
 11. **Overhead speech, typing and nametags** (P1)

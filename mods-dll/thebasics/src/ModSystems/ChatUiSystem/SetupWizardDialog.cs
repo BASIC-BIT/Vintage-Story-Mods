@@ -38,7 +38,8 @@ public sealed class SetupWizardDialog : GuiDialog
     private double _elapsed;
     private double? _fixedTime;
     private int _lastBeat = -1;
-    private string _topicPageId = SetupWizardCatalog.Topics[0].EntryPageId;
+    private readonly Dictionary<string, string> _topicPages = SetupWizardCatalog.Topics
+        .ToDictionary(topic => topic.Id, topic => topic.EntryPageId, StringComparer.Ordinal);
 
     public SetupWizardDialog(ICoreClientAPI api, SetupWizardDraft draft, string runId, bool isDedicated,
         Action onSave, Action<string, string, string> onTrack, Action onClose, Action onAdvanced = null,
@@ -86,7 +87,7 @@ public sealed class SetupWizardDialog : GuiDialog
         if (stepId != "hub" && stepId != "review" && stepId != "finish" && !SetupWizardCatalog.TryGetPage(stepId, out _))
             throw new ArgumentException("Unknown setup page.", nameof(stepId));
         CurrentStepId = stepId;
-        if (SetupWizardCatalog.TryGetPage(stepId, out var topicPage)) _topicPageId = topicPage.Id;
+        if (SetupWizardCatalog.TryGetPage(stepId, out var topicPage)) _topicPages[topicPage.TopicId] = topicPage.Id;
         _preview?.EndDrag(false);
         _chatPreviewTab = CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) || Bool("UseGeneralChannelAsProximityChat") || CurrentStepId == "chat.tabs" && !Bool("ProximityChatAsDefault") ? 0 : 1;
         _reviewOffset = 0;
@@ -173,15 +174,18 @@ public sealed class SetupWizardDialog : GuiDialog
             .AddShadedDialogBG(body)
             .AddDialogTitleBar(IsCaptureOnly ? "The BASICs setup (QA preview, save disabled)" : "The BASICs setup", () => TryClose())
             .BeginChildElements(body);
-        SetupWizardCatalog.TryGetPage(_topicPageId, out var activePage);
-        var activeTopic = SetupWizardCatalog.Topics.First(topic => topic.Id == activePage.TopicId);
-        var destinations = new[] { "hub", _topicPageId, "review" };
-        var tabs = new[] { "Topics", activeTopic.Title, "Review" }
+        var destinations = new[] { "hub" }.Concat(SetupWizardCatalog.Topics.Select(topic => _topicPages[topic.Id]))
+            .Append("review").ToArray();
+        var tabs = new[] { "Topics" }.Concat(SetupWizardCatalog.Topics.Select(topic => topic.Title)).Append("Review")
             .Select((name, index) => new GuiTab { Name = name, DataInt = index }).ToArray();
         composer.AddHorizontalTabs(tabs, ElementBounds.Fixed(0, 40, Width, 32), index => ShowPage(destinations[index]),
-            CairoFont.WhiteSmallText().WithFontSize(17), CairoFont.WhiteSmallText().WithFontSize(17).WithColor(GuiStyle.ActiveButtonTextColor), "topic-tabs");
-        var selectedTopic = CurrentStepId == "hub" ? 0 : CurrentStepId is "review" or "finish" ? 2 : 1;
-        composer.GetHorizontalTabs("topic-tabs").SetValue(selectedTopic, false);
+            CairoFont.WhiteSmallText().WithFontSize(15), CairoFont.WhiteSmallText().WithFontSize(15).WithColor(GuiStyle.ActiveButtonTextColor), "topic-tabs");
+        var navigation = composer.GetHorizontalTabs("topic-tabs");
+        navigation.unscaledTabPadding = 3;
+        navigation.unscaledTabSpacing = 3;
+        var selectedTopic = CurrentStepId == "hub" ? 0 : CurrentStepId is "review" or "finish" ? tabs.Length - 1
+            : Array.FindIndex(destinations, page => page == CurrentStepId);
+        navigation.SetValue(selectedTopic, false);
         composer.AddStaticElement(new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, FooterY - 14, Width, 1),
             (context, _, bounds) =>
             {
@@ -213,7 +217,7 @@ public sealed class SetupWizardDialog : GuiDialog
             var x = index % 4 * 224;
             var y = (CompactLayout ? 160 : 169) + index / 4 * (CompactLayout ? 122 : 140);
             composer.AddInteractiveElement(new GuiElementSetupTopicCard(capi, topic.Title, topic.Description, TopicIcon(topic.Id),
-                () => { ShowPage(topic.EntryPageId); return true; }, ElementBounds.Fixed(x, y, 208, CompactLayout ? 110 : 124)), "topic-" + topic.Id);
+                () => { ShowPage(_topicPages[topic.Id]); return true; }, ElementBounds.Fixed(x, y, 208, CompactLayout ? 110 : 124)), "topic-" + topic.Id);
         }
         var changes = Draft.ChangedKeys.Count;
         if (changes > 0 && string.IsNullOrEmpty(_message) && !_pending)
