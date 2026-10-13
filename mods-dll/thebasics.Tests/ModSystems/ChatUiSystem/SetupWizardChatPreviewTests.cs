@@ -27,7 +27,8 @@ public class SetupWizardChatPreviewTests
         var tabs = wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs");
         Assert.Equal(new[] { "General", "Proximity" }, tabs.tabs.Select(tab => tab.Name));
         Assert.Equal(1, tabs.activeElement);
-        Assert.Equal(1, wizard.SingleComposer.GetHorizontalTabs("topic-tabs").activeElement);
+        var navigation = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+        Assert.Equal("Chat", navigation.tabs[navigation.activeElement].Name);
         Assert.Contains("Pip says \"Hello, traveler!\"", PreviewText(wizard));
         Assert.Contains("(GOOC)", PreviewText(wizard));
         AssertPreviewBounds(host, wizard);
@@ -158,15 +159,15 @@ public class SetupWizardChatPreviewTests
         wizard.TryOpen();
         host.RenderGuiDialog(wizard, 0);
 
-        var destinations = new[]
-        {
-            (Key: "topic-chat", Page: "chat.basics", Tab: 1),
-            (Key: "topic-teleportation", Page: "teleport.tools", Tab: 2),
-            (Key: "topic-notifications", Page: "notifications.savestart", Tab: 3)
-        };
-        var cards = destinations.Select(destination =>
-            Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer[destination.Key])).ToArray();
+        var topics = SetupWizardCatalog.Topics;
+        Assert.Equal(8, topics.Count);
+        var cards = topics.Select(topic =>
+            Assert.IsType<GuiElementSetupTopicCard>(wizard.SingleComposer["topic-" + topic.Id])).ToArray();
         var elements = Elements(wizard);
+        Assert.Equal(8, elements.Values.OfType<GuiElementSetupTopicCard>().Count());
+        var rows = cards.GroupBy(card => card.Bounds.absY).ToArray();
+        Assert.Equal(2, rows.Length);
+        Assert.All(rows, row => Assert.Equal(4, row.Count()));
         var footer = new[] { "Review changes", "All settings", "Close" }.Select(label =>
             elements.Values.OfType<GuiElementTextButton>().Single(button => button.Text == label)).ToArray();
         var footerY = footer[0].Bounds.absY;
@@ -184,20 +185,32 @@ public class SetupWizardChatPreviewTests
             Assert.True(footer[index - 1].Bounds.absX + footer[index - 1].Bounds.OuterWidth < footer[index].Bounds.absX,
                 "Hub footer actions must have a gap between their click targets.");
         foreach (var card in cards)
+        {
+            Assert.InRange(card.Bounds.absX, 0, host.Canvas.Width);
+            Assert.True(card.Bounds.absX + card.Bounds.OuterWidth <= host.Canvas.Width);
             Assert.True(card.Bounds.absY + card.Bounds.OuterHeight < footerY,
                 "Topic cards must not overlap the hub footer actions.");
-        for (var index = 1; index < cards.Length; index++)
-            Assert.True(cards[index - 1].Bounds.absX + cards[index - 1].Bounds.OuterWidth < cards[index].Bounds.absX,
-                "Topic cards must have separate click targets.");
+        }
+        for (var first = 0; first < cards.Length; first++)
+            for (var second = first + 1; second < cards.Length; second++)
+            {
+                var a = cards[first].Bounds;
+                var b = cards[second].Bounds;
+                Assert.True(a.absX + a.OuterWidth < b.absX || b.absX + b.OuterWidth < a.absX ||
+                    a.absY + a.OuterHeight < b.absY || b.absY + b.OuterHeight < a.absY,
+                    "Topic cards must have separate click targets.");
+            }
 
-        foreach (var destination in destinations)
+        foreach (var topic in topics)
         {
             wizard.ShowPage("hub");
             host.RenderGuiDialog(wizard, 0);
-            var card = Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer[destination.Key]);
+            var card = Assert.IsType<GuiElementSetupTopicCard>(wizard.SingleComposer["topic-" + topic.Id]);
             ClickElement(host, wizard, card, 0.75);
-            Assert.Equal(destination.Page, wizard.CurrentStepId);
-            Assert.Equal(destination.Tab, wizard.SingleComposer.GetHorizontalTabs("topic-tabs").activeElement);
+            Assert.Equal(topic.EntryPageId, wizard.CurrentStepId);
+            var tabs = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+            Assert.Equal(new[] { "Topics", topic.Title, "Review" }, tabs.tabs.Select(tab => tab.Name));
+            Assert.Equal(topic.Title, tabs.tabs[tabs.activeElement].Name);
         }
 
         wizard.ShowPage("hub");
@@ -243,7 +256,7 @@ public class SetupWizardChatPreviewTests
         Assert.True(failureText.Bounds.renderX + failureText.Bounds.OuterWidth <= guide.Bounds.renderX,
             "The hub failure message must stay beside the guide.");
 
-        wizard.SingleComposer.GetHorizontalTabs("topic-tabs").SetValue(4);
+        wizard.SingleComposer.GetHorizontalTabs("topic-tabs").SetValue(2);
         var save = Assert.Single(wizard.SingleComposer.staticElements.Values.OfType<GuiElementTextButton>()
             .Where(button => button.Text == "Save settings"));
         ClickElement(host, wizard, save);
@@ -293,11 +306,60 @@ public class SetupWizardChatPreviewTests
             host.RenderGuiDialog(wizard, 0);
         }
 
+        foreach (var page in SetupWizardCatalog.Pages.Where(page =>
+            page.TopicId is "appearance" or "map" or "characters" or "roleplay" or "server"))
+        {
+            wizard.ShowPage(page.Id);
+            var appearance = page.TopicId == "appearance";
+            AssertPreviewElements(wizard, chat: false, diagram: true, layoutGuide: appearance);
+            if (appearance)
+                Assert.Contains(Elements(wizard).Values.OfType<GuiElementStaticText>(), text => text.Text == "Native 3D Pip omitted");
+            host.RenderGuiDialog(wizard, 0);
+        }
+
         wizard.ShowPage("notifications.sleep");
         AssertPreviewElements(wizard, chat: true, diagram: true);
         AssertDisabledInput(host, wizard);
         Assert.Equal("General", Assert.Single(wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs").tabs).Name);
         host.RenderGuiDialog(wizard, 0);
+        Assert.Empty(host.UnsupportedCalls);
+        Assert.DoesNotContain(host.UsedCalls, call => call.Contains("SendChatMessage", StringComparison.Ordinal));
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void NewTopicDiagramsShowTheirDraftChoices(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        draft.Set("ManageMapPlayerVisibility", "1");
+        draft.Set("EnableCharacterSheets", "1");
+        using var wizard = CreateWizard(host, draft);
+        wizard.TryOpen();
+        host.SetMouse(-1, -1);
+        var cases = new[]
+        {
+            (Page: "appearance.bubbles", Key: "OverheadChatBubbleMode", Before: "RpText", After: "Off"),
+            (Page: "map.visibility", Key: "MapHideOtherPlayers", Before: "0", After: "1"),
+            (Page: "characters.slots", Key: "EnableRpCharacterSlots", Before: "0", After: "1"),
+            (Page: "roleplay.dice", Key: "EnableDiceRolling", Before: "1", After: "0"),
+            (Page: "server.history", Key: "EnableChatHistory", Before: "1", After: "0")
+        };
+        foreach (var example in cases)
+        {
+            draft.Set(example.Key, example.Before);
+            wizard.ShowPage(example.Page);
+            host.RenderGuiDialog(wizard, 0);
+            var before = DiagramPixels(host, wizard);
+
+            draft.Set(example.Key, example.After);
+            wizard.ShowPage(example.Page);
+            host.RenderGuiDialog(wizard, 0);
+            var after = DiagramPixels(host, wizard);
+            Assert.False(before.SequenceEqual(after),
+                $"The {example.Page} preview must show the change to {example.Key}.");
+        }
         Assert.Empty(host.UnsupportedCalls);
         Assert.DoesNotContain(host.UsedCalls, call => call.Contains("SendChatMessage", StringComparison.Ordinal));
     }
@@ -375,7 +437,8 @@ public class SetupWizardChatPreviewTests
         labels = Elements(wizard).Values.OfType<GuiElementStaticText>().Select(element => element.Text).ToArray();
         Assert.Contains("Use General as proximity chat | After restart", labels);
         Assert.Contains("Off  >  On", labels);
-        Assert.Equal(4, wizard.SingleComposer.GetHorizontalTabs("topic-tabs").activeElement);
+        var navigation = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+        Assert.Equal("Review", navigation.tabs[navigation.activeElement].Name);
         host.RenderGuiDialog(wizard, 0);
         Assert.Empty(host.UnsupportedCalls);
     }
@@ -480,7 +543,8 @@ public class SetupWizardChatPreviewTests
         Assert.Equal("2 of 4 players are asleep.", DisplayedText(wizard.SingleComposer.GetRichtext("preview-sleep-count")));
         Assert.Equal(draft.Get("TEXT_SleepNotification"), PreviewText(wizard));
         Assert.False(fixedPixels.SequenceEqual(host.Canvas.GetRgbaPixels()));
-        Assert.Equal(3, wizard.SingleComposer.GetHorizontalTabs("topic-tabs").activeElement);
+        var navigation = wizard.SingleComposer.GetHorizontalTabs("topic-tabs");
+        Assert.Equal("Notifications", navigation.tabs[navigation.activeElement].Name);
 
         foreach (var threshold in new[] { 0d, 0.25, 0.5, 0.75, 1 })
         {
@@ -510,6 +574,24 @@ public class SetupWizardChatPreviewTests
         new(host.Api, draft, "chat-preview", true, null!, null!, null!, onAdvanced: onAdvanced!, layoutOnly: true);
 
     private static string PreviewText(SetupWizardDialog wizard) => DisplayedText(wizard.SingleComposer.GetRichtext("preview-text"));
+
+    private static byte[] DiagramPixels(PreviewHost host, SetupWizardDialog wizard)
+    {
+        var bounds = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
+        var left = (int)bounds.renderX;
+        var top = (int)bounds.renderY;
+        var width = bounds.OuterWidthInt;
+        var height = bounds.OuterHeightInt;
+        Assert.InRange(left, 0, host.Canvas.Width - 1);
+        Assert.InRange(top, 0, host.Canvas.Height - 1);
+        Assert.InRange(width, 1, host.Canvas.Width - left);
+        Assert.InRange(height, 1, host.Canvas.Height - top);
+        var canvas = host.Canvas.GetRgbaPixels();
+        var cropped = new byte[width * height * 4];
+        for (var row = 0; row < height; row++)
+            Buffer.BlockCopy(canvas, ((top + row) * host.Canvas.Width + left) * 4, cropped, row * width * 4, width * 4);
+        return cropped;
+    }
 
     private static string DisplayedText(GuiElementRichtext text) =>
         string.Join(" ", text.Components.OfType<RichTextComponent>().Select(component => component.DisplayText));

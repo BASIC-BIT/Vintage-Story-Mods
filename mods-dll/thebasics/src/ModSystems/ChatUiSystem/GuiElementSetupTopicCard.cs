@@ -9,7 +9,12 @@ public enum SetupTopicCardIcon
 {
     Chat,
     Teleportation,
-    Notifications
+    Notifications,
+    PlayerDisplay,
+    Map,
+    Characters,
+    Roleplay,
+    ServerTools
 }
 
 /// <summary>A topic choice with native button input and an integrated icon, title and description.</summary>
@@ -17,7 +22,7 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
 {
     private readonly string description;
     private readonly SetupTopicCardIcon icon;
-    private readonly CairoFont titleFont = CairoFont.WhiteSmallText().WithFontSize(18).WithWeight(FontWeight.Bold);
+    private readonly CairoFont titleFont = CairoFont.WhiteSmallText().WithFontSize(17).WithWeight(FontWeight.Bold);
     private readonly CairoFont descriptionFont = CairoFont.WhiteSmallText().WithFontSize(14)
         .WithColor(new[] { 0.86, 0.83, 0.76, 1.0 });
     private readonly TextDrawUtil textUtil = new();
@@ -31,8 +36,8 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
 
     public GuiElementSetupTopicCard(ICoreClientAPI api, string title, string description,
         SetupTopicCardIcon icon, ActionConsumable onClick, ElementBounds bounds)
-        : base(api, title, CairoFont.WhiteSmallText().WithFontSize(18),
-            CairoFont.WhiteSmallText().WithFontSize(18), onClick, bounds, EnumButtonStyle.None)
+        : base(api, title, CairoFont.WhiteSmallText().WithFontSize(17),
+            CairoFont.WhiteSmallText().WithFontSize(17), onClick, bounds, EnumButtonStyle.None)
     {
         this.description = description ?? throw new ArgumentNullException(nameof(description));
         this.icon = icon;
@@ -94,8 +99,8 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
         context.Save();
         if (down) context.Translate(scaled(1), scaled(1));
         context.Save();
-        context.Translate(scaled(20), scaled(19));
-        context.Scale(scaled(1), scaled(1));
+        context.Translate(scaled(16), scaled(19));
+        context.Scale(scaled(0.875), scaled(0.875));
         context.SetSourceRGBA(0.86, 0.73, 0.49, 1);
         context.LineWidth = 1.7;
         context.LineJoin = LineJoin.Round;
@@ -104,10 +109,10 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
         context.Restore();
 
         titleFont.SetupContext(context);
-        textUtil.DrawTextLine(context, titleFont, Text, scaled(62), scaled(24));
-        var descriptionWidth = Math.Max(1, width - scaled(36));
+        textUtil.DrawTextLine(context, titleFont, Text, scaled(54), scaled(22));
+        var descriptionWidth = Math.Max(1, width - scaled(32));
         textUtil.AutobreakAndDrawMultilineTextAt(context, descriptionFont, description,
-            scaled(18), scaled(66), descriptionWidth);
+            scaled(16), scaled(58), descriptionWidth);
         context.Restore();
 
         if (disabled)
@@ -160,6 +165,74 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
                 context.LineTo(16, 5);
                 context.Stroke();
                 context.Arc(16, 24, 3, 0, Math.PI);
+                context.Stroke();
+                break;
+            case SetupTopicCardIcon.PlayerDisplay:
+                RoundRectangle(context, 0, 3, 32, 23, 3);
+                context.Stroke();
+                context.Arc(8, 10, 3, 0, Math.PI * 2);
+                context.Stroke();
+                context.MoveTo(3, 21);
+                context.CurveTo(3, 15, 13, 15, 13, 21);
+                context.MoveTo(17, 10);
+                context.LineTo(27, 10);
+                context.MoveTo(17, 17);
+                context.LineTo(25, 17);
+                context.Stroke();
+                break;
+            case SetupTopicCardIcon.Map:
+                context.MoveTo(1, 7);
+                context.LineTo(10, 3);
+                context.LineTo(21, 7);
+                context.LineTo(31, 3);
+                context.LineTo(31, 24);
+                context.LineTo(21, 28);
+                context.LineTo(10, 24);
+                context.LineTo(1, 28);
+                context.ClosePath();
+                context.MoveTo(10, 3);
+                context.LineTo(10, 24);
+                context.MoveTo(21, 7);
+                context.LineTo(21, 28);
+                context.Stroke();
+                break;
+            case SetupTopicCardIcon.Characters:
+                context.Arc(10, 7, 5, 0, Math.PI * 2);
+                context.Stroke();
+                context.Arc(23, 9, 4, 0, Math.PI * 2);
+                context.Stroke();
+                context.MoveTo(1, 28);
+                context.CurveTo(1, 13, 19, 13, 19, 28);
+                context.MoveTo(20, 17);
+                context.CurveTo(28, 14, 32, 21, 31, 28);
+                context.Stroke();
+                break;
+            case SetupTopicCardIcon.Roleplay:
+                context.MoveTo(3, 4);
+                context.CurveTo(11, 0, 21, 0, 29, 4);
+                context.LineTo(28, 16);
+                context.CurveTo(27, 24, 21, 29, 16, 30);
+                context.CurveTo(11, 29, 5, 24, 4, 16);
+                context.ClosePath();
+                context.MoveTo(8, 11);
+                context.CurveTo(10, 9, 12, 9, 14, 11);
+                context.MoveTo(18, 11);
+                context.CurveTo(20, 9, 22, 9, 24, 11);
+                context.MoveTo(9, 18);
+                context.CurveTo(12, 24, 20, 24, 23, 18);
+                context.Stroke();
+                break;
+            case SetupTopicCardIcon.ServerTools:
+                context.MoveTo(20, 1);
+                context.CurveTo(12, 1, 9, 8, 13, 14);
+                context.LineTo(2, 24);
+                context.LineTo(7, 29);
+                context.LineTo(19, 17);
+                context.CurveTo(25, 20, 31, 16, 30, 9);
+                context.LineTo(25, 14);
+                context.LineTo(19, 8);
+                context.LineTo(24, 3);
+                context.ClosePath();
                 context.Stroke();
                 break;
         }

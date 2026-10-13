@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 const MAX_ONLINE_PLAYER_COUNT = 10_000;
-export const CONTRACT_REVISION = 9;
+export const CONTRACT_REVISION = 10;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -110,10 +110,15 @@ const DICE_BOOLEAN_PROPERTIES = new Set([
 const WIZARD_STEPS = new Set([
   "invitation", "start", "hub", "review", "finish", "advanced",
   "chat.basics", "chat.language", "chat.ranges", "chat.obfuscation", "chat.tabs",
+  "chat.languageaccess", "chat.signlanguage",
   "teleport.tools", "teleport.utilities", "teleport.requests", "teleport.requesttiming",
   "teleport.homes", "teleport.spawn", "teleport.top", "teleport.back", "teleport.stuck",
   "teleport.stuckpolicy", "teleport.warmup",
   "notifications.savestart", "notifications.savefinish", "notifications.sleep",
+  "appearance.bubbles", "appearance.typing", "appearance.names", "appearance.nametagcolors",
+  "map.visibility", "characters.sheets", "characters.access", "characters.slots",
+  "roleplay.dice", "roleplay.scenemarkers", "roleplay.spectators", "roleplay.nicknamechanges", "roleplay.nicknamerules",
+  "server.history", "server.retention", "server.staffnotes", "server.personalnotes", "server.notelimits", "server.stats",
 ]);
 const WIZARD_ACTIONS = new Set([
   "offered", "dismissed", "started", "opened", "viewed", "choice", "back", "skip",

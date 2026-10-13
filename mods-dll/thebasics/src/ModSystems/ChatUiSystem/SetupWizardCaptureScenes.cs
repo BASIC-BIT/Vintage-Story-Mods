@@ -16,7 +16,9 @@ public static class SetupWizardCaptureScenes
     [
         "wizard-hub", "wizard-chat-default", "wizard-chat-edited", "wizard-chat-presentation", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
         "wizard-travel-default", "wizard-travel-edited", "wizard-notifications-default", "wizard-notifications-edited", "wizard-notifications-sleep",
-        "wizard-review", "wizard-error", "wizard-restart-dedicated", "wizard-restart-integrated"
+        "wizard-review", "wizard-error", "wizard-restart-dedicated", "wizard-restart-integrated",
+        "wizard-appearance-bubbles", "wizard-appearance-names", "wizard-map-visibility", "wizard-characters-sheets",
+        "wizard-roleplay-dice", "wizard-server-history", "wizard-server-stats"
     ];
 
     public static List<ConfigAdminSettingValue> DefaultValues()
@@ -69,18 +71,25 @@ public static class SetupWizardCaptureScenes
             "wizard-travel-default" or "wizard-travel-edited" => "teleport.tools",
             "wizard-notifications-default" or "wizard-notifications-edited" => "notifications.savestart",
             "wizard-notifications-sleep" => "notifications.sleep",
+            "wizard-appearance-bubbles" => "appearance.bubbles",
+            "wizard-appearance-names" => "appearance.names",
+            "wizard-map-visibility" => "map.visibility",
+            "wizard-characters-sheets" => "characters.sheets",
+            "wizard-roleplay-dice" => "roleplay.dice",
+            "wizard-server-history" => "server.history",
+            "wizard-server-stats" => "server.stats",
             "wizard-review" => "review",
             _ => "chat.basics"
         };
         dialog.ShowPage(page);
-        if (scenario == "wizard-error") dialog.SetRequestFailure("The setting changed on the server. Your draft is retained; review it and retry.");
+        if (scenario == "wizard-error") dialog.SetRequestFailure("The setting changed on the server. Review your changes and try saving again.");
         if (scenario.StartsWith("wizard-restart-", StringComparison.Ordinal))
         {
             dialog.Draft.CreateSaveRequest(1, dialog.RunId);
             dialog.SetResult(new TheBasicsSetupWizardResultMessage
             {
                 Kind = SetupWizardResultKind.SaveResult, RequestId = 1, RunId = dialog.RunId, Success = true,
-                Message = "Settings saved. Restart is required for the chat channel layout.",
+                Message = "Settings saved. Restart the server to apply them.",
                 Values = dialog.Draft.Values.ToList(), RestartRequiredKeys = ["UseGeneralChannelAsProximityChat"],
                 IsDedicated = scenario == "wizard-restart-dedicated"
             });

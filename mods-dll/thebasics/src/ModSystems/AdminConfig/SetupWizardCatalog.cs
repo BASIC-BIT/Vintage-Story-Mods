@@ -5,15 +5,32 @@ using System.Linq;
 namespace thebasics.ModSystems.AdminConfig;
 
 public sealed record SetupWizardPage(string Id, string TopicId, string Title, string Description, IReadOnlyList<string> SettingKeys);
+public sealed record SetupWizardTopic(string Id, string Title, string Description, string EntryPageId);
 
 public static class SetupWizardCatalog
 {
+    public static IReadOnlyList<SetupWizardTopic> Topics { get; } = Array.AsReadOnly(new[]
+    {
+        new SetupWizardTopic("chat", "Chat", "Speech, languages\nand chat tabs", "chat.basics"),
+        new SetupWizardTopic("teleportation", "Teleportation", "Requests, homes\nand recovery", "teleport.tools"),
+        new SetupWizardTopic("notifications", "Notifications", "Save announcements\nand sleep reminders", "notifications.savestart"),
+        new SetupWizardTopic("appearance", "Player display", "Bubbles, typing\nand nametags", "appearance.bubbles"),
+        new SetupWizardTopic("map", "Map visibility", "Who appears on\nplayer maps", "map.visibility"),
+        new SetupWizardTopic("characters", "Characters", "Sheets, access\nand character slots", "characters.sheets"),
+        new SetupWizardTopic("roleplay", "Roleplay tools", "Dice, scene markers\nand player choices", "roleplay.dice"),
+        new SetupWizardTopic("server", "Server tools", "History, notes\nand player stats", "server.history")
+    });
+
     public static IReadOnlyList<SetupWizardPage> Pages { get; } = Array.AsReadOnly(new[]
     {
         Page("chat.basics", "chat", "Chat style and channels", "Use General for nearby speech, or keep it global with a separate Proximity tab. Choose how speech looks and sounds. Nearby chat still works with roleplay features off.",
             "DisableRPChat", "UseGeneralChannelAsProximityChat", "ProximityChatPresentationMode", "NormalizeProximityChatText", "EnableChatter"),
         Page("chat.language", "chat", "Languages and OOC", "Languages and global OOC need roleplay features. Local OOC uses the speech range, while global OOC reaches everyone. Set who can stay in local OOC mode.",
             "EnableLanguageSystem", "EnableGlobalOOC", "AllowOOCToggle", "OOCTogglePermission", "UseNicknameInOOC"),
+        Page("chat.languageaccess", "chat", "Learning and granting languages", "Choose who can add or remove languages. The player limit applies to /addlang. Staff grants and learning through speech can exceed it.",
+            "ChangeOwnLanguagePermission", "ChangeOtherLanguagePermission", "MaxLanguagesPerPlayer", "RemoveGrantedLanguagesOnChange"),
+        Page("chat.signlanguage", "chat", "Reading sign language", "Set how far players can read signing, and whether they need a clear view. Distance counts blocks along the grid and stops before the limit. There is no unlimited range.",
+            "SignLanguageRange", "RequireLineOfSightForSignLanguage"),
         Page("chat.ranges", "chat", "Hearing distance", "Distance counts blocks along the grid, including height. A range of 5 reaches up to 4 blocks away. Use -1 for server-wide speech.",
             "ProximityChatModeDistances.Whisper", "ProximityChatModeDistances.Normal", "ProximityChatModeDistances.Yell"),
         Page("chat.obfuscation", "chat", "Understanding distant speech", "Speech becomes harder to read with distance and walls. These distances use a straight line. Speech with a hearing range of -1 stays clear.",
@@ -47,7 +64,45 @@ public static class SetupWizardCatalog
         Page("notifications.savefinish", "notifications", "When saving finishes", "Let players know saving has finished. Show the message as regular or highlighted chat in General, or turn it off.",
             "SendServerSaveFinishedAnnouncement", "ServerSaveFinishedAsNotification", "TEXT_ServerSaveFinished"),
         Page("notifications.sleep", "notifications", "Inviting players to sleep", "Send a reminder when enough players are in bed. At 50%, it appears when the second of four players goes to bed. The game's night-skipping rules stay the same.",
-            "EnableSleepNotifications", "SleepNotificationThreshold", "TEXT_SleepNotification")
+            "EnableSleepNotifications", "SleepNotificationThreshold", "TEXT_SleepNotification"),
+        Page("appearance.bubbles", "appearance", "Overhead speech", "Show formatted speech above players, use the game's plain bubbles, or turn overhead bubbles off. Formatted bubbles need roleplay features. Minimum time applies to custom bubbles.",
+            "OverheadChatBubbleMode", "SpeechBubbleMinimumDisplayMilliseconds"),
+        Page("appearance.typing", "appearance", "Typing indicators", "Show when nearby players have chat open, are composing, or are typing. Indicators need a clear view and stay hidden for sneaking players and spectators. A range of 0 hides them.",
+            "EnableTypingIndicator", "TypingIndicatorDisplayMode", "TypingIndicatorMaxRange", "TypingIndicatorTimeoutSeconds", "TypingIndicatorTextOverride"),
+        Page("appearance.names", "appearance", "Names above players", "Show character names, account names, or both. Limit how far away other nametags appear, require a clear view, or show them only when targeted.",
+            "ShowNicknameInNametag", "ShowPlayerNameInNametag", "HideNametagUnlessTargeting", "NametagRenderRange", "NametagRequiresLineOfSight"),
+        Page("appearance.nametagcolors", "appearance", "Nametag colors", "Set default background and border colors for BASICs nametags. Empty colors use the game theme. Players' saved colors take priority over these defaults.",
+            "NametagBackgroundColor", "NametagBorderColor", "AllowPlayersToChangeNametagColors", "ChangeNametagColorPermission"),
+        Page("map.visibility", "map", "Players on the map", "Control other players on the minimap and world map. Managed maps turn off same-group visibility. Use -1 for unlimited range, or hide other players.",
+            "ManageMapPlayerVisibility", "MapHideOtherPlayers", "MapPlayerRenderDistance"),
+        Page("characters.sheets", "characters", "Character sheets", "Let players write a character sheet and inspect nearby characters. Opening a sheet with the C menu is a server default that players can override for themselves.",
+            "EnableCharacterSheets", "CharacterSheetAutoOpenOnCharacterScreen"),
+        Page("characters.access", "characters", "Viewing and editing sheets", "Choose who can use sheet-editing commands or manage other players' sheets. Limit nearby viewing by distance and line of sight. Required fields can block roleplay until complete.",
+            "CharacterSheetSetPermission", "CharacterSheetAdminPermission", "CharacterSheetLookRange", "CharacterSheetLookRequiresLineOfSight", "CharacterSheetRequireRequiredFieldsForRoleplay"),
+        Page("characters.slots", "characters", "Multiple characters", "Character slots keep separate identities, appearances, inventories, body states, and positions. They require character sheets. The slot limit applies per account.",
+            "EnableRpCharacterSlots", "MaxRpCharacterSlots"),
+        Page("roleplay.dice", "roleplay", "Dice rolls", "Public rolls follow the player's speech range. Private rolls go only to the roller. Dice sounds reach eligible listeners within 8 blocks, and players can mute them.",
+            "EnableDiceRolling", "EnableDiceRollSounds"),
+        Page("roleplay.scenemarkers", "roleplay", "Scene markers", "Let players leave descriptions in the world. Turning markers off stops crafting, placement, and editing while keeping existing markers and their text.",
+            "EnableSceneMarkers"),
+        Page("roleplay.spectators", "roleplay", "Spectator chat", "Protect invisible spectators from accidental speech or emotes. They can still choose OOC or narration. Typing indicators and player-attached bubbles stay hidden.",
+            "ProtectSpectatorRoleplayChat", "AllowSpectatorPlacedEnvironmentalMessages", "UseNicknameInSpectatorOOC"),
+        Page("roleplay.nicknamechanges", "roleplay", "Player nickname choices", "Let players set their own nicknames and colors. Color changes need the chosen permission. Turning these commands off keeps saved names.",
+            "ProximityChatAllowPlayersToChangeNicknames", "ProximityChatAllowPlayersToChangeNicknameColors", "ChangeNicknameColorPermission"),
+        Page("roleplay.nicknamerules", "roleplay", "Nickname rules", "Set nickname length limits, or disable nickname commands and the nickname requirement. Saved names can still appear in chat and nametags.",
+            "DisableNicknames", "MinNicknameLength", "MaxNicknameLength"),
+        Page("server.history", "server", "Chat history", "Store chat for staff search. You can also include chat sent outside The BASICs. Search and export or deletion can have different permissions.",
+            "EnableChatHistory", "ChatHistoryCaptureNonBasicChat", "ChatHistoryPermission", "ChatHistoryManagePermission"),
+        Page("server.retention", "server", "History limits", "Remove older entries by age or keep only the newest entries. Set either retention limit to 0 to remove that limit. Search limits control how many results staff receive.",
+            "ChatHistoryRetentionDays", "ChatHistoryMaxEntries", "ChatHistorySearchMaxResults"),
+        Page("server.staffnotes", "server", "Staff notes", "Keep staff-only notes about player accounts. Offer separate timestamped entries, one freeform ledger, or both. Only players with the chosen permission can access them.",
+            "EnableAdminNotes", "EnableStructuredAdminNotes", "EnableAdminNoteLedger", "AdminNotesPermission", "MaxAdminNotesPerTarget"),
+        Page("server.personalnotes", "server", "Personal notes", "Give players private notes and a freeform notebook. Notes belong to their author and can describe different players. The entry limit counts all of an author's notes.",
+            "EnablePlayerNotes", "PlayerNotesPermission", "MaxPlayerNotesPerAuthor"),
+        Page("server.notelimits", "server", "Note length limits", "Set the maximum characters in each note body and freeform ledger. These limits apply to both staff and personal notes.",
+            "MaxNoteLength", "MaxFreeformNoteLength"),
+        Page("server.stats", "server", "Player activity stats", "Record player activity for /playerstats. The tracking switch takes effect after restart. Choose who can clear saved statistics.",
+            "PlayerStatSystem", "PlayerStatClearPermission")
     });
 
     private static readonly HashSet<string> SettingKeys = Pages.SelectMany(page => page.SettingKeys).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -59,6 +114,15 @@ public static class SetupWizardCatalog
         page = Pages.FirstOrDefault(candidate => candidate.Id == id);
         return page != null;
     }
+
+    public static bool TryGetTopic(string id, out SetupWizardTopic topic)
+    {
+        topic = Topics.FirstOrDefault(candidate => candidate.Id == id);
+        return topic != null;
+    }
+
+    public static SetupWizardTopic GetTopicForPage(string pageId) =>
+        TryGetPage(pageId, out var page) && TryGetTopic(page.TopicId, out var topic) ? topic : null;
 
     private static SetupWizardPage Page(string id, string topicId, string title, string description, params string[] keys) =>
         new(id, topicId, title, description, Array.AsReadOnly(keys));

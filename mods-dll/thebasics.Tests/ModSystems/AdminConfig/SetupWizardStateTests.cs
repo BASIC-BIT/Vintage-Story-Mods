@@ -9,12 +9,22 @@ namespace thebasics.Tests.ModSystems.AdminConfig;
 public class SetupWizardStateTests
 {
     [Fact]
-    public void Catalog_UsesBoundedRegistryBackedPagesForTheThreeTopics()
+    public void Catalog_UsesReadOnlyTopicsWithBoundedRegistryBackedPages()
     {
+        var topicIds = new[] { "chat", "teleportation", "notifications", "appearance", "map", "characters", "roleplay", "server" };
+        SetupWizardCatalog.Topics.Select(topic => topic.Id).Should().OnlyHaveUniqueItems().And.BeEquivalentTo(topicIds);
+        if (SetupWizardCatalog.Topics is System.Collections.IList topics) topics.IsReadOnly.Should().BeTrue();
+        foreach (var topic in SetupWizardCatalog.Topics)
+        {
+            topic.Title.Should().NotBeNullOrWhiteSpace();
+            topic.Description.Should().NotBeNullOrWhiteSpace();
+            SetupWizardCatalog.TryGetPage(topic.EntryPageId, out var entry).Should().BeTrue();
+            entry.TopicId.Should().Be(topic.Id);
+        }
         SetupWizardCatalog.Pages.Should().NotBeEmpty();
         SetupWizardCatalog.Pages.Select(page => page.Id).Should().OnlyHaveUniqueItems();
         SetupWizardCatalog.Pages.Select(page => page.TopicId).Distinct()
-            .Should().BeEquivalentTo(new[] { "chat", "teleportation", "notifications" });
+            .Should().BeEquivalentTo(topicIds);
 
         foreach (var page in SetupWizardCatalog.Pages)
         {
@@ -31,6 +41,7 @@ public class SetupWizardStateTests
         }
 
         SetupWizardCatalog.TryGetPage("unknown-page", out _).Should().BeFalse();
+        SetupWizardCatalog.IsSettingKey("UnknownSetting").Should().BeFalse();
         SetupWizardCatalog.IsSettingKey("DebugMode").Should().BeFalse();
     }
 
@@ -59,8 +70,19 @@ public class SetupWizardStateTests
         });
     }
 
+    [Fact]
+    public void Catalog_CoversAppearanceMapCharactersRoleplayAndServerControls()
+    {
+        KeysFor("appearance").Should().Contain(new[] { "OverheadChatBubbleMode", "ShowNicknameInNametag", "EnableTypingIndicator" });
+        KeysFor("map").Should().Contain(new[] { "ManageMapPlayerVisibility", "MapHideOtherPlayers", "MapPlayerRenderDistance" });
+        KeysFor("characters").Should().Contain(new[] { "EnableCharacterSheets", "EnableRpCharacterSlots", "MaxRpCharacterSlots" });
+        KeysFor("roleplay").Should().Contain(new[] { "EnableDiceRolling", "EnableSceneMarkers" });
+        KeysFor("server").Should().Contain(new[] { "PlayerStatSystem", "EnableChatHistory", "EnableAdminNotes" });
+    }
+
     [Theory]
     [InlineData("UnknownSetting")]
+    [InlineData("Teleportation.UnknownCommand")]
     [InlineData("DebugMode")]
     public void TryValidatePatch_RejectsUnknownAndNonWizardKeysWithoutMutatingCurrent(string key)
     {

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using thebasics.Configs;
+using thebasics.ModSystems.AdminConfig;
 
 namespace thebasics.ModSystems.Analytics;
 
@@ -16,15 +17,10 @@ public static class AnalyticsService
     private static readonly object PendingFailureLock = new();
     private static volatile bool _allowErrorTelemetry;
     private static volatile bool _errorTelemetryConfigured;
-    private static readonly HashSet<string> SetupWizardSteps = new(StringComparer.Ordinal)
-    {
-        "invitation", "start", "hub", "review", "finish", "advanced",
-        "chat.basics", "chat.language", "chat.ranges", "chat.obfuscation", "chat.tabs",
-        "teleport.tools", "teleport.utilities", "teleport.requests", "teleport.requesttiming",
-        "teleport.homes", "teleport.spawn", "teleport.top", "teleport.back", "teleport.stuck",
-        "teleport.stuckpolicy", "teleport.warmup",
-        "notifications.savestart", "notifications.savefinish", "notifications.sleep"
-    };
+    private static readonly HashSet<string> SetupWizardSteps = SetupWizardCatalog.Pages
+        .Select(page => page.Id)
+        .Concat(["invitation", "start", "hub", "review", "finish", "advanced"])
+        .ToHashSet(StringComparer.Ordinal);
     private static readonly HashSet<string> SetupWizardActions = new(StringComparer.Ordinal)
     {
         "offered", "dismissed", "started", "opened", "viewed", "choice", "back", "skip",

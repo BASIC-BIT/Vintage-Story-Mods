@@ -38,6 +38,7 @@ public sealed class SetupWizardDialog : GuiDialog
     private double _elapsed;
     private double? _fixedTime;
     private int _lastBeat = -1;
+    private string _topicPageId = SetupWizardCatalog.Topics[0].EntryPageId;
 
     public SetupWizardDialog(ICoreClientAPI api, SetupWizardDraft draft, string runId, bool isDedicated,
         Action onSave, Action<string, string, string> onTrack, Action onClose, Action onAdvanced = null,
@@ -85,6 +86,7 @@ public sealed class SetupWizardDialog : GuiDialog
         if (stepId != "hub" && stepId != "review" && stepId != "finish" && !SetupWizardCatalog.TryGetPage(stepId, out _))
             throw new ArgumentException("Unknown setup page.", nameof(stepId));
         CurrentStepId = stepId;
+        if (SetupWizardCatalog.TryGetPage(stepId, out var topicPage)) _topicPageId = topicPage.Id;
         _preview?.EndDrag(false);
         _chatPreviewTab = CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) || Bool("UseGeneralChannelAsProximityChat") || CurrentStepId == "chat.tabs" && !Bool("ProximityChatAsDefault") ? 0 : 1;
         _reviewOffset = 0;
@@ -171,13 +173,14 @@ public sealed class SetupWizardDialog : GuiDialog
             .AddShadedDialogBG(body)
             .AddDialogTitleBar(IsCaptureOnly ? "The BASICs setup (QA preview, save disabled)" : "The BASICs setup", () => TryClose())
             .BeginChildElements(body);
-        var destinations = new[] { "hub", "chat.basics", "teleport.tools", "notifications.savestart", "review" };
-        var tabs = new[] { "Topics", "Chat", "Teleportation", "Notifications", "Review" }
+        SetupWizardCatalog.TryGetPage(_topicPageId, out var activePage);
+        var activeTopic = SetupWizardCatalog.Topics.First(topic => topic.Id == activePage.TopicId);
+        var destinations = new[] { "hub", _topicPageId, "review" };
+        var tabs = new[] { "Topics", activeTopic.Title, "Review" }
             .Select((name, index) => new GuiTab { Name = name, DataInt = index }).ToArray();
         composer.AddHorizontalTabs(tabs, ElementBounds.Fixed(0, 40, Width, 32), index => ShowPage(destinations[index]),
             CairoFont.WhiteSmallText().WithFontSize(17), CairoFont.WhiteSmallText().WithFontSize(17).WithColor(GuiStyle.ActiveButtonTextColor), "topic-tabs");
-        var selectedTopic = CurrentStepId == "hub" ? 0 : CurrentStepId.StartsWith("chat.", StringComparison.Ordinal) ? 1
-            : CurrentStepId.StartsWith("teleport.", StringComparison.Ordinal) ? 2 : CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) ? 3 : 4;
+        var selectedTopic = CurrentStepId == "hub" ? 0 : CurrentStepId is "review" or "finish" ? 2 : 1;
         composer.GetHorizontalTabs("topic-tabs").SetValue(selectedTopic, false);
         composer.AddStaticElement(new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, FooterY - 14, Width, 1),
             (context, _, bounds) =>
@@ -204,13 +207,18 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         Text(composer, "Set up your server", 0, 92, Width, 30, true);
         Text(composer, "Choose a topic to get started.", 0, 129, Width, 48);
-        TopicCard(composer, "Chat", "Chat style, languages\nand hearing distance.", SetupTopicCardIcon.Chat, "chat.basics", 0, "topic-chat");
-        TopicCard(composer, "Teleportation", "Teleport requests, homes\nand travel commands.", SetupTopicCardIcon.Teleportation, "teleport.tools", 305, "topic-teleportation");
-        TopicCard(composer, "Notifications", "Save announcements\nand sleep reminders.", SetupTopicCardIcon.Notifications, "notifications.savestart", 610, "topic-notifications");
+        for (var index = 0; index < SetupWizardCatalog.Topics.Count; index++)
+        {
+            var topic = SetupWizardCatalog.Topics[index];
+            var x = index % 4 * 224;
+            var y = (CompactLayout ? 160 : 169) + index / 4 * (CompactLayout ? 122 : 140);
+            composer.AddInteractiveElement(new GuiElementSetupTopicCard(capi, topic.Title, topic.Description, TopicIcon(topic.Id),
+                () => { ShowPage(topic.EntryPageId); return true; }, ElementBounds.Fixed(x, y, 208, CompactLayout ? 110 : 124)), "topic-" + topic.Id);
+        }
         var changes = Draft.ChangedKeys.Count;
         if (changes > 0 && string.IsNullOrEmpty(_message) && !_pending)
             Text(composer, changes == 1 ? "1 unsaved change" : $"{changes} unsaved changes", 0, StatusY, 640, 30);
-        var guideBounds = ElementBounds.Fixed(700, CompactLayout ? 314 : 330, 160, CompactLayout ? 80 : 142);
+        var guideBounds = ElementBounds.Fixed(766, 76, 100, 84);
         if (LayoutOnly) Text(composer, "Native 3D Pip omitted", guideBounds.fixedX, guideBounds.fixedY, guideBounds.fixedWidth, guideBounds.fixedHeight);
         else composer.AddInteractiveElement(new PreviewActorElement(capi, guideBounds, this), "pip");
         Button(composer, "Review changes", () => ShowPage("review"), 0, FooterY, 240);
@@ -225,10 +233,18 @@ public sealed class SetupWizardDialog : GuiDialog
         composer.GetButton("hub-all-settings").Enabled = _onAdvanced != null;
     }
 
-    private void TopicCard(GuiComposer composer, string title, string description, SetupTopicCardIcon icon,
-        string page, double x, string key)
-        => composer.AddInteractiveElement(new GuiElementSetupTopicCard(capi, title, description, icon,
-            () => { ShowPage(page); return true; }, ElementBounds.Fixed(x, 179, 270, 132)), key);
+    private static SetupTopicCardIcon TopicIcon(string id) => id switch
+    {
+        "chat" => SetupTopicCardIcon.Chat,
+        "teleportation" => SetupTopicCardIcon.Teleportation,
+        "notifications" => SetupTopicCardIcon.Notifications,
+        "appearance" => SetupTopicCardIcon.PlayerDisplay,
+        "map" => SetupTopicCardIcon.Map,
+        "characters" => SetupTopicCardIcon.Characters,
+        "roleplay" => SetupTopicCardIcon.Roleplay,
+        "server" => SetupTopicCardIcon.ServerTools,
+        _ => SetupTopicCardIcon.ServerTools
+    };
 
     private void ComposePage(GuiComposer composer)
     {
@@ -313,7 +329,8 @@ public sealed class SetupWizardDialog : GuiDialog
                 y += 30;
             }
             else
-                composer.AddInteractiveElement(new GuiElementDropDown(capi, options, definition.OptionNames.ToArray(), selected,
+                composer.AddInteractiveElement(new GuiElementDropDown(capi, options,
+                    options.Select((option, index) => SettingOptionName(key, option, definition.OptionNames[index])).ToArray(), selected,
                     (choice, _) => Changed(key, choice, "option" + Array.IndexOf(options, choice), false), bounds, CairoFont.WhiteSmallText(), false), key);
         }
         else
@@ -430,7 +447,22 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void AddPreview(GuiComposer composer)
     {
-        if (CurrentStepId is "chat.basics" or "chat.language" or "chat.tabs" or "notifications.savestart" or "notifications.savefinish")
+        if (SetupWizardFeaturePreview.Supports(CurrentStepId))
+        {
+            var appearance = CurrentStepId.StartsWith("appearance.", StringComparison.Ordinal);
+            _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, 174, 310,
+                appearance ? 64 : 220),
+                (context, surface, bounds) => SetupWizardFeaturePreview.Draw(context, surface, bounds, CurrentStepId, Draft), true);
+            composer.AddInteractiveElement(_diagram, "preview-diagram");
+            if (appearance)
+            {
+                var guide = ElementBounds.Fixed(0, 242, 310, CompactLayout ? 190 : 240);
+                if (LayoutOnly) Text(composer, "Native 3D Pip omitted", guide.fixedX, guide.fixedY, guide.fixedWidth, guide.fixedHeight);
+                else composer.AddInteractiveElement(new PreviewActorElement(capi, guide, this), "pip");
+            }
+            return;
+        }
+        if (CurrentStepId is "chat.basics" or "chat.language" or "chat.languageaccess" or "chat.signlanguage" or "chat.tabs" or "notifications.savestart" or "notifications.savefinish")
         {
             AddChatPreview(composer, CompactLayout ? 204 : 212, CompactLayout ? 184 : 230);
             return;
@@ -492,6 +524,10 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         if (CurrentStepId.StartsWith("chat.", StringComparison.Ordinal))
         {
+            if (CurrentStepId == "chat.signlanguage")
+                return Bool("EnableLanguageSystem") && !Bool("DisableRPChat") ? "Pip signs, \"Meet me by the gate.\"" : "";
+            if (CurrentStepId == "chat.languageaccess")
+                return Bool("EnableLanguageSystem") && !Bool("DisableRPChat") ? "Pip says in Common, \"Hello, traveler!\"" : "";
             var replacement = Bool("UseGeneralChannelAsProximityChat");
             if (!replacement && _chatPreviewTab == 0)
                 return "MaraPlayer: Anyone heading north?<br>PipPlayer: Meet you by the gate.";
@@ -560,9 +596,23 @@ public sealed class SetupWizardDialog : GuiDialog
     private string SleepCountText() => $"{Sleepers} of 4 players are asleep.";
     private bool NeedsRestart => _runtimeApplyFailed || _restartKeys.Count > 0;
     private bool CompactLayout => capi.Render.FrameHeight / Math.Max(RuntimeEnv.GUIScale, 0.1f) < 660;
-    private double BodyHeight => CurrentStepId == "hub" ? CompactLayout ? 450 : 530 : CompactLayout ? 528 : 608;
+    private double BodyHeight
+    {
+        get
+        {
+            if (CurrentStepId == "hub") return CompactLayout ? 488 : 546;
+            var height = CompactLayout ? 528 : 608;
+            if (!SetupWizardFeaturePreview.Supports(CurrentStepId) || CurrentStepId.StartsWith("appearance.", StringComparison.Ordinal))
+                return height;
+            SetupWizardCatalog.TryGetPage(CurrentStepId, out var page);
+            var controls = page.SettingKeys.Count(SettingVisible);
+            var editorBottom = 178 + Math.Max(0, controls - 1) * (CompactLayout ? 54 : 65) + 51;
+            var contentBottom = Math.Max(174 + 220, editorBottom);
+            return Math.Min(height, contentBottom + (CompactLayout ? 84 : 104));
+        }
+    }
     private double FooterY => BodyHeight - 38;
-    private double StatusY => FooterY - (CompactLayout ? 36 : 56);
+    private double StatusY => FooterY - (CurrentStepId == "hub" ? CompactLayout ? 48 : 64 : CompactLayout ? 36 : 56);
     private string AnimationCode() => CurrentStepId == "hub" ? "wave" : CurrentStepId == "finish" ? "cheer" : "idle";
 
     private static string PresentationName(string mode) => ProximityChatPresentationModes.Normalize(mode) switch
@@ -592,8 +642,20 @@ public sealed class SetupWizardDialog : GuiDialog
             return (fraction * 100).ToString(CultureInfo.InvariantCulture) + "%";
         if (definition.Kind == ConfigAdminSettingKind.Boolean && ConfigAdminSettingDefinition.TryParseBool(value, out var enabled))
             return enabled != (definition.Key == "DisableRPChat") ? "On" : "Off";
+        if (definition.Kind == ConfigAdminSettingKind.Select) return SettingOptionName(definition.Key, value, value);
         return value;
     }
+    private static string SettingOptionName(string key, string value, string fallback) => (key, value) switch
+    {
+        ("OverheadChatBubbleMode", "RpText") => "Roleplay text",
+        ("OverheadChatBubbleMode", "Vanilla") => "Game default",
+        ("TypingIndicatorDisplayMode", "Icon") => "Icon only",
+        ("TypingIndicatorDisplayMode", "Text") => "Text only",
+        ("TypingIndicatorDisplayMode", "Both") => "Icon and text",
+        ("ProximityChatTabPosition", "GameOrder") => "Game default",
+        ("ProximityChatTabPosition", "AfterGeneral") => "After General",
+        _ => fallback
+    };
     private bool Bool(string key) => ConfigAdminSettingDefinition.TryParseBool(Draft.Get(key), out var value) && value;
     private double Number(string key) => double.TryParse(Draft.Get(key), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && double.IsFinite(value) ? value : 0;
 

@@ -20,6 +20,7 @@ public static class ConfigAdminSettingRegistry
     // the admin UI; a hand-edited the_basics.json reaches the same fields without passing through it.
     private const int MaxWallPenaltyBlocks = 128;
     private const int MaxSignLanguageRange = 512;
+    private const int MaxCharacterSheetLookRange = 512;
 
     private static readonly IReadOnlyList<ConfigAdminSettingDefinition> _settings = BuildSettings();
     private static readonly IDictionary<string, ConfigAdminSettingDefinition> _settingsByKey =
@@ -58,6 +59,11 @@ public static class ConfigAdminSettingRegistry
         }
 
         ValidateSightBlockPatterns(config, errors);
+
+        if (!double.IsFinite(config.CharacterSheetLookRange) || config.CharacterSheetLookRange < 0 || config.CharacterSheetLookRange > MaxCharacterSheetLookRange)
+        {
+            errors.Add($"CharacterSheetLookRange must be a number from 0 to {MaxCharacterSheetLookRange} blocks.");
+        }
 
         return errors;
     }
@@ -181,11 +187,11 @@ public static class ConfigAdminSettingRegistry
             Bool("EnableTypingIndicator", "Client UX", "Enable typing indicator", "Show typing state above players.", ConfigAdminReloadBehavior.Live, c => c.EnableTypingIndicator, (c, v) => c.EnableTypingIndicator = v),
             Select("TypingIndicatorDisplayMode", "Client UX", "Typing indicator display", "Controls icon/text rendering for typing indicators.", ConfigAdminReloadBehavior.Live, (c => c.TypingIndicatorDisplayMode.ToString(), (c, v) => c.TypingIndicatorDisplayMode = Enum.Parse<TypingIndicatorDisplayMode>(v, true)), EnumNames<TypingIndicatorDisplayMode>()),
             Int("TypingIndicatorMaxRange", "Client UX", "Typing indicator range", "Maximum range in blocks for typing indicators.", ConfigAdminReloadBehavior.Live, (c => c.TypingIndicatorMaxRange, (c, v) => c.TypingIndicatorMaxRange = v), (0, 512)),
-            Decimal("TypingIndicatorTimeoutSeconds", "Client UX", "Typing indicator timeout", "Seconds before typing state expires.", ConfigAdminReloadBehavior.Live, (c => c.TypingIndicatorTimeoutSeconds, (c, v) => c.TypingIndicatorTimeoutSeconds = (float)v), (0, 60)),
+            Decimal("TypingIndicatorTimeoutSeconds", "Client UX", "Recent typing window (seconds)", "Seconds after the last text change before the indicator changes from typing to composing. 0 uses the default of 5 seconds.", ConfigAdminReloadBehavior.Live, (c => c.TypingIndicatorTimeoutSeconds, (c, v) => c.TypingIndicatorTimeoutSeconds = (float)v), (0, 60)),
             Text("TypingIndicatorTextOverride", "Client UX", "Typing indicator text override", "Optional custom typing indicator text. Empty uses lang default.", ConfigAdminReloadBehavior.Live, c => c.TypingIndicatorTextOverride, (c, v) => c.TypingIndicatorTextOverride = v),
             Bool("IsolateChatMessageFormatting", "Client UX", "Prevent chat formatting leaks", "Keep each chat message's formatting separate so a broken announcement cannot restyle later messages. Off uses vanilla chat rendering. Applies on the next chat update.", ConfigAdminReloadBehavior.Live, c => c.IsolateChatMessageFormatting, (c, v) => c.IsolateChatMessageFormatting = v),
             Select("OverheadChatBubbleMode", "Client UX", "Overhead chat bubbles", "Controls RP text, vanilla, or disabled overhead bubbles.", ConfigAdminReloadBehavior.Live, (c => c.OverheadChatBubbleMode, (c, v) => c.OverheadChatBubbleMode = v), new[] { "RpText", "Vanilla", "Off" }),
-            Int("SpeechBubbleMinimumDisplayMilliseconds", "Client UX", "Minimum bubble time", "Minimum speech bubble lifetime in milliseconds.", ConfigAdminReloadBehavior.Live, (c => c.SpeechBubbleMinimumDisplayMilliseconds, (c, v) => c.SpeechBubbleMinimumDisplayMilliseconds = v), (0, 60000)),
+            Int("SpeechBubbleMinimumDisplayMilliseconds", "Client UX", "Minimum custom bubble time (milliseconds)", "Minimum lifetime for custom formatted bubbles. Requires roleplay features and RpText bubbles. Plain bubbles use the game's timing.", ConfigAdminReloadBehavior.Live, (c => c.SpeechBubbleMinimumDisplayMilliseconds, (c, v) => c.SpeechBubbleMinimumDisplayMilliseconds = v), (0, 60000)),
             Bool("ShowNicknameInNametag", "Client UX", "Show nickname in nametag", "Include RP nickname in rendered nametags.", ConfigAdminReloadBehavior.Live, c => c.ShowNicknameInNametag, (c, v) => c.ShowNicknameInNametag = v),
             Bool("ShowPlayerNameInNametag", "Client UX", "Show account name in nametag", "Include account name in rendered nametags.", ConfigAdminReloadBehavior.Live, c => c.ShowPlayerNameInNametag, (c, v) => c.ShowPlayerNameInNametag = v),
             Bool("HideNametagUnlessTargeting", "Client UX", "Hide other nametags unless targeted", "Only show other players' nametags when targeted.", ConfigAdminReloadBehavior.Live, c => c.HideNametagUnlessTargeting, (c, v) => c.HideNametagUnlessTargeting = v),
@@ -193,7 +199,7 @@ public static class ConfigAdminSettingRegistry
             Bool("NametagRequiresLineOfSight", "Client UX", "Nametag requires line of sight", "Require client line-of-sight for nametag rendering.", ConfigAdminReloadBehavior.Live, c => c.NametagRequiresLineOfSight, (c, v) => c.NametagRequiresLineOfSight = v),
             OptionalHexColor("NametagBackgroundColor", "Client UX", "Nametag background color", "Optional #RRGGBB or #RRGGBBAA background color for custom nametags. Empty uses the active UI theme.", ConfigAdminReloadBehavior.Live, c => c.NametagBackgroundColor, (c, v) => c.NametagBackgroundColor = v),
             OptionalHexColor("NametagBorderColor", "Client UX", "Nametag border color", "Optional #RRGGBB or #RRGGBBAA border color for custom nametags. Empty uses the active UI theme.", ConfigAdminReloadBehavior.Live, c => c.NametagBorderColor, (c, v) => c.NametagBorderColor = v),
-            Bool("ManageMapPlayerVisibility", "Map Visibility", "Manage player map markers", "Let The BASICs write vanilla map player marker world config keys. Also disables same-group map visibility to avoid Proximity chat group leaks.", ConfigAdminReloadBehavior.Live, c => c.ManageMapPlayerVisibility, (c, v) => c.ManageMapPlayerVisibility = v),
+            Bool("ManageMapPlayerVisibility", "Map Visibility", "Manage player map markers", "Let The BASICs control vanilla map player markers. Same-group visibility stays off while managed. Turning this off clears the world overrides instead of restoring earlier values.", ConfigAdminReloadBehavior.Live, c => c.ManageMapPlayerVisibility, (c, v) => c.ManageMapPlayerVisibility = v),
             Bool("MapHideOtherPlayers", "Map Visibility", "Hide other map players", "Hide other players on the minimap and full world map when map visibility is managed.", ConfigAdminReloadBehavior.Live, c => c.MapHideOtherPlayers, (c, v) => c.MapHideOtherPlayers = v),
             Int("MapPlayerRenderDistance", "Map Visibility", "Map player render range", "Maximum range in blocks for other player map markers. Use -1 for unlimited; ignored when other players are hidden.", ConfigAdminReloadBehavior.Live, (c => c.MapPlayerRenderDistance, (c, v) => c.MapPlayerRenderDistance = v), (-1, 100000)),
             Bool("BoldNicknames", "Client UX", "Bold nicknames", "Render RP nicknames in bold where supported.", ConfigAdminReloadBehavior.Live, c => c.BoldNicknames, (c, v) => c.BoldNicknames = v),
@@ -258,6 +264,12 @@ public static class ConfigAdminSettingRegistry
         settings.AddRange(new[]
         {
             Bool("DebugMode", "Diagnostics", "Debug mode", "Enable The BASICs diagnostic logging.", ConfigAdminReloadBehavior.Live, c => c.DebugMode, (c, v) => c.DebugMode = v),
+            Bool("EnableCharacterSheets", "Characters", "Enable character sheets", "Let players write character sheets and inspect nearby characters. Requires restart.", ConfigAdminReloadBehavior.RestartRequired, c => c.EnableCharacterSheets, (c, v) => c.EnableCharacterSheets = v),
+            Text("CharacterSheetSetPermission", "Characters", "Sheet editing command permission", "Permission required for sheet-editing commands and headshot uploads. Players can still edit their own non-staff fields in the sheet window. Requires restart.", ConfigAdminReloadBehavior.RestartRequired, c => c.CharacterSheetSetPermission, (c, v) => c.CharacterSheetSetPermission = v),
+            Text("CharacterSheetAdminPermission", "Characters", "Manage character sheets permission", "Permission required to inspect and edit other players' complete sheets. Requires restart to update the registered commands.", ConfigAdminReloadBehavior.RestartRequired, c => c.CharacterSheetAdminPermission, (c, v) => c.CharacterSheetAdminPermission = v),
+            Decimal("CharacterSheetLookRange", "Characters", "Nearby sheet viewing range (blocks)", "Maximum straight-line distance for inspecting another player's nearby sheet. Players at the limit can view it. Viewing your own sheet has no distance limit.", ConfigAdminReloadBehavior.Live, (c => c.CharacterSheetLookRange, (c, v) => c.CharacterSheetLookRange = v), (0, MaxCharacterSheetLookRange)),
+            Bool("CharacterSheetLookRequiresLineOfSight", "Characters", "Nearby sheets require line of sight", "Require a clear view when inspecting another player's nearby sheet. Does not restrict viewing your own sheet or staff inspection.", ConfigAdminReloadBehavior.Live, c => c.CharacterSheetLookRequiresLineOfSight, (c, v) => c.CharacterSheetLookRequiresLineOfSight = v),
+            Bool("CharacterSheetRequireRequiredFieldsForRoleplay", "Characters", "Complete required fields before roleplay", "Require non-optional sheet fields before sending roleplay messages. Staff-only fields do not block roleplay, and disabling nicknames exempts the nickname field.", ConfigAdminReloadBehavior.Live, c => c.CharacterSheetRequireRequiredFieldsForRoleplay, (c, v) => c.CharacterSheetRequireRequiredFieldsForRoleplay = v),
             Bool("EnableRpCharacterSlots", "Characters", "Enable RP character slots", "Enable full RP character slots with per-character identity, appearance, inventory, body state, and position. Requires character sheets to be enabled.", ConfigAdminReloadBehavior.RestartRequired, c => c.EnableRpCharacterSlots, (c, v) => c.EnableRpCharacterSlots = v),
             Bool("CharacterSheetAutoOpenOnCharacterScreen", "Characters", "Open character sheet with C menu", "Open your character sheet when you open the character screen. Players can choose Default, On, or Off for themselves.", ConfigAdminReloadBehavior.Live, c => c.CharacterSheetAutoOpenOnCharacterScreen, (c, v) => c.CharacterSheetAutoOpenOnCharacterScreen = v),
             Int("MaxRpCharacterSlots", "Characters", "Max RP character slots", "Maximum active RP character slots per account.", ConfigAdminReloadBehavior.Live, (c => c.MaxRpCharacterSlots, (c, v) => c.MaxRpCharacterSlots = v), (1, 20)),

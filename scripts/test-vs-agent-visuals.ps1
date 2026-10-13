@@ -148,6 +148,66 @@ if ($realEncoder -and $realProbe) {
     $realClip = Get-Content -LiteralPath (Join-Path $realDirectory 'clip.json') -Raw | ConvertFrom-Json
     Assert-True ($realClip.frames.Count -eq 2 -and $realClip.encodedWidth -eq 4 -and $realClip.encodedHeight -eq 4) 'Actual ffmpeg/ffprobe encode and inspect the tiny odd-size pose fixture.'
 } else { Write-Warning 'Actual encoder integration skipped because ffmpeg/ffprobe are unavailable; fake tool behavior checks passed.' }
+# Exercise the real native runner against a disposable bridge, including newly added branches.
+$nativeScript = Join-Path $PSScriptRoot 'capture-native-wizard.ps1'
+$fakeVsctl = Join-Path $fixtureScripts 'vsctl.ps1'
+$global:nativeVisualProfile = $profile
+$global:nativeVisualFailure = ''
+@'
+param($Command)
+$global:LASTEXITCODE = 0
+switch ($Command) {
+    'hello' {
+        $result = @{protocolVersion = $(if ($global:nativeVisualFailure -eq 'protocol') {'2.0'} else {'1.0'}); mutationGranted = $true}
+    }
+    'extensions' {
+        $result = @('thebasics.setup.open','thebasics.setup.capture','thebasics.setup.poll') | ForEach-Object { @{operation = $_} }
+    }
+    'execute' {
+        $fileArgument = [Array]::IndexOf([object[]]$args, '--file')
+        if ($fileArgument -lt 0) { throw 'Expected a vsctl action file.' }
+        $file = $args[$fileArgument + 1]
+        $actions = @(Get-Content -LiteralPath $file -Raw | ConvertFrom-Json)
+        $details = @()
+        foreach ($action in $actions) {
+            $detail = @{}
+            if ($action.operation -eq 'thebasics.setup.capture') {
+                $global:nativeVisualJob = [Guid]::NewGuid().ToString('N')
+                $global:nativeVisualDirectory = Join-Path $global:nativeVisualProfile "Screenshots/thebasics-setup/$global:nativeVisualJob"
+                $scene = $action.arguments.scenario
+                New-Item -ItemType Directory -Path $global:nativeVisualDirectory | Out-Null
+                [IO.File]::WriteAllBytes((Join-Path $global:nativeVisualDirectory "$scene.png"), [Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAIAAADZSiLoAAAACXBIWXMAAAABAAAAAQBPJcTWAAAAF0lEQVR4nGNgYGD4D8Ug6v9/hv9wgf8Ac6oI+HvFVCcAAAAASUVORK5CYII='))
+                @{
+                    scenario = $scene; previewTime = $action.arguments.previewTime; width = 3; height = 3; scale = 1
+                    sourceTreeHash = $(if ($global:nativeVisualFailure -eq 'source') {'b' * 64} else {'a' * 64})
+                    coverage = 'native-client'; environment = @{sourceIdentityVerified = ($global:nativeVisualFailure -ne 'unverified')}
+                } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $global:nativeVisualDirectory "$scene.json") -Encoding utf8
+                $detail = @{jobId = $global:nativeVisualJob}
+            }
+            if ($action.operation -eq 'thebasics.setup.poll') {
+                $detail = @{status = 'completed'; directory = $global:nativeVisualDirectory}
+            }
+            $details += @{detail = $detail}
+        }
+        $result = @{status = 'completed'; actions = $details}
+    }
+}
+@{ok = $true; result = $result} | ConvertTo-Json -Depth 15
+'@ | Set-Content -LiteralPath $fakeVsctl -Encoding utf8
+$newScenes = @('wizard-appearance-bubbles', 'wizard-appearance-names', 'wizard-map-visibility', 'wizard-characters-sheets', 'wizard-roleplay-dice', 'wizard-server-history', 'wizard-server-stats')
+$nativeArguments = @{ExpectedSourceTreeHash = ('a' * 64); Vsctl = $fakeVsctl; DataPath = $profile; Scenarios = $newScenes}
+$nativeDirectory = Join-Path $root 'native-new-branches'
+& $nativeScript @nativeArguments -OutputDirectory $nativeDirectory
+$native = Get-Content -LiteralPath (Join-Path $nativeDirectory 'captures.json') -Raw | ConvertFrom-Json
+Assert-True (($native.captures.scenario -join ',') -ceq ($newScenes -join ',')) 'The native runner accepts every new branch fixture in the selected order.'
+Assert-True ($native.coverage -eq 'native-client' -and $native.sourceTreeHash -ceq ('a' * 64) -and $native.dataPath -eq $profile -and $native.pipeName -eq 'vintage-story-agentcontrol-profile2') 'New branches retain source, profile, coverage and pipe provenance.'
+foreach ($case in @('protocol', 'source', 'unverified')) {
+    $global:nativeVisualFailure = $case
+    $rejectedDirectory = Join-Path $root "native-reject-$case"
+    Assert-Throws { & $nativeScript @nativeArguments -OutputDirectory $rejectedDirectory } 'protocol|enabled Agent Control session|source identity or native coverage mismatch'
+    Assert-True (@(Get-ChildItem -LiteralPath $rejectedDirectory -Filter '*.png').Count -eq 0) 'Unsupported protocols and mismatched source identity never export native screenshots.'
+}
+foreach ($variable in @('nativeVisualProfile','nativeVisualFailure','nativeVisualJob','nativeVisualDirectory')) { Remove-Variable -Name $variable -Scope Global -ErrorAction SilentlyContinue }
 Remove-Variable visualFailure -Scope Global -ErrorAction SilentlyContinue
 Remove-Variable visualTestProcesses -Scope Global -ErrorAction SilentlyContinue
 Write-Host "$checks visual workflow assertions passed; disposable fixtures: $root"

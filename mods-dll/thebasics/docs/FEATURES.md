@@ -76,6 +76,8 @@ Version 5.5.0 shifts the generated/default config toward showcasing RP-server fe
 
 ## In-Game Admin Config
 
+`/basic setup` opens a wizard with 40 focused pages across eight topics: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. Each page has at most five controls. The wizard and advanced config panel use the same setting registry and validation.
+
 Features:
 
 - Server-authoritative admin config panel opened with `/basic config`, `/thebasics config`, or `/tb config`.
@@ -83,16 +85,29 @@ Features:
 - Shared server config object so live-safe changes update existing systems without replacing stale references.
 - Client config resync after successful saves or disk reloads.
 - New-setting discovery through persisted `ReviewedConfigSettingKeys`.
-- The panel identifies changes that apply immediately and changes that require a server restart.
+- Wizard choices stay in a draft until saved. Review the changed settings and restart requirements before saving.
+- The shared registry now exposes existing character-sheet enablement, editing-command permissions, nearby viewing rules, and the required-fields check.
+
+```mermaid
+flowchart LR
+    Setup["/basic setup"] --> Topics[Choose a topic] --> Draft[Edit draft] --> Review[Review changes] --> Save[Save]
+    Config["/basic config"] --> Advanced[Advanced settings] --> Save
+    Dedicated["Language and sheet-field commands"] --> Editors[Separate editors] --> Save
+    Save --> Live[Apply live changes]
+    Save --> Restart[Restart for flagged changes]
+```
 
 Admin commands:
 
+- `/basic setup`
 - `/basic config`, `/thebasics config`, `/tb config`
 - `/basic reloadconfig`, `/thebasics reloadconfig`, `/tb reloadconfig`
 
-Setting groups that apply immediately include chatter, typing indicators, nametag display/range/style, map player visibility, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, per-mode proximity/chat/audio dictionaries, chat delimiters, player-stat toggles, and debug mode. Changes to the available travel and nickname commands, chat group setup, or language and player-statistics enablement require a server restart.
+Live settings include speech and display options, managed map visibility, teleport timing, notifications, character-sheet viewing rules, notes, chat history, and selected command permissions. Command availability, chat group setup, language enablement, character-sheet enablement and command permissions, character-slot enablement, and player-statistics enablement require a restart.
 
-The admin panel exposes fixed-shape complex settings as validated flattened rows. This covers per-mode distance, obfuscation, font-size, verb, punctuation, RPTTS, chatter dictionaries, chat delimiter start/end values, player-stat toggles, and comma-separated font-size clamps. Variable-length/nested collections use dedicated editors where available: `/thebasics config languages` for `Languages` and `/thebasics config charsheetfields` for `CharacterSheetFields`. Prefer these editors over direct JSON edits because they validate field keys, bindings, options, and persisted character-sheet compatibility.
+Individual player-stat toggles remain available in the advanced panel, but tracking subscriptions are chosen at startup. Restart after changing these toggles to apply the tracking choices consistently.
+
+The advanced panel exposes per-mode chat and audio settings, delimiters, stat toggles, and font-size clamps as validated rows. Variable language definitions and character-sheet fields currently use separate editors: `/thebasics config languages` for `Languages` and `/thebasics config charsheetfields` for `CharacterSheetFields`. These editors validate keys, bindings, options, and compatibility with saved sheets. The setup hierarchy will expand to cover more configuration choices.
 
 ## RP Proximity Chat
 

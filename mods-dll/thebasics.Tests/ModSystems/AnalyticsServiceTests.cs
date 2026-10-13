@@ -1,5 +1,6 @@
 using FluentAssertions;
 using thebasics.Configs;
+using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.Analytics;
 
 namespace thebasics.Tests.ModSystems;
@@ -230,6 +231,25 @@ public class AnalyticsServiceTests : IDisposable
     }
 
     [Fact]
+    public void SetupJourney_EveryConfiguredPageTracksWithoutAcceptingRawChoices()
+    {
+        var sink = new RecordingAnalyticsSink();
+        AnalyticsService.Configure(sink);
+        var runId = Guid.NewGuid().ToString("N");
+
+        foreach (var page in SetupWizardCatalog.Pages)
+        {
+            AnalyticsService.TrackSetupWizardJourney(runId, sink.Events.Count + 1, page.Id, "viewed");
+            AnalyticsService.TrackSetupWizardJourney(runId, sink.Events.Count + 1, page.Id, "choice", "private configured value");
+        }
+
+        sink.Events.Select(analyticsEvent => analyticsEvent.Properties["wizard_step_id"])
+            .Should().Equal(SetupWizardCatalog.Pages.Select(page => page.Id));
+        sink.Events.Should().OnlyContain(analyticsEvent => analyticsEvent.Name == "setup wizard journey"
+            && !analyticsEvent.Properties.ContainsKey("wizard_choice"));
+    }
+
+    [Fact]
     public void SetupJourney_WithServerConsent_EmitsOrderedRunWithoutActorOrRawContent()
     {
         var sink = new RecordingAnalyticsSink();
@@ -284,6 +304,8 @@ public class AnalyticsServiceTests : IDisposable
     [InlineData("dddddddddddddddddddddddddddddddd", 0, "hub", "viewed", null, null)]
     [InlineData("dddddddddddddddddddddddddddddddd", 10_001, "hub", "viewed", null, null)]
     [InlineData("dddddddddddddddddddddddddddddddd", 1, "private page", "viewed", null, null)]
+    [InlineData("dddddddddddddddddddddddddddddddd", 1, "appearance.custom", "viewed", null, null)]
+    [InlineData("dddddddddddddddddddddddddddddddd", 1, "server.stats private text", "viewed", null, null)]
     [InlineData("dddddddddddddddddddddddddddddddd", 1, "hub", "chat text", null, null)]
     [InlineData("dddddddddddddddddddddddddddddddd", 1, "hub", "choice", "custom privilege", null)]
     [InlineData("dddddddddddddddddddddddddddddddd", 1, "hub", "save_failed", null, "exception message")]

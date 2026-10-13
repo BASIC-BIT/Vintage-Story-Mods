@@ -1,9 +1,59 @@
 # Visual setup wizard QA
 
 Worktree: `.codex-worktrees/visual-config-wizard`, branch `codex/visual-config-wizard`.
-Scope: chat, teleportation, notifications, invitation, restart guidance, native Pip preview and capture, integrated config search and proximity tab placement.
+Scope: hierarchical configuration, invitation, restart guidance, native Pip preview and capture, integrated config search and proximity tab placement.
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
+
+## Hierarchy expansion, October 13
+
+The goal is to make every BASICs setting accessible through a hierarchy with useful explanations and previews. This revision expands the existing setup rather than treating its original three topics as the final scope.
+
+- The hub now has eight cards in two rows: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. Pip moves into the header. The shared catalog defines each branch, its entry page, and 40 focused pages. Navigation keeps only Topics, the active branch, and Review across the top. Short new pages size their dialog to the controls and preview.
+- New pages cover language access and signing; overhead speech, typing, names and colors; player maps; character sheets, access and slots; dice, scene markers, spectators and nickname choices; history, retention, staff and personal notes, and player stats. The original 19 page IDs remain valid. Six existing character-sheet fields are now registered for validated editing; no configuration fields or protobuf numbers were added.
+- Contextual previews illustrate the selected feature. Display pages put a speech box, typing indicator or nametag above native Pip. Other new pages show a map, sheet, dice, notes, history or statistics panel. New language pages use the mock chat window. These illustrative panels are not the actual feature GUIs and do not establish gameplay behavior.
+- Analytics accepts the catalog's bounded page IDs as wizard steps. The relay's finite step list now matches those pages, with contract revision 10 and the producer's required revision set to 10. Custom text, privileges and colors are still excluded from wizard event properties. Deploy relay revision 10 before releasing this producer: the revision-9 relay rejects new page IDs. The relay change is local; production rollout and PostHog ingestion are not verified here.
+
+```mermaid
+flowchart TD
+    Command["/basic setup"] --> Topics[Topics]
+    Invitation[Administrator invitation] --> Topics
+    Invitation -->|Not now| Reminder[Chat reminder with /basic setup]
+    Reminder --> Game[Return to game]
+    Topics -->|Choose a category| Branch[Focused settings pages]
+    Branch -->|Next, Back or page selector| Branch
+    Branch -->|All topics| Topics
+    Branch -->|Review tab| Review[Review changes]
+    Topics -->|Review changes| Review
+    Review -->|Save and server acknowledgement| Saved[Saved changes]
+    Saved -->|Restart needed| Restart[Host restart instructions]
+    Saved -->|Done| Game
+    Restart -->|Later or reconnect after restart| Game
+    Topics -->|All settings| Editor[Full config editor]
+    Editor -->|Close| Game
+    Game --> Command
+```
+
+### Verification and retained evidence
+
+- Full implementation suite: 1,359 passed, zero failed or skipped. After shortening the new dialogs, all 102 wizard/guide checks passed. Relay compatibility checks passed 29 Node cases and 23 targeted .NET cases, including catalog-derived finite acceptance, arbitrary-step rejection and revision alignment. The mock visual workflow passed 48 assertions, including new scene routing and source/protocol rejection. Agent tooling checks passed.
+- All 23 standalone scenes rendered at scales 1 and 1.25. Native review found a collision between the `Blocks broken` label and its count in the stats sample; widening the shared preview value column fixed it without clipping the sheet or history values. The reviewed hub, display, map, character, dice, history and statistics samples fit their bounds. Final stamped captures and handoff receipts are recorded below.
+- Final source identity: `e0cae415d598f147ac994240818ce170686d5a9ea8a2ada3d0d13ed8e2313582`. Package SHA-256: `96d96f839eb32892787684bd964500a4a924ae3e4be3a3b10b34bdf159c0b981`. The canonical build completed with zero errors and 175 warnings. Server package readback and both profile zips match. QA restarted with all BASICs systems loaded and reached RunGame at 09:04:08 UTC on October 13. The relay Worker itself was not deployed by QA staging.
+- `native-relay10/captures.json` records all 23 final native scenes, Profile2, pipe `vintage-story-agentcontrol-profile2`, and the final source identity. Every manifest has `native-client` coverage and verified source identity at 1908x1260, scale 1.125. Final hub and stats images were re-inspected. Profile2's client log contains no errors or exceptions.
+- Evidence lives in `.tmp/wizard-branches-20261013/`: TRX/logs, standalone renders, native manifests, build receipts, stage backups/journal/recovery mapping, and client launch receipts. Superseded evidence stays in place; only the final stamped package is used for handoff.
+- Handoff: `controller-shutdown-relay10.json` confirms the automation session was disabled, leaving Profile2 connected for `/basic setup`. `profile3-final-launch.json` records Profile3's visible launch to its menu; it was not connected automatically. The original GUI scale is unchanged. The temporary helper stays installed for ongoing QA; its restoration receipt is `.tmp/qa-main-20261012-1791837188457/profile/profile-receipt.json`. No screenshot baseline was approved and no merge or release was performed.
+- Existing Flywheel duplicate warnings and the bare `/home/container` startup error predate this revision. They remain outside this change. The final server startup contains no exceptions.
+- New human cards 10 through 14 below remain pending. Native images establish captured appearance, not owner acceptance, real-time animation feel, saves, permission enforcement or actual feature behavior.
+
+### Remaining hierarchy work
+
+The eight branches are the first expansion, not full configuration coverage. Next, bring variable-length language and character-field editors into their branches, add chat formatting/audio submenus and integration-aware settings, and add presets after their effects are tested. Diagnostics should be reachable deliberately rather than mixed into ordinary Server tools. Full coverage must preserve existing saved values and review only the settings an administrator changes.
+
+The source audit also identified existing behavior to resolve before adding its controls:
+
+- Individual player-stat switches are marked live in the registry, but several runtime subscriptions are selected only at startup. Enabling a counter that was off at boot may not subscribe it; some handlers ignore later disabling. This wizard exposes overall tracking with restart guidance and the clearing privilege, leaving individual counters in the full editor until their lifecycle is corrected.
+- The optional custom nametag renderer does not reliably restore the vanilla texture when switched off, and delayed headshot callbacks can replace textures without rechecking it. Names, targeting, range and line-of-sight settings still apply through the vanilla path. The renderer switch is not included in this revision.
+- Semantic language learning needs its provider/atlas configuration, and RP TTS depends on another mod. Future menus need to represent those dependencies. Repair has no existing configurable module switch; do not invent one for menu completeness.
 
 ## Topic cards and footer, October 12
 
@@ -179,3 +229,32 @@ flowchart LR
    - Expect: the unrelated wizard save preserves the disabled isolation setting. Off uses native history parsing on the next chat update, so the intentional malformed probe may style later text. On restores separate formatting on both clients after their next update without a restart. Isolation remains enabled after restoring chatter sounds, and the saved checkbox matches each choice.
    - Watch for: an unrelated wizard save resetting the toggle; explicit false reverting to true; different behavior between clients; an unnecessary restart prompt; missing history; or client exceptions.
    - Reset: leave isolation enabled and chatter sounds at its original value. Both new cards remain pending until the owner reports observations and approves QA completion.
+
+## Expanded hierarchy: draft-only checks
+
+10. **Eight categories and branch navigation** (P1)
+    - Do: open `/basic setup`, click each card's description area, and visit its first and last pages with Next, Back and the page selector. Return with All topics, then select the active branch tab. Change one setting in three different categories and open Review.
+    - Expect: every card opens its own branch, the top tab shows that branch's English title, and the branch tab returns to its last visited page. Review includes all three changes. Two rows of cards, the unsaved count and footer fit at scales 1 and 1.25. Short feature pages have a shorter dialog. Close and discard afterward.
+    - Watch for: dead description areas, wrong branch titles, lost drafts, skipped pages, clipped five-control pages or footer overlap.
+
+11. **Overhead speech, typing and nametags** (P1)
+    - Do: compare all overhead bubble choices, then toggle typing and switch Icon, Text and Both. Edit its text, range and recent-typing window. On Names above players, toggle nickname and account name separately. Try nametag colors. Do not save.
+    - Expect: the relevant speech box, typing label or nameplate updates above clothed Pip. Off and zero range have the documented effect in the example. Switching pages preserves the draft. Normal dragging and flicking still turn Pip.
+    - Watch for: Pascal-case mode labels, missing or clipped Pip, stale labels/colors or diagram state interpreting `0` as On.
+
+12. **Maps and character settings** (P1)
+    - Do: toggle BASICs map management, hidden players and distance; inspect nearby and distant markers. Compare character sheets Off/On, C-menu behavior and multiple-character slots. Leave sheet enablement changed from its original value. On Viewing and editing sheets, change Sheet editing command permission to a temporary distinct value, then open Review without saving. Discard afterward.
+    - Expect: unmanaged maps defer to world-map settings; managed maps depict the selected range or hidden players. The character panel reflects sheets and slots. Review identifies sheet enablement and command-permission changes as requiring restart; nearby viewing controls are live.
+    - Watch for: same-group visibility being presented as safe, a false claim of map filtering when management is Off, wrong restart requirements or a sample that changes the live player's character.
+
+13. **Roleplay tools** (P1)
+    - Do: compare dice and sound choices, scene markers, spectator protections, player nickname changes and nickname limits. Use the branch selector to revisit the same pages. Discard the draft.
+    - Expect: the feature-specific samples update and the controls retain edits. Descriptions distinguish public/private roll delivery, existing scene-marker text, invisible spectators and saved nicknames from command registration.
+    - Watch for: a preview claiming settings erase existing markers or names, public rolls shown as server-wide, or disabled nickname commands still shown as available.
+
+14. **History, notes and stats** (P1)
+    - Do: toggle chat history and capture of other chat, inspect retention limits, staff notes, personal notes and their length limits. Compare activity tracking Off/On and inspect Review without saving.
+    - Expect: each page shows only its relevant example, with readable label/value columns. History capture changes the Other chat sample. Staff and personal notes stay clearly distinct. Overall stat tracking requires restart; individual counters are not presented here.
+    - Watch for: merged labels/counts, permission examples contradicting controls, notes being described as public, or a draft preview actually storing messages or notes.
+
+All five cards are pending owner observations. Real saves, permission checks and gameplay delivery should be batched by configuration state using the existing human-QA workflow after these draft checks.

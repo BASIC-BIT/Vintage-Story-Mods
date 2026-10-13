@@ -1032,13 +1032,11 @@ test("scene actions cannot be attributed to another feature", () => {
   }
 });
 
+const wizardCatalogSource = readFileSync(new URL("ModSystems/AdminConfig/SetupWizardCatalog.cs", sourceRoot), "utf8");
+const wizardPageIds = [...wizardCatalogSource.matchAll(/\bPage\("([^"]+)"/g)].map((match) => match[1]);
 const wizardSteps = [
   "invitation", "start", "hub", "review", "finish", "advanced",
-  "chat.basics", "chat.language", "chat.ranges", "chat.obfuscation", "chat.tabs",
-  "teleport.tools", "teleport.utilities", "teleport.requests", "teleport.requesttiming",
-  "teleport.homes", "teleport.spawn", "teleport.top", "teleport.back", "teleport.stuck",
-  "teleport.stuckpolicy", "teleport.warmup",
-  "notifications.savestart", "notifications.savefinish", "notifications.sleep",
+  ...wizardPageIds,
 ];
 const wizardActions = [
   "offered", "dismissed", "started", "opened", "viewed", "choice", "back", "skip",
@@ -1090,6 +1088,7 @@ test("setup journey retains run order and server identity under existing consent
 });
 
 test("setup journey accepts only registered finite step, action, choice and result labels", () => {
+  assert.ok(wizardPageIds.length >= 40, "catalog page fixtures must cover the expanded setup journey");
   for (const [key, values] of [
     ["wizard_step_id", wizardSteps], ["wizard_action", wizardActions],
     ["wizard_choice", wizardChoices], ["wizard_result", wizardResults],
@@ -1109,6 +1108,7 @@ test("setup journey rejects missing order fields and arbitrary content", () => {
   for (const addition of [
     { wizard_run_id: "player-name" }, { wizard_sequence: 0 }, { wizard_sequence: 10_001 },
     { wizard_sequence: 1.5 }, { wizard_sequence: "1" }, { wizard_step_id: "player-name" },
+    { wizard_step_id: "appearance.custom" }, { wizard_step_id: "server.stats private text" },
     { wizard_action: "message-text" }, { wizard_choice: "custom privilege" },
     { wizard_result: "notification wording" }, { pending_restart: "true" },
     { player_uid: "raw-player-uid" }, { config_value: "private config" },
@@ -1125,10 +1125,23 @@ test("setup journey rejects missing order fields and arbitrary content", () => {
   assert.equal(validatePayload(payloadForEvent("feature used", { feature_name: "dice", ...wizardProperties() })).events.length, 0);
 });
 
+test("expanded setup page contract requires relay revision 10", () => {
+  assert.ok(CONTRACT_REVISION >= 10);
+  const source = readFileSync(new URL("ModSystems/Analytics/RelayAnalyticsSink.cs", sourceRoot), "utf8");
+  const requiredRevision = source.match(/RequiredRelayContractRevision\s*=\s*(\d+)/);
+  assert.ok(requiredRevision);
+  assert.ok(Number(requiredRevision[1]) >= 10, "expanded producers must require the expanded relay contract");
+});
+
 test("relay accepts every setup label registered by the C# producer", () => {
   const source = readFileSync(new URL("ModSystems/Analytics/AnalyticsService.cs", sourceRoot), "utf8");
+  const registeredSteps = source.match(/SetupWizardSteps = SetupWizardCatalog\.Pages\s*\.Select\(page => page\.Id\)\s*\.Concat\(\[([^\]]+)\]\)\s*\.ToHashSet\(StringComparer\.Ordinal\)/);
+  assert.ok(registeredSteps, "missing catalog-derived producer step registry");
+  for (const value of [...wizardPageIds, ...[...registeredSteps[1].matchAll(/"([^"]+)"/g)].map((match) => match[1])]) {
+    assertAccepted(validatePayload(payloadForEvent("setup wizard journey", wizardProperties({ wizard_step_id: value }))), `wizard_step_id=${value}`);
+  }
   for (const [registration, key] of [
-    ["SetupWizardSteps", "wizard_step_id"], ["SetupWizardActions", "wizard_action"],
+    ["SetupWizardActions", "wizard_action"],
     ["SetupWizardChoices", "wizard_choice"], ["SetupWizardResults", "wizard_result"],
   ]) {
     const registered = source.match(new RegExp(`${registration} = new\\(StringComparer\\.Ordinal\\)\\s*\\{([\\s\\S]*?)\\};`));
